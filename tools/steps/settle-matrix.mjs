@@ -79,6 +79,21 @@ const PILE = { pileScale: 1.05 };
 // entirely. It also changes shipped trajectories on its own, so `sleepoff`
 // is here as ITS OWN baseline — read deaden+sleepoff against sleepoff, never
 // against shipped, and do not read the verdict gates on either row.
+// AND SINCE THE 2026-08-11 FLIP THIS OVERRIDE IS A NO-OP. `BODYFLAGS` in
+// js/main.js now ships `allowSleep: false`, so `setBodyFlags({allowSleep:
+// false})` over the inert state changes nothing — every row below carrying
+// SLEEPOFF is byte-identical to the same row without it, and so is `shipped`.
+// The same is true of DISP(0.02): `SETTLEGATE` ships `displacement` / 0.02.
+//
+// Which means the pairs that read as an A/B are now the SAME variant twice:
+//   deaden+sleepoff        ==  deaden
+//   deaden+sleepoff+gate4  ==  deaden+gate4        <- the C30 residual headline
+//   disp02+sleepoff        ==  shipped
+// Kept, not deleted, because the names are what the record quotes — but do not
+// read a "sleep off vs sleep on" comparison off them. Sleep-on is no longer
+// reachable through this instrument at all; it would need `allowSleep: true`.
+// (Verified 2026-08-17 against the run header's own `inert:` line, which is
+// read off the app rather than restated here — that is what made it visible.)
 const SLEEPOFF = { allowSleep: false };
 
 // THE DISPLACEMENT TERMINATOR (C30e). The freeze predicate itself, swapped for
@@ -187,8 +202,28 @@ const PILE_ZOOMS = ['medium', 'close'];
 
 // The prior session's paired measurement of the SAME seed family. Not a
 // tuning target — a reproduction test for this rig.
-const CANARY_DUR = { '1d20': 1.37, soul: 2.26, '4d6': 2.04, '8d6': 2.40, '20d6': 6.25 };
-const CANARY_SHAKE = { '1d20': 0.106, soul: 0.141, '4d6': 0.152, '8d6': 0.191, '20d6': 0.212 };
+//
+// RE-ANCHORED TO THE POST-FLIP DEFAULTS, 2026-08-17. The values here were the
+// PRE-flip baseline (1.37 / 2.26 / 2.04 / 2.40 / 6.25 and shake 0.106 / 0.141 /
+// 0.152 / 0.191 / 0.212), and the 2026-08-11 flip — displacement terminator,
+// allowSleep false, the tempo curve, pileScale 1.05 — moved four of the five
+// duration cells by 9-38%. So the canary has MISSED on every run since the
+// flip, and printed "THE CANARY MISSED. The verdict above is not evidence."
+// under a verdict table that was in fact fine. A gate that is always red is a
+// gate everybody learns to scroll past, which is the same failure as one that
+// is always green.
+//
+// Measured, and REPRODUCED ACROSS TWO INDEPENDENT STAGE BOOTS (identical to
+// every digit printed here, plus a third agreement on the 4-seed determinism
+// quartet [1.6, 1.467, 1.167, 1.4]):
+//
+//   node tools/drive.mjs tools/steps/settle-matrix.mjs 16 10 shipped
+//
+// Sixteen shake seeds. Re-anchor from a measured run, never by applying the
+// percentage deltas a record quotes: that is how two of the 2026-08-14
+// corrections went in wrong.
+const CANARY_DUR = { '1d20': 1.39, soul: 1.47, '4d6': 1.26, '8d6': 2.19, '20d6': 4.15 };
+const CANARY_SHAKE = { '1d20': 0.085, soul: 0.117, '4d6': 0.106, '8d6': 0.135, '20d6': 0.175 };
 
 const mean = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
 
@@ -535,9 +570,12 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     + `  c caps   total capped throws <= shipped's, AND 20d6 caps <= 1\n`
     + `  d pile   every cell within +/-2pp of shipped, and 6d6@close flat-throws >= shipped's\n`
     + `  e clock  per-pool mean wall <= 1.5x shipped\n`
-    + `  f rest   same terminator as shipped: creep no pool worse than +15%;\n`
-    + `           a row that MOVES the settle frame is judged FORWARD instead\n`
-    + `           (worst dispMax <= shipped's and loose <= shipped's), because\n`
+    + `  f rest   same terminator AND same settle frame as shipped: creep no pool\n`
+    + `           worse than +15%; a row that MOVES the settle frame — by swapping\n`
+    + `           the terminator OR by stopping dice >=5% sooner — is judged FORWARD\n`
+    + `           against the terminator's own promise (dispMax < eps, loose 0,\n`
+    + `           caps <= shipped's) rather than compared, because both sides\n`
+    + `           saturate at eps and the comparison is float noise; because\n`
     + `           creep's backward window is unreadable across anchor moves —\n`
     + `           in both directions (audit 2026-08-11: the same confounded\n`
     + `           meter that showed creep +114% also flattered shake)\n`);
@@ -561,14 +599,59 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
       (got.get(`${n}|${p}`).creep - b(p).creep) / b(p).creep));
     // A row that changes the terminator moves every settle frame, and with it
     // the anchor of creep's backward window — so it is judged forward.
-    const movesFrame = !!(v[7] && v[7].mode && v[7].mode !== INERT.settleGate.mode);
+    //
+    // AND A TERMINATOR SWAP IS NOT THE ONLY WAY TO MOVE THAT ANCHOR (2026-08-17).
+    // This predicate asked "did you change SETTLEGATE", but creep is anchored to
+    // each die's own settle FRAME, and a pure TUNING row moves that frame too:
+    // grip 0.6 stops a die sooner in its own arc, so the 0.6 s window slides
+    // back into the fast slide and the die covers more ground inside it. The
+    // deaden/grip rows measured on 2026-08-17 read creep +17% to +171% while
+    // shake fell 30-43%, hops fell 14-32% and duration fell on every pool —
+    // and restMotion's own comment says exactly this case is ambiguous ("a die
+    // rolling smoothly to a halt covers more ground in its last 0.6 s than one
+    // twitching in place"). A gate cannot be evidence when its meter's zero
+    // point is a function of the variant.
+    //
+    // So the anchor test is now EITHER a terminator swap or a material move in
+    // duration, at the same 5% gate b already calls material — not a new free
+    // parameter — and the printed cell always names which meter decided.
+    // Widening it flips no ship decision: the two rows it affects
+    // (deaden+gate4, feltgrip+gate4) are refused on gate d regardless.
+    const worstShorter = Math.min(...SHAKE_POOLS.map(([p]) =>
+      (got.get(`${n}|${p}`).dur - b(p).dur) / b(p).dur));
+    const anchorMoved = worstShorter <= -0.05;
+    const movesFrame = !!(v[7] && v[7].mode && v[7].mode !== INERT.settleGate.mode)
+      || anchorMoved;
     const worstDispMax = Math.max(...SHAKE_POOLS.map(([p]) => got.get(`${n}|${p}`).dispMax));
     const baseDispMax = Math.max(...SHAKE_POOLS.map(([p]) => b(p).dispMax));
     const worstLoose = Math.max(...SHAKE_POOLS.map(([p]) => got.get(`${n}|${p}`).loose));
     const baseLoose = Math.max(...SHAKE_POOLS.map(([p]) => b(p).loose));
+    // THE FORWARD BAR IS THE THEOREM, NOT A COMPARISON (fixed 2026-08-17).
+    // It was `worstDispMax <= baseDispMax`, and BOTH SIDES SATURATE: under a
+    // displacement terminator every clean freeze is bounded by eps, so a row
+    // whose worst die sits at 0.019987 "loses" to a shipped worst of 0.019953
+    // by 3.4e-5 of a die-width — 0.17% of the bar, decided by float noise, and
+    // printed at four decimals as 0.0200 vs 0.0200, i.e. a fail nobody can read.
+    // Measured 2026-08-17: both deaden+gate4 and feltgrip+gate4 failed gate f
+    // exactly that way. SHIPPED.md already flagged this saturation from the
+    // other end (a guarantee rounded to four places reads as violating itself).
+    //
+    // So the forward gate asserts what the terminator actually promises:
+    //   dispMax < eps          the bound holds for every clean freeze
+    //   loose == 0             the box test is really wired into the freeze path
+    //   caps <= shipped's      the ONE path that can still freeze a moving die
+    // Gate c already judges caps, and that overlap is deliberate: it is the
+    // only remaining way to buy a still picture by stopping a die mid-slide,
+    // which is the hazard this gate exists for.
+    const eps = INERT.settleGate.eps;
+    const capsOk = caps <= baseCaps;
     const restGate = movesFrame
-      ? [worstDispMax <= baseDispMax && worstLoose <= baseLoose,
-        `f disp ${worstDispMax.toFixed(4)}/${baseDispMax.toFixed(4)} loose ${worstLoose}/${baseLoose}`]
+      ? [worstDispMax < eps && worstLoose === 0 && capsOk,
+        `f disp ${worstDispMax.toFixed(6)}<${eps} loose ${worstLoose} caps ${caps}/${baseCaps}`
+        // Say out loud that creep was set aside and what it would have read,
+        // so a forward PASS can never be mistaken for "creep was fine".
+        + (anchorMoved ? ` [fwd: anchor ${(worstShorter * 100).toFixed(0)}%,`
+          + ` creep ${worstCreep >= 0 ? '+' : ''}${(worstCreep * 100).toFixed(0)}% unread]` : '')]
       : [worstCreep <= 0.15, `f creep ${worstCreep >= 0 ? '+' : ''}${(worstCreep * 100).toFixed(0)}%`];
     const g = [
       [shakeCut >= 0.20, `a shake ${(shakeCut * 100).toFixed(0)}%`],

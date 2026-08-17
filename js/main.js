@@ -13489,6 +13489,12 @@ window.__diceDebug = {
   // The width `eps` is a fraction OF. Tools judging the terminator need it and
   // DIE_DEFS is not otherwise reachable from outside.
   dieWidth(type) { return DIE_DEFS[type] ? dieWidth(type) : null; },
+  // The PILE bar, for the same reason — a tool asking "is this die resting on
+  // another die" needs the hull circumradius, and `1.2` is the d6's answer
+  // borrowed by everything else (a d20 rests legitimately at 1.190). Exposed
+  // 2026-08-17 for tools/steps/grip-look.mjs so a frame's pile count is on the
+  // theorem rather than on a constant that happens to fit one type.
+  restCeiling(type) { return DIE_DEFS[type] ? restCeiling(type) : null; },
   tableDiceInfo() {
     return tableDice.map((d) => ({
       type: d.type,
