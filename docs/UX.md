@@ -5966,3 +5966,92 @@ nothing may be built on top of it that assumes it was read.
 - **Telling anyone else.** There is nobody else — `players.length <= 1` is
   part of the predicate.
 
+
+### §7.52 — The seat that outlives its tab (2026-08-17)
+
+*docs/IDENTITY.md §5's rung 1, shipped. There is **no new pixel in this
+section** and that is its whole point: the surface it fixes is a Reveal button
+that used to disappear, and the fix is that it does not.*
+
+#### ① The felt symptom, in the words a player would use
+
+You hold a roll — the stake is on the table, face down, and everyone can see
+you are holding something. Your laptop sleeps, or you close the tab by
+accident and reopen it. You come back to your own table, under your own name,
+looking at your own face-down die.
+
+And there is no way to turn it over. Not "the button is greyed" — the button
+is **gone**, because the client asks `revealAuthority === my playerId` and the
+answer is no. Meanwhile anyone at the table can sweep the die away unread
+(§7.7's housekeeping rule, widened by U19 once the roller has left). So the
+stake could be *thrown out* by anybody and *read* by nobody. A player has no
+model in which that is anything but a bug: they did not leave, they blinked.
+
+The second symptom is quieter and worse for trust: your **secret** rolls were
+gone from your own log when you came back. Not redacted — absent. The log is
+server-owned online, and it was being projected for a stranger who happened to
+have your name.
+
+#### ② What was actually wrong: authority was hung on the wrong noun
+
+Three things wear the word "who" here, and §1 of IDENTITY.md separates them.
+The **name** addresses you and authorizes nothing. The **library** is
+characters, not persons. The **seat** (`playerId`) authorizes everything — "the
+id IS the credential" — and it lived in sessionStorage, per TAB, on purpose
+(a second tab of a shared screen is genuinely a second player).
+
+Goal 11 says a held roll is "revealable by whoever chose it" — a PERSON. The
+implementation hung that on an id whose life was shorter than the roll's. Both
+symptoms are that one sentence.
+
+#### ③ The fix has no UI, and it must not grow one
+
+One key: `dice.who.v1`, minted once per browser, opaque, in localStorage. It
+rides the `/api/join` body and nothing else. A join carrying it resumes a seat
+**nobody is sitting in**, handing back the same `playerId` — so the Reveal
+button is there for the same reason it was there before you closed the tab, and
+the secret entries are in your log because you are their roller again. No new
+check, no new field on any payload, no signature changed.
+
+**The five must-nots are UX constraints, not just plumbing ones:**
+
+- **Never displayed.** No "your identity: 3f9c…" anywhere. A string a player
+  can see is a string they will try to write down, share, or reset, and it
+  authorizes real things. There is no surface for it and there must not be one.
+- **Never in a broadcast, snapshot or projection.** Redaction in this app is
+  ABSENT data, never hidden data; a credential inside a roster payload is a
+  leak with a schema.
+- **Never an entitlement hook.** ROADMAP B1's server half is dead (IDENTITY
+  §4) and durable identity does not revive it. Nothing may be refused because
+  of who asked.
+- **Never resumes a live seat.** Two tabs on one machine stay two players.
+- **Never outlives the room** (goal 7: rooms die whole).
+
+#### ④ What a player is told when it does NOT work, and why that is nothing
+
+There are three ways this quietly does not fire, and the answer in all three
+is the same: **a fresh seat, silently, exactly as before this existed.**
+
+| Case | What happens | Why no notice |
+| --- | --- | --- |
+| Somebody is sitting there (your own second tab, or a stranger with the key) | the joiner gets their own new seat | nothing failed — this is the shared-screen design working |
+| You chose **Leave & switch seat** | the seat was deleted; nothing to resume | leaving on purpose means leaving. A notice here would read as the app arguing |
+| The seat was reaped (~74 s of liveness, plus grace) before you got back | a fresh seat, and a held roll that only sweeping can now clear | see below |
+
+The third row is the honest gap, and it is deliberately **not** dressed. A
+message like "your old seat expired" tells a player about a mechanism they
+cannot act on, in a moment when they are trying to play. It also cannot be
+worded truthfully without naming the seat/name/library split (§2), which is
+exactly the account model PROFILES §6 refuses to build. So: silence, and a
+table that works. IDENTITY §7 asks Joe whether that third row should stop
+existing (rung 2); until it is answered, nothing on screen pretends it does
+not.
+
+#### ⑤ The one thing this changes about reading §7.7 and §7.5
+
+Nothing in their text, but their *frequency* changes. U19's "anyone may clear a
+departed roller's uncollected roll" was written for a felt permanently occupied
+by an orphaned stake. That case is now rare rather than routine — it needs a
+browser that is gone for good, not a tab that closed. The rule stays exactly as
+written (it never discloses a value, so it is still the fail-closed direction),
+but it stops being the thing that happens every time somebody's laptop sleeps.

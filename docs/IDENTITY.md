@@ -113,6 +113,27 @@ why it must never appear in any snapshot, broadcast, or projection
 (redaction is absent data; a credential in a roster payload is a leak with a
 schema).
 
+**Rung 1 — SHIPPED 2026-08-17** (UX §7.52, ROADMAP B4). What landed matched
+this section, with **one condition added that this design did not have**, and it
+is worth recording because it is a race the design's single test would have
+missed: `clients.size === 0` alone cannot tell a LAPSED seat from an ARRIVING
+one. A seat between its join and its EventSource attaching has zero clients too
+— so a browser session-restoring five tabs of one room would have landed two of
+them on one seat, with two tabs then driving one playerId. The server tracks
+`everStreamed` (set in `handleEvents`, never cleared) and requires it: *was
+anybody ever sitting here* and *is anybody sitting here now* are two questions.
+
+Everything else held as written: the same `playerId` comes back,
+`projectEntryFor` is untouched, no signature changed, and refusal is a fresh
+seat rather than an error. Two additions beyond the design's text, both small:
+`who` is re-bound on the seatId resume too (a browser that minted its key after
+taking the seat would otherwise hold a seat no key points at), and the resume
+log line carries `by=seat|who` — one path, but which door opened is not
+inferable from anything else in the log. Proved in `tests/identity.test.mjs`
+(11 checks; three were written red and are quoted in ROADMAP B4).
+
+*The design as written, kept below for the record:*
+
 **Rung 1 — the first commit (fixes §3 items 1–3 for the common case).**
 `handleJoin`, after the existing seatId RESUME branch: a join carrying `who`
 that matches a seat with **zero live clients** resumes that seat — same
