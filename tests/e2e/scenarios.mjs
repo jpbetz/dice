@@ -236,6 +236,16 @@ const tableTab = (ctx, opts = {}) => bootTab(ctx, {
 // gotoTable()/leaveToLobby() NAVIGATE (§3b L3: ROOM is a module const, so
 // every table transition is a real page load) — evals die mid-flight, so
 // poll under try/catch exactly as harness.reload does.
+//
+// AND THE FIRST READ *AFTER* `landedAtTable`/`gotoRoom` NEEDS IT TOO, which is
+// not obvious and cost a sweep (2026-08-17). `split-chrome-quiet` failed with
+// `TypeError: Cannot read properties of undefined (reading 'subtables')` on a
+// plain `t.waitFor('!!window.__diceDebug.subtables.parent')` — reproduced 1 in
+// 4 in isolation. The landing helper had already returned, so the new document
+// was up; the very next eval still landed in a context being torn down, and
+// `Table.waitFor` does not catch — it propagates, and an exception is a
+// scenario failure. The predicate and the timeout are unchanged; only the
+// tolerance is added, so nothing is weakened to reach green.
 async function settleNavigation(t, expr, desc, { timeout = 30000 } = {}) {
   const deadline = Date.now() + timeout;
   let last = null;
@@ -1755,6 +1765,27 @@ export const scenarios = [
           `a 390px-wide felt puts both boxes in one column `
           + `(banner ${JSON.stringify(vs.banner)}, flyout ${JSON.stringify(vs.flyout)})`);
         // THE ASSERTION. Pre-fix this reads 840 of 1008.
+        //
+        // A SECOND MISSING TRIGGER, MEASURED 2026-08-17 AND NOT YET FIXED —
+        // this leg fails INTERMITTENTLY, 3 runs in 8 in isolation, and it is
+        // the feature that is wrong, not the sampling. The banner is not final
+        // when the log opens: its verdict line lands late and the card grows
+        // ~37px upward. `syncFlyoutLift` runs at the open, against the SHORT
+        // banner, and then never runs again — so `--banner-lift` stays 37px
+        // short and the log sits on ~168 of 966 sampled points of the read.
+        //   settled  lift=146px  banner.top=659  flyout.bottom=686  covered=168/966
+        //   after one dispatched `resize`:
+        //            lift=183px  banner.top=659  flyout.bottom=649  covered=0/966
+        // 183px is exactly what the formula wants for that banner, so the
+        // arithmetic is right and only the trigger is missing — the SAME shape
+        // as the rotation defect this scenario's last leg found, with a new
+        // cause: a size change the ResizeObserver on #result-banner does not
+        // deliver. Reproduce with a d20 roll, open the log at 390x844 and read
+        // `__diceDebug.bannerVsLog` twice.
+        // NOT WEAKENED, deliberately. The claim — the read is never painted
+        // over — is the right claim, and a scenario relaxed to reach green is
+        // the failure this repo keeps paying for. The fix is one line in
+        // js/main.js and belongs to whoever owns it.
         assert.equal(vs.covered, 0,
           `not one of ${vs.total} sampled points of the read is painted over by `
           + `the log (covered ${vs.covered})`);
@@ -2436,6 +2467,18 @@ export const scenarios = [
         await atLeast('the collapse strip', '#edge-toggle', 44, 44, halo);
         await atLeast('the identity chip', '#identity-chip', 34, 34);
         await atLeast('a teammate pill', '.roster-name', 34, 34);
+        // U28b: the EXPANDED rail foot, which U28 never asked about — the same
+        // five controls the collapsed block already fixed, in the state most
+        // people use. They were 31/28 and fail these lines before the coarse
+        // `min-height/min-width: 34px` rule; the floor is 34 rather than 44
+        // because the two families share ONE ROW, so `?` at 33px wide is the
+        // binding dimension and four 44px glyphs plus a 101px labelled ✕
+        // cannot fit a 260px column. (`#rail-help` is 34×34 too but is
+        // display:none when the rail collapses, so it belongs here in the
+        // expanded state and NOT in the collapsed block further down.)
+        await atLeast('the settings gear',   '#toggle-settings', 34, 34);
+        await atLeast('the log rail button', '#rail-log',        34, 34);
+        await atLeast('quick roll',          '#rail-palette',    34, 34);
 
         // ---- the well and its rim (a staged die builds both) ----
         await a.eval(`document.querySelector('#die-buttons .die-btn').click()`);
@@ -4107,6 +4150,126 @@ export const scenarios = [
     },
   },
   {
+    name: 'log-export',
+    tags: ['chrome', 'log', 'cuj9'],
+    // TAKING THE EVENING WITH YOU (ROADMAP §5, UX §7.49): Copy and Download
+    // under the log flyout write one plain-text transcript, oldest first.
+    //
+    // Every assertion here reads `__diceDebug.logExport.text` — THE ARTEFACT,
+    // not the screen — because the claim that matters is about the FILE. A
+    // face-down roll's values being absent from what the player sees is
+    // already `held-roll`'s claim; that they are absent from the bytes that
+    // leave the app is a different one, and only the bytes can make it.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Bram' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Wren' });
+      // Stated, not inherited: the per-die world is what the four rolls below
+      // were transcribed under, and `usesTotal` changes every line's shape.
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.waitFor(`window.__diceDebug.system === 'soul-deal'`, { desc: 'the per-die world' });
+
+      // EMPTY IS DISABLED, NOT SILENT (C15's lesson: a capture that writes
+      // nothing and says "Saved!" is a failed capture that read as a success).
+      const e0 = await a.dbg('logExport');
+      assert.ok(e0.verbs.every((v) => v.disabled === true),
+        `both verbs dim with no rolls (got ${JSON.stringify(e0.verbs)})`);
+      assert.equal(e0.rolls, 0, 'no rolls');
+      assert.equal(e0.lines, 0, 'and no lines — not one blank one');
+
+      await a.roll('1d20+2 # Sword');
+      await a.roll('4d6dl1 dc 14');
+      await b.roll('3d6 # Body');
+      await b.roll('1d20 held # Stealth');
+      const heldId = await b.rollId();
+      await a.settle();
+      await a.waitFor(`document.getElementById('log-list').childElementCount === 4`,
+        { desc: 'all four rolls reach Bram' });
+
+      const ex = JSON.parse(await a.eval('JSON.stringify(window.__diceDebug.logExport)'));
+      const bodyOf = (t) => t.split('\n\n').slice(1).join('\n\n').replace(/\n$/, '').split('\n');
+      const lines = bodyOf(ex.text);
+      assert.equal(ex.lines, ex.rolls,
+        `every roll is a line — none lost, none invented (${ex.lines} of ${ex.rolls})`);
+      assert.equal(ex.lines, 4, 'four rolls, four lines');
+
+      // THE REVERSAL IS THE DECISION, so it is asserted rather than assumed:
+      // the screen runs newest-first (a feed you scan from the top) and the
+      // file runs oldest-first (a document you read start to end).
+      assert.match(ex.head, /oldest first/, 'the header says which way it runs');
+      assert.match(lines[0], /Sword/, 'and the FIRST line is the FIRST roll');
+      assert.match(lines[3], /Stealth/, 'the newest is last');
+
+      // GOAL 11, ON THE BYTES. Written as a whole-line SHAPE rather than as
+      // `!text.includes(total)`: a two-digit total collides with the clock,
+      // the die count and every other number in the file, so an absence check
+      // on the value would pass for the wrong reason about half the time.
+      // Nothing but time, name, label, die TYPE (public even face down, the
+      // same rule the row's chips follow) and the word.
+      //
+      // WHAT THE GATE ACTUALLY BUYS, measured by removing it: the values are
+      // not in the client's entry at ALL for a face-down roll — not even the
+      // ROLLER'S (the server withholds until reveal, which is `raw-sse-leak`'s
+      // claim on the wire) — so `hidden = false` does not leak digits. It
+      // prints the ROW'S PLACEHOLDER, `d20 ?`, into a file that has no column
+      // header to explain it: a transcript stating a die's face as `?`. The
+      // word is the whole point, and the shape is what asserts it.
+      assert.match(lines[3], /^\d\d:\d\d\s+Wren\s+Stealth\s+d20\s+face down$/,
+        `a held roll exports without its values (got ${JSON.stringify(lines[3])})`);
+      // Both players' files say the same thing about it. The header names whose
+      // view a file is (§7.49), so two files differing over a secret is legible
+      // — but a HELD roll is face down for everyone, the roller included, and
+      // the two transcripts must not disagree about that.
+      const wren = bodyOf((await b.dbg('logExport')).text)[3];
+      assert.equal(wren.replace(/^\d\d:\d\d/, ''), lines[3].replace(/^\d\d:\d\d/, ''),
+        `the roller's own transcript says exactly the same (got ${JSON.stringify(wren)})`);
+      // …and the row's own marks, no new ones: a dropped die is parenthesised
+      // exactly where the screen dims it, and 4d6dl1 drops exactly one.
+      assert.equal((lines[1].match(/\(d6 /g) || []).length, 1,
+        `the discarded die is marked, once (got ${JSON.stringify(lines[1])})`);
+      assert.match(lines[1], /vs DC 14$/,
+        'the stake is public; its adjudication needs a total this system has not got (U17)');
+
+      assert.match(ex.text, /not an import file/,
+        'the file does not claim to be a rack — portable.js owns that transport (GOALS §7)');
+      assert.match(ex.filename, /-rolls\.txt$/, 'and its name says text');
+      assert.doesNotMatch(ex.filename, /ya?ml/, 'never yaml');
+      assert.ok(ex.verbs.every((v) => v.disabled === false), 'with rolls, both verbs arm');
+      assert.match(await a.dbg('logExportDownload()'), /-rolls\.txt$/,
+        'Download writes that name');
+
+      // THE EXPORT TRACKS THE GATE, IT DOES NOT COPY IT. Reveal the held roll
+      // and the same line grows its face — proving the file asks `entryHidden`
+      // rather than carrying its own idea of what is hidden.
+      await b.dbg(`reveal(${JSON.stringify(heldId)})`);
+      for (const t of [a, b]) await t.waitFor(revealSettled(heldId), { desc: 'the flip settles' });
+      const after = bodyOf((await a.dbg('logExport')).text)[3];
+      assert.doesNotMatch(after, /face down/, 'the revealed roll is no longer withheld');
+      assert.match(after, /^\d\d:\d\d\s+Wren\s+Stealth\s+d20 \d+\s+→ /,
+        `and carries its face and its meaning (got ${JSON.stringify(after)})`);
+
+      // THE FILTER DOES NOT NARROW THE FILE. The find box has no selection
+      // affordance and its own count reads "1 of 4" — plainly hiding, not
+      // choosing — so Copy must not be the one place a search field decides
+      // what leaves.
+      await a.dbg(`setLogFind('Sword')`);
+      assert.equal((await a.dbg('logFind')).shown, 1, 'the list really is filtered');
+      assert.equal((await a.dbg('logExport')).lines, 4, 'and the file still holds all four');
+      await a.dbg(`setLogFind('')`);
+
+      // THE VERBS ARM ON THE INCREMENTAL PATH, which is the one that had the
+      // gap: `addLogEntry` appends without rebuilding, so `updateLogExportVerbs`
+      // had to be called there too. A scenario that COLLECTED a roll first
+      // would pass against the broken code, because collecting forces a full
+      // renderLog — so this rolls once and asserts armed with nothing tidied.
+      await a.eval(`document.getElementById('clear-log').click()`);
+      assert.ok((await a.dbg('logExport')).verbs.every((v) => v.disabled === true),
+        'Clear history dims them again');
+      await a.roll('1d6');
+      assert.ok((await a.dbg('logExport')).verbs.every((v) => v.disabled === false),
+        'and ONE arrival on the append path arms them, uncollected');
+    },
+  },
+  {
     name: 'identity-chip',
     tags: ['smoke', 'chrome', 'seat', 'cuj3'],
     // The rail identity chip: rename propagates to every roster and the chip
@@ -4297,6 +4460,172 @@ export const scenarios = [
       // time precisely so leaving cannot rewrite it.
       assert.ok((await b.logTop()).includes('Alice'),
         `Alice's roll is still hers (got: ${await b.logTop()})`);
+    },
+  },
+
+  // ---------------------------------------------------------------------
+  // `dice.who.v1` RUNG 1 — a seat outlives its tab (docs/IDENTITY.md §5,
+  // ROADMAP B4, UX §7.52). The seat memory is per TAB (sessionStorage), so a
+  // CLOSED tab used to come back as a stranger: its held roll could not be
+  // revealed by the person who chose it, and its secret rolls fell out of its
+  // own log. The browser key is per ORIGIN (localStorage), it is a second
+  // credential for the SAME resume path, and it is never anything a client
+  // can be told "no" to — the lookup either finds a lapsed seat or falls
+  // through to an ordinary join, which is what keeps it from being a login.
+  // ---------------------------------------------------------------------
+  {
+    name: 'who-resume',
+    tags: ['seat', 'identity', 'cuj3'],
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await b.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+
+      // THE TWO STORAGES, AND THE DIFFERENCE IS THE FEATURE. The key is
+      // origin-wide and outlives the tab; the seat is per-tab and does not.
+      const who = await a.dbg('who');
+      assert.ok(typeof who === 'string' && who.length >= 8,
+        `a browser key was minted (got ${JSON.stringify(who)})`);
+      assert.equal(await a.eval(`sessionStorage.getItem('dice.who.v1')`), null,
+        'the key is NOT per-tab — that is the whole point of it');
+      assert.ok(await a.eval(
+        `sessionStorage.getItem(${JSON.stringify(`dice.seat.v1:${ctx.room}`)})`),
+      'while the seat still is');
+
+      const seat = await a.playerId();
+      const color = await a.color();
+
+      // Alice holds a roll, then her tab is gone — the REAL pagehide beacon,
+      // which `seat-closed-tab` already proves fires.
+      await a.roll('d20 held');
+      const rollId = await a.rollId();
+      await a.close();
+      // …AND THE BEACON IS THEN LANDED SYNCHRONOUSLY, which is the difference
+      // between this scenario and a flake. `navigator.sendBeacon` cannot be
+      // awaited from anywhere (that is the whole reason the server's liveness
+      // sweep exists), so `a.close()` returning says nothing about the server
+      // having noticed — and the resume requires `clients.size === 0`. Seen
+      // for real: green three times in isolation, then one FAIL inside a
+      // 38-scenario lane with a fresh uuid, because the join beat the socket
+      // close. This is the same endpoint the beacon posts to, in its own
+      // documented no-streamId mode ("drop them all"), and it answers 200 —
+      // so the precondition is a fact by the time the join is sent. If the
+      // browser's beacon lands too, it is idempotent: scheduleReap never
+      // shortens a pending grace.
+      const gone = await ctx.api('/api/leave', { playerId: seat });
+      assert.ok(gone.ok, `the server has seen the tab go (got ${gone.status})`);
+
+      // DRIVEN AT THE PROTOCOL LEVEL ON PURPOSE. A fresh tab boot takes 2–5 s
+      // against a 5 s grace, so a second `newTable` here would be a flake
+      // generator: it would sometimes arrive after the seat had been reaped
+      // outright, and the resume path under test is for a seat that lapsed.
+      const back = await ctx.api('/api/join', { name: 'Alice', who });
+      assert.ok(back.ok, `the re-join is accepted (got ${back.status})`);
+      assert.equal(back.data.playerId, seat, 'and it is the SAME seat');
+      assert.equal(back.data.color, color, 'wearing the same color');
+      // The server names which door opened — `by=who` here, `by=seat` on the
+      // ordinary reload path — so a resume that happened for the wrong reason
+      // is distinguishable from one that happened for the right one.
+      await ctx.waitForLog(/resume .*by=who/, { desc: 'the server says it resumed by key' });
+
+      // AND THE AUTHORITY CAME WITH IT. This is the defect: before rung 1 the
+      // returning browser got a fresh uuid, so its own held roll answered 403
+      // `not_reveal_authority` — the button was gone from the only screen
+      // entitled to press it.
+      const rev = await ctx.api('/api/reveal', { playerId: back.data.playerId, rollId });
+      assert.ok(rev.ok, `the returning browser still holds the reveal (got ${rev.status})`);
+      // …and the flip really reached the table, from the resumed authority. A
+      // 200 that revealed nothing is exactly the green check this repo keeps
+      // catching itself writing.
+      await b.waitFor(revealSettled(rollId), { desc: 'the table sees the held roll flip' });
+      assert.equal(await b.eval(
+        `window.__diceDebug.players.filter((p) => p.name === 'Alice').length`), 1,
+      'and there was exactly one Alice throughout — a resume is not an arrival');
+    },
+  },
+  {
+    name: 'who-never-steals',
+    tags: ['seat', 'identity'],
+    // THE REFUSAL, which is one comparison (`p.clients.size === 0`) and is the
+    // whole security argument. Green before rung 1 and after — it is the
+    // guard, and step 1 is what stops it being vacuous: proving the two tabs
+    // really do share one key is what makes "and they are still two players"
+    // a claim about the resume rule rather than about two unrelated browsers.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const seat = await a.playerId();
+      const who = await a.dbg('who');
+
+      // A SECOND TAB of the same browser, with the first still live.
+      const a2 = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      assert.equal(await a2.dbg('who'), who, 'the two tabs really do share one browser key');
+      const seat2 = await a2.playerId();
+      assert.notEqual(seat2, seat, 'and are still two players — a live seat is never resumed');
+
+      // A stranger holding the key gets a seat OF THEIR OWN, and no error:
+      // there is nothing here a client can be told "no" to, which is what
+      // keeps this from being a login and is why no settings write can ever
+      // be refused by identity (the defect that killed B1).
+      const thief = await ctx.api('/api/join', { name: 'Mallory', who });
+      assert.ok(thief.ok, `the would-be thief is simply seated (got ${thief.status})`);
+      assert.notEqual(thief.data.playerId, seat, 'never into the first tab’s chair');
+      assert.notEqual(thief.data.playerId, seat2, 'nor the second’s');
+
+      // AND THE KEY NEVER LEAVES. publicPlayers builds its roster field by
+      // field and this is not one of them; there is no other path a player
+      // object leaves by.
+      assert.equal(await a.eval(
+        `document.body.innerText.includes(${JSON.stringify(who)})`), false,
+      'the key is never displayed');
+      assert.equal(await a.eval(
+        `JSON.stringify(window.__diceDebug.players).includes(${JSON.stringify(who)})`), false,
+      'and never rides the roster');
+    },
+  },
+  {
+    name: 'who-held-survives-reload',
+    tags: ['seat', 'identity', 'visibility'],
+    // The same resume, in a REAL BROWSER rather than over the API — and the
+    // assertion the whole rung is for, which is about a button.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await b.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+
+      await a.roll('d20 held');
+      const rollId = await a.rollId();
+      const seat = await a.playerId();
+      const who = await a.dbg('who');
+
+      // FORCE THE KEY PATH DELIBERATELY. `dropSeatMemory()` forgets this tab's
+      // seat without telling the server — the browser state a closed tab
+      // leaves behind, minus the wait — so the reload arrives with NO seat id
+      // and a key, and must come back through `resumableSeatFor`. Racing a
+      // real 5 s grace with a fresh tab boot is the alternative, and it is a
+      // flake.
+      assert.equal(await a.dbg('dropSeatMemory()'), true, 'the seat memory is dropped');
+      await a.reload();
+      assert.equal(await a.dbg('who'), who, 'the key survived the reload');
+      assert.equal(await a.playerId(), seat, 'and brought the seat back with it');
+      await ctx.waitForLog(/resume .*by=who/,
+        { desc: 'resumed by the KEY, not by a seat id it no longer has' });
+
+      // THE PURGE SPARES IT. purgeStaleClientState drops every `dice.*` key on
+      // a client older than the current schema; the key is on PURGE_KEEPS,
+      // because a browser that gets purged and then cannot sit back down has
+      // lost its held roll to a housekeeping pass.
+      await a.eval(`localStorage.removeItem('dice.schema.v1')`);
+      assert.ok(await a.dbg('purgeStale()') > 0, 'the purge really ran');
+      assert.equal(await a.dbg('who'), who, 'and did not take the key with it');
+
+      // THE ASSERTION THE RUNG EXISTS FOR: the Reveal is on Alice's own screen
+      // and on nobody else's. Before the fix this read false on the player's
+      // own screen — the button was gone from the one seat entitled to it.
+      assert.equal((await a.entryState(rollId)).canReveal, true,
+        'the returning tab holds the reveal on its own screen');
+      assert.equal((await b.entryState(rollId)).canReveal, false, 'and Bob still does not');
+      await a.dbg(`reveal(${JSON.stringify(rollId)})`);
+      for (const t of [a, b]) await t.waitFor(revealSettled(rollId), { desc: 'the flip settles' });
     },
   },
 
@@ -5496,6 +5825,214 @@ export const scenarios = [
       await a.waitFor(`document.getElementById('pop-preview').textContent.includes('min ')`,
         { desc: 'system flip repaints the open popover into the sum world' });
       await a.dbg(`setSystem('soul-deal')`);
+    },
+  },
+  {
+    name: 'sum-read',
+    tags: ['groups', 'meanings'],
+    // THE SUM CURVE (§2l ⑥, UX §7.48, POOL-ANALYSIS §10) — `pool-forecast`'s
+    // sibling in the OTHER world: where that one asserts the per-die spectrum
+    // under soul-deal, this one asserts the distribution of the TOTAL under
+    // dnd. Every number below is a transcription of what the running app
+    // returned (POOL-ANALYSIS §10, 2026-08-17), not a prediction.
+    //
+    // The three failure modes here all live BETWEEN the arithmetic and the
+    // paint, which is why the units cannot reach them and why every assertion
+    // reads the RENDERED popover: a cell drawn at its index instead of at its
+    // total, a tie-break sold as a peak, and a refusal printing `0%`.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setSystem('dnd')`);
+      // Online, a system change applies on the settings echo — opening a
+      // popover before it lands reads the per-die world and `sumRead` is null.
+      await a.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'the sum world is in force' });
+      await a.dbg(`setGroups([
+        {name: 'Heroic', notation: '4d6dl1 dc15', category: 'Attributes'},
+        {name: 'Strike', notation: '1d20+5'},
+        {name: 'Spark', notation: '1d6!'},
+        {name: 'Impossible', notation: '8d8+2d20 kh4 dc30'},
+        {name: 'Horde', notation: '40d20dl1'},
+        {name: 'Coincide', notation: '2d6 dc7'}])`);
+      await a.dbg('setPoolsEditMode(true)'); // the ± door opens inside ✎
+      const open = async (name) => {
+        const g = (await a.dbg('groups')).find((x) => x.name === name);
+        assert.ok(g, `the ${name} pool exists`);
+        assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify(g.id)})`), true,
+          `the ± opens on ${name}`);
+        const r = await a.dbg('sumRead');
+        assert.ok(r, `${name}'s popover paints a SUM read (null = the per-die world)`);
+        return r;
+      };
+      const popText = () => a.eval(`document.getElementById('pop-preview').textContent`);
+
+      // ---- the everyday pool: a curve, a peak, an average and a stake ----
+      const heroic = await open('Heroic');
+      assert.equal(heroic.line, 'min 3 · avg 12.2 · max 18', 'the min/avg/max line');
+      assert.equal(heroic.cells, 16, '16 reachable totals, 16 drawn cells');
+      // THE PEAK IS DRAWN WHERE IT LANDS. 4d6dl1's mode is 13 — the 11th of 16
+      // totals from 3 — so the tallest cell is index 10 and not index 8 (the
+      // middle) nor index 12 (the average's neighbour). A cell positioned by
+      // its INDEX rather than by its total passes every count assertion and
+      // draws the wrong curve, which is the whole reason `heights` exists.
+      assert.equal(heroic.heights.indexOf(Math.max(...heroic.heights)), 10,
+        `the tallest cell is total 13 (got index ${heroic.heights.indexOf(Math.max(...heroic.heights))})`);
+      assert.equal(heroic.avgAt, 60.9, 'the average mark sits at the mean, not at the peak');
+      assert.equal(heroic.dcAt, 78.1, 'and the target mark at the stake');
+      assert.equal(heroic.target, 'Difficulty Class 15 · 23% to clear',
+        '300/1296, in the system\'s own word for a stake');
+      assert.equal(await a.dbg('hoverSumCell(0)'), '3 · <1% · 3+ 100%',
+        'the floor cell: a real sliver, and everything is at least the minimum');
+      assert.equal(await a.dbg('hoverSumCell(8)'), '11 · 11% · 11+ 73%',
+        'and a mid cell carries its own mass and its tail');
+
+      // ---- a flat pool NAMES the tie instead of tie-breaking it ----
+      // fc.mode takes the first of 20 equal totals and would report `most
+      // likely 6 · 5%`, which is true of 6 and equally true of the other 19.
+      const strike = await open('Strike');
+      assert.equal(strike.readout, 'flat — every total 5%', 'a flat curve says so');
+      assert.equal(strike.target, null, 'no dc, no target sentence');
+
+      // ---- THE SPARSE RULE: an unreachable total is a HOLE ----
+      // 1d6! cannot total 6, 12 or 18 (a max face always explodes), and the
+      // renderer must leave those x positions EMPTY rather than closing the
+      // gap. No assertion on a count can see the difference — 21 squeezed
+      // cells and 21 positioned cells are both 21 — so this reads `lefts`.
+      //
+      // AND IT IS STATED POSITIVELY, which is a correction of this scenario's
+      // own first draft. It asserted only that nothing sits at 20.8/45.8/70.8,
+      // and the sabotage that repositions every cell BY ITS INDEX passed —
+      // index positions are 0, 4.76, 9.52 … which miss those three numbers
+      // too, so the whole curve could collapse to the wrong axis and the
+      // "hole" assertion stayed green. Every cell is now pinned to its own
+      // total, and the three holes are what the list does not contain.
+      const spark = await open('Spark');
+      assert.equal(spark.cells, 21, '21 reachable totals of 24');
+      const reachable = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24];
+      // the hook's own rounding, over the renderer's own formula: (t − lo)/span
+      const wantLefts = reachable.map((t) => Math.round(((t - 1) / 24) * 1000) / 10);
+      assert.deepEqual(spark.lefts, wantLefts,
+        'every cell is drawn at its OWN TOTAL — so 6, 12 and 18 are gaps at '
+        + `20.8/45.8/70.8% rather than closed up (got ${spark.lefts.join(', ')})`);
+      assert.ok(spark.words.includes('21 of 24 reachable'),
+        `and the AT layer says so out loud (got ${JSON.stringify(spark.words)})`);
+
+      // ---- THE REFUSAL, which must not print a number ----
+      // keep/drop across dice with different distributions has no exact curve.
+      // The line survives (a refusal owes the min/avg/max beside it) and the
+      // target sentence says it cannot answer — `0%` here would be a lie
+      // dressed as arithmetic, because 0% is this feature's word for
+      // IMPOSSIBLE.
+      const imp = await open('Impossible');
+      assert.ok(imp.refusal.includes('keep/drop across dice'),
+        `the refusal names the mechanic (got ${JSON.stringify(imp.refusal)})`);
+      assert.equal(imp.line, 'min 4 · avg 36.7 · max 56',
+        'and the line stays — previewOf answers where the curve cannot');
+      assert.equal(imp.target, 'Difficulty Class 30 · no exact odds for this pool',
+        'the stake is repeated and the odds declined');
+      assert.equal(imp.targetUnknown, true, 'dressed as the unknown it is');
+      assert.equal(imp.cells, 0, 'no cells — a refusal draws no curve');
+      // The whole rendered node, not just the sentence: no percentage of any
+      // kind appears on a refused read. (`includes('0%')` would also match
+      // 10%/20%/100%, so the honest form of this claim is stronger.)
+      assert.doesNotMatch(await popText(), /%/,
+        'a refused read prints no percentage anywhere');
+
+      // ---- THE BINNED END, and the deep-tail underflow it caught ----
+      const horde = await open('Horde');
+      assert.equal(horde.cells, 47, '742 totals bin to 47 cells of 16 (max 48)');
+      assert.equal(await a.dbg('hoverSumCell(0)'), '39–54 · <1% · 39+ 100%',
+        'a binned cell reads as a RANGE');
+      assert.equal(await a.dbg(`hoverSumCell(${horde.cells - 1})`),
+        '775–780 · <1% · 775+ <1%',
+        'and the top cell says <1%, never 0% — this pool\'s cdf reaches 1.0 in '
+        + 'double precision hundreds of totals early, so `1 − cdf` returned a '
+        + 'FALSE ZERO on a cell with visible mass (js/odds.js sumAtLeast)');
+
+      // ---- TWO FACTS, TWO MARKS (the bug the eye caught, UX §7.48 ⑨) ----
+      // On `2d6 dc7` the average and the target land on the SAME total, so
+      // both marks get `left: 50%` — and the dashed target painted exactly
+      // onto the solid average, with the solid line showing through the gaps
+      // in the dash, so the pair read as ONE mark and the target vanished on
+      // the pool where it is easiest to clear.
+      //
+      // `dcAt` WAS CORRECT THE WHOLE TIME (50, the right number at the right
+      // total), which is why no assertion on the number could catch this. The
+      // separation is a 2.5px CSS stand-off, so the only thing that can fail
+      // is the RENDERED x.
+      const coincide = await open('Coincide');
+      assert.equal(coincide.avgAt, coincide.dcAt,
+        'the premise: both marks are authored at the same position');
+      const marks = await a.eval(`(() => {
+        const all = [...document.querySelectorAll('#pop-preview .sf-mark')];
+        return all.map((m) => { const b = m.getBoundingClientRect();
+          return { cls: m.className, x: Math.round(b.left * 100) / 100, h: Math.round(b.height) }; });
+      })()`);
+      assert.equal(marks.length, 2, `two marks are drawn (got ${JSON.stringify(marks)})`);
+      // …and they are really ON SCREEN. A zero-height read would make every
+      // geometry claim below vacuously true through a display:none ancestor.
+      assert.ok(marks.every((m) => m.h > 0),
+        `both marks are laid out (got heights ${marks.map((m) => m.h).join(', ')})`);
+      assert.ok(marks[1].cls.includes('sf-dc-near'),
+        `the target mark knows it is coincident (got ${JSON.stringify(marks[1].cls)})`);
+      assert.ok(Math.abs(marks[1].x - marks[0].x) >= 2,
+        `and stands off the average by real pixels — ${marks[0].x} vs ${marks[1].x}`);
+      // The stand-off is CONDITIONAL, or this assertion proves nothing: a
+      // target nowhere near the average carries no `sf-dc-near`.
+      await open('Heroic');
+      assert.equal(await a.eval(
+        `document.querySelector('#pop-preview .sf-dc').classList.contains('sf-dc-near')`), false,
+      'a target far from the average is NOT nudged — the class is conditional');
+      await a.dbg('closePopover()');
+
+      // ---- the command box: the same arithmetic, one line ----
+      // DEBOUNCED. Dispatching `input` and reading in the same tick returns
+      // nothing (the `preview-honest` pattern).
+      const type = (s) => a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = ${JSON.stringify(s)};
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      const slotOk = `(document.querySelector('#cmd-slot .ok') || {}).textContent || ''`;
+      await type('1d20+5 dc15');
+      await a.waitFor(`(${slotOk}).includes('55% to clear 15')`,
+        { desc: 'the box answers the stake' });
+      assert.ok((await a.eval(slotOk)).includes('min 6 avg 15.5 max 25'),
+        'beside the line it always carried');
+      // A TRUE ZERO PRINTS. `pctText` says `0%` only when the answer IS zero
+      // and `<1%` for anything that merely rounds there, so 2d6 against 20 —
+      // genuinely impossible — must not be softened into `<1%`.
+      await type('2d6 dc20');
+      await a.waitFor(`(${slotOk}).includes('0% to clear 20')`,
+        { desc: 'an impossible stake reads 0%' });
+      await type('8d8+2d20 kh4 dc30');
+      await a.waitFor(`(${slotOk}).includes('no exact odds against 30')`,
+        { desc: 'the box refuses in words too' });
+      assert.ok(!(await a.eval(slotOk)).includes('%'),
+        'and prints no percentage while refusing');
+
+      // U7 IS NOT REGRESSED: a per-die system still gets a per-die read, and
+      // no total is forecast anywhere near it.
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.waitFor(`window.__diceDebug.system === 'soul-deal'`, { desc: 'back to per-die' });
+      await type('3d6+5');
+      await a.waitFor(`(${slotOk}).includes('per-die')`, { desc: 'the per-die read returns' });
+      assert.ok(!/min \d/.test(await a.eval(slotOk)), 'and forecasts no total');
+
+      // ---- EVERY DOOR, not just the pool door (§9's answer 1) ----
+      // The draft ± carries the draft's own spec and forecasts exactly what
+      // ROLL ❯❯❯ throws.
+      await a.dbg(`setSystem('dnd')`);
+      await a.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'the sum world again' });
+      await type('2d6+3 dc10');
+      await a.waitFor(`(${slotOk}).includes('58% to clear 10')`, { desc: 'the draft is parsed' });
+      assert.equal(await a.dbg(`openPopoverFor('tray')`), true, 'the draft ± opens');
+      const draft = await a.dbg('sumRead');
+      assert.ok(draft, 'and paints a sum read of its own');
+      assert.equal(draft.target, 'Difficulty Class 10 · 58% to clear',
+        'the same answer as the box, on the other surface');
+      assert.equal(draft.line, 'min 5 · avg 10 · max 15', 'over the draft\'s own spec');
+      await a.dbg('closePopover()');
+      await a.dbg('setPoolsEditMode(false)');
     },
   },
   {
@@ -8586,8 +9123,95 @@ export const scenarios = [
     },
   },
   {
+    name: 'scene-draw-budget',
+    tags: ['perf', 'roll', 'tower'],
+    // THE FRAME'S DRAW COUNT (ROADMAP V4), and the instrument is the point.
+    //
+    // `renderer.info.render.calls` is NOT a one-liner to read: three.js resets
+    // the counter inside every `renderer.render()`, and js/post.js issues up
+    // to 8 per frame — so the naive read reports the CLOSING QUAD's 1 draw
+    // call and calls it the scene's cost. `renderer.info.autoReset = false`
+    // plus a per-tick reset is what makes `renderAudit()` report the whole
+    // frame; this scenario is what makes that FALSIFIABLE.
+    //
+    // Two traps for whoever edits it. `sim()` ticks with render=false, so the
+    // audit always describes the last REAL rAF frame — always `waitFor` on the
+    // audit itself after changing scene state, never `sim()`. And read after
+    // `settle()`: mid-playback frames legitimately draw more. It cannot be a
+    // `look` scenario; it rolls dice on purpose, because a budget measured on
+    // an empty table is a budget for a table nobody is using.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      // ESTABLISH THE DICE SET, DO NOT INHERIT IT — and this is not hygiene,
+      // it is the difference between a green sweep and a red one. `diceSet`
+      // persists to PER-ORIGIN localStorage, which outlives a scenario's room;
+      // `pool-set-override` runs on this same origin and commits
+      // `tidewrack.seaglass`, whose skin declares `post: { bloom: true }`
+      // (js/themes.js). A bloom-flagged die ON THE FELT is one of the four
+      // things that make the post stack `need`ed every frame — so the four d6
+      // below would sit there keeping the stack on forever, and the plain-frame
+      // leg would read 8 passes on a perfectly quiet table. It did, once, in
+      // the scenario that runs immediately after that one in a full sweep.
+      await a.dbg(`setDiceSet('std')`);
+      await a.settle();
+      // The instrument's own zero, so every number below is known to be
+      // measuring the scene rather than a constant: an empty table draws 2.
+      const empty = await a.dbg('renderAudit()');
+      assert.ok(empty.calls < 10,
+        `an empty table is nearly free (got ${empty.calls} draw calls)`);
+
+      // blackanvil is the heaviest registry tower — the budget's worst case.
+      await a.dbg(`setTower('blackanvil')`);
+      await a.waitFor(`window.__diceDebug.tower === 'blackanvil'`
+        + ` && window.__diceDebug.towerBodies().length > 0`,
+      { desc: 'the heaviest tower is socketed' });
+      await a.roll('4d6');
+      await a.settle();
+      // WAITED FOR, NOT ASSERTED ONCE — the second of the two traps in the
+      // header. `settle()` drives the dt clock through `sim()`, which renders
+      // nothing, so the audit still describes the last REAL rAF frame, and
+      // mid-ceremony that frame legitimately runs the post stack. Belt and
+      // braces beside the `setDiceSet('std')` above: with a bloom set the
+      // stack never turns off and this times out saying exactly that, which is
+      // a better failure than `8 !== 1` on a line about quiet frames.
+      await a.waitFor(`window.__diceDebug.renderAudit().passes === 1`,
+        { desc: 'a quiet rAF frame is drawn after the roll settles' });
+      const plain = await a.dbg('renderAudit()');
+      assert.equal(plain.post, false, 'a quiet frame does not pay for the post stack');
+      assert.ok(plain.calls <= 220,
+        `the worst plain frame stays under budget (measured 186, got ${plain.calls})`);
+      // THE CLAMP, ASSERTED RATHER THAN REMEMBERED. IMMERSION-AUDIT §10 called
+      // this an open gap for days; `git log -S` says the clamp has been there
+      // since `init` and was never missing. A gate is how a claim like that
+      // stops being re-copied.
+      assert.ok(plain.pixelRatio <= 2,
+        `setPixelRatio is clamped (got ${plain.pixelRatio})`);
+
+      await a.dbg('postForce(true)');
+      await a.waitFor(`window.__diceDebug.renderAudit().passes > 1`,
+        { desc: 'the post stack engages' });
+      const post = await a.dbg('renderAudit()');
+      assert.equal(post.passes, 8,
+        `base + glow + threshold + 4 blurs + composite (got ${post.passes})`);
+      // THE ANTI-COLLAPSE GUARD, and it belongs HERE and nowhere else. If
+      // `info.autoReset` ever comes back, this frame reports 1 instead of 246
+      // — the closing quad, mistaken for the scene. The same floor on the
+      // PLAIN frame is theatre: sabotaged it reads 81 (only the shadow pass is
+      // hidden), which is above any sane floor, so it can never fail.
+      assert.ok(post.calls > 40,
+        `the audit counts the WHOLE frame, not the last pass (got ${post.calls}; `
+        + 'a value near 1 means renderer.info.autoReset is back on)');
+      assert.ok(post.calls <= 300,
+        `and the composited frame stays under budget (measured 246, got ${post.calls})`);
+      await a.dbg('postForce(false)');
+    },
+  },
+  {
     name: 'endurance-log',
     tags: ['perf', 'roll', 'log', 'endurance-log', 'cuj9'],
+    // 108 rolls at ~0.3 s each, so the 90 s default is not the bound to run
+    // under load — leg (4) below took it from 62 rolls to 108.
+    timeout: 180000,
     // Tier 0 §0e: addLogEntry used to full-rebuild #log-list on every
     // arrival, rebinding one closure per entry. This scenario proves the
     // append+prune path is:
@@ -8700,6 +9324,46 @@ export const scenarios = [
       // C: the newest — a reroll of B, not yet rerolled itself.
       assert.deepEqual(chain.c, { rerolled: 0, reroll: 1, isReroll: true },
         `C wears 'reroll' only (got ${JSON.stringify(chain.c)})`);
+
+      // (4) THE EXPORT'S TRUNCATION HONESTY (§5, UX §7.49) — here rather than
+      // in `log-export` because this is the only scenario that already pays
+      // for a long log, and the claim needs the cap CROSSED.
+      //
+      // `a.roll()` CANNOT REACH IT: it waits for `#log-list` to GROW, and at
+      // LOG_CAP the DOM count stops growing, so roll 101 times out. Past the
+      // cap the only honest wait is on `currentRoll.rollId` changing.
+      const CAP = 100;
+      const have = await a.eval(`document.getElementById('log-list').childElementCount`);
+      const TOTAL = 108; // 8 past the cap, so the note is a real number
+      for (let i = have + 1; i <= TOTAL; i++) {
+        const before = await a.rollId();
+        await a.dbg(`commandRoll("d6 # r${i}")`);
+        await a.waitFor(
+          `(window.__diceDebug.sim(240), (window.__diceDebug.currentRoll || {}).rollId`
+          + ` !== ${JSON.stringify(before)})`,
+          { desc: `roll r${i} to land past the cap` });
+      }
+      await a.settle();
+      assert.equal(await a.eval(`document.getElementById('log-list').childElementCount`), CAP,
+        'the DOM stops at LOG_CAP — which is what a.roll() cannot see past');
+
+      const ex = await a.dbg('logExport');
+      const dropped = TOTAL - CAP;
+      // A FILE THAT SILENTLY ENDED AT 100 WOULD READ AS THE WHOLE EVENING.
+      assert.match(ex.head,
+        new RegExp(`${dropped} earlier rolls rolled off the end of the log and are not here`),
+        `the header owns up to the ${dropped} it lost (got ${JSON.stringify(ex.head)})`);
+      // …and it says it in the panel foot's own words, because both read the
+      // same counter. A second sentence about the same fact is how they drift.
+      const foot = await a.eval(`document.getElementById('log-dropped').textContent`);
+      assert.ok(foot && ex.head.includes(foot),
+        `the file and the panel foot agree (foot: ${JSON.stringify(foot)})`);
+      // The transcript starts where the surviving history does. r1 here would
+      // be a file claiming to hold rolls the app has already forgotten.
+      const first = ex.text.split('\n\n').slice(1).join('\n\n').split('\n')[0];
+      assert.match(first, new RegExp(`\\br${dropped + 1}\\b`),
+        `the first line is r${dropped + 1}, not r1 (got ${JSON.stringify(first)})`);
+      assert.equal(ex.lines, CAP, 'and there are exactly as many lines as rolls left');
     },
   },
   {
@@ -10126,6 +10790,387 @@ export const scenarios = [
         `the prepared seat is back for anyone arriving now (got ${(peek.seats || []).map((s) => s.name)})`);
       assert.equal((await org2.dbg('felt')).id, 'plum',
         "and so is the felt the organizer chose — the heal carries the table, not just the seats");
+    },
+  },
+  {
+    name: 'setup-stamp',
+    tags: ['prepared-seat', 'table-file', 'cuj2'],
+    // C22's SECOND HALF (ROADMAP §C22, UX §7.49): `room.setup` carries a
+    // version stamp, and the stamp comes from the WRITER.
+    //
+    // THE ONE ASSERTION THIS SCENARIO EXISTS FOR is `roomStamp === stamp`.
+    // The stamp travels portablePushToTable → net.pushTable → server
+    // handleTable → the 'table-setup' broadcast → adoptRoomSetup's judged
+    // read, and every one of those five links can drop a field it does not
+    // know about (the server used to rebuild `room.setup` field by field,
+    // which is exactly how it was silently dropped before this shipped). If
+    // ANY link stops carrying it, `roomStamp` goes null and this fails.
+    //
+    // Two tabs, TWO ORIGINS. The harness shares localStorage per origin, so a
+    // same-origin second tab reads the first one's `dice.table.v1:<room>`
+    // authorship record and reports `storedStamp` without ever having pushed —
+    // which would make the reader half of the chain vacuous.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Bram' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Wren' });
+      const stamp = (await a.dbg('schemaState')).stamp;
+      assert.match(stamp, /^\d+\.\d+\.\d+$/, `this build has a stamp (got ${stamp})`);
+      // The "before", so the push is what puts it there.
+      assert.equal((await a.dbg('schemaState.table')).roomStamp, null,
+        'an unprepared room carries no stamp');
+
+      // AUTHORSHIP: this build makes a setup out of the box's own text.
+      //
+      // A LITERAL FILE, not `portable.snapshot()`. The contract sketched the
+      // snapshot, and it made `seats` inherit: profile libraries are per-ORIGIN
+      // localStorage that outlives a scenario's room, `prepared-seat` applies a
+      // seat as a second profile on `localhost`, and this scenario then read
+      // `seats: 2` in a sweep and `seats: 1` in isolation. The stamp chain is
+      // indifferent to what the file says, so the file says something fixed.
+      const file = [
+        'table:',
+        "  felt: 'ocean'",
+        'players:',
+        "  'Alice':",
+        '    pools:',
+        '      Attributes:',
+        "        - 'Strength': '3d6'",
+        '',
+      ].join('\n');
+      await a.dbg(`portable.loadText(${JSON.stringify(file)})`);
+      const v = await a.dbg('portable.pushToTable()');
+      assert.equal(v.ok, true, `the push lands (got ${v.status})`);
+
+      const st = await a.dbg('schemaState');
+      assert.equal(st.table.storedStamp, st.stamp,
+        'the authorship record §G6 will replay carries THIS build\'s stamp');
+      assert.equal(st.table.roomStamp, st.stamp,
+        'and it survived writer → net.pushTable → server → broadcast → judged read');
+
+      // A SECOND BROWSER reads the AUTHOR's stamp — not its own, and not the
+      // server's — and still gets the prepared seat.
+      await b.waitFor(
+        `window.__diceDebug.schemaState.table.roomStamp === window.__diceDebug.schemaState.stamp`,
+        { desc: 'the stamp reaches a second browser' });
+      const bt = await b.dbg('schemaState.table');
+      assert.equal(bt.storedStamp, null, 'which has authored nothing of its own');
+      assert.equal(bt.seats, 1, 'and the prepared seat arrived with it');
+      assert.equal((await b.dbg('settings')).felt, 'ocean',
+        '…as did the felt — a stamp that rode over an empty setup would prove nothing');
+
+      // ---- THE REFUSAL IS REACHABLE, AND ACTIONABLE ----
+      // Forging a newer major over the API is the only way to reach it: the
+      // client cannot mint a stamp it does not have.
+      const forged = await ctx.api('/api/table', {
+        playerId: await a.playerId(), rev: 100, ver: '2.9.0', table: {},
+        profiles: [{ name: 'Ghost', system: 'soul-deal', pools: [] }],
+      });
+      assert.equal(forged.status, 200, 'the server carries a stamp it cannot judge');
+      await b.waitFor(`window.__diceDebug.schemaState.table.roomRefused !== null`,
+        { desc: 'the newer major is refused client-side' });
+      const t = await b.dbg('schemaState.table');
+      assert.equal(t.seats, 0, 'load NOTHING — never a partial adopt');
+      assert.equal(t.roomKeptRev, true,
+        'the rev survives, so §G6 does not push an older setup over a newer one it refused');
+      assert.match(t.roomRefused, /^✗ /, 'the app\'s refusal grammar');
+      assert.match(t.roomRefused, /newer version of this page/, 'says what happened');
+      assert.match(t.roomRefused, /2\.9\.0/, 'names the stamp it found');
+      assert.match(t.roomRefused, new RegExp(stamp.replace(/\./g, '\\.')), 'and the one it reads');
+      assert.match(t.roomRefused, /Reload/, 'and what to do about it');
+      // THE REGRESSION FOUND BY LOOKING, and the reason this assertion is on
+      // the PILL rather than on the string above: `'table-setup'` called
+      // showSettingsNote('X prepared the table') one line after adoptRoomSetup
+      // had painted the refusal — same pill, same announce — so it did not
+      // merely hide the sentence, it spoke a reassuring lie over it in the one
+      // slot explaining why no seats appeared.
+      assert.equal(await b.eval(`document.getElementById('status-pill').textContent`),
+        t.roomRefused, 'the refusal is what the player is actually told');
+      assert.equal(await b.eval(
+        `document.getElementById('status-pill').classList.contains('hidden')`), false,
+      '…on screen, not merely in the DOM');
+
+      // ---- JUNK ON THE WIRE IS A 400 (the server validates shape, never
+      // judges: `2.9.0` was accepted above and `banana` is not a version) ----
+      const junk = await ctx.api('/api/table', {
+        playerId: await a.playerId(), rev: 101, ver: 'banana', table: {}, profiles: [],
+      });
+      assert.equal(junk.status, 400, 'a malformed stamp never reaches a room');
+      assert.equal(junk.data.code, 'bad_ver', 'and says which field');
+    },
+  },
+  {
+    name: 'setup-stamp-replay',
+    tags: ['prepared-seat', 'table-file', 'cuj2'],
+    // C22's replay half — the leg that CANNOT be reached by pushing, because
+    // both cases are about a record an EARLIER build wrote.
+    //
+    //  · An absent stamp stays absent. Every `dice.table.v1:*` record in the
+    //    field right now has no `ver` at all, so a replay that minted today's
+    //    stamp would claim this build authored bytes it only stored — the same
+    //    lie C22 refuses to let the server tell — and a Tuesday-prepared table
+    //    would stop healing a restarted room.
+    //  · A record from a NEWER build is not replayed at all. `net.pushTable`
+    //    destructures exactly four fields, so replaying it would put a
+    //    truncated copy over the room's setup AT THE SAME REV, degrading the
+    //    whole table's preparation by an act nobody clicked.
+    //
+    // Seeded through localStorage + reload rather than a fresh tab: the record
+    // has to be there before the hello that replays it.
+    async fn(ctx) {
+      const key = `dice.table.v1:${ctx.room}`;
+      const seed = async (t, rec) => {
+        await t.eval(`localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(JSON.stringify(rec))})`);
+        await t.reload();
+      };
+
+      // (1) A PRE-STAMP RECORD STILL HEALS A ROOM.
+      const a = await ctx.newTable({ origin: '127.0.0.2', name: 'Ghosty' });
+      await seed(a, {
+        rev: 5, table: { felt: 'plum' },
+        profiles: [{ name: 'Alice', pools: [] }], at: Date.now(),
+      });
+      await a.waitFor(`window.__diceDebug.tableRev.room === 5`,
+        { desc: 'the unstamped record heals the room on hello' });
+      const at = await a.dbg('schemaState.table');
+      assert.equal(at.storedStamp, null, 'the record carries no stamp');
+      assert.equal(at.roomStamp, null,
+        'and the replay MINTED none — absent stays absent, on the wire too');
+      assert.equal(at.seats, 1, 'while the seat it was prepared with did arrive');
+      assert.equal(at.replayable, true, 'an unstamped record is readable, not refused');
+      assert.equal(await a.dbg('repushTable()'), false,
+        'and stands down once the room is current — a heal is not a heartbeat');
+
+      // (2) A NEWER-MAJOR RECORD IS NEVER REPLAYED. Its rev (9) is higher than
+      // the room's (5), so a build that judged nothing WOULD replay it — which
+      // is what makes this a real gate rather than a restatement of (1).
+      // `sand` is a REAL felt, and that is load-bearing rather than incidental:
+      // the first draft of this used `moss`, which the server refuses
+      // (FELT_THEMES), so it 400'd the whole push — and the content assertion
+      // below could not have failed under ANY sabotage. Caught by breaking the
+      // judged read and watching the felt stay `plum` anyway.
+      const c = await ctx.newTable({ origin: '127.0.0.3', name: 'Newer' });
+      await seed(c, {
+        rev: 9, ver: '2.9.0', table: { felt: 'sand' },
+        profiles: [{ name: 'Nope', pools: [] }], at: Date.now(),
+      });
+      const ct = await c.dbg('schemaState.table');
+      assert.equal(ct.storedStamp, '2.9.0', 'the record names a build this one is not');
+      assert.ok(ct.storedRefused, 'so the judged read refuses it, in a whole sentence');
+      assert.match(ct.storedRefused, /^✗ .*newer version of this page/, ct.storedRefused);
+      assert.equal(ct.replayable, false, 'and nothing can replay it');
+      assert.equal(await c.dbg('repushTable()'), false, 'including the heal on hello');
+      // The CONTENT claim, which the flags cannot make: the room still holds
+      // rev 5's furniture. `sand` anywhere here means the truncating replay ran.
+      assert.equal((await c.dbg('tableRev')).room, 5, 'the room kept the older setup');
+      assert.equal((await c.dbg('settings')).felt, 'plum',
+        'down to its felt — `sand` here would be the replay this refuses');
+    },
+  },
+  {
+    name: 'peek-presence',
+    tags: ['prepared-seat', 'visibility', 'cuj3'],
+    // WHAT THE PRE-JOIN PEEK SAYS ABOUT WHO IS SITTING THERE (ROADMAP §3b L2).
+    //
+    // `GET /api/table` is the only unauthenticated read on the server, and its
+    // budget comment says "No players, no roster, no log, no offers". That has
+    // been inaccurate since C17 (2026-08-09) gave the peek a second seat
+    // source — every seated player's PUBLISHED library, each seat carrying
+    // `from`, which is that player's display name — and nothing in the suite
+    // noticed, because `prepared-seat`'s peek check loops a leak-list of
+    // notations and ids and says NOTHING ABOUT PRESENCE. That is exactly how
+    // `from` walked in unremarked, and this is the assertion that would have
+    // caught it.
+    //
+    // The line the L2 decision drew: presence is disclosed by an ACT (you
+    // published a character, so the character is offered and it says whose it
+    // is), never inferred from occupancy. A player who has asserted nothing is
+    // not described by this endpoint at all.
+    async fn(ctx) {
+      const peek = () => fetch(
+        `http://127.0.0.1:${ctx.port}/api/table?room=${encodeURIComponent(ctx.room)}`,
+      ).then((r) => r.json());
+      const peekUntil = async (pred, desc) => {
+        const deadline = Date.now() + 15000;
+        let last;
+        while (Date.now() < deadline) {
+          last = await peek();
+          if (pred(last)) return last;
+          await sleep(150);
+        }
+        throw new Error(`timeout waiting for the peek: ${desc} (last: ${JSON.stringify(last)})`);
+      };
+
+      // ---- A SEAT THAT HAS PUBLISHED NOTHING ----
+      // A RawPlayer is the right fixture and a browser tab is the wrong one: a
+      // real tab re-shares its library on every hello, so publishing is not a
+      // user act and a browser can only be silent by accident.
+      const bob = await ctx.rawPlayer('Bob');
+      assert.ok(bob.playerId, 'Bob really is seated');
+      const p0 = await peek();
+      assert.equal(p0.system, 'soul-deal', 'the peek answers about the room');
+      assert.equal(p0.seats, undefined,
+        `and offers no seats at all — one occupant, nothing published (got ${JSON.stringify(p0)})`);
+      assert.equal(JSON.stringify(p0).includes('Bob'), false, 'Bob is not in it');
+
+      // ---- A SEAT THAT HAS ----
+      // Named apart from their character on purpose: with both called 'Wren',
+      // `from` and `name` are the same string and the disclosure this scenario
+      // is about cannot be told from the one C17 intended.
+      const a = await ctx.newTable({ origin: '127.0.0.20', name: 'Alice Cooper' });
+      await a.dbg('profiles.reset()'); // establish, don't inherit (per-origin store)
+      const mine = await a.dbg('profiles.active');
+      await a.dbg(`profiles.rename(${JSON.stringify(mine.id)}, 'Wren')`);
+      await a.waitFor(`window.__diceDebug.players.length === 2`,
+        { desc: 'two people are at this table' });
+
+      // Waited on the NAME, not on `seats.length === 1`: the tab publishes at
+      // hello, so a seat is already there under the dealt name and a length
+      // poll returns before the rename propagates. (It did, first run — the
+      // peek answered 'Alice Cooper' and the scenario read it as settled.)
+      const p1 = await peekUntil((p) => (p.seats || []).some((s) => s.name === 'Wren'),
+        "the publishing player's renamed character reaches the door");
+      assert.deepEqual(p1.seats.map((s) => s.name), ['Wren'],
+        'the peek offers the character they published');
+      // THE DISCLOSURE, NAMED. This is a real field with a real reason — a
+      // profile you did not build must say who did, because taking one COPIES
+      // it — and the point of asserting it is that it is a DISPLAY NAME on an
+      // unauthenticated endpoint, so a change here is a change to what the
+      // door tells a stranger.
+      assert.equal(p1.seats[0].from, 'Alice Cooper',
+        'and says whose it is — the seated player’s display name');
+
+      // ---- AND BOB IS STILL NOT THERE ----
+      // The whole L2 question in one line: a count (or a `present: true`)
+      // would be the first field on this endpoint describing a player who
+      // published nothing. Recommendation was NO, and this is the shape of
+      // the change that would break it.
+      const blob = JSON.stringify(p1);
+      assert.equal(blob.includes('Bob'), false,
+        `a seat that published nothing is still invisible (got ${blob})`);
+      assert.equal(blob.includes(bob.playerId), false, 'by name and by id');
+      assert.equal(p1.seats.length, 1,
+        'one published character, one seat — never one seat per occupant');
+      // Nor does the count leak sideways through a total: two people are here.
+      assert.equal((await a.dbg('players')).length, 2,
+        'which the ROSTER knows, because taking a seat is what buys it');
+    },
+  },
+  {
+    name: 'prepared-tower',
+    tags: ['prepared-seat', 'portable', 'tower', 'cuj3'],
+    // A PREPARED TABLE ARRIVES WITH ITS TOWER UP (ROADMAP §9d, UX §7.50).
+    // `tower` is the only `table:` key that is not an enumerated set in
+    // js/portable.js — the catalogue is declared to grow, so the parser checks
+    // SHAPE and the apply site checks the CATALOGUE, against the registry the
+    // reader actually has.
+    //
+    // THE ASSERTION THAT MATTERS is `tower === 'bastion'` AND
+    // `towerBodies().length > 0`, together. `currentTower` is written only
+    // inside `towerSocket` and `towerBodies()` is empty unless `towerRig` is
+    // live, so the pair says the tower is UP WITH ITS COLLIDERS IN THE WORLD.
+    // `settings.tower` alone is the MENU — asserting only that is the
+    // green-check-over-a-broken-thing shape this repo keeps catching.
+    //
+    // No `?stability=beta`: the channel gates the OFFER and never the
+    // capability (js/stability.js), and running on the default is strictly the
+    // better test because it also proves that law.
+    async fn(ctx) {
+      const seat = ['players:', "  'Alice':", '    pools:', '      Attributes:',
+        "        - 'Strength': '3d6'"];
+      const file = (tableLines, withSeat = true) => [
+        'table:', ...tableLines.map((l) => `  ${l}`), ...(withSeat ? seat : []), '',
+      ].join('\n');
+      // The load verdict is checked here rather than at the call sites: a
+      // parser that stopped accepting `tower` refuses the whole document, and
+      // without this the first symptom is a TypeError off a null
+      // `portable.table()` three lines later.
+      const push = async (t, text) => {
+        const loaded = await t.dbg(`portable.loadText(${JSON.stringify(text)})`);
+        assert.equal(loaded.ok, true, `the file parses (got ${loaded.status})`);
+        return t.dbg('portable.pushToTable()');
+      };
+      const socketed = (id) => `window.__diceDebug.tower === ${JSON.stringify(id)}`
+        + ` && window.__diceDebug.towerBodies().length > 0`;
+
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      // The "before", so step 3 means something.
+      assert.equal(await a.dbg('tower'), 'none', 'a fresh table stands towerless');
+      assert.equal((await a.dbg('settings')).tower, 'none', 'and the room says so');
+
+      // ---- (1) the whole prepared table, tower included ----
+      const v = await push(a, file([
+        "name: 'Forge night'", "felt: 'obsidian'", "system: 'dnd'",
+        "zoom: 'wide'", "tower: 'bastion'",
+      ]));
+      assert.equal((await a.dbg('portable.table()')).tower, 'bastion',
+        'the FILE carried the tower — the parse took an id it does not enumerate');
+      assert.equal(v.ok, true, `the push lands (got ${v.status})`);
+      assert.match(v.status, /^✓ table prepared/, 'in the shared verdict grammar');
+      assert.doesNotMatch(v.status, /left behind/, 'and nothing was dropped on the way');
+
+      await a.waitFor(`window.__diceDebug.settings.tower === 'bastion'`,
+        { desc: 'the ROOM took the tower' });
+      // POLLED, not asserted once: `queueTower` defers a change across a roll
+      // boundary and the model has to load, so a non-null `pendingTower` means
+      // "still coming" rather than failure.
+      await a.waitFor(socketed('bastion'),
+        { desc: 'the tower is socketed with its colliders in the world' });
+      assert.equal(await a.dbg('pendingTower'), null, 'with nothing left queued');
+
+      // ---- (2) THE CUJ3 HALF: a joiner who never saw the file ----
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await b.waitFor(socketed('bastion'),
+        { desc: 'the person who followed the link finds the tower up' });
+
+      // ---- (3) AN ID THIS BUILD CANNOT RAISE COSTS ONLY THE TOWER ----
+      // Sending it hopefully is not a degradation: validateSettingsPatch
+      // refuses the ENTIRE push for one bad value, so the felt, the name and
+      // every prepared seat would die too — under a receipt reading "couldn't
+      // reach the table", over a table that answered perfectly.
+      const v2 = await push(a, file(["felt: 'plum'", "tower: 'brassworks'"]));
+      assert.equal((await a.dbg('portable.table()')).tower, 'brassworks',
+        'the file still PARSES an unknown id — a whole document is not refused over one');
+      assert.equal(v2.ok, true, `and the push still lands (got ${v2.status})`);
+      assert.match(v2.status, /left behind/, 'the receipt names what was dropped');
+      assert.match(v2.status, /brassworks/, 'and says which id');
+      await a.waitFor(`window.__diceDebug.settings.felt === 'plum'`,
+        { desc: 'the rest of the push arrived' });
+      assert.equal((await a.dbg('schemaState.table')).seats, 1,
+        'seat and all — this is what a 400 on the whole push would have cost');
+      assert.equal(await a.dbg('tower'), 'bastion',
+        'and the standing tower is untouched, not lowered');
+
+      // ---- (4) `'none'` is an id, and it is the only way a file LOWERS one ----
+      const v3 = await push(a, file(["tower: 'none'"], false));
+      assert.equal(v3.ok, true, v3.status);
+      await a.waitFor(`window.__diceDebug.tower === 'none'`
+        + ` && window.__diceDebug.towerBodies().length === 0`,
+      { desc: 'the tower comes down and takes its colliders with it' });
+
+      // ---- (5) AN ABSENT KEY IS SILENCE, NOT `'none'` ----
+      // `table:` is a PATCH over the room's furniture — the same thing an
+      // absent felt has always meant.
+      await a.dbg(`setTower('bastion')`);
+      await a.waitFor(socketed('bastion'), { desc: 're-raised by hand' });
+      const v4 = await push(a, file(["felt: 'sand'"], false));
+      assert.equal(v4.ok, true, v4.status);
+      await a.waitFor(`window.__diceDebug.settings.felt === 'sand'`,
+        { desc: 'a file naming only a felt lands' });
+      assert.equal(await a.dbg('tower'), 'bastion',
+        'and the tower it said nothing about is still standing');
+
+      // ---- (6) THE ROUND TRIP, and the compat rule inside it ----
+      // The emitter is SILENT about `'none'` even though it writes the felt
+      // unconditionally: a reader already in the field refuses an unknown key
+      // inside `table:`, so writing `tower: 'none'` on every export would make
+      // every file this build writes unreadable by every older one — for a
+      // default value on a closed-beta feature.
+      assert.match(await a.dbg('portable.snapshot()'), /\n {2}tower: 'bastion'\n/,
+        'a raised tower travels in the file');
+      await a.dbg(`setTower('none')`);
+      await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'lowered' });
+      assert.doesNotMatch(await a.dbg('portable.snapshot()'), /tower:/,
+        'a towerless table writes no tower line at all');
     },
   },
 
@@ -18255,8 +19300,8 @@ export const scenarios = [
       const search = await landedAtTable(bo, boFrom);
       assert.equal(search, `?room=${encodeURIComponent(key)}`, `Bo landed in the breakout (got: ${search})`);
       bo.url = `${bo.url.split('?')[0]}${search}`;
-      await bo.waitFor(`!!window.__diceDebug.subtables.parent`,
-        { desc: 'the follower declares the parent the splitter never did' });
+      await settleNavigation(bo, `!!window.__diceDebug.subtables.parent`,
+        'the follower declares the parent the splitter never did');
       assert.equal((await bo.dbg('subtables')).parent.room, ctx.room,
         'the way back is there for the person who arrived first');
       assert.equal((await bo.dbg('settings')).felt, 'emerald',
@@ -18371,7 +19416,8 @@ export const scenarios = [
       const key = await a.dbg(`split('One Level')`);
       assert.ok(key, 'the split landed');
       await gotoRoom(a, key);
-      await a.waitFor(`!!window.__diceDebug.subtables.parent`, { desc: 'the breakout declares its parent' });
+      await settleNavigation(a, `!!window.__diceDebug.subtables.parent`,
+        'the breakout declares its parent');
       assert.equal((await a.dbg('subtables')).canSplit, false,
         'a breakout cannot split again — the verb stops one level down');
       assert.equal(await idmSplitDisplay(a), 'none',
@@ -18408,7 +19454,8 @@ export const scenarios = [
       const key = await alice.dbg(`split('Vault')`);
       assert.ok(key, 'the split landed');
       await gotoRoom(alice, key);
-      await alice.waitFor(`!!window.__diceDebug.subtables.parent`, { desc: 'Alice is in the breakout' });
+      await settleNavigation(alice, `!!window.__diceDebug.subtables.parent`,
+        'Alice is in the breakout');
 
       // The parent is now EMPTY — an unprepared room is deleted the moment its
       // last player leaves (§G6), so the room object Alice's pointer names is
@@ -18483,7 +19530,8 @@ export const scenarios = [
       const key = await alice.dbg(`split('Cellar')`);
       assert.ok(key, 'the split landed');
       await gotoRoom(alice, key);
-      await alice.waitFor(`!!window.__diceDebug.subtables.parent`, { desc: 'Alice is in the breakout' });
+      await settleNavigation(alice, `!!window.__diceDebug.subtables.parent`,
+        'Alice is in the breakout');
       const before = JSON.stringify(await alice.dbg('subtables.parent'));
 
       // (i) A STREAM REOPEN. The room still holds the split, so hello carries it
