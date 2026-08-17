@@ -6282,3 +6282,45 @@ an argument for shipping `venue` next, not for gating the tower.
   (`skippedPrefix`) and `portableVerdict().warnings` is asserted as exactly that
   loss. A tower is not a skipped section, and the report belongs where the
   consequence is — at the push, where a table is being prepared.
+
+### §7.51 — The rail foot on a finger (2026-08-17)
+
+**One paragraph of §7.45 is now superseded.** Its *Deliberately not done* list
+says all four U28b size families "stay put"; two of them no longer do. The rule
+that moved them is four lines in `css/style.css`, directly under the collapsed
+foot's coarse block:
+
+```css
+@media (pointer: coarse) {
+  #rail-foot .btn.ghost,
+  #rail-foot .corner-btn { min-height: 34px; min-width: 34px; }
+}
+```
+
+**⚙ ≣ ? ❯ and ✕ Clear mine are ONE ROW, so they are one change.** They were
+31px and 28px; both are 34×34 on a coarse pointer now. The row's height is its
+tallest child, which is why pricing them as two families would have priced the
+same 3px twice — and 3px is the whole bill, off the scrolling body at U30's
+worst frame (1024×768 landscape: reverting the rule reads 660 → 663). Rerun any
+figure in this section with `node tools/steps/touch-price.mjs`.
+
+**Why 34 and not 44, stated as a ruling rather than a shortfall.** `?` is 33px
+wide, and four 44px glyphs beside a 101px labelled ✕ do not fit a 260px column.
+A rule buying 44 of height while the width stayed 37 would spend rack for a
+target that still fails 44×44 — paying for a number instead of a finger. 34 —
+U28's 9 mm finger pad, this file's floor — is reachable on **both** axes here,
+and that is the whole of why it is the number. Where a control's budget affords
+44, the doctrine is unchanged and 44 is still taken.
+
+**The collapsed rail is deliberately untouched.** Its controls keep the width
+budget they were measured to (`#left-panel.collapsed …` at (2,3,0) outguns this
+rule's (1,2,0) on both `padding` and `min-width`), and its own coarse block
+already stands them up on height. It has a live near-miss the expanded state
+does not: 18–19px **wide**, in an 86px content box that 81px of it already
+spends. That is a layout question in U28a's shape, recorded in ROADMAP U28b
+against U21 — **do not answer it with a size rule**, because there is no width
+left to give.
+
+Reasoning, before/after measurements and the refusals for `.btn.tiny` and
+`#section-bar` are in [SHIPPED.md](SHIPPED.md), *U28b — the expanded rail foot*.
+

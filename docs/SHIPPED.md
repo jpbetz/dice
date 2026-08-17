@@ -2928,6 +2928,72 @@ a short-laptop frame for U30's height branch. A coarse-only rule is invisible
 to a tool that never emulates touch, which is the same blindness the audit
 found in the suite itself.
 
+### U28b. The expanded rail foot — SHIPPED 2026-08-17
+
+One of U28b's four refused size families, taken alone and with its price. The
+rule is four lines in `css/style.css` under the collapsed foot's coarse block,
+where the two halves of the same story now sit together:
+
+```css
+@media (pointer: coarse) {
+  #rail-foot .btn.ghost,
+  #rail-foot .corner-btn { min-height: 34px; min-width: 34px; }
+}
+```
+
+**Two families, one row, one change.** ⚙ ≣ ? ❯ (`.btn.ghost`, 31px) and
+✕ Clear mine (`.corner-btn`, 28px) are siblings in `#rail-foot`, so the row's
+height is its tallest child and both reach the floor together — pricing them
+separately would have priced the same 3px twice. Before
+(`38×31, 37×31, 33×31, 37×31` and `101×28`) and after (`38×34, 37×34, 34×34,
+37×34` and `101×34`).
+
+**Every number in this entry is printed by `node tools/steps/touch-price.mjs`**,
+which shipped with it. It reads offsetWidth/offsetHeight under an emulated
+coarse pointer at U30's worst frame — deliberately the same reader
+`touch-targets` uses, so a figure here and an assertion there cannot disagree —
+and it prices each candidate as a **delta inside one run** rather than two
+numbers from two runs.
+
+**What U28 actually did, and why this was left.** The 2026-08-08 pass fixed the
+**collapsed** foot (`padding: 11px 3px`, css/style.css:2467) and stopped there,
+so the same five controls stayed at 31/28 in the state most people use. The
+comment above that block is a width argument end to end — it never asks what
+the expanded row costs, because in the expanded column width is free.
+
+**THE FLOOR IS 34 AND THAT IS THE ARGUMENT, not a shortfall.** `?` is 33px
+wide, and four 44px glyphs plus a 101px labelled ✕ cannot fit a 260px column —
+so a rule buying 44 of height while width stayed 37 would have spent rack for a
+target that still failed 44×44. 34 is reachable on **both** axes here, which is
+the whole of why it is the number (U28's own conversion: 34 is a 9 mm finger
+pad and this file's floor; 44 is the platform guideline and is taken where the
+budget affords it).
+
+**It costs the rack 3px, and the tool prices it by REVERTING it.** `#rail-foot`
+is `flex: none` in the column, so its height comes off the scrolling body: put
+the row back to 31/28 and `#builder-panel > .panel-body` goes **660 → 663**.
+The two refused families are priced in the same run — see ROADMAP U28b.
+
+**The first write-up of this said 4px, and that is worth more than the fix.**
+The 4 was measured on a *padding-based candidate* (`padding-block: 9px`) which
+landed the ghosts at 35px; the rule that shipped uses `min-height` and lands
+them at exactly 34, so the row grows 31→34 and the bill is 3. **A number
+measured on the prototype and written up as the shipped fact** is this repo's
+commonest doc defect, and it slipped past two doc passes here — it was caught
+only when the throwaway probe was rewritten as a committed tool step and run
+against the shipped tree. That is the argument for the tool step over a
+scratchpad path in a comment: a command nobody can run is a date with extra
+characters.
+
+**The collapsed rail is untouched, by specificity rather than by hope.** The
+collapsed block is `#left-panel.collapsed #rail-foot .btn.ghost` at (2,3,0)
+against the new rule's (1,2,0), so both `padding` and `min-width` lose there and
+the icon rail keeps the width budget it was measured to. Verified after the
+change: the collapsed foot still uses **81px of its 86px content box**, and its
+controls still read 19×39 / 18×39 / 18×39 / 18×37 — which is also how the new
+near-miss in ROADMAP U28b was found (18–19px **wide** is under the floor, and
+no rule can fix it in an 86px box).
+
 ---
 
 # Moved out of ROADMAP.md (2026-08-14 cleanup)
@@ -4128,6 +4194,73 @@ rMax 12, count 200) and scoped it to HEARTWOOD ONLY — a registry family
 trait (`TOWERS[id].motes`) set through towerSocket, so the dust rises and
 settles with its tower and every other body of air stays clean.
 
+### V4 (instrument). The frame's draw budget is now a number — SHIPPED 2026-08-17
+
+Audit §10's first gap, and the reason it was not the one-liner it looks like:
+**the obvious read of `renderer.info.render.calls` lies, and it lies in the
+flattering direction.** three.js resets that counter *inside* every
+`renderer.render()` (`if (this.info.autoReset === true) this.info.reset()`),
+and js/post.js issues up to **eight** renders per frame — base, glow,
+threshold, four blurs, composite. So a scenario reading it after a bloom frame
+gets the **1 draw call** of the closing fullscreen quad and passes any budget
+anybody could write. A green check masking a broken thing, pre-installed.
+
+Three small hunks in `js/main.js` take the reset over:
+
+- `renderer.info.autoReset = false` beside the renderer (js/main.js:655);
+- `renderer.info.reset()` once per frame, inside tick()'s `if (render)` gate
+  (js/main.js:8657), so the counters **accumulate across every pass** — and the
+  2048² PCFSoft **shadow map is now in the total**, which the engine's own reset
+  point deliberately skips (it resets *after* `shadowMap.render`);
+- `__diceDebug.renderAudit()` (js/main.js:12512) — `calls`, `triangles`,
+  `lines`, `points`, `passes`, `post`, `pixelRatio`, `programs`, `geometries`,
+  `textures`.
+
+**`passes` is there so the number can be disbelieved**, and the sabotage check
+proved it is needed *and* corrected the contract that was written first. Flip
+`autoReset` back to `true` and:
+
+| frame | as shipped | sabotaged |
+| --- | --- | --- |
+| blackanvil + 4d6, plain | 186 calls, 1 pass | **81** calls, 1 pass |
+| blackanvil + 4d6, post forced | 246 calls, 8 passes | **1** call, 8 passes |
+| blackanvil idle, no dice, plain | 170 calls | **93** calls |
+
+So **the anti-collapse floor belongs on a POST frame and nowhere else.** On a
+plain frame the sabotage only hides the shadow pass — 81 is still far above any
+sane floor, and a plain-frame floor would have been theatre. A ceiling-only
+budget passes the sabotage on every row. The first draft of this contract put
+the floor on a plain settled frame; it would have shipped green.
+
+The same table measures something the default counter can never show: the 2048²
+shadow pass is **77 of blackanvil's 170** idle draw calls, **45% of the frame**.
+`pixelRatio` rides along for the same disbelief reason (see the wrong-claims
+table: the clamp the audit called missing was never missing).
+
+**The scene-wide sibling of `towerDressAudit()`, not a replacement.** That one
+WALKS the graph and counts meshes — the dressing's static price, budgeted at
+≤4k tris / ≤8 draws by `tower-dress-budget`. This one reports what three.js
+actually *issued* for one frame.
+
+**Measured 2026-08-17 by `node tools/steps/draw-price.mjs`**, which shipped with
+the instrument and is the command behind every draw figure in this entry and in
+ROADMAP V4 — after settle, headless, dpr 1 (draw calls do not depend on
+resolution, so the figures port): empty felt **2**, a settled `4d6` on bare felt
+**58**, `heartwood` **133**, `bastion` **141**, `blackanvil` **186**,
+`nullstone` **68**, `hollowbole` **79**, and `blackanvil` with the post stack
+forced **246 in 8 passes**. The step finds the worst tower itself rather than
+trusting the list, then evaluates the proposed assertion and prints PASS/FAIL
+per line, so the scenario can be written from a run instead of from a paragraph.
+
+Two of those numbers are load-bearing elsewhere: 186-every-frame-forever is what
+makes V4's idle throttle worth keeping, and 2-on-an-empty-table is what makes it
+a LOOK question rather than a win.
+
+*Note for whoever writes the assertion:* `sim()` ticks with `render=false`, so
+the audit always reports the last **real** rAF frame — wait for a fresh frame
+(`waitFor` on the audit itself) after changing scene state, and read after a
+settle, since mid-playback frames legitimately draw more.
+
 
 ## Tier W — the landings (W0, W1, W3)
 
@@ -5110,6 +5243,7 @@ was true when it was made and had stopped being true — which is the failure th
 | **GOALS goal 14: "the thirteen rules"** | Fifteen. Rules 14 and 15 had both landed. GOALS wins ties, so a stale count there is worse than anywhere else. |
 | **§3b's blocker, and four line refs** | The throttle it names as owed **landed**. `initNet`, `dice.name.v1`, `MAX_ROOMS` and `renderSeatChoices` were all cited at line numbers that had moved. |
 | **POOL-ANALYSIS §6.1's two timings** | Do not reproduce, and their *ordering is impossible* — `poolBars` calls `spectrum`, yet the doc has it faster. Unwarmed-JIT noise, never measurements, in a document whose first rule is that every number is generated. |
+| **IMMERSION-AUDIT §10 / ROADMAP V4: "pixel ratio not clamped (worth checking on laptops)"** | **Never true, on any day.** `renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))` is at js/main.js:641 and has been there since the repo's first commit: `git log -S "setPixelRatio(Math.min" --oneline -- js/main.js` returns `2036d59 init` and nothing else. Same shape as C27 — not drift, wrong on the day it was written, and it survived a re-copy into the roadmap. It is now assertable rather than re-asserted: `__diceDebug.renderAudit().pixelRatio` reports it (headless reads 1; the ceiling is the claim, so assert `<= 2`). |
 
 ## Two findings about method, worth more than any single fix
 

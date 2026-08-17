@@ -452,25 +452,51 @@ attributed-math invariant has nothing to attribute.
 The visibility core shipped. What remains is refinement; nothing here blocks
 the ladder.
 
-### 4b. Visibility refinements
+### 4b. Visibility refinements — ALL FOUR ARE DESIGN-FIRST; none is a one-line fix
+
+**Re-verified against the tree 2026-08-17 and every claim below HELD** — which
+is itself the finding, and an unusual one for this file. Two of these bullets
+are claims *about today's code* and both are still exactly true; the other two
+are unbuilt by decision rather than by neglect. So THE ORDER's "several
+one-line" describes V4 and U28b, **not this section** — there is nothing here
+an hour can close, and the two that look smallest are the two that touch the
+wire.
 
 - **Sticky mode + its badge, as one change.** A remembered per-player default
   (Foundry's roll-mode ergonomic) is only safe alongside a standing eye-slash
   badge on the Roll button and the mini pills — a sticky non-open default with
   no persistent signal is the accident vector §3.2 names. **Ship both or
-  neither.**
+  neither.** *Verified unbuilt:* `grep -rn "sticky\|eye-slash" js/ css/ index.html`
+  finds only CSS `position: sticky` and one mockup helper
+  (`docs/mockups/dice-sets.html:771`); the picker is seeded from the notation it
+  opened on, and [UX §3.2](UX.md) says so in its own words at docs/UX.md:730
+  ("Not sticky, and therefore un-badged"). **Bigger than the tail:** the badge
+  half is a persistent signal on the Roll button *and* every mini pill *and*
+  every saved-pool row, on the one control whose mistake cannot be undone.
 - **Silent whisper.** A whisper whose bystanders learn *nothing*, not even
   that a roll happened. Today every rung but `secret` makes existence public,
   and PF2e's precedent is that roll-existence is itself mechanically
   meaningful. This is a fifth rung, not a tweak: `secret`'s omit-entirely
-  projection with `whisper`'s audience.
+  projection with `whisper`'s audience. **Bigger than the tail, and
+  structurally:** the rungs are an enum on the wire (`VIS_MODES`,
+  js/main.js:14607) with a projection branch per rung (`projectEntryFor`,
+  server.js:1737) — a fifth rung owes a projection, a picker sub-line, a
+  reveal-authority answer, and an answer for every `visMode` reader that
+  switches on three names.
 - **Reveal to a subset.** Rejected for step 4 because reveal is currently
   total and one-way, which is what makes it auditable. Revisit only with a
   concrete table need.
 - **Audience legibility.** A shrouded viewer reads the audience only when the
   roll has no `# comment` — `label` carries one or the other. Decide whether
   "who was whispered to" deserves its own always-present field, or whether
-  comment-shadowing is the correct privacy default.
+  comment-shadowing is the correct privacy default. *Verified true today:* the
+  redacted projection carries `label` (server.js:1757) and deliberately never
+  the audience (the comment at server.js:1774 says so), and `label` is
+  `res.comment || res.canonical` (js/main.js:15461) — so `1d20 w:Kira` shows a
+  bystander the audience and `1d20 w:Kira # Perception` hides it. **This is a
+  decision, not a defect:** an always-present audience field is a new wire
+  field on the one payload whose whole job is to omit, so it cannot be a
+  refinement of the renderer.
 
 ---
 
@@ -1324,14 +1350,54 @@ UX §7.45. **The first bullet — the one CUJS.md names as CUJ11's first item �
 stale**: §7.28 deleted the auto-collect clock on 2026-08-10, four days after the
 audit found it. CUJ11's first item shipped by deletion before the journey was named.
 
-### U28b. Touch findings — TWO SHIPPED, the near-misses still open
+### U28b. Touch findings — TWO SHIPPED, then the RAIL FOOT; two families still refused
 
 `.rd-cell` and the rim wrap shipped (UX §7.45), both coarse-only.
 
-**Still open, and the reasons still bind:** a blanket coarse `.btn` bump touches ~30
-surfaces and bumping `#section-bar` spends U30's rack budget directly. The families
-are `.btn.ghost` at 31px, `.corner-btn` at 28 expanded, `.btn.tiny` at 19,
-`#section-bar` cells at 26. **Raise by family with the measurement, never in bulk.**
+**The rail foot shipped 2026-08-17** — `.btn.ghost` and `.corner-btn`, which
+turned out to be the *same row*, so the pair is one change and it cost the rack
+**3px**. See SHIPPED.md, *U28b — the expanded rail foot*. All four measurements
+in the original entry were re-taken first and **all four were still exact**
+(31 / 28 / 19 / 26).
+
+**Every figure below reruns: `node tools/steps/touch-price.mjs`.** It prints the
+families' live geometry and prices each candidate as a delta inside one run
+(the shipped rule by reverting it), at U30's worst frame, with the same reader
+`touch-targets` asserts on.
+
+**Still refused, and now with the number that refuses them:**
+
+- **`.btn.tiny` at 19px** — the worst of the four and the one that must not be
+  done alone. It is ~25 buttons in the densest rows in the app (the portable
+  door's five-across, the profile row, the offer row), and its dress is
+  explicitly *label-bearing* — "`.btn.tiny` verbs, muted words, no new colour"
+  (css/style.css:3815). 19 → 34 is +15px on rows that already have an
+  overflow defect on the record (index.html:1164: a settings destination
+  "overflowed a 459px window by 251px"). It needs the settings modal
+  re-measured in the same pass, which is what makes it not a one-liner.
+- **`#section-bar` cells at 26px** — unchanged reason (U30's rack budget), and
+  the measurement now says something sharper than "spends it": the bar lives
+  *inside* the scrollport, so bumping it costs **0px of scrollport and 8px of
+  the rack's own content**, i.e. it is paid in the one place U30 exists to
+  protect. §7.41 also has it as a SWITCH set, not a button family.
+
+**And one NEW near-miss the original list missed.** The *collapsed* foot's
+controls are 18–19px **WIDE** on coarse — `toggle-settings 19×39`,
+`rail-log 18×39`, `rail-palette 18×39`, `corner-clear 18×37` — so they clear
+the floor on height and fail it on width, and `touch-targets` never looks
+(its list is expanded-state). This is not fixable by a rule: four controls plus
+the contextual ✕ in an 86px content box already use 81px (measured, and the
+budget is written at css/style.css:2434). It is U28a's shape — a **layout**
+change before a size one — and it belongs with U21, which is already the
+"collapsed rail deletes multiplayer" entry.
+
+**Raise by family with the measurement, never in bulk** — that rule held up:
+of the four families it says to price separately, one was nearly free (3px), one
+is paid in the protected place, one carries a known overflow, and the fifth
+thing it did not list cannot be priced at all. It held up in a second way too:
+the first write-up of the shipped bump said **4px**, measured on a
+padding-based candidate rather than on the rule that shipped, and only the
+committed tool step caught it (SHIPPED.md has the postmortem).
 
 ---
 
@@ -1341,23 +1407,107 @@ are `.btn.ghost` at 31px, `.corner-btn` at 28 expanded, `.btn.tiny` at 19,
 against the industry canon: seven pillars STRONG, three PARTIAL, one GAP. V1
 (audio phase one) and V2 (dust motes) shipped — see SHIPPED.md.*
 
-### V3. Finish the wear dossier — small-medium
+### V3. Finish the wear dossier — **NOT small; it is a fifth wear pass and a LOOK**
 Audit §2's two designed-but-unbuilt items: hand-polish roughness zones (tray,
 jambs — "polished where hands and dice pass") and the arris ribbon (sparse
 chip decals that break the long straight edges). Completes "aged" into "aged
 and handled."
 
-### V4. Performance guardrails — small
-Audit §10: assert `renderer.info.render.calls` in `tower-roll` (a budget as a
-failing test, not a vibe) · clamp `setPixelRatio` · an idle tick throttle
-(render-on-demand proper conflicts with the breathing world; the applicable
-form is a reduced idle rate). *(T14 already made the tower draw budget an
-assertion at 20 total — this is the same discipline for the scene.)*
+**Re-scoped 2026-08-17 (verified unbuilt: `grep -rn "arris\|burnish\|polish"`
+over `js/` finds the word only in *comments explaining existing bevels*, never
+a pass).** This is not tail work and it should not be started as tail work:
 
-### V5. Diegetic nudges — small, DESIGN FIRST
+- The wear stack is FIVE analytic passes shared by every tower
+  (`weatherPass`, `grimePass`, `dustPass`, `mossPass`, `gravityStain` — all
+  exported from js/towerskin.js and called by towerhollow/towerbastion/
+  towerdress). A polish pass is a **sixth**, it INVERTS the others' sign
+  (roughness *down* where they all push it up), and it needs a zone predicate
+  ("where hands and dice pass") that no existing pass has any notion of — the
+  four dials are curvature, concavity, up-vector and drift.
+- Then it has to be **dialled per tower and per palette**, which is
+  T6's "two palettes cost two of everything", and accepted **by Joe's eye** —
+  and five LOOK verdicts are already outstanding at #1. Shipping a wear pass
+  into that queue lengthens it.
+- The arris ribbon is the cheaper half and still not small: `DecalField`
+  (js/decals.js) is a FELT-impact system, so edge chips on tower geometry are
+  either a new decal domain or baked into each skin.
+
+**Leave it whole for a materials round with a LOOK slot booked.** Salvage: it
+is the natural companion to [T15](#t15-re-bake-the-three-classic-skins-through-the-forge--large-scoped-2026-08-14),
+which is already re-baking the three classic skins and already queued behind
+Joe.
+
+### V4. Performance guardrails — **the instrument SHIPPED 2026-08-17; the assertion and the throttle are what is left**
+Audit §10 asked for three things and one of the three was **never true**:
+
+- ✅ **`renderer.info.render.calls`, as a number a test can hold** — SHIPPED
+  (SHIPPED.md, *V4 (instrument)*). `__diceDebug.renderAudit()` reports the
+  frame's real cost, and the reason it took more than one line is the trap:
+  three.js resets that counter inside *every* `renderer.render()`, and
+  js/post.js issues up to eight per frame, so the obvious read reports the
+  closing quad's single draw and passes any budget. `renderer.info.autoReset`
+  is now ours (js/main.js:655) and tick() resets once per frame
+  (js/main.js:8657).
+- ❌ **"pixel ratio not clamped"** — **the audit was wrong on the day it was
+  written.** `renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))`
+  has been there since the repo's first commit: `git log -S
+  "setPixelRatio(Math.min" --oneline -- js/main.js` returns `2036d59 init` and
+  nothing else. Recorded in SHIPPED.md's wrong-claims table; `renderAudit()`
+  now reports `pixelRatio` so the clamp is assertable rather than re-asserted
+  from memory.
+- ⬜ **The assertion itself** — a scenario, and the contract is written **and
+  sabotage-checked**, which changed it. Read on `blackanvil` (the heaviest
+  registry tower) with a settled `4d6`:
+  - plain frame: `passes === 1`, `post === false`, `calls <= 220` (measured
+    **186**);
+  - then `postForce(true)` and wait for `passes > 1`: `passes === 8`,
+    `calls <= 300` (measured **246**), and **`calls > 40`**;
+  - `pixelRatio <= 2`.
+
+  **The floor belongs on the POST frame and nowhere else, and the first
+  version of this contract had it in the wrong place.** With
+  `renderer.info.autoReset` sabotaged back to `true`, the post frame reads
+  **1 call in 8 passes** (the closing quad) — caught. The *plain* frame reads
+  **81 instead of 186**, because the engine's reset point only hides the shadow
+  pass there: still far above any sane floor, so a plain-frame floor is theatre.
+  A ceiling-only budget passes the sabotage on both. Incidentally measured the
+  same way: the 2048² shadow pass is **77 of blackanvil's 170** idle draw calls
+  (170 shipped vs 93 sabotaged, no dice) — 45% of the frame, and exactly what
+  the default counter does not show you.
+
+  Per-tower, after settle, headless at dpr 1: empty felt **2**, 4d6 on bare
+  felt **58**, `heartwood` **133**, `bastion` **141**, `blackanvil` **186**,
+  `nullstone` **68**, `hollowbole` **79**. Owner: whoever owns
+  `tests/e2e/scenarios.mjs` next.
+
+  **Every number above reruns: `node tools/steps/draw-price.mjs`** — it walks
+  the registry, finds the worst plain frame itself rather than trusting this
+  list, forces the post frame, and then *evaluates the five assertions above and
+  prints PASS/FAIL for each*, so the scenario can be written from a run instead
+  of from this paragraph. It also carries the instruction for re-running the
+  sabotage.
+- ⬜ **The idle tick throttle — NOT a one-liner, because its gate is an eye.**
+  The measurement is why it is worth keeping: idle with no tower is **2 draw
+  calls**, and idle with `blackanvil` up is **186, every frame, forever**. So
+  the payoff is real. But "idle" here still has the ember breath, the sway and
+  the smoke running by design (the audit says so itself), so a reduced idle
+  rate is a *visible* change to the breathing world, and the only thing that
+  can accept or refuse it is Joe's eye — which is the queue at #1. Do not
+  land it as tail work; take it with a LOOK slot.
+
+### V5. Diegetic nudges — DESIGN FIRST, and the hover half has no substrate
 Audit §11: a result echo on the felt near the deciding die; hover warmth on
 dice ("everything you can touch touches back"). The mat's painted text is the
 precedent that this is buildable without a framework.
+
+**Checked 2026-08-17: there is no pointer→die path in the app at all.** The
+only `pointermove` on the canvas is CAMPEEK's hold-drag (js/main.js:747), and
+it deliberately *swallows* the click that follows a pivot — so "hover warmth"
+starts by adding a per-frame raycast against `tableDice` and then owes an
+answer for touch, where hover does not exist and every one of those frames is
+the drag. The felt echo is the more promising half and the mat precedent does
+hold, but it needs the ruling U16 needs: the app has no worldspace text
+renderer, only painted mat texture. Both stay design-first.
 
 ### V6. Taste items, someday — record only
 A trauma²-curve table-nudge on the heaviest single-die landing; a grade LUT.

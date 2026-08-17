@@ -160,10 +160,21 @@ pass; frustum culling default; bakes memoized per page.
 
 Gaps: no `renderer.info.render.calls` assertion in the e2e (the audit's
 "turns a budget from a vibe into a failing test" — fits our __diceDebug
-pattern exactly); pixel ratio not clamped (worth checking on laptops); no
-idle render throttling — and note render-on-demand proper now conflicts
+pattern exactly); ~~pixel ratio not clamped (worth checking on laptops)~~;
+no idle render throttling — and note render-on-demand proper now conflicts
 with the breathing world (sway/smoke/ember run every frame by design), so
 the applicable version is a reduced idle tick rate, not a stopped loop.
+
+**CORRECTION 2026-08-17 — the pixel-ratio gap was never real.** The clamp is
+`renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))` at
+js/main.js:641 and it has been there since the repo's first commit:
+`git log -S "setPixelRatio(Math.min" --oneline -- js/main.js` → `2036d59 init`,
+nothing else. Struck rather than deleted because the *habit* is the finding:
+this row was written from a reading, copied into ROADMAP V4, and read twice
+more before anybody ran a grep. The other two gaps stand, and the first now
+has its instrument — `__diceDebug.renderAudit()`, which also reports
+`pixelRatio` so this claim can be *asserted* instead of remembered
+(SHIPPED.md, *V4 (instrument)*).
 
 ## 11. Interaction & diegesis — PARTIAL
 

@@ -640,6 +640,19 @@ const view = (() => {
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(view.width, view.height);
+// THE FRAME'S DRAW BUDGET IS OURS TO COUNT (V4, IMMERSION-AUDIT §10). A naive
+// read of `renderer.info.render.calls` after a frame LIES here, and it lies in
+// the flattering direction: three.js resets that counter inside every
+// `renderer.render()` (vendor/three.module.js — `if (this.info.autoReset ===
+// true) this.info.reset()`), and js/post.js issues up to EIGHT renders per
+// frame (base, glow, threshold, four blurs, composite). So a bloom frame read
+// that way reports the ONE draw call of the closing fullscreen quad and passes
+// any budget anybody could write. Own the reset instead — tick() clears once
+// per frame, below the `if (render)` gate — and two things become true:
+// the counters ACCUMULATE across every pass of the frame, and the SHADOW map
+// is finally in the total, because the engine's own reset point sits *after*
+// `shadowMap.render` and a 2048² PCFSoft pass is real GPU work either way.
+renderer.info.autoReset = false;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -8581,6 +8594,14 @@ function stepTowerDress(dt) {
   }
 }
 
+// How many `renderer.render()` calls the last rendered frame made: 1 through
+// the plain path, up to 8 through the post stack. Not decoration — it is what
+// makes renderAudit()'s draw count FALSIFIABLE. If `info.autoReset` ever came
+// back on, `calls` would quietly collapse to the closing quad's single draw
+// and every "under budget" assertion would still pass; a frame that reports
+// several passes and a draw count in the dozens cannot be that frame.
+let renderPasses = 0;
+
 function tick(dt, render = true, realtime = false) {
   // Themed-set clocks (Tier 6 §9): the Level 2 shader uniform and the
   // Level 3 particle field advance with the same dt discipline as
@@ -8630,6 +8651,11 @@ function tick(dt, render = true, realtime = false) {
   if (isPeekOpen()) positionPeek();
   updateCornerClear();
   if (render) {
+    // One reset per FRAME, not per pass (see renderer.info.autoReset above):
+    // everything the frame draws — shadow map, base, glow, blurs, composite —
+    // lands in one total that renderAudit() can read afterwards.
+    renderer.info.reset();
+    const passAt = renderer.info.render.frame;
     // Level 5 bypass: the stack runs only in frames where it could show
     // something — a bloom-flagged die on the FELT, live particles, a
     // running ring/shimmer, or the test force. (The S3 fix's shelf gate
@@ -8643,6 +8669,7 @@ function tick(dt, render = true, realtime = false) {
     } else {
       renderer.render(scene, camera);
     }
+    renderPasses = renderer.info.render.frame - passAt;
   }
   if (peeked) restoreCamPeek();
 }
@@ -12470,6 +12497,28 @@ window.__diceDebug = {
   towerProbePortals(spec) {
     towerProbeOverride = spec ? JSON.parse(JSON.stringify(spec)) : null;
     return towerProbeOverride ? towerVolumes(towerProbeOverride).z0 !== undefined : null;
+  },
+  // WHAT THE LAST FRAME COST THE GPU (V4, IMMERSION-AUDIT §10 — "turns a
+  // budget from a vibe into a failing test"). The scene-wide sibling of
+  // towerDressAudit(): that one WALKS the graph and counts meshes, which is
+  // the dressing's static price; this one reports what three.js actually
+  // ISSUED — shadow map, base pass, and every post pass — for one frame.
+  //
+  // `passes` is here so the number can be disbelieved: see renderPasses.
+  // `pixelRatio` rides along because the audit's other §10 gap was "pixel
+  // ratio not clamped", and the clamp is a claim a test can hold (a headless
+  // tab at dpr 1 reads 1; the ceiling is what matters, so assert `<= 2`).
+  // Read it AFTER a settle — mid-playback frames legitimately draw more.
+  renderAudit() {
+    const r = renderer.info.render;
+    return {
+      calls: r.calls, triangles: Math.round(r.triangles), lines: r.lines, points: r.points,
+      passes: renderPasses,
+      post: renderPasses > 1,
+      pixelRatio: renderer.getPixelRatio(),
+      programs: renderer.info.programs ? renderer.info.programs.length : null,
+      geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures,
+    };
   },
   wallPositions() {
     return {
