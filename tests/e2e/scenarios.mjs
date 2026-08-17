@@ -1496,7 +1496,10 @@ export const scenarios = [
         'the panel is a NAMED region');
 
       // ---- the trap, on every blocking surface ----
-      const state = (id) => a.eval(`(() => {
+      // Parameterised by TAB, because the fourth surface (#name-modal) cannot
+      // be opened on this one: the seat picker is a boot-time prompt, not a
+      // verb, so its row brings its own `anon: true` tab below.
+      const state = (t, id) => t.eval(`(() => {
         const el = document.getElementById(${JSON.stringify(id)});
         const bg = [...document.body.children].filter((c) => c !== el);
         return {
@@ -1505,8 +1508,10 @@ export const scenarios = [
           named: !!(el.getAttribute('aria-labelledby') || el.getAttribute('aria-label')),
           inertBg: bg.every((c) => c.inert),
           focusInside: el.contains(document.activeElement),
+          focusedId: document.activeElement ? document.activeElement.id || null : null,
         };
       })()`);
+      const anyInert = (t) => t.eval(`[...document.body.children].some((c) => c.inert)`);
 
       for (const [id, open, close] of [
         ['help-overlay', `openHelpDialog(null)`, `closeHelpDialog()`],
@@ -1514,7 +1519,7 @@ export const scenarios = [
         ['settings-modal', `openSettingsModal()`, `closeSettingsModal()`],
       ]) {
         await a.dbg(open);
-        const st = await state(id);
+        const st = await state(a, id);
         assert.equal(st.modal, 'true', `${id} claims aria-modal`);
         assert.equal(st.role, 'dialog', `${id} is a dialog`);
         assert.ok(st.named, `${id} has an accessible name`);
@@ -1523,9 +1528,7 @@ export const scenarios = [
         assert.equal(st.inertBg, true, `${id} makes the rest of the page inert`);
         assert.equal(st.focusInside, true, `${id} takes focus when it opens`);
         await a.dbg(close);
-        const after = await a.eval(
-          `[...document.body.children].some((c) => c.inert)`);
-        assert.equal(after, false, `${id} releases the page when it closes`);
+        assert.equal(await anyInert(a), false, `${id} releases the page when it closes`);
       }
 
       // ---- the focus ring that was removed with nothing put back ----
@@ -1586,6 +1589,283 @@ export const scenarios = [
       assert.equal(mk.tab, 0, 'and it is reachable — its card is the only door to Reveal');
       assert.ok(mk.named > 10, `and it says which roll it is (name is ${mk.named} chars)`);
       await a.dbg('setLogFlyout(false)');
+
+      // THE TWO TAB-OPENING BLOCKS BELOW RUN LAST, and that is a harness fact
+      // rather than a preference: opening a page over CDP moves the browser's
+      // focus to it, and `:focus` only matches in the FOCUSED document — so the
+      // focus-ring assertion above reads `box-shadow: none` on a perfectly good
+      // input the moment a second tab exists. Measured here, 2026-08-17: this
+      // pair sat above it for one run and took it red.
+
+      // ---- the FOURTH surface: #name-modal, the one a stranger meets first --
+      //
+      // It was the last blocking overlay outside `openModal`: full-screen
+      // scrim, no `role`, no `aria-modal`, no containment, and Tab from the
+      // name field walked the entire workbench behind it. It is now the same
+      // call as the three above, so it owes the same five — asserted through
+      // the same `state()` so the row cannot quietly become a weaker test.
+      //
+      // Its open and close are not verbs: the picker is raised by `promptName`
+      // during boot and torn down by whichever door resolves the prompt. So the
+      // row brings an `anon: true` tab (no seeded name → the app stops at 'Take
+      // a seat' instead of joining) and uses the two real doors.
+      {
+        const door = await ctx.newTable({ origin: '127.0.0.180', anon: true });
+        const st = await state(door, 'name-modal');
+        assert.equal(st.modal, 'true', 'name-modal claims aria-modal');
+        assert.equal(st.role, 'dialog', 'name-modal is a dialog');
+        assert.ok(st.named, 'name-modal has an accessible name');
+        assert.equal(st.inertBg, true, 'name-modal makes the rest of the page inert');
+        assert.equal(st.focusInside, true, 'name-modal takes focus when it opens');
+        // C11 SURVIVED THE TRAP, and that is not free: the initial focus now
+        // rides `openModal`'s `focus:` option rather than a separate
+        // `input.focus()`, so a trap that took focusablesIn's first element
+        // unconditionally would land on the ✕ for EVERYONE. On a fine pointer
+        // (headless is `pointer: none`, which is not coarse) the field keeps it.
+        assert.equal(st.focusedId, 'name-input',
+          `a fine pointer still lands in the name field (focus is on ${st.focusedId})`
+          + ' — the keyboard rule and the trap have to hold at the same time');
+        await door.dbg('dismissSeatPicker()');
+        await door.waitFor(`window.__diceDebug.seatPicker.open === false`,
+          { desc: 'the ✕ / Esc door closes the picker' });
+        assert.equal(await anyInert(door), false,
+          'name-modal releases the page when it is dismissed');
+        // Left open on purpose: ctx.closeAll() takes it, and dropping a tab
+        // from ctx.tables early would drop its recorded page exceptions with it.
+      }
+
+      // ---- …and released after a real JOIN, not only after a dismissal ------
+      //
+      // THE LEG THAT MATTERS. `takeFreeSeat` is a SECOND exit from this modal
+      // and it hides the panel itself; a trap wired only to the dismissal path
+      // would leave every body sibling `inert` forever on the ordinary way in —
+      // no scrim, no dialog, nothing on screen to see, and a table that cannot
+      // be tabbed into, clicked, or read by assistive tech. There is no visible
+      // symptom, which is why it is asserted rather than trusted, and why
+      // `hideSeatModal()` is the one place that hides the door.
+      {
+        const joiner = await ctx.newTable({ origin: '127.0.0.181', anon: true });
+        assert.equal(await anyInert(joiner), true,
+          'the page is inert while the door is up — otherwise the release below is a claim about nothing');
+        const got = await joiner.dbg(`chooseSomeoneElse('Nadia')`);
+        assert.equal(got.ok, true, `the Join door takes the typed name (${got.status})`);
+        await joiner.waitOnline();
+        assert.equal(await joiner.dbg('seatPicker.open'), false, 'and the door is down');
+        assert.equal(await anyInert(joiner), false,
+          'JOINING releases the page too — the exit nobody wires the trap to');
+      }
+    },
+  },
+  {
+    name: 'flyout-banner',
+    tags: ['chrome', 'roll'],
+    timeout: 150000,
+    // THE FLYOUT AND THE BANNER WANT THE SAME FELT (2026-08-16, css:6501).
+    //
+    // THE ROADMAP'S FRAMING OF THIS BUG WAS WRONG TWICE, and this scenario
+    // encodes the corrected version rather than the one that was written down:
+    //
+    //   · it is NOT a `body.mini` rule. At 1440x900 with both panels collapsed
+    //     the page IS mini and the overlap is exactly ZERO. The real condition
+    //     is a felt narrower than ~324px, where both boxes saturate to the same
+    //     column — both size themselves off the felt and both anchor to its
+    //     bottom edge (12px and 44px), so any flyout taller than 32px lands on
+    //     the banner. `sharesColumn` is the measured predicate; `body.mini` is
+    //     the proxy that would have moved a layout that was never broken.
+    //   · and "covers it entirely" was 83%, not all. 840 of 1008 sampled
+    //     points; the ~23px strip that survives carries #result-label, so a
+    //     screenshot still shows a titled card while the total, the meaning,
+    //     the breakdown and the fold's Reveal are all underneath it.
+    //
+    // WHY `covered` AND NOT `lift`. The lift is the MODEL. An occlusion claim
+    // that trusts the model is this project's signature green check: the lift
+    // could be perfect and a third box could still be painted over the read.
+    // `bannerVsLog.covered` samples the banner on a 6px grid and asks
+    // elementFromPoint what is actually on top — the same instrument the defect
+    // was measured with. And `covered === 0` is worthless on its own, because
+    // two hidden boxes and a banner that never appeared both produce it: every
+    // leg below therefore pins `total > 0` and both `shown` flags first.
+    async fn(ctx) {
+      // Its own origin: setPanelState writes PER-ORIGIN localStorage that
+      // outlives this room, and a leaked `{pools:false}` hides the rack for
+      // every later scenario on the origin (the trap phone-framing records).
+      const a = await ctx.newTable({ origin: '127.0.0.182', name: 'Alice' });
+      await a.settle();
+      const viewport = async (w, h) => {
+        await a.page.browser.send('Emulation.setDeviceMetricsOverride',
+          { width: w, height: h, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
+        await a.eval('window.dispatchEvent(new Event("resize"))');
+        await a.dbg('sim(120)');
+      };
+      // Both surfaces up AND SETTLED. The lift is published by a
+      // ResizeObserver and the banner's own height is not final when it is
+      // un-hidden — its verdict line and fold land later, and a d20 that rolls
+      // a 20 is a taller card than one that rolls a 7. So the poll waits for
+      // two consecutive identical geometries rather than for a frame count: a
+      // single sample taken mid-settle measures a lift computed against a
+      // banner that has since grown, which is a race in the INSTRUMENT and
+      // would read as an occlusion defect. (Seen: 126/966 on one run and
+      // 0/1008 on the next, same code.)
+      const geometryOf = (b) => JSON.stringify([b.lift, b.banner, b.flyout]);
+      const settled = async (why) => {
+        let prev = null;
+        let last = null;
+        const deadline = Date.now() + 15000;
+        while (Date.now() < deadline) {
+          await a.dbg('sim(30)');
+          last = await a.dbg('bannerVsLog');
+          if (last.shown.banner && last.shown.flyout && last.total > 0) {
+            const g = geometryOf(last);
+            if (g === prev) return last;
+            prev = g;
+          } else {
+            prev = null;
+          }
+          await sleep(100);
+        }
+        throw new Error(`the banner and the flyout never settled together (${why}): `
+          + JSON.stringify(last));
+      };
+      // OPEN THE LOG *IN* THE VIEWPORT BEING MEASURED. openLogFlyout() calls
+      // syncFlyoutLift() synchronously, which is the state a player is in when
+      // they tap ≣ at that size — and it is the state the fix was measured in.
+      // (Carrying an already-open flyout across a resize is a DIFFERENT state,
+      // and it is broken; the last leg is about exactly that.)
+      const openAt = async (w, h, why) => {
+        await a.dbg('setLogFlyout(false)');
+        await viewport(w, h);
+        await a.dbg('setLogFlyout(true)');
+        return settled(why);
+      };
+
+      try {
+        // PANELS COLLAPSED for every leg, which is the state the roadmap
+        // blamed. It is held constant precisely so the two viewports below
+        // disagree about the overlap while `body.mini` agrees.
+        await a.dbg('setPanelState({pools: false, log: false})');
+        await viewport(390, 844);
+        await a.roll('d20');
+        await a.settle();
+
+        // ---- the phone the defect was measured on -------------------------
+        let vs = await openAt(390, 844, '390x844');
+        assert.equal(await a.eval(`document.body.classList.contains('mini')`), true,
+          'the compact view is on at 390x844');
+        assert.equal(vs.sharesColumn, true,
+          `a 390px-wide felt puts both boxes in one column `
+          + `(banner ${JSON.stringify(vs.banner)}, flyout ${JSON.stringify(vs.flyout)})`);
+        // THE ASSERTION. Pre-fix this reads 840 of 1008.
+        assert.equal(vs.covered, 0,
+          `not one of ${vs.total} sampled points of the read is painted over by `
+          + `the log (covered ${vs.covered})`);
+        assert.ok(parseFloat(vs.lift) > 0,
+          `and the LOG is what yielded — it lifts off the banner (${vs.lift})`);
+        // The lift is a number the stylesheet consumes, so prove it landed in
+        // the geometry rather than only in the custom property.
+        assert.ok(vs.flyout.bottom <= vs.banner.top,
+          `the flyout's floor is clear of the banner's head `
+          + `(flyout bottom ${vs.flyout.bottom}, banner top ${vs.banner.top})`);
+
+        // ---- the same state at a desktop: EXACTLY nothing moves -----------
+        // THE PIXEL-NEUTRALITY CLAIM, and the one that refutes `body.mini`.
+        // Still collapsed, still mini, and the two boxes do not even share a
+        // column — so the lift must be 0 and the two declarations it appears in
+        // must compute to the values that shipped before it existed, byte for
+        // byte. A rule keyed off `body.mini` would move this layout for nothing.
+        vs = await openAt(1440, 900, '1440x900');
+        assert.equal(await a.eval(`document.body.classList.contains('mini')`), true,
+          'the desktop with both panels collapsed is ALSO mini — which is why '
+          + '`body.mini` was the wrong predicate');
+        assert.equal(vs.sharesColumn, false,
+          `and here the two boxes are nowhere near each other `
+          + `(banner ${JSON.stringify(vs.banner)}, flyout ${JSON.stringify(vs.flyout)})`);
+        assert.equal(vs.covered, 0,
+          `nothing covers the read here either, and never did (${vs.covered}/${vs.total})`);
+        assert.equal(vs.lift, '0px', `so the log does not move (lift ${vs.lift})`);
+        const geom = await a.eval(`(() => {
+          const cs = getComputedStyle(document.getElementById('log-flyout'));
+          return { bottom: cs.bottom, maxHeight: cs.maxHeight };
+        })()`);
+        assert.equal(geom.bottom, '12px',
+          `calc(12px + var(--banner-lift)) computes to the shipped 12px (${geom.bottom})`);
+        assert.equal(geom.maxHeight, '540px',
+          `and min(60vh, calc(100dvh - lift - 24px)) computes to the shipped 60vh `
+          + `of 900 (${geom.maxHeight})`);
+
+        // ---- the landscape phone: the half that is easiest to drop ---------
+        // Raising the floor without lowering the ceiling pushes the flyout's
+        // HEAD off the top of the screen — the one row that names what you are
+        // reading — and nothing about the occlusion count would notice, because
+        // a box starting at y=-21 covers no more of the banner than one
+        // starting at y=12. Measured at 844x390 the lift is ~167px, so this is
+        // the viewport where the clamp is actually load-bearing.
+        vs = await openAt(844, 390, '844x390');
+        assert.ok(parseFloat(vs.lift) > 0,
+          `the lift is under load at 844x390 (${vs.lift}) — without that this `
+          + 'clamp assertion is about a flyout that was never pushed');
+        assert.ok(vs.flyout.top >= 0,
+          `and the flyout's head is still on screen (top ${vs.flyout.top}) — the `
+          + 'max-height clamp is the half that keeps it there');
+        assert.equal(vs.covered, 0,
+          `while the read stays unobstructed in landscape too (${vs.covered}/${vs.total})`);
+
+        // ---- A RESIZE UNDER AN OPEN LOG. THIS LEG FAILS, AND THE FEATURE IS
+        //      WHAT IS WRONG (measured 2026-08-17) --------------------------
+        //
+        // syncFlyoutLift has exactly one driver besides the flyout's own open:
+        // a ResizeObserver on #result-banner and #log-flyout. So it fires when
+        // either box changes SIZE — and `sharesColumn` is a statement about
+        // where the boxes ARE, which a viewport change can flip while both
+        // sizes stay identical. Measured, with the log left open across the
+        // resize:
+        //
+        //   1440x900  banner 271x125  flyout 300x143  share=false  lift 0px   covered 0/900
+        //    844x390  banner 271x125  flyout 300x143  share=TRUE   lift 0px   covered 251/900
+        //    844x390, log closed and re-opened:       share=true   lift 167px covered 0/900
+        //
+        // Neither box resized, so the observer never fired, so the lift stayed
+        // at the desktop's 0 and the log sat on 28% of the read. It is the
+        // ORIGINAL defect with a different trigger, and it has the same two
+        // properties that made the original worth fixing: the banner has no
+        // clock, so it lasts until the next roll or until the log is closed;
+        // and there is nothing on screen that says the read is under there.
+        //
+        // Reachable without a phone: any window resize that narrows the felt
+        // past the saturation point while both boxes keep their sizes — the
+        // banner is only capped once the felt drops under ~340px, so there is a
+        // wide band where it moves without resizing.
+        //
+        // THE FIX IS NOT MINE TO MAKE (this session owns tests/e2e/ only) and
+        // the assertion is deliberately NOT weakened to match the behaviour: a
+        // scenario relaxed to pass is the failure this repo keeps paying for.
+        // The likely repair is one line — call syncFlyoutLift() from the same
+        // resize/orientation path the felt already re-fits on, since the guard
+        // `lift === flyoutLift` already makes a redundant call free.
+        await a.dbg('setLogFlyout(false)');
+        await viewport(1440, 900);
+        await a.dbg('setLogFlyout(true)');
+        const before = await settled('1440x900 with the log open');
+        assert.equal(before.sharesColumn, false, 'the desktop starts clear of the read');
+        await viewport(844, 390);
+        const after = await settled('844x390 without touching the log');
+        assert.equal(after.sharesColumn, true,
+          'the resize puts the two boxes back in one column — the state the lift exists for');
+        assert.equal(after.covered, 0,
+          `KNOWN FEATURE DEFECT: resizing the window under an open log leaves `
+          + `--banner-lift stale at ${after.lift}, and the log covers `
+          + `${after.covered} of ${after.total} sampled points of the read. `
+          + `The ResizeObserver is the only driver and neither box changed SIZE, `
+          + `so it never fired. Closing and re-opening the log fixes it, which `
+          + `is the proof that the geometry is fine and only the trigger is missing.`);
+      } finally {
+        // PUT THE ORIGIN BACK (phone-framing's lesson): panel state is
+        // per-origin localStorage and outlives this room.
+        await a.dbg('setLogFlyout(false)').catch(() => {});
+        await a.dbg('setPanelState({pools: true, log: true})').catch(() => {});
+        await a.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, a.page.sessionId)
+          .catch(() => {});
+        await a.eval('window.dispatchEvent(new Event("resize"))').catch(() => {});
+      }
     },
   },
   {
@@ -10755,6 +11035,201 @@ export const scenarios = [
     },
   },
   {
+    name: 'empty-return',
+    tags: ['lobby', 'resync', 'table-file'],
+    timeout: 180000,
+    // A TABLE THAT CAME BACK EMPTY (UX §7.47). Nothing can arrive to announce
+    // a room's death — `lingerRoom` runs when the LAST player leaves, so by
+    // construction there is nobody there to be told — and the notice is
+    // therefore assembled on the way BACK IN, out of three purely local facts.
+    //
+    // THE TWO SILENT LEGS ARE THE POINT OF THIS SCENARIO, and they are the
+    // reason §7.47 was designed before it was built. `freshRoom` alone is a
+    // room with no log, no setup and at most one player — which is ALSO an
+    // ordinary F5 into a live table nobody has rolled at yet. So the obvious
+    // predicate, `freshRoom && remembered`, announces a death on every reload,
+    // for everyone, forever, and it would pass any test that only ever killed
+    // a room first. Each half of the shipped predicate names something this
+    // browser knows it LEFT here and can now see is gone: a setup it authored
+    // that the room no longer has, or a NAME it knew that the room no longer
+    // reports. The named-and-reloaded leg below is exactly that near-miss, and
+    // it is red under `freshRoom && remembered`.
+    //
+    // And the pill is asserted AS PAINTED (`__diceDebug.pill` reads the
+    // element, class included) rather than off a model flag: the notice pill
+    // is a SHARED transient slot that a live refusal may take within seconds,
+    // so a flag would be asserting something the player may never have seen.
+    async fn(ctx) {
+      const OWNER = '127.0.0.183';    // the browser that was here before
+      const AUTHOR = '127.0.0.184';   // the browser that PUSHED the setup
+      const STRANGER = '127.0.0.185'; // a browser following a link, cold
+      const NOTE = 'this table came back empty';
+      const deaths = (kind) => (ctx.serverLog()
+        .match(new RegExp(`room ${kind}: room="${ctx.room}"`, 'g')) || []).length;
+      // Counted rather than matched once: this room dies more than once here,
+      // and `waitForLog` would be satisfied by the first death forever after.
+      const waitDeaths = async (kind, n) => {
+        const deadline = Date.now() + 30000;
+        while (Date.now() < deadline) {
+          if (deaths(kind) >= n) return;
+          await sleep(150);
+        }
+        throw new Error(`timeout waiting for death #${n} of ${ctx.room} (${kind}); `
+          + `seen ${deaths(kind)}`);
+      };
+      const pill = (t) => t.dbg('pill');
+
+      // ---- ① a plain reload into a LIVE unprepared room says nothing ------
+      const a = await ctx.newTable({ origin: OWNER, name: 'Alice' });
+      assert.equal((await pill(a)).shown, false, 'arriving at a brand-new table says nothing');
+      await a.reload();
+      assert.equal((await pill(a)).shown, false,
+        `an ordinary F5 into a live room says nothing (pill: ${JSON.stringify(await pill(a))})`);
+
+      // ---- ② NAME the table, and a reload STILL says nothing --------------
+      // THE NEAR-MISS. Two reloads, and the second one is the load-bearing
+      // one: `rememberTable` runs in initNet, so the name only reaches this
+      // browser's recents on the join AFTER the room carries it. The first
+      // reload records it; the second is then a browser that remembers a name
+      // AND finds a fresh-looking room — every input `freshRoom && remembered`
+      // needs — and the app must still say nothing, because the room reports
+      // that name right back at it.
+      await ctx.api('/api/settings', {
+        playerId: await a.playerId(),
+        settings: { tableName: 'Ninefold Deep' },
+      });
+      await a.waitFor(`window.__diceDebug.settings.tableName === 'Ninefold Deep'`,
+        { desc: 'the table takes its name' });
+      await a.reload();
+      await a.reload();
+      assert.equal(await a.dbg('settings.tableName'), 'Ninefold Deep',
+        'the room still reports its own name after the round trip');
+      const remembered = await a.eval(
+        `(JSON.parse(localStorage.getItem('dice.tables.v1') || '[]') || [])`
+        + `.find((t) => t.room === ${JSON.stringify(ctx.room)}) || null`);
+      assert.ok(remembered && remembered.name === 'Ninefold Deep',
+        `and this browser now REMEMBERS that name (${JSON.stringify(remembered)}) — `
+        + 'without it the silence below is silence for the wrong reason');
+      assert.equal((await pill(a)).shown, false,
+        `a reload into a live NAMED room still says nothing (pill: `
+        + `${JSON.stringify(await pill(a))}) — this is the leg that fails under `
+        + '`freshRoom && remembered`');
+
+      // ---- ③ now really lose it: the room is deleted, and the return speaks -
+      // An UNPREPARED room is deleted outright the moment its last player
+      // goes, so the room the link names is genuinely not the room she left.
+      await a.close();
+      await waitDeaths('deleted', 1);
+
+      // …but only to the people who were there (§7.47 ②). A cold browser has
+      // none of the three facts, so it is told nothing — and it lands in a
+      // room that is fresh by every measure, which is what makes this the
+      // sharp version of the claim rather than a vacuous one.
+      const cold = await ctx.newTable({ origin: STRANGER, name: 'Nobody' });
+      assert.equal((await pill(cold)).shown, false,
+        `a stranger following the same dead link is told nothing (pill: `
+        + `${JSON.stringify(await pill(cold))}) — they did not lose a table, `
+        + 'they opened an empty one');
+      await cold.close();
+      await waitDeaths('deleted', 2);
+
+      const a2 = await ctx.newTable({ origin: OWNER, name: 'Alice' });
+      const said = await pill(a2);
+      assert.equal(said.text, NOTE, `the returning owner is told, once (${JSON.stringify(said)})`);
+      assert.equal(said.cls, 'notice',
+        `in the notice register — steel, not gold: HUE = ACT and this is `
+        + `housekeeping rather than a refusal of hers (${said.cls})`);
+      assert.equal(said.shown, true, 'and it is actually on screen');
+      // WHAT IT MUST NEVER CLAIM (§7.47 ③). Four causes are indistinguishable
+      // from a client — the 12 h TTL, a scale-to-zero, a deploy, and an
+      // unprepared room dying with its last player — so the sentence carries
+      // no cause and no duration.
+      assert.doesNotMatch(said.text, /expir|restart|timed out|hour|minute|second|\d/i,
+        `and it never guesses why or how long (${JSON.stringify(said.text)})`);
+
+      // ---- ④ it is a RECEIPT, so it takes itself away ---------------------
+      await sleep(3000);
+      assert.equal((await pill(a2)).shown, true,
+        'it is still up three seconds later — a notice that flashes is not a notice');
+      await a2.waitFor(`window.__diceDebug.pill.shown === false`,
+        { desc: 'and it clears itself (~6 s) rather than becoming furniture', timeout: 9000 });
+
+      // ---- ⑤ the AUTHOR's return carries the second sentence --------------
+      // The other half of the predicate: a browser that PUSHED this room's
+      // setup (dice.table.v1:<room>) and finds a room without one. It is the
+      // clause §7.47 calls exact rather than probable — a live room keeps its
+      // setup, and `freshRoom` has already ruled out every room that survived.
+      //
+      // The second sentence is written ONLY once the server says the push
+      // applied, because a promise about an in-flight push is the one thing on
+      // this surface that could turn out false. So it is waited for rather
+      // than sampled.
+      // THE AUTHOR'S BROWSER MUST NOT ALSO REMEMBER A NAME, or this leg proves
+      // the OTHER clause. Measured: with the table still called 'Ninefold
+      // Deep', deleting `storedTable()` from the predicate outright left this
+      // scenario green — the returning organizer was being told by the name
+      // half all along. So the table is un-named before the organizer ever
+      // joins, and their recents entry is therefore stored as ''.
+      await ctx.api('/api/settings', {
+        playerId: await a2.playerId(),
+        settings: { tableName: '' },
+      });
+      await a2.waitFor(`window.__diceDebug.settings.tableName === ''`,
+        { desc: 'the table gives its name back' });
+
+      const org = await ctx.newTable({ origin: AUTHOR, name: 'Organizer' });
+      assert.equal((await pill(org)).shown, false,
+        'the organizer arrives at a live table and is told nothing');
+      const orgRemembers = await org.eval(
+        `(JSON.parse(localStorage.getItem('dice.tables.v1') || '[]') || [])`
+        + `.find((t) => t.room === ${JSON.stringify(ctx.room)}) || null`);
+      assert.ok(orgRemembers && orgRemembers.name === '',
+        `and this browser knows the room by no name at all `
+        + `(${JSON.stringify(orgRemembers)}) — so only the AUTHORSHIP clause can `
+        + 'speak below');
+      await org.dbg(`portable.loadText(${JSON.stringify([
+        'table:',
+        "  felt: 'plum'",
+        'players:',
+        "  'Rill':",
+        '    pools:',
+        '      Attributes:',
+        "        - 'Agility': '2d8'",
+        '',
+      ].join('\n'))})`);
+      const pushed = await org.dbg('portable.pushToTable()');
+      assert.equal(pushed.ok, true, `the organizer prepares the table (${pushed.status})`);
+      await org.waitFor(`window.__diceDebug.tableRev.room >= 1`, { desc: 'the room takes the setup' });
+      assert.equal((await org.dbg('tableRev')).stored, 1,
+        'and this browser is on record as its author — the fact the notice is assembled from');
+
+      // Everyone leaves. A PREPARED room lingers instead of dying, and the
+      // harness pins DICE_SETUP_TTL_MS=4000 so the reaper is reachable.
+      await a2.close();
+      await org.close();
+      await waitDeaths('expired', 1);
+
+      const org2 = await ctx.newTable({ origin: AUTHOR, name: 'Organizer' });
+      await org2.waitFor(
+        `window.__diceDebug.pill.text === ${JSON.stringify(`${NOTE} — your prepared seats are back`)}`,
+        { desc: 'the receipt lands once the server says the re-push applied' });
+      const healed = await pill(org2);
+      assert.equal(healed.cls, 'notice', `still the notice register (${healed.cls})`);
+      assert.ok(healed.text.startsWith(NOTE),
+        `the second sentence EXTENDS the first rather than replacing it (${healed.text})`);
+      // …and the act it is a receipt FOR actually happened. Without this the
+      // sentence is a claim about a restore nobody performed.
+      await org2.waitFor(`window.__diceDebug.tableRev.room >= 1`,
+        { desc: 'the setup really is back on the room' });
+      const peek = await fetch(
+        `http://127.0.0.1:${ctx.port}/api/table?room=${encodeURIComponent(ctx.room)}`,
+      ).then((r) => r.json());
+      assert.ok((peek.seats || []).map((s) => s.name).includes('Rill'),
+        `and the prepared seat is there for the next arrival `
+        + `(got ${JSON.stringify((peek.seats || []).map((s) => s.name))})`);
+    },
+  },
+  {
     name: 'tower-contract-freeze',
     tags: ['tower'],
     // THE ENGINE CONTRACT, TO THE BIT (docs/TOWER.md, "The six engine-owned
@@ -14055,6 +14530,336 @@ export const scenarios = [
       await a.dbg('setAmbienceOn(false)');
       g = await a.dbg('audioGraphInfo()');
       assert.equal(g.bedSources, 0, 'and turning it off puts the room away again');
+    },
+  },
+
+  {
+    name: 'audio-venue',
+    tags: ['fx', 'audio', 'roll', 'settings'],
+    timeout: 300000,
+    // THE VENUE'S AUDIO PALETTE (W6, docs/AUDIO.md §2.5). Two rows per venue —
+    // what the room's own noise is MADE OF, and what its ground does to
+    // whatever lands on it — read through the one reader, `venueAudio()`.
+    //
+    // TWO TRAPS, BOTH PAID FOR WHILE W6 WAS BUILT, AND NEITHER IS REDISCOVERED
+    // HERE (AUDIO.md §8):
+    //
+    //   1. A SUSPENDED CONTEXT HAS A FROZEN CLOCK. `ctx.currentTime` does not
+    //      advance without a trusted gesture, so NO `setTargetAtTime` ramp in
+    //      js/main.js can ever be observed to move — every param reads its old
+    //      value forever and a working feature looks broken. So this scenario
+    //      spends `audio-graph`'s F8 trick before it asks any live question.
+    //   2. `sim()` IS THE FILM CLOCK, NOT THE AUDIO CLOCK. Stepping 120 frames
+    //      moves an AudioParam ramp by exactly nothing. So a claim about
+    //      INTENT is read off `live.told` instantly, and a claim about MOTION
+    //      is a `waitFor` on the live node value and costs real wall seconds.
+    //      The two legitimately disagree for ~3 s (BED_VOICE_S), which is why
+    //      the hook publishes both.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.186', name: 'Alice', allowSolo: true });
+      const gi = () => a.dbg('audioGraphInfo()');
+      const vi = () => a.dbg('venueAudioInfo()');
+      // Strength 50 is chosen, not arbitrary: it is well above
+      // IMPACT_SOFT_STRENGTH (3.5) so the soft tier is out of the arithmetic,
+      // and it clamps `min(0.35, strength · gainScale)` for EVERY body in
+      // IMPACT_VOICES — including `hush`, the quietest at 0.018. That makes
+      // the gain comparisons below independent of which voice a tower or a
+      // staged set happens to resolve, which matters because a fantasy venue
+      // brings both.
+      const S = 50;
+      const voicing = (ev) => a.dbg(`impactVoicingFor(${S}, 'std', ${JSON.stringify(ev)})`);
+      const near = (got, want, msg) => assert.ok(
+        Math.abs(got - want) <= Math.max(2e-9, Math.abs(want) * 1e-5),
+        `${msg} — got ${got}, expected ${want}`);
+      const setVenue = async (id) => {
+        await a.dbg(`setVenue(${JSON.stringify(id)})`);
+        await a.waitFor(
+          `(window.__diceDebug.sim(2), window.__diceDebug.venue === ${JSON.stringify(id)})`,
+          { desc: `${id} is the room` });
+        // A fantasy venue carries its tower in the same settings patch, and the
+        // socket is queued behind the table being idle. Both bakes further down
+        // must pour through the SAME solid or their films are not comparable,
+        // so the wait is here rather than at the call sites.
+        // …and only a FANTASY venue declares one: `venueTower` is null in the
+        // grounded room, and `selectVenue` sends no tower key there at all, so
+        // waiting for `tower === null` would hang forever on the way home.
+        await a.waitFor(
+          `(window.__diceDebug.sim(2), (() => {`
+          + ` const vt = window.__diceDebug.venueInfo().venueTower;`
+          + ` return vt === null || window.__diceDebug.tower === vt; })())`,
+          { desc: `${id}'s own tower is up` });
+      };
+
+      // ---- the graph, and a context that can actually move a param --------
+      await a.roll('4d6');
+      await a.settle();
+      const key = (type) => a.page.browser.send('Input.dispatchKeyEvent',
+        { type, key: 'F8', code: 'F8', windowsVirtualKeyCode: 119, nativeVirtualKeyCode: 119 },
+        a.page.sessionId);
+      await key('keyDown');
+      await key('keyUp');
+      await a.waitFor(`window.__diceDebug.audioGraphInfo().ctxState === 'running'`,
+        { desc: 'one trusted gesture unlocks the context — without it every ramp below is frozen' });
+
+      // ---- ① THE GROUNDED ROOM IS INERT, and it is inert IN EFFECT --------
+      // "W6 changed nothing for players who never leave the room" is the
+      // claim, and `groundedInert` is the app's own statement of it — a
+      // conjunction over the `table` row: every multiplier 1, no breath, and a
+      // cutoff above anything pink or brown noise carries.
+      let v = await vi();
+      assert.equal(v.id, 'table', 'the tab boots in the grounded room');
+      assert.equal(v.groundedInert, true,
+        `the shipped table's row is all 1s and an inaudible cutoff BY `
+        + `CONSTRUCTION (declared: ${JSON.stringify(v.declared)})`);
+      // …and the same claim where it is actually audible, which the flag
+      // cannot make: in the grounded room a landing and a baffle knock resolve
+      // the SAME neutral ground, so their whole voicing must be identical.
+      // That is a product comparison rather than a re-reading of the row, and
+      // it goes red the day anything in VENUE_AUDIO.table stops being 1.
+      assert.equal(await a.dbg('tower'), 'none',
+        'no tower is socketed, so both queries below resolve the same BODY and '
+        + 'can differ only by ground');
+      const impTable = await voicing({});
+      const knockTable = await voicing({ clunk: 'baffle' });
+      assert.deepEqual(impTable, knockTable,
+        `in the grounded room a landing and a knock are the same sound `
+        + `(${JSON.stringify(impTable)} vs ${JSON.stringify(knockTable)})`);
+      assert.equal(impTable.gain, 0.35,
+        `and it sits exactly on §5's 0.35 ceiling, untrimmed (${impTable.gain})`);
+
+      // ---- ② A VENUE NEVER SWITCHES THE BED ON (refusal 14) ---------------
+      // "A venue changes what the room is MADE OF, never whether the room is
+      // audible." Selecting a venue is a visual choice; flipping an audio
+      // switch inside it is refusal 7 wearing a different hat, and an inferred
+      // sound the UI does not report is the same green-check shape as an
+      // inferred mute. `bedSources` counts NODES, so zero means the room is
+      // not there rather than merely turned down.
+      let g = await gi();
+      assert.equal(g.ambienceOn, false, 'Room tone ships off, and this tab has not asked for it');
+      assert.equal(g.bedSources, 0, `so no bed exists (${g.bedSources} sources)`);
+      assert.equal((await vi()).live, null, 'and there is no standing bed to read');
+      for (const id of ['moonrise', 'foxfire', 'table']) {
+        await setVenue(id);
+        await a.dbg('sim(180)');
+        g = await gi();
+        assert.equal(g.bedSources, 0,
+          `${id} did not switch the room on (refusal 14) — ${g.bedSources} sources`);
+        assert.equal(g.ambienceOn, false, `…and did not flip the preference either (${id})`);
+        assert.equal((await vi()).live, null, `…and there is still no bed to read (${id})`);
+      }
+
+      // ---- ③ A FANTASY VENUE TRIMS THE LANDING ----------------------------
+      await setVenue('moonrise');
+      v = await vi();
+      assert.equal(v.id, 'moonrise', 'the glade is the room');
+      const gMoon = v.declared.ground;
+      assert.ok(gMoon.centre < 1 && gMoon.length < 1 && gMoon.gain < 1,
+        `moss over soil is duller, shorter and quieter than felt `
+        + `(${JSON.stringify(gMoon)})`);
+      const impMoon = await voicing({});
+      // THE PRODUCT, NOT THE DIAL (TESTING.md P10). Each of the three is the
+      // grounded room's own answer times the factor the venue declares, so an
+      // unwired trim fails here and a re-derivation of the formula cannot make
+      // it pass — the baseline is measured, not computed.
+      near(impMoon.centre, impTable.centre * gMoon.centre,
+        'the landing’s centre frequency comes down by the ground’s own factor');
+      near(impMoon.durSec, impTable.durSec * gMoon.length,
+        'its envelope shortens by the ground’s own factor');
+      near(impMoon.gain, impTable.gain * gMoon.gain,
+        'and it quietens by the ground’s own factor');
+      // THE MIX CEILING ONLY FALLS. The trim is applied OUTSIDE the 0.35
+      // clamp, so a venue can subtract from §5's plan and never add to it —
+      // the same number a venue with `gain: 1.4` would break.
+      assert.ok(impMoon.gain < 0.35,
+        `a venue only ever subtracts from the ceiling (${impMoon.gain} < 0.35)`);
+
+      // ---- ④ …AND A BAFFLE KNOCK UNDER THE SAME VENUE IS NOT TRIMMED ------
+      // A clunk is a die hitting the TOWER, which has its own palette and its
+      // own send. A die inside the trunk is not on the moss, and running the
+      // glade's floor over it would voice a knock inside a hollow trunk as if
+      // it had happened outside. `groundFor(isClunk)` is the whole mechanism.
+      const knockMoon = await voicing({ clunk: 'baffle' });
+      assert.deepEqual(knockMoon.ground, { centre: 1, length: 1, gain: 1 },
+        `the knock takes the neutral ground under the glade `
+        + `(${JSON.stringify(knockMoon.ground)})`);
+      assert.deepEqual(impMoon.ground, gMoon,
+        `while the landing beside it takes the glade's (${JSON.stringify(impMoon.ground)})`);
+      // Body-independent, which is why S clamps: whatever voice the venue's
+      // tower resolves, an untrimmed knock is at the full ceiling and the
+      // landing next to it is not. Same venue, same frame, two answers.
+      assert.equal(knockMoon.gain, 0.35,
+        `so the knock is still at the full ceiling (${knockMoon.gain})`);
+      assert.ok(knockMoon.gain > impMoon.gain,
+        `and louder than the landing beside it (${knockMoon.gain} > ${impMoon.gain})`);
+
+      // ---- ⑤ THE GRIND — and what this scenario CANNOT prove about it -----
+      // stepRollingVoices multiplies the surface band AND the tilt ceiling by
+      // `venueAudio().ground.centre`, which is the same object, through the
+      // same one reader, that `impactVoicingFor` reports as `ground`. So the
+      // trim the grind consults is asserted here.
+      //
+      // WHAT IS MISSING, said out loud rather than papered over: there is NO
+      // hook that publishes a rolling voice's band or tilt frequency —
+      // `audioGraphInfo` reports pool sizes and levels, never filters — so a
+      // grind that stopped multiplying by this number would still pass. That
+      // is a gap in the instrument, not a claim this scenario is making.
+      assert.equal(impMoon.ground.centre, gMoon.centre,
+        'the grind reads the same ground.centre the impacts and the tail wear');
+
+      // ---- ⑥ THE TAIL CARRIES THE TRIM, AND THE RHYTHM DOES NOT ----------
+      // The settle cluster inherits the landing's voicing (`A0 = vo.gain ·
+      // TAP_A0_FRAC`), so the taps are where the trim becomes a RENDERED
+      // quantity rather than a field on a projection.
+      //
+      // MOONRISE vs FOXFIRE, not table vs glade, and that is the whole design
+      // of this leg: the two fae venues declare the SAME tower and the SAME
+      // staged dice set, so the film, the landing strengths and the resolved
+      // body are all identical and the ONLY thing that differs between the two
+      // bakes is the ground row. Against `table` the staged set changes the
+      // body, `gainScale` changes with it, and the comparison would be
+      // measuring the wrong difference.
+      await a.dbg('audioForce(true)');
+      await a.dbg('holdClock(true)');
+      const bake = async (seed, why) => {
+        await a.dbg('clearTable()');
+        await a.dbg('sim(400)');
+        await a.dbg(`throwSeeded(['d6','d6','d6'], ${seed})`);
+        // One eval, not one round trip per frame (P6): the rAF clock is held,
+        // so the film advances exactly as far as this loop says.
+        await a.eval('(() => { const D = window.__diceDebug;'
+          + ' for (let w = 0; w < 1800 && !D.busy; w++) D.sim(1);'
+          + ' return 1; })()');
+        // A fixed number of frames into the throw, with the clock held: the
+        // film is deterministic, so this lands on the SAME frame in both
+        // venues and the levels below are comparable.
+        await a.dbg('sim(150)');
+        const rolling = await a.dbg('rollingState()');
+        await a.eval('(() => { const D = window.__diceDebug;'
+          + ' for (let f = 0; f < 9000 && D.busy; f++) D.sim(1); return 1; })()');
+        const settle = await a.dbg('audioSettleInfo()');
+        const film = await a.dbg('audioFilmScan()');
+        assert.ok(settle.plans.length === settle.dice && settle.dice === 3,
+          `${why}: the pour finished and every die scheduled a tail `
+          + `(${settle.plans.length} plans for ${settle.dice} dice)`);
+        return { settle, film, rolling };
+      };
+      const moon = await bake(9091, 'moonrise');
+      await setVenue('foxfire');
+      g = await gi();
+      assert.equal(g.bedSources, 0, 'still no bed — the second venue did not switch one on either');
+      const fox = await bake(9091, 'foxfire');
+      const gFox = (await vi()).declared.ground;
+      assert.ok(gFox.gain !== gMoon.gain,
+        `the two rooms declare different floors (${gFox.gain} vs ${gMoon.gain}) — `
+        + 'identical rows would make every comparison below vacuous');
+
+      // THE PRECONDITION, asserted rather than assumed: same tower, same set,
+      // same seed → the same film. If this ever fails the tap comparison is
+      // meaningless, and it should say so here instead of failing obscurely.
+      assert.deepEqual(fox.film, moon.film,
+        'the two fae venues bake the SAME film — same tower, same staged set, same seed');
+      // §4's determinism line, and §2.5 property 3: the trim is TIMBRE ONLY.
+      // `targetLevel` is film-derived and must be identical on every client, so
+      // a replay of a roll recorded under another sky derives the same levels.
+      assert.equal(fox.rolling.frame, moon.rolling.frame,
+        'the two level samples are taken at the same film frame');
+      assert.deepEqual(fox.rolling.dice.map((d) => d.targetLevel),
+        moon.rolling.dice.map((d) => d.targetLevel),
+        'and the venue moves no rolling LEVEL — §4 stays literally true');
+
+      const byDi = (info) => [...info.plans].sort((x, y) => x.di - y.di);
+      const moonPlans = byDi(moon.settle);
+      const foxPlans = byDi(fox.settle);
+      assert.deepEqual(foxPlans.map((p) => [p.di, p.gaps]), moonPlans.map((p) => [p.di, p.gaps]),
+        'the tail keeps its RHYTHM across the two rooms — timing is the '
+        + 'determinism line and a floor may not move it');
+      const ratio = gFox.gain / gMoon.gain;
+      let compared = 0;
+      for (let i = 0; i < moonPlans.length; i++) {
+        assert.equal(foxPlans[i].amps.length, moonPlans[i].amps.length,
+          `d${moonPlans[i].di}: the same number of taps in both rooms`);
+        for (let k = 0; k < moonPlans[i].amps.length; k++) {
+          near(foxPlans[i].amps[k], moonPlans[i].amps[k] * ratio,
+            `d${moonPlans[i].di} tap ${k}: the tail's LEVEL is the other room's `
+            + `times the two floors' own ratio (${ratio})`);
+          compared++;
+        }
+      }
+      assert.ok(compared >= 9,
+        `and there were real taps to compare (${compared}) — a silent tail proves nothing`);
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+      await a.dbg('audioForce(false)');
+      await a.dbg('holdClock(false)');
+
+      // ---- ⑦ THE STANDING BED RE-VOICES IN PLACE --------------------------
+      // A teardown would restart the six-second fade and re-fill 52 seconds of
+      // noise, so `bedRevoice` re-tunes the nodes instead. Note which half is
+      // load-bearing: `bedSources` alone CANNOT catch a rebuild, because a
+      // rebuilt bed has the same seven nodes. `perHitBufferAllocs` is the
+      // discriminator — the two noise buffers go through the patched
+      // `createBuffer`, so a rebuild moves it by two and a re-voice by none.
+      await setVenue('table');
+      await a.dbg('setAmbienceOn(true)');
+      await a.waitFor(`window.__diceDebug.audioGraphInfo().bedSources > 0`,
+        { desc: 'the room comes up when a PERSON asks for it' });
+      const bed0 = await vi();
+      const graph0 = await gi();
+      assert.ok(graph0.bedSources > 0,
+        `the bed is really built (${graph0.bedSources} sources) — which is also what `
+        + 'makes the four zeros in ② claims about a table that HAS audio');
+      assert.equal(bed0.live.voice, 'table', 'and it is voiced for the room it came up in');
+
+      await a.dbg(`setVenue('moonrise')`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(2), (window.__diceDebug.venueAudioInfo().live || {}).voice === 'moonrise')`,
+        { desc: 'the standing bed hears the new room (stepAmbience compares bed.voice to the venue)' });
+      const graph1 = await gi();
+      assert.equal(graph1.bedSources, graph0.bedSources,
+        `not one node was replaced (${graph1.bedSources} vs ${graph0.bedSources})`);
+      assert.equal(graph1.perHitBufferAllocs, graph0.perHitBufferAllocs,
+        `and not one buffer was re-filled (${graph1.perHitBufferAllocs} vs `
+        + `${graph0.perHitBufferAllocs}) — THE discriminator, since a rebuilt bed `
+        + 'has the same seven nodes as a re-voiced one');
+
+      // INTENT, read instantly. `told` is what the last re-voice ASKED for, and
+      // it is exact: the glade's brown is the grounded room's brown times the
+      // factor the row declares.
+      const after = await vi();
+      near(after.live.told.brown, bed0.live.told.brown * after.declared.bed.brown,
+        'the re-voice asked for the glade’s own enclosure level');
+      near(after.live.told.pink, bed0.live.told.pink * after.declared.bed.pink,
+        'and for its own pink level');
+      assert.equal(after.live.told.airHz, after.declared.bed.airHz,
+        `and for the treeline's 1200 Hz air (${after.live.told.airHz})`);
+      assert.ok(after.live.told.airHz < bed0.live.told.airHz,
+        `which is well under the grounded room's inaudible cutoff `
+        + `(${after.live.told.airHz} < ${bed0.live.told.airHz})`);
+      assert.equal(after.live.tickRate, after.declared.bed.tick.rate,
+        `and the next pop is a canopy drip rather than a hearth spark `
+        + `(${after.live.tickRate}/s)`);
+
+      // MOTION, on real wall time. This is the half `sim()` cannot buy: the
+      // ramp is a setTargetAtTime with τ = BED_VOICE_S / 3, so it moves on
+      // ctx.currentTime and 120 simulated frames move it by nothing at all.
+      const startedAt = bed0.live.airHz;
+      await a.waitFor(
+        `window.__diceDebug.venueAudioInfo().live.airHz < ${Math.round(startedAt * 0.6)}`,
+        { desc: `the air really closes down from ${startedAt} Hz — a live AudioParam, `
+          + 'not a flag' });
+      await a.waitFor(
+        `window.__diceDebug.venueAudioInfo().live.brownGain < `
+        + `${bed0.live.brownGain * 0.9}`,
+        { desc: 'and the enclosure layer really steps back' });
+      const moved = await vi();
+      assert.equal(moved.live.voice, 'moonrise', 'all of it on the same standing bed');
+      assert.equal((await gi()).bedSources, graph0.bedSources,
+        'which still has the nodes it started with');
+
+      // ---- cleanup: this origin outlives the room ------------------------
+      await a.dbg('setAmbienceOn(false)');
+      assert.equal((await gi()).bedSources, 0, 'and the room goes away when it is switched off');
+      await setVenue('table');
     },
   },
 
