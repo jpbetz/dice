@@ -1065,6 +1065,13 @@ Audit §10 asked for three things and one of the three was **never true**:
   felt **58**, `heartwood` **133**, `bastion` **141**, `blackanvil` **186**,
   `nullstone` **68**, `hollowbole` **79**. Owner: whoever owns
   `tests/e2e/scenarios.mjs` next.
+
+  **Every number above reruns: `node tools/steps/draw-price.mjs`** — it walks
+  the registry, finds the worst plain frame itself rather than trusting this
+  list, forces the post frame, and then *evaluates the five assertions above and
+  prints PASS/FAIL for each*, so the scenario can be written from a run instead
+  of from this paragraph. It also carries the instruction for re-running the
+  sabotage.
 - ⬜ **The idle tick throttle — NOT a one-liner, because its gate is an eye.**
   The measurement is why it is worth keeping: idle with no tower is **2 draw
   calls**, and idle with `blackanvil` up is **186, every frame, forever**. So

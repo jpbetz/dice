@@ -4242,13 +4242,19 @@ WALKS the graph and counts meshes — the dressing's static price, budgeted at
 ≤4k tris / ≤8 draws by `tower-dress-budget`. This one reports what three.js
 actually *issued* for one frame.
 
-**Measured 2026-08-17** — `renderAudit()` after settle, headless, dpr 1 (draw
-calls do not depend on resolution, so the figures port): empty felt **2**, a
-settled `4d6` on bare felt **58**, `heartwood` **133**, `bastion` **141**,
-`blackanvil` **186**, `nullstone` **68**, `hollowbole` **79**, post stack
-forced **70 in 8 passes**. Two of those numbers are load-bearing elsewhere:
-186-every-frame-forever is what makes V4's idle throttle worth keeping, and
-2-on-an-empty-table is what makes it a LOOK question rather than a win.
+**Measured 2026-08-17 by `node tools/steps/draw-price.mjs`**, which shipped with
+the instrument and is the command behind every draw figure in this entry and in
+ROADMAP V4 — after settle, headless, dpr 1 (draw calls do not depend on
+resolution, so the figures port): empty felt **2**, a settled `4d6` on bare felt
+**58**, `heartwood` **133**, `bastion` **141**, `blackanvil` **186**,
+`nullstone` **68**, `hollowbole` **79**, and `blackanvil` with the post stack
+forced **246 in 8 passes**. The step finds the worst tower itself rather than
+trusting the list, then evaluates the proposed assertion and prints PASS/FAIL
+per line, so the scenario can be written from a run instead of from a paragraph.
+
+Two of those numbers are load-bearing elsewhere: 186-every-frame-forever is what
+makes V4's idle throttle worth keeping, and 2-on-an-empty-table is what makes it
+a LOOK question rather than a win.
 
 *Note for whoever writes the assertion:* `sim()` ticks with `render=false`, so
 the audit always reports the last **real** rAF frame — wait for a fresh frame
