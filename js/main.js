@@ -19061,12 +19061,9 @@ function buildSumRead(fc, opts) {
       : `${targetWord} ${dc} · ${pctText(atLeast)} to clear`;
     target.classList.toggle('unknown', atLeast === null);
   }
-
-  if (!fc.exact) {
-    const why = document.createElement('span');
-    why.className = 'sf-refusal';
-    why.textContent = fc.refusal.reason;
-    frag.append(why, line);
+  // The visibility whisper closes every state, exactly as the per-die path
+  // closes its own (§7.8: the audience rides the read, not a second line).
+  const close = () => {
     if (hasDc) frag.append(target);
     if (visSuffix) {
       const vis = document.createElement('span');
@@ -19075,10 +19072,22 @@ function buildSumRead(fc, opts) {
       frag.appendChild(vis);
     }
     return frag;
+  };
+
+  const bins = fc.exact ? sumBins(fc, SUM_CURVE_CELLS) : null;
+  const peak = fc.exact ? sumPeak(fc) : null;
+  // No curve: a typed refusal, or — belt and braces — an exact forecast the
+  // bin/peak pair could not read. This path must not throw: the popover's
+  // preview slot is downstream of it and taking the popover down over a
+  // forecast is the failure POOL-ANALYSIS §6.3a warns about.
+  if (!bins || !peak) {
+    const why = document.createElement('span');
+    why.className = 'sf-refusal';
+    why.textContent = fc.refusal ? fc.refusal.reason : 'no exact curve for this pool';
+    frag.append(why, line);
+    return close();
   }
 
-  const bins = sumBins(fc, SUM_CURVE_CELLS);
-  const peak = sumPeak(fc);
   const cellWord = (c) => (c.lo === c.hi ? String(c.lo) : `${c.lo}–${c.hi}`);
   // The peak sentence, which is also what the readout says at rest. A tie is
   // named as a tie: 'most likely 6' for a d20+5 would be an artifact of the
@@ -19155,14 +19164,7 @@ function buildSumRead(fc, opts) {
 
   row.append(text, curve, axis, read);
   frag.append(row, line);
-  if (hasDc) frag.append(target);
-  if (visSuffix) {
-    const vis = document.createElement('span');
-    vis.className = 'fc-vis';
-    vis.textContent = visSuffix.replace(/^ · /, '');
-    frag.appendChild(vis);
-  }
-  return frag;
+  return close();
 }
 
 // Echo, preview and action buttons — the cheap half of a re-render.
