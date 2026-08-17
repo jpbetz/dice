@@ -20302,6 +20302,13 @@ function addLogEntry(entry) {
   }
   if (!netOnline) save(LS_LOG, log); // online mode: the server owns the log
   logEmpty.style.display = 'none';
+  // §7.49: the log just stopped being empty, so the capture verbs arm HERE, on
+  // the same line that hides the empty hint. renderLog()'s call cannot cover
+  // this: the incremental append below deliberately does not rebuild, and the
+  // verbs only LOOKED right in a probe because collecting a roll happens to
+  // trigger a full render. A first roll left uncollected would have sat under
+  // two dim buttons with a full log — a green check over a broken thing.
+  updateLogExportVerbs();
   // Defensive fallback: a rollId-less entry would make the delegated ⟳
   // handler inert (dataset lookup returns null). Should not happen — every
   // production path assigns one — but if it does, redraw the whole list so
