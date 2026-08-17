@@ -54,7 +54,7 @@ by *finishing what is in flight*.
 | 2 | [**§2l ⑥'s RENDERING**](#2l-pool-analysis--⑤-and-⑥s-engine-shipped-the-rendering-is-the-open-half) | The engine landed 08-16, proven four ways, 5.5 ms worst case — and is **inert**: `kind:'sum'` is matched nowhere, so nothing renders. Goal 4 names summing as toil the system owes the player, and the app still cannot say a word about `4d6dl1`. The smaller half of the work and the whole of the payoff. | med | A |
 | 3 | [**C22's `room.setup` stamp**](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15) | Half a contract is worse than none. The stamp must come from the WRITER (`maybeRepushTable`); a stamp only the server writes is a stamp nobody can trust. ~10 lines once someone owns that site. | small | A |
 | 4 | [**§5** — roll-log export](#5-capture-mechanisms) | Goal 7's last uncapturable surface: the online log cannot be copied or downloaded. Reuses `portableDownload()`. The half of §5 that does **not** wait on #2. | small | A |
-| 5 | [**9d follow-up** — `tower` in the portable YAML](#9d-follow-up-tower-and-venue-in-the-portable-yaml) | `TABLE_KEYS` is still `{name, felt, system, zoom}`, so a prepared table cannot arrive with its tower up. Ship `tower` alone; GOALS punted how a venue rides the file. | small | A |
+| 5 | [**9d follow-up** — `venue` in the portable YAML](#9d-follow-up-venue-in-the-portable-yaml--tower-shipped-2026-08-17) | **`tower` SHIPPED 2026-08-17** ([UX §7.50](UX.md)) — `TABLE_KEYS` is `{name, felt, system, zoom, tower}` and a prepared table arrives with its tower up. What is left is GOALS' punt: how a **venue** rides the file. Shipping the tower alone exposed that a file can now prepare *half a fae venue*, which is the argument for sequencing this next. | small | A |
 | 6 | [**C30 residual** — deaden + grip, sleep off](#c30-residual-deaden--the-only-lever-that-touches-the-dithering) | The best shake and hop numbers measured anywhere on this table, failing four of six gates. Grip recovers 70% of the glide and **has never been run with sleep off**. The pile's untried lever is spawn geometry — **which moved on 08-15**, so the pairing is genuinely worth re-running now. | med | A |
 | 7 | [**§3b L2**](#3b-the-lobby-and-the-table-flow--l4-shipped-l2-is-a-judgment-call) | Judgment, not plumbing: should the pre-join peek say how many people are here? Runs straight into `handleTableInfo`'s deliberate privacy omission. | small | A |
 | 8 | [**U16**, **U21**, **C26**](#u16-draft-intent-in-the-well--design-first-medium) | The design-first trio, stuck for one reason each: no carrier for intent in the live draft; the collapsed rail deletes multiplayer; `Change seat…` wears a seat-shaped label on a name-wiping verb. | med | A |
@@ -456,14 +456,33 @@ system-profile registry. Needs dice.js custom face sets.
 build record — five models, the dressing pass, the portal-floors campaign —
 is in SHIPPED.md §9d.*
 
-### 9d follow-up. `tower` and `venue` in the portable YAML
+### 9d follow-up. `venue` in the portable YAML — `tower` SHIPPED 2026-08-17
 
-Verified open 2026-08-14: `TABLE_KEYS` in js/portable.js is
-`{ name, felt, system, zoom }`. A prepared table cannot arrive with its tower
-up or its venue set — the one place these settings are not treated like their
-neighbours. **Note GOALS' punt** (2026-08-15): *how a venue rides the portable
-YAML and the room settings* is explicitly deferred, so shipping `tower` alone
-is the coherent smaller move, and `venue` waits on that ruling.
+**`tower` shipped** ([UX §7.50](UX.md)): `TABLE_KEYS` is
+`{ name, felt, system, zoom, tower }`, `portableSnapshot` writes the key when a
+tower is up, and `portablePushToTable` is the catalogue door. The format judges
+SHAPE and the apply site judges the CATALOGUE against `TOWERS` — the tower list
+grows, and a hand-mirrored copy in the format would be a fourth home for it
+with no drift guard reachable from Node. Three failure modes, all decided and
+tested (`node tests/portable.test.mjs` → 96): an id this build cannot raise
+parses, rides through `Open → Download` verbatim, and is dropped at the push
+and named in the receipt (never sent — `validateSettingsPatch` refuses the
+*whole* push for one bad value); `'none'` survives the parse because it is the
+only way to lower a raised tower, while the *emitter* stays silent about it
+because an older reader refuses an unknown key inside `table:` and every
+export would otherwise become unreadable; an absent key is silence.
+
+**`venue` still waits, and it is now the only half left.** GOALS' punt
+(2026-08-15) — *how a venue rides the portable YAML and the room settings* —
+is untouched. The two were separable: nothing in the tower work needed a venue
+key. What shipping `tower` alone exposes is that a file can now prepare **half
+a fae venue** (`tower: 'hollowbole'` with no venue), which is a state two
+clicks already reach — `selectVenue('table')` sends no tower, so leaving a
+venue leaves its tree standing — and which nothing guards. Read that as an
+argument for sequencing `venue` next, not as a defect in the tower key.
+
+*Verified 2026-08-14, still true when it was fixed 2026-08-17: `TABLE_KEYS` was
+`{ name, felt, system, zoom }`.*
 
 *Known cost, recorded rather than hidden: a 40-die pour is ~25 s of film and
 up to five bake attempts (~3 s synchronous). Forty dice through one chute is

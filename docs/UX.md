@@ -5966,3 +5966,123 @@ nothing may be built on top of it that assumes it was read.
 - **Telling anyone else.** There is nobody else — `players.length <= 1` is
   part of the predicate.
 
+
+### §7.50 — The tower rides the portable file (2026-08-17)
+
+*ROADMAP's 9d follow-up. `TABLE_KEYS` was `{name, felt, system, zoom}`, so the
+one piece of furniture that changes the FILM was the one piece a prepared table
+could not carry. Shipped `tower` ALONE; how a **venue** rides the file is
+GOALS' explicit punt (2026-08-15) and is untouched here.*
+
+#### ① The key, and the one asymmetry in the section
+
+```yaml
+table:
+  name: 'Foxfire night'
+  felt: 'obsidian'
+  system: 'soul-deal'
+  zoom: 'close'
+  tower: 'blackanvil'     # ← new; present-or-absent; reads last
+```
+
+Four of the five keys are **closed enums, mirrored by hand from server.js**, and
+an unknown value refuses at its line — "a felt that silently fell back would be
+a table nobody prepared". `tower` is **shape-checked and not enumerated**, and
+that is the section's one deliberate asymmetry:
+
+| | felt · system · zoom | tower |
+|---|---|---|
+| catalogue | closed; unmoved since it was mirrored | **declared to grow** — one model → five in a fortnight |
+| homes for the list | client, server, `portable.js` | would be a **fourth**, and unguardable |
+| unknown value | refuses at its line | parses; dropped at the apply site, named in the receipt |
+
+Two reasons, and the second is the load-bearing one:
+
+1. **The mirror would rot on the key that changes most often.** No drift guard
+   is reachable from Node: `server.js` does not export its tower list and
+   `js/main.js` cannot be imported outside a browser (`tests/profiles.test.mjs`'
+   mirror guard works only because `meanings.js` is import-free data). A rotted
+   mirror's failure mode is "every file the new build writes, the old build
+   refuses".
+2. **A catalogue addition is not a schema change.** C22's stamp is the door for
+   "this file holds something you cannot read"; making a sixth tower model
+   refuse a whole document — forty pools, thirty-two profiles — is a
+   compatibility break the version contract deliberately declines to make.
+
+So the format judges **shape** (`/^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/` — wider
+than today's ids on purpose, because dice-set ids in this same file already
+carry dots) and the **catalogue** is judged where the real registry lives.
+
+#### ② The three failure modes, and what each one does
+
+**A tower this build does not have** (a newer build's model, a typo, a mod).
+The parse carries the id verbatim — so `Open → Download` on an older build keeps
+the DM's tower instead of quietly stripping it. `portablePushToTable` checks it
+against `TOWERS`, drops what it cannot socket, and names it in the receipt:
+
+> ✓ table prepared — 4 seats offered at this room · left behind: the tower
+> 'brassworks', which this build can't raise
+
+**It is never sent.** `validateSettingsPatch` refuses the ENTIRE push for one
+bad value and `net.pushTable` answers `null` for that, so an id sent hopefully
+would cost the felt, the name and every prepared seat — under the receipt
+"couldn't reach the table", over a table that answered perfectly. A file whose
+only table key was an unraisable tower refuses outright rather than reporting
+`✓ settings sent to the room` for an empty patch.
+
+**`tower: 'none'`.** Kept by the parse, unlike `name: ''`. An empty name is the
+*absence* of a name; `'none'` is a tower id with a registry row of its own and
+the only way a prepared table can LOWER a tower somebody raised. The
+**emitter's** silence about it is a separate call, at `portableSnapshot`: a
+reader already in the field refuses an unknown key inside `table:` ("unknown
+table key … — expected name, felt, system, zoom"), so writing `tower: 'none'`
+unconditionally would make **every file this build exports unreadable by every
+older build** — a hard version break bought for a default value on a
+closed-beta feature. Only a table that actually raised a tower writes the key.
+
+That also keeps the stamp honest: `major` is owed "the moment stored data can
+hold something an older reader would silently drop" (js/schema.js), and an older
+reader does not drop this silently — it refuses at the line. The loud door is
+already in the field, so a tower model still costs one registry row.
+
+**No `tower` key at all.** Silence, exactly as before this key existed: the
+room keeps the tower it has. Every line of the push is `if (t.key)` — the
+`table:` section is a **patch** over the room's furniture, never a total
+statement of it — which is what an absent felt has always meant. Absence is not
+a synonym for `'none'`.
+
+#### ③ The channel does not gate it, and that is the one law
+
+`tower` is a beta setting (`BETA_SETTINGS`), and the apply site deliberately
+does **not** filter by channel: the channel decides what the settings panel
+OFFERS, never what works (§7.38, js/stability.js). A stable browser applying a
+beta table's prepared file raises that table's tower for the whole room,
+itself included — refusing would bake a different film from every other seat
+(GOALS goal 15).
+
+#### ④ A venue-only tower is allowed, and `venue` is why that is a seam
+
+Hollow Bole is `venueOnly`, which is *"a picker rule, not a capability"* —
+`setTower` accepts it and `renderTowerPicker` skips its chip. The file is not a
+picker, so it is not special-cased. **There is no venue↔tower hosting relation
+in either direction**: a fantasy venue *stages* a tower by sending an id
+(`selectVenue`'s patch), and leaving a venue sends `{venue:'table'}` with no
+tower, so `{venue:'table', tower:'hollowbole'}` — a fae trunk in a grounded room
+— is already two clicks away with no file involved, and `faeTowerPalette()`
+falls back to `'moonrise'` for it rather than failing. So the file cannot reach
+a state the UI cannot. What it CAN now do is prepare half a fae venue, which is
+an argument for shipping `venue` next, not for gating the tower.
+
+#### ⑤ What was considered and refused
+
+- **Mirroring the tower enum** — see ①. Rejected on drift, not on effort.
+- **Falling closed to `'none'`** (the dice-set rule). A set falls closed to *no
+  override* and the pool survives; there is no "no tower" that is not itself a
+  tower id, so falling closed would ASSERT a towerless table where the file
+  asserted a tower. Dropping the key is the honest degradation, because it is
+  the same thing the absent key already means.
+- **A `warnings` entry for the dropped id.** `warnings` is spoken for: the
+  preview renders it as *"N sections this version can't read, skipped"*
+  (`skippedPrefix`) and `portableVerdict().warnings` is asserted as exactly that
+  loss. A tower is not a skipped section, and the report belongs where the
+  consequence is — at the push, where a table is being prepared.
