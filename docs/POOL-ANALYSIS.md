@@ -1,6 +1,7 @@
 # Pool analysis — the die spectrum and the dice-value ledger
 
-**Status: DESIGN, four decisions taken.** This is the detail behind
+**Status: DESIGN, four decisions taken; ①–⑤ shipped, ⑥'s ENGINE shipped
+2026-08-16 and its rendering is the open half.** This is the detail behind
 [ROADMAP §2l](ROADMAP.md); that entry is the summary and the ship order, this
 is the reasoning, the data and the record of what was killed. Decisions Joe has
 taken are marked **[JOE]** and collected in §8; what is still open is §9.
@@ -8,7 +9,8 @@ taken are marked **[JOE]** and collected in §8; what is still open is §9.
 **Every number in this document is generated, not asserted:**
 
 ```bash
-node tools/pool-analysis-data.mjs
+node tools/pool-analysis-data.mjs        # the per-die half (§3, §4, §6.5)
+node tests/sumread.test.mjs --bench      # the sum half's timings (§6.3)
 ```
 
 It derives each figure from `js/meanings.js`, `js/notation.js` and
@@ -18,6 +20,13 @@ and **three of its claims did not survive checking**, two of them fabricated
 outright by the agents that produced them (§7). A figure you cannot regenerate
 is a figure you should not trust; §13 does the same for the non-numeric
 claims, listing the command that re-checks each one.
+
+**And it keeps happening, which is the argument for the rule rather than
+against it.** ⑥'s build (2026-08-16) found **four more** claims in §6.3 that did
+not survive a measurement — three timings and one detection test that this same
+document disproves one paragraph earlier — plus **three stale rows in §13**,
+the table whose whole job is not going stale. All seven are struck in place
+below, never deleted.
 
 ## 1. The ask
 
@@ -303,6 +312,13 @@ what a 1-die pool costs. Measured: `spectrum(d20)` **1.3 µs**,
 > there is no DP, convolution or combinatorics in it at all. That is a
 > property of the algorithm, not of a stopwatch. Treat both numbers as "µs,
 > not ms", nothing finer.
+>
+> **Still unwarmed as of 2026-08-16** — `tools/pool-analysis-data.mjs` times
+> 500 cold calls and prints whatever falls out; a re-run this morning gave 7.6
+> and 3.1 µs, the right ordering by luck rather than by method. ⑥'s bench
+> (`node tests/sumread.test.mjs --bench`) is what a timing in this document
+> should look like: warm up, take the fastest of several batches, and print the
+> method beside the number.
 
 No DP, no convolution, no combinatorics anywhere
 in the per-die path. `pmf()` and `js/odds.js` exist **only for the sum
@@ -325,24 +341,153 @@ So refuse on `mods.keep` alone, in the shipped `pure`-gate voice. **Caveat:**
 the 40-dice budget makes advantage a *mixture* — above 20 d20s some dice keep
 the plain pmf.
 
-### 6.3 The sum profiles (dnd, none) — unaffected by the ruling
+### 6.3 The sum profiles (dnd, none) — unaffected by the ruling, **BUILT 2026-08-16**
 
-A total genuinely *is* a fact of play there. Exact convolution at 40d20 is
-~0.25 ms. **Keep/drop is exactly computable too**, contra all three designs: a
-state-collapsed order-statistic DP does keep-20-of-40d20 in ~45 ms and the
-worst legal case in ~110 ms — *cheaper than the 4000-sample fallback proposed
-to protect it*. Guard on **allocation**, not accuracy.
+A total genuinely *is* a fact of play there, so it gets the whole
+distribution. `sumForecast(dice, mods)` in `js/odds.js` returns the exact pmf
+of `composeRoll`'s total — values, probabilities, cdf, min/max/mean/sd/mode,
+modifier folded in — or the same object carrying a typed `refusal`. Nothing is
+sampled. `SYSTEMS.dnd` and `SYSTEMS.none` supply it through `forecastFor`, with
+the math injected as `tools.sumForecast` exactly as `countingPmfs` is, so
+`js/meanings.js` stays dependency-free.
 
-Two genuine gaps remain: **mixed-type keep/drop** (`2d20+2d6 kh2` parses and
-`composeRoll` sorts across types — the iid DP would be confidently wrong;
-detect with `new Set(spec.dice).size === 1`), and **combined adv+explode**,
-which interact through the one 40-slot budget (`20d20 adv !` yields zero
-children — advantage silently disables explosion).
+Three engines, in `composeRoll`'s own order of operations. **Convolution** for
+sums of independent dice: a dense accumulator against a sparse multiplicand, so
+d10x's ten-wide support over a ninety-wide lattice costs ten multiplies per
+point and not ninety. An **order-statistic DP** for keep/drop, over FACES
+rather than dice, with two collapses that carry it: the kept count after
+placing *j* dice is `min(k, j)` — a function of the state, not a second
+dimension — and the moment the keep budget fills, the kept sum is frozen, so
+the entire tail of the face order absorbs in one add. A **closed-form explosion
+chain**, folded into the one face that can trigger it, which is how explosion
+gets in without a state dimension of its own.
+
+Ties needed no thought and that is the point: `composeRoll`'s sort is stable,
+so WHICH die it keeps among equals is an artifact, but the multiset of kept
+VALUES is not, and a sum only sees the multiset.
+
+**Timings, warmed** — `node tests/sumread.test.mjs --bench`, node v24 on the
+dev box. Method is printed with them: 40 warm-up calls, then the fastest of 5
+batches of 10. §6.1's cautionary tale is why the method is printed at all.
+
+| Pool | Exact curve |
+|---|---|
+| `1d20+5` | **0.002 ms** |
+| `4d6dl1` | **0.005 ms** |
+| `40d6` | 0.14 ms |
+| `40d20` | 0.99 ms |
+| `40d20 kh20` | 1.15 ms |
+| `20d10x+20d20` (widest lattice) | 2.97 ms |
+| **`40d20 dl1` / `dh1`** — the worst legal case | **5.5 ms** |
+
+Median over all **302** legal single-type 40-dice specs: **0.245 ms**.
+
+**Three of this section's claims did not survive the build**, and the pattern
+is the one §7 already names — plausible figures, never regenerated:
+
+- **"~45 ms for keep-20-of-40d20, ~110 ms worst legal case."** Measured
+  **1.15 ms** and **5.5 ms** — 40× and 20× pessimistic. The conclusion the
+  numbers were supporting (exact beats the 4000-sample fallback) survives and
+  strengthens: measured **19×** cheaper at `40d20 kh20`, **4.5×** at the worst
+  case. The *worst legal case* is also not the one this section assumed. It is
+  not keep-half; it is **keep-almost-everything** (`dl1`, `dh1`), because the
+  keep budget never fills and the collapse never fires.
+- **"~0.25 ms for exact convolution at 40d20."** Measured **0.99 ms** warmed.
+- **"Detect mixed-type keep/drop with `new Set(spec.dice).size === 1`."**
+  **Insufficient, and this document contains its own counter-example one
+  paragraph earlier.** §6.2's caveat — *above 20 d20s some dice keep the plain
+  pmf* — means `21d20 adv kh3` is **one type and two distributions**: the
+  40-die cap pairs only 19 of the dice, so nineteen roll max-of-two and two
+  roll a plain d20. The type test waves it through and the iid DP would be
+  confidently wrong. The shipped guard compares the counting **pmfs**, which
+  subsumes the type test and the reroll and advantage cases with it.
+
+**And one "genuine gap" is not one.** *Combined adv+explode* was listed here as
+a second gap beside mixed-type keep/drop. It is not a category at all. The
+loser of an advantage pair is `counts: false` **before** `composeRoll`'s
+explosion loop looks at the queue, so the exploding population is exactly the
+winners and their resolved pmf is already `advPairPmf`. What actually bites is
+the 40-slot budget the pairs spend first — and that is the ordinary VOID /
+FREE / BINDING classification `js/odds.js` has had since ①:
+
+| Spec | Tier | Answer |
+|---|---|---|
+| `1d20 adv !` | FREE | exact — pinned against exhaustive enumeration |
+| `1d20+1d4 adv !` | FREE | exact — same |
+| `20d20 adv !` | VOID | exact, explosion ignored; the pairs took all 40 slots |
+| `19d20 adv !` | BINDING | refused (`explode-cap`) — 2 slots, 19 candidates |
+
+The parenthetical this section offered as evidence — "`20d20 adv !` yields zero
+children" — describes the VOID row, which is the exactly-computable one.
+
+**The three refusals**, typed, and each detected before a number is computed:
+
+| Code | When | Why it cannot be exact |
+|---|---|---|
+| `mixed-keep` | keep/drop over dice that do not all roll ONE distribution | the DP's sequential-multinomial decomposition needs an exchangeable population; with two populations "how many dice are left" stops being a sufficient statistic |
+| `reroll-cap` | previewOf's reroll BINDING tier | which die loses the last cap slot depends on every earlier die, so the dice stop being independent |
+| `explode-cap` | previewOf's explode BINDING tier | the same, for children |
+
+**A sum refusal is `kind:'sum'` with a `refusal` field — never
+`kind:'refusal'`,** and the distinction is load-bearing rather than tidy.
+`js/main.js` prints a `kind:'refusal'` **instead of** the min/avg/max line; but
+`previewOf` is still exact for the AVERAGE of a pool whose CURVE cannot be
+drawn (`8d8+2d20 kh4` is exactly such a pool — `eTopK` is tie-proof across
+mixed types where the distribution DP is not). Borrowing that kind would delete
+a true read to print a sentence about a different one. The refusal costs the
+player the curve and not the average.
+
+**Guard on allocation, not accuracy** — the ruling stands, and nothing here
+allocates more than a `(41 × k·maxFace)` scratch pair.
 
 If sampling ever ships it must be **seeded from `res.canonical`** and labeled
 "sampled — 4,000 rolls", never a bare `≈`: the interpretation profile is a
 *room* setting, and two seats reading different odds for one pool would be the
-only number in the app that diverges per browser.
+only number in the app that diverges per browser. **It did not ship and should
+not**: the exact path is 4.5–19× cheaper than the fallback it was proposed to
+protect, and where it cannot answer it says so.
+
+### 6.3a What the rendering pass is handed
+
+The engine landed alone, on purpose: `js/main.js` was being written by another
+pass in the same hours. **Nothing renders yet**, and that is not a half-ship —
+`kind:'sum'` is a kind today's `renderPopEcho` and `renderCmdState` do not
+match, so both fall through to the shipped `fmtPreview` line and the app is
+byte-identical until someone renders it.
+
+```js
+sumForecast(dice, mods) -> {
+  kind: 'sum',
+  exact: true,
+  refusal: null,
+  modifier,                 // already folded into every value below
+  min, max, mean, sd,       // mean/min/max agree with previewOf, pinned
+  mode: {value, p},
+  values: [ …ascending totals with p > 0… ],   // gaps are real: 1d6! has no 6
+  probs:  [ …P(total = values[i])… ],
+  cdf:    [ …P(total ≤ values[i])… ],
+}
+// or, refused:
+{ kind: 'sum', exact: false, refusal: {code, reason}, values: [], min: null, … }
+
+sumAtLeast(fc, n) / sumAtMost(fc, n)   // → 0..1, or null on a refusal
+SUM_REFUSALS                           // {code: reason} — the three sentences
+```
+
+The wiring is **one word at each of two call sites** — `js/main.js` imports
+`sumForecast` beside `countingPmfs` and passes `{countingPmfs, sumForecast}` to
+`forecastFor`. Until it does, `forecastFor` returns `null` for the sum
+profiles, deliberately and silently: the popover's preview slot is on the other
+side of that call, and a profile that threw on the narrow tool bag would take
+the popover down with it.
+
+Three things the renderer must not re-derive. **`sumAtLeast` is the only place
+this app should do cdf arithmetic** — it returns `null` on a refusal precisely
+so a caller cannot print `0%` where the honest answer is "we do not know".
+**A refusal still owes the min/avg/max line** (§6.3) — print `fmtPreview`
+beside the refusal sentence, never instead of it. And **`values` is sparse**:
+a bar per array slot draws `1d6!`'s three unreachable totals as zero-height
+bars unless the renderer bins by value.
 
 ### 6.4 Two free invariants, both worth pinning
 
@@ -426,11 +571,18 @@ than any lens, and the per-die half of the design is his, not the panel's.
 
 ## 9. Still open
 
-*Two of these were taken by the ⑤ build, 2026-08-15, and are struck below
-rather than deleted — the reasoning that made them open is what made the
-answers defensible. Everything not struck is still genuinely open, and ⑥ (the
-sum read) has not been started: `forecastFor` still returns `null` for `dnd`
-and `none`.*
+*Two of these were taken by the ⑤ build, 2026-08-15, and one more by ⑥'s
+engine, 2026-08-16; all three are struck below rather than deleted — the
+reasoning that made them open is what made the answers defensible. Everything
+not struck is still genuinely open.*
+
+*⑥'s state: **the math is built and proved, and nothing renders it.**
+`forecastFor` returns a `kind:'sum'` distribution for `dnd` and `none` (§6.3,
+§6.3a) the moment `js/main.js` passes `sumForecast` in its tools bag, which it
+does not yet. Four of the questions below are questions about that rendering —
+which popover doors forecast, what a pool-scope forecast forecasts, the offer
+card, and UX §2.1's odds line — and none of them was answered by building the
+engine. They got sharper: there is now an exact number to decide about.*
 
 - **Does the parser stop collapsing `2d20kh1` → `1d20 adv`?** The physical-dice
   count closes the *budget* bug either way; what remains is whether notation
@@ -453,8 +605,16 @@ and `none`.*
 - **The offer card.** It carries dice, mods, dc, visibility and experience, and
   a claimant is deciding whether to accept — with stakes UX.md declares public
   on every rung. Odds line, or a written refusal?
-- **Mixed adv+explode / mixed-type keep/drop** (sum profiles only): simulate
-  the 40-slot budget over pmfs, or refuse with the `pure`-gate grammar?
+- ~~**Mixed adv+explode / mixed-type keep/drop** (sum profiles only): simulate
+  the 40-slot budget over pmfs, or refuse with the `pure`-gate grammar?~~
+  **TAKEN 2026-08-16 by ⑥'s engine: REFUSE, and the question was one question
+  and a mistake.** Mixed-type keep/drop refuses as `mixed-keep` — broadened to
+  any pool whose counting dice do not share one distribution, because the type
+  test this document proposed misses `21d20 adv kh3` (§6.3). *Mixed
+  adv+explode* is not a case: it is exact below the 40-slot cap and refuses as
+  `explode-cap` above it, which is the classification `js/odds.js` already had.
+  Simulation was refused on its own terms — the exact path is **4.5–19×
+  cheaper** than the 4000-sample fallback that was proposed to protect it.
 - ~~**Where the rack figure lives.**~~ **TAKEN 2026-08-15: it stays in the
   head, and the figure IS the door.** The scroll problem is real and neither
   location fixed it — a foot figure scrolls away just as a head figure does,
@@ -524,6 +684,30 @@ the two invariants (§6.4); the five cap regressions (`40d20! === 40d20`,
 `40d20 adv` pairs 0, `21d20 adv` pairs 19, `40d6 ro<=3` rerolls 0, `2d6 kh5`
 keeps 1); and MC cross-validation against `composeRoll`.
 
+**⑥'s units are `tests/sumread.test.mjs`** (106 checks, 2.4 s, appended to the
+same literal chain), and they answer to four standards *because the convolution
+agreeing with itself is not evidence*:
+
+1. **Exhaustive enumeration of `composeRoll`** — 47 specs, every rng draw
+   branched over its real faces with probability carried down, compared
+   distribution-to-distribution at 1e-12. The mechanics authority's own answer.
+   Exploding pools stay enumerable because only a max face branches further:
+   `4d6dl1` is 1,296 leaves and `1d20 adv !` is 3,364.
+2. **Published closed forms nobody in this repo derived** — the 2d6 and 3d6
+   triangles, the 4d6-drop-lowest table over 1296, `P(max of 2d20 = k) =
+   (2k−1)/400`, d100 uniform on 1..100, and `1d6!`'s three unreachable totals.
+3. **`previewOf`'s min/avg/max on every exact case**, including the 40-dice
+   pools no oracle reaches. It gets there by an order-statistic *identity* and
+   a Poisson-binomial; this gets there by a face DP. They share the per-die
+   pmfs and nothing else, so agreement is two derivations meeting.
+4. **Seeded Monte Carlo** with a 5σ *per-bucket* band, not just a mean — a
+   shifted or mis-shaped curve fails that even when the mean survives.
+
+Plus the relation that keeps the two reads honest, fuzzed over 400 random
+legal specs: **every spec this engine calls exact is one `previewOf` also calls
+exact**, never the other way round. If it ever inverts, one surface is printing
+a curve the other will not average.
+
 **Hooks.** `get rackDiceValue` → `{total, shelves:[…]}` — **named to avoid
 `shelfValue`, already a live concept** (a die's face on the collect shelf) —
 plus `forecast(notation)`, `get forecastSheet`, `openForecastSheet(scope,key)`,
@@ -555,10 +739,12 @@ label or a "composed pool" tooltip fails `npm test`.
 
 - **Tier 4 §5 "Local roll statistics"** is a **dependent**, not a sibling —
   there is no other source of an expected value in the tree, so this supplies
-  §5's *expected* term and §5 is the *observed* half. §5 has its own unnamed
-  blocker: online the client persists no log at all
-  (`if (!netOnline) save(LS_LOG, log)`), so there is no durable substrate for a
-  per-player distribution.
+  §5's *expected* term and §5 is the *observed* half. **Unblocked 2026-08-16:**
+  `sumForecast(dice, mods).mean` is that term, and `.sd` came with it, so
+  "you are 1.4σ under expectation on this pool" is arithmetic §5 can now do
+  rather than a number it has to invent. §5's own unnamed blocker is untouched:
+  online the client persists no log at all (`if (!netOnline) save(LS_LOG, log)`),
+  so there is no durable substrate for a per-player distribution.
 - **UX.md §2.1's promised odds line is NOT delivered here** — §2.1 puts it on
   the *intent card*, public and mid-ceremony. This builds the math that line
   will need and leaves its slot open, or it gets marked shipped and quietly
@@ -588,19 +774,36 @@ figure is `DIE_MAX` arithmetic, identical under `soul-deal`, `dnd` and `none`.
 no URL state, no new `dice.*.v1` key, no `portable.js` change, no build step.
 **12** — was the one exposure, closed by the session-only ruling (§5).
 
+⑥ adds nothing to that list and subtracts nothing from it: `sumForecast` is a
+pure function of `(dice, mods)` with no rng, no clock and no storage, supplied
+**by the profile** (goal 6) rather than queried by a renderer — so two seats
+reading one pool read the same curve, and a system that does not sum is not
+asked to.
+
 ## 13. Claims verified against the tree
 
 Every load-bearing factual claim above, with the command that re-checks it.
 Verified 2026-08-05 at `1457c50`. Line numbers move; the commands do not.
 
+**Re-run 2026-08-16 for ⑥'s engine. Three rows below had gone stale — the
+table's own point, made against itself.** Struck inline rather than deleted:
+
+| Row | Was | Is |
+|---|---|---|
+| `#pop-preview` is unasserted | **0** | **22** hits across the forecast scenarios ①–④ shipped. The reason it was safe to rewrite is gone: **the rendering pass now breaks tests if it rewrites that node**, which is the good outcome and needs to be planned for rather than discovered |
+| `MAX_PHYSICAL_DICE` / `EXPLODE_CHAIN_CAP` are module-private | not exported | **both are `export const`** (`js/rollspec.js:33–34`) — slice ① needed them, and `js/odds.js` has imported them ever since. `tools/pool-analysis-data.mjs:78` still mirrors the constant under a `TODO: import once js/rollspec.js exports it` that has been satisfied for ten days |
+| `test:unit` hand-lists **8** files | 8 | **18** with `sumread` |
+
 | Claim | Check | Result |
 |---|---|---|
-| No e2e asserts `#pop-preview`, so rewriting it regresses silently | `grep -c pop-preview tests/e2e/scenarios.mjs` | **0** |
+| ~~No e2e asserts `#pop-preview`~~ — **REVERSED, see above** | `grep -c pop-preview tests/e2e/scenarios.mjs` | **22** |
 | `renderCmdState` is shared by the command box *and* the quick palette | `grep -n renderCmdState js/main.js` | called at **5578** and **8998** |
 | `rerenderInterpretation` never repaints the popover | `grep -n -A20 'function rerenderInterpretation' js/main.js` | log · shelf markers · verdict · banner **only** |
 | The `terminology` sweep bans the words a forecast might reach for | `grep -n 'banned = ' tests/e2e/scenarios.mjs` | `/\btrays?\b\|\bgroups?\b\|\bcompose\b/i` over `#left-panel`, `#mods-popover`, … |
-| `test:unit` is a literal `&&` chain with no glob | `grep -n 'test:unit' package.json` | **8** files, hand-listed (grew by 2 in `2549c79`) |
-| `MAX_PHYSICAL_DICE` / `EXPLODE_CHAIN_CAP` are module-private | `grep -n 'MAX_PHYSICAL_DICE\|EXPLODE_CHAIN_CAP' js/rollspec.js` | plain `const`, **not exported** (:33, :34) |
+| `test:unit` is a literal `&&` chain with no glob | `grep -n 'test:unit' package.json` | **18** files, hand-listed — the property holds, the count did not |
+| ~~`MAX_PHYSICAL_DICE` / `EXPLODE_CHAIN_CAP` are module-private~~ | `grep -n 'MAX_PHYSICAL_DICE\|EXPLODE_CHAIN_CAP' js/rollspec.js` | **`export const`** (:33, :34) since ① |
+| Advantage makes ONE type into TWO distributions past the cap | `node -e "…countingPmfs(Array(21).fill('d20'), {adv:'adv'})"` | 19 pairs + 2 plain — the `mixed-keep` counter-example (§6.3) |
+| Every spec ⑥ calls exact, `previewOf` also calls exact | `node tests/sumread.test.mjs` | fuzzed over **400** random legal specs |
 | `DIE_MAX` already exists three times — do not mint a fourth | `grep -rn 'DIE_MAX = ' js/` | exported `rollspec.js:30`; private `meanings.js:50`, `notation.js:89` |
 | `shelfValue` is already a live concept (a die's face on the collect shelf) | `grep -c shelfValue js/main.js` | **7** uses — hence `rackDiceValue` for the debug hook |
 | `stageGroup` drops mods/dc, so a staged pool ≠ the saved spec | `grep -n 'set aside' js/main.js` | `:6142` — "set aside — re-add via ±" |
