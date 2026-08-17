@@ -1766,26 +1766,28 @@ export const scenarios = [
           + `(banner ${JSON.stringify(vs.banner)}, flyout ${JSON.stringify(vs.flyout)})`);
         // THE ASSERTION. Pre-fix this reads 840 of 1008.
         //
-        // A SECOND MISSING TRIGGER, MEASURED 2026-08-17 AND NOT YET FIXED —
-        // this leg fails INTERMITTENTLY, 3 runs in 8 in isolation, and it is
-        // the feature that is wrong, not the sampling. The banner is not final
-        // when the log opens: its verdict line lands late and the card grows
-        // ~37px upward. `syncFlyoutLift` runs at the open, against the SHORT
-        // banner, and then never runs again — so `--banner-lift` stays 37px
-        // short and the log sits on ~168 of 966 sampled points of the read.
+        // A SECOND MISSING TRIGGER — found by this leg failing INTERMITTENTLY
+        // (3 runs in 8, and the run that passes is the lucky one), left RED by
+        // the pass that found it rather than weakened, and FIXED the same day.
         //   settled  lift=146px  banner.top=659  flyout.bottom=686  covered=168/966
         //   after one dispatched `resize`:
         //            lift=183px  banner.top=659  flyout.bottom=649  covered=0/966
-        // 183px is exactly what the formula wants for that banner, so the
-        // arithmetic is right and only the trigger is missing — the SAME shape
-        // as the rotation defect this scenario's last leg found, with a new
-        // cause: a size change the ResizeObserver on #result-banner does not
-        // deliver. Reproduce with a d20 roll, open the log at 390x844 and read
-        // `__diceDebug.bannerVsLog` twice.
-        // NOT WEAKENED, deliberately. The claim — the read is never painted
-        // over — is the right claim, and a scenario relaxed to reach green is
-        // the failure this repo keeps paying for. The fix is one line in
-        // js/main.js and belongs to whoever owns it.
+        // 183px is exactly what the formula wants, so the arithmetic was right
+        // and only the input was wrong — and the cause is worth more than the
+        // fix. It is NOT that the banner grows: `banner-in` runs 350ms on a
+        // springy curve from `translateY(30px) scale(0.9)`, and a TRANSFORM
+        // moves and shrinks what `getBoundingClientRect` reports while leaving
+        // the layout box — the only thing a ResizeObserver watches — untouched.
+        // The rect was lying, not late. So opening the log inside that window
+        // measured a banner ~37px below where it lands and published a lift
+        // that short, and no trigger existed that could fire, because by
+        // layout nothing had happened. `syncFlyoutLift` now asks layout where
+        // the banner will BE (`bottom` + `offsetHeight`) instead of asking the
+        // compositor where it is mid-flight, which is also why the lift is
+        // right on the first synchronous call rather than 350ms later.
+        // Verified 8 runs in 8 after the fix, against 1 failure in 4 before it,
+        // same machine, same commit otherwise. Reproduce the old behaviour by
+        // reading `banner.getBoundingClientRect().top` there again.
         assert.equal(vs.covered, 0,
           `not one of ${vs.total} sampled points of the read is painted over by `
           + `the log (covered ${vs.covered})`);

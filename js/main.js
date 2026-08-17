@@ -20804,8 +20804,32 @@ function syncFlyoutLift() {
   if (!logFlyoutEl.classList.contains('hidden') && !banner.classList.contains('hidden')) {
     const f = logFlyoutEl.getBoundingClientRect();
     const b = banner.getBoundingClientRect();
-    if (b.height > 0 && f.right > b.left && f.left < b.right) {
-      lift = Math.max(0, Math.round(window.innerHeight - b.top + FLYOUT_BANNER_GAP - 12));
+    // THE BANNER'S RECT LIES WHILE THE BANNER IS ARRIVING, and neither trigger
+    // above can save a measurement taken during the lie. `banner-in` runs for
+    // 350ms on a springy curve from `translateY(30px) scale(0.9)`, and a
+    // TRANSFORM moves and shrinks what getBoundingClientRect reports while
+    // leaving the layout box — the only thing ResizeObserver watches — exactly
+    // as it was. So opening the log within that window measured a banner ~37px
+    // lower than where it lands (30px of translate, plus half the height a
+    // 0.9 scale takes off a 125px card), published a lift that short, and was
+    // never corrected: 168 of 966 sampled points of the read sat under the log
+    // until the next resize. Intermittent by nature — it depends on how long
+    // ago the roll was — which is why `flyout-banner` failed 3 runs in 8 and
+    // not 8 in 8. Measured 2026-08-17.
+    //
+    // Fixed by asking LAYOUT where the banner will be, not the compositor
+    // where it is mid-flight: `bottom` + `offsetHeight` is the settled top,
+    // and it is right on the first synchronous call rather than after an
+    // `animationend` that would leave the lift wrong for those 350ms.
+    const bottomCss = parseFloat(getComputedStyle(banner).bottom) || 0;
+    const settledH = banner.offsetHeight;
+    // Horizontally the centre is animation-invariant (translateX is identical
+    // in both keyframes and the scale is about that centre), so the untransformed
+    // width can be hung off it.
+    const cx = b.left + b.width / 2;
+    const halfW = banner.offsetWidth / 2;
+    if (settledH > 0 && f.right > cx - halfW && f.left < cx + halfW) {
+      lift = Math.max(0, Math.round(bottomCss + settledH + FLYOUT_BANNER_GAP - 12));
     }
   }
   if (lift === flyoutLift) return; // the write is the only thing that could loop
