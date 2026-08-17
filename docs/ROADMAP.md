@@ -33,12 +33,16 @@ by *finishing what is in flight*.
    page that turns all of it into one sitting — **`tools/verdict-sheet.mjs`
    builds it; see [#1](#the-order)** — which makes the queue the cheapest
    high-value hour in this file and the reason it stays at the top.
-3. **The docs go stale in one specific way and it costs real work.** ~20 claims
-   were found false on 08-15 and more on 08-16, including a framing table that
-   **stopped reproducing one day after it was recorded**. Each was true when
-   written. The rule is not "write more carefully", it is **re-derive before
-   you build** — and every measured entry below now carries the date it was
-   taken and the command that reproduces it.
+3. **The docs go stale in one specific way, and the fix is a COMMAND, not a
+   date.** ~20 claims were found false on 08-15 and more since. Two of them
+   were written *during those very cleanups* — C27's table turned out to be
+   three cells of a different tool's probe grid filed under the wrong heading
+   (it never drifted; it was wrong on the day), and C24's correction contained
+   a false sentence of its own. **Both came from the same habit: correcting a
+   stale claim without re-running the thing it claimed.** So: a number anybody
+   will later quote gets the command that reproduces it written beside it.
+   `frame-residual.mjs`, `sumread --bench` and `glade-frame.mjs` are the
+   pattern; a bare date is not good enough and has now failed twice.
 
 ---
 
@@ -625,23 +629,37 @@ tightenings and one refused fourth — dice at rest counted above y=1.2:
 | 6.7×4.1 | 2 | 5 | 15/20 | 32/40 | 6.3 |
 | 5.2×3.2 *(a fourth notch, refused)* | 3 | 10/12 | 17/20 | 32/40 | **9.0** |
 
-**The PRESET NAMES that were in this table are gone, and that is the point.**
-It labelled 8.6×5.2 as `medium` and 6.7×4.1 as `close`. **The ladder shifted
-out on 2026-08-12**: today `wide/medium/close` = **14.1 / 11 / 8.6**, so the
-row this entry called `medium` is today's **`close`**, and the row it called
-`close` does not ship at all. Every mat now in the app is *larger* than the two
-it measured. The measurement and the instruction still bind — a smaller mat
-puts dice off the felt, and the mat is the physics walls so it cannot vary by
-device — but **do not quote a preset name out of this table.** This is the same
-shape as C28 ①'s stale preset table and C27's stand-in that stopped standing
-in: a number that kept its label after the thing it named moved.
+**THE PRESET NAMES were struck here on 2026-08-14 and that was HALF RIGHT and
+half an over-correction — re-measured 2026-08-17** with
+`node tools/drive.mjs tools/steps/frame-residual.mjs --pile`:
 
-A 12-die pool at the proposed fourth notch had ten of twelve dice off the
-felt. That breaks goal 5 and goal 1, and the camera is framed for a flat mat,
-so a tower reads as a smudge. **The mat is the PHYSICS WALLS** — identical on
-every client, because a seeded roll replayed against different walls lands
-differently — so it cannot vary by device and must hold the largest pool
-anyone rolls. `dice-land-flat` is the pin.
+| mat | 6d6 | 12d6 | 20d6 | 40d6 | max height |
+| --- | --- | --- | --- | --- | --- |
+| `wide` 14.1×8.6 | 0 | 0 [0..1] | 2 [1..4] | 13 [12..15] | 3.3 |
+| `medium` 11×6.7 | 0 | 3 [1..3] | 4 [1..4] | 20 [18..21] | 4.4 |
+| `close` 8.6×5.2 | 0 [0..1] | 3 [1..3] | **9 [9..10]** | **28 [27..29]** | 5.3 |
+
+- **Today's `close` IS the 8.6×5.2 row — identical, not larger** — so the
+  2026-08-14 amendment's second sentence ("every mat now in the app is larger
+  than the two it measured") was **false**, and "do not quote a preset name out
+  of this table" over-corrected. That row is quotable as `close`, and it
+  **re-measures true** a week and a whole settle campaign later: 20d6 `9/20`
+  then and `9 [9..10]` now, 40d6 `27/40` then and `28 [27..29]` now.
+- **Only the two mats that never shipped stay unquotable** — 6.7×4.1 and the
+  refused 5.2×3.2.
+- **The original table had no row for the two mats most players are on.**
+  `wide` and `medium` were never in it. They are above.
+- **The instruction is confirmed live rather than merely archived:** 40d6
+  piling goes 13 → 20 → 28 and max height 3.3 → 4.4 → 5.3 down the shipped
+  ladder. A fourth notch still breaks goal 5 and goal 1. **The mat is the
+  PHYSICS WALLS** — identical on every client, because a seeded roll replayed
+  against different walls lands differently — so it cannot vary by device and
+  must hold the largest pool anyone rolls. `dice-land-flat` is the pin.
+
+*Two documentation errors on the same table in three days, both from the same
+habit: correcting a stale claim without re-running the thing it claimed.
+`tools/steps/pile.mjs`'s own header carries the third instance — it says "at
+`medium` … `TABLE_W` is 8.6", which is `close`.*
 
 ### C25. The physical shelf does not fit the mat any more — SHIPPED 2026-08-15
 
@@ -679,39 +697,101 @@ stacking is worst. Rung 1's descent and the portrait quarter-turn shipped in
 the immersion wave; containing the mat was priced and declined at ~24% of die
 size.
 
-**What 2026-08-15 changed is that this entry's residual was measured, and it is
-NOT a phone problem.** Die span in px, one fixed seed per pool:
+**The residual is a COMMAND now, not a date:**
+`node tools/drive.mjs tools/steps/frame-residual.mjs`. Die span in px, 5 seeds
+a cell, `preferDice` off and on read from ONE settled throw so the delta is the
+camera and provably nothing else. Seed #1 of each cell is the seed the old
+table used (`3d6` 7002, `6d6` 7004, `40d6` 7007, …), the rest +1000 apart.
+Measured 2026-08-17 at zoom `medium`:
 
-| pool | 390px phone | with `preferDice` | iPad-p 834 | desktop 1600 |
-| --- | --- | --- | --- | --- |
-| 1d20 | 266 | 266 | — | — |
-| **3d6** *(the canonical Soul Deal roll)* | **85** | **85** | **119 → 242** | **200 → 245** |
-| 6d6 | 62 | 62 | — | 200 → 236 |
-| 12d6 | 59 | 68 | — | — |
-| 40d6 | 59 | 59 | — | **200 → 184 (worse)** |
+| pool | phone 390 | iPad-p 834 | desktop 1600 |
+| --- | --- | --- | --- |
+| 1d20 | 215 → 239 [191..266] · fires 2/5 | 119 → **351** [306..405] · **5/5** | 200 → 246 [200..287] · 4/5 |
+| **3d6** *(the canonical Soul Deal roll)* | 73 → 74 [71..113] · 1/5 | 119 → **199** [184..242] · **5/5** | 200 → 200 [200..253] · 2/5 |
+| 6d6 | 62 → 68 [62..91] · 3/5 | 119 → **159** [119..227] · **4/5** | 200 → 200 · 0/5 |
+| 12d6 | 59 → 63 [59..69] · 2/5 | 119 → 119 [119..168] · 1/5 | 200 → 200 [200..235] · 1/5 |
+| 20d6 | 59 → 59 · 0/5 | 119 → 119 · 0/5 | 200 → 200 · 0/5 |
+| 40d6 | 59 → 59 · 0/5 | 119 → 119 · 0/5 | 200 → 200 · 0/5 |
 
-**At 390px the option gains nothing at all** — three dice span 3.9×3.0 of an
-11×6.7 mat, so nothing is being cropped and the ladder correctly declines to
-act. The win is on a tablet and a desktop, and at 40d6 it is a loss.
+**THE TABLE THAT WAS HERE WAS TWO INSTRUMENTS UNDER ONE HEADING, and it did
+not drift — it was wrong on the day.** The tree at `c29d429`, the commit that
+wrote it, runs the step above to numbers byte-identical with today's. Its phone
+and iPad columns are `frame-small`'s GATED `preferDice` readings and they
+reproduce exactly, every digit. Its desktop column is `frame-price`'s UNGATED
+probe grid — and not even one column of that: 3d6's `245` and 40d6's `184` are
+`land 1.0`, while 6d6's `236` is `land .55`, **a different option's column**
+(its `land 1.0` is 221). What `preferDice` actually does on those three seeds
+is 253 · no change · no change.
 
-**So it shipped as an instrument, not a default.** `__diceDebug.setFraming({
-preferDice: true })` (add `floor: 0.55` for the aggressive version) is inert
-until Joe says otherwise, and `framing-instrument-is-inert` pins that it stayed
-that way. **The question is not measurable and is his: does a cropped felt
-still read as a table?** Roll 3d6, then 6d6, then 40d6 with it on.
+**So "it makes 40d6 worse" is struck, and it was never a thing the option can
+do.** Rung 2 is kept only if it beats rung 1 by `FRAMING.gain` (1.15), so the
+instrument returns rung 1's span or a bigger one and nothing else. Over 90
+paired throws: **0 shrank, 0 lost a die, 30 fired.**
+
+**And "at 390px it gains nothing at all" is half struck.** The MEDIAN phone
+throw still gains nothing (1.00 at every pool but 6d6, which is 1.06) — but 8
+of 30 phone throws fire, at +6% to +69%, and the reason given here was wrong
+twice. The cluster for 3d6 is 3.5×6.2, not 3.9×3.0, and the ladder is NOT
+"correctly declining to act": on a phone it is already at rung 2 for every pool
+up to 12d6, which this entry's own prose says two paragraphs up.
+**`preferDice` is two options wearing one name** — where the mat fits it runs
+rung 2 and crops the felt; where the mat does not fit (every phone) rung 2 is
+already running and all it changes is `computeFraming`'s ORBIT tie-break, from
+"completeness" to "completeness, then size". That second half is what
+quarter-turns a table, **including a DESKTOP**, and nobody has looked at it.
+
+**Where the win actually is: the tablet, and only the tablet.** iPad portrait
+fires 5/5, 5/5, 4/5 on 1d20 / 3d6 / 6d6 at 1.34×–2.95×. Desktop fires 7 of 30
+and turns the table when it does — the same roll, two orientations, decided by
+which way the dice happened to settle, because desktop's gain sits astride the
+1.15 gate (rung2 1.09–1.23) where the tablet's does not (1.31–3.40). **A coin
+flip is worse than either answer.** The camera is per-viewer — that is what
+makes it safe to vary by device where the MAT never can (C24) — so the honest
+shape of the decision is not on-or-off but a **device split**: on for the
+tablet band, off on desktop until the flip is fixed, near-no-op on a phone.
+
+*Cheap lever, argued and deliberately not made: the desktop coin flip is
+`FRAMING.gain` at 1.15 sitting inside desktop's distribution. Raising it makes
+desktop consistently off and leaves the tablet untouched — one constant, buying
+the device split with no device gate. Worth measuring before anyone writes one.*
+
+**It therefore still ships as an instrument, not a default.**
+`__diceDebug.setFraming({ preferDice: true })` (add `floor: 0.55` for the
+aggressive version) is inert, and `framing-instrument-is-inert` pins that.
+**The question is still not measurable and still his — but it is a different
+question now:** not "is +23% worth a loss at 40d6" (that trade does not exist),
+but **"is a 1.67×–2.95× tablet frame worth losing the felt on small rolls, and
+may a desktop table turn?"** Roll 3d6 then 6d6 then 40d6 with it on, at a
+tablet width.
 
 **The rail, not the camera, is the phone's real lever** — a 390px phone gives
 the felt 278px — but the two only pay off together: a full-width felt makes the
 mat *fit*, which sends the frame back to rung 1 and makes dice **smaller**
 (85 → 66).
 
-**THE RULE this entry named, in its third shape — *nothing fails loudly when a
+**THE RULE this entry named, in its FOURTH shape — *nothing fails loudly when a
 stand-in stops standing in*.** `SHELF_SLOT_W` stopped tracking `TABLE_W` (C25).
-The spawn-spread comment stopped tracking the mat (C28 ①). This was a framing
-TARGET that stopped tracking the thing it stood for. **And on 2026-08-15 the
-shape recurred twice in this very file** — C28 ①'s preset table and C24's mat
-table both kept their labels a full notch after the ladder moved.
-`grep -n "TABLE_W" js/main.js` is this shape's audit.
+The spawn-spread comment stopped tracking the mat (C28 ①). The framing TARGET
+stopped tracking the thing it stood for. And now the entry's own EVIDENCE: a
+probe reading wearing an instrument's label, for two days, load-bearing on a
+shipping decision. The verification run at the time ("every span matches the
+pre-change run") **could not** catch it — it compared the shipped frame, which
+is bit-identical by construction when the option is off, and never asked
+whether the ON column came from the option. **A number somebody will later
+quote gets a command, not a date.**
+
+*Also refuted while re-measuring: the suspicion that spawn geometry moved these
+numbers. At `medium` — the zoom every C27 figure is taken at — 0 of 30 throws
+is born inside a wall under either formula, and the three archived seeds clear
+by 0.13/0.21/0.14, so the two are bit-identical on the exact throws in
+question. The instrument is not blind: the same probe at `close` catches 3 of
+16 wall births, reproducing C28 ①.*
+
+*One thing found in passing and recorded nowhere else: on desktop at 40d6 with
+`preferDice` OFF, 39 of 40 dice are on screen on 2 of 5 seeds, mat fitting.
+Rung 1 guarantees only the DECIDING die, so a piled non-hero die can be cropped
+at rung 1 on a desktop. Consistent with the shipped design; simply never
+written down.*
 
 ### C28. Two more things the zoom ladder left behind — SHIPPED 2026-08-15
 
