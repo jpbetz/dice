@@ -222,9 +222,20 @@ privacy decision, not an oversight". That is true of the FIELD and **materially
 false about what the endpoint discloses.** C17 (2026-08-09) gave the peek a
 second seat source — every seated player's published `library`, each seat
 carrying `from`, *which is that player's display name* (server.js
-`handleTableInfo`, the `for (const pl of room.players.values())` loop). The
-budget comment one screen above it — *"No players, no roster, no log, no
-offers"* — predates that change and was not updated with it.
+`handleTableInfo`, the `for (const pl of room.players.values())` loop).
+
+**The stale artifact is THIS FILE, not the code — checked, and the first
+version of this very finding got it backwards.** It said the budget comment
+*"No players, no roster, no log, no offers"* still sat one screen above the
+loop and needed correcting. That string is **nowhere in `server.js`**:
+`git log -S "No players, no roster" -- server.js` puts its removal in
+`a3d4976` on **2026-08-08**, the commit that added the second source, one day
+*before* C17 — so the comment was rewritten by the change that invalidated it,
+which is the system working. What stands there today is a long note naming both
+sources and explaining `from` in as many words (*"whose character this is"*,
+and why a copy you did not know you were making is the `#g=` mistake with
+better manners). The quotation survived only in the docs that cite it, this one
+included.
 
 Measured, not read (`node server.js` on any free port that is **not 8123**,
 then `POST /api/join`, `POST /api/pools` with a `library`, then
@@ -329,13 +340,14 @@ seat names the peek already carries"*), shipped (2)+(3) instead, and recorded
 *"(1) … stays unbuilt and unneeded"*. Its `seatsOpen` counted unclaimed SEATS
 where L2 counts PEOPLE, so the precedent is directional, not binding.
 
-#### ⑤ The two things this actually owes, whichever way it is decided
+#### ⑤ The one thing this actually owes, whichever way it is decided
 
-1. **Correct `handleTableInfo`'s budget comment.** *"No players, no roster, no
-   log, no offers"* has been wrong since 2026-08-09: the endpoint reports the
-   display name of any seated player holding a profile. It should say what it
-   does — including that a library-less player is invisible, since that
-   asymmetry is now load-bearing for the argument above.
+1. ~~**Correct `handleTableInfo`'s budget comment.**~~ **Withdrawn 2026-08-17:
+   there is no such comment to correct.** It was removed in `a3d4976` on
+   2026-08-08 by the change that added the second source, and what stands there
+   now describes both sources and `from` in full. ① has the receipt. Keeping
+   this item would have sent somebody to fix a line that was already right —
+   which is the same cost as the stale claim it was written to fix.
 2. **Assert it.** `prepared-seat`'s peek check loops a leak-list
    (`1d20`, `playerId`, `rev`, `log`, `felt`) and says nothing about presence,
    which is exactly why `from` walked in unremarked. The assertion that would

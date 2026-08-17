@@ -4093,9 +4093,14 @@ gate was written against the pre-join peek's `seats` list, which made it fire
 for *anyone* arriving at a prepared table — including **the organizer at the
 table they just prepared**, and three scenarios hung waiting for a join that
 never came. The word doing the work in Joe's ruling is **unclaimed**, and the
-peek cannot know it: `handleTableInfo` deliberately omits the roster
-(server.js:2540 — *"No players, no roster, no log, no offers"*), which is a
-privacy decision, not an oversight. `unclaimedSeats()` can only run in-room,
+peek cannot know it: `handleTableInfo` deliberately omits the roster **field**,
+which is a privacy decision, not an oversight. *(Amended 2026-08-17: the comment
+this paragraph quoted — "No players, no roster, no log, no offers" — was removed
+from `server.js` in `a3d4976` on 2026-08-08, and the endpoint does disclose a
+seated player's display name via `from` when they have published a profile. The
+sentence above is still true of the roster field and of `unclaimed`; the
+citation was not. ROADMAP §3b L2 ① carries the measurement.)*
+`unclaimedSeats()` can only run in-room,
 after the join the gate is deciding whether to make.
 
 **So the open question is where "unclaimed" comes from**, and there are three
