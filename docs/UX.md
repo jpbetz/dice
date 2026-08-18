@@ -6720,9 +6720,9 @@ computed where it never used to be, and wins where it frames the same dice
 larger.
 
 Measured: **5 of 30 desktop throws and 5 of 30 tablet throws come back
-quarter-turned that did not before**, all at 1d20 / 3d6 / 12d6 — the pools
-where the dice rung fires at all. Every one of them grew the frame and none
-lost a die. `v-crop-desktop-3d6-on.png`, the frame the verdict came back
+quarter-turned that did not before** — desktop at 1d20 / 3d6 / 12d6, tablet at
+1d20 / 3d6 / 6d6, which in both cases is exactly the set of pools where the
+dice rung fires at all. Every one of them grew the frame and none lost a die. `v-crop-desktop-3d6-on.png`, the frame the verdict came back
 against, is one of the turned ones, so the desktop turn was inside what was
 approved rather than a consequence discovered afterwards.
 

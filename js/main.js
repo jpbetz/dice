@@ -23609,11 +23609,15 @@ function decidingOnScreen() {
 // if nothing judged it — which was never on offer. Over 90 paired throws:
 // **0 shrank, 0 lost a die, 30 fired.**
 //
-// WHAT IT COSTS, stated in the frame rather than in prose: where rung 2 is kept
-// the mat leaves the view, so the felt is cropped and the frame is filled with
-// felt instead of containing it (`framingInfo().feltFill` goes to 1). That is
-// the trade Joe was shown — shots/v-crop-*.png, `tools/steps/verdict-shots.mjs
-// crop` — and approved.
+// WHAT IT COSTS, and what it does NOT. Where rung 2 is kept, `matFits` goes
+// false: the PLAYABLE MAT's four corners leave the view. That is the whole
+// cost, and it is smaller than it sounds — the floor is a 160x160 plane, so the
+// viewport was already 100% table surface before the crop and still is after.
+// Nothing empty comes into frame; there is just less mat and more die. **Do not
+// build a "does the felt fill the frame" gate on top of that** — it is green
+// either way, for a reason unrelated to what it would claim. The trade Joe was
+// shown and approved is shots/v-crop-*.png (`tools/steps/verdict-shots.mjs
+// crop`); the tablet, where the win actually is, is `frame-look.mjs`.
 //
 // TWO OPTIONS WEAR THIS ONE NAME, and only the first is the block below. Where
 // the mat FITS (tablet, desktop) it runs rung 2 and crops the felt. Where the
@@ -23622,9 +23626,10 @@ function decidingOnScreen() {
 // phone's median gains nothing here and 6 of its 30 throws still come back
 // quarter-turned. See computeFraming.
 //
-// `floor` lets the dice rung's scan start below the preset (1 = the shipped
-// promise that the eye never comes closer); it stays OFF, and it is the dial
-// that was never asked about. `setFraming` remains, and its job has inverted:
+// `floor` lets the dice rung's scan start below the preset; it stays at 1 —
+// the shipped promise that the eye never comes closer than the zoom says — and
+// it is the one C27 dial nobody asked about. `setFraming` remains, and its job
+// has inverted:
 // it is now how a measurement turns the shipped framing OFF for an A/B read
 // (`frame-residual.mjs` reads both sides of one throw through it).
 //
@@ -23733,7 +23738,8 @@ function framingFor(orbit) {
 // portrait frames the same dice larger. **Measured 2026-08-18, 5 seeds a cell,
 // `node tools/drive.mjs tools/steps/frame-residual.mjs --verbose`: 5 of 30
 // desktop throws and 5 of 30 tablet throws come back quarter-turned that did
-// not before, all of them at 1d20 / 3d6 / 12d6 — the pools where rung 2 fires.
+// not before — desktop at 1d20/3d6/12d6, tablet at 1d20/3d6/6d6, which in both
+// cases is exactly the set of pools where rung 2 fires at all.
 // Every one of them GREW the frame; none lost a die.** The frame Joe approved
 // (shots/v-crop-desktop-3d6-on.png, seed 7002) is one of the turned ones, so
 // the desktop turn is inside the call and not a side effect of it.
