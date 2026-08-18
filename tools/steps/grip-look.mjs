@@ -14,14 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// THE ONE FRAME THAT COULD OVERTURN THE C30 REFUSAL — deaden+grip's rest pose
-// against shipped's, on the SAME SEED, at the two zooms that decide it.
+// THE REST POSE UNDER THE FELT TUNING AND UNDER THE ONE IT REPLACED, on the
+// SAME SEED, at the two zooms that decide it.
 //
-// ROADMAP C30 refuses `feltgrip+gate4` on one gate of six: the pile. Every
-// other axis is the best ever measured on this table (shake -35%, hops -32%,
-// every pool faster, clock 1.01x). Whether +6.3pp of piling at `close` is worth
-// the calmest dice on the table is not a measurement, it is Joe's eye — so this
-// puts the two rest poses side by side and gets out of the way.
+// THE PAIR IS NOW SHIPPED vs CLASSIC, NOT SHIPPED vs CANDIDATE (2026-08-18).
+// This step was built to overturn a refusal: ROADMAP C30 refused
+// `feltgrip+gate4` on one gate of six, the pile, while it won every other axis
+// ever measured here (shake -35%, hops -14% to -32%, every pool faster, clock
+// 1.03x). Joe overturned the refusal — "Pilling is OK. If you throw a lot of
+// dice, it's your fault if they pile up. Let's not try to prevent it." — and
+// the tuning shipped. Left as it was, this step would have set the candidate's
+// overrides on top of a build that already holds them and shot two IDENTICAL
+// frames under two different labels, which is a look that cannot fail. So the
+// second arm is now `classic`: the pre-C30 numbers, restored as an override.
 //
 // WHY REST POSES AND NOT A VIDEO. The costs and the wins live in different
 // media: the win is motion over the last 0.6 s (shake and hops, already
@@ -31,21 +36,22 @@ limitations under the License.
 //
 //   node tools/drive.mjs tools/steps/grip-look.mjs [seed]
 //
-// Frames land in tools/out/ as grip-<zoom>-<pool>-<shipped|feltgrip>.png.
+// Frames land in tools/out/ as grip-<zoom>-<pool>-<shipped|classic>.png.
 // COMPARE WITHIN A PAIR ONLY — same zoom, same pool, same seed, one variable.
 
-// Exactly the matrix's `feltgrip+gate4`, restated here because this step must
-// keep working if that file's variant list is re-cut. GRIP + DEADEN.
-const GRIP_DEADEN = {
-  floorFriction: 0.6, diceFriction: 0.4, wallFriction: 0.2,
-  floorRestitution: 0.15, diceRestitution: 0.2, wallRestitution: 0.5,
+// Exactly the matrix's `classic` row, restated here because this step must
+// keep working if that file's variant list is re-cut: the tuning that shipped
+// from the first pass until 2026-08-18, and the speed gate off.
+const CLASSIC = {
+  floorFriction: 0.25, diceFriction: 0.15, wallFriction: 0.05,
+  floorRestitution: 0.35, diceRestitution: 0.45, wallRestitution: 0.7,
 };
-const GATE4 = { gate: 4, slowLinear: 0.1, slowAngular: 0.14 };
+const NOGATE = { gate: 0, slowLinear: 0, slowAngular: 0 };
 
-// close/6d6 is the cell the refusal turns on (+6.3pp, flat 33/40 -> 23/40) and
-// medium/trio is the canonical Soul Deal roll that dice-land-flat pins as a
-// floor at every zoom — it regresses 40/40 -> 39/40, which is the quieter half
-// of the objection and the one Joe has never been shown.
+// close/6d6 is the cell the refusal turned on (+6.3pp, flat 33/40 -> 23/40)
+// and medium/trio is the canonical Soul Deal roll that dice-land-flat pins as
+// a floor at every zoom — it moves 40/40 -> 39/40, which is the quieter half
+// of the cost that was accepted.
 const CELLS = [
   ['close', '6d6', Array(6).fill('d6')],
   ['medium', 'trio', ['d8', 'd6', 'd10']],
@@ -68,14 +74,14 @@ export default async function run(stage, args) {
 
   const rows = [];
   for (const [zoom, pool, types] of CELLS) {
-    for (const variant of ['shipped', 'feltgrip']) {
+    for (const variant of ['shipped', 'classic']) {
       // Reset FIRST, every time — the felt is global and a leaked override
       // would silently label the next frame with the wrong variant.
       await a.dbg(`setPhysics(${JSON.stringify(INERT.phys)})`);
       await a.dbg(`setDampgate(${JSON.stringify(INERT.dampgate)})`);
-      if (variant === 'feltgrip') {
-        await a.dbg(`setPhysics(${JSON.stringify(GRIP_DEADEN)})`);
-        await a.dbg(`setDampgate(${JSON.stringify(GATE4)})`);
+      if (variant === 'classic') {
+        await a.dbg(`setPhysics(${JSON.stringify(CLASSIC)})`);
+        await a.dbg(`setDampgate(${JSON.stringify(NOGATE)})`);
       }
       await a.dbg(`setZoom('${zoom}')`);
       await a.dbg('sim(200)');
@@ -124,7 +130,7 @@ export default async function run(stage, args) {
   console.log(w.map((k) => '-'.repeat(k)).join('  '));
   for (const r of rows) console.log(line(r));
   console.log(`\nframes in tools/out/ — compare WITHIN a pair (same zoom, same`
-    + ` pool, same seed).\n  close/6d6:    is the candidate's heap something you`
-    + ` would ship for calmer dice?\n  medium/trio:  the canonical roll — does it`
-    + ` still read as three dice on a table?`);
+    + ` pool, same seed).\n  close/6d6:    what the accepted pile actually looks`
+    + ` like, against the mat that piled less.\n  medium/trio:  the canonical roll`
+    + ` — does it still read as three dice on a table?`);
 }
