@@ -292,14 +292,77 @@ t('the two he liked still measure exactly what he heard', () => {
   }
 });
 
-t('the C family still measures exactly what he heard', () => {
+// ---------------------------------------------------------------------------
+// C1 / C2 / C3 — "I hate this sound… far less sharp".
+// ---------------------------------------------------------------------------
+
+t('the C family is ONE voice, which is why all three rows failed together', () => {
+  // THE FINDING BEHIND THE FIX. docs/AUDIO.md §9 lists C1, C2 and C3 as three
+  // things to judge, and they are three CONTEXTS of a single body: the
+  // Witchlight set's `chime`, then that same chime with each venue's ground
+  // multiplier over it. Joe used the same sentence for C1 and C2 and a
+  // near-identical one for C3, which is what a single shared cause sounds
+  // like — and no ground trim could have rescued it, because the deepest one
+  // in the app (×0.66) applied to a 3.4 kHz band still lands at 2.2 kHz.
+  assert.equal(IMPACT_VOICES.chime.filter, 'bandpass');
+  const deepest = Math.min(...Object.values(VENUE_AUDIO).map((v) => v.ground.centre));
+  assert.ok(deepest > 0.6,
+    `the deepest ground in the app is ×${deepest} — a multiplier, not a rescue`);
+});
+
+t('C1/C2/C3 moved FAR, on all three axes of "sharp"', () => {
+  const rows = [['table', 'C1'], ['moonrise', 'C2'], ['foxfire', 'C3']];
   const witch = { body: 'chime', weight: 0.22 };   // js/themes.js moonmoot.witchlight
-  for (const [venue, was] of Object.entries(BASELINE_2026_08_17.witchlight)) {
+  for (const [venue, id] of rows) {
+    const was = BASELINE_2026_08_17.witchlight[venue];
     const now = spectrumOf(witch, VENUE_AUDIO[venue].ground.centre);
-    assert.equal(now.fcHz, was.fcHz, `witchlight on ${venue}: band`);
-    assert.equal(now.centroidHz, was.centroidHz, `witchlight on ${venue}: centroid`);
-    assert.equal(now.partialHz, was.partialHz, `witchlight on ${venue}: partial`);
-    assert.equal(now.attackMs, was.attackMs, `witchlight on ${venue}: transient`);
+    const d = pct(now.centroidHz, was.centroidHz);
+    assert.ok(d <= -30,
+      `${id}: "far less sharp" is at least a third off the centroid — `
+      + `${was.centroidHz} → ${now.centroidHz} Hz is ${d}%`);
+    assert.ok(now.partialHz < was.partialHz * 0.7,
+      `${id}: the sine partial welded to its front came down with it `
+      + `(${was.partialHz} → ${now.partialHz} Hz)`);
+    assert.ok(now.attackMs >= 5,
+      `${id}: and it stopped starting at full gain on its first sample `
+      + `(${was.attackMs} → ${now.attackMs} ms)`);
+  }
+  // THE TWO THE PLAYER ACTUALLY HEARS. §9's C section is walked inside the
+  // glade, so C2/C3 are the rows with a verdict on them — and both now sit
+  // with most of their energy BELOW §1's own boundary, which the shipped
+  // voice never did in any venue.
+  for (const venue of ['moonrise', 'foxfire']) {
+    const now = spectrumOf(witch, VENUE_AUDIO[venue].ground.centre);
+    assert.ok(now.aboveBoundary < 0.6,
+      `${venue}: most of a landing's energy is now under ${MATERIAL_BOUNDARY_HZ} Hz `
+      + `(${now.aboveBoundary} above it, was ${BASELINE_2026_08_17.witchlight[venue].aboveBoundary})`);
+  }
+});
+
+t('the chime got duller without getting quieter', () => {
+  // The cheapest way to fake "less sharp" is to turn a voice down, and the
+  // second cheapest is to widen its filter and let the extra bandwidth do it.
+  // `gainScale` is untouched and the widened band moves this body's broadband
+  // power by under a dB, so whatever Joe hears next sitting is timbre.
+  assert.equal(IMPACT_VOICES.chime.gainScale, 0.045,
+    'the chime ships at the gain it shipped at');
+  const now = impactSpectrum(IMPACT_VOICES.chime, centreOf(0.22));
+  const wasNoiseGain = 0.3055;   // the shipped body at the same centre
+  assert.ok(Math.abs(20 * Math.log10(now.noiseGain / wasNoiseGain)) < 1,
+    `and passes the same broadband power within a dB `
+    + `(${wasNoiseGain} → ${now.noiseGain})`);
+});
+
+t('the default body and the two he liked kept their transients', () => {
+  // The attack is opt-in per body, so this is the claim that the change did
+  // not quietly soften the most common sound in the app.
+  assert.equal(IMPACT_DEFAULT_BODY, 'felt');
+  for (const body of ['felt', 'click', 'thud', 'clack', 'hush', 'crackle']) {
+    assert.ok(!IMPACT_VOICES[body].attackMs,
+      `${body} still begins on its first sample — it was not complained about`);
+  }
+  for (const body of ['chime', 'bell']) {
+    assert.ok(IMPACT_VOICES[body].attackMs > 0, `${body} has a rise`);
   }
 });
 
@@ -335,16 +398,18 @@ t('the grounded row is inert BY CONSTRUCTION (venueAudioInfo agrees)', () => {
   assert.equal(t0.bed.tick.gain, 1);
 });
 
-t('only the body he complained about grew an attack', () => {
+t('the default body and the two he liked kept their transients', () => {
   // The attack is opt-in per body, so this is the claim that the change did
   // not quietly soften the most common sound in the app.
   assert.equal(IMPACT_DEFAULT_BODY, 'felt');
   assert.equal(FAINT.length, 2);
-  for (const body of ['felt', 'click', 'chime', 'thud', 'clack', 'hush', 'crackle']) {
+  for (const body of ['felt', 'click', 'thud', 'clack', 'hush', 'crackle']) {
     assert.ok(!IMPACT_VOICES[body].attackMs,
       `${body} still begins on its first sample — it was not complained about`);
   }
-  assert.ok(IMPACT_VOICES.bell.attackMs > 0, 'bell has a rise');
+  for (const body of ['chime', 'bell']) {
+    assert.ok(IMPACT_VOICES[body].attackMs > 0, `${body} has a rise`);
+  }
 });
 
 console.log(`voices: ${n} assertions run`);

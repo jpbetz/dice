@@ -233,7 +233,7 @@ export const IMPACT_VOICES = {
   // re-listen to is therefore purely a TIMBRE change — the level is the level
   // that shipped, so "it sounds better because you turned it down" is not
   // available as an explanation of whatever he hears.
-  chime:   { filter: 'bandpass', baseFreq: 3400, freqSpread:  700, q: 2.8, decayShape: 0.42, gainScale: 0.045, partial: true },
+  chime:   { filter: 'bandpass', baseFreq: 1750, freqSpread:  550, q: 1.5, decayShape: 0.46, gainScale: 0.045, partial: true, attackMs: 7 },
   // NEW 2026-08-18, and it exists because Joe's two complaints about this
   // family are DIFFERENT SIZES. Black Anvil is "slightly too shrill / clanky";
   // the Witchlight chime is one he hates. One body cannot move a little for
