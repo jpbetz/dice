@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // THE SITTING — every outstanding visual and audio judgement in this project
-// on ONE page (ROADMAP THE ORDER #1, "Joe's LOOK and LISTEN queue").
+// on ONE page (ROADMAP THE ORDER #1b, "the re-asks the sitting created").
 //
 // WHY IT EXISTS. The queue was five LOOKs and five voices deep not because
 // any one of them is hard, but because each was a paragraph in a different
@@ -25,10 +25,22 @@ limitations under the License.
 // rather than by tier number, with the question stated in one sentence and
 // the consequence of either answer written down beside it.
 //
-//   node tools/drive.mjs tools/steps/verdict-shots.mjs        # the new frames
-//   node tools/drive.mjs --steps tools/steps/glade-look.mjs,\
-//     tools/steps/life-look.mjs,tools/steps/record-look.mjs    # the existing ones
+// IT IS THREE ITEMS LONG NOW, AND THAT IS THE POINT. The 2026-08-18 sitting
+// answered all eight in about an hour and everything it opened has been built
+// and deployed; what is left is three. A page padded back to eight would cost
+// him the same hour for a third of the information, and re-asking something he
+// has already answered is how a queue stops being trusted — so what the last
+// sitting CLOSED is rendered at the top (`CLOSED_LAST_SITTING`) and the queue
+// below it is only what is genuinely open.
+//
+//   node tools/drive.mjs tools/steps/flare-look.mjs           # item 1, AFTER
+//   git checkout 48bd128 -- models/towers/ \
+//     && node tools/drive.mjs tools/steps/flare-look.mjs tag=before \
+//     && git checkout HEAD -- models/towers/                  # item 1, BEFORE
+//   node tools/drive.mjs tools/steps/grip-look.mjs 1000       # item 2
 //   node tools/verdict-sheet.mjs                              # this page
+//
+// Item 3 is a LISTEN and has no frames: it is two clicks on the live table.
 //
 // SINGLE FILE, ON PURPOSE. Frames are downscaled and embedded as JPEG data
 // URIs, so `shots/verdicts.html` opens from the filesystem with no server and
@@ -75,8 +87,28 @@ const QUALITY = 0.82;
 // frames (`v-crop-*`) are deliberately NOT in it: for C25 the chrome IS the
 // subject, and for C27 "does it still read as a table" is a question about
 // the whole window.
-const SCENE_CROP_LEFT = 316 / 1500;
-const cropFor = (file) => (/^(glade-|life-|v-stump-)/.test(file) ? SCENE_CROP_LEFT : 0);
+//
+// `flare-*-resting` is in it (same rig, same 1500 px, same panel) and
+// `flare-*-foot` is NOT: those are already clipped to the stump by the step,
+// so taking another 21% off their left would slice the thing being judged.
+//
+// THE FRACTION IS NOT ONE NUMBER, because the panel is not a fraction — it is
+// a FIXED 316 px column, measured at both rigs against the running app (1500
+// px on 2026-08-16, and 780 px on 2026-08-18 when the C30 frames arrived). So
+// the same panel is 21% of a scene frame and **41% of a grip frame**, and
+// carrying 21% across to the smaller rig would have left a strip of dead
+// chrome in the pair whose whole question is where six dice ended up. The rule
+// stores the rig width and divides.
+const PANEL_CSS = 316;
+const RIG = [
+  [/^(glade-|life-|v-stump-)/, 1500],
+  [/^flare-.*-resting\.png$/, 1500],
+  [/^grip-/, 780],           // the harness's default window; these have no .png suffix
+];
+const cropFor = (file) => {
+  const hit = RIG.find(([re]) => re.test(file));
+  return hit ? PANEL_CSS / hit[1] : 0;
+};
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -129,7 +161,15 @@ function gitSha() {
 // warning that fires on unrelated work is a warning that gets switched off.
 // So each row's bar is the newest of (the app the frames photograph) and
 // (only the steps its OWN regen command names).
-const APP_PATHS = ['js', 'vendor', 'index.html', 'lab.html'];
+//
+// `models` JOINED THIS LIST 2026-08-18, and it is not housekeeping. Item 1 is
+// a LOOK at a baked GLB: for a tower round the model IS the code the frame
+// shows, and without it a re-bake could land while the frames stayed put and
+// the page would still print "every frame is newer than every source that
+// could restage it". The BEFORE leg's `git checkout 48bd128 -- models/towers/`
+// dance is safe under this for the same reason the fae-lab one is — the file
+// is restored, so it is clean again and has no uncommitted mtime to trip on.
+const APP_PATHS = ['js', 'vendor', 'models', 'index.html', 'lab.html'];
 
 const git = (args) => {
   try { return execFileSync('git', args, { cwd: ROOT }).toString(); } catch { return ''; }
@@ -170,431 +210,276 @@ const stepsWatermark = (regen) => barFor(
 // is built, because the stamp line in the header is evaluated before the items.
 const STALE = new Map();
 
+// WHAT THE LAST SITTING CLOSED — rendered at the top of the page, above the
+// queue, because "here is what your hour bought" is half of what this page is
+// for. Eight items went in on 2026-08-18, all eight came back, and everything
+// they opened has since been built and deployed (`/health` reports the same
+// sha this page stamps). A queue that visibly shrinks is a queue worth sitting
+// again; a queue that is always eight deep teaches the opposite.
+const CLOSED_LAST_SITTING = {
+  when: '2026-08-18',
+  headline: 'Eight items, about an hour, and every one of them answered. Four approvals closed four '
+    + 'entries outright, two two-word decisions became builds that have since shipped, one "not yet" '
+    + 'became two more rounds on the stump, and ten voices were heard for the first time. The five '
+    + 'separate askings over the previous fortnight had produced one verdict between them.',
+  groups: [
+    { label: 'Approved — closed, and not re-asked here', tone: 'good', rows: [
+      ['W7 ② the staging of the glade', '“Focus is the dice. This looks perfectly fine.”'],
+      ['W5 the living layer', 'the fireflies, the wisps and the moot procession; the governor’s curves are final'],
+      ['W4 the Moonmoot Witchlight set art', 'staged by both fae venues at roll creation'],
+      ['C25 Stage 2’s location', 'the build’s arithmetic refusal stands — the record lives in the log’s head'],
+    ] },
+    { label: 'Decided — and the build has shipped since', tone: 'good', rows: [
+      ['C27 the cropped felt', '“turn preferDice on” — shipped; the camera now frames the dice'],
+      ['9c the standard dice edge', '“round .090” — the soft candidate, not the ceiling; shipped'],
+    ] },
+    { label: 'Heard — the audio queue is closed', tone: 'good', rows: [
+      ['Eight of ten voices approved', '“All other audio sounds good” — three room beds and all five '
+        + 'tower clunks, frozen in tests/voices.test.mjs as APPROVED_2026_08_18 with equality '
+        + 'assertions, the first sign-off this palette has ever had'],
+      ['One design killed', 'the ringing die in the two fae venues — deleted, not re-tuned a third '
+        + 'time. That kill is item 3 below, and it is the only reason any audio row is on this page'],
+      ['One row still unheard', 'IMPACT_VOICES.chime survives for three grounded-table sets (seaglass, '
+        + 'sealed resin, focuscrystal) carrying a re-voice commissioned by the caller that was just '
+        + 'deleted. Small, not a blocker, and deliberately NOT padded onto this page'],
+    ] },
+    { label: 'Not yet — and this is item 1 below', tone: 'open', rows: [
+      ['The round-6 grounded stump', '“It’s still a set piece in my eyes… nothing to make it feel '
+        + 'rooted.” Round 7 found the cause was not on the model at all (its contact shadow had been '
+        + 'UNDER the glade floor since the venue shipped) and round 10 re-baked the flare. Item 1 is '
+        + 'that re-bake'],
+    ] },
+  ],
+};
+
 // ---------------------------------------------------------------------------
 // THE ITEMS, in the order of what each verdict FREES
 // ---------------------------------------------------------------------------
 
-const REGEN_VERDICT = 'node tools/drive.mjs tools/steps/verdict-shots.mjs';
-const REGEN_GLADE = 'node tools/drive.mjs tools/steps/glade-look.mjs';
-const REGEN_BEFORE = 'git checkout 9f1e592 -- js/fae-lab.js && '
-  + 'node tools/drive.mjs tools/steps/glade-look.mjs tag=before && git checkout HEAD -- js/fae-lab.js';
-const REGEN_LIFE = 'node tools/drive.mjs tools/steps/life-look.mjs';
-const REGEN_RECORD = 'node tools/drive.mjs tools/steps/record-look.mjs';
+const REGEN_FLARE = 'node tools/drive.mjs tools/steps/flare-look.mjs';
+const REGEN_FLARE_BEFORE = 'git checkout 48bd128 -- models/towers/ && '
+  + 'node tools/drive.mjs tools/steps/flare-look.mjs tag=before && git checkout HEAD -- models/towers/';
+const REGEN_GRIP = 'node tools/drive.mjs tools/steps/grip-look.mjs 1000';
 
 const ITEMS = [
   {
     n: 1,
-    id: 'w7',
+    id: 'flare',
     kind: 'LOOK',
-    title: 'W7 ② — the staging of the glade',
-    where: 'ROADMAP Tier W · shipped 2026-08-13 (583b569, c67977f, 2698cc5), frame-verified 2026-08-15',
-    unblocks: 'It is the ROOM. Three of the four looks below are photographed inside it, and W5’s '
-      + 're-ask is explicitly staged on top of this one — so every other fae verdict is provisional '
-      + 'until this one lands.',
-    question: 'Is the re-staged glade — moot ring forward and much larger on screen, pond back and '
-      + 'grown, one foreground wing bottom-left — the room you asked for, or was the arrangement you '
-      + 'rejected the better frame?',
+    title: 'The Hollow Bole’s base — the flare, re-baked',
+    where: 'ROADMAP Tier W · W3 round 10, SHIPPED 2026-08-18 · docs/UX.md §7.59 · docs/TOWER.md',
+    unblocks: 'Your “still a set piece” from the last sitting, second answer. It is the only thing '
+      + 'left on this tower’s track: approving it sends hollowbole to the paint bisect and then to '
+      + 'the ledger item, and overruling it sends the base back for a fourth bake.',
+    question: 'The foot no longer tucks under itself and the roots no longer end together — is the '
+      + 'base a better shape, even though the pale band is still there?',
     stakes: {
-      approve: 'W7 ② closes. With W6 landed on 2026-08-16, Tier W is then built end to end and '
-        + 'waiting only on the rest of this page — and T15 (the three classic skins re-baked '
-        + 'through the forge, explicitly queued behind this queue) can start.',
-      overrule: 'The staging is re-cut, and items 2, 3 and 4 below have to be re-asked afterwards, '
-        + 'because all three are photographed in this room.',
+      approve: 'The base’s SHAPE is settled and stops being re-opened. Round 11 on this model is the '
+        + 'paint bisect described below — a diagnostic, not another guess — and after it the ledger '
+        + 'item (the pale machined face at the shell’s x-clamp plane, which reads as a sawn plank in '
+        + 'side views).',
+      overrule: 'The base re-opens as another bake with its own gates and review. The paint bisect '
+        + 'still has to happen first either way, because three geometry changes have now failed to '
+        + 'move the band and a fourth would be the fourth guess.',
     },
     notes: [
-      { kind: 'reservation', text: 'A reservation from the agent that took these frames, included so '
-        + 'you can confirm or overrule it rather than have it filed as a fact: the AFTER is dimmer '
-        + 'overall, most of the new mass reads as dark silhouette, and its only strongly-lit cluster '
-        + 'is bottom-left and clipped by the frame edge. That is either "in a scene" or a value '
-        + 'problem, and the geometry gates cannot tell which.' },
-      { kind: 'plain', text: 'BEFORE is not a memory — it was re-rendered from js/fae-lab.js at '
-        + '9f1e592 (the commit immediately before the staging landed) against today’s tree, '
-        + 'then the file was restored.' },
+      { kind: 'finding', text: 'SAY IT FIRST: THE PALE RUFFLED BAND AT THE FOOT IS STILL IN THE '
+        + 'FRAME. If that band is your complaint verbatim, this round does not clear your bar and the '
+        + 'honest answer is "not yet". What the round did establish about it, by elimination in the '
+        + 'app’s own room: it is painted by ONE surface (hiding towerSkinBoleShell removes it '
+        + 'entirely; hiding the dressing, the shelves, the curtain and the contact ring each leaves '
+        + 'it untouched) — and three separate changes to that surface’s radius field, the root '
+        + 'envelopes, the bay ceiling and the base band’s grain frequency, each moved the field '
+        + 'measurably and NONE of them moved those pleats. That triple null is why the next step is a '
+        + 'paint bisect (one diagnostic bake with each surface class at a flat separable colour, ten '
+        + 'minutes) rather than a fourth bake of inference.' },
+      { kind: 'plain', text: 'What did change, in geometry rather than in taste. The old base was a '
+        + 'BELL: measured over the arc you can see, 13 of the 13 headings that had a flare on them '
+        + 'were widest ABOVE the soil, with up to 0.44 of tuck back in underneath, and every root '
+        + 'ended at the same height. Now: 0 bells of 10, the roots leave at six heights instead of '
+        + 'one (knee spread 0.20 → 0.60), the widest row of the outline is below the soil, and the '
+        + 'sill apron — a lens whose maximum was in mid-air — is deleted.' },
+      { kind: 'plain', text: 'BEFORE is not a memory and not last week’s screenshot: round 9’s baked '
+        + 'GLBs were restored into today’s tree, the same step re-run, and the files put back. Only '
+        + 'the mesh differs between the two halves of every pair — no colour constant moved in this '
+        + 'round at all, which was the rule it was given.' },
+      { kind: 'plain', text: 'The foot crops are the same frames, magnified. The box is derived from '
+        + 'the built mesh’s own world footprint through the live camera, so both halves of a pair are '
+        + 'cropped to within half a pixel of each other and the difference you see is the model.' },
     ],
     groups: [
-      { label: 'Moonrise Glade · the resting eye', regen: REGEN_BEFORE, cols: 2, pair: true,
+      { label: 'THE QUESTION — the foot at Moonrise, magnified',
+        regen: REGEN_FLARE_BEFORE, cols: 2, pair: true,
         frames: [
-          { file: 'glade-before-moonrise-resting.png', cap: 'BEFORE — the formal triptych (9f1e592)' },
-          { file: 'glade-moonrise-resting.png', cap: 'AFTER — shipped today' },
+          { file: 'flare-before-moonrise-foot.png', cap: 'BEFORE — round 9: the hem splays wide and '
+            + 'the wood curves back under it, every root dying at one height' },
+          { file: 'flare-after-moonrise-foot.png', cap: 'AFTER — round 10: shipped today' },
         ] },
-      { label: 'Foxfire Hollow · the resting eye', regen: REGEN_GLADE, cols: 2, pair: true,
+      { label: 'The same question in the other sky — Foxfire',
+        regen: REGEN_FLARE_BEFORE, cols: 2, pair: true,
         frames: [
-          { file: 'glade-before-foxfire-resting.png', cap: 'BEFORE (9f1e592)' },
-          { file: 'glade-foxfire-resting.png', cap: 'AFTER — shipped today' },
+          { file: 'flare-before-foxfire-foot.png', cap: 'BEFORE (round 9)' },
+          { file: 'flare-after-foxfire-foot.png', cap: 'AFTER — shipped today' },
         ] },
-      { label: 'And with the venue’s own dice on the felt — the frame a player actually gets',
-        regen: REGEN_GLADE, cols: 2, pair: true,
+      { label: 'And the whole room at the resting eye, because a base is judged standing in a place',
+        regen: REGEN_FLARE, cols: 2, pair: true,
         frames: [
-          { file: 'glade-before-moonrise-dice.png', cap: 'BEFORE · moonrise, dice settled' },
-          { file: 'glade-moonrise-dice.png', cap: 'AFTER · moonrise, dice settled' },
+          { file: 'flare-before-moonrise-resting.png', cap: 'BEFORE · Moonrise Glade' },
+          { file: 'flare-after-moonrise-resting.png', cap: 'AFTER · Moonrise Glade' },
+        ] },
+      { label: 'Foxfire Hollow, the resting eye', regen: REGEN_FLARE, cols: 2, pair: true,
+        frames: [
+          { file: 'flare-before-foxfire-resting.png', cap: 'BEFORE · Foxfire Hollow' },
+          { file: 'flare-after-foxfire-resting.png', cap: 'AFTER · Foxfire Hollow' },
         ] },
     ],
   },
 
   {
     n: 2,
-    id: 'w5',
-    kind: 'LOOK',
-    title: 'W5 — the living layer',
-    where: 'ROADMAP Tier W · "W5’s LOOK read — OPEN, and it was never actually asked"',
-    unblocks: 'The last unjudged fae MECHANISM. Nothing else in the tier waits on it, but Tier W '
-      + 'cannot be called done while it is open — and with W6 landed, this and the three items '
-      + 'around it are the whole of what is left.',
-    question: 'Do the fireflies, the wisps and the moot procession read as a living layer — and do '
-      + 'its two gestures land: does the glade step BACK while the dice are flying, and lean IN once '
-      + 'they are down?',
+    id: 'c30',
+    kind: 'CALL',
+    choices: ['overturn the refusal', 'the refusal stands', 'not yet'],
+    title: 'C30 — the calmest dice ever measured here, and the heap they make',
+    where: 'ROADMAP THE ORDER #6 · C30 residual, RUN 2026-08-17 and REFUSED on the pile alone',
+    unblocks: 'The last physics item. The build refused this candidate on ONE gate of six against a '
+      + 'bar the build itself wrote, and a bar is exactly the kind of thing only your eye can '
+      + 'overturn — so it is here rather than closed quietly.',
+    question: 'This tuning is your “magnetize themselves to the surface once they’re landed, no more '
+      + 'bounding like they’re on the moon” — shake −35%, hops −32%, every pool faster — and it pays '
+      + 'for it by clustering six dice and perching one on top of another: is that heap worth calmer '
+      + 'dice?',
     stakes: {
-      approve: 'W5 closes; the governor’s curves are final.',
-      overrule: 'The population and the two mood curves are re-tuned — a contained change inside '
-        + 'js/fae-lab.js that touches no other item on this page.',
+      approve: 'Gate d’s BAR is what changes, not the tuning. That is a real cost and it is stated '
+        + 'up front: every physics constant moves, so replay-drift runs first, every film-pinning '
+        + 'expectation in the suite re-anchors, and the character change gets its own UX §7 entry.',
+      decline: 'C30 closes as measured-and-refused, and the open question stays where it is — nobody '
+        + 'has proposed a way to make dice separate WITHOUT the skid. Every other instrument aimed at '
+        + 'the pile is already priced and refused.',
     },
     notes: [
-      { kind: 'plain', text: 'This was never asked. Your W7 verdict answered a question about the '
-        + 'composition and the model, and nothing in it was about the fireflies or the procession — '
-        + 'recorded as an un-asked question rather than banked as an approval nobody gave.' },
-      { kind: 'plain', text: 'A static room is fair to photograph once; a moving one is not. Each '
-        + 'palette gets two frames of the SAME eye twenty seconds apart, so a population that only '
-        + 'reads in one lucky frame is visible as such.' },
-      { kind: 'plain', text: 'The two gestures are driven by mood.life and mood.lean, and the step '
-        + 'prints both beside every frame it takes — so if a frame looks wrong the question "did the '
-        + 'governor fire, or did it fire and not show?" is already answered in the run log. Nothing '
-        + 'in the two flying/settled frames below is a lucky moment: they are the peak of each curve.' },
+      { kind: 'finding', text: 'JUDGE THE PILE OFF THESE STILLS AND NEVER OFF THE SHAKE. The costs '
+        + 'and the wins live in different media: the win is motion over the last 0.6 s and a still '
+        + 'cannot show it, while the cost is the final arrangement, which a still shows better than '
+        + 'any clip. If you go and roll this in the app you will be shown the flattering half — the '
+        + 'shake — and the thing being decided will be off screen. Compare only WITHIN a pair: same '
+        + 'zoom, same pool, same seed, one variable.' },
+      { kind: 'plain', text: 'Five gates of six say ship. Shake −35% (−30 to −43 across pools). Hops '
+        + '−32% at 20d6, the largest move ever measured on that meter here. Every pool faster, worst '
+        + '−2%. Wall-clock 1.01×. Cocked-die corrections 0, against shipped’s 1. The sixth gate is '
+        + 'the pile: close/6d6 goes +6.3pp and its clean throws fall 33/40 → 23/40, which is three '
+        + 'times its allowance, and all four cells regress.' },
+      { kind: 'plain', text: 'A number worth distrusting, from the run itself: at 10 seeds the same '
+        + 'cell read +3.3pp and the trio read perfectly clean. The cheap run flatters this candidate, '
+        + 'and the refusal is a 40-seed number. The e2e floor that reads like the pile guard would not '
+        + 'have caught it either — it samples three throws and passes ~99% of the time at this '
+        + 'candidate’s rate.' },
+      { kind: 'plain', text: 'The cell that fails is `close`, whose own tooltip says “biggest dice, '
+        + 'best on a phone” — opt-in density, not the default. The medium/trio pair below is the '
+        + 'canonical Soul Deal roll and is here as reassurance: 0 piled under BOTH tunings, and the '
+        + 'candidate arguably separates the pair that shipped leaves touching.' },
     ],
     groups: [
-      { label: 'Moonrise · the same eye, 20 s apart — did one lucky frame carry it?',
-        regen: REGEN_LIFE, cols: 2, pair: true,
+      { label: 'THE QUESTION — close / 6d6, seed 1000, the cell the refusal turns on',
+        regen: REGEN_GRIP, cols: 2, pair: true,
         frames: [
-          { file: 'life-moonrise-phase-a.png', cap: 'phase A' },
-          { file: 'life-moonrise-phase-b.png', cap: 'phase B — 20 s later' },
+          { file: 'grip-close-6d6-shipped', cap: 'SHIPPED — six dice flat and spread, 0 piled, '
+            + 'highest rest 0.67' },
+          { file: 'grip-close-6d6-feltgrip', cap: 'CANDIDATE — clustered, and one die perched at '
+            + '2.03, plainly resting on another' },
         ] },
-      { label: 'Moonrise · the two gestures', regen: REGEN_LIFE, cols: 2, pair: true,
+      { label: 'THE REASSURANCE — medium / trio, the canonical roll, same seed',
+        regen: REGEN_GRIP, cols: 2, pair: true,
         frames: [
-          { file: 'life-moonrise-flying.png', cap: 'DICE FLYING — the layer should have withdrawn' },
-          { file: 'life-moonrise-settled.png', cap: 'DICE DOWN — and it leans toward the clearing' },
-        ] },
-      { label: 'Moonrise · the moot in session (found by stepping to the session peak, not guessed)',
-        regen: REGEN_LIFE, cols: 2, pair: true,
-        frames: [
-          { file: 'life-moonrise-session.png', cap: 'moonrise — the procession standing in the ring' },
-          { file: 'life-foxfire-session.png', cap: 'foxfire — the same moment, the other sky' },
-        ] },
-      { label: 'Foxfire · the value floor a tertiary field dies in', regen: REGEN_LIFE, cols: 2, pair: true,
-        frames: [
-          { file: 'life-foxfire-phase-a.png', cap: 'phase A' },
-          { file: 'life-foxfire-settled.png', cap: 'dice down — the lean' },
+          { file: 'grip-medium-trio-shipped', cap: 'SHIPPED — 0 piled' },
+          { file: 'grip-medium-trio-feltgrip', cap: 'CANDIDATE — 0 piled, and the d8/d6 that shipped '
+            + 'leaves touching are apart' },
         ] },
     ],
   },
 
   {
     n: 3,
-    id: 'stump',
-    kind: 'LOOK',
-    title: 'The round-6 grounded stump — berm, fingers, creep',
-    where: 'ROADMAP Tier W · W2c step 2, "the stump grows its ground" (d088bf9 + promotion)',
-    unblocks: 'Your own either/or from W2c. Approving it confirms the fork that was taken '
-      + '(ground-integration, not fog-blend) and lets the tower rounds move on to the ledger item. '
-      + 'It also closes the round that fixed the palette flip.',
-    question: 'Does the stump now GROW out of the ground — an earthen berm where the wooden gangplank '
-      + 'was, root-flare fingers diving into the soil, moss creep low on the trunk — or does it still '
-      + 'read as an item set on a table?',
-    stakes: {
-      approve: 'W2c’s step 2 is finished and hollowbole’s next round is the ledger item (the '
-        + 'pale machined face at the shell’s x-clamp plane, which reads as a sawn plank in side '
-        + 'views).',
-      overrule: 'The base re-opens as a hollowbole round 9 — a /new-tower-shaped job with its own bake, '
-        + 'gates and review.',
-    },
-    notes: [
-      { kind: 'plain', text: 'Your words this is answering, from W2c: "It looks like an item set on a '
-        + 'table, not a stump that grew out of the ground… the ramp out of the stump is not part of '
-        + 'the immersion and instead plays against it."' },
-      { kind: 'plain', text: 'Both palettes are shown because the palette flip is the bug this round '
-        + 'shipped a fix for — the moonrise model stood in the foxfire world for two rounds, invisible '
-        + 'while everything was pale wood and loud the moment the berm carried baked soil.' },
-    ],
-    groups: [
-      { label: 'From the doorway side — the berm crest where the wooden tongue used to be',
-        regen: REGEN_VERDICT, cols: 2, pair: true,
-        frames: [
-          { file: 'v-stump-moonrise-berm.png', cap: 'moonrise' },
-          { file: 'v-stump-foxfire-berm.png', cap: 'foxfire' },
-        ] },
-      { label: 'From the other flank — the skirt, the root fingers and the ground seam',
-        regen: REGEN_VERDICT, cols: 2, pair: true,
-        frames: [
-          { file: 'v-stump-moonrise-flank.png', cap: 'moonrise' },
-          { file: 'v-stump-foxfire-flank.png', cap: 'foxfire' },
-        ] },
-    ],
-  },
-
-  {
-    n: 4,
-    id: 'w4',
-    kind: 'LOOK',
-    title: 'W4 — the Moonmoot Witchlight set art',
-    where: 'ROADMAP Tier W · "W4. The dice set — DONE 2026-08-13 (pending Joe’s LOOK verdict)"',
-    unblocks: 'The last unjudged fae OBJECT. Goal 14 asks the venue to be judged as a WHOLE for '
-      + 'internal consistency, and that cannot be done over an unapproved set — the dice are the '
-      + 'brightest thing in either sky by construction.',
-    question: 'Is the Witchlight set finished art — deep-carved numerals carrying all the light, over '
-      + 'a body that stays a quiet step above the venue’s floor?',
-    stakes: {
-      approve: 'W4 closes. The set is staged by both fae venues at roll creation and nothing else '
-        + 'waits on it.',
-      overrule: 'The recipe changes in js/themes.js — and it is judged twice, because the digit colour '
-        + 'was deliberately placed BETWEEN moonrise’s teal rim and foxfire’s mint rim so one '
-        + 'bake serves both skies.',
-    },
-    notes: [
-      { kind: 'plain', text: '"Rune glow" was delivered as CARVING plus LIGHT rather than a runic '
-        + 'alphabet — a recorded refusal: real runes for 1..20 would trade the one invariant a set may '
-        + 'never touch, which is that the numbers stay readable.' },
-      { kind: 'plain', text: 'The set ships with no particles and no parented light on purpose: the '
-        + 'venue lights its own dice (two followers, halos, the fog lattice), so the bench frames and '
-        + 'the in-venue frames are both needed — neither one alone is the set.' },
-    ],
-    groups: [
-      { label: 'The bench, under the felt lamp and in the dark', regen: REGEN_VERDICT, cols: 2, pair: true,
-        frames: [
-          { file: 'v-set-table-row.png', cap: 'env: table — the whole row' },
-          { file: 'v-set-dark-row.png', cap: 'env: dark — where the carving is supposed to bloom' },
-        ] },
-      { label: 'Hero, and the neighbour the value structure was reasoned against',
-        regen: REGEN_VERDICT, cols: 2, pair: true,
-        frames: [
-          { file: 'v-set-dark-d20.png', cap: 'Witchlight d20, dark' },
-          { file: 'v-set-dark-blackanvil-d20.png',
-            cap: 'Black Anvil d20, dark — the structure this inverts to cold' },
-        ] },
-      { label: 'And where it actually lives: settled in the venue that stages it',
-        regen: REGEN_GLADE, cols: 2, pair: true,
-        frames: [
-          { file: 'glade-moonrise-dice.png', cap: 'Moonrise Glade' },
-          { file: 'glade-foxfire-dice.png', cap: 'Foxfire Hollow' },
-        ] },
-    ],
-  },
-
-  {
-    n: 5,
-    id: 'listen',
+    id: 'faeground',
     kind: 'LISTEN',
-    title: 'The ten voices — every sound in this app is unheard',
-    where: 'docs/AUDIO.md §9, "The listening script — ten voices, one sitting" · W6 landed 2026-08-16',
-    unblocks: 'W6 shipped the room beds and the ground trims, so the audio palette is now COMPLETE '
-      + 'and completely unjudged. This is the only section of the sitting that is not looking at '
-      + 'pictures, and it is twenty clicks: three rooms, five towers, and the venue’s dice and floor.',
-    question: 'Are these ten voices right — and if not, which numbers move?',
+    title: 'The two fae ground impacts, re-listened — two clicks',
+    where: 'docs/AUDIO.md §9.1 C · the killed-design record in SHIPPED.md · UX §7.60',
+    unblocks: 'The one row you rejected. Everything else in this palette is approved and frozen with '
+      + 'equality assertions, so this is the whole of what is left of the audio queue — and it is the '
+      + 'only item on this page that is not answerable from the page itself.',
+    question: 'You said this landing sounded horrible twice; the ringing die is deleted and a die now '
+      + 'lands in Moonrise Glade and Foxfire Hollow with the ordinary knock — is it right now?',
     stakes: {
-      approve: 'The dials freeze, and the audio palette stops being a set of numbers reasoned from '
-        + 'a table and becomes something a person has heard.',
-      overrule: 'You name the direction (heavier / longer / duller / less shaft, or one venue’s '
-        + '`ground.centre`) and the row changes — a cosmetic edit that provably cannot move a film, '
-        + 'so it costs one commit and no simulations.',
+      approve: 'No audio item is open. The fae venues stop carrying a voice of their own for impacts '
+        + 'and the palette is closed.',
+      overrule: 'One edit, already located: both fae `ground` rows to `{centre: 1, length: 1, gain: '
+        + '1}`, after which a fae landing is byte-identical to a landing on the grounded table. That '
+        + 'is the only lever left on this path and it is deliberately yours.',
     },
     notes: [
-      { kind: 'plain', text: 'The order below is copied from AUDIO.md §9 and is load-bearing: the '
-        + 'rows are arranged so that exactly ONE thing changes between consecutive rows. Taken in '
-        + 'order it is one sitting; taken out of order it is ten errands.' },
+      { kind: 'plain', text: 'What was removed, exactly: one line. The Witchlight set’s '
+        + '`sound: {body: "chime", weight: 0.22, sustain: 65}` recipe is deleted, so the two fae '
+        + 'venues fall through to the same contact every unthemed die on the grounded table already '
+        + 'makes. No fourth set of numbers was authored — a third re-tuning is what you had already '
+        + 'rejected twice. Measured on the graph: a Moonrise landing goes from 1745 Hz to 346 Hz, its '
+        + 'energy above the 1.5 kHz wood/metal line from 54% to 2%, and the decaying sine partial at '
+        + '714 Hz is gone entirely.' },
+      { kind: 'plain', text: 'THE ONE THING THAT IS STILL DIFFERENT IS THE DESIGN, NOT A LEFTOVER. '
+        + 'Each fae venue keeps a `ground` trim that can only DARKEN, shorten and quieten a contact, '
+        + 'so a fae landing is the same body about a third of an octave darker than the grounded '
+        + 'table rather than identical to it. That was chosen deliberately and the arithmetic is why: '
+        + 'zeroing those trims — the naive reading of "just use the normal sound" — would have taken '
+        + 'the landing you rejected from 1745 Hz UP to 2344 Hz. The trim was never part of the '
+        + 'complaint; it was the one thing already pulling the way you asked. If you want the venues '
+        + 'to sound exactly like the table anyway, that is the overrule above.' },
+      { kind: 'plain', text: 'Why "the chime is fine, the ground is not" was never available as a '
+        + 'reading: the Witchlight set is venue-only, and the standing venue’s ground rides every '
+        + 'non-clunk contact. There is no way to ask this app for a Witchlight die without a fae '
+        + 'floor under it, so the three rows AUDIO.md lists were always one rendered sound.' },
     ],
     listen: true,
   },
-
-  {
-    n: 6,
-    id: 'c25',
-    kind: 'LOOK',
-    title: 'C25 Stage 2 — where the record of previous rolls lives',
-    where: 'ROADMAP Tier C · C25, SHIPPED 2026-08-15 · UX §7.42',
-    unblocks: 'A shipped surface whose LOCATION was refused with arithmetic rather than with taste. '
-      + 'It is the only item on this page where the build said no to something you asked for.',
-    question: 'You asked for the previous N rolls as panels across the bottom of the felt; the build '
-      + 'put them in the roll log’s head instead, with a three-pixel spine on the ≣ button when '
-      + 'the log is closed — do you overrule that?',
-    stakes: {
-      approve: 'C25 closes as built.',
-      overrule: 'The record moves to the felt, and the arithmetic that refused it becomes a design '
-        + 'problem to solve rather than a reason not to: five panels across a 390 px phone is 78 px '
-        + 'each, which is C24’s "a tower reads as a smudge" applied to UI.',
-    },
-    notes: [
-      { kind: 'plain', text: 'The pair the entry itself names as the one that lets you overrule it in '
-        + 'one look is the phone and the five-deep desktop, both with the log open.' },
-      { kind: 'plain', text: 'Two rollers, two colours, on purpose: the under-glow ring this replaced '
-        + 'was unreadable precisely because two rollers differed by about 10 of 255 (C13).' },
-    ],
-    groups: [
-      { label: 'THE PAIR — a 390 px phone and the five-deep desktop, log open',
-        regen: REGEN_RECORD, cols: 2, pair: true, fit: 'h',
-        frames: [
-          { file: 'rec-phone-open.png', cap: '390 px phone, panels collapsed — the width the felt '
-            + 'strip could not have survived' },
-          { file: 'rec-five-open.png', cap: 'desktop, five put-away rolls — the record at its cap' },
-        ] },
-      { label: 'The head of the log, magnified — the object itself',
-        regen: REGEN_RECORD, cols: 2, pair: true,
-        frames: [
-          { file: 'rec-five-head.png', cap: 'five rolls in the log’s head (3× crop)' },
-          { file: 'rec-held-card.png', cap: 'a held roll awaiting its reveal, opened from its rank' },
-        ] },
-      { label: 'And with the log CLOSED — the three-pixel spine is the only presence a put-away roll has',
-        regen: REGEN_RECORD, cols: 2, pair: true, fit: 'n',
-        frames: [
-          { file: 'rec-empty-spine.png', cap: 'EMPTY — the spine must not draw a socket for rolls '
-            + 'that are not there (5× crop)' },
-          { file: 'rec-five-spine.png', cap: 'FIVE — the same button, loaded (5× crop)' },
-        ] },
-    ],
-  },
-
-  {
-    n: 7,
-    id: 'c27',
-    kind: 'CALL',
-    choices: ['turn preferDice on', 'leave it off', 'not yet'],
-    title: 'C27 — does a cropped felt still read as a table?',
-    where: 'ROADMAP Tier C · C27, "INSTRUMENT SHIPPED, THE CALL IS JOE’S"',
-    unblocks: 'A shipped instrument that is inert by default. Your answer either turns it into a '
-      + 'default or closes the entry as measured-and-declined; either way C24/C27 stop being open.',
-    question: 'With `preferDice` on, the camera frames the DICE instead of the mat and the felt gets '
-      + 'cropped — does the table still read as a table?',
-    stakes: {
-      approve: '`setFraming({preferDice:true})` becomes the shipped default and the '
-        + '`framing-instrument-is-inert` pin is replaced by one that asserts the new behaviour.',
-      decline: 'C27 closes as "measured, declined", and the phone’s real lever is named as the '
-        + 'RAIL (a 390 px phone gives the felt 278 px) rather than the camera.',
-    },
-    notes: [
-      { kind: 'finding', text: 'FINDING, and it does not match the entry. Re-measured on today’s '
-        + 'tree, the option changes the frame in only TWO of these six cases, and only one of them '
-        + 'meaningfully. ROADMAP C27’s table (2026-08-15) claims a desktop 6d6 win of 200→236 and '
-        + 'a desktop 40d6 LOSS of 200→184; neither reproduces — both frames now come back '
-        + 'byte-identical. The 390 px rows still agree with the entry exactly (the option correctly '
-        + 'declines to act). Spawn geometry moved on 2026-08-15, which is the likeliest cause, and it '
-        + 'means the "it is a loss at 40d6" argument against turning this on may no longer hold.' },
-    ],
-    groups: [
-      { label: '3d6 — the canonical Soul Deal roll', regen: REGEN_VERDICT, cols: 2, pair: true,
-        span: 'desktop-3d6',
-        frames: [
-          { file: 'v-crop-desktop-3d6-off.png', cap: 'desktop 1600 · OFF (shipped)' },
-          { file: 'v-crop-desktop-3d6-on.png', cap: 'desktop 1600 · preferDice ON' },
-        ] },
-      { label: '3d6 on a 390 px phone', regen: REGEN_VERDICT, cols: 2, pair: true, span: 'phone-3d6',
-        frames: [
-          { file: 'v-crop-phone-3d6-off.png', cap: 'phone 390 · OFF' },
-          { file: 'v-crop-phone-3d6-on.png', cap: 'phone 390 · preferDice ON' },
-        ] },
-      { label: '6d6', regen: REGEN_VERDICT, cols: 2, pair: true, span: 'desktop-6d6',
-        frames: [
-          { file: 'v-crop-desktop-6d6-off.png', cap: 'desktop 1600 · OFF' },
-          { file: 'v-crop-desktop-6d6-on.png', cap: 'desktop 1600 · preferDice ON' },
-        ] },
-      { label: '40d6 — the heap the option was supposed to lose on',
-        regen: REGEN_VERDICT, cols: 2, pair: true, span: 'desktop-40d6',
-        frames: [
-          { file: 'v-crop-desktop-40d6-off.png', cap: 'desktop 1600 · OFF' },
-          { file: 'v-crop-desktop-40d6-on.png', cap: 'desktop 1600 · preferDice ON' },
-        ] },
-      { label: '40d6 on a phone', regen: REGEN_VERDICT, cols: 2, pair: true, span: 'phone-40d6',
-        frames: [
-          { file: 'v-crop-phone-40d6-off.png', cap: 'phone 390 · OFF' },
-          { file: 'v-crop-phone-40d6-on.png', cap: 'phone 390 · preferDice ON' },
-        ] },
-    ],
-  },
-
-  // 9c — WHICH EDGE DO THE STANDARD DICE WEAR — ANSWERED 2026-08-18: `round
-  // .090`, shipped the same day (SHIPPED §9c "the standard edge", UX §7.54).
-  // The CALL is deleted rather than marked done because this array is the
-  // sitting's queue: a decided question left in it costs Joe the one thing
-  // the page exists to save. Its three-way bench frames (`v-9c-*.png`,
-  // verdict-shots `bench`) are KEPT — §9c Tier 3 (tumbled resin) is the next
-  // question about the same surface and will want the same rig.
 ];
 
-// THE LISTENING SCRIPT IS NOT AUTHORED HERE — it is docs/AUDIO.md §9, and this
-// is a transcription of it. The ORDER is the load-bearing part: the rows are
-// arranged so that exactly ONE thing changes between consecutive rows, which
-// is what turns ten errands into one sitting. Re-ordering them to suit a page
-// layout would quietly throw that away, so the three sections and their
-// sequence are preserved exactly (W6, 2026-08-16).
+// THE LISTENING SCRIPT IS NOT AUTHORED HERE — it is docs/AUDIO.md §9.1's C
+// route, and this is a transcription of it. It used to be eleven rows over
+// three sections; ten of those voices were heard on 2026-08-18 and eight were
+// approved and frozen, so what is left is the C rows and the reference they
+// are judged against. The ORDER is still the load-bearing part: exactly one
+// thing changes between consecutive rows, which is what makes this two clicks
+// instead of an errand.
+//
+// The reference row is NOT padding and is not a question. A landing has no
+// absolute right answer — "is this a normal sound" is a comparison — so the
+// grounded table is played first to give the ear the thing the other two rows
+// are supposed to resemble.
 const VOICE_SECTIONS = [
   {
-    id: 'A',
-    title: 'A. The three rooms — no dice, just the room',
-    blurb: 'A minute each with nothing on the felt. What is being judged is whether the room is a '
-      + 'PLACE, and whether it is quiet enough to disappear.',
-    after: 'Then go back — The Table → Moonrise Glade once more. The A/B is where "is this the '
-      + 'same building?" actually gets answered.',
-    rows: [
-      { id: 'A1', voice: 'The Table', dial: 'hearth, walls',
-        clicks: 'Staging → <b>The Table</b>',
-        listen: 'the reference. Brown low end, sparse bright fire ticks (~4/s).' },
-      { id: 'A2', voice: 'Moonrise Glade', dial: 'clearing',
-        clicks: '<b>Moonrise Glade</b> → <i>(nothing; wait 3 s)</i>',
-        listen: 'the low end steps back and the top goes soft — no walls, leaf hiss at the '
-          + 'treeline. Ticks become rare low drips (~0.7/s). The change takes 3 s '
-          + '(<code>BED_VOICE_S</code>): that transition is a voice too.' },
-      { id: 'A3', voice: 'Foxfire Hollow', dial: 'damp hollow',
-        clicks: '<b>Foxfire Hollow</b> → <i>(wait 3 s)</i>',
-        listen: 'closer, wetter and more enclosed than A2, dripping twice as often and lower.' },
-    ],
-  },
-  {
-    id: 'B',
-    title: 'B. The five tower voices — under The Table, on equal ground',
-    blurb: 'Put the grounded venue back first (The Table) so every tower is judged on felt with '
-      + 'all ground trims at 1. Room tone may stay on; off is a cleaner read of the knocks.',
-    after: 'B5 moves two things at once (tower AND venue) and there is no way around it: Hollow '
-      + 'Bole cannot stand in the grounded room. Judge it against B2, which is the nearest body, '
-      + 'and remember there is moss under it now.',
-    rows: [
-      { id: 'B1', voice: 'Heartwood', dial: 'clack 0.35/20',
-        clicks: '<b>Heartwood</b> → <b>Roll</b>',
-        listen: 'dry wood on wood, short and narrow, over the shortest comb in the set.' },
-      { id: 'B2', voice: 'Bastion', dial: 'thud 0.7/40',
-        clicks: '<b>Bastion</b> → <b>Roll</b>',
-        listen: 'heavier and lower, and it rings on in the chute after the knock.' },
-      { id: 'B3', voice: 'Black Anvil', dial: 'chime 0.85/70',
-        clicks: '<b>Black Anvil</b> → <b>Roll</b>', flag: 'most likely to want moving',
-        listen: 'a chime body weighted right down, meant to read as cast iron rather than crystal. '
-          + 'If it reads as glass, the weight goes up.' },
-      { id: 'B4', voice: 'Nullstone', dial: 'hush 0.75/25',
-        clicks: '<b>Nullstone</b> → <b>Roll</b>',
-        listen: 'a subtracted click through the deadest comb here — a bore through solid rock '
-          + 'returns almost nothing.' },
-      { id: 'B5', voice: 'Hollow Bole', dial: 'thud 0.5/35',
-        clicks: '<b>Moonrise Glade</b> → <b>Roll</b>', flag: 'second most likely to want moving',
-        listen: 'a dead drum: hollower than B2 over the longest comb, the note an empty trunk '
-          + 'gives back. It has <b>no tower chip</b> — venue-only, so the VENUE is the click. '
-          + 'Do not go looking for it in the tower picker.' },
-    ],
-  },
-  {
     id: 'C',
-    title: 'C. The venue’s dice and its ground — you are already there',
-    blurb: 'Stay in Moonrise Glade from B5. Every roll is now Witchlight on moss.',
-    after: 'The single control that answers most of section C is '
-      + '`VENUE_AUDIO[venue].ground.centre` in js/main.js. It moves the impacts, the whole settle '
-      + 'tail, the rolling surface band and the tilt curve TOGETHER, by design — so if you want one '
-      + 'number to react to, that is the one.',
+    title: 'The same die, three floors — in this order, without stopping',
+    blurb: 'One pool, rolled three times, changing only the room between rolls. Tap a die row eight '
+      + 'times and hit Roll; a pour is what the complaint was about, not a single strike. Judge the '
+      + 'LANDING and the settle tail right after it — five taps inside about 145 ms is where a floor '
+      + 'either sounds soft or sounds broken.',
+    after: 'The question is only whether rows 2 and 3 now sound like ordinary dice landing on '
+      + 'something. If they do, this closes. If they still ring, say so — but the lever is no longer '
+      + 'the die’s voice (it has none now), it is the two venues’ ground trims, and setting them to 1 '
+      + 'makes a fae landing byte-identical to row 1.',
     rows: [
-      { id: 'C1', voice: 'Witchlight', dial: 'chime 0.22/65',
-        clicks: '<i>(a row)</i> → <b>Roll</b>',
-        listen: '"a long faint cold ring — glass struck in another room". Check it is not '
-          + 'competing with the tower knocks it arrives after.' },
-      { id: 'C2', voice: 'Moonrise ground', dial: '×0.72 / ×0.85 / ×0.90',
-        clicks: '<i>(a row ×8)</i> → <b>Roll</b>',
-        listen: 'the same die landing in moss: dull, short, absorbed. Judge the SETTLE TAIL '
-          + 'hardest — five taps in ~145 ms is where a floor either sounds soft or sounds broken — '
-          + 'then the grind as the pile rolls out.' },
-      { id: 'C3', voice: 'Foxfire ground', dial: '×0.66 / ×0.78 / ×0.85',
-        clicks: '<b>Foxfire Hollow</b> → <b>Roll</b>',
-        listen: 'the same again, deader. <b>If C2 and C3 are indistinguishable the two rows should '
-          + 'collapse into one.</b>' },
+      { id: 'C0', voice: 'The Table — the reference', dial: 'ground ×1 / ×1 / ×1',
+        clicks: 'Staging → <b>The Table</b> → <i>(a die row ×8)</i> → <b>Roll</b>',
+        listen: 'the ordinary knock, 468 Hz, nothing above the wood/metal line. This is the sound '
+          + 'the other two rows are being asked to resemble — play it first so the ear has it.' },
+      { id: 'C2', voice: 'Moonrise Glade — the ground you rejected', dial: 'ground ×0.72 / ×0.85 / ×0.90',
+        clicks: '<b>Moonrise Glade</b> → <i>(a die row ×8)</i> → <b>Roll</b>',
+        flag: 'this is the one you called horrible',
+        listen: 'the same body as row 1, about a third of an octave darker and slightly shorter: '
+          + '346 Hz, 2% above the boundary, no ring. What should be GONE is the long cold sine that '
+          + 'used to arrive with every die and stack forty deep in a pour.' },
+      { id: 'C3', voice: 'Foxfire Hollow — the same again, deader', dial: 'ground ×0.66 / ×0.78 / ×0.85',
+        clicks: '<b>Foxfire Hollow</b> → <i>(a die row ×8)</i> → <b>Roll</b>',
+        listen: 'the same change in the wetter room — 320 Hz. If C2 and C3 are indistinguishable to '
+          + 'you, say so: the two rows should then collapse into one.' },
     ],
   },
 ];
@@ -781,32 +666,52 @@ function listenHtml() {
   }).join('\n');
   return `
     <div class="setup">
-      <h4>The preamble, once — three things, and the first one is not optional</h4>
+      <h4>The preamble, once — two things, and the first one is not optional</h4>
       <ol>
-        <li><b>Open the table on <code>?stability=beta</code></b> —
-          <code>http://localhost:8123/?stability=beta</code>. Venue and tower are closed-beta rows
-          and the pickers are simply ABSENT without it. The param is stripped from the address bar
-          and the enrolment persists in this browser.</li>
-        <li><code>⚙</code> → <b>You</b> → <b>Room tone</b> ON. The bed is off by default and W6 did
-          not change that — section A is inaudible without it.</li>
-        <li><code>⚙</code> → <b>Staging</b>, and leave the panel open. It covers nothing that makes
-          a sound.</li>
+        <li><b>Open the table on <code>?stability=beta</code></b> — the deployed one,
+          <code>https://dice-5wi5rwk2oa-uc.a.run.app/?stability=beta</code>, which is running this
+          exact tree, or your own preview at <code>http://localhost:8123/?stability=beta</code>.
+          Venue is a closed-beta row and the picker is simply ABSENT without the param. It is
+          stripped from the address bar and the enrolment persists in that browser.</li>
+        <li><code>⚙</code> → <b>Staging</b>, and leave the panel open — it is where the three rooms
+          are, and it covers nothing that makes a sound. <b>Leave Room tone OFF.</b> The beds are
+          already approved and frozen; with them up you would be judging a landing through a room
+          bed, and the cleanest read of a knock is a silent room.</li>
       </ol>
-      <p><b>A roll is two clicks:</b> a row in the left column, then <b>Roll</b>. Tap the row N times
-        first for N dice — those taps are not counted below. For a big pour (the tower voices want
-        one) <code>/</code> → <code>8d6</code> → Enter is faster, and is the only keyboard in this
-        script.</p>
+      <p><b>A roll is two clicks:</b> a row in the left column, then <b>Roll</b>. Tap the row eight
+        times first — <b>this complaint was about a pour, not a strike</b>, and the defect it names
+        only exists at forty dice, so one die is the wrong test. <code>/</code> → <code>8d6</code> →
+        Enter is faster and is the only keyboard in this script.</p>
     </div>
     ${sections}
     <div class="disc">
-      <b>Two corrections to what this page was first told, both worth stating plainly.</b>
-      The brief said four tower clunk voices; there are <b>five</b> — <code>nullstone</code>
-      (hush 0.75/25) was missed by the roadmap. And with W6’s room beds and ground trims landed,
-      the count is not five voices but <b>ten, and every voice in the app is unheard</b>. Nine were
-      reasoned from tables and never played to a person; the tenth (the grounded bed) has been
-      playable since V1 and nobody has sat with it. That is the argument for doing them in one
-      pass rather than one at a time.
+      <b>Why this is three rows and not eleven.</b> The listening page you sat on 2026-08-18 ran
+      eleven rows over three sections. Ten voices were heard, <b>eight are approved</b> and frozen in
+      <code>tests/voices.test.mjs</code> with equality assertions, and one design was killed — this
+      is what remains of that list. The C rows are three in AUDIO.md and were only ever ONE rendered
+      sound (the Witchlight set is venue-only and the venue’s ground rides every contact), which is
+      also why “the chime is fine but the ground is not” was never a distinction the app could make.
     </div>`;
+}
+
+// WHAT YOUR LAST HOUR BOUGHT, rendered above the queue. It is deliberately NOT
+// a collapsed footnote: the page's own argument for sitting again is that the
+// queue shrank from eight to three, and an argument nobody can see is not an
+// argument. Every row here is CLOSED — there is no verdict control on any of
+// them, because a control invites an answer and this section is a receipt.
+function closedHtml() {
+  const groups = CLOSED_LAST_SITTING.groups.map((g) => `
+    <div class="cgroup ${esc(g.tone)}">
+      <h4>${esc(g.label)}</h4>
+      <ul>${g.rows.map(([what, why]) =>
+    `<li><b>${esc(what)}</b>${why ? ` — ${esc(why)}` : ''}</li>`).join('')}</ul>
+    </div>`).join('\n');
+  return `
+  <section class="closed">
+    <h3>Closed by the sitting of ${esc(CLOSED_LAST_SITTING.when)} — nothing below is being re-asked</h3>
+    <p class="chead">${esc(CLOSED_LAST_SITTING.headline)}</p>
+    <div class="cgrid">${groups}</div>
+  </section>`;
 }
 
 function itemHtml(item, frames) {
@@ -967,17 +872,37 @@ function pageHtml(frames, stats) {
     border:1px solid var(--gold); background:var(--gold); color:#14110b; }
   .bar .ghost { background:none; color:var(--gold); }
   .bar span { color:var(--dim); font-size:13px; }
+  /* The receipt. Quieter than an item on purpose — no card, no gold number,
+     no verdict row — because it is the one block on this page that is not
+     asking for anything. */
+  section.closed { margin:26px 0 0; padding:18px 20px 14px; border:1px solid var(--line);
+    border-radius:14px; background:rgba(143,206,155,0.045); }
+  section.closed h3 { font:700 17px/1.3 Georgia, serif; margin:0 0 6px; color:var(--green); }
+  .chead { color:var(--dim); margin:0 0 14px; max-width:104ch; font-size:14px; }
+  .cgrid { display:grid; gap:14px; grid-template-columns:repeat(2, minmax(0,1fr)); }
+  @media (max-width: 900px) { .cgrid { grid-template-columns:1fr; } }
+  .cgroup { padding:11px 14px; border-radius:10px; background:rgba(255,255,255,0.03);
+    border-left:3px solid rgba(143,206,155,0.55); }
+  .cgroup.open { border-left-color:var(--gold); background:rgba(205,190,138,0.06); }
+  .cgroup h4 { font:600 11.5px/1.4 system-ui; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--green); margin:0 0 7px; }
+  .cgroup.open h4 { color:var(--gold); }
+  .cgroup ul { margin:0; padding-left:18px; color:var(--dim); font-size:13.5px; }
+  .cgroup li { margin:0 0 5px; }
+  .cgroup b { color:var(--ink); }
   textarea#dump { position:fixed; left:-9999px; }
 </style></head>
 <body>
 <div class="wrap">
 <header class="top">
   <h1>The sitting — every open LOOK and LISTEN in one page</h1>
-  <p class="sub">Seven LOOKs and one listening pass, ordered by what each verdict FREES rather than
-    by tier number. Each states the question in one sentence, shows the frames side by side, and says
+  <p class="sub">Two LOOKs and one listening pass. <b>Three items, and that is the whole queue</b> —
+    it was eight on 2026-08-18, you answered all eight, and everything they opened has been built and
+    deployed. Nothing has been invented to pad it and nothing you have already answered is asked
+    again. Each item states the question in one sentence, shows the frames side by side, and says
     what happens either way. The last row of every item records your answer; the button at the bottom
-    copies all of them out as text. <b>Item 5 is the only one that needs the live table</b> — the
-    other seven are answerable from this page alone.</p>
+    copies all of them out as text. <b>Item 3 is the only one that needs the live table</b> — the
+    other two are answerable from this page alone.</p>
   <p class="stampline">generated ${esc(stats.when)} · tree ${esc(stats.sha)} ·
     ${stats.embedded} frames embedded${stats.missing ? ` · <b style="color:#e2705a">${stats.missing} MISSING</b>` : ''} ·
     ${stats.stale
@@ -986,6 +911,7 @@ function pageHtml(frames, stats) {
     : `every frame is newer than every source that could restage it (newest: ${esc(stats.watermark)})`}</p>
   <nav>${nav}</nav>
 </header>
+${closedHtml()}
 ${ITEMS.map((i) => itemHtml(i, frames)).join('\n')}
 </div>
 <div class="bar">
