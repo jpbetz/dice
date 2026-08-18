@@ -166,8 +166,10 @@ clunk ─┬──────────────────────�
 
 Six nodes (in gain, delay, comb gain, two peaks, out gain), no feedback, no
 stability question. *("Five" here and in the code's own banner counted the
-chain and forgot the input gain; corrected 2026-08-16.)* The dials live on the
-TOWERS registry row inside `clunkVoice.shaft`, so the palette still resolves
+chain and forgot the input gain; corrected here 2026-08-16 and **in the banner
+2026-08-18**, which had gone two months disagreeing with this line.)* The dials
+are `clunkVoice.shaft` on the row a TOWERS entry references
+(`js/voices.js CLUNK_VOICES`), so the palette still resolves
 in the sound drain and nowhere else — and the FIRST LAW holds *by
 construction*: a towerless roll records no `clunk` event, so no film can
 reach this bus. Dice in hidden transit additionally get a
