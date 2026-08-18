@@ -314,7 +314,7 @@ export const CLUNK_VOICES = {
     shaft: { delayS: 0.0032, combGain: 0.55, mode1Hz: 430, mode2Hz: 860 },
   },
   // METAL, and the only voice in the palette that is not a knock. Joe,
-  // 2026-08-18: *"Slightly too shrill / clanky for me.."* — SLIGHTLY, so this
+  // 2026-08-18: *"Slightly to shrill / clanky for me.."* — SLIGHTLY, so this
   // is a small move and it is deliberately not taken all the way to the two
   // he liked. `chime` at weight 0.85 put its band at 2.16 kHz with a Q-2.8
   // ring and no attack at all; `bell` at weight 0.55 puts it at 1.69 kHz with
