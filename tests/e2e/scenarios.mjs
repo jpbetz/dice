@@ -14936,13 +14936,38 @@ export const scenarios = [
       }
 
       // ---- the depth law ---------------------------------------------------
-      // A gain multiplier only. The back of the mat is quieter than the front,
-      // by a cue's worth rather than a mix move's worth.
-      const near = await a.dbg('audioDepthGainFor([0, 0.6, 3])');
-      const far = await a.dbg('audioDepthGainFor([0, 0.6, -3])');
-      assert.ok(far < near, `the far edge is quieter than the near one (${far} < ${near})`);
-      assert.ok(near <= 1 && far > 0.5,
-        `and by a cue, not a duck (near ${near}, far ${far})`);
+      // A gain multiplier only. The mat edge away from the eye is quieter than
+      // the one under it, by a cue's worth rather than a mix move's worth.
+      //
+      // THIS ASSERTION USED TO NAME +z AS "NEAR", and that was the camera's
+      // HABIT written down as if it were the law. C27 shipped `preferDice` on
+      // 2026-08-18 and the framer may now quarter-turn the eye to fit a pool —
+      // so on some boots −z is the near edge, the two readings swap, and the
+      // old form failed with `1 < 0.981`: not a wrong law, a wrong assumption
+      // about where the listener stands. It flaked about 1 run in 3 from the
+      // day the flip landed.
+      //
+      // The law itself does not care which side the eye is on, so neither does
+      // this now: `depthGainFor` clamps distance to the camera→centre
+      // reference, so the centre always reads exactly 1 and whichever edge is
+      // farther reads less. That is stated directly instead.
+      const centre = await a.dbg('audioDepthGainFor([0, 0.6, 0])');
+      const zPlus = await a.dbg('audioDepthGainFor([0, 0.6, 3])');
+      const zMinus = await a.dbg('audioDepthGainFor([0, 0.6, -3])');
+      const orbit = (await a.dbg('framingInfo()') || {}).orbit;
+      const near = Math.max(zPlus, zMinus);
+      const far = Math.min(zPlus, zMinus);
+      assert.equal(centre, 1, `the mat centre is the reference and reads exactly 1 (${centre})`);
+      assert.ok(far < centre,
+        `the edge away from the eye is quieter than the centre `
+        + `(orbit ${orbit}, +z ${zPlus}, −z ${zMinus})`);
+      assert.ok(near <= 1 + 1e-9,
+        `and nothing is ever LOUDER than the reference (${near})`);
+      assert.notEqual(zPlus, zMinus,
+        'the two edges are not equidistant from the eye — this table is raked, '
+        + 'never overhead, and if they ever match the depth cue has stopped existing');
+      assert.ok(far > 0.5,
+        `and it is a cue, not a duck (near ${near}, far ${far})`);
       assert.equal(await a.dbg('audioDepthGainFor(null)'), 1,
         'a placeless contact — a baffle knock — takes no depth attenuation');
     },
@@ -18354,26 +18379,140 @@ export const scenarios = [
     },
   },
   {
-    name: 'framing-inert',
+    name: 'framing-dials-ship-on',
     tags: ['fx', 'look'],
-    // C27's RESIDUAL SHIPPED AS AN INSTRUMENT, NOT A DEFAULT, and this is the
-    // cheap pin that it stayed one. The measurement refused the change for the
-    // common case (three dice on a 390px phone already span most of the mat, so
-    // letting the eye approach buys 0px there) and found the real gain on
-    // devices where the mat FITS — which is exactly where taking it would crop
-    // the felt on every small roll. So `FRAMING` ships inert and the frame is
-    // bit-identical with it off.
+    // C27 SHIPPED ON, 2026-08-18, and this pin now guards the flip BACK.
     //
-    // An authored default flipping to true is a one-character change with no
-    // failing test anywhere near it: every framing scenario would go on
-    // passing, because they all measure what the ladder DID rather than what it
-    // was allowed to do. This costs a few milliseconds and no dice — which is
-    // why it can carry `look`, and why it is a scenario rather than a comment.
+    // It was born as `framing-inert` for the opposite reason: the residual
+    // shipped as an instrument, not a default, because no measurement could
+    // answer "does a cropped felt still read as a table". The owner answered it
+    // by looking — *turn preferDice on* — and the re-measurement that followed
+    // found the entry's own objection was false: 0 of 90 throws shrank, none
+    // lost a die, and the 40-die pool it was supposed to ruin is a byte-for-byte
+    // no-op. (The `200 → 184` that had been quoted against it in this file's
+    // ancestors and in a js/main.js comment came from `framingProbe()`'s
+    // UNGATED scan — a frame that was never on offer.)
+    //
+    // The reason it is a scenario rather than a comment is unchanged and is the
+    // whole point: an authored default flipping is a one-character change with
+    // no failing test anywhere near it, because every other framing scenario
+    // measures what the ladder DID rather than what it was allowed to do. This
+    // costs a few milliseconds and no dice, which is why it carries `look`.
+    //
+    // `floor` is the dial that was never spent — it is here so that taking it
+    // later also has to be deliberate.
     async fn(ctx) {
-      const a = await ctx.newTable({ origin: '127.0.0.63', name: 'Inert' });
-      assert.deepEqual(await a.dbg('framing'), { preferDice: false, floor: 1, gain: 1.15 },
-        'the C27 dials ship inert — preferDice off, and the floor at the preset '
-        + 'so the eye may never come closer than the zoom says');
+      const a = await ctx.newTable({ origin: '127.0.0.63', name: 'Dials' });
+      assert.deepEqual(await a.dbg('framing'), { preferDice: true, floor: 1, gain: 1.15 },
+        'C27 ships ON — preferDice true, and the floor still at the preset so '
+        + 'the eye may never come closer than the zoom says');
+    },
+  },
+  {
+    name: 'framing-prefers-dice',
+    tags: ['roll', 'fx', 'cuj8'],
+    timeout: 200000,
+    // THE FRAME-SPACE GATE FOR C27, and it is built the only way
+    // VENUE-COMPOSITION rule 15 accepts: a composition gate must FAIL the frame
+    // that was rejected. Every assertion below compares the SHIPPED camera with
+    // the pre-C27 camera **on one settled throw** — same dice, same poses, two
+    // reads — so flipping `preferDice` back collapses every ratio to 1.00 and
+    // legs A and H go red. A gate that only measured the new frame would pass
+    // just as happily with the feature off, which is this repo's signature
+    // failure and the exact reason `framing-inert` existed at all.
+    //
+    // The pairing is also what makes the numbers trustworthy: two cameras read
+    // off ONE throw cannot disagree because the dice landed differently. It is
+    // the same technique `tools/steps/frame-residual.mjs` uses, and it is the
+    // reason the debug override survives C27 rather than being deleted with it
+    // — the override is now the only way to read the counterfactual.
+    //
+    // Leg J is the one that will age best: it asserts the gain is ZERO on a
+    // phone, so the old "it's a phone feature" — which this roadmap believed
+    // for weeks — cannot come back without a red.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.64', name: 'Framer' });
+      const pair = async (w, h, mini, types, seed) => {
+        await a.page.browser.send('Emulation.setDeviceMetricsOverride',
+          { width: w, height: h, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
+        await a.dbg(`setPanelState({pools: ${!mini}, log: ${!mini}})`);
+        await a.dbg("setZoom('medium')"); // dice.zoom.v1 outlives a scenario
+        await a.eval('window.dispatchEvent(new Event("resize"))');
+        await a.dbg('clearTable()');
+        await a.dbg('sim(400)');
+        await a.dbg(`throwSeeded(${JSON.stringify(types)}, ${seed})`);
+        await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+          { desc: `${w} ${types.length}d ${seed}`, timeout: 60000 });
+        await a.dbg('sim(600)');
+        await a.dbg('setFraming({preferDice: false, floor: 1})'); // the pre-C27 frame
+        const off = await a.dbg('framingInfo()');
+        await a.dbg('setFraming({preferDice: true, floor: 1})'); // what ships
+        const on = await a.dbg('framingInfo()');
+        return { off, on };
+      };
+      const d6 = (n) => Array(n).fill('d6');
+      const never = (t, { off, on }) => {
+        // G — the invariant that stands in for the one structurally reachable
+        // shrink nobody could close without a ratio constant: the option is
+        // gated on `after.span >= before.span * gain`, so it can return the old
+        // frame or a bigger one and never a smaller one.
+        assert.ok(on.spanPx >= off.spanPx,
+          `${t}: the shipped frame never shrinks a die (${off.spanPx} → ${on.spanPx})`);
+        assert.ok(on.diceOnScreen >= off.diceOnScreen,
+          `${t}: and never loses one (${off.diceOnScreen} → ${on.diceOnScreen})`);
+      };
+
+      try {
+        // ---- A–E · the tablet, which is where the whole gain lives ---------
+        const tab3 = await pair(834, 1112, true, d6(3), 7002);
+        never('iPad-p 3d6', tab3);
+        assert.ok(tab3.on.spanPx >= tab3.off.spanPx * 1.5,
+          `the tablet is the case C27 was for — a 3d6 die goes from `
+          + `${tab3.off.spanPx}px to ${tab3.on.spanPx}px (want ≥1.5×)`);
+        assert.equal(tab3.on.diceOnScreen, tab3.on.dice, 'every die is still on screen');
+        assert.equal(tab3.on.decidingOnScreen, true, 'and the deciding die above all');
+        // D NAMES THE TRADE Joe accepted rather than hiding it: the mat leaves
+        // the frame. That is the whole cost of C27 and it belongs in an
+        // assertion, so that a later change which quietly keeps the mat is
+        // recognised as a revert rather than an improvement.
+        assert.equal(tab3.off.matFits, true, 'before C27 the whole mat fitted');
+        assert.equal(tab3.on.matFits, false, 'and after it the felt is cropped — the trade, stated');
+        assert.equal(tab3.off.mode, 'mat', 'the old rung framed the mat');
+        assert.equal(tab3.on.mode, 'dice', 'the shipped rung frames the dice');
+
+        // ---- F · the pool C27 was accused of ruining ----------------------
+        const tab40 = await pair(834, 1112, true, d6(40), 7007);
+        never('iPad-p 40d6', tab40);
+        assert.equal(tab40.on.spanPx, tab40.off.spanPx,
+          `40 dice are a byte-for-byte no-op (${tab40.off.spanPx} → ${tab40.on.spanPx}) — `
+          + 'the "loss at 40d6" in C27\'s table came from an UNGATED probe scan, '
+          + 'a frame that was never on offer');
+        assert.equal(tab40.on.mode, tab40.off.mode, 'and it stays on the mat rung');
+
+        // ---- H, I · the desktop, which was supposed to be untouched -------
+        const desk1 = await pair(1440, 900, true, ['d20'], 7001);
+        never('desktop 1d20', desk1);
+        assert.ok(desk1.on.spanPx >= desk1.off.spanPx * 1.15,
+          `a lone d20 on a desktop DOES take the dice rung (${desk1.off.spanPx} → `
+          + `${desk1.on.spanPx}) — "a desktop is never touched" was never true`);
+        const desk40 = await pair(1440, 900, true, d6(40), 7007);
+        never('desktop 40d6', desk40);
+        assert.equal(desk40.on.spanPx, desk40.off.spanPx, 'a full pool on a desktop does not move');
+        assert.equal(desk40.on.mode, 'mat', 'it stays on the mat rung — big pools are untouched');
+
+        // ---- J · NOT a phone feature, pinned so that cannot come back -----
+        const ph3 = await pair(390, 844, true, d6(3), 7002);
+        never('phone 3d6', ph3);
+        assert.equal(ph3.on.spanPx, ph3.off.spanPx,
+          `three dice on a 390px phone gain exactly nothing (${ph3.off.spanPx} → `
+          + `${ph3.on.spanPx}) — they already span most of the mat, and this `
+          + `roadmap called it a phone feature for weeks`);
+      } finally {
+        await a.dbg('setFraming({preferDice: true, floor: 1})').catch(() => {});
+        await a.dbg('setPanelState({pools: true, log: true})').catch(() => {});
+        await a.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, a.page.sessionId)
+          .catch(() => {});
+      }
     },
   },
 
