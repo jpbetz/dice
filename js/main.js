@@ -642,10 +642,23 @@ const LS_NAME = 'dice.name.v1';
 // below, next to the picker it belongs to, so it is read here rather than
 // hoisted — this is the only other reader, and hoisting it would put the seat
 // picker's constant at the top of the file for one boolean.
+// THE THIRD CONDITION IS THE PURGE, and it is the one that is easy to miss:
+// purgeStaleClientState() runs ~14k lines below this, and on a client whose
+// schema stamp is stale it drops `dice.name.v1` — the very name read here. A
+// knock that outran it would claim a seat under a name the app is about to
+// forget, and the boot would then stop at the seat modal with a resumed seat
+// held for the full 60 s join grace behind it. So this boot does not knock;
+// its next one will. (Both constants are spelled out rather than hoisted: the
+// key belongs beside the purge that owns it, and this is the only other
+// reader — hoisting either for one boolean would be the tail wagging the dog.)
 if (!IN_LOBBY && !(new URLSearchParams(window.location.search).get('as') || '').trim()) {
   let bootName = '';
-  try { bootName = (localStorage.getItem(LS_NAME) || '').trim(); } catch { /* no store, no knock */ }
-  if (bootName) prejoinSeat(ROOM, bootName);
+  let schemaCurrent = false;
+  try {
+    bootName = (localStorage.getItem(LS_NAME) || '').trim();
+    schemaCurrent = Number(localStorage.getItem('dice.schema.v1') || 0) >= SCHEMA_EPOCH;
+  } catch { /* a browser that will not store cannot have a seat to resume either */ }
+  if (bootName && schemaCurrent) prejoinSeat(ROOM, bootName);
 }
 
 // ---------------------------------------------------------------------------
