@@ -1174,7 +1174,10 @@ export const scenarios = [
       // `setPanelState` and `setZoom` write PER-ORIGIN localStorage that
       // outlives this room, and `localhost` is the origin ~forty other
       // scenarios boot on. This one alone stayed there.
-      const a = await ctx.newTable({ origin: '127.0.0.183', name: 'Alice' });
+      // (.187, not .183: `empty-return` holds .183/.184/.185 in const-named
+      // browsers, so grepping only for `origin: '127.0.0.…'` misses them —
+      // grep the bare address when you claim an origin.)
+      const a = await ctx.newTable({ origin: '127.0.0.187', name: 'Alice' });
       await a.settle();
       const viewport = async (w, h, mini) => {
         await a.page.browser.send('Emulation.setDeviceMetricsOverride',
@@ -1505,7 +1508,7 @@ export const scenarios = [
       // Its own origin + a finally, because the sweep below WRITES panel state
       // (dice.panels.v1, per-origin, outlives the room) — the exact leak this
       // scenario was the victim of.
-      const a = await ctx.newTable({ origin: '127.0.0.184', name: 'Alice' });
+      const a = await ctx.newTable({ origin: '127.0.0.188', name: 'Alice' });
       await a.settle();
       const sweep = () => a.eval(`(() => {
         const ids = ${JSON.stringify([
