@@ -47,6 +47,16 @@ limitations under the License.
 // door — it is a bearer credential, and a credential in a roster payload is a
 // leak with a schema (IDENTITY §5's five must-nots).
 //
+// RUNG 1's OWN WINDOW WAS THE NEXT DEFECT (IDENTITY §8, added 2026-08-18).
+// Everything above is about a LAPSED seat — one the roster still holds. That
+// window is DISCONNECT_GRACE_MS, five seconds, and a browser reloading this app
+// announces itself 4.2–5.4 s after its old socket closed. So the promise held
+// or broke on a coin toss (`seat-resume` failed four runs in six), and the
+// player it broke for was the one on the slow phone. The fix separates the two
+// clocks — the ROSTER drops a gone browser in seconds, as it always did; the
+// SERVER remembers the seat for RESUME_TTL_MS — and the tests for it are at the
+// bottom of this file, including the one that fails if the ghosts come back.
+//
 // A real server.js child on an ephemeral port — never 8123 (Joe's live table).
 
 import assert from 'node:assert/strict';
@@ -74,9 +84,9 @@ async function freePort() {
   });
 }
 
-async function startServer(port) {
+async function startServer(port, env = {}) {
   const proc = spawn(process.execPath, [join(ROOT, 'server.js')], {
-    env: { ...process.env, PORT: String(port) },
+    env: { ...process.env, PORT: String(port), ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let out = '';
@@ -118,6 +128,22 @@ const port = await freePort();
 const proc = await startServer(port);
 const base = `http://127.0.0.1:${port}`;
 
+// THE SECOND SERVER, with both clocks shrunk (DICE_DISCONNECT_GRACE_MS,
+// DICE_RESUME_TTL_MS). §8's whole claim is a RELATION between them — the roster
+// lets go first, the server remembers longer — and asserting a relation needs
+// both ends moved, not sped up in prose. Everything above stays on the DEFAULT
+// server, where five seconds means five seconds: `the roster still lets a gone
+// browser go on the old schedule` is the anti-ghost assertion and it is worth
+// the wall-clock it costs.
+const GRACE_MS = 400;
+const TTL_MS = 4000;
+const portFast = await freePort();
+const procFast = await startServer(portFast, {
+  DICE_DISCONNECT_GRACE_MS: String(GRACE_MS),
+  DICE_RESUME_TTL_MS: String(TTL_MS),
+});
+const baseFast = `http://127.0.0.1:${portFast}`;
+
 const post = async (path, body) => {
   const res = await fetch(base + path, {
     method: 'POST',
@@ -144,13 +170,13 @@ const joinAs = async (room, name, { who, playerId, color } = {}) => post('/api/j
 });
 
 /** An SSE stream, opened the way a browser does, with its bytes kept. */
-function openStream(room, playerId, streamId) {
+function openStream(room, playerId, streamId, at = base) {
   const ac = new AbortController();
   const state = { ended: false, text: '', ac, streamId };
   state.done = (async () => {
     const qs = `room=${encodeURIComponent(room)}&playerId=${encodeURIComponent(playerId)}`
       + `&streamId=${encodeURIComponent(streamId)}`;
-    const res = await fetch(`${base}/api/events?${qs}`, { signal: ac.signal });
+    const res = await fetch(`${at}/api/events?${qs}`, { signal: ac.signal });
     if (!res.ok) { state.ended = true; return; }
     try {
       const decoder = new TextDecoder();
@@ -193,6 +219,65 @@ const closeTab = async (room, me) => {
 };
 
 const WHO_ALICE = 'who-alice-11111111-2222-3333-4444-555555555555';
+
+// ---- the same four verbs, against the shrunk-clock server -------------------
+// Spelled out rather than factored so the suite above keeps talking to the real
+// clocks: every helper here is the one above with `base` swapped.
+
+const postF = async (path, body) => {
+  const res = await fetch(baseFast + path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let data = null;
+  try { data = JSON.parse(text); } catch { /* non-JSON */ }
+  return { status: res.status, data, text };
+};
+
+const joinF = (room, name, { who, playerId, color } = {}) => postF('/api/join', {
+  room,
+  name,
+  ...(who ? { who } : {}),
+  ...(playerId ? { playerId } : {}),
+  ...(color ? { color } : {}),
+});
+
+const seatF = async (room, name, who) => {
+  const res = await joinF(room, name, { who });
+  assert.equal(res.status, 200, `join ${name}: ${res.text.slice(0, 200)}`);
+  const streamId = `stream-${name}-${Math.random().toString(36).slice(2, 8)}`;
+  const stream = openStream(room, res.data.playerId, streamId, baseFast);
+  await streamUp(stream, `${name} @ ${room}`);
+  return { ...res.data, streamId, stream, who };
+};
+
+/** The tab is gone: the beacon lands, the socket dies. The reap follows. */
+const closeTabF = async (room, me) => {
+  const res = await postF('/api/leave', { room, playerId: me.playerId, streamId: me.streamId });
+  assert.equal(res.status, 200, `beacon: ${res.text.slice(0, 200)}`);
+  me.stream.ac.abort();
+};
+
+/**
+ * Poll the roster until `check(names)` holds, and answer how long it took.
+ *
+ * The poll RESUMES one seat rather than joining a new one each time (the seatId
+ * path adds no player), so watching a roster cannot change it — a fresh join
+ * per tick would fill the room it is measuring, and its own pill would be in
+ * every answer.
+ */
+const rosterWait = async (join, room, watcher, check, ms, desc) => {
+  const t0 = Date.now();
+  for (;;) {
+    const res = await join(room, watcher.name, { playerId: watcher.playerId });
+    const names = (res.data.players || []).map((p) => p.name);
+    if (check(names)) return Date.now() - t0;
+    if (Date.now() - t0 > ms) throw new Error(`${desc} — after ${Date.now() - t0}ms the roster is ${JSON.stringify(names)}`);
+    await sleep(100);
+  }
+};
 
 try {
   // ---- the mechanism ------------------------------------------------------
@@ -441,6 +526,217 @@ try {
     alice.stream.ac.abort();
   });
 
+  // ---- §8: the seat outlives the ROSTER, and the roster stays honest -------
+
+  await t('THE GHOST CASE: a gone browser still leaves the roster on the old schedule', async () => {
+    // THE ASSERTION THAT FAILS IF THE NAIVE FIX EVER LANDS. Lengthening
+    // DISCONNECT_GRACE_MS would make every §8 test below pass and would put an
+    // abandoned pill back on everyone's roster — the production bug (four seats,
+    // one real window) whose fix cost a whole liveness protocol. So this one runs
+    // on the DEFAULT server, against the real five seconds, and it is an upper
+    // BOUND: a seat still shown ten seconds after its browser went is a ghost,
+    // whatever the reason.
+    const room = 'ghost-schedule';
+    const watcher = (await joinAs(room, 'Watcher', { who: 'who-ghost-watcher' })).data;
+    const alice = await seat(room, 'Alice', WHO_ALICE);
+    await closeTab(room, alice);
+
+    const took = await rosterWait(
+      joinAs, room, { name: 'Watcher', playerId: watcher.playerId },
+      (names) => !names.includes('Alice'), 10000,
+      'the abandoned seat is still on the roster',
+    );
+    assert.ok(took < 10000, `the roster let it go in ${took}ms`);
+    // …and not INSTANTLY either: the grace is what a reconnect survives on, and
+    // a zero-grace roster would flap on every proxy blip.
+    assert.ok(took > 1500, `it waited out a real grace first (took ${took}ms)`);
+  });
+
+  await t('the seat comes back AFTER the reap — the roster let go, the server did not', async () => {
+    const room = 'vacated-basic';
+    const bob = await seatF(room, 'Bob', 'who-bob-only');   // keeps the room alive
+    const alice = await seatF(room, 'Alice', WHO_ALICE);
+    await closeTabF(room, alice);
+
+    // Past the grace: the seat is REAPED, not lapsed. Rung 1's door
+    // (resumableSeatFor) has nothing left to find — the player object is gone
+    // from room.players and every projection with it.
+    await sleep(GRACE_MS + 300);
+    const gone = await joinF(room, 'Peek', { who: 'who-peek' });
+    assert.equal(gone.data.players.some((p) => p.name === 'Alice'), false,
+      'the roster really did let the seat go');
+
+    const back = await joinF(room, 'Alice', { who: WHO_ALICE });
+    assert.equal(back.status, 200, `the return is accepted: ${back.text.slice(0, 200)}`);
+    assert.equal(back.data.playerId, alice.playerId,
+      'THE DEFECT: before this, a reload slower than five seconds came back a stranger');
+    assert.equal(back.data.color, alice.color, 'wearing the same colour');
+    assert.equal(back.data.players.filter((p) => p.name === 'Alice').length, 1,
+      'and there is one Alice, not two');
+    bob.stream.ac.abort();
+  });
+
+  await t('and the authority comes back with it — the held roll is still revealable', async () => {
+    const room = 'vacated-held';
+    const alice = await seatF(room, 'Alice', WHO_ALICE);
+    const bob = await seatF(room, 'Bob', 'who-bob-only');
+    const rolled = await postF('/api/roll', {
+      room, playerId: alice.playerId, dice: ['d20'], faceDown: true, label: 'the stake',
+    });
+    const rollId = rolled.data.roll.rollId;
+
+    await closeTabF(room, alice);
+    await sleep(GRACE_MS + 300);   // reaped, not lapsed
+
+    const back = await joinF(room, 'Alice', { who: WHO_ALICE });
+    const reveal = await postF('/api/reveal', { room, playerId: back.data.playerId, rollId });
+    assert.equal(reveal.status, 200,
+      `the browser that chose the visibility still holds it (got ${reveal.status} ${reveal.text.slice(0, 200)})`);
+    // It really flipped — a 200 that revealed nothing is the green check this
+    // project keeps catching itself writing.
+    const seen = await joinF(room, 'Bob2', { who: 'who-bob2-only' });
+    const entry = seen.data.log.find((r) => r.rollId === rollId);
+    assert.equal(entry.revealed, true, 'revealed for the table');
+    assert.equal(typeof entry.total, 'number', 'with its total');
+    bob.stream.ac.abort();
+  });
+
+  await t('the tab that reloads gets ITS chair, not its sibling\'s', async () => {
+    // Two tabs of one browser, both gone: two stubs, one key. The seat id is
+    // the sharper credential and it must win, or a reload lands on the other
+    // tab's seat — and the other tab's held roll.
+    const room = 'vacated-two-tabs';
+    const keeper = await seatF(room, 'Keeper', 'who-keeper');
+    const first = await seatF(room, 'Alice', WHO_ALICE);
+    const second = await seatF(room, 'Alice', WHO_ALICE);
+    assert.notEqual(first.playerId, second.playerId, 'two tabs are two players');
+    await closeTabF(room, first);
+    await closeTabF(room, second);
+    await sleep(GRACE_MS + 300);
+
+    const backFirst = await joinF(room, 'Alice', { who: WHO_ALICE, playerId: first.playerId });
+    assert.equal(backFirst.data.playerId, first.playerId, 'the first tab reloads into its own seat');
+    // And the key alone still answers for the OTHER one — most recent first,
+    // which is rung 1's own rule (the seat whose held roll you came back for).
+    const backSecond = await joinF(room, 'Alice', { who: WHO_ALICE });
+    assert.equal(backSecond.data.playerId, second.playerId, 'the key answers for the seat that is left');
+    // A stub is good for ONE return: a third arrival is simply a new player.
+    const third = await joinF(room, 'Alice', { who: WHO_ALICE });
+    assert.notEqual(third.data.playerId, first.playerId, 'no stub is handed out twice');
+    assert.notEqual(third.data.playerId, second.playerId, 'nor the other');
+    keeper.stream.ac.abort();
+  });
+
+  await t('a LIVE seat is never revived into, and leaving on purpose still buries nothing', async () => {
+    const room = 'vacated-refusals';
+    const alice = await seatF(room, 'Alice', WHO_ALICE);
+    await closeTabF(room, alice);
+    await sleep(GRACE_MS + 300);
+    // Alice is back — the stub is spent and she is LIVE again.
+    const back = await joinF(room, 'Alice', { who: WHO_ALICE });
+    const streamId = 'stream-alice-live';
+    const stream = openStream(room, back.data.playerId, streamId, baseFast);
+    await streamUp(stream, 'Alice live again');
+    const thief = await joinF(room, 'Mallory', { who: WHO_ALICE });
+    assert.notEqual(thief.data.playerId, back.data.playerId,
+      'a key that names a seat somebody is sitting in gets a seat of its own');
+    assert.equal(thief.status, 200, 'and no error — refusal here is a fresh seat, never a "no"');
+
+    // THE GESTURE. 'Leave & switch seat' removes the seat with `immediate`,
+    // which must not leave a stub behind: leaving on purpose still means
+    // leaving, and its client has already forgotten the seat.
+    await postF('/api/leave', { room, playerId: back.data.playerId, streamId, immediate: true });
+    stream.ac.abort();
+    await sleep(GRACE_MS + 300);
+    const after = await joinF(room, 'Alice', { who: WHO_ALICE });
+    assert.notEqual(after.data.playerId, back.data.playerId,
+      'a deliberate leave is not undone by coming back');
+  });
+
+  await t('a seat that never streamed is not remembered either', async () => {
+    // An arrival that gave up (joined, never opened a stream) is not a lapse,
+    // and it is the same bit that stops resumableSeatFor confusing the two.
+    const room = 'vacated-arriving';
+    const keeper = await seatF(room, 'Keeper', 'who-keeper');
+    const ghost = await joinF(room, 'Alice', { who: WHO_ALICE });
+    await postF('/api/leave', { room, playerId: ghost.data.playerId, immediate: true });
+    await sleep(GRACE_MS + 300);
+    const back = await joinF(room, 'Alice', { who: WHO_ALICE });
+    assert.notEqual(back.data.playerId, ghost.data.playerId, 'nothing to come back to');
+    keeper.stream.ac.abort();
+  });
+
+  await t('the window is a window: past it, gone for good is gone for good', async () => {
+    const room = 'vacated-expiry';
+    const keeper = await seatF(room, 'Keeper', 'who-keeper');
+    const alice = await seatF(room, 'Alice', WHO_ALICE);
+    const rolled = await postF('/api/roll', {
+      room, playerId: alice.playerId, dice: ['d20'], faceDown: true,
+    });
+    const rollId = rolled.data.roll.rollId;
+    await closeTabF(room, alice);
+    await sleep(TTL_MS + GRACE_MS + 400);
+
+    const back = await joinF(room, 'Alice', { who: WHO_ALICE });
+    assert.notEqual(back.data.playerId, alice.playerId,
+      'a browser gone longer than the window comes back a stranger — IDENTITY §7, unchanged');
+    const tryReveal = await postF('/api/reveal', { room, playerId: back.data.playerId, rollId });
+    assert.equal(tryReveal.status, 403, 'and holds no authority over the stake it left');
+    assert.equal(tryReveal.data.code, 'not_reveal_authority');
+    // …which is exactly the price §7 named: swept by anybody, revealed by nobody.
+    const swept = await postF('/api/clear-roll', { room, playerId: keeper.playerId, rollId });
+    assert.equal(swept.status, 200, 'a bystander can still clear it');
+    keeper.stream.ac.abort();
+  });
+
+  await t('the stub table is bounded — a room cannot be made to remember forever', async () => {
+    // MAX_VACATED_PER_ROOM is 8 and the oldest goes first. Nine walk-aways, and
+    // the first one must be the one the room forgot.
+    const room = 'vacated-cap';
+    const keeper = await seatF(room, 'Keeper', 'who-keeper');
+    const walkers = [];
+    for (let i = 0; i < 9; i++) {
+      const w = await seatF(room, `W${i}`, `who-walker-${i}`);
+      walkers.push(w);
+      await closeTabF(room, w);
+      await sleep(GRACE_MS + 150);   // reaped one at a time, so age order is known
+    }
+    const oldest = await joinF(room, 'W0', { who: 'who-walker-0' });
+    assert.notEqual(oldest.data.playerId, walkers[0].playerId,
+      'the oldest stub was evicted at the cap, which is what bounds the memory');
+    const newest = await joinF(room, 'W8', { who: 'who-walker-8' });
+    assert.equal(newest.data.playerId, walkers[8].playerId, 'and the newest is still there');
+    keeper.stream.ac.abort();
+  });
+
+  await t('a stub never becomes a way to see a player who is not there', async () => {
+    // The projection invariant (GOALS goal 11): redaction is ABSENT data. A
+    // vacated seat must be absent from every payload — no roster row, no
+    // player-joined event, no `who` anywhere — until its browser really returns.
+    const room = 'vacated-egress';
+    const bob = await seatF(room, 'Bob', 'who-bob-only');
+    const alice = await seatF(room, 'Alice', WHO_ALICE);
+    await closeTabF(room, alice);
+    await sleep(GRACE_MS + 300);
+
+    const snap = await joinF(room, 'Peek', { who: 'who-peek' });
+    assert.equal(snap.text.includes(alice.playerId), false,
+      "the vacated seat's id is in no payload at all");
+    assert.equal(snap.text.includes(WHO_ALICE), false, 'and neither is the key');
+    assert.equal(snap.data.players.some((p) => p.name === 'Alice'), false, 'no row for a player who is not there');
+
+    // And when she DOES come back, the room is told the ordinary way: a
+    // player-joined, because the room really did see her leave.
+    const back = await joinF(room, 'Alice', { who: WHO_ALICE });
+    await sleep(150);
+    assert.ok(bob.stream.text.includes('event: player-left'), "Bob saw the seat leave");
+    assert.ok(bob.stream.text.includes('event: player-joined'), 'and saw it come back');
+    assert.equal(bob.stream.text.includes(WHO_ALICE), false,
+      'while the key stayed at the front door, as the five must-nots require');
+    assert.equal(back.data.playerId, alice.playerId, 'as the same seat');
+    bob.stream.ac.abort();
+  });
+
   await t('a resume never costs a room its cap headroom', async () => {
     // The seatId resume sits AHEAD of the entity caps on purpose so a FULL
     // room can still let the players in it reload. who-resume adds no player
@@ -454,6 +750,7 @@ try {
   });
 } finally {
   await stopServer(proc);
+  await stopServer(procFast);
 }
 
 console.log(`identity: ${n - failed}/${n} passed`);

@@ -117,8 +117,62 @@ const HEARTBEAT_MS = (() => {
   if (!Number.isFinite(raw) || raw <= 0) return 20_000;
   return Math.min(raw, 2 ** 31 - 1);
 })();
-const DISCONNECT_GRACE_MS = 5_000;   // survive an EventSource reconnect
+// How long a seat whose last stream just closed stays ON THE ROSTER. Five
+// seconds, unchanged since it shipped: it is the ghost budget, not the resume
+// budget (see RESUME_TTL_MS, which is the other half of that sentence). A tab
+// that is really gone must stop being shown in seconds — four ghost pills on a
+// table with one real window open is the production bug this number bounds.
+//
+// DICE_DISCONNECT_GRACE_MS overrides it at boot exactly as DICE_HEARTBEAT_MS
+// does, for the same reason: the resume window is a claim ABOUT this clock
+// ("longer than the grace"), and a test that cannot shrink the grace has to
+// sleep through a real one for every case it makes.
+const DISCONNECT_GRACE_MS = (() => {
+  const raw = Number(process.env.DICE_DISCONNECT_GRACE_MS);
+  if (!Number.isFinite(raw) || raw <= 0) return 5_000;
+  return Math.min(raw, 2 ** 31 - 1);
+})();
 const JOIN_GRACE_MS = 60_000;        // time to open the SSE stream after join
+
+// HOW LONG A REAPED SEAT IS STILL THE SAME PERSON'S (docs/IDENTITY.md §8).
+//
+// THE DEFECT THIS NUMBER EXISTS FOR. Rung 1 let a LAPSED seat be resumed — one
+// nobody is streaming but which the roster still holds. That made the feature's
+// whole promise depend on beating DISCONNECT_GRACE_MS with a browser boot, and
+// a browser boot does not cooperate: measured on this machine, a reload of this
+// app announces itself 4.2–5.4 s after the old tab's socket closed (the app's
+// own module evaluation, not the network), against a 5 s grace. So `seat-resume`
+// failed four runs in six, and a player on a slow phone lost their seat — and
+// with it the authority to reveal the roll they were holding — on any reload.
+//
+// TWO CLOCKS, NOT ONE, because the roster and the resume answer different
+// questions and the naive fix (a longer grace) brings the ghosts back:
+//   DISCONNECT_GRACE_MS  what the ROSTER shows. A browser that is gone stops
+//                        being drawn in seconds. Untouched by any of this.
+//   RESUME_TTL_MS        what the SERVER REMEMBERS. After the reap, the seat's
+//                        id, colour and browser key live on in room.vacated —
+//                        invisible to every projection — so the browser that
+//                        was sitting there can sit back down.
+//
+// SIXTY SECONDS is sized to the accident, not to durability. A cold cache on a
+// slow phone, a crashed tab reopened with ctrl-shift-T, a laptop lid closed
+// mid-reload: all tens of seconds. It stops well short of "come back tomorrow
+// and reveal it", which is rung 2 — CLOSED by the owner (IDENTITY §7), and this
+// must not become it by accident.
+const RESUME_TTL_MS = (() => {
+  const raw = Number(process.env.DICE_RESUME_TTL_MS);
+  if (!Number.isFinite(raw) || raw <= 0) return 60_000;
+  return Math.min(raw, 2 ** 31 - 1);
+})();
+
+// Vacated seats remembered per room. A record is three short strings and a
+// timestamp (~200 bytes) — deliberately NOT the player's pools or library,
+// which the returning client re-publishes on its first hello anyway — so the
+// absolute worst case is MAX_ROOMS × this × ~200 B, well under a megabyte.
+// A table has one of these per browser that walked away, and eight is more
+// walk-aways than a room this size sees inside one minute; past that the
+// oldest goes, which is the one nearest its own expiry.
+const MAX_VACATED_PER_ROOM = 8;
 
 // How long a stream may go without answering a heartbeat before we stop
 // believing the transport and drop it.
@@ -479,6 +533,13 @@ function getRoom(name) {
       // — the one predicate evictLingeringRoom scans for.
       lingerTimer: null,
       lingerAt: 0,
+      // SEATS THE ROSTER HAS LET GO OF AND THE SERVER STILL REMEMBERS
+      // (docs/IDENTITY.md §8): playerId -> {id, who, color, at}. Written by
+      // removePlayer on the DISCONNECT reap only, read by takeVacatedSeat at
+      // the door, and NEVER by anything that builds a payload — publicPlayers
+      // walks room.players and nothing else, which is what keeps a vacated
+      // seat from becoming a way to see a player who is not there.
+      vacated: new Map(),
     };
     rooms.set(name, room);
     log(`room created: ${logField('room', name)}`);
@@ -565,6 +626,12 @@ function dropRoomIfEmpty(room) {
 //     something that happened tonight. And the pointer cannot rot: it is a room
 //     KEY, not a handle (see handleSplit), so it stays followable whether or
 //     not the parent still exists.
+//   KEPT for sixty seconds by its own clock — `vacated` (IDENTITY §8). It IS
+//     session state, and it clears itself: every read checks RESUME_TTL_MS, so
+//     an eleven-hour linger hands back nothing. Not cleared here because the
+//     player who trips this path is the organizer reloading ALONE in a prepared
+//     room — the last seat leaving is what armed the linger — and clearing it
+//     would take the seat from exactly the person §G6 exists for.
 //
 // Nothing is broadcast: there is nobody left to hear it, and the room's next
 // occupant learns the whole state from hello.
@@ -634,12 +701,74 @@ function evictLingeringRoom() {
   return true;
 }
 
+// THE SEAT LEAVES THE ROSTER AND THE SERVER KEEPS THE STUB (IDENTITY §8).
+//
+// Only from the DISCONNECT reap, and only for a seat somebody really sat in:
+//   why === 'disconnected'   the ACCIDENT — a closed tab, a reload that lost
+//                            the race, a dead network. The GESTURE ('Leave &
+//                            switch seat', why === 'left') buries nothing:
+//                            leaving on purpose still means leaving, and its
+//                            client has already forgotten the seat anyway.
+//   everStreamed             somebody WAS here. A seat that joined and never
+//                            streamed is an arrival that gave up, and the same
+//                            bit that stops resumableSeatFor confusing the two
+//                            stops this one (see there for the session-restore
+//                            case it protects).
+// A seat with no `who` is not remembered either: nothing could ever answer for
+// it except its own id, and a client holding that id is a client whose tab is
+// still open. Present-or-absent all the way through, as rung 1 is.
+function rememberVacatedSeat(room, player, why) {
+  if (why !== 'disconnected' || !player.everStreamed || !player.who) return;
+  const now = Date.now();
+  // Prune first — expired stubs are the cheapest thing to give up, and doing
+  // it here means no timer exists to hold the event loop open or to leak.
+  for (const [id, rec] of room.vacated) {
+    if (now - rec.at > RESUME_TTL_MS) room.vacated.delete(id);
+  }
+  room.vacated.delete(player.id);        // re-insert at the end: Map order is age
+  while (room.vacated.size >= MAX_VACATED_PER_ROOM) {
+    room.vacated.delete(room.vacated.keys().next().value);
+  }
+  room.vacated.set(player.id, { id: player.id, who: player.who, color: player.color, at: now });
+}
+
+// The seat this arrival may sit back down in, or null. Consuming: a stub is
+// good for ONE return, so two tabs cannot both revive one seat.
+//
+// THE SEAT ID WINS OVER THE KEY, and the order is the whole reason this is not
+// a scan for `who` alone: a browser with two dead tabs has two stubs and one
+// key, and the tab that reloads should get ITS chair back rather than its
+// sibling's. Falling back to the key's most recent stub is rung 1's own rule
+// (resumableSeatFor keeps the last match, for the same reason: it is the seat
+// whose held roll the player is coming back for).
+//
+// NEVER A LIVE SEAT: a stub only exists for a player removePlayer has already
+// deleted, and the `room.players.has` check makes that hold by construction
+// rather than by argument. Refusal is not an error anywhere here — a miss falls
+// through to an ordinary join, exactly as rung 1's does, and nothing at this
+// door is ever told "no" because of who asked (IDENTITY §4).
+function takeVacatedSeat(room, seatId, who) {
+  if (!room || room.vacated.size === 0) return null;
+  let rec = (seatId && room.vacated.get(seatId)) || null;
+  if (!rec && who) {
+    for (const r of room.vacated.values()) if (r.who === who) rec = r;
+  }
+  if (!rec) return null;
+  room.vacated.delete(rec.id);
+  if (Date.now() - rec.at > RESUME_TTL_MS) return null;  // gone for good is gone for good
+  if (room.players.has(rec.id)) return null;             // cannot happen; stays impossible
+  return rec;
+}
+
 function removePlayer(room, player, why) {
   if (room.players.get(player.id) !== player) return;
   holdPlayer(player);
   room.players.delete(player.id);
   for (const res of player.clients) endStream(res);
   player.clients.clear();
+  // Before the broadcast, so the two lifetimes are visibly one step apart: the
+  // roster loses the seat NOW; the stub outlives it (RESUME_TTL_MS).
+  rememberVacatedSeat(room, player, why);
   log(`left    ${logField('room', room.name)} ${logField('name', player.name)} (${why})`);
   broadcast(room, 'player-left', { playerId: player.id });
   dropRoomIfEmpty(room);
@@ -1135,6 +1264,12 @@ function takeRoomCreateBudget(req) {
 // below and the browser gets a fresh seat, exactly as it did before this
 // existed. There is nothing here a client can be told "no" to.
 //
+// AND IT IS ONLY THE FIRST DOOR. This one answers while the seat is still on
+// the roster, which is DISCONNECT_GRACE_MS — five seconds, less than one boot
+// of this app. takeVacatedSeat is the second door, for the browser that comes
+// back after the reap (IDENTITY §8); the difference between them is whether
+// the room has been told the seat left.
+//
 // TWO LAPSED SEATS, ONE KEY (two tabs of one browser, both closed) is a real
 // state, so the scan does not stop at the first hit — it keeps the LAST match.
 // Map iteration is insertion order, so that is the most recently taken seat,
@@ -1226,10 +1361,22 @@ async function handleJoin(req, res) {
   }
 
   const room = getRoom(roomName);
+  // COMING BACK AFTER THE REAP (IDENTITY §8). The roster let this seat go on
+  // the ordinary schedule and nothing about that changed — the room saw the
+  // departure, and this arrival is a real `player-joined`, not the invisible
+  // resume above. What the stub restores is the only thing the reap should
+  // never have taken: the seat's IDENTITY. The same playerId means every
+  // authority check heals untouched — reveal, Done, collect, mine-clear and
+  // projectEntryFor are bit-for-bit what they were, exactly as in rung 1.
+  //
+  // BELOW the caps, unlike the resume above, and the difference is real: a
+  // resume adds no player and a revive does, so a full room refuses it like any
+  // other arrival. Capacity is capacity; it is not a judgement about who asked.
+  const vacated = takeVacatedSeat(room, seatId, who);
   const player = {
-    id: crypto.randomUUID(),
+    id: vacated ? vacated.id : crypto.randomUUID(),
     name,
-    color: keepColor(room, cleanString(body.value.color, 16)),
+    color: keepColor(room, vacated ? vacated.color : cleanString(body.value.color, 16)),
     pools: [],
     clients: new Set(),
     reapTimer: null,
@@ -1245,16 +1392,30 @@ async function handleJoin(req, res) {
     // payload is a leak with a schema, so the test that matters greps the BYTES
     // a bystander receives (tests/identity.test.mjs, 'who never leaves the
     // front door') rather than trusting this comment.
-    ...(who ? { who } : {}),
+    // …and on a revive it is re-bound to the key that answered, exactly as the
+    // resume path re-binds: a browser that minted its key after taking this
+    // seat must not end up holding a seat no key points at.
+    ...(who || (vacated && vacated.who) ? { who: who || vacated.who } : {}),
     // Has a stream ever attached here? handleEvents sets it. Lets
-    // resumableSeatFor tell a lapsed seat from an arriving one.
+    // resumableSeatFor tell a lapsed seat from an arriving one. FALSE on a
+    // revive too: this browser has to open a stream again before its seat can
+    // be called lapsed, and the stub it came from is already spent.
     everStreamed: false,
   };
   room.players.set(player.id, player);
   // If the client never opens an event stream, forget it again eventually.
   scheduleReap(room, player, JOIN_GRACE_MS);
 
-  log(`join    ${logField('room', roomName)} ${logField('name', name)} color=${player.color} players=${room.players.size}`);
+  if (vacated) {
+    // A verb of its own, because it is not the silent path: the room really did
+    // see this seat leave and come back. `by=` names the credential that
+    // answered and `after=` is the gap it crossed — the one field that says
+    // whether RESUME_TTL_MS is sized right, read straight from a field log.
+    log(`reseat  ${logField('room', roomName)} ${logField('name', name)} color=${player.color} `
+      + `players=${room.players.size} by=${vacated.id === seatId ? 'seat' : 'who'} after=${Date.now() - vacated.at}ms`);
+  } else {
+    log(`join    ${logField('room', roomName)} ${logField('name', name)} color=${player.color} players=${room.players.size}`);
+  }
   broadcast(room, 'player-joined', { player: { id: player.id, name: player.name, color: player.color, pools: [] } });
 
   sendJson(res, 200, joinSnapshot(room, player));
