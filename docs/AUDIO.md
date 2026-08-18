@@ -20,18 +20,36 @@ The design authority for sound. [GOALS.md](GOALS.md) still wins ties;
 [IMMERSION-AUDIT.md](IMMERSION-AUDIT.md) is what asked for this work and
 [ROADMAP.md](ROADMAP.md) Tier V sequences it — plus **Tier W6, the venue's
 audio palette (§2.5)**, which is where goals 13–15 reach this file.
-Everything here is implemented in `js/main.js` (the section headed *Sound —
-the audio graph*) and proved by the `audio` tag in `tests/e2e/scenarios.mjs`.
+
+The **graph** is in `js/main.js` (the section headed *Sound — the audio
+graph*); the **numbers** are in `js/voices.js` (the voice tables, the bed
+levels, the venue palette, and the ruler that measures them). It is proved by
+the `audio` tag in `tests/e2e/scenarios.mjs` and by `tests/voices.test.mjs`.
 
 Anything marked **DIAL FOR JOE** is a listening decision, not a design gap.
 It ships at the stated default and is flagged `// DIAL FOR JOE` in code.
 
-**NOTHING IN THIS FILE HAS BEEN LISTENED TO BY A HUMAN.** Not one voice —
-not the five tower clunks, not the Witchlight chime, not the bed, not the
-venue palette §2.5 added. Every number was reasoned from the tables here and
-from the material each thing claims to be. Read every "warm", "dead",
-"bright" and "dull" below as a *prediction*, and see §9 for the sitting that
-would settle them.
+**IT HAS NOW BEEN LISTENED TO.** Joe sat down on **2026-08-18** and heard all
+ten voices in §9's script — the first human verdict this audio has ever had.
+Eight of the ten needed work and two did not, and his exact words are the
+record in §9. What that sitting proved, beyond the eight specifics:
+
+- **Two of the predictions in this file were right and one was very wrong.**
+  §9 named Black Anvil "the one most likely to want moving" and it was
+  (*"Slightly to shrill / clanky"*); it named Hollow Bole second and he said
+  *"sounds good"*. What nothing here predicted is that **the whole fae bed
+  premise did not land**: three rooms reasoned from three different places
+  came back as *"white noise"*, *"more white noise"*, *"deeper white noise"* —
+  one texture at three volumes.
+- **Every number is measurable now.** The voice tables moved to
+  `js/voices.js` on the same day, with a spectral ruler beside them, because
+  the agent that changes a sound cannot hear it either. `tests/voices.test.mjs`
+  holds the 2026-08-17 numbers he judged as a frozen baseline and asserts each
+  change moved in the direction his word asked, by a stated amount.
+
+Read what is left of "warm", "dead", "bright" and "dull" below as a
+*prediction* still — but §9's ten rows now carry verdicts, and only the rows
+that CHANGED need a second sitting.
 
 ## 1. The sound of this table
 
@@ -54,14 +72,27 @@ that a roll is over is the room going quiet again.
 ### 2.1 Buses — built once, in `ensureAudio()`
 
 ```
-                                    ┌─ panBus[0..8] (StereoPanner, −0.6…+0.6 step 0.15) ─┐
-one-shots (impacts, settle taps) ───┤                                                    ├─▶ master(Gain 0.7)
-rolling voices (per-die panner) ────┘                                                    │        │
-tower clunks ─▶ shaftBus (comb + 2 peaking biquads, §2.4) ───────────────────────────────┤        ▼
-room bed ─▶ air(lowpass, §2.5) ─▶ duck ─▶ roomGain (the duck point) ─────────────────────┘  softClip(tanh)
+one-shots (impacts, settle taps) ─▶ panBus[0..8] (StereoPanner, −0.6…+0.6 step 0.15) ───┐
+rolling voices ─▶ own StereoPanner ─────────────────────────────────────────────────────┤─▶ master(Gain 0.7)
+tower clunks ─▶ shaftBus (comb + 2 peaking biquads, §2.4) ──────────────────────────────┤        │
+room bed ─▶ air(lowpass, §2.5) ─▶ duck (THE DUCK POINT) ─▶ roomGain ────────────────────┘        ▼
+                                                                                          softClip(tanh)
                                                                                                   │
                                                                                             destination
 ```
+
+*Corrected 2026-08-18, and it was wrong in three places at once — so was the
+banner over the same section in `js/main.js`, which is where the picture was
+copied from.* **(a)** Only one-shots go through the pooled pan buses; rolling
+voices own a `StereoPannerNode` each and connect **straight to master**, which
+§2.1's prose directly under the old picture already said. **(b)** The shaft
+send also goes straight to master (`p1 → p2 → out → master`), not through a
+pan bus — a baffle knock is `at: null` and is never panned by position, which
+is the whole reason. **(c)** `roomGain` was labelled "the duck point" and it
+is not: `AUDIO.room` is a unity gain written exactly once, at build, and
+`roomDuck()` ramps `bed.duck` one node upstream. Anyone reading this to find
+the duck would have found a node that never moves. §5 carried the same
+mistake and is corrected there too.
 
 `master` is the **one** point every source passes through, which is what
 makes `soundOn === false` structurally total rather than a list of callers
@@ -135,17 +166,50 @@ clunk ─┬──────────────────────�
 
 Six nodes (in gain, delay, comb gain, two peaks, out gain), no feedback, no
 stability question. *("Five" here and in the code's own banner counted the
-chain and forgot the input gain; corrected 2026-08-16.)* The dials live on the
-TOWERS registry row inside `clunkVoice.shaft`, so the palette still resolves
+chain and forgot the input gain; corrected here 2026-08-16 and **in the banner
+2026-08-18**, which had gone two months disagreeing with this line.)* The dials
+are `clunkVoice.shaft` on the row a TOWERS entry references
+(`js/voices.js CLUNK_VOICES`), so the palette still resolves
 in the sound drain and nowhere else — and the FIRST LAW holds *by
 construction*: a towerless roll records no `clunk` event, so no film can
 reach this bus. Dice in hidden transit additionally get a
 `lowpass 2200 Hz` that is removed at the mouth; the muffled-then-bright exit
 sells the tower more than anything else in the chain.
 
-**Five towers carry a voice**, not four: `heartwood` clack 0.35/20,
-`bastion` thud 0.7/40, `blackanvil` chime 0.85/70, `nullstone` hush 0.75/25,
-`hollowbole` thud 0.5/35 — each with its own shaft row. None has been heard.
+**Five towers carry a voice**, not four, and the rows live in `js/voices.js`
+(`CLUNK_VOICES`, keyed by tower id; the `TOWERS` registry row references it,
+so a row still declares its palette and `towerCos(row).clunkVoice` still
+answers by value).
+
+| tower | voice | shaft | heard 2026-08-18 |
+|---|---|---|---|
+| `heartwood` | **thud 0.7/40** | 5.5 ms, g 0.50, 300 + 600 | *was* `clack 0.35/20` — **swapped with Bastion** |
+| `bastion` | **clack 0.35/20** | 3.2 ms, g 0.55, 430 + 860 | *was* `thud 0.7/40` — **swapped with Heartwood** |
+| `blackanvil` | **bell 0.55/70** | 2.5 ms, g 0.60, 520 + 1040 | *was* `chime 0.85/70` — **−15% centroid** |
+| `nullstone` | hush 0.75/25 | 4.5 ms, g 0.34, 240 + 430 | **"sounds good" — untouched** |
+| `hollowbole` | thud 0.5/35 | 4.0 ms, g 0.50, 360 + 720 | **"sounds good" — untouched** |
+
+**B1/B2 is a swap and nothing else.** Joe: *"I'd probably switch the bastion
+and heartwood sounds, they feel reversed to what I'd expect"* — and he is
+right about the physics. A dice tower made of **planks** is a resonant box: a
+die hits it and you get a low hollow tok with body. A **stone** turret is a
+wall with a turret's mass behind it, so almost nothing transmits and what you
+hear is a short bright tick off the surface. The rows were reasoned from
+materials in the abstract ("stone is heavy, so stone is low") and had it
+backwards. The two whole voices — body *and* shaft row — exchanged places, so
+the SET of five is conserved exactly and the change reverts by exchanging two
+keys. `tests/voices.test.mjs` asserts that conservation, which is what stops a
+future "improvement" hiding inside a swap.
+
+**B3 is a small move, and measurably small.** *"Slightly to shrill / clanky
+for me.."* — so `chime 0.85` became the new `bell 0.55` body: band 2156 → 1686
+Hz, log centroid 2487 → 2125 Hz (−15%), Q 2.8 → 1.8 (that is the *clanky*
+half — a high-Q band rings on one note), 0 → 5 ms of attack, and **the same
+loudness to within 0.02 dB** (`gainScale` was solved for it, not chosen). The
+Witchlight chime beside it took −37% because he hated that one; the whole
+point of the separate body is that one table cannot move a little for one
+caller and a lot for another. The shaft row is untouched — the flue's colour
+was never what he named.
 
 ### 2.5 The venue's palette (W6)
 
@@ -164,34 +228,75 @@ loud in a night clearing:**
   die ringing off a hard table in a bog is the same costume problem one layer
   down.
 
-So the palette is exactly two rows per venue, in `VENUE_AUDIO` (`js/main.js`,
-this section), read through **one** function, `venueAudio()`:
+So the palette is exactly two rows per venue, in `VENUE_AUDIO` (`js/voices.js`
+since 2026-08-18), read through **one** function, `venueAudio()`. **Bold is
+what 2026-08-18 moved**; everything else is as W6 shipped:
 
 | | `table` (grounded) | `moonrise` | `foxfire` |
 |---|---|---|---|
 | the place | a warm room, a hearth, walls | a night clearing — treeline, open sky | a damp hollow — close air, standing water |
-| pink ×  | 1 | 1 | 1 |
-| brown × | 1 | **0.58** | **0.75** |
-| air lowpass | 20 000 Hz | **1200 Hz** | **900 Hz** |
-| air breath | 0.019 Hz, **±0** | 0.019 Hz, ±420 Hz | 0.013 Hz, ±240 Hz |
-| tick rate | 4 /s | **0.7 /s** | **1.6 /s** |
-| tick band | 900 + 2600, Q 3, 30 ms | **220 + 380, Q 6, 45 ms** | **180 + 260, Q 7, 55 ms** |
-| ground centre × | 1 | **0.72** | **0.66** |
-| ground length × | 1 | **0.85** | **0.78** |
-| ground gain × | 1 | **0.90** | **0.85** |
+| pink ×  | 1 | **1.55** | **1.35** |
+| brown × | 1 | 0.58 | 0.75 |
+| air lowpass | 20 000 Hz | 1200 Hz | 900 Hz |
+| air breath | 0.019 Hz, ±0 | 0.019 Hz, ±420 Hz | 0.013 Hz, ±240 Hz |
+| tick rate | 4 /s | **1.15 /s** | **2.6 /s** |
+| tick band | 900 + 2600, Q 3, 30 ms | **220 + 380, Q 6, 55 ms** | **170 + 250, Q 7, 75 ms** |
+| tick **note** | **none** (a spark has none) | **×0.55 of band** | **×0.62 of band** |
+| **swell** rate | **1 per 12 s** | **1 per 12 s** | **1 per 20 s** |
+| **swell** band / depth | **90 + 210, +5.5 dB** | **300 + 1100, +11.3 dB** | **120 + 300, +8.4 dB** |
+| ground centre × | 1 | 0.72 | 0.66 |
+| ground length × | 1 | 0.85 | 0.78 |
+| ground gain × | 1 | 0.90 | 0.85 |
 
 **How each number was reasoned.** `brown` is the *enclosure* layer — §5 calls
 it "the low end that makes a room feel enclosed" — so a clearing with no walls
 cuts it hardest and a **hollow**, which is by its own name more enclosed than a
-clearing, gets some of it back. The pink pair keeps its level but goes through
-a lowpass at **1200 Hz, under §1's 1.5 kHz wood/metal boundary**: the same
-measure that demoted `click` and seated `felt` at 700. That is leaf hiss at
-the treeline rather than room air, and a fourth mutually-prime LFO (0.019 Hz,
-±420 Hz on the cutoff) is the wind moving through it. The tick layer stops
-being a fire and becomes **condensation off the canopy**: rare, low, *pitched*
-(a drip has a note where a spark does not) and longer-tailed, because water
-lands in moss. Foxfire is "older and damper", so it drips more than twice as
-often, lower, and its air sits lower and breathes shallower.
+clearing, gets some of it back. The pink pair goes through a lowpass at
+**1200 Hz, under §1's 1.5 kHz wood/metal boundary**: the same measure that
+demoted `click` and seated `felt` at 700. That is leaf hiss at the treeline
+rather than room air, and a fourth mutually-prime LFO (0.019 Hz, ±420 Hz on
+the cutoff) is the wind moving through it. The tick layer stops being a fire
+and becomes **condensation off the canopy**: rare, low, and longer-tailed,
+because water lands in moss. Foxfire is "older and damper", so it drips more
+than twice as often, lower, and its air sits lower and breathes shallower.
+
+**What the listening changed, and why (2026-08-18).**
+
+- **`pink` is no longer 1 in the fae rooms**, and the old row's reasoning was
+  the bug: "the pink pair keeps its level but goes through a lowpass" is not a
+  thing a lowpass does. A 1200 Hz cutoff throws away most of a 1/f spectrum's
+  upper half, so the glade arrived **3.9 dB quieter** than the room he had
+  just been in and the hollow 2.7 dB quieter. That is exactly *"super
+  faint"*/*"VERY faint"*, it is comparative, and the arithmetic could have
+  caught it before he ever heard it. 1.55 and 1.35 are the measured make-up
+  gains; all three rooms now sit within 1.6 dB of each other.
+- **The tick layer became audible and got a note.** Its amplitude law was
+  `u³`, whose *median* is ⅛ — half of every room's events arrived at an eighth
+  of the peak, under the room's own hiss. It is now `u^1.6` (median ⅓), the
+  fae rates roughly doubled, and the fae drips carry a decaying **sine at
+  0.55–0.62 of the pop's band centre**. A drip has a note where a spark does
+  not, and a pitched event is the one a listener can *name* — which is the
+  whole difference between "a room" and "noise". The hearth declares `tone: 0`
+  deliberately: giving a fire a note would make it a music box.
+- **A `swell` layer exists at all.** This is the finding behind A1/A2/A3 and
+  it is not about spectrum: **steady broadband noise reads as white noise
+  however you tilt it.** A place is made of *events* and *slow motion*, and the
+  bed had one inaudible event layer and, for motion, three LFOs at 0.031–0.073
+  Hz — periods of 14 to 32 seconds at depths of 40% of an already-inaudible
+  layer, which nobody perceives as a room breathing. A swell is one filtered
+  breath, up over ~2 s and down over ~3, on its own Poisson clock: the fire's
+  body, wind through a treeline, the draught of a closed hollow. It costs three
+  fire-and-forget nodes every ten-to-twenty seconds off the **shared** buffer,
+  so `perHitBufferAllocs` is unmoved.
+
+**How "can you tell them apart with your eyes shut" is measured.**
+`bedDistance(a, b)` in `js/voices.js` splits the axes into **texture** (level,
+colour) and **event** (rate, band, tail, note, swell), and the split is the
+finding rather than a presentation choice: two rooms that differ only on
+texture are one sound played louder or darker, which is precisely what Joe's
+three sentences describe. The shipped rooms differed on texture; the test now
+requires **≥3 of 5 event axes** per pair **and** that the level axis is
+*false* — none of the distinctness may be done by volume.
 
 **The ground is a second timbre tier, not a new body.** `IMPACT_SOFT_*` was
 already a one-tier modifier over the resolved body (§3.2); the venue's floor is
@@ -278,6 +383,21 @@ shape, multiplied in, skipped for baffle knocks. All of the arithmetic lives in
 `impactVoicingOf(strength, voice, isClunk)`, which `playImpact`, the settle
 cluster **and** the `impactVoicingFor` debug hook all call: a scenario that
 re-derived the trim itself would stay green with the trim unwired.
+
+**4. `attackMs` — the second axis of "sharp" (2026-08-18).** Every one-shot in
+this file began at full gain on its first sample: an instantaneous rise, which
+is the steepest attack physically expressible and is heard as an ice pick
+wherever the spectrum sits. Joe's *"far less sharp"* (C1/C2) and *"slightly to
+shrill"* (B3) are about both axes, and moving the spectrum alone would have
+left the transient exactly as it was. A body may now declare `attackMs` and
+rise over that long instead; a body that does not is byte-identical to what
+shipped. **Only `chime` (7 ms) and the new `bell` (5 ms) declare one** — the
+default `felt`, `click`, `thud`, `clack`, `hush` and `crackle` keep their
+edges, and `tests/voices.test.mjs` asserts that, because softening the most
+common sound in the app by accident is exactly the kind of thing this change
+could have done quietly. The **sine partial** wears the same rise: it is 40% of
+the gain, and a softened noise burst with a zero-rise sine welded to its front
+is still a sharp sound.
 
 ### 3.3 Rolling (sustained, derived)
 
@@ -377,19 +497,36 @@ covering it *silently*.
 | Impacts | 0.35 | the loudest single impact of a throw is the mix's ceiling |
 | Settle taps | A0 = 0.5 × parent impact | decaying under it |
 | Rolling (all voices summed) | 0.12 | a 20-die pile cannot out-shout its own landing |
-| Room bed | pink 0.003 + brown 0.006 + tick 0.02·u³ | present enough that absence is noticeable |
+| Room bed | pink **0.015** + brown **0.030** + tick **0.05·u^1.6** + swell **0.022** | present enough that absence is noticeable |
 
-The bed row is the **grounded** room's. A venue re-balances it (§2.5) with
-multipliers that only ever subtract, so these three numbers stay the ceiling
-for every venue and stay Joe's dial: **the venue says what the room is made
-of, the mix plan says how loud a room is allowed to be.**
+The bed row is the **grounded** room's. A venue re-balances it (§2.5); the
+ground multipliers only ever subtract, and the bed's `pink`/`brown` may carry
+a make-up gain for what the venue's own air filter takes out but nothing else.
+These numbers stay Joe's dial: **the venue says what the room is made of, the
+mix plan says how loud a room is allowed to be.**
+
+*Raised ×5 on 2026-08-18, the first time anybody turned them after hearing the
+result.* Measured, the shipped bed ran at **−59.8 dBFS RMS at the output** —
+48 dB under the loudest impact and under the noise floor of most rooms. That
+is not a quiet bed, it is an inaudible one, and *"super faint"* / *"VERY
+faint"* is what it sounds like. The three rooms now sit at **−45.9 / −47.5 /
+−47.5 dBFS**: audible in a quiet room, still ~34 dB under a landing, still the
+quietest thing in the app by a wide margin. `tests/voices.test.mjs` holds both
+ends of that (a floor **and** a ceiling — a bed that got loud enough to
+compete with the dice would fail the same assertion).
 
 **Duck direction is fixed: ambience ducks, dice never.** No compressor does
-this; it is a scheduled ramp on `roomGain` — −4 dB with a 250 ms attack at
+this; it is a scheduled ramp on **`bed.duck`** — −4 dB with a 250 ms attack at
 roll start, recovering with τ = 1.2 s from the last die's settle. Both edges
 are slow enough that the gesture itself is imperceptible, and the recovery
 does narrative work: *the room coming back* is the strongest "roll is over"
 cue in the app.
+
+*This paragraph said `roomGain` until 2026-08-18 and §2.2's diagram labelled
+that node "the duck point". Neither was true: `AUDIO.room` is a unity gain
+written once at build and never again, and `roomDuck()` has always ramped
+`bed.duck`, one node upstream. See §2.2 for the other two errors in the same
+picture.*
 
 **Silence discipline.** The bake's `v > 2` gate is the strength floor — a
 contact below it did not happen, audibly, and render must not voice below it
@@ -467,27 +604,90 @@ context on `visibilitychange`.
 
 ## 7. DIAL FOR JOE
 
+**Turned 2026-08-18, after the first sitting** (so these are no longer
+guesses, they are first answers to a real verdict): the bed levels ×5, the
+tick amplitude law `u³ → u^1.6`, the fae `pink` make-up gains, the fae drip
+rates and notes, `BED_SWELL`, the `chime` body, the new `bell` body, and which
+tower wears which voice. Every one of them is in `js/voices.js` and every one
+is measured in `tests/voices.test.mjs`.
+
+**Still untouched and still his:**
+
 - `ROLL_GAIN` 0.05 and the 0.12 rolling sum clamp — the loudness of the
   grind relative to landings.
 - Felt band centre 380 Hz and tilt ceiling 1800 Hz — the warm/dull boundary.
 - Duck depth −4 dB and recovery τ 1.2 s — how much the room "breathes".
-- Bed layer levels, and whether the bed ever ships on by default (currently:
-  never before an hour of continuous listening).
-- **Every row of `VENUE_AUDIO` (§2.5).** The two ground trims are the biggest
-  single lever — `centre` alone moves the impacts, the whole settle tail, the
-  surface band and the tilt curve together, so it is one number per venue and
-  it is worth turning first. Then the drip rate (0.7/s and 1.6/s are a
-  *guess at how often a wood drips*, and nothing else in the app is as easy to
-  find annoying), then the air cutoffs.
+- Whether the bed ever ships on by default (currently: never before an hour of
+  continuous listening).
+- **The two ground trims in `VENUE_AUDIO` (§2.5)** — the biggest single lever
+  left. `centre` alone moves the impacts, the whole settle tail, the surface
+  band and the tilt curve together, so it is one number per venue.
 - **`BED_VOICE_S` 3 s** — how long the room takes to become a different room.
   It only ever runs when a venue changes with the bed already up.
-- Black Anvil's `chime 0.85/70` and its shaft row.
 - The `restY` polyhedron constant (0.75 · radius) — verify against a baked
   settle; the rough track's surface class supersedes it.
 - Clunk density on 40-die pours. If it grates, drop `POUR.clunkMax` to 3
   rather than reshaping the plan.
 
+**The three single numbers most likely to want turning next**, in order, if
+the second sitting says "close, but":
+
+1. **`BED_SWELL` 0.022** — the slow layer is the biggest new thing in the room
+   and the one with no prior verdict at all. If the rooms move too much, this
+   is one number; `swell: null` on a row removes the layer from that room
+   outright.
+2. **`BED_PINK` 0.015 / `BED_BROWN` 0.030** — ×5 was derived from a dBFS
+   target, not heard. Everything scales together.
+3. **The fae drip rates** (1.15/s and 2.6/s) — still a *guess at how often a
+   wood drips*, and nothing else in the app is as easy to find annoying.
+
 ## 8. Where the tests are
+
+### 8.0 `tests/voices.test.mjs` — Joe's verdicts as arithmetic (2026-08-18)
+
+**Run it with `npm test`; it costs 40 ms and it is where a claim about a SOUND
+goes.** Nobody working on this audio can hear it — not the agent that changes
+a voice and not the orchestrator that asked for the change — so each of the
+eight complaints in §9 was turned into a property with a number attached, the
+value of that number **on the tree he listened to** was frozen into the test as
+`BASELINE_2026_08_17`, and every assertion states a direction and a size.
+
+The ruler is in `js/voices.js`: `biquadMag` is the Audio EQ Cookbook transfer
+function (what `BiquadFilterNode` implements, so the filter half is the
+browser's own arithmetic), `impactSpectrum` reports **log centroid**, the
+**share of power above §1's 1.5 kHz boundary**, the sine partial's line, the
+body's broadband gain and the attack in ms, and `bedProfile` reports a room's
+**dBFS RMS, colour, audible events per second, event note, and swell rate and
+depth**.
+
+Two choices in that ruler are load-bearing and are argued in the file:
+
+- **The centroid is the log-frequency one.** The textbook linear centroid
+  diverges on a 6 dB/oct bandpass skirt, so *widening* a resonance — exactly
+  what "less clanky" asks for — makes the number go UP while the sound gets
+  duller. The ruler would have contradicted the change it exists to check.
+- **Event audibility has an absolute floor as well as a relative one.**
+  Counting events against the bed's own RMS alone is perverse: it scores a
+  quieter room higher, and the room Joe called *"VERY faint"* would have won.
+  `BED_AUDIBLE_DBFS = −55` is derived from §5's own ceiling and a comfortable
+  playback level.
+
+**What it cannot prove** is that anything sounds good, and it does not try.
+What it proves is that a change **moved, in the direction a word asked for, by
+an amount somebody wrote down** — which turns "please listen again" into
+"please listen again and tell me if the direction was right".
+
+`tools/steps/voice-spectra.mjs` is its partner and catches the other lie: it
+drives a real tab and asks `impactVoicingFor` / `venueAudioInfo` — the same
+resolvers `playImpact` and `bedBuild` use — for all ten rows, then asserts the
+centres the **app** resolves match the tables the unit test measures. A
+beautiful table nobody wired would pass one and fail the other.
+
+```
+node tools/drive.mjs tools/steps/voice-spectra.mjs
+```
+
+### 8.1 The e2e tags
 
 Tag `audio` (with `fx` and `roll`), in `tests/e2e/scenarios.mjs`:
 
@@ -533,73 +733,143 @@ verifying W6:
    wall time (`waitFor` on the live value); a claim about *intent* can read
    `live.told` immediately.
 
-## 9. The listening script — ten voices, one sitting
+## 9. The listening script — ten voices, and what he said
 
-**Every voice in this app is unheard.** Nine were reasoned from the tables
-above and never played to a person; the tenth (the grounded bed) has been
-playable since V1 and nobody has sat with it. They are cheap to make and
-expensive to *find*, which is the only reason the backlog exists — so here is
-the whole palette as a route, ordered so that **exactly one thing changes
-between consecutive rows.**
+**Heard 2026-08-18. The verdicts below are Joe's exact words** and they are
+the specification for everything §2.4, §2.5, §3.2 and §5 changed on that day.
+Nine of these voices had never been played to a person and the tenth (the
+grounded bed) had been playable since V1 with nobody sitting with it; they are
+cheap to make and expensive to *find*, which is the only reason the backlog
+existed. The route below is unchanged and still ordered so that **exactly one
+thing changes between consecutive rows.**
+
+### 9.0 THE RECORD — first sitting, 2026-08-18
+
+| # | voice | **his words** | what changed | re-listen? |
+|---|---|---|---|---|
+| A1 | The Table (bed) | *"sounds like white noise mostly"* | bed +13.9 dB; tick law `u³→u^1.6`; new swell layer (fire's body, 1 per 12 s) | **YES** |
+| A2 | Moonrise Glade (bed) | *"more white noise, super faint"* | bed +16.2 dB (incl. a 1.55 pink make-up gain — it was 3.9 dB *under* A1); drips 0.35→0.72 audible/s and now **pitched**; wind swell +11.3 dB | **YES** |
+| A3 | Foxfire Hollow (bed) | *"deeper white noise, VERY faint"* | bed +15.0 dB (1.35 make-up); drips 0.80→1.69 audible/s, lower, wetter, **pitched**; a rarer, shallower draught | **YES** |
+| B1 | Heartwood clunk | *"I'd probably switch the bastion and heartwood sounds, they feel reversed to what I'd expect"* | **swapped with B2.** Now `thud 0.7/40` over the 5.5 ms comb — band 1114→338 Hz | **YES** |
+| B2 | Bastion clunk | *(the same note)* | **swapped with B1.** Now `clack 0.35/20` over the 3.2 ms comb — band 338→1114 Hz | **YES** |
+| B3 | Black Anvil clunk | *"Slightly to shrill / clanky for me.."* | `chime 0.85` → new `bell 0.55`: centroid −15%, Q 2.8→1.8, attack 0→5 ms, **loudness held to 0.02 dB** | **YES** |
+| B4 | Nullstone clunk | **"sounds good"** | **nothing. Do not touch.** | no |
+| B5 | Hollow Bole clunk | **"sounds good"** | **nothing. Do not touch.** | no |
+| C1 | Witchlight chime | *"I hate this sound. I'd prefer something far less sharp"* | `chime` body re-voiced 3400→1750, Q 2.8→1.5, attack 0→7 ms: centroid −37%, partial 1836→991 Hz | **YES** |
+| C2 | Moonrise ground | *"I hate this sound. I'd prefer something far less sharp"* | same body (see below): centroid 2749→1745 Hz, and **46% of its energy is now under §1's 1.5 kHz line, against 3% before** | **YES** |
+| C3 | Foxfire ground | *"Also to shrill / sharp"* | same: centroid 2536→1612 Hz | **YES** |
+
+**Eight rows need a second sitting; B4 and B5 do not, and must not move.**
+They are the only two data points of his taste being *satisfied* and they are
+the reference the others were sized against — B3 was deliberately **not**
+taken down into their register.
+
+**Four things the first sitting taught that were not in any row:**
+
+1. **C1, C2 and C3 are ONE voice**, which is why he used the same sentence
+   for two of them and a near-identical one for the third. The script lists
+   three things to judge and they are three *contexts* of the Witchlight set's
+   `chime` — the die's ring, then that ring with each venue's ground over it.
+   No ground trim could have rescued it either: the deepest floor in the app
+   (×0.66) applied to a 3.4 kHz band still lands at 2.2 kHz. **The fix had to
+   be the body**, and that is also why B3 got a *separate* body — one table
+   cannot move a little for one caller and a lot for another.
+2. **"Faint" was comparative, and the arithmetic could have caught it.** The
+   row for both fae beds said the pink pair "keeps its level but goes through a
+   lowpass", which is not a thing a lowpass does: the glade arrived 3.9 dB
+   under the room he had just been in. §2.5.
+3. **The fae bed premise did not land, and not because of its spectrum.**
+   Steady broadband noise reads as "white noise" however you tilt it. A place
+   is made of *events* — something intermittent, sparse, identifiable — and of
+   *slow motion*. The bed had one event layer whose amplitude law buried nine
+   pops in ten, and for motion three LFOs with 14-to-32-second periods.
+4. **The palette's whole level was wrong**, not just the fae rooms': −59.8
+   dBFS RMS is inaudible, not quiet, and every "is this dull enough?" judgment
+   made above it was made at the wrong volume.
+
+### 9.1 The route — same script, second sitting
 
 **Preamble, once.** Open the table on **`?stability=beta`** — venue and tower
 are closed-beta rows and the pickers are simply absent without it (`BETA_ROWS`;
-UX §7.38). Then `⚙` → **You** → **Room tone** ON (the bed is off by default and
-W6 did not change that) → **Staging**. You are now parked with the panel open;
-leave it open, it covers nothing that makes a sound.
+UX §7.38). Then `⚙` → **You** → **Room tone** ON (the bed is off by default) →
+**Staging**. You are now parked with the panel open; leave it open, it covers
+nothing that makes a sound.
 
 **A roll is two clicks:** a row in the left column, then **Roll**. Tap the row
 N times first for N dice — the extra taps are optional and are not counted
 below. For a big pour (the tower voices want one) `/` → `8d6` → Enter is
 faster, and is the only keyboard in this script.
 
-### A. The three rooms — no dice, just the room
+**One thing to know before A1: the bed arrives over six seconds** (`BED_FADE_S`)
+and its slow layer fires about **every 12 seconds**. A minute a room is now the
+minimum rather than a suggestion — under about 25 seconds you will hear the
+hiss and none of the motion, which is the state that produced the first
+verdict.
+
+#### A. The three rooms — no dice, just the room
 
 A minute each with nothing on the felt. What is being judged is whether the
 room is a *place*, and whether it is quiet enough to disappear.
 
-| # | Voice | The two clicks | Listen for |
-|---|---|---|---|
-| A1 | **The Table** — hearth, walls | `Staging` → **The Table** | the reference. Brown low end, sparse bright fire ticks (~4/s) |
-| A2 | **Moonrise Glade** — clearing | **Moonrise Glade** → *(nothing; wait 3 s)* | the low end steps back and the top goes soft — no walls, leaf hiss at the treeline. Ticks become rare low drips (~0.7/s). The change takes 3 s (`BED_VOICE_S`): **that transition is a voice too** |
-| A3 | **Foxfire Hollow** — damp hollow | **Foxfire Hollow** → *(wait 3 s)* | closer, wetter and more enclosed than A2, dripping twice as often and lower |
+| # | Voice | The two clicks | Listen for | asked |
+|---|---|---|---|---|
+| A1 | **The Table** — hearth, walls | `Staging` → **The Table** | the reference, now ~14 dB louder. Sparse bright fire ticks (~2/s audible), and **a low breath every ~12 s** that is the fire's body, not a spark | is it a fire, and is 14 dB the right amount? |
+| A2 | **Moonrise Glade** — clearing | **Moonrise Glade** → *(nothing; wait 3 s, then a minute)* | it is **no longer quieter** than A1 — that was the bug. The low end steps back, the top goes soft, and the drips are now **pitched**: each one has a note. A long **gust** every ~12 s is the treeline. The change takes 3 s (`BED_VOICE_S`): **that transition is a voice too** | can you tell it from A1 with your eyes shut? |
+| A3 | **Foxfire Hollow** — damp hollow | **Foxfire Hollow** → *(wait 3 s, then a minute)* | closer, wetter, more enclosed than A2: **more than twice A2's drip rate**, lower, longer-tailed, more strongly pitched. Its slow layer is rarer and shallower — a draught, not wind | and can you tell it from A2? |
 
 *Then go back — **The Table** → **Moonrise Glade** once more. The A/B is where
-"is this the same building?" actually gets answered.*
+"is this the same building?" actually gets answered, and it is the question the
+first sitting answered "yes" to.*
 
-### B. The five tower voices — under The Table, on equal ground
+**If any room now moves too much**, `BED_SWELL` is one number and `swell: null`
+on a row removes the layer from that room entirely (§7).
+
+#### B. The five tower voices — under The Table, on equal ground
 
 Put the grounded venue back first (**The Table**) so every tower is judged on
 felt with all ground trims at 1. Room tone may stay on; off is a cleaner read
 of the knocks.
 
-| # | Voice | The two clicks | Listen for |
-|---|---|---|---|
-| B1 | **Heartwood** `clack 0.35/20` | **Heartwood** → **Roll** | dry wood on wood, short and narrow, over the shortest comb in the set |
-| B2 | **Bastion** `thud 0.7/40` | **Bastion** → **Roll** | heavier and lower, and it rings on in the chute after the knock |
-| B3 | **Black Anvil** `chime 0.85/70` | **Black Anvil** → **Roll** | **the one most likely to want moving.** A chime body weighted right down, meant to read as cast iron rather than crystal. If it reads as glass, the weight goes up |
-| B4 | **Nullstone** `hush 0.75/25` | **Nullstone** → **Roll** | a subtracted click through the deadest comb here — a bore through solid rock returns almost nothing |
-| B5 | **Hollow Bole** `thud 0.5/35` | **Moonrise Glade** → **Roll** | **the second most likely to want moving.** A dead drum: hollower than B2 over the longest comb, the note an empty trunk gives back. It has **no tower chip** — venue-only, so the venue *is* the click |
+| # | Voice | The two clicks | Listen for | asked |
+|---|---|---|---|---|
+| B1 | **Heartwood** `thud 0.7/40` | **Heartwood** → **Roll** | **the swap.** The wooden tower is now the LOW one: a plank box is a drum, and this is the hollow tok it gives back, over the longest comb of the pair | is this the right way round now? |
+| B2 | **Bastion** `clack 0.35/20` | **Bastion** → **Roll** | **the other half.** Stone gives a die almost nothing back — a short bright tick off a surface with a turret's mass behind it | — |
+| B3 | **Black Anvil** `bell 0.55/70` | **Black Anvil** → **Roll** | **a deliberately small move.** Still the ringing tower, still cast iron rather than crystal: the band is down 22%, the ring is opened out (that is the "clanky" half) and the strike has 5 ms of rise instead of an edge. **Same loudness as before, to 0.02 dB** | is "slightly" the right size, or does it want more? |
+| B4 | **Nullstone** `hush 0.75/25` | **Nullstone** → **Roll** | **unchanged — you said this one is good.** Here only as the reference for what "good" sounds like beside the three that moved | *(skip unless a comparison wants it)* |
+| B5 | **Hollow Bole** `thud 0.5/35` | **Moonrise Glade** → **Roll** | **unchanged — you said this one is good.** | *(same)* |
 
 *B5 moves two things at once (tower **and** venue) and there is no way around
-it: Hollow Bole cannot stand in the grounded room. Judge it against B2, which
-is the nearest body, and remember there is moss under it now.*
+it: Hollow Bole cannot stand in the grounded room.*
 
-### C. The venue's dice and its ground — you are already there
+**The one new risk in section B, named rather than discovered.** After the
+swap, Heartwood (`thud 0.7`) and Hollow Bole (`thud 0.5`) are the closest pair
+in the palette — same body, one weight step apart, combs 1.5 ms apart. That is
+honest (a solid plank box and a hollow trunk really are neighbours) but it has
+never been A/B'd. **If they read as the same tower, B5 is the one that stays
+and Heartwood is the one that moves** — B5 has a verdict on it and Heartwood
+does not.
+
+#### C. The venue's dice and its ground — you are already there
 
 Stay in **Moonrise Glade** from B5. Every roll is now Witchlight on moss.
 
-| # | Voice | The two clicks | Listen for |
-|---|---|---|---|
-| C1 | **Witchlight** `chime 0.22/65` | *(a row)* → **Roll** | "a long faint cold ring — glass struck in another room". Check it is not competing with the tower knocks it arrives after |
-| C2 | **Moonrise ground** ×0.72 / ×0.85 / ×0.90 | *(a row ×8)* → **Roll** | the same die landing in moss: dull, short, absorbed. Judge the **settle tail** hardest — five taps in ~145 ms is where a floor either sounds soft or sounds broken — then the grind as the pile rolls out |
-| C3 | **Foxfire ground** ×0.66 / ×0.78 / ×0.85 | **Foxfire Hollow** → **Roll** | the same again, deader. **If C2 and C3 are indistinguishable the two rows should collapse into one** |
+**These three rows are one body.** C1 is the Witchlight `chime`; C2 and C3 are
+that same chime with each venue's ground over it. It has moved a long way — the
+band is down 46%, the sine partial welded to its front is down with it, and it
+has 7 ms of attack where it used to start at full gain on its first sample.
 
-**The single control that answers most of this** is
-`VENUE_AUDIO[venue].ground.centre` in `js/main.js`. It moves the impacts, the
-whole settle tail, the rolling surface band and the tilt curve *together*, by
-design — so one number per venue is the first thing to turn, and everything
-else in §2.5 is a detail beside it.
+| # | Voice | The two clicks | Listen for | asked |
+|---|---|---|---|---|
+| C1 | **Witchlight** `chime 0.22/65` | *(a row)* → **Roll** | "a long faint cold ring — glass struck in another room", now an octave and a half of it lower. It should still be the **one bright element** on the table (§1) and no longer a whistle | is "far less sharp" far enough, or too far? |
+| C2 | **Moonrise ground** ×0.72 / ×0.85 / ×0.90 | *(a row ×8)* → **Roll** | the same die landing in moss: dull, short, absorbed — and now with **most of its energy under the wood/metal line**. Judge the **settle tail** hardest — five taps in ~145 ms is where a floor either sounds soft or sounds broken — then the grind as the pile rolls out | — |
+| C3 | **Foxfire ground** ×0.66 / ×0.78 / ×0.85 | **Foxfire Hollow** → **Roll** | the same again, deader. **If C2 and C3 are indistinguishable the two rows should collapse into one** — still open, and the 2026-08-18 pass did not widen the gap between them | — |
+
+**The single control that answers most of section C** is
+`VENUE_AUDIO[venue].ground.centre` in `js/voices.js`. It moves the impacts,
+the whole settle tail, the rolling surface band and the tilt curve *together*,
+by design — so one number per venue is the first thing to turn, and everything
+else in §2.5 is a detail beside it. **The single control that answers most of
+section A** is `BED_SWELL`, then the two bed levels.
 
 **Deliberately not in this script:** the duck (§5) is unchanged and keeps its
 own dials, and the living layer has no voice at all — refusal 13 says why.
