@@ -7133,3 +7133,110 @@ finishes the transition (`getAnimations().forEach(a => a.finish())`) and prices
 the ring the eye gets — alpha and spread, both non-zero — which is TESTING.md
 P10's rule about gating the rendered quantity rather than the authored one,
 applied to a quantity nobody had noticed was authored.
+
+---
+
+### §7.59 — The flare, re-baked: a stump is widest where it meets the soil (2026-08-18, W3 round 10)
+
+*Joe, on §7.56's after-shot: the root flare "is still the lightest structure
+near the ground" — and the round's question, is that its brightness or its
+shape, was answered by him and by the reviewer independently and the same way.
+**It is the shape.** So this round is a BAKE, not a paint pass; rounds 4, 6 and
+9 all went to the object's colour or to props beside it, and this one was
+forbidden to.*
+
+#### ① What a player sees
+
+The Hollow Bole's foot no longer ends in a rolled hem. Where the base used to
+swell outward about three quarters of a unit ABOVE the felt and then curve back
+under itself to a smooth stepped lip on the soil, the wood now stands widest
+where it touches the ground and goes up from there. The six buttress roots
+leave the trunk at six different heights instead of all together, the two that
+flank the doorway run unbroken from the soil to the wound's lower corner, and
+the shallow bays between them are cut to the ground rather than to a level
+ring. Nothing about the mouth, the doorway, the crown or the way dice fall
+through it changed: the portals are the same four numbers and the film is a
+function of the portal spec and the seed.
+
+#### ② Why it was a bell, in geometry
+
+Three separable products built the flare, and all three shared one envelope in
+y. `flare(y)` — the buttress web — carried a `smoothstep(y, 0.05, 0.62)`
+shoulder that held it OFF the soil, honestly earned in round 2 (the web and the
+foot both at full strength on the felt summed past the mat wall and the socket
+clamp planed the pair into a machined face). `toe_h(y)` put every foot's zero
+at 0.92. `finger_h(y)` put every finger's at 0.53. And the sill apron was a
+LENS in y — rising over 0.35–0.85, falling over 0.60–1.55 — so its maximum sat
+in mid-air at |φ| 0.90 either side of the door.
+
+Measured on the bake that collected the verdict, at the resting eye's own arc:
+
+| | round 9 | this build |
+| --- | --- | --- |
+| headings whose widest wood is above the soil | 38 of 72 | 0 |
+| …of the headings that have a flare at all | **13 of 13** | **0 of 10** |
+| tuck under the maximum at ±50° | 0.44 | — |
+| knee spread (p90−p10 of where the roots turn in) | 0.20 | 0.60 |
+
+**Every heading round 9 had a flare on was a bell.** A form whose greatest
+girth is above its hem with the material curving under is a skirt in any
+material, and no albedo argues with it.
+
+#### ③ Why the shelf is lit, and why that is a normal rather than a colour
+
+The glade's key is a spotlight twenty-two units straight overhead. A
+near-horizontal surface takes it at full N·L; the trunk's vertical wall takes
+it at a graze. §7.56 wrote that sentence down and then fought it with a
+multiply. It is geometry: the flare was the most horizontal thing on a stump,
+so it was the brightest wood on the model at the one height a stump should be
+darkest.
+
+Removing it entirely is not available and the arithmetic says so: a root that
+reaches 0.7 out of the trunk has to turn back in over some run, and a run long
+enough not to face up is a cone — the shape being escaped. What IS available is
+refusing the RING, which is what the shoulder ladder buys.
+
+#### ④ Three statistics that turned out to be floors
+
+VENUE-COMPOSITION rule 15(a) — a gate the rejected thing also passes is a
+floor, not evidence — cost three drafts here, and all three are recorded beside
+the constants because the next person will reach for the same ones:
+
+| statistic | round 9 | this build | verdict |
+| --- | --- | --- | --- |
+| up-facing share of the base band | 16.7% | 13.2% | 1.26×, threshold would be hand-placed |
+| longest up-facing run at one height | 4 cols | 6 cols | measures the same |
+| share of up-facing rows in the busiest 0.30 | 52% | 52% | identical |
+
+So `assert_the_flare_is_not_a_skirt` gates two claims and PRINTS the third as a
+declared floor. What changed between the two bakes is not how much wood faces
+the sky — it is where the wood's maximum is and whether the roots end together.
+
+#### ⑤ THE HONEST PART: the ruffle is still in the frame, and it is not the roots
+
+**The pale ruffled band at the foot is still there, and this round did not
+remove it.** That has to be said plainly, because the gates above are all
+green and a reader could take them for the answer.
+
+What the round established, by elimination in the app's own room
+(`tools/steps/flare-probe.mjs`): it is painted by `towerSkinBoleShell` and by
+nothing else — hiding the shell removes it completely, and hiding the dressing,
+the shelves, the curtain and the contact ring each leaves it untouched. So it
+is the baked model. But three separate changes to the model's outer radius
+field — the root envelopes and their shoulder ladder, the bay ceiling, and the
+base band's grain frequency — each moved the field measurably and **none of
+them moved those pleats at all**. A surface pinned to the wound's own boundary
+that ignores every change to the outer field is most likely the wound's LOWER
+CUT FACE: radial by construction (`radial_window` extrudes the loop radially,
+so the cut at a constant-y boundary is a level annulus), pale by design (round
+1's "punky rot in the fringe, pale exposed fiber ON it"), and lit at full N·L
+by the same overhead key. That is a hypothesis with three null results behind
+it, not a measurement.
+
+The instrument this round wanted and did not have is a **paint bisect**: one
+diagnostic bake with each surface class — outer wall, wound cut face, liner —
+at a flat separable colour, shot once at the resting eye. Ten minutes, and it
+replaces three bakes of guessing. The next round on this model should do that
+first and change no geometry until it has.
+
+Frames: `shots/flare-{before,after}-{moonrise,foxfire}-resting.png`.

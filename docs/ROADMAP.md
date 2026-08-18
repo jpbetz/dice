@@ -1706,6 +1706,53 @@ z-fighting the glade ground at 0.02 and buried under the clearing detail at
 0.035. `DECALS_DEFAULT_ENABLED` is false, so nothing ships broken; anyone
 turning them back on inherits the same floor problem.)*
 
+### W3 round 10. The flare is re-baked — SHIPPED 2026-08-18, **LOOK OPEN, and read ⑤ first**
+
+Joe on round 9's frame: the flare "is still the lightest structure near the
+ground", and the next lever is **the shape, not the paint**. He and the reviewer
+answered that independently and the same way, so this round was a BAKE and was
+forbidden to touch a colour.
+
+**It was a bell, and that is arithmetic rather than taste.** Three separable
+terms shared one envelope in y — a buttress web held OFF the soil by round 2's
+shoulder, one foot envelope for all six roots, one finger envelope for all
+seven, and a sill apron that was a lens with its maximum in mid-air. Measured
+at the resting eye's arc:
+
+| gate (`assert_the_flare_is_not_a_skirt`, on the built mesh) | round 9 | shipped |
+| --- | --- | --- |
+| headings widest ABOVE the soil, of those with a flare | **13 of 13** | **0 of 10** |
+| tuck under the maximum at ±50° | 0.44 | — |
+| knee spread (p90−p10 of where the roots turn in) | 0.20 | 0.60 |
+
+The re-bake: one `grip` per root split between web and foot (so neither has to
+be staggered in height to stay inside the mat wall), a per-root shoulder ladder
+0.38…1.42 with the two front diagonals carrying the wood the deleted sill apron
+used to, per-finger shoulders, and bays that close at their own neighbours'
+heights instead of at one. **Portals bit-identical** (in 0/9.40/−2.55/2.20, out
+0/1.00/4.20/3.50), throat 25/25, approach 25/25, occlusion 99/99 cowl and shaft
+at all six eyes, sill holes 0/2304, lane clad 0/162 and 0/81, 7258 tris.
+`rooted` unchanged in both venues (moonrise G1 0.733 / G2 141 / G3 22.2;
+foxfire 0.766 / 138 / 19.2).
+
+**⑤ THE RUFFLE IS STILL IN THE FRAME.** The gates are green and they are not
+the answer. Hiding groups one at a time at the resting eye
+(`tools/steps/flare-probe.mjs`) proves the band is `towerSkinBoleShell` and
+nothing else — but three separate changes to the shell's outer radius field
+(root envelopes, bay ceiling, base-band grain frequency) each moved the field
+measurably and **none moved those pleats**. Most likely the wound's own lower
+cut face: radial by construction, pale by design, level by construction. The
+instrument this round wanted is a **paint bisect** — one diagnostic bake with
+each surface class at a flat separable colour. Ten minutes, and it replaces
+three bakes of guessing. Next round does that before touching geometry.
+
+**OPEN, and it is Joe's:** `shots/flare-before-{moonrise,foxfire}-resting.png` →
+`shots/flare-after-{moonrise,foxfire}-resting.png`, the resting eye, four
+frames. The honest ask is narrow: *the foot no longer tucks under itself and
+the roots no longer end together — is the base a better shape, even though the
+pale band is still there?* If the answer is "the pale band IS the complaint",
+that is the paint bisect's round and this one bought the ground under it.
+
 ### W2c ledger — next tower round, not W2c
 
 The pale MACHINED FACE at the shell's x-clamp plane (x 3.13, y 0.70–0.85, z
