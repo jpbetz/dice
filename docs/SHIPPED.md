@@ -1659,6 +1659,85 @@ builder's ink slider pops the face outline one step off the round
 default — inherent to the coupled ink semantics; a split knob would
 betray the one-visual-system rule.
 
+**THE STANDARD EDGE — `round .090`. SHIPPED 2026-08-18** (`214f34d`,
+seam `e61c826`). Joe judged the three-way on the bench — `std` ↕
+`round .090` ↕ `round .130` — and took the soft candidate. This was the
+oldest open item in the roadmap; it had been "waiting on Joe" since
+2026-08-04 and the code half was one constant.
+
+*What ships is bit-identical to the bench row he judged.* `std`'s d6
+render mesh and `lab.round090`'s d6 render mesh hash the same
+(`f71d8c4d` over every position at 1e-6), which is the check that the
+app got the picture rather than a near-miss of it. Reproduce:
+`__labRows` on `lab.html`, FNV-1a over `attributes.position.array`.
+
+*The blast radius, measured not assumed.* 9 of 30 lab rows changed:
+`std`, the shroud (it must — the reveal path swaps geometry, so a
+shrouded die would change SHAPE on reveal), and the eight Classics,
+which are the standard die in another colour and are the only sets
+naming no edge. All 21 themed rows are byte-identical; every one of
+them states its own `bevel`.
+
+*Why a `std` recipe did not simply gain a field.* There was no `std`
+recipe: `bevel` fell back to a module constant and `profile` fell back
+to `'cut'`, INDEPENDENTLY. Flipping the profile default would have
+re-cut boltglass, blackanvil, focuscrystal, voidgrain and oxblood, all
+of which state a bevel and mean a flat facet by saying nothing. So the
+standard edge became one frozen unit (`STD_EDGE`, `js/dice.js`) applied
+only where a recipe names NEITHER field, resolved ONCE in `buildDie` so
+the geometry builder, `applyGeoCharacter`, the painted face outline and
+the band's `edgeDark` all read the same object. Resolving it at the
+geometry call alone shipped the .090 fillet under the CUT band's ink
+(.25 instead of .12) — the right shape wearing a darker seam than the
+bench Joe judged it on. That was caught by reading `edgeDark`, not by
+a test; nothing asserts band ink against profile.
+
+*The film did not move, and it is proven.* `tools/steps/edge-film.mjs`
+(new) digests the CANNON hull per die type and the whole keyframe array
+of 15 seeded throws at 9 dp — 1d20, 8d6, 20d6, a mixed seven, and
+40d20 at the pool cap. Before and after: collider `4d6b5640`, RUN
+DIGEST `17dae9ba`. It answers a question `perf-determinism` cannot:
+that one client agrees with a build from before the change, which is
+what a room spanning two deploys needs.
+
+*The price*, `node tools/drive.mjs tools/steps/edge-price.mjs 40 d20`
+(new step; reads `__diceDebug.dieGeoStats`, new hook):
+
+| | cut .055 | round .090 |
+|---|---|---|
+| render verts, 7 types | 1476 | 5040 (3.4×) |
+| dice triangles, 40× d20 | 9280 | 30400 (3.3×) |
+| dice **draw calls**, 40× d20 | 1680 | **1680** |
+| frame median, 40× d20 | ~450 ms | ~555 ms (1.23×) |
+| frame median, 40× d6 | ~350 ms | ~350 ms |
+
+Draw calls are the thing this repo actually budgets (`scene-draw-budget`
+asserts `calls <= 220`) and a vertex count cannot move them — a die is
+one mesh in `faces+1` material groups either way. The frame medians are
+headless SwiftShader at 1600×1000 (3 runs a side), which is
+triangle-bound in a way no player's GPU is; 40× d6 cannot tell the
+difference even there. `segments: 2` is the documented lever if a field
+report ever names the cost: 3480 verts, 69%, measured.
+
+*Two facts the fillet-tier notes above got slightly wrong, corrected by
+measurement.* `canonicalDiePose` — cited twice as the thing the resting
+plane protects — was DELETED by C25; the surviving guarantee is that
+the mesh stays inside the physics hull, which `edge-price.mjs` now
+prints as a pass/fail per type. And the mesh's lowest point is NOT
+recipe-invariant: it moves on six of seven types by ≤ 0.0037 world
+units, because a fillet bulges back toward the sharp edge and so sits
+NEARER the hull than a chamfer's chord. Only the d6 is exactly still,
+because a cube's local frame puts a face down and no bevel can move a
+face plane.
+
+*In the room, not on the bench.* `tools/steps/edge-look.mjs` (new)
+shoots the same seed at three cells — close/4 mixed, medium/the Soul
+Deal trio, wide/40 — as a whole frame and a 4× crop centred on the die
+nearest the mat's middle. Run it either side of a change with two
+prefixes; `tools/out/{cut055,round090}-hero-crop.png` is the pair that
+shows what §9c did. The dice are at identical poses in both, which is
+the render-only claim visible rather than argued.
+
 ---
 
 ## Later landings (terse index)

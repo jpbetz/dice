@@ -6940,3 +6940,94 @@ tomorrow: the held roll stays sweepable-unread, exactly as §7.52 ⑤ describes,
 and anything reporting *that* as a defect is still answered by IDENTITY §7's
 paragraph. The minute is sized to the accident (a cold boot, a crashed tab, a
 closed lid), not to durability the design deliberately does not offer.
+
+### §7.54 — The standard edge (2026-08-18)
+
+*ROADMAP §9c's edge question, closed. Joe judged `std` ↕ `round .090` ↕
+`round .130` on the lab bench and took the soft candidate; the standard dice
+wear `{ bevel: 0.09, profile: 'round' }`. RENDER ONLY — the physics hull, the
+face values and the read logic are the same objects they were, and the film is
+byte-identical (proof below).*
+
+#### ① What "the standard dice" means, which is more sets than it sounds
+
+`STD_EDGE` in `js/dice.js` is applied to any recipe that names **neither**
+`bevel` nor `profile`. That is three groups, and the third is the one worth
+saying out loud:
+
+| Wearer | Why it wears the standard edge |
+| --- | --- |
+| the `std` variant | it IS the standard die |
+| the `shroud` skin | it must. Reveal swaps geometry in place (`js/main.js` reveal path), so a shrouded die on a different edge would change SHAPE at the moment it turns over |
+| the eight **Classics** (ivory, ivory-pips, onyx, slate, crimson, cobalt, emerald, brass) | they are the standard die in another colour — "the civilian house, the control against which every themed set reads as a theme" |
+
+Every themed set states its own `bevel` and is untouched. Measured, not
+assumed: 9 of 30 lab rows changed, 21 byte-identical.
+
+**The edge is a UNIT, and that is the mechanism's one new rule.** `bevel` and
+`profile` used to default independently, which is invisible while the standard
+edge is a cut and wrong the moment it is not: a set that writes `bevel: 0.02`
+and nothing else means a lapidary CUT, and a flipped `profile` default would
+have silently rounded five themed sets. So a recipe either states its edge and
+keeps the old per-field fallbacks, or states nothing and gets the standard one
+whole.
+
+#### ② The trap in wiring it, which nothing tests
+
+`geo` is read in four places — the geometry builder, `applyGeoCharacter`, the
+painted face outline (`def.geo.ink`), and the band material's `edgeDark`. The
+band's ink default *rides the profile*: `.25` for a cut, `.12` for a round,
+because a worn edge is frosted rather than inked. Resolve the standard edge at
+the geometry call alone and the die comes out the right SHAPE wearing the
+wrong SEAM — a .090 fillet under a cut's dark band, which is not the picture
+that was judged. It is resolved once, in `buildDie`, and every reader sees the
+same object. No assertion covers band ink against profile; this paragraph is
+the guard.
+
+#### ③ What it costs, and what it provably does not
+
+`node tools/drive.mjs tools/steps/edge-price.mjs 40 d20`
+
+| | cut .055 | round .090 |
+| --- | --- | --- |
+| render verts over the 7 types | 1476 | 5040 (3.4×) |
+| dice triangles, 40× d20 | 9280 | 30400 (3.3×) |
+| dice **draw calls**, 40× d20 | 1680 | **1680** |
+| frame median, 40× d20 | ~450 ms | ~555 ms |
+| frame median, 40× d6 | ~350 ms | ~350 ms |
+
+Draw calls are what this repo budgets (`scene-draw-budget`: `calls <= 220`)
+and a vertex count cannot move them — a die is one mesh in `faces+1` material
+groups either way. The frame medians are headless SwiftShader at 1600×1000,
+three runs a side: software rasterisation is triangle-bound in a way no
+player's GPU is, so that 1.23× on the worst pool that exists is the *most*
+pessimistic reading available, and 40× d6 cannot tell the difference even
+there. If a field report ever names the cost, `segments: 2` is the lever —
+3480 verts, 69%, measured.
+
+#### ④ The film, and the invariant that is actually load-bearing
+
+`node tools/drive.mjs tools/steps/edge-film.mjs` — the CANNON hull per type
+plus every keyframe of 15 seeded throws at 9 dp (1d20, 8d6, 20d6, a mixed
+seven, 40d20 at the cap). Before and after: collider `4d6b5640`, RUN DIGEST
+`17dae9ba`. Unchanged, as it must be: `createDieBody` builds from the base
+polyhedron and has never seen the beveled twin.
+
+The invariant to hold going into Tier 3 is **the mesh stays inside the physics
+hull** (`edge-price.mjs` prints it per type), *not* "the resting plane never
+moves". The mesh's lowest point does move — six of seven types, by ≤ 0.0037
+world units — because a fillet bulges back toward the sharp edge and so sits
+nearer the hull than a chamfer's chord. The d6 alone is exactly still, because
+a cube's local frame puts a face down. Two older notes read the other way and
+also cite `canonicalDiePose`, which C25 deleted.
+
+#### ⑤ Judging the next one
+
+The bench is a die on a grey field under canned light; the product is dice on
+felt at the zoom a player sits at, with the post stack running. Those are
+different pictures. `tools/steps/edge-look.mjs <prefix>` shoots the second one
+— close/4 mixed, medium/the Soul Deal trio, wide/40 — whole frame plus a 4×
+crop on the die nearest the mat's centre, at a fixed seed so a before/after
+pair is the same throw. `tools/out/{cut055,round090}-hero-crop.png` is that
+pair for this change, and the dice sit at identical poses in both, which makes
+"render only" something you can see rather than something you are told.

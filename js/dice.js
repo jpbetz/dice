@@ -615,9 +615,36 @@ function makeFaceBundle(def, face, spec, seed) {
 // fans stitch the gaps under one unmapped edge material (index
 // faces.length) whose darker tone reads as the painted face outline moving
 // onto real geometry. Resting height is untouched: the bottom face's inset
-// ring stays in the bottom face's plane (canonicalDiePose reads this mesh).
+// ring stays in the bottom face's plane, so the mesh's lowest point is the
+// base solid's bottom face whatever the recipe (asserted: minY is identical
+// across every bench row).
 const BEVEL = 0.055; // inset share of each corner's distance to its face centroid
 
+// THE STANDARD EDGE — what a die wears when its recipe says nothing about
+// its edge (ROADMAP §9c). It is a UNIT, not two independent defaults: a
+// recipe that names `bevel` or `profile` is stating its own edge and keeps
+// the per-field fallbacks below (BEVEL, 'cut'), which is why `bevel: 0.02`
+// still means a lapidary CUT and not a 0.02 fillet. Wearers: the `std`
+// variant, the shroud, and the whole CLASSICS house — the sets that are the
+// standard die in another colour. Everything else names its own.
+// Joe chose it on the lab bench 2026-08-18 from `std` ↕ `round .090` ↕
+// `round .130` — the soft candidate, neither the sharp cut that shipped for
+// a year nor the recipe ceiling. It is exactly the bench's `lab.round090`:
+// bevel .09, profile round, everything else default (3 arc strips per edge,
+// band ink .12 because a worn edge is frosted rather than inked). The d6's
+// mesh comes out BIT-IDENTICAL to that bench row, which is the check.
+//
+// It costs 3.4× the render vertices of the cut it replaces (1476 → 5040 over
+// the seven types) and ZERO draw calls — a die is one mesh in `faces+1`
+// material groups either way, so the frame's shipped budget (`scene-draw-budget`
+// asserts calls ≤ 220) does not move. Priced at the pool cap with
+// `node tools/drive.mjs tools/steps/edge-price.mjs 40 d20`. If a field report
+// ever names the cost, `segments: 2` is the lever: 3480 verts, ~69%, measured.
+const STD_EDGE = Object.freeze({ bevel: 0.09, profile: 'round' });
+function withStandardEdge(geo) {
+  if (geo && (geo.bevel != null || geo.profile != null)) return geo;
+  return geo ? { ...geo, ...STD_EDGE } : STD_EDGE;
+}
 // Level 3.5 (docs/THEMES.md): GEOMETRY IDENTITY. A set may reshape the
 // die the player SEES — edge width and profile, tumbled wear, chips,
 // pillowed faces — while the physics hull, face values and read logic
@@ -1028,9 +1055,16 @@ function buildDie(type, variant = 'std') {
   // looking implemented.)
   // A set may omit body/text to inherit the std per-type colors (the lab's
   // GEO BENCH judges edge recipes on otherwise-standard dice).
-  const skin = shroud ? { ...def, color: SHROUD_COLOR }
+  const raw = shroud ? { ...def, color: SHROUD_COLOR }
     : theme ? { ...def, ...theme, color: theme.body ?? def.color, text: theme.text ?? def.text }
     : def;
+  // THE STANDARD EDGE IS RESOLVED ONCE, HERE, and the resolved recipe is what
+  // every downstream reader sees — the geometry builder, applyGeoCharacter,
+  // materialFor's painted outline (`def.geo.ink`) and the band material's
+  // `edgeDark`. Resolving it at the geometry call alone would have shipped the
+  // .090 fillet under the CUT band's ink (.25 instead of .12): the same shape
+  // Joe judged, wearing a darker seam than the bench he judged it on.
+  const skin = { ...raw, geo: withStandardEdge(raw.geo) };
   // The BASE polyhedron drives faces, values and the physics hull; the mesh
   // the player sees is its beveled twin (render only — see buildBeveledGeometry).
   // A set's `geo` recipe reshapes ONLY that twin (Level 3.5): edge width,
@@ -1100,7 +1134,10 @@ function buildDie(type, variant = 'std') {
   }));
 
   const shape = buildShape(faces);
-  return { type, def, geometry, materials, shape, faces, vertexValues };
+  // `geo` is the RESOLVED recipe (standard edge folded in), so a probe can
+  // assert what this die actually wears instead of re-deriving it from a
+  // vertex count — see __diceDebug.dieGeoStats.
+  return { type, def, geo: skin.geo, geometry, materials, shape, faces, vertexValues };
 }
 
 function materialFor(def, face, spec, shroud = false, seed = 1) {

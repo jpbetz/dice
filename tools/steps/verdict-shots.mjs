@@ -21,15 +21,14 @@ limitations under the License.
 //
 //   crop    C27 — does a cropped felt still read as a table? The SAME seeded
 //           throw shot twice, `setFraming({preferDice:true})` off and on, at a
-//           390px phone and a 1600px desktop, for 3d6 / 6d6 / 40d6.
-//           **ANSWERED: "turn preferDice on" (Joe, 2026-08-18)**, so `-off` is
-//           now the counterfactual and `-on` is what a player sees. Kept
-//           runnable because it is the record of what the call was made on —
-//           and note that `v-crop-desktop-3d6-on.png`, the frame the answer
-//           came back against, is a QUARTER-TURNED desktop.
-//   bench   9c — `std` ↕ `round .090` ↕ `round .130` on the lab bench, the
-//           three rows at the SAME hero distance so the edge treatment is the
-//           only thing that differs. The oldest open item in the project.
+//           390px phone and a 1600px desktop, for 3d6 / 6d6 / 40d6. The
+//           option is inert as shipped; this is the picture of what turning
+//           it on would buy and what it would cost.
+//   bench   `std` ↕ `round .090` ↕ `round .130` on the lab bench, the three
+//           rows at the SAME hero distance so the edge treatment is the only
+//           thing that differs. Its CALL is answered (§9c chose round .090 on
+//           2026-08-18 and it shipped), so this shoots no open question today;
+//           it is kept for §9c Tier 3, which asks the next one.
 //   set     W4 — the Moonmoot Witchlight set as ART: the lab's row and hero
 //           views under the felt lamp and in the dark, where a carved-and-lit
 //           digit either blooms or does nothing. The frames of it IN the
@@ -164,9 +163,16 @@ async function shootCrop(stage, t) {
 // 9c — the std recipe on the lab bench
 // ---------------------------------------------------------------------------
 
+// THE CALL THIS RIG WAS BUILT FOR IS ANSWERED (2026-08-18: `round .090`,
+// shipped — SHIPPED §9c "the standard edge"). The rig is kept because §9c
+// Tier 3 asks the next question about the same surface, and because a
+// three-way at one hero distance is how an edge gets decided here. What is
+// SHIPPED is now `std` and `lab.round090` BOTH — their d6 meshes are
+// bit-identical, so the two rows are a self-check on the rig: if those two
+// frames ever differ, the bench and the app have come apart.
 const BENCH_ROWS = [
-  { id: 'std', label: 'std — the sharp cut (shipped)' },
-  { id: 'lab.round090', label: 'round .090 — the soft candidate' },
+  { id: 'std', label: 'std — the shipped edge (round .090 since 2026-08-18)' },
+  { id: 'lab.round090', label: 'round .090 — the bench row std is built from' },
   { id: 'lab.round130', label: 'round .130 — the recipe ceiling' },
 ];
 
