@@ -5237,7 +5237,10 @@ own claims is the more valuable half**, and is collected at the end.*
   shipped as an **instrument, not a default** — every gain costs cropping the
   felt where it currently fits, which is the mirror of the crop C27 already
   priced and declined. `setFraming({preferDice:true})` is inert until Joe says
-  otherwise.
+  otherwise. ***He said otherwise on 2026-08-18 and it now SHIPS ON — see "C27
+  — the camera frames the DICE" below. This paragraph is the state on
+  2026-08-15 and is left as written; the two reasons it gives for holding back
+  were both measured false.***
 
 - **§3 resync + C22 — the version stamp** (ORDER #13, #10). Resync needed **no
   new wire field**: an entry with neither `collected` nor `cleared` is on the
