@@ -17,8 +17,16 @@ limitations under the License.
 // THE RESTING EYE (Joe, 2026-08-11): with a tower socketed and the felt
 // empty, the camera rests on the tower — so the next pour starts already
 // framed. Four transitions, each asserted from framingInfo():
-//   socket on empty felt → tower · dice settle → ladder ('mat') ·
-//   clear → tower again · unsocket → ladder ('mat', the first law).
+//   socket on empty felt → tower · dice settle → THE LADDER, whichever rung
+//   it picks · clear → tower again · unsocket → the ladder again (first law).
+//
+// The middle leg deliberately asserts `mode !== 'tower'` rather than a rung,
+// and since C27 shipped `preferDice` ON (2026-08-18) that matters: three dice
+// on the felt now come back `dice`, not `mat`, and a step that had pinned the
+// rung would have reddened for a reason with nothing to do with towers.
+// Measured on heartwood after the flip: `tower → dice → tower → mat-overflow`,
+// CLEAN. The three empty-felt legs cannot be touched by C27 at all — with no
+// dice, `diceFramingPoints()` is null and the dice rung is unreachable.
 //
 // It takes a TOWER ID, like every other proof step, and defaults to
 // heartwood. It did not until the third tower was built: the skill says all

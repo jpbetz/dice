@@ -32,6 +32,16 @@ limitations under the License.
 //           the retreat was not needed at all.
 //
 //   node tools/drive.mjs tools/steps/frame-price.mjs
+//
+// TWO THINGS ABOVE ARE OUT OF DATE SINCE `preferDice` SHIPPED ON (2026-08-18),
+// and they are corrected rather than deleted because three cells of this grid
+// were once quoted as `preferDice` numbers and cost two days. (1) ORBIT is no
+// longer gated on cropping alone: with the mat conceded the tie-break is
+// completeness THEN SIZE, and desktop 3d6 turns on 2 of 5 seeds. (2) the
+// `shipped` column below now reads the DICE-PREFERRING frame, because that is
+// what ships. **Every cell of this grid is still UNGATED** — it says what rung 2
+// would give if nothing judged it, which is not what any player sees. For a
+// number somebody will quote, run `frame-residual.mjs`.
 
 const VIEWPORTS = [
   { name: 'phone 390', w: 390, h: 844, mini: true },

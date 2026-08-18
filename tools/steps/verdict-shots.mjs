@@ -21,9 +21,12 @@ limitations under the License.
 //
 //   crop    C27 — does a cropped felt still read as a table? The SAME seeded
 //           throw shot twice, `setFraming({preferDice:true})` off and on, at a
-//           390px phone and a 1600px desktop, for 3d6 / 6d6 / 40d6. The
-//           option is inert as shipped; this is the picture of what turning
-//           it on would buy and what it would cost.
+//           390px phone and a 1600px desktop, for 3d6 / 6d6 / 40d6.
+//           **ANSWERED: "turn preferDice on" (Joe, 2026-08-18)**, so `-off` is
+//           now the counterfactual and `-on` is what a player sees. Kept
+//           runnable because it is the record of what the call was made on —
+//           and note that `v-crop-desktop-3d6-on.png`, the frame the answer
+//           came back against, is a QUARTER-TURNED desktop.
 //   bench   9c — `std` ↕ `round .090` ↕ `round .130` on the lab bench, the
 //           three rows at the SAME hero distance so the edge treatment is the
 //           only thing that differs. The oldest open item in the project.
@@ -136,7 +139,10 @@ async function shootCrop(stage, t) {
       const on = await t.dbg('framingInfo()');
       await t.eval('window.__diceDebug.tick(0, true, false)');
       await stage.shot(t, join(SHOTS, `v-crop-${vp.id}-${pool.id}-on.png`));
-      await t.dbg('setFraming({preferDice: false, floor: 1})');
+      // Back to what SHIPS, which since 2026-08-18 is `on` — a leg that left
+      // the tab on the counterfactual would hand the next pool a camera the
+      // app does not use.
+      await t.dbg('setFraming({preferDice: true, floor: 1})');
 
       rows.push({
         view: vp.id, viewLabel: vp.label, pool: pool.id,

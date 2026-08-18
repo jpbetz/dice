@@ -11976,11 +11976,14 @@ window.__diceDebug = {
   // which is what shipped before 2026-08-10. The scenario measures BOTH sides
   // through this, so "cropping bought size" is a number rather than a claim.
   setFramingLadder(on) { framingLadder = !!on; applyCameraFraming(false); return framingLadder; },
-  // C27's residual, as a switch rather than a default — see FRAMING. Inert as
-  // shipped; `{preferDice: true}` lets rung 2 run where rung 1 already
-  // succeeded, and `{floor: 0.55}` lets it come closer than the preset. Both
-  // are per-viewer like the rest of the ladder, so flipping one shows nobody
-  // else anything. Re-frames immediately so a console flip is visible.
+  // C27's dials — see FRAMING. `preferDice` SHIPS ON (Joe, 2026-08-18), so this
+  // hook's job has inverted: it is now how a measurement turns the shipped
+  // framing OFF to read the other side of the same throw
+  // (`{preferDice: false, floor: 1}` is the pre-C27 frame). `{floor: 0.55}`
+  // lets the dice rung come closer than the preset and is still off — that dial
+  // was never asked about. Both are per-viewer like the rest of the ladder, so
+  // flipping one shows nobody else anything. Re-frames immediately so a console
+  // flip is visible.
   get framing() { return { ...FRAMING }; },
   setFraming(o) { Object.assign(FRAMING, o || {}); applyCameraFraming(false); return { ...FRAMING }; },
   // The portrait-roll probe. Radians; Math.PI/2 stands the mat up on screen.
@@ -23575,36 +23578,64 @@ function decidingOnScreen() {
 //
 // Returns the pose rather than moving the camera, so the caller can ease to it.
 //
-// RUNG 1 IS A TERMINATOR, NOT A COMPARISON, AND THAT IS C27'S RESIDUAL
-// (measured 2026-08-14, tools/steps/frame-price.mjs, one seed per pool, medium):
+// RUNG 1 IS NOT A TERMINATOR ANY MORE — that was C27's residual, and Joe
+// answered it "turn preferDice on" (2026-08-18). Rung 2 is now offered even
+// where rung 1 succeeded, and kept only when it is better by both measures the
+// ladder already trusts: it may lose no die, and it must beat rung 1 by `gain`.
 //
-//   viewport      pool   shipped   the dice rung, if it were allowed to run
-//   phone 390     3d6      85 px     85 px  (already at rung 2, and retreating)
-//   ipad-p 834    3d6     119 px    242 px
-//   desktop 1600  3d6     200 px    245 px  (350 px if the eye may approach)
-//   desktop 1600  40d6    200 px    184 px  (a big pool is WORSE off there)
+// THE NUMBERS GET A COMMAND, NOT A DATE. Every figure below is one row of
 //
-// The roll C27 says gained nothing gains nothing ON A PHONE, and the reason is
-// not the camera: three dice at rest span 3.9 x 3.0 of an 11 x 6.7 mat, and with
-// the AABB's margin the dice frame is 5.9 x 5.0 — three quarters of the mat's
-// DEPTH. Framing the dice IS framing the mat at that pool size, so the eye ends
-// up at 2.5x the preset either way, and an approach floor cannot help something
-// that is retreating. C24's premise — a compact settled cluster — is not what
-// three dice do on this mat.
+//   node tools/drive.mjs tools/steps/frame-residual.mjs [--verbose]
 //
-// The 2x IS there, on every device where the mat FITS, which is the one place
-// the ladder never descends. Taking it means a desktop crops the felt on every
-// small roll, which is a taste call and Joe's: C27 priced CONTAINING the mat and
-// declined; this is the mirror image and nobody has looked at it. So it is an
-// instrument, not a default. `preferDice` runs rung 2 even when rung 1 succeeded
-// and keeps it only if it shows every die and beats rung 1 by `gain`; `floor`
-// lets the dice rung's scan start below the preset (1 = the shipped promise that
-// the eye never comes closer). Inert at preferDice false — the block below does
-// not execute at all — so the shipped frame is bit-identical.
+// 6 pools x 3 widths x 5 seeds, `off` and `on` read from ONE settled throw so
+// the delta is the camera and provably nothing else. Re-run 2026-08-18 (medians,
+// spanPx; "fires" = how often the gain gate accepted rung 2):
 //
-//   __diceDebug.setFraming({preferDice: true})            // the +23%/+103% frame
-//   __diceDebug.setFraming({preferDice: true, floor: 0.55}) // and let it approach
-const FRAMING = { preferDice: false, floor: 1, gain: 1.15 };
+//   viewport      pool   off -> on          fires
+//   phone 390     3d6      73 -> 74          1/5   (the median phone gains ~0)
+//   ipad-p 834    1d20    119 -> 351         5/5   (2.95x — the win is HERE)
+//   ipad-p 834    3d6     119 -> 199         5/5
+//   ipad-p 834    6d6     119 -> 159         4/5
+//   desktop 1600  1d20    200 -> 246         4/5
+//   desktop 1600  3d6     200 -> 200[..253]  2/5
+//   desktop 1600  40d6    200 -> 200         0/5   (NOT a loss — see below)
+//
+// **"IT IS A LOSS AT 40d6" IS STRUCTURALLY IMPOSSIBLE, AND THE ARCHIVED −16 px
+// WAS A DIFFERENT INSTRUMENT.** The gate below returns rung 1's own span or a
+// span at least `gain` times it and nothing else, so the option cannot shrink
+// the frame it exists to grow. That is the whole carve-out the big pools need,
+// it is self-tuning, and it needs no die-count constant. The `184 px` that used
+// to sit here is `framingProbe()`'s UNGATED rung-2 scan — what rung 2 would give
+// if nothing judged it — which was never on offer. Over 90 paired throws:
+// **0 shrank, 0 lost a die, 30 fired.**
+//
+// WHAT IT COSTS, and what it does NOT. Where rung 2 is kept, `matFits` goes
+// false: the PLAYABLE MAT's four corners leave the view. That is the whole
+// cost, and it is smaller than it sounds — the floor is a 160x160 plane, so the
+// viewport was already 100% table surface before the crop and still is after.
+// Nothing empty comes into frame; there is just less mat and more die. **Do not
+// build a "does the felt fill the frame" gate on top of that** — it is green
+// either way, for a reason unrelated to what it would claim. The trade Joe was
+// shown and approved is shots/v-crop-*.png (`tools/steps/verdict-shots.mjs
+// crop`); the tablet, where the win actually is, is `frame-look.mjs`.
+//
+// TWO OPTIONS WEAR THIS ONE NAME, and only the first is the block below. Where
+// the mat FITS (tablet, desktop) it runs rung 2 and crops the felt. Where the
+// mat has never fit (every phone) rung 2 is already running and the only thing
+// `preferDice` changes is computeFraming's ORBIT tie-break — which is why a
+// phone's median gains nothing here and 6 of its 30 throws still come back
+// quarter-turned. See computeFraming.
+//
+// `floor` lets the dice rung's scan start below the preset; it stays at 1 —
+// the shipped promise that the eye never comes closer than the zoom says — and
+// it is the one C27 dial nobody asked about. `setFraming` remains, and its job
+// has inverted:
+// it is now how a measurement turns the shipped framing OFF for an A/B read
+// (`frame-residual.mjs` reads both sides of one throw through it).
+//
+//   __diceDebug.setFraming({preferDice: false, floor: 1}) // the pre-C27 frame
+//   __diceDebug.setFraming({floor: 0.55})                 // and let it approach
+const FRAMING = { preferDice: true, floor: 1, gain: 1.15 };
 
 // HOW GOOD IS THE FRAME THE CAMERA IS IN RIGHT NOW — dice kept, and how big a
 // world unit lands in CSS px (roll-aware: a quarter turn maps world x onto the
@@ -23646,11 +23677,19 @@ function framingFor(orbit) {
       else mode = 'mat-overflow';
     }
   } else if (framingLadder && FRAMING.preferDice && mode === 'mat') {
-    // RUNG 1 SUCCEEDED — ask rung 2 anyway (the C27 instrument above). Kept
-    // only if it is better by BOTH of the measures the ladder already trusts:
-    // no die may leave the frame, and the dice must actually get bigger by a
-    // margin, or this trades the whole felt for noise. Restores rung 1's eye
-    // when it is refused, because fitCameraTo leaves the camera where it looked.
+    // RUNG 1 SUCCEEDED — ask rung 2 anyway (C27, shipped on). Kept only if it
+    // is better by BOTH of the measures the ladder already trusts: no die may
+    // leave the frame, and the dice must actually get bigger by a margin, or
+    // this trades the whole felt for noise. Restores rung 1's eye when it is
+    // refused, because fitCameraTo leaves the camera where it looked.
+    //
+    // **THESE TWO CONDITIONS ARE THE BIG-POOL CARVE-OUT, AND THEY NEED NO
+    // DIE COUNT.** A forty-die heap is nearly as wide as the mat, so framing it
+    // can only pull the eye BACK; `after.span >= before.span * gain` refuses
+    // that outright and the frame stays rung 1's. The rule is therefore
+    // self-tuning — it reads the cluster that is actually on the felt — and the
+    // archived "40d6 is a 200→184 loss" was `framingProbe()`'s UNGATED scan,
+    // which is the number this line exists to throw away.
     const held = camera.position.clone();
     const before = framingScore();
     const dice = diceFramingPoints();
@@ -23684,13 +23723,26 @@ function framingFor(orbit) {
 //
 // That single rule produces every behaviour the measurements argued for, with
 // no magic numbers and nothing to retune when the zoom ladder moves:
-//   · a desktop keeps landscape — the mat fits, all dice show, and landscape is
-//     the larger frame. Nothing below rung 1 ever runs there.
 //   · a lone d20 on a phone keeps landscape and its crop, because both
 //     orientations show the one die and landscape shows it at 189px to 74px.
 //   · 20d6 and 40d6 on a phone TURN, because landscape shows 19/20 and 32/40
 //     while portrait shows all of them. Completeness wins the tie-break it is
 //     supposed to win.
+//
+// **"A DESKTOP KEEPS LANDSCAPE AND NEVER EVEN COMPUTES THE SECOND CANDIDATE"
+// STOPPED BEING TRUE WHEN C27 SHIPPED ON**, and it is written here because
+// this is the third time in this file a sentence outlived the thing it
+// described. The trigger below is `!land.matFits`, and `preferDice` gives the
+// mat up ON PURPOSE to make the dice bigger — so on a desktop the second
+// candidate is now computed exactly when rung 2 fired, and it wins where
+// portrait frames the same dice larger. **Measured 2026-08-18, 5 seeds a cell,
+// `node tools/drive.mjs tools/steps/frame-residual.mjs --verbose`: 5 of 30
+// desktop throws and 5 of 30 tablet throws come back quarter-turned that did
+// not before — desktop at 1d20/3d6/12d6, tablet at 1d20/3d6/6d6, which in both
+// cases is exactly the set of pools where rung 2 fires at all.
+// Every one of them GREW the frame; none lost a die.** The frame Joe approved
+// (shots/v-crop-desktop-3d6-on.png, seed 7002) is one of the turned ones, so
+// the desktop turn is inside the call and not a side effect of it.
 // Turning the table is per-viewer: no shared state, no wire field, and nothing
 // another player can see (ruling ②). The MAT does not move — item 21 proposed
 // rotating the physics walls, which every client would have to agree to.
@@ -23705,22 +23757,37 @@ function computeFraming() {
   // dice a few are always piled above the mat plane and project out of frame
   // whichever way round the table sits. A tie-break that fine is noise.
   //
-  // So the table turns only when portrait changes the KIND of frame available:
-  //   · landscape cannot contain the mat (a desktop always can, so a desktop
-  //     never turns and never even computes the second candidate), AND
+  // So the OFF rule turns the table only when portrait changes the KIND of
+  // frame available:
+  //   · landscape cannot contain the mat, AND
   //   · portrait can, AND
   //   · landscape is actually dropping dice that portrait would show — which is
   //     what keeps a lone d20 in landscape at 212px instead of turning for a
   //     completeness it already had.
   //
-  // AND `matFits` STOPS BEING A USABLE PROXY UNDER preferDice. That instrument
+  // AND `matFits` STOPS BEING A USABLE PROXY UNDER preferDice. That option
   // deliberately gives up the mat to make the dice bigger, so the portrait
   // candidate can come back with matFits FALSE and be refused — which is how a
   // first run of it put 12d6 on a 390px phone into the DECIDING rung and showed
   // one die of twelve. The intent behind the proxy is "portrait changes the kind
   // of frame available"; with cropping already conceded, that intent is just
   // completeness, then size. Written as a branch rather than as a replacement so
-  // the shipped rule stays exactly the rule that was measured.
+  // the OFF rule stays exactly the rule that was measured.
+  //
+  // THE ONE HOLE, WRITTEN DOWN BECAUSE IT IS UNOBSERVED RATHER THAN CLOSED.
+  // `framingFor`'s rung-2 gate cannot shrink the frame — it returns rung 1's
+  // span or `gain`x it — but THIS comparison can, through its first disjunct: a
+  // portrait candidate showing one more die at a smaller span wins. That is the
+  // 40d6 trade the paragraph above calls noise, and it is reachable only when
+  // rung 1 was ALREADY dropping dice on a device where rung 2 then fires — i.e.
+  // a big pile that is nonetheless tight enough to gain 1.15x, which no cell of
+  // the grid produces (desktop 40d6's ungated rung 2 is 0.92x, so it never
+  // fires). Measured 2026-08-18 over 90 paired throws: **0 shrank, 0 lost a
+  // die.** Not fixed here, because every rule that closes it either re-breaks
+  // the 1-of-12 phone case above (completeness must be allowed to cost size
+  // when landscape has given up) or buys the distinction with a ratio constant.
+  // `framing-prefers-dice` asserts the invariant instead, so if the hole ever
+  // opens it opens loudly.
   if (framingLadder && !land.matFits) {
     const port = framingFor(Math.PI / 2);
     const better = FRAMING.preferDice

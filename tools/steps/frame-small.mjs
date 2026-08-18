@@ -81,15 +81,18 @@ export default async function run(stage, args = []) {
       await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
         { desc: `${vp.name} ${pool.label}`, timeout: 40000 });
       await a.dbg('sim(600)');
+      // `preferDice` SHIPS ON since 2026-08-18, so the `spanPx` column has to
+      // ask for the pre-C27 frame explicitly or it reads the same camera twice.
+      await a.dbg('setFraming({preferDice: false, floor: 1})');
       const f = await a.dbg('framingInfo()');
       const p = await a.dbg('framingProbe()');
-      // The same roll under the C27 instrument, so the option and the shipped
-      // frame are one table rather than two runs.
+      // The same roll under C27's two dials, so the options and the pre-C27
+      // frame are one table rather than three runs.
       await a.dbg('setFraming({preferDice: true})');
       const pref = await a.dbg('framingInfo()');
       await a.dbg('setFraming({preferDice: true, floor: 0.55})');
       const near = await a.dbg('framingInfo()');
-      await a.dbg('setFraming({preferDice: false, floor: 1})');
+      await a.dbg('setFraming({preferDice: true, floor: 1})');
       rows.push({
         view: vp.name,
         pool: pool.label,
@@ -122,6 +125,7 @@ export default async function run(stage, args = []) {
   console.log('');
   console.log('  scale > 1 is a RETREAT from the preset eye. A phone retreats at every pool');
   console.log('  above one die, so no approach floor can help it — the cluster is the mat.');
-  console.log('  preferDice/+approach are __diceDebug.setFraming, inert as shipped (C27).');
+  console.log('  spanPx is the PRE-C27 frame (preferDice off); `preferDice` is what SHIPS since');
+  console.log('  2026-08-18, and `+approach` (floor .55) is the dial that stayed off.');
   return rows;
 }
