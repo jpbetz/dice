@@ -506,51 +506,13 @@ const ITEMS = [
     ],
   },
 
-  {
-    n: 8,
-    id: '9c',
-    kind: 'CALL',
-    choices: ['keep std (the sharp cut)', 'round .090', 'round .130', 'not yet'],
-    title: '9c — which edge do the standard dice wear',
-    where: 'ROADMAP Tier 3 · 9c, "Waiting on Joe" — the oldest open item in the project',
-    unblocks: 'True fillets shipped; `std` is still the sharp cut because only you can pick. This is '
-      + 'the last thing standing between Tier 3’s dice art and a decision.',
-    question: 'Do the standard dice keep today’s sharp cut (bevel .055, profile cut), or move to '
-      + 'round .090, or to round .130?',
-    stakes: {
-      approve: 'The chosen recipe becomes `std` and every die in the app that is not a house set '
-        + 'changes shape. 9c’s "waiting on Joe" clears.',
-      decline: 'The item closes as a DECISION to keep the cut, rather than staying open as a wait.',
-    },
-    notes: [
-      { kind: 'plain', text: 'All three are framed at the same hero distance by the lab, so the edge '
-        + 'treatment is the only thing that differs. The constraint that bounds the answer: the digit '
-        + 'plane stays dead flat (legibility), so face bulge is subtle or shading-only.' },
-      { kind: 'plain', text: 'All fillet tiers are RENDER ONLY — the physics hull, the face values and '
-        + 'the read logic stay canonical whichever you pick.' },
-    ],
-    groups: [
-      { label: 'd20 — where a chamfer is widest and most visible', regen: REGEN_VERDICT, cols: 3,
-        frames: [
-          { file: 'v-9c-std-d20.png', cap: 'std — the sharp cut (shipped)', bench: 'std' },
-          { file: 'v-9c-lab.round090-d20.png', cap: 'round .090 — the soft candidate', bench: 'lab.round090' },
-          { file: 'v-9c-lab.round130-d20.png', cap: 'round .130 — the recipe ceiling', bench: 'lab.round130' },
-        ] },
-      { label: 'd6 — the die most rolls are made of', regen: REGEN_VERDICT, cols: 3,
-        frames: [
-          { file: 'v-9c-std-d6.png', cap: 'std' },
-          { file: 'v-9c-lab.round090-d6.png', cap: 'round .090' },
-          { file: 'v-9c-lab.round130-d6.png', cap: 'round .130' },
-        ] },
-      { label: 'The whole row of each, so the smaller dice are in the read too',
-        regen: REGEN_VERDICT, cols: 3,
-        frames: [
-          { file: 'v-9c-std-row.png', cap: 'std' },
-          { file: 'v-9c-lab.round090-row.png', cap: 'round .090' },
-          { file: 'v-9c-lab.round130-row.png', cap: 'round .130' },
-        ] },
-    ],
-  },
+  // 9c — WHICH EDGE DO THE STANDARD DICE WEAR — ANSWERED 2026-08-18: `round
+  // .090`, shipped the same day (SHIPPED §9c "the standard edge", UX §7.54).
+  // The CALL is deleted rather than marked done because this array is the
+  // sitting's queue: a decided question left in it costs Joe the one thing
+  // the page exists to save. Its three-way bench frames (`v-9c-*.png`,
+  // verdict-shots `bench`) are KEPT — §9c Tier 3 (tumbled resin) is the next
+  // question about the same surface and will want the same rig.
 ];
 
 // THE LISTENING SCRIPT IS NOT AUTHORED HERE — it is docs/AUDIO.md §9, and this
