@@ -1279,60 +1279,87 @@ const diceMat = new CANNON.Material('dice');
 const floorMat = new CANNON.Material('floor');
 const wallMat = new CANNON.Material('wall');
 
-// UNCHANGED, AND THAT IS A FINDING (2026-08-10). These are generic
-// bouncy-dice numbers with cannon's 0.01 default damping left in — i.e. none.
-// A felt tuning (grip 0.6, bounce 0.15, damping 0.1/0.14) was measured a
-// large win on settle time: Soul Deal -43%, 20d6 -1.63s, and 20-38% less
-// shake. It is not here, because it also PILES.
+// THE FELT TUNING, SHIPPED 2026-08-18 (ROADMAP C30). Grip and deaden
+// together, with the speed-gated damping below at gate 4. It sat out four
+// measured passes; what changed is not the measurement but the ruling on the
+// one gate it fails.
 //
-// On this mat, sliding apart is how dice separate. spawnDie lines the throw
-// up along one edge with `Math.min(TABLE_W - 4.4, count * 2.6)` of spread,
-// and at `medium` that clamp bites hard — TABLE_W is 8.6, so six dice start
-// 0.84 apart when the spacing wants 2.6. They were relying on bounce and
-// skid to fan out. Take that away and they stop where they land, on each
-// other: at `close`, 6d6 went from 17% of dice piled to 33%, and from 3
-// throws in 10 that piled nothing to 1. That is the C24 floor and goal 5
-// ("organized over realistic"), and `dice-land-flat` caught it — 3 failures
-// in 13 runs against 0 in 8 on the parent commit.
+// Measured against the numbers it replaces — floor .25/.35, dice .15/.45,
+// wall .05/.7, gate off — over 16 shake seeds and 40 pile seeds. That old
+// tuning is still reachable as the matrix's `classic` row, so the A/B below
+// can be re-run at any time and in either direction:
 //
-// So the settle work ships as NUDGE.cockedDot and the tail cut only, which
-// cost nothing here. Priced by tools/steps/pile.mjs and settle-paired.mjs —
-// and note that halving the damping did NOT halve the piling.
+//   node tools/drive.mjs tools/steps/settle-matrix.mjs 16 40 classic
 //
-// STILL UNCHANGED AFTER FOUR MEASURED PASSES, and the reasons have moved on
-// from "it needs a wider spawn". tools/steps/settle-matrix.mjs, which judges
-// shake, duration, caps, piling, creep and the clock together, 16 paired
-// seeds and a canary that refuses the run if the rig cannot reproduce a known
-// answer:
+//   shake  -30% to -43% on every pool, mean -35% over soul/4d6/8d6/20d6
+//   hops   -14% to -32% — the complaint stated literally, as a count of the
+//          separate times a die goes back UP in its last 0.6 s
+//   dur    faster on every pool: 1d20 -20%, soul -18%, 4d6 -2%, 8d6 -6%,
+//          20d6 -14%; throws reaching SETTLE_CAP 1 -> 0
+//   clock  1.03x worst pool of per-throw wall time
+//   pile   WORSE on all four cells: close/6d6 +6.3pp (23 of 240 dice against
+//          8) with flat throws 33/40 -> 23/40, medium/6d6 +3.3pp, close/trio
+//          +2.5pp, medium/trio +0.8pp
+//
+// THE PILE IS A REAL COST AND IT IS ACCEPTED, NOT SOLVED. Joe, 2026-08-17,
+// overturning the refusal:
+//
+//   "Pilling is OK. If you throw a lot of dice, it's your fault if they pile
+//    up. Let's not try to prevent it."
+//
+// So nothing here tries to prevent it, and nothing new was added to. What
+// still has a floor is the HEAP — a pool in a tower rather than a die on a
+// die — and that floor lives in settle-matrix's gate d and in
+// `dice-land-flat`, both of which say there what they are and are not for.
+//
+// WHY IT COSTS THE PILE, which is the transferable half: on this mat, sliding
+// apart is how dice separate. spawnDie lines the throw up along one edge with
+// `Math.min(TABLE_W - 4.4, count * 2.6)` of spread, and at `medium` that clamp
+// bites hard — TABLE_W is 8.6, so six dice start 0.84 apart when the spacing
+// wants 2.6. They were relying on bounce and skid to fan out. Deaden takes the
+// bounce and grip takes the skid, so the shake win and the pile loss are the
+// same fact. Nobody has proposed a mechanism that separates dice without the
+// skid, and three were tried and priced: the nudge, the terminator, and the
+// spawn line.
+//
+// WHAT THE FOUR PASSES ESTABLISHED, kept because it is the map for the next
+// one. tools/steps/settle-matrix.mjs judges shake, duration, caps, piling,
+// creep and the clock together, 16 paired seeds and a canary that refuses the
+// run if the rig cannot reproduce a known answer:
 //
 //   The shake win is RESTITUTION. Deadening alone (floor .15 / dice .2 /
 //   wall .5) is -23% to -37% on every multi-die pool. Speed-gated damping on
 //   its own is worth ZERO shake, so the felt tuning's win was never the
 //   damping. What the gate is good for is the slow half: 20d6 -22%, caps 7->2.
 //
-//   Deadening's cost is GLIDE, not pile-grind. It removes where a die's
-//   vertical energy went and leaves the horizontal skid on a floor of
-//   friction 0.25. 8d6 over one 10-seed family: shipped 2.13 s, deaden+gate4
-//   3.71 s, deaden+GRIP+gate4 2.60 s — grip takes back 70% of it. That
-//   answers ROADMAP C30a, which had guessed damping.
+//   Deadening's cost is GLIDE, not pile-grind, and GRIP IS THE ANSWER TO IT.
+//   Deadening removes where a die's vertical energy went and leaves the
+//   horizontal skid; grip is what bills the skid. Measured 2026-08-18, 8d6
+//   over 16 seeds: the old tuning 2.19 s, deaden+gate4 alone +19% on 4d6 and
+//   slower again on 8d6, deaden+GRIP+gate4 2.06 s — FASTER than the tuning it
+//   replaces, not merely recovered. An earlier pre-flip reading of this line
+//   said "grip takes back 70%" and was measured against a baseline the
+//   2026-08-11 settle campaign had already moved.
 //
-//   Deadening does not REPLAY. Throw a soul family, run 700 unrelated throws,
-//   throw it again: one seed in sixteen comes back a different throw (2.267 s
-//   -> 2.600 s, 137 frames -> 157). That is the disease that took the sleep
-//   raise off the table, and it disqualifies deaden on its own terms — every
-//   client fast-forwards from the seed and must agree, and perf-determinism
-//   compares two FRESHLY LOADED tabs, so it cannot see it.
-//   tools/steps/replay-drift.mjs.
+//   Deadening did not REPLAY, and that was cannon's sleep rather than deaden.
+//   Throw a soul family, run 700 unrelated throws, throw it again: under the
+//   pre-2026-08-11 build one seed in sixteen came back a different throw
+//   (2.267 s -> 2.600 s, 137 frames -> 157). With `allowSleep: false` on the
+//   bodies — BODYFLAGS below, shipped since the flip — deaden replays 16/16.
+//   The disease is diagnosed in C31 and the instrument is
+//   tools/steps/replay-drift.mjs, which still has to be run against any
+//   further tuning: perf-determinism compares two FRESHLY LOADED tabs and
+//   cannot see drift that accumulates inside one.
 //
 //   And the pile cannot be nudged away. NUDGE.pileScale (below) refuses a
 //   freeze to a die resting on another and hands it to the existing nudge —
 //   targeted energy where the lost bounce used to do the work. It recovers
 //   part of the regression at medium (6d6 flat throws 17/40 -> 22/40 against
-//   shipped's 33/40) and it is not enough: at `close`, 6d6 across 24 seeds,
-//   it takes a die off the pile ONCE, and that throw costs 4.60 s -> 8.73 s.
-//   Nudging is the wrong instrument for a crowded mat — the die comes down on
-//   another die. The machinery is here, inert, because it is sound and cheap
-//   and the next attempt should not have to rediscover it.
+//   the old tuning's 33/40) and it is not enough: at `close`, 6d6 across 24
+//   seeds, it takes a die off the pile ONCE, and that throw costs 4.60 s ->
+//   8.73 s. Nudging is the wrong instrument for a crowded mat — the die comes
+//   down on another die. It stays at 1.05, unchanged by this ship: it is a
+//   freeze refusal, not a separator, and pricing it is how we know.
 //
 // PASS FOUR (2026-08-10) DID NOT CHANGE THESE NUMBERS EITHER, AND FOUND THE
 // ONE THING THAT WOULD LET SOMEBODY ELSE. Read with the TEMPO and (excised)
@@ -1362,9 +1389,9 @@ const wallMat = new CANNON.Material('wall');
 //   FLOOR MAGNETIZE block below: it failed on its own axis, because in this
 //   solver what the eye reads at rest is contact chatter, not bounce.
 const PHYS = {
-  floorFriction: 0.25, floorRestitution: 0.35,
-  diceFriction: 0.15, diceRestitution: 0.45,
-  wallFriction: 0.05, wallRestitution: 0.7,
+  floorFriction: 0.6, floorRestitution: 0.15,
+  diceFriction: 0.4, diceRestitution: 0.2,
+  wallFriction: 0.2, wallRestitution: 0.5,
   linearDamping: 0.01, angularDamping: 0.01,
 };
 const cmFloor = new CANNON.ContactMaterial(diceMat, floorMat, { friction: PHYS.floorFriction, restitution: PHYS.floorRestitution });
@@ -1385,26 +1412,33 @@ function setPhysics(p = {}) {
   return { ...PHYS };
 }
 
-// --- three inert instruments for the settle matrix (C30c) ------------------
+// --- three knobs from the settle matrix (C30c). ONE OF THEM NOW SHIPS ------
 // The felt tuning above failed as a CONSTANT. The hypothesis these price is
 // that a throw has two temporally separate phases wanting opposite physics:
 // early and fast, the dice must bounce and skid to fan out; late and slow,
-// they must die quietly instead of dithering. All three default to the
-// shipped behaviour EXACTLY — `gate: 0` skips the loop body entirely (not
-// even an assignment), THROW_TARGET is the 0.4 that was hardcoded, and SLEEP
-// holds WHAT dice.js ALREADY SETS — 0.4 / 0.35 at js/dice.js:1203-1204, which
-// are OVERRIDES of cannon-es's Body defaults (0.1 / 1), not those defaults.
-// This paragraph used to claim the stock numbers while the SLEEP block below
+// they must die quietly instead of dithering. DAMPGATE is that hypothesis and
+// it is LIVE as of 2026-08-18 — read the block below for what it is set to.
+// The other two are still inert and still default to the shipped behaviour
+// exactly: THROW_TARGET is the 0.4 that was hardcoded, and SLEEP holds WHAT
+// dice.js ALREADY SETS — 0.4 / 0.35 at js/dice.js:1240-1242, which are
+// OVERRIDES of cannon-es's Body defaults (0.1 / 1), not those defaults. This
+// paragraph used to claim the stock numbers while the SLEEP block below
 // correctly claimed the overrides. Two readings of one constant in one file is
 // how an instrument gets seeded with a live physics change while advertising
-// itself as inert — which happened once, and `settle-tail` caught it. So
-// master and this file simulate byte-identically until a tool says otherwise.
-// Driven only by __diceDebug.setDampgate / setThrowTarget / setSleep.
+// itself as inert — which happened once, and `settle-tail` caught it.
+// Driven by __diceDebug.setDampgate / setThrowTarget / setSleep.
 
 // Speed-gated damping: felt damping ONLY while a die is slow. `gate` is a
 // velocity threshold compared against lengthSquared (so gate 4 ≈ 2 units/s),
 // and 0 means the instrument is off.
-const DAMPGATE = { gate: 0, slowLinear: 0, slowAngular: 0 };
+//
+// SHIPPED 2026-08-18 at gate 4 with the felt damping (ROADMAP C30), as half of
+// the tuning documented at PHYS. On its own it is worth ZERO shake — measured,
+// twice — and what it buys is the slow half: 20d6 -22%, throws reaching
+// SETTLE_CAP 7 -> 2. It ships with deaden+grip rather than instead of them.
+// `gate: 0` is the off setting and restores the pre-C30 film exactly: the
+// per-step loop body is skipped entirely, not merely given zero coefficients.
+const DAMPGATE = { gate: 4, slowLinear: 0.1, slowAngular: 0.14 };
 
 // How wide the throw AIMS. spawnDie hurls every die at a random point inside
 // the middle ±THROW_TARGET/2 of the table, so 0.4 means every die in a pool
@@ -1606,7 +1640,8 @@ function tempoCurveAt(roll) {
 // WORTH KEEPING. Do not rebuild it without reading to the end.
 //
 // The idea is sound in general and both Bullet and PhysX ship it. cannon-es
-// has no restitution threshold: it applies the same 0.35 to a 20 unit/s slam
+// has no restitution threshold: it applies the floor's restitution (0.35 when
+// this was written, 0.15 since the felt tuning shipped) to a 20 unit/s slam
 // and a 0.5 unit/s tap, so the tap bounces forever in miniature. `MAGNET.vy`
 // was that missing threshold — after each world.step, a die IN CONTACT WITH
 // THE FLOOR (by body identity, so nothing airborne was reachable) moving
@@ -4900,9 +4935,9 @@ function playRoll(roll) {
   for (;;) {
     stepContacts = 0; // the per-step contact budget refills; see the recorder
     if (pouring) pourAdvance(simTime + FIXED_DT);
-    // Speed-gated damping (DAMPGATE, off by default): the ONE place dice are
-    // advanced, so gating here gates the whole app. Frozen dice are STATIC
-    // and their damping is meaningless; skip them.
+    // Speed-gated damping (DAMPGATE, LIVE since 2026-08-18): the ONE place
+    // dice are advanced, so gating here gates the whole app. Frozen dice are
+    // STATIC and their damping is meaningless; skip them.
     if (DAMPGATE.gate > 0) {
       for (const d of dice) {
         if (d.frozen) continue;
@@ -9717,9 +9752,11 @@ function towerColliders(w, v) {
   boxAt('towerL', wallMat, v.pit.left.c, v.pit.left.h);
   boxAt('towerR', wallMat, v.pit.right.c, v.pit.right.h);
   // The apron RAMP is a SLICK CHUTE — its own material, near-zero friction
-  // (a polished slide, not felt): at 28° with felt friction (0.25) dice
-  // stalled on the slope instead of delivering. Restitution stays low so
-  // the first touchdown doesn't trampoline.
+  // (a polished slide, not felt): at 28° with felt friction dice stalled on
+  // the slope instead of delivering. That was measured at the felt's 0.25;
+  // the felt is 0.6 since the 2026-08-18 tuning, so the reason holds harder
+  // now, and the ramp's own material is why the tuning did not reach it.
+  // Restitution stays low so the first touchdown doesn't trampoline.
   const rampMat = new CANNON.Material('towerRamp');
   const cm = new CANNON.ContactMaterial(diceMat, rampMat, { friction: 0.03, restitution: 0.3 });
   w.addContactMaterial(cm);
@@ -13088,9 +13125,11 @@ window.__diceDebug = {
   setDiceSet(id) { return setDiceSet(id); },
   get physics() { return { ...PHYS }; },
   setPhysics(p) { return setPhysics(p); },
-  // The three settle instruments (C30c). All inert at their defaults — see
-  // DAMPGATE / THROW_TARGET / SLEEP. Priced by tools/steps/settle-matrix.mjs;
-  // nothing in the app sets them.
+  // The three settle knobs (C30c). THROW_TARGET and SLEEP are inert at their
+  // defaults; DAMPGATE is not — it ships at gate 4 as half of the felt tuning
+  // (2026-08-18), so a tool that wants the pre-C30 throw asks for `gate: 0`
+  // explicitly, the way it already has to for SPAWN. See DAMPGATE / PHYS.
+  // Priced by tools/steps/settle-matrix.mjs; nothing in the app sets them.
   get dampgate() { return { ...DAMPGATE }; },
   setDampgate(o) { Object.assign(DAMPGATE, o || {}); return { ...DAMPGATE }; },
   get throwTarget() { return THROW_TARGET; },
