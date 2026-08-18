@@ -16,6 +16,15 @@ limitations under the License.
 
 // C27's RESIDUAL, RE-MEASURED SO THE TABLE HAS AN INSTRUMENT INSTEAD OF A DATE.
 //
+// **`preferDice` SHIPS ON SINCE 2026-08-18** (Joe's call on the v-crop frames),
+// so this step's `off` column is now the COUNTERFACTUAL and its `on` column is
+// what a player sees. Nothing else about it changed: both sides are still read
+// off one settled throw, and both are now set explicitly — see the setFraming
+// pair below for why the day of the flip is exactly when an unset read lies.
+// The 2026-08-18 re-run before shipping reproduced the 08-17 table cell for
+// cell, median and range, all eighteen: **0 of 90 paired throws shrank, 0 lost
+// a die, 30 fired.**
+//
 // WHY THIS FILE EXISTS. The C27 residual table was measured once, written into
 // the roadmap as fixed numbers, and did not reproduce a day later — desktop 3d6
 // came back 253 where the doc said 245, and desktop 6d6 and 40d6 came back with
@@ -254,11 +263,17 @@ export default async function run(stage, args = []) {
         // wherever the old one was legal — the jitter is drawn before the clamp).
         const spawn = await a.dbg('spawnLine()');
         const worstClear = spawn.length ? Math.min(...spawn.map((s) => s.clear)) : null;
+        // BOTH SIDES ARE SET EXPLICITLY, and that is not belt-and-braces: since
+        // 2026-08-18 `preferDice` SHIPS ON, so an unset read is the ON frame.
+        // This step used to read `off` straight off the default and only ever
+        // set the option ON — which the day the default flipped would have
+        // printed an on/on column pair under an off/on heading, silently, on
+        // the one page whose whole job is to stop that happening.
+        await a.dbg('setFraming({preferDice: false, floor: 1})');
         const off = await a.dbg('framingInfo()');
         const probe = await a.dbg('framingProbe()');
         await a.dbg('setFraming({preferDice: true})');
         const on = await a.dbg('framingInfo()');
-        await a.dbg('setFraming({preferDice: false, floor: 1})');
 
         const raw = probe.cases.find((c) => c.orbit === 'landscape' && c.from === 1);
         cell.off.push(off.spanPx);
@@ -310,6 +325,7 @@ export default async function run(stage, args = []) {
 
   await a.dbg('setPanelState({pools: true, log: true})');
   await a.dbg("setZoom('medium')");
+  await a.dbg('setFraming({preferDice: true, floor: 1})'); // back to what ships
   if (spawnAxis) await a.dbg("setSpawn({axis: 'clamp'})");
 
   const table = (head, data) => {
