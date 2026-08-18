@@ -39,9 +39,14 @@
 // · `glyph` — face-glyph family: default 'digit' or 'pip' (d6-only —
 //   other die types fall back to digits, since pips are the traditional
 //   d6 idiom; a full glyph library — roman, runes — is a later slice)
-// · `sound` {body, weight, sustain} — impact voice. body ∈ chime |
-//   thud | crackle | clack | hush; weight 0..1 (heavier = lower); sustain
-//   ms of tail. Absent = the legacy click.
+// · `sound` {body, weight, sustain} — impact voice. body ∈ felt | click |
+//   chime | bell | thud | crackle | clack | hush (js/voices.js
+//   IMPACT_VOICES); weight 0..1 (heavier = lower); sustain ms of tail.
+//   ABSENT = IMPACT_DEFAULT_BODY (`felt`) at weight 0 and sustain 0 — the
+//   ordinary knock every unthemed die makes. This line said "the legacy
+//   click" until 2026-08-18 and had been wrong since `felt` took the default
+//   seat; it is load-bearing now, because Joe's *"just use a normal sound"*
+//   for the fae venues was delivered by DELETING a recipe (see witchlight).
 // · `rate` {rate, window} — retimes the LAST `window` fraction of the
 //   roll's playback to `rate` playback speed. rate<1 = decelerate (vine
 //   catch / glacial arrest / ceremonial hover). Physics untouched — only
@@ -547,11 +552,47 @@ export const THEMES = {
         // set light inside that rig would double-glow every landing.
         // Restraint is also identity — the court does not shed.
         post: { bloom: true }, // the runes burn in the dark
-        // A long faint cold ring — glass struck in another room. Distinct
-        // from focuscrystal (nearer, brighter) and seaglass (wetter,
-        // shorter). REASONED FROM THE TABLE, NEVER LISTENED TO — Joe's
-        // dial, same honesty as every tower clunkVoice.
-        sound: { body: 'chime', weight: 0.22, sustain: 65 },
+        // NO `sound` RECIPE, AND THE ABSENCE IS THE DESIGN (2026-08-18).
+        //
+        // This row used to read `{ body: 'chime', weight: 0.22, sustain: 65 }`
+        // — "a long faint cold ring, glass struck in another room" — and its
+        // own comment admitted it was REASONED FROM THE TABLE AND NEVER
+        // LISTENED TO. Joe has now listened to it twice. First sitting:
+        // *"I hate this sound. I'd prefer something far less sharp"*, answered
+        // by re-voicing the shared `chime` body an octave down with its ring
+        // opened out and 7 ms of attack. Second sitting, on the live table:
+        //
+        //   "When the dice hit the ground it sounds horrible in the two
+        //    venues. Everything else is fine."  …  "Just use a normal sound
+        //    I think.. The idea you had was fun but unfortunately is just
+        //    not working."
+        //
+        // So the ringing die is KILLED rather than tuned a third time, and
+        // deleting the key is the whole kill: `impactVoice` returns
+        // `fxSet.sound || null` (js/main.js) and `impactPresetOf(null)`
+        // resolves IMPACT_DEFAULT_BODY at weight 0 and sustain 0 — which is
+        // not "a felt-ish approximation of normal", it is byte-for-byte the
+        // contact every unthemed die on the grounded table already makes.
+        // "Just use a normal sound", expressed as the absence of a special one.
+        //
+        // WHY NO AMOUNT OF TUNING WAS GOING TO WORK — the named defect, kept
+        // here because this is where the next person will reach for a chime:
+        // a RESONANT, PARTIAL-BEARING body is a bell, and this app never
+        // strikes a landing once. One die brings a sine partial plus a
+        // five-tap settle cluster inside 145 ms, times every die in the pour.
+        // A bell struck once is an event; struck forty times in two seconds
+        // it is clanking, and the band it is struck at does not change that.
+        //
+        // The venue's ground trim (js/voices.js VENUE_AUDIO) is KEPT and is
+        // not implicated: it only ever makes a contact duller, shorter and
+        // quieter, so it was the one thing pulling this sound in the direction
+        // he asked for. Neutralising it — the naive reading of "use the
+        // grounded table's sound" — would have taken the landing's centroid
+        // from 1745 Hz UP to 2344 Hz. docs/SHIPPED.md has the record.
+        //
+        // `IMPACT_VOICES.chime` itself stays: three grounded-table sets
+        // (seaglass, sealed resin, focuscrystal) use it and none of them has
+        // ever been heard.
         // The court holds its breath: the last 12% of a roll retimes to
         // 0.7× — a faint hover before the verdict, subtler than
         // heartwood's vine catch. Playback clock only; physics untouched.

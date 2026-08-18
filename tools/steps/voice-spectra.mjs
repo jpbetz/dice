@@ -44,6 +44,10 @@ import {
   IMPACT_VOICES, CLUNK_VOICES, VENUE_AUDIO,
   impactSpectrum, bedProfile, bedDistance, MATERIAL_BOUNDARY_HZ,
 } from '../../js/voices.js';
+// The set registry, for the C block: the staged set's voice is a field on a
+// SETS row, and since 2026-08-18 the row it matters most for is the one with
+// no such field.
+import { SETS } from '../../js/themes.js';
 
 function table(head, rows) {
   const w = head.map((h, i) => Math.max(String(h).length, ...rows.map((r) => String(r[i]).length)));
@@ -53,19 +57,21 @@ function table(head, rows) {
   for (const r of rows) console.log(line(r));
 }
 
-// docs/AUDIO.md §9's ten rows, in his order, with the words he used.
+// docs/AUDIO.md §9's ten rows, in his order, with the words he used — SECOND
+// sitting where there is one, because that is the live verdict on the tree
+// this step is measuring. The first sitting's words are in §9.0.
 const VERDICTS = {
-  A1: 'sounds like white noise mostly',
-  A2: 'more white noise, super faint',
-  A3: 'deeper white noise, VERY faint',
-  B1: 'switch the bastion and heartwood sounds',
-  B2: 'switch the bastion and heartwood sounds',
-  B3: 'Slightly to shrill / clanky for me..',
-  B4: 'sounds good',
-  B5: 'sounds good',
-  C1: 'I hate this sound. far less sharp',
-  C2: 'I hate this sound. far less sharp',
-  C3: 'Also to shrill / sharp',
+  A1: 'APPROVED — "all other audio sounds good"',
+  A2: 'APPROVED — "everything else is fine"',
+  A3: 'APPROVED — "everything else is fine"',
+  B1: 'APPROVED (was: "they feel reversed")',
+  B2: 'APPROVED (was: "they feel reversed")',
+  B3: 'APPROVED (was: "slightly to shrill / clanky")',
+  B4: 'APPROVED twice — "sounds good"',
+  B5: 'APPROVED twice — "sounds good"',
+  C1: 'KILLED — "sounds horrible… use a normal sound"',
+  C2: 'KILLED — "when the dice hit the ground"',
+  C3: 'KILLED — "in the two venues"',
 };
 
 export default async function run(stage) {
@@ -145,15 +151,28 @@ export default async function run(stage) {
   // seam check below caught it. There is no way to ask the app for "the
   // staged die's voice, untrimmed" while a fantasy venue stands — which is
   // itself the right design, because under that venue there is no such sound.
+  // …AND SINCE 2026-08-18 THERE IS NO RING TO SEPARATE. Joe heard the re-voiced
+  // chime on the live table — *"When the dice hit the ground it sounds horrible
+  // in the two venues"* — and the Witchlight set's `sound` recipe was deleted
+  // rather than tuned a third time. So all three rows below now resolve
+  // IMPACT_DEFAULT_BODY, and what this block reports is a KNOCK under three
+  // floors. The C1/C2/C3 split survives because the SCRIPT still has three
+  // rows; the sound does not vary the way the split implies.
   const cs = [['C1', 'table', 'the die\'s own ring'],
     ['C2', 'moonrise', 'on moss over soil'],
     ['C3', 'foxfire', 'on near-black moss']];
+  // READ THE RECIPE, NEVER RESTATE IT. This used to hardcode
+  // `{ body: 'chime', weight: 0.22 }` and would have gone red on the deletion
+  // — correctly, but for the wrong reason: it would have been reporting a
+  // resolver/table mismatch when the table is exactly what changed. The seam
+  // this step exists to check is app-vs-registry, so the registry is where the
+  // expectation comes from.
+  const witchWeight = (SETS['moonmoot.witchlight'].sound || {}).weight || 0;
   for (const [id, venue, what] of cs) {
     await a.dbg(`setVenue(${JSON.stringify(venue)})`);
     await a.dbg('sim(4)');
     const vo = await a.dbg(`impactVoicingFor(50, 'moonmoot.witchlight', {})`);
-    const cv = { body: 'chime', weight: 0.22 };
-    near(vo.centre, (1 - 0.5 * cv.weight) * VENUE_AUDIO[venue].ground.centre,
+    near(vo.centre, (1 - 0.5 * witchWeight) * VENUE_AUDIO[venue].ground.centre,
       `${id} resolved centre`);
     const s = impactSpectrum(IMPACT_VOICES[vo.body], vo.centre);
     rowsC.push([id, `${venue} — ${what}`, vo.body,

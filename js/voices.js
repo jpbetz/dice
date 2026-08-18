@@ -24,6 +24,27 @@ limitations under the License.
 // `node tests/*.test.mjs`. So a claim like "less sharp than it was" could only
 // ever be re-listened to, never asserted.
 //
+// THEN HE LISTENED AGAIN, on the live table, the same day, and that sitting is
+// the reason to read this comment before touching a number below:
+//
+//   "When the dice hit the ground it sounds horrible in the two venues.
+//    Everything else is fine."
+//   "Just use a normal sound I think.. The idea you had was fun but
+//    unfortunately is just not working."
+//
+// EIGHT VOICES ARE NOW APPROVED and it is the first sign-off this palette has
+// ever had: A1/A2/A3, the three room beds — including the fae drips and the
+// ×5 level fix — and B1..B5, all five tower clunks. **Every table in this file
+// that those eight rows read is FROZEN by `tests/voices.test.mjs` and must not
+// drift.** Not one of them changed on the second pass.
+//
+// WHAT DIED IS NOT IN THIS FILE, and that is worth knowing before you go
+// looking: the ringing die. The C rows are the Witchlight set's `sound` recipe
+// (js/themes.js), and the kill is the deletion of that recipe, so the venues'
+// dice now land on IMPACT_DEFAULT_BODY like everything else. See the `chime`
+// row below for what that means for the body itself, and the VENUE_AUDIO
+// header for why the venues' GROUND rows were kept.
+//
 // The tables moved HERE, and the ruler came with them:
 //
 //   · the DATA — IMPACT_VOICES, CLUNK_VOICES, VENUE_AUDIO, the bed levels —
@@ -227,12 +248,26 @@ export const IMPACT_VOICES = {
   // brightest body in the registry and still the ONE bright element §1
   // permits; it is no longer a whistle.
   //
+  // AND IT WAS NOT ENOUGH — the second sitting is the whole reason to be
+  // careful with this row now. Joe heard exactly this body, at exactly these
+  // numbers, and said the venues' landings still sound *horrible*, so the
+  // Witchlight set stopped using it (js/themes.js). **The C rows no longer
+  // read this table at all.**
+  //
+  // WHAT THAT LEAVES: three sets still declare `chime` — Wildwood's seaglass,
+  // a sealed resin, and focuscrystal — and ALL THREE ARE UNHEARD. The move
+  // from 3400 to 1750 was commissioned by a complaint about a caller that has
+  // since been deleted, so these numbers are now an UNJUDGED change riding on
+  // three unjudged sets. Do not read the 2026-08-18 re-voice as approved. It
+  // is deliberately not reverted either: he never heard 3400 on these three,
+  // and putting a body back up an octave and a half on nobody's word would be
+  // a second unjudged change instead of one. Whoever next fills a listening
+  // page: this row belongs on it.
+  //
   // `gainScale` IS DELIBERATELY UNTOUCHED at 0.045, and the widened filter
   // only moves this body's broadband power by +1.4% (`noiseGain` in the
-  // spectrum report is what says so). The change Joe is being asked to
-  // re-listen to is therefore purely a TIMBRE change — the level is the level
-  // that shipped, so "it sounds better because you turned it down" is not
-  // available as an explanation of whatever he hears.
+  // spectrum report is what says so) — so whatever those three sets are one
+  // day judged on, it will be timbre and not level.
   chime:   { filter: 'bandpass', baseFreq: 1750, freqSpread:  550, q: 1.5, decayShape: 0.46, gainScale: 0.045, partial: true, attackMs: 7 },
   // NEW 2026-08-18, and it exists because Joe's two complaints about this
   // family are DIFFERENT SIZES. Black Anvil is "slightly too shrill / clanky";
@@ -264,6 +299,13 @@ export const IMPACT_VOICES = {
 // Which body a voice with no recipe of its own falls back to — the most
 // common event in the whole app, so it is the one that decides what this
 // table sounds like.
+//
+// AND SINCE 2026-08-18 IT IS ALSO WHAT THE TWO FAE VENUES SOUND LIKE. Joe's
+// *"just use a normal sound"* was answered by deleting the Witchlight set's
+// recipe rather than by writing a new one, which routes the venues' landings
+// through this constant. That makes the fallback path load-bearing where it
+// used to be merely common: it is now the literal implementation of a verdict,
+// and `tests/voices.test.mjs` asserts the venues resolve it.
 export const IMPACT_DEFAULT_BODY = 'felt';
 
 // ONE TIMBRE TIER, and it is about HARDNESS rather than loudness: below this
@@ -443,6 +485,30 @@ export const BED_AUDIBLE_DBFS = -55;
 // and its air cutoff is still above anything noise carries. The room got
 // louder because the DIALS moved, not because the grounded row started
 // asking for something.)
+//
+// EVERY NUMBER IN THIS TABLE IS APPROVED AS OF 2026-08-18, and it is the first
+// time that has ever been true. Both rows, both halves:
+//
+//   · THE BEDS. A1/A2/A3 — *"Everything else is fine"* after the ×5 level
+//     fix, the u^1.6 tick law, the fae make-up gains, the pitched drips and
+//     the swell layer. An earlier draft of this pass read his *"clankyness of
+//     the Moonrise glade and Foxfire Hollow"* as a complaint about the drips
+//     — Q 6 and Q 7 with a welded sine partial really are the narrowest
+//     resonances in the app — and it was WRONG. He meant the dice hitting the
+//     ground. **The drips stay pitched. Do not re-litigate them off that
+//     first reading.**
+//   · THE GROUND ROWS. The `centre`/`length`/`gain` trims survived the kill of
+//     the ringing die, and NOT by omission. A trim that only ever makes a
+//     contact duller, shorter and quieter is the one thing in that signal
+//     chain pulling the way he asked; the arithmetic says so out loud, because
+//     zeroing these rows — the naive reading of "use the grounded table's
+//     sound" — would take a fae landing's centroid from 1745 Hz UP to 2344 Hz
+//     and its share of energy above §1's boundary from 54% to 83%. The rows
+//     below are what makes moss sound like moss under the normal knock that
+//     replaced the chime, and they are the one remaining lever if he says it
+//     is STILL not normal enough: set both to all-1s and a fae landing becomes
+//     byte-identical to a grounded one. That is one edit, and it should be his
+//     call rather than a guess made here.
 export const VENUE_AUDIO = {
   // THE ROOM YOU KNOW — the reference row, all multipliers 1.
   table: {

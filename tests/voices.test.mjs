@@ -14,11 +14,40 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// tests/voices.test.mjs — JOE'S TEN VERDICTS, AS ARITHMETIC.
+// tests/voices.test.mjs — JOE'S VERDICTS, AS ARITHMETIC.
 //
-// On 2026-08-18 the owner listened to every sound in this app for the first
-// time. Eight of the ten voices needed work and two did not, and his words
-// were these:
+// TWO SITTINGS ON 2026-08-18. The second one is the one that decides what this
+// file is now for, so it goes first:
+//
+//   "I still dislike the clankyness of the Moonrise glade and Foxfire
+//    Hollow. Just use a normal sound I think.. The idea you had was fun
+//    but unfortunately is just not working. All other audio sounds good."
+//   …and, asked which part: "When the dice hit the ground it sounds
+//    horrible in the two venues. Everything else is fine."
+//
+// So this file changed job. It used to argue that eight complaints had been
+// answered in the direction each word asked for. Now:
+//
+//   · EIGHT VOICES ARE APPROVED — A1/A2/A3, the three room beds, and B1..B5,
+//     all five tower clunks. Those assertions are no longer "it moved the
+//     right way"; they are FREEZES. `APPROVED_2026_08_18` below is the
+//     record, and anything that moves those numbers is a regression against a
+//     human verdict rather than a redesign.
+//   · THE RINGING DIE IS KILLED. The C rows were the Witchlight set's `chime`
+//     recipe; the recipe is deleted (js/themes.js) and the fae venues' dice
+//     now land on IMPACT_DEFAULT_BODY. The C assertions below no longer
+//     measure a chime at all — they assert there is no longer a chime to
+//     measure, which is a different and stronger claim.
+//
+// ONE CORRECTION THIS FILE OWES ITS READER, because it was nearly acted on: a
+// first reading of *"clankyness of the Moonrise glade and Foxfire Hollow"*
+// took it for the fae bed DRIPS, which are pitched and sit at Q 6 and Q 7 —
+// genuinely the narrowest resonances in the app. That reading was wrong. He
+// named the venues, not the beds, and the beds are approved. The drips stay.
+//
+// THE FIRST SITTING, kept because BASELINE_2026_08_17 is measured against it:
+// he listened to every sound in the app for the first time, eight of the ten
+// voices needed work and two did not, and his words were these:
 //
 //   A1 The Table       "sounds like white noise mostly"
 //   A2 Moonrise Glade  "more white noise, super faint"
@@ -53,6 +82,12 @@ import {
   PINK_BUFFER_RMS, BROWN_BUFFER_RMS, MATERIAL_BOUNDARY_HZ,
   impactSpectrum, bedProfile, bedDistance, biquadMag,
 } from '../js/voices.js';
+// THE SET REGISTRY ITSELF, because the kill is the ABSENCE of a field on one
+// row and nothing in js/voices.js can see that. `SETS` and not `THEMES`: it is
+// the flattened map `impactVoice` actually reads, so a recipe that came back
+// through some other door would still be caught. js/themes.js is pure data
+// with no three.js import, so unlike js/main.js it loads in Node.
+import { SETS } from '../js/themes.js';
 
 let n = 0;
 const t = (name, fn) => {
@@ -103,14 +138,78 @@ const BASELINE_2026_08_17 = {
 // been listening to.
 const FAINT = ['moonrise', 'foxfire'];
 
+// ---------------------------------------------------------------------------
+// WHAT HE APPROVED — the second sitting, 2026-08-18. A DIFFERENT KIND OF
+// CONSTANT FROM THE ONE ABOVE.
+// ---------------------------------------------------------------------------
+// BASELINE_2026_08_17 is a record of a sound that was WRONG, kept so a fix can
+// be shown to have moved. This is a record of sounds that are RIGHT, and it is
+// the first one this palette has ever had. It is not a target to move toward;
+// it is a fence. Every number here is re-derived live from js/voices.js below
+// and asserted EQUAL, so the failure mode it catches is drift rather than
+// direction — an agent "improving" an approved voice, which is the single
+// cheapest way to lose an hour of Joe's time that has already been spent.
+//
+// "All other audio sounds good" / "Everything else is fine" is the sign-off,
+// and it covers eight voices: the three room beds and the five tower clunks.
+// It does NOT cover the C rows — those are the thing he called horrible.
+const APPROVED_2026_08_18 = {
+  // A1/A2/A3. Frozen on the fields `bedProfile` publishes, which is where the
+  // level fix (×5, −59.8 → −45.9 dBFS), the u^1.6 tick law, the fae make-up
+  // gains, the PITCHED drips and the new swell layer all show up. Freezing
+  // `pitched: true` on the two fae rooms is deliberate and slightly pointed:
+  // the pitched drip was very nearly deleted on a misreading of his sentence,
+  // and this line is what would have caught that.
+  bed: {
+    table: { rmsDbfs: -45.9, centroidHz: 140, eventsPerS: 2.15, pitched: false, swellsPerS: 0.08 },
+    moonrise: { rmsDbfs: -47.5, centroidHz: 125, eventsPerS: 0.72, pitched: true, swellsPerS: 0.085 },
+    foxfire: { rmsDbfs: -47.5, centroidHz: 93, eventsPerS: 1.69, pitched: true, swellsPerS: 0.05 },
+  },
+  // B1..B5, as rows rather than as spectra: the whole point of the B verdicts
+  // was WHICH TOWER WEARS WHICH VOICE (the B1/B2 swap) and how far B3 moved,
+  // so the row is the thing he judged. B4 and B5 had "sounds good" from the
+  // FIRST sitting too and are now approved twice over.
+  clunk: {
+    heartwood: { body: 'thud', weight: 0.7, sustain: 40 },
+    bastion: { body: 'clack', weight: 0.35, sustain: 20 },
+    blackanvil: { body: 'bell', weight: 0.55, sustain: 70 },
+    nullstone: { body: 'hush', weight: 0.75, sustain: 25 },
+    hollowbole: { body: 'thud', weight: 0.5, sustain: 35 },
+  },
+};
+
+// WHAT HE REJECTED, measured — the C rows as the FIRST pass left them, which
+// is the tree he heard on the live table when he said "horrible".
+//
+// This block is the evidence that the kill is a kill and not impatience. The
+// first sitting said "far less sharp" and got it: the chime came down 3400 →
+// 1750 with its Q opened out and 7 ms of attack, and by the numbers below a
+// glade landing had already lost 37% of its centroid and dropped from 97% to
+// 54% of its energy above the wood/metal line. He listened to THAT and said it
+// still sounds horrible. A third re-tuning was the obvious next move and it is
+// the move these numbers refuse.
+const REJECTED_2026_08_18 = {
+  table: { fcHz: 1802, centroidHz: 2344, aboveBoundary: 0.827, partialHz: 991, attackMs: 7 },
+  moonrise: { fcHz: 1298, centroidHz: 1745, aboveBoundary: 0.538, partialHz: 714, attackMs: 7 },
+  foxfire: { fcHz: 1189, centroidHz: 1612, aboveBoundary: 0.461, partialHz: 654, attackMs: 7 },
+};
+
 // The voicing multiplier `impactVoicingOf` resolves for a hard contact:
 // (1 − 0.5·weight) × the venue's ground.centre. Re-stated here rather than
 // imported because js/main.js cannot be loaded in Node — which is exactly
 // why the tables moved to js/voices.js. `tests/e2e` asserts the app applies
 // it, through `impactVoicingFor`; this file asserts what it applies it TO.
 const centreOf = (weight, groundCentre = 1) => (1 - 0.5 * weight) * groundCentre;
-const spectrumOf = (voice, groundCentre = 1) =>
-  impactSpectrum(IMPACT_VOICES[voice.body], centreOf(voice.weight, groundCentre));
+// …and the FALLBACK half of it, which used to be untested because every caller
+// passed a body. It is load-bearing now: the fae venues' landing voice IS the
+// fallback (the Witchlight recipe was deleted 2026-08-18), so `spectrumOf({})`
+// has to walk the same two defaults `impactPresetOf` + `impactVoicingOf` do —
+// an absent body resolves IMPACT_DEFAULT_BODY, an absent weight is 0.
+const spectrumOf = (voice, groundCentre = 1) => {
+  const body = (voice && IMPACT_VOICES[voice.body]) ? voice.body : IMPACT_DEFAULT_BODY;
+  const weight = voice ? (voice.weight || 0) : 0;
+  return impactSpectrum(IMPACT_VOICES[body], centreOf(weight, groundCentre));
+};
 const pct = (now, was) => Math.round((now / was - 1) * 1000) / 10;
 
 // ---------------------------------------------------------------------------
@@ -160,6 +259,65 @@ t('the measured buffer RMS constants still describe the generators', () => {
     `pink generator RMS ${pink.toFixed(4)} vs declared ${PINK_BUFFER_RMS}`);
   assert.ok(Math.abs(brown - BROWN_BUFFER_RMS) < 0.03,
     `brown generator RMS ${brown.toFixed(4)} vs declared ${BROWN_BUFFER_RMS}`);
+});
+
+// ---------------------------------------------------------------------------
+// THE EIGHT APPROVALS — "All other audio sounds good" (Joe, 2026-08-18).
+// ---------------------------------------------------------------------------
+
+t('the eight approved voices are exactly what he approved', () => {
+  // THE FIRST SIGN-OFF THIS PALETTE HAS EVER HAD, and the whole point of
+  // writing it down is that approval is the scarcest thing in this file. Nine
+  // voices were unheard for the life of the project; getting a verdict cost an
+  // hour of Joe's time and two sittings. Losing one to a well-meant tweak is
+  // not a bug you find later — the information is simply gone, and the only
+  // way back is to spend the hour again.
+  //
+  // So: EQUALITY, not tolerance, and against a frozen copy rather than against
+  // the tables themselves.
+  //
+  // A1/A2/A3 — the three room beds. Every field here is a thing the first pass
+  // moved and he then blessed: the ×5 level (−59.8 → −45.9 dBFS), the u^1.6
+  // tick law, the fae make-up gains, the swell layer, and `pitched: true` on
+  // the two fae rooms.
+  for (const id of ['table', 'moonrise', 'foxfire']) {
+    const want = APPROVED_2026_08_18.bed[id];
+    const got = bedProfile(id);
+    for (const k of Object.keys(want)) {
+      assert.equal(got[k], want[k],
+        `${id}.${k}: APPROVED 2026-08-18 at ${want[k]}, now ${got[k]} — `
+        + 'this is a human verdict, not a target');
+    }
+  }
+  // …AND THE PITCHED DRIP IN PARTICULAR, called out because it is the one that
+  // was nearly deleted. *"Clankyness of the Moonrise glade and Foxfire
+  // Hollow"* was first read as a complaint about these, and they are on paper
+  // the most clank-shaped things in the app: Q 6 and Q 7 with a welded sine,
+  // against the Q 2.8 that earned the word on Black Anvil. He meant the dice
+  // hitting the ground. THE DRIPS STAY.
+  for (const id of FAINT) {
+    assert.ok(VENUE_AUDIO[id].bed.tick.tone > 0,
+      `${id}: the drip keeps its note — approved, not merely un-complained-about`);
+    assert.ok(VENUE_AUDIO[id].bed.tick.q >= 6,
+      `${id}: and its Q, which reads as "clanky" on paper and was judged fine `
+      + 'by the only ear that counts');
+  }
+  // B1..B5 — the five tower clunks, as ROWS, because "which tower wears which
+  // voice" is what the B verdicts were about.
+  for (const [id, want] of Object.entries(APPROVED_2026_08_18.clunk)) {
+    const got = CLUNK_VOICES[id];
+    assert.equal(got.body, want.body, `${id}: approved body`);
+    assert.equal(got.weight, want.weight, `${id}: approved weight`);
+    assert.equal(got.sustain, want.sustain, `${id}: approved sustain`);
+  }
+  // The palette still spans what it spanned: the approval covers the SET of
+  // five as a set, so a change that kept every row legal while collapsing the
+  // range would slip past the row checks above.
+  const centroids = Object.keys(APPROVED_2026_08_18.clunk)
+    .map((k) => spectrumOf(CLUNK_VOICES[k]).centroidHz);
+  assert.ok(Math.max(...centroids) / Math.min(...centroids) > 4,
+    `and the five are still five different towers `
+    + `(${Math.min(...centroids)}..${Math.max(...centroids)} Hz)`);
 });
 
 // ---------------------------------------------------------------------------
@@ -268,57 +426,132 @@ t('B3 Black Anvil got less shrill, and only slightly', () => {
 });
 
 // ---------------------------------------------------------------------------
-// C1 / C2 / C3 — "I hate this sound… far less sharp".
+// C1 / C2 / C3 — first sitting "I hate this sound… far less sharp"; second
+// sitting, after that fix shipped: *"When the dice hit the ground it sounds
+// horrible in the two venues."* THE RINGING DIE IS KILLED.
 // ---------------------------------------------------------------------------
 
-t('the C family is ONE voice, which is why all three rows failed together', () => {
-  // THE FINDING BEHIND THE FIX. docs/AUDIO.md §9 lists C1, C2 and C3 as three
-  // things to judge, and they are three CONTEXTS of a single body: the
-  // Witchlight set's `chime`, then that same chime with each venue's ground
-  // multiplier over it. Joe used the same sentence for C1 and C2 and a
-  // near-identical one for C3, which is what a single shared cause sounds
-  // like — and no ground trim could have rescued it, because the deepest one
-  // in the app (×0.66) applied to a 3.4 kHz band still lands at 2.2 kHz.
-  assert.equal(IMPACT_VOICES.chime.filter, 'bandpass');
-  const deepest = Math.min(...Object.values(VENUE_AUDIO).map((v) => v.ground.centre));
-  assert.ok(deepest > 0.6,
-    `the deepest ground in the app is ×${deepest} — a multiplier, not a rescue`);
-});
-
-t('C1/C2/C3 moved FAR, on all three axes of "sharp"', () => {
-  const rows = [['table', 'C1'], ['moonrise', 'C2'], ['foxfire', 'C3']];
-  const witch = { body: 'chime', weight: 0.22 };   // js/themes.js moonmoot.witchlight
-  for (const [venue, id] of rows) {
-    const was = BASELINE_2026_08_17.witchlight[venue];
-    const now = spectrumOf(witch, VENUE_AUDIO[venue].ground.centre);
-    const d = pct(now.centroidHz, was.centroidHz);
-    assert.ok(d <= -30,
-      `${id}: "far less sharp" is at least a third off the centroid — `
-      + `${was.centroidHz} → ${now.centroidHz} Hz is ${d}%`);
-    assert.ok(now.partialHz < was.partialHz * 0.7,
-      `${id}: the sine partial welded to its front came down with it `
-      + `(${was.partialHz} → ${now.partialHz} Hz)`);
-    assert.ok(now.attackMs >= 5,
-      `${id}: and it stopped starting at full gain on its first sample `
-      + `(${was.attackMs} → ${now.attackMs} ms)`);
-  }
-  // THE TWO THE PLAYER ACTUALLY HEARS. §9's C section is walked inside the
-  // glade, so C2/C3 are the rows with a verdict on them — and both now sit
-  // with most of their energy BELOW §1's own boundary, which the shipped
-  // voice never did in any venue.
+t('the C rows were one voice — and the app could only ever make ONE of them', () => {
+  // THE FINDING, AND IT IS STRONGER THAN THE FIRST PASS STATED IT. docs/AUDIO
+  // .md §9 lists C1, C2 and C3 as three things to judge. The first pass found
+  // they were three CONTEXTS of one body — correct, and the reason all three
+  // rows failed together. They were also, as the app can actually be driven,
+  // ONE RENDERED SOUND, and that is what settles who the second verdict was
+  // about. Two facts compose to it and neither is a matter of reading:
+  //
+  //   1. the Witchlight set is `venueOnly`, so it takes no chip anywhere a
+  //      player picks (js/main.js filters `pickable` on exactly this flag). It
+  //      is reachable ONLY as the staged set of the two fae venues;
+  //   2. `groundFor(isClunk)` puts the standing venue's ground over EVERY
+  //      non-clunk contact.
+  //
+  // So there is no way to hear this die without a fae floor under it. "C1, the
+  // die's own ring" is not a sound this app can produce, and §9's route never
+  // leaves Moonrise Glade between C1 and C2 — they were the same rendered
+  // sound, heard once. That is why *"everything else is fine"* cannot be read
+  // as approving C1 while condemning C2: there was no separate C1 to approve.
+  const witchSet = SETS['moonmoot.witchlight'];
+  assert.ok(witchSet, 'the fae venues stage this set');
+  assert.equal(witchSet.venueOnly, true,
+    'and it is venue-only, so it is never heard on the grounded table');
   for (const venue of ['moonrise', 'foxfire']) {
-    const now = spectrumOf(witch, VENUE_AUDIO[venue].ground.centre);
-    assert.ok(now.aboveBoundary < 0.6,
-      `${venue}: most of a landing's energy is now under ${MATERIAL_BOUNDARY_HZ} Hz `
-      + `(${now.aboveBoundary} above it, was ${BASELINE_2026_08_17.witchlight[venue].aboveBoundary})`);
+    assert.ok(VENUE_AUDIO[venue].ground.centre < 1,
+      `${venue}: …and the floor is always over it (×${VENUE_AUDIO[venue].ground.centre})`);
   }
 });
 
-t('the chime got duller without getting quieter', () => {
-  // The cheapest way to fake "less sharp" is to turn a voice down, and the
-  // second cheapest is to widen its filter and let the extra bandwidth do it.
-  // `gainScale` is untouched and the widened band moves this body's broadband
-  // power by under a dB, so whatever Joe hears next sitting is timbre.
+t('C1/C2/C3 — the ringing die is GONE, not re-tuned a third time', () => {
+  // THE KILL, ASSERTED AT ITS ROOT: the recipe is absent. `impactVoice`
+  // returns `fxSet.sound || null`, so an absent key is not "a set that happens
+  // to resolve felt" — it is a set with no voice of its own, which is what
+  // every unthemed die on the grounded table already is. That is *"just use a
+  // normal sound"* expressed as the absence of a special one, and it is the
+  // reason this is a kill rather than a fourth set of numbers.
+  assert.ok(!('sound' in SETS['moonmoot.witchlight']),
+    'the Witchlight set declares no voice at all');
+  // …and what the venues therefore resolve. `{}` has no body, so this walks
+  // the same fallback the app walks.
+  for (const [venue, id] of [['table', 'C1'], ['moonrise', 'C2'], ['foxfire', 'C3']]) {
+    const now = spectrumOf({}, VENUE_AUDIO[venue].ground.centre);
+    const rejected = REJECTED_2026_08_18[venue];
+    // ① NO RESONANCE. "Clanky" is Q by this file's own published law (see B3),
+    //    and a landing now wears a LOWPASS — there is no band left to ring.
+    assert.equal(IMPACT_VOICES[IMPACT_DEFAULT_BODY].filter, 'lowpass',
+      `${id}: a landing is a knock, not a struck band`);
+    // ② NO PARTIAL. The welded sine was the half of "a bell" that no amount of
+    //    moving the band could fix, because a partial IS a note.
+    assert.equal(now.partialHz, null,
+      `${id}: and nothing rings under it (was a ${rejected.partialHz} Hz sine)`);
+    // ③ AND IT IS FAR BELOW WHAT HE REJECTED — measured against the re-tune he
+    //    actually heard and still disliked, not against the original.
+    const d = pct(now.centroidHz, rejected.centroidHz);
+    assert.ok(d <= -70,
+      `${id}: ${rejected.centroidHz} → ${now.centroidHz} Hz is ${d}% off the `
+      + `voice he called horrible — a kill, not a fourth nudge`);
+    assert.ok(now.aboveBoundary < 0.1,
+      `${id}: and almost nothing is left above §1's ${MATERIAL_BOUNDARY_HZ} Hz `
+      + `line (${now.aboveBoundary}, was ${rejected.aboveBoundary})`);
+  }
+});
+
+t('a fae landing is the SAME BODY as a grounded one — only the floor differs', () => {
+  // "The ordinary sound these dice make on the grounded table" is the
+  // instruction, and this states how much of it was delivered, with the
+  // shortfall rather than around it.
+  //
+  // SAME BODY, exactly: no venue overrides the body, so a die lands on
+  // IMPACT_DEFAULT_BODY in all three rooms. What still differs is the venue's
+  // GROUND trim, kept on purpose — see the last assertion for why.
+  const grounded = spectrumOf({}, 1);
+  assert.equal(grounded.partialHz, null, 'the grounded knock has no note');
+  for (const venue of ['moonrise', 'foxfire']) {
+    const now = spectrumOf({}, VENUE_AUDIO[venue].ground.centre);
+    assert.equal(now.partialHz, grounded.partialHz, `${venue}: nor does the fae one`);
+    assert.equal(now.attackMs, grounded.attackMs, `${venue}: same transient`);
+    // NOT byte-identical, and this is the honest size of the gap: about a
+    // third of an octave darker than the felt. If Joe says it is STILL not
+    // normal, THIS is the remaining lever and it is one edit — VENUE_AUDIO's
+    // two ground rows to all-1s.
+    const d = pct(now.centroidHz, grounded.centroidHz);
+    assert.ok(d < 0 && d > -40,
+      `${venue}: the floor still absorbs, and only absorbs `
+      + `(${grounded.centroidHz} → ${now.centroidHz} Hz, ${d}%)`);
+  }
+  // THE TRIM WAS NEVER WHAT WAS WRONG, and this is the assertion that stops a
+  // future pass "finishing the job" by zeroing it. Removing the ground would
+  // have moved the voice he hated UP — brighter, and more of it over the
+  // wood/metal line — so it was never a candidate for the complaint.
+  const witch = { body: 'chime', weight: 0.22 };   // the deleted recipe
+  const trimmed = spectrumOf(witch, VENUE_AUDIO.moonrise.ground.centre);
+  const bare = spectrumOf(witch, 1);
+  assert.ok(bare.centroidHz > trimmed.centroidHz,
+    `neutralising the glade's floor would have made the rejected voice `
+    + `BRIGHTER (${trimmed.centroidHz} → ${bare.centroidHz} Hz), which is why `
+    + 'the kill is the body and not the trim');
+});
+
+t('the chime body survives for three sets, UNHEARD and unjudged', () => {
+  // It stays in the registry because three grounded-table sets declare it and
+  // none of them has ever been played to anybody. Two things follow, and both
+  // are worth a fence:
+  //
+  //   · nothing may quietly delete it while "removing the fae chime";
+  //   · and nobody may cite Joe's 2026-08-18 words as approval of its numbers.
+  //     The 3400 → 1750 re-voice was commissioned by the C complaint and the C
+  //     caller has since been deleted, so those numbers now ride on three sets
+  //     with no verdict at all. Deliberately NOT reverted: he never heard 3400
+  //     on these three either, and putting the body back up an octave and a
+  //     half on nobody's word is a second unjudged change instead of one.
+  assert.ok(IMPACT_VOICES.chime, 'the body stays in the registry');
+  const callers = Object.entries(SETS)
+    .filter(([, r]) => r.sound && r.sound.body === 'chime').map(([id]) => id);
+  assert.ok(callers.length >= 3,
+    `and it still has callers (${callers.join(', ')}) — deleting it would `
+    + 'silently re-voice sets nobody complained about');
+  assert.ok(!callers.includes('moonmoot.witchlight'),
+    'but the Witchlight set is not one of them any more');
+  // The gain claim from the re-voice still holds, so if these three are ever
+  // judged, what is judged is timbre and not level.
   assert.equal(IMPACT_VOICES.chime.gainScale, 0.045,
     'the chime ships at the gain it shipped at');
   const now = impactSpectrum(IMPACT_VOICES.chime, centreOf(0.22));
