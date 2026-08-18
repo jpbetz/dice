@@ -104,9 +104,13 @@ export default async function edgeLook(stage, args) {
     // after it photographs whatever was last drawn, which on a 40-die felt at
     // ~2 fps is a frame from the middle of the throw.
     await new Promise((r) => setTimeout(r, 1200));
-    const values = await a.chips();
+    // No `chips()` read here on purpose: per-die value chips are OFF by
+    // default (§7.9's *Just you* scope), so an empty list is the shipped
+    // table behaving, and printing it invites somebody to read a correct
+    // frame as a broken one. The banner in the frame carries the values.
     console.log(`${cell.id.padEnd(6)} ${cell.zoom.padEnd(6)} ${cell.types.length} dice`
-      + `  span=${(await a.dbg('framingCost()')).today.span}px  values=${values.join(',')}`);
+      + `  span=${(await a.dbg('framingCost()')).today.span}px`
+      + `  onFelt=${await a.diceCount()}`);
     console.log('  ' + await stage.shot(a, `${prefix}-${cell.id}.png`));
     const box = await centreDieBox(a);
     if (box) console.log(`  ${await crop(a, stage.out(`${prefix}-${cell.id}-crop.png`), box)}`
