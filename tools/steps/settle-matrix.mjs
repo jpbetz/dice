@@ -71,6 +71,27 @@ const SLEEPIER = { speed: 0.9, time: 0.2 };
 // of every type lands at 0.73-0.95 of its own ceiling.
 const PILE = { pileScale: 1.05 };
 
+// THE PRE-C30 TUNING, KEPT REACHABLE AFTER IT STOPPED BEING WHAT SHIPS
+// (2026-08-18). Every row here is an override on top of whatever js/main.js
+// holds, so the moment `feltgrip+gate4` shipped, this instrument lost the
+// ability to ask the question it was built for: is the new floor better than
+// the old one? `classic` restores the numbers `shipped` carried from the first
+// pass until 2026-08-18 — generic bouncy-dice values with cannon's 0.01
+// damping left in and the speed gate off.
+//
+// Every gate reads BACKWARD on this row and that is correct, not a failure:
+// it is the old floor judged against the new one, so gate a prints a shake
+// RISE. Read it as the ship diff with the sign flipped, and read
+// `feltgrip+gate4` as a no-op canary — since the ship it must reproduce
+// `shipped` cell for cell, and if it does not, what shipped is not what was
+// measured.
+const CLASSIC = {
+  floorFriction: 0.25, floorRestitution: 0.35,
+  diceFriction: 0.15, diceRestitution: 0.45,
+  wallFriction: 0.05, wallRestitution: 0.7,
+};
+const NOGATE = { gate: 0, slowLinear: 0, slowAngular: 0 };
+
 // ATTRIBUTION ONLY, AND IT IS NOT A SHIP CANDIDATE. Deaden does not replay
 // (one seed in sixteen comes back a different throw after 700 unrelated
 // throws) and the standing suspicion is the sleep boundary: a deadened die
@@ -116,6 +137,7 @@ const VARIANTS = [
   ['gate4', {}, { gate: 4, ...SLOW }, null, null],
   ['deaden+gate4', DEADEN, { gate: 4, ...SLOW }, null, null],
   ['feltgrip+gate4', { ...GRIP, ...DEADEN }, { gate: 4, ...SLOW }, null, null],
+  ['classic', CLASSIC, NOGATE, null, null],
   ['felt+target65', { ...GRIP, ...DEADEN, ...FELT_DAMP }, null, 0.65, null],
   // As specified — and NEARLY A NULL, which is itself the finding. dice.js
   // ships sleepSpeedLimit 0.4 / sleepTimeLimit 0.35, not cannon's 0.1 / 1, so
@@ -203,27 +225,37 @@ const PILE_ZOOMS = ['medium', 'close'];
 // The prior session's paired measurement of the SAME seed family. Not a
 // tuning target — a reproduction test for this rig.
 //
-// RE-ANCHORED TO THE POST-FLIP DEFAULTS, 2026-08-17. The values here were the
-// PRE-flip baseline (1.37 / 2.26 / 2.04 / 2.40 / 6.25 and shake 0.106 / 0.141 /
-// 0.152 / 0.191 / 0.212), and the 2026-08-11 flip — displacement terminator,
-// allowSleep false, the tempo curve, pileScale 1.05 — moved four of the five
-// duration cells by 9-38%. So the canary has MISSED on every run since the
-// flip, and printed "THE CANARY MISSED. The verdict above is not evidence."
-// under a verdict table that was in fact fine. A gate that is always red is a
-// gate everybody learns to scroll past, which is the same failure as one that
-// is always green.
+// THIS PAIR PINS A FILM, so it is re-anchored in the commit that moves one.
+// It has now been re-anchored twice, for two different reasons:
+//
+//   2026-08-17, to the post-flip defaults. The values had been the PRE-flip
+//   baseline (1.37 / 2.26 / 2.04 / 2.40 / 6.25 and shake 0.106 / 0.141 /
+//   0.152 / 0.191 / 0.212), and the 2026-08-11 flip — displacement
+//   terminator, allowSleep false, the tempo curve, pileScale 1.05 — moved
+//   four of the five duration cells by 9-38%. So the canary MISSED on every
+//   run for six days and printed "THE CANARY MISSED. The verdict above is not
+//   evidence." under verdict tables that were fine. A gate that is always red
+//   is a gate everybody learns to scroll past, which is the same failure as
+//   one that is always green.
+//
+//   2026-08-18, to the felt tuning (ROADMAP C30) — grip + deaden + the speed
+//   gate. Every duration cell fell 2-20% and every shake cell 30-43%, which is
+//   the ship diff and not drift. The values below are the `shipped` row of the
+//   run that shipped it; the row it replaces is exactly reproducible as the
+//   matrix's `classic` variant, and was: dur 1.39 / 1.47 / 1.26 / 2.19 / 4.15,
+//   shake 0.085 / 0.117 / 0.106 / 0.135 / 0.175.
 //
 // Measured, and REPRODUCED ACROSS TWO INDEPENDENT STAGE BOOTS (identical to
 // every digit printed here, plus a third agreement on the 4-seed determinism
-// quartet [1.6, 1.467, 1.167, 1.4]):
+// quartet [1.133, 1.033, 1.283, 1.367]):
 //
 //   node tools/drive.mjs tools/steps/settle-matrix.mjs 16 10 shipped
 //
 // Sixteen shake seeds. Re-anchor from a measured run, never by applying the
 // percentage deltas a record quotes: that is how two of the 2026-08-14
 // corrections went in wrong.
-const CANARY_DUR = { '1d20': 1.39, soul: 1.47, '4d6': 1.26, '8d6': 2.19, '20d6': 4.15 };
-const CANARY_SHAKE = { '1d20': 0.085, soul: 0.117, '4d6': 0.106, '8d6': 0.135, '20d6': 0.175 };
+const CANARY_DUR = { '1d20': 1.12, soul: 1.20, '4d6': 1.24, '8d6': 2.06, '20d6': 3.57 };
+const CANARY_SHAKE = { '1d20': 0.049, soul: 0.070, '4d6': 0.068, '8d6': 0.094, '20d6': 0.114 };
 
 const mean = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
 
@@ -399,6 +431,8 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
           let dice = 0;
           let flat = 0;
           let piledTrue = 0;
+          let worstTiers = 0;
+          let worstShare = 0;
           for (const seed of pileSeeds) {
             await throwOnce(types, seed, `${vname} ${z} ${pname}/${seed}`);
             await a.dbg('sim(600)');
@@ -411,18 +445,30 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
             // above it the die is on something, and it is the bar C30c said
             // any future check should use. The trio pool (d8/d6/d10) is where
             // they disagree — a d8 ceiling is 1.050, so 1.2 misses real stacks.
+            //
+            // `tiers` is the third reading and the only one gate d still
+            // BLOCKS on: how many of its own rest ceilings high the worst die
+            // in this throw is holding its centre. It is a depth, not a rate.
+            // A die on felt reads 0.73-0.95 (measured, every type,
+            // pile-bar.mjs), a die on one neighbour reads about 2, a die on a
+            // stack three deep reads about 3.
             const r = JSON.parse(await a.eval(`JSON.stringify((() => {
               const ds = window.__diceDebug.tableDice;
-              return [ds.filter((o) => o.body.position.y > 1.2).length,
-                ds.filter((o) => o.body.position.y
-                  > window.__diceDebug.restCeiling(o.type)).length];
+              const rc = (o) => window.__diceDebug.restCeiling(o.type);
+              return { n: ds.filter((o) => o.body.position.y > 1.2).length,
+                nTrue: ds.filter((o) => o.body.position.y > rc(o)).length,
+                tiers: ds.reduce((m, o) =>
+                  Math.max(m, o.body.position.y / rc(o)), 0) };
             })())`));
-            piled += r[0]; piledTrue += r[1]; dice += types.length;
-            if (r[0] === 0) flat++;
+            piled += r.n; piledTrue += r.nTrue; dice += types.length;
+            worstTiers = Math.max(worstTiers, r.tiers);
+            worstShare = Math.max(worstShare, r.nTrue / types.length);
+            if (r.n === 0) flat++;
             await clear();
           }
           piles.set(`${vname}|${z}|${pname}`,
-            { pct: (piled / dice) * 100, flat, n: piled, nTrue: piledTrue, dice });
+            { pct: (piled / dice) * 100, flat, n: piled, nTrue: piledTrue, dice,
+              worstTiers, worstShare });
         }
       }
       await a.dbg(`setZoom(${JSON.stringify(INERT.zoom)})`);
@@ -546,6 +592,23 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
           + (n === base ? '' : ` (${d >= 0 ? '+' : ''}${d.toFixed(1)}pp)`);
       })]));
 
+  // THE HEAP, which is a different question from the rate above and the only
+  // one gate d still blocks on. `tiers` is the worst single die in the cell,
+  // in units of its own rest ceiling; `share` is the worst single THROW's
+  // fraction of dice above the theorem bar. Both are per-throw worsts on
+  // purpose: a heap is a property of one throw, and a mean over 40 seeds
+  // would hide the one that collapsed.
+  console.log(`\nheap — worst die's height in its own rest ceilings, and the worst`
+    + ` throw's share of dice above the theorem bar.\n  Felt rest is 0.73-0.95 tiers;`
+    + ` a die on one neighbour is about 2; the C24 disaster was 10 of 12 dice`
+    + ` at ~7 tiers\n`);
+  table(['variant', ...pileCells.map(([z, p]) => `${z}/${p} tiers/share`)],
+    ran.filter(([n]) => piles.has(`${n}|${PILE_ZOOMS[0]}|${PILE_POOLS[0][0]}`))
+      .map(([n]) => [n, ...pileCells.map(([z, p]) => {
+        const c = piles.get(`${n}|${z}|${p}`);
+        return `${c.worstTiers.toFixed(2)}/${(c.worstShare * 100).toFixed(0)}%`;
+      })]));
+
   // --- wall-time -----------------------------------------------------------
   console.log(`\nper-throw cost, mean ms. "bake" = the throwSeeded call alone`
     + ` (the physics); "wall" = to an idle table\n`);
@@ -557,18 +620,60 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     })]));
 
   // --- verdict -------------------------------------------------------------
-  // THE PILE GATE IS TIGHTER THAN PASS ONE'S, deliberately. It was +3pp with
-  // a one-throw allowance on the flat count, which is the right bar for
-  // "does this tuning make piling worse"; pass three is judging a mechanism
-  // whose ENTIRE PURPOSE is the pile, so it has to hold the line exactly.
-  // Creep joins as its own gate for the same reason it was printed: a
-  // mechanism that stops dice sooner can buy a still picture by freezing one
-  // mid-slide, and creep is the only column that can tell.
+  // GATE D IS A HEAP FLOOR, NOT A PILE RATE (2026-08-18). It used to block on
+  // "every cell within +/-2pp of shipped, and close/6d6 flat-throws >=
+  // shipped's", and on that bar it refused `feltgrip+gate4` — the best
+  // physics candidate this table has measured, five of six gates, shake -35%
+  // and hops -14% to -32%. Joe overturned it:
+  //
+  //   "Pilling is OK. If you throw a lot of dice, it's your fault if they
+  //    pile up. Let's not try to prevent it."
+  //
+  // So the rate is now REPORTED and never blocks. The pp delta and the flat
+  // count still print, in the pile table and inside gate d's own cell, because
+  // a future tuning run should still be able to see what it cost — it just
+  // should not be stopped by it.
+  //
+  // WHAT THE FLOOR IS FOR. A die resting on another die is dice behaving like
+  // dice. A pool of dice in a tower is the solver, the mat or the spawn line
+  // having failed: C24 measured a refused fourth zoom notch putting TEN of
+  // twelve dice on top of each other in a heap nine units tall, which is not a
+  // piling rate anybody would argue about — it is a smudge where a table
+  // should be. That case has to stay catchable, and it is the only case this
+  // gate now judges.
+  //
+  // WHAT THE FLOOR IS NOT FOR. It is not a pile budget, not a regression
+  // detector, and not a bar a tuning is supposed to sit just under. Two dice
+  // touching passes it. Every throw in a cell putting one die on a neighbour
+  // passes it. If you want to know whether a candidate piles MORE than
+  // shipped, read the pile and heap tables — that number is measured on every
+  // run and this gate deliberately ignores it.
+  //
+  // THE TWO CONDITIONS ARE AND-ED so that neither alone can fire. Depth
+  // without breadth is one unlucky die on a short stack; breadth without depth
+  // is a crowded mat, which at `close` is what the zoom is FOR (its own
+  // tooltip sells density). Only both at once is a heap.
+  //
+  // AND IT IS CALIBRATED FOR POOLS THE MAT HAS ROOM FOR, which is what
+  // PILE_POOLS rolls: three dice and six. A pool that overflows the mat trips
+  // it legitimately, and that is not a bug in the pool — C24 measured 40d6 at
+  // `close` on the shipped ladder at 28 of 40 dice up and a max height of 5.3
+  // units, which for a d6 is 4.5 rest ceilings, so it clears both bars. Forty
+  // dice do not fit on a phone-sized mat and nobody claims they do. Do not
+  // extend PILE_POOLS past what the mat can lay out without re-deciding this.
+  const HEAP_TIERS = 3;   // a die whose centre sits three of its own rest
+                          // ceilings up is on a stack three deep
+  const HEAP_SHARE = 0.5; // and more than half the throw is off the felt
   console.log(`\nverdict — every gate judged against THIS run's shipped row\n`
     + `  a shake  mean reduction over ${SHAKE_GATED.join('/')} >= 20%\n`
     + `  b dur    no pool worse than shipped +5%\n`
     + `  c caps   total capped throws <= shipped's, AND 20d6 caps <= 1\n`
-    + `  d pile   every cell within +/-2pp of shipped, and 6d6@close flat-throws >= shipped's\n`
+    + `  d heap   no throw stacks a die ${HEAP_TIERS}+ rest-ceilings high with`
+    + ` >${HEAP_SHARE * 100}% of the pool off the felt.\n`
+    + `           The pile RATE is reported in [brackets] and does not block —`
+    + ` Joe, 2026-08-17:\n`
+    + `           "Pilling is OK. If you throw a lot of dice, it's your fault`
+    + ` if they pile up.\n            Let's not try to prevent it."\n`
     + `  e clock  per-pool mean wall <= 1.5x shipped\n`
     + `  f rest   same terminator AND same settle frame as shipped: creep no pool\n`
     + `           worse than +15%; a row that MOVES the settle frame — by swapping\n`
@@ -592,8 +697,14 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     const hasPile = piles.has(`${n}|${PILE_ZOOMS[0]}|${PILE_POOLS[0][0]}`);
     const worstPile = hasPile ? Math.max(...pileCells.map(([z, p]) =>
       piles.get(`${n}|${z}|${p}`).pct - piles.get(`${base}|${z}|${p}`).pct)) : NaN;
-    const flatOk = hasPile
-      && piles.get(`${n}|close|6d6`).flat >= piles.get(`${base}|close|6d6`).flat;
+    const closeFlat = hasPile ? piles.get(`${n}|close|6d6`).flat : NaN;
+    // The heap floor, over every cell. Both readings are per-throw worsts, so
+    // a cell fails only if ONE throw was both deep and broad.
+    const heapCells = hasPile ? pileCells.map(([z, p]) => piles.get(`${n}|${z}|${p}`)) : [];
+    const heaped = heapCells.filter((c) =>
+      c.worstTiers >= HEAP_TIERS && c.worstShare > HEAP_SHARE);
+    const worstTiers = hasPile ? Math.max(...heapCells.map((c) => c.worstTiers)) : NaN;
+    const worstShare = hasPile ? Math.max(...heapCells.map((c) => c.worstShare)) : NaN;
     const worstClock = Math.max(...SHAKE_POOLS.map(([p]) => got.get(`${n}|${p}`).wall / b(p).wall));
     const worstCreep = Math.max(...SHAKE_POOLS.map(([p]) =>
       (got.get(`${n}|${p}`).creep - b(p).creep) / b(p).creep));
@@ -657,11 +768,16 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
       [shakeCut >= 0.20, `a shake ${(shakeCut * 100).toFixed(0)}%`],
       [worstDur <= 0.05, `b dur ${worstDur >= 0 ? '+' : ''}${(worstDur * 100).toFixed(0)}%`],
       [caps <= baseCaps && caps20 <= 1, `c caps ${caps}/${baseCaps} 20d6 ${caps20}`],
-      // "within 2pp" read as ONE-SIDED: a cell that piles LESS than shipped is
-      // the point of the exercise, not a gate failure.
-      [hasPile && worstPile <= 2 && flatOk,
-        `d pile ${hasPile ? `${worstPile >= 0 ? '+' : ''}${worstPile.toFixed(1)}pp` : 'n/a'}`
-        + `${hasPile && !flatOk ? ' flat!' : ''}`],
+      // The heap floor decides; the rate rides along in brackets so it is
+      // never lost, and so a PASS can never be read as "the pile did not
+      // move". Both numbers are printed on every row including a clean one.
+      [hasPile && heaped.length === 0,
+        hasPile
+          ? `d heap ${worstTiers.toFixed(2)} tiers/${(worstShare * 100).toFixed(0)}%`
+            + `${heaped.length ? ' HEAP' : ''}`
+            + ` [rate ${worstPile >= 0 ? '+' : ''}${worstPile.toFixed(1)}pp,`
+            + ` close/6d6 flat ${closeFlat}/${nPile} vs ${piles.get(`${base}|close|6d6`).flat}]`
+          : 'd heap n/a'],
       [worstClock <= 1.5, `e clock ${worstClock.toFixed(2)}x`],
       restGate,
     ];

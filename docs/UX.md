@@ -7013,6 +7013,12 @@ seven, 40d20 at the cap). Before and after: collider `4d6b5640`, RUN DIGEST
 `17dae9ba`. Unchanged, as it must be: `createDieBody` builds from the base
 polyhedron and has never seen the beveled twin.
 
+**The RUN DIGEST moved on 2026-08-18 and the collider did not** (§7.61, the
+C30 felt tuning): `17dae9ba` → **`424d10e4`**, collider still `4d6b5640`. If
+you run this tool today, `424d10e4` is what it should print. A physics tuning
+is entitled to move the film and is never entitled to move a hull, which is
+why the tool prints the two separately.
+
 The invariant to hold going into Tier 3 is **the mesh stays inside the physics
 hull** (`edge-price.mjs` prints it per type), *not* "the resting plane never
 moves". The mesh's lowest point does move — six of seven types, by ≤ 0.0037
@@ -7322,3 +7328,166 @@ replaces three bakes of guessing. The next round on this model should do that
 first and change no geometry until it has.
 
 Frames: `shots/flare-{before,after}-{moonrise,foxfire}-resting.png`.
+
+### §7.61 — The dice stop bounding, and piling stops being a defect (2026-08-18)
+
+*No new pixel and no new control. The dice on this table land quieter, settle
+sooner, and end up on each other more often than they did — and the third of
+those is why the first two waited four measured passes over eight days. What
+unblocked it was not a measurement. It was Joe answering a question nobody had
+put to him plainly.*
+
+#### ① The complaint, and how far short the table was
+
+Joe, on the settle, twice: the dice must *"really magnetize themselves to the
+surface once they're landed, no more bounding like they're on the moon"*, and
+the tail is *"a very slow, very shaky process by which the dice slide and
+wiggle-move until they are stable… super awkward to watch."*
+
+Both halves have a meter. **`shake`** is the share of the 0.6 s before each die
+stops in which it reverses direction — the wiggle. **`hops`** is the count of
+separate times a die goes back UP in that window — the moon. Neither is a
+proxy: both are read off the baked film, not reported by whatever mechanism
+produced them.
+
+#### ② What shipped
+
+| | before | after |
+| --- | --- | --- |
+| floor friction / restitution | 0.25 / 0.35 | **0.6 / 0.15** |
+| dice friction / restitution | 0.15 / 0.45 | **0.4 / 0.2** |
+| wall friction / restitution | 0.05 / 0.7 | **0.2 / 0.5** |
+| speed-gated damping | off | **gate 4, 0.1 linear / 0.14 angular** |
+
+Grip, deaden, and the gate — settle-matrix's `feltgrip+gate4` exactly. Nothing
+else moved; `NUDGE.pileScale` is still 1.05.
+
+#### ③ The measurement, and the command that reproduces it
+
+The tuning it replaces is kept as the matrix's `classic` row, so this is a
+repeatable A/B rather than a historical one:
+
+```
+node tools/drive.mjs tools/steps/settle-matrix.mjs 16 40 classic
+```
+
+16 shake seeds, 40 pile seeds, paired. `classic` → `shipped`:
+
+| meter | 1d20 | soul | 4d6 | 8d6 | 20d6 |
+| --- | --- | --- | --- | --- | --- |
+| shake | −43% | −40% | −35% | −30% | −35% |
+| hops | −14% | −25% | −22% | −20% | **−32%** |
+| duration | −20% | −18% | −2% | −6% | −14% |
+
+Throws reaching the 9 s cap: **1 → 0**. Worst per-pool wall clock **1.03×**.
+Every pool is faster; nothing on this table has ever won all three columns at
+once before.
+
+#### ④ The cost, said plainly
+
+Dice pile more. Measured on all four cells over 40 paired seeds, worst first:
+`close`/6d6 **+6.3pp** (23 of 240 dice against 8) with flat throws **33/40 →
+23/40**; `medium`/6d6 +3.3pp; `close`/trio +2.5pp; `medium`/trio +0.8pp. The
+canonical Soul Deal trio — attribute + skill + motivation — is in that last
+pair, so this is not confined to a pool nobody rolls.
+
+The mechanism was never in doubt and it is the reason no fix exists: **on this
+mat, sliding apart is how dice separate.** `spawnDie` lines a throw up along one
+edge with `Math.min(TABLE_W - 4.4, count * 2.6)` of spread, and at `medium` that
+clamp bites — six dice start 0.84 apart when the spacing wants 2.6, and they
+were relying on bounce and skid to fan out. Deaden takes the bounce, grip takes
+the skid. **The shake win and the pile loss are the same fact.** Four passes
+tried three instruments against it — the nudge, the terminator, the spawn line —
+and priced all three; the record is in SHIPPED.md.
+
+#### ⑤ The ruling, which is what actually changed
+
+> *"Pilling is OK. If you throw a lot of dice, it's your fault if they pile up.
+> Let's not try to prevent it."* — Joe, 2026-08-17
+
+Nothing was added to prevent it and nothing was tuned to soften it. The pass
+that shipped this took no new measurement of the physics; it re-ran the same
+one, got the same answer, and applied a different verdict to it.
+
+#### ⑥ What replaced the gate, and the distinction it draws
+
+His ruling is that the app should not try to *prevent* piling. It is not that
+any pile is fine — C24 measured a refused fourth zoom notch putting **ten of
+twelve dice in a heap nine units tall**, which is goal 5 ("organized over
+realistic") failing outright and reads as a smudge under a camera framed for a
+flat table. So the bar moved from a rate to a shape:
+
+- **Reported, never blocking:** the pile rate, per cell, against the baseline —
+  printed in settle-matrix's pile table and inside gate d's own cell, so a
+  future tuning run can see what it cost without being stopped by it.
+- **Blocking:** the **heap** — one throw stacking a die **three or more of its
+  own rest ceilings** high with **more than half the pool off the felt**. Both
+  AND-ed, because depth without breadth is one unlucky die on a short stack and
+  breadth without depth is a crowded mat, which at `close` is what the zoom is
+  for; its own tooltip sells density.
+
+`tiers` is the unit that makes this readable: a die's centre height in multiples
+of `restCeiling(type)`, the highest a convex die touching the felt can hold its
+centre. Felt rest measures **0.73–0.95** tiers for every type, a die on one
+neighbour about **2**, a stack three deep about **3**. Measured headroom under
+either tuning, worst cell of four: **1.95 tiers and 3 of 6 dice off the felt**.
+
+**The floor is calibrated for pools the mat has room for**, and the code says
+so. C24 measured 40d6 at `close` on the shipped ladder at 28 of 40 dice up and a
+max height of 5.3 units — 4.5 rest ceilings — so a pool that overflows the mat
+clears both bars legitimately. Forty dice do not fit on a phone-sized mat and
+nobody claims they do.
+
+#### ⑦ The floor that would not have caught it, and the one that would
+
+`dice-land-flat` sampled three throws and needed 2 of 3 flat. At the per-throw
+flat rate this table produces at `close`/trio — **36/40 now, 39/40 before** — a
+2-of-3 majority passes **97%** and **99.8%** of the time. It was green either
+side of the exact move it existed to catch, and a green run there proves
+nothing. It caught C30c only because that regression was an order larger: three
+clean throws in ten.
+
+Seeing a pile-rate move at all needs about **40 paired seeds a cell**. That
+belongs in a tool and not in the suite: `commandRoll` takes a server seed, so
+scenario throws are unpaired and half the sample would go on seed variance, and
+it is 160 throws a variant. The matrix measures it on every physics run now,
+blocking or not. **Writing a scenario for it would buy a two-minute sweep cost
+to defend a number the owner has ruled is not a defect** — so it was not
+written, and this paragraph is the record of that decision.
+
+What the scenario asserts instead is the heap, at every zoom, for both pools —
+including `close`/6d6, **which asserted nothing at all before** and is the cell
+this tuning moved most. A heap is not a coin flip: the C24 mat put ten of twelve
+dice up on *every* throw, so a per-throw bar has full power where the
+majority-flat bar had almost none.
+
+#### ⑧ The film moved, and that is the invariant to be careful with
+
+One seed, one film, every client. A physics tuning rewrites the film by design,
+so every recorded expectation that pinned one is a deliberate update, re-run
+rather than adjusted. `edge-film.mjs` says it in one line: **collider
+`4d6b5640` before and after — unchanged, and a tuning has no business touching a
+hull — and RUN DIGEST `17dae9ba` → `424d10e4`**, every per-pool digest and frame
+count with it.
+
+Seven sites were re-anchored and they are listed in the ship commits. The kind
+worth carrying into the next pass is the one that does not look like a pin at
+all: **a seed chosen for an outcome**. `pile-refusal` named two 6d6 seeds
+because they landed flat, and the new tuning piles both. `audio-phases` named
+one because a die on it was still turning after the bake called it landed, and
+the new tuning retires dice with less left in them, so no die on that seed
+qualifies any more. Neither reads as a recorded film. Both are.
+
+**Three of the seven were found by the full sweep and not by reasoning about
+the change**, which is the argument for running it: the two `audio-phases`
+carriers and the camera rung. The physics and perf tags alone would have
+missed the audio pair entirely.
+
+#### ⑨ What proves it is the thing that was measured
+
+Two checks, because "we shipped the candidate" is exactly the claim that
+deserves one. Run against the shipped build, `feltgrip+gate4` is a **no-op
+canary** — it sets what the app already holds, and every cell of every table
+reads **+0.0%**. And `replay-drift.mjs shipped 8 900 20d6`, one pool per
+invocation as the campaign rule requires, is **8/8 byte-identical** after 900
+unrelated throws.
