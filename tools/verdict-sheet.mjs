@@ -25,22 +25,26 @@ limitations under the License.
 // rather than by tier number, with the question stated in one sentence and
 // the consequence of either answer written down beside it.
 //
-// IT IS THREE ITEMS LONG NOW, AND THAT IS THE POINT. The 2026-08-18 sitting
-// answered all eight in about an hour and everything it opened has been built
-// and deployed; what is left is three. A page padded back to eight would cost
-// him the same hour for a third of the information, and re-asking something he
-// has already answered is how a queue stops being trusted — so what the last
-// sitting CLOSED is rendered at the top (`CLOSED_LAST_SITTING`) and the queue
-// below it is only what is genuinely open.
+// THE QUEUE IS EMPTY AS OF 2026-08-18. Eleven questions were answered that
+// day across two sittings and everything they opened has been built and
+// deployed. `ITEMS` is empty on purpose; `CLOSED_LAST_SITTING` holds the
+// record of what was decided. Refill `ITEMS` when there is something real to
+// ask.
 //
-//   node tools/drive.mjs tools/steps/flare-look.mjs           # item 1, AFTER
-//   git checkout 48bd128 -- models/towers/ \
-//     && node tools/drive.mjs tools/steps/flare-look.mjs tag=before \
-//     && git checkout HEAD -- models/towers/                  # item 1, BEFORE
-//   node tools/drive.mjs tools/steps/grip-look.mjs 1000       # item 2
-//   node tools/verdict-sheet.mjs                              # this page
+// Two rules the page has earned, worth keeping when it is refilled:
 //
-// Item 3 is a LISTEN and has no frames: it is two clicks on the live table.
+//  1. Refill to a full page and ask once. One-at-a-time asking produced one
+//     verdict in a fortnight; the page produced eleven in two sittings.
+//  2. Never leave an answered question on it. Re-asking something already
+//     answered is how a queue stops being trusted.
+//
+// WRITE IT PLAINLY. Joe asked for this directly on 2026-08-18, about this
+// page: state the question, then the consequences. No build-up, no capitals
+// for emphasis, no bold for drama. Say what failed and what is unknown —
+// flatly.
+//
+//   node tools/drive.mjs tools/steps/<step>.mjs   # render the frames first
+//   node tools/verdict-sheet.mjs                  # then build the page
 //
 // SINGLE FILE, ON PURPOSE. Frames are downscaled and embedded as JPEG data
 // URIs, so `shots/verdicts.html` opens from the filesystem with no server and
@@ -218,11 +222,19 @@ const STALE = new Map();
 // again; a queue that is always eight deep teaches the opposite.
 const CLOSED_LAST_SITTING = {
   when: '2026-08-18',
-  headline: 'Eight items, about an hour, and every one of them answered. Four approvals closed four '
-    + 'entries outright, two two-word decisions became builds that have since shipped, one "not yet" '
-    + 'became two more rounds on the stump, and ten voices were heard for the first time. The five '
-    + 'separate askings over the previous fortnight had produced one verdict between them.',
+  headline: 'Eleven items answered on 2026-08-18, in two sittings. Everything they opened has been '
+    + 'built and deployed. Nothing below is being re-asked.',
   groups: [
+    { label: 'Answered in the second sitting', tone: 'good', rows: [
+      ['The Hollow Bole’s base', 'Approved. The shape is settled. The pale band at the foot is still '
+        + 'there and is not settled — the next step on it is the paint bisect, a diagnostic bake, not '
+        + 'another guess.'],
+      ['C30, the piling', '“Pilling is OK. If you throw a lot of dice, it’s your fault if they pile '
+        + 'up. Let’s not try to prevent it.” The tuning ships. Gate d stops being a blocker and '
+        + 'becomes a reported number.'],
+      ['The two fae ground impacts', 'Approved. The audio queue is now closed except for one unheard '
+        + 'row (IMPACT_VOICES.chime, three grounded-table sets).'],
+    ] },
     { label: 'Approved — closed, and not re-asked here', tone: 'good', rows: [
       ['W7 ② the staging of the glade', '“Focus is the dice. This looks perfectly fine.”'],
       ['W5 the living layer', 'the fireflies, the wisps and the moot procession; the governor’s curves are final'],
@@ -238,16 +250,15 @@ const CLOSED_LAST_SITTING = {
         + 'tower clunks, frozen in tests/voices.test.mjs as APPROVED_2026_08_18 with equality '
         + 'assertions, the first sign-off this palette has ever had'],
       ['One design killed', 'the ringing die in the two fae venues — deleted, not re-tuned a third '
-        + 'time. That kill is item 3 below, and it is the only reason any audio row is on this page'],
+        + 'time. Re-listened and approved the same day.'],
       ['One row still unheard', 'IMPACT_VOICES.chime survives for three grounded-table sets (seaglass, '
         + 'sealed resin, focuscrystal) carrying a re-voice commissioned by the caller that was just '
         + 'deleted. Small, not a blocker, and deliberately NOT padded onto this page'],
     ] },
-    { label: 'Not yet — and this is item 1 below', tone: 'open', rows: [
+    { label: 'Was not yet, now answered', tone: 'good', rows: [
       ['The round-6 grounded stump', '“It’s still a set piece in my eyes… nothing to make it feel '
         + 'rooted.” Round 7 found the cause was not on the model at all (its contact shadow had been '
-        + 'UNDER the glade floor since the venue shipped) and round 10 re-baked the flare. Item 1 is '
-        + 'that re-bake'],
+        + 'UNDER the glade floor since the venue shipped) and round 10 re-baked the flare. That re-bake was approved in the second sitting'],
     ] },
   ],
 };
@@ -262,183 +273,19 @@ const REGEN_FLARE_BEFORE = 'git checkout 48bd128 -- models/towers/ && '
 const REGEN_GRIP = 'node tools/drive.mjs tools/steps/grip-look.mjs 1000';
 
 const ITEMS = [
-  {
-    n: 1,
-    id: 'flare',
-    kind: 'LOOK',
-    title: 'The Hollow Bole’s base — the flare, re-baked',
-    where: 'ROADMAP Tier W · W3 round 10, SHIPPED 2026-08-18 · docs/UX.md §7.59 · docs/TOWER.md',
-    unblocks: 'Your “still a set piece” from the last sitting, second answer. It is the only thing '
-      + 'left on this tower’s track: approving it sends hollowbole to the paint bisect and then to '
-      + 'the ledger item, and overruling it sends the base back for a fourth bake.',
-    question: 'The foot no longer tucks under itself and the roots no longer end together — is the '
-      + 'base a better shape, even though the pale band is still there?',
-    stakes: {
-      approve: 'The base’s SHAPE is settled and stops being re-opened. Round 11 on this model is the '
-        + 'paint bisect described below — a diagnostic, not another guess — and after it the ledger '
-        + 'item (the pale machined face at the shell’s x-clamp plane, which reads as a sawn plank in '
-        + 'side views).',
-      overrule: 'The base re-opens as another bake with its own gates and review. The paint bisect '
-        + 'still has to happen first either way, because three geometry changes have now failed to '
-        + 'move the band and a fourth would be the fourth guess.',
-    },
-    notes: [
-      { kind: 'finding', text: 'SAY IT FIRST: THE PALE RUFFLED BAND AT THE FOOT IS STILL IN THE '
-        + 'FRAME. If that band is your complaint verbatim, this round does not clear your bar and the '
-        + 'honest answer is "not yet". What the round did establish about it, by elimination in the '
-        + 'app’s own room: it is painted by ONE surface (hiding towerSkinBoleShell removes it '
-        + 'entirely; hiding the dressing, the shelves, the curtain and the contact ring each leaves '
-        + 'it untouched) — and three separate changes to that surface’s radius field, the root '
-        + 'envelopes, the bay ceiling and the base band’s grain frequency, each moved the field '
-        + 'measurably and NONE of them moved those pleats. That triple null is why the next step is a '
-        + 'paint bisect (one diagnostic bake with each surface class at a flat separable colour, ten '
-        + 'minutes) rather than a fourth bake of inference.' },
-      { kind: 'plain', text: 'What did change, in geometry rather than in taste. The old base was a '
-        + 'BELL: measured over the arc you can see, 13 of the 13 headings that had a flare on them '
-        + 'were widest ABOVE the soil, with up to 0.44 of tuck back in underneath, and every root '
-        + 'ended at the same height. Now: 0 bells of 10, the roots leave at six heights instead of '
-        + 'one (knee spread 0.20 → 0.60), the widest row of the outline is below the soil, and the '
-        + 'sill apron — a lens whose maximum was in mid-air — is deleted.' },
-      { kind: 'plain', text: 'BEFORE is not a memory and not last week’s screenshot: round 9’s baked '
-        + 'GLBs were restored into today’s tree, the same step re-run, and the files put back. Only '
-        + 'the mesh differs between the two halves of every pair — no colour constant moved in this '
-        + 'round at all, which was the rule it was given.' },
-      { kind: 'plain', text: 'The foot crops are the same frames, magnified. The box is derived from '
-        + 'the built mesh’s own world footprint through the live camera, so both halves of a pair are '
-        + 'cropped to within half a pixel of each other and the difference you see is the model.' },
-    ],
-    groups: [
-      { label: 'THE QUESTION — the foot at Moonrise, magnified',
-        regen: REGEN_FLARE_BEFORE, cols: 2, pair: true,
-        frames: [
-          { file: 'flare-before-moonrise-foot.png', cap: 'BEFORE — round 9: the hem splays wide and '
-            + 'the wood curves back under it, every root dying at one height' },
-          { file: 'flare-after-moonrise-foot.png', cap: 'AFTER — round 10: shipped today' },
-        ] },
-      { label: 'The same question in the other sky — Foxfire',
-        regen: REGEN_FLARE_BEFORE, cols: 2, pair: true,
-        frames: [
-          { file: 'flare-before-foxfire-foot.png', cap: 'BEFORE (round 9)' },
-          { file: 'flare-after-foxfire-foot.png', cap: 'AFTER — shipped today' },
-        ] },
-      { label: 'And the whole room at the resting eye, because a base is judged standing in a place',
-        regen: REGEN_FLARE, cols: 2, pair: true,
-        frames: [
-          { file: 'flare-before-moonrise-resting.png', cap: 'BEFORE · Moonrise Glade' },
-          { file: 'flare-after-moonrise-resting.png', cap: 'AFTER · Moonrise Glade' },
-        ] },
-      { label: 'Foxfire Hollow, the resting eye', regen: REGEN_FLARE, cols: 2, pair: true,
-        frames: [
-          { file: 'flare-before-foxfire-resting.png', cap: 'BEFORE · Foxfire Hollow' },
-          { file: 'flare-after-foxfire-resting.png', cap: 'AFTER · Foxfire Hollow' },
-        ] },
-    ],
-  },
-
-  {
-    n: 2,
-    id: 'c30',
-    kind: 'CALL',
-    choices: ['overturn the refusal', 'the refusal stands', 'not yet'],
-    title: 'C30 — the calmest dice ever measured here, and the heap they make',
-    where: 'ROADMAP THE ORDER #6 · C30 residual, RUN 2026-08-17 and REFUSED on the pile alone',
-    unblocks: 'The last physics item. The build refused this candidate on ONE gate of six against a '
-      + 'bar the build itself wrote, and a bar is exactly the kind of thing only your eye can '
-      + 'overturn — so it is here rather than closed quietly.',
-    question: 'This tuning is your “magnetize themselves to the surface once they’re landed, no more '
-      + 'bounding like they’re on the moon” — shake −35%, hops −32%, every pool faster — and it pays '
-      + 'for it by clustering six dice and perching one on top of another: is that heap worth calmer '
-      + 'dice?',
-    stakes: {
-      approve: 'Gate d’s BAR is what changes, not the tuning. That is a real cost and it is stated '
-        + 'up front: every physics constant moves, so replay-drift runs first, every film-pinning '
-        + 'expectation in the suite re-anchors, and the character change gets its own UX §7 entry.',
-      decline: 'C30 closes as measured-and-refused, and the open question stays where it is — nobody '
-        + 'has proposed a way to make dice separate WITHOUT the skid. Every other instrument aimed at '
-        + 'the pile is already priced and refused.',
-    },
-    notes: [
-      { kind: 'finding', text: 'JUDGE THE PILE OFF THESE STILLS AND NEVER OFF THE SHAKE. The costs '
-        + 'and the wins live in different media: the win is motion over the last 0.6 s and a still '
-        + 'cannot show it, while the cost is the final arrangement, which a still shows better than '
-        + 'any clip. If you go and roll this in the app you will be shown the flattering half — the '
-        + 'shake — and the thing being decided will be off screen. Compare only WITHIN a pair: same '
-        + 'zoom, same pool, same seed, one variable.' },
-      { kind: 'plain', text: 'Five gates of six say ship. Shake −35% (−30 to −43 across pools). Hops '
-        + '−32% at 20d6, the largest move ever measured on that meter here. Every pool faster, worst '
-        + '−2%. Wall-clock 1.01×. Cocked-die corrections 0, against shipped’s 1. The sixth gate is '
-        + 'the pile: close/6d6 goes +6.3pp and its clean throws fall 33/40 → 23/40, which is three '
-        + 'times its allowance, and all four cells regress.' },
-      { kind: 'plain', text: 'A number worth distrusting, from the run itself: at 10 seeds the same '
-        + 'cell read +3.3pp and the trio read perfectly clean. The cheap run flatters this candidate, '
-        + 'and the refusal is a 40-seed number. The e2e floor that reads like the pile guard would not '
-        + 'have caught it either — it samples three throws and passes ~99% of the time at this '
-        + 'candidate’s rate.' },
-      { kind: 'plain', text: 'The cell that fails is `close`, whose own tooltip says “biggest dice, '
-        + 'best on a phone” — opt-in density, not the default. The medium/trio pair below is the '
-        + 'canonical Soul Deal roll and is here as reassurance: 0 piled under BOTH tunings, and the '
-        + 'candidate arguably separates the pair that shipped leaves touching.' },
-    ],
-    groups: [
-      { label: 'THE QUESTION — close / 6d6, seed 1000, the cell the refusal turns on',
-        regen: REGEN_GRIP, cols: 2, pair: true,
-        frames: [
-          { file: 'grip-close-6d6-shipped', cap: 'SHIPPED — six dice flat and spread, 0 piled, '
-            + 'highest rest 0.67' },
-          { file: 'grip-close-6d6-feltgrip', cap: 'CANDIDATE — clustered, and one die perched at '
-            + '2.03, plainly resting on another' },
-        ] },
-      { label: 'THE REASSURANCE — medium / trio, the canonical roll, same seed',
-        regen: REGEN_GRIP, cols: 2, pair: true,
-        frames: [
-          { file: 'grip-medium-trio-shipped', cap: 'SHIPPED — 0 piled' },
-          { file: 'grip-medium-trio-feltgrip', cap: 'CANDIDATE — 0 piled, and the d8/d6 that shipped '
-            + 'leaves touching are apart' },
-        ] },
-    ],
-  },
-
-  {
-    n: 3,
-    id: 'faeground',
-    kind: 'LISTEN',
-    title: 'The two fae ground impacts, re-listened — two clicks',
-    where: 'docs/AUDIO.md §9.1 C · the killed-design record in SHIPPED.md · UX §7.60',
-    unblocks: 'The one row you rejected. Everything else in this palette is approved and frozen with '
-      + 'equality assertions, so this is the whole of what is left of the audio queue — and it is the '
-      + 'only item on this page that is not answerable from the page itself.',
-    question: 'You said this landing sounded horrible twice; the ringing die is deleted and a die now '
-      + 'lands in Moonrise Glade and Foxfire Hollow with the ordinary knock — is it right now?',
-    stakes: {
-      approve: 'No audio item is open. The fae venues stop carrying a voice of their own for impacts '
-        + 'and the palette is closed.',
-      overrule: 'One edit, already located: both fae `ground` rows to `{centre: 1, length: 1, gain: '
-        + '1}`, after which a fae landing is byte-identical to a landing on the grounded table. That '
-        + 'is the only lever left on this path and it is deliberately yours.',
-    },
-    notes: [
-      { kind: 'plain', text: 'What was removed, exactly: one line. The Witchlight set’s '
-        + '`sound: {body: "chime", weight: 0.22, sustain: 65}` recipe is deleted, so the two fae '
-        + 'venues fall through to the same contact every unthemed die on the grounded table already '
-        + 'makes. No fourth set of numbers was authored — a third re-tuning is what you had already '
-        + 'rejected twice. Measured on the graph: a Moonrise landing goes from 1745 Hz to 346 Hz, its '
-        + 'energy above the 1.5 kHz wood/metal line from 54% to 2%, and the decaying sine partial at '
-        + '714 Hz is gone entirely.' },
-      { kind: 'plain', text: 'THE ONE THING THAT IS STILL DIFFERENT IS THE DESIGN, NOT A LEFTOVER. '
-        + 'Each fae venue keeps a `ground` trim that can only DARKEN, shorten and quieten a contact, '
-        + 'so a fae landing is the same body about a third of an octave darker than the grounded '
-        + 'table rather than identical to it. That was chosen deliberately and the arithmetic is why: '
-        + 'zeroing those trims — the naive reading of "just use the normal sound" — would have taken '
-        + 'the landing you rejected from 1745 Hz UP to 2344 Hz. The trim was never part of the '
-        + 'complaint; it was the one thing already pulling the way you asked. If you want the venues '
-        + 'to sound exactly like the table anyway, that is the overrule above.' },
-      { kind: 'plain', text: 'Why "the chime is fine, the ground is not" was never available as a '
-        + 'reading: the Witchlight set is venue-only, and the standing venue’s ground rides every '
-        + 'non-clunk contact. There is no way to ask this app for a Witchlight die without a fae '
-        + 'floor under it, so the three rows AUDIO.md lists were always one rendered sound.' },
-    ],
-    listen: true,
-  },
+  // Empty on purpose. The three questions this page carried on 2026-08-18 were
+  // all answered that day (see CLOSED_LAST_SITTING above), and an answered
+  // question left on the page is how a queue stops being trusted. Refill it
+  // when there is something real to ask, and refill it to a full page rather
+  // than one item at a time: eleven answers in two sittings came after a
+  // fortnight of one-at-a-time asking had produced one.
+  //
+  // An item is: { n, id, kind, title, where, unblocks, question, stakes,
+  // notes, groups } — or { listen: true } for a listening pass. Git history
+  // has three worked examples; `git log -p tools/verdict-sheet.mjs` finds them.
+  //
+  // Write them plainly. State the question, then the consequences. No
+  // build-up, no capitals for emphasis, no bolding for drama.
 ];
 
 // THE LISTENING SCRIPT IS NOT AUTHORED HERE — it is docs/AUDIO.md §9.1's C
@@ -753,7 +600,7 @@ function pageHtml(frames, stats) {
 <!-- generated by tools/verdict-sheet.mjs — regenerate, never edit -->
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The sitting — every open LOOK and LISTEN</title>
+<title>The sitting</title>
 <style>
   :root { --bg:#0e1013; --card:#161a1f; --line:rgba(255,255,255,0.10); --ink:#e9e3d4;
     --dim:#98a0a8; --gold:#cdbe8a; --red:#e2705a; --green:#8fce9b; }
@@ -895,14 +742,13 @@ function pageHtml(frames, stats) {
 <body>
 <div class="wrap">
 <header class="top">
-  <h1>The sitting — every open LOOK and LISTEN in one page</h1>
-  <p class="sub">Two LOOKs and one listening pass. <b>Three items, and that is the whole queue</b> —
-    it was eight on 2026-08-18, you answered all eight, and everything they opened has been built and
-    deployed. Nothing has been invented to pad it and nothing you have already answered is asked
-    again. Each item states the question in one sentence, shows the frames side by side, and says
-    what happens either way. The last row of every item records your answer; the button at the bottom
-    copies all of them out as text. <b>Item 3 is the only one that needs the live table</b> — the
-    other two are answerable from this page alone.</p>
+  <h1>The sitting</h1>
+  <p class="sub">${ITEMS.length
+    ? `${ITEMS.length} question${ITEMS.length > 1 ? 's' : ''} waiting on you. Each one states the `
+      + 'question, shows the frames, and says what happens for each answer. Your answer goes in the '
+      + 'last row of the item. The button at the bottom copies all the answers out as text.'
+    : 'Nothing is waiting on you. Everything asked so far has been answered, built and deployed. '
+      + 'The record below is what those answers decided.'}</p>
   <p class="stampline">generated ${esc(stats.when)} · tree ${esc(stats.sha)} ·
     ${stats.embedded} frames embedded${stats.missing ? ` · <b style="color:#e2705a">${stats.missing} MISSING</b>` : ''} ·
     ${stats.stale
