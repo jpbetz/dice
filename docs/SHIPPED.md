@@ -3173,6 +3173,108 @@ no rule can fix it in an 86px box).
 
 ---
 
+## The audio sitting — eight voices approved, the ringing die KILLED (2026-08-18)
+
+**The day every sound in this app stopped being unheard.** Nine of the ten
+voices in [AUDIO.md](AUDIO.md) §9 had never been played to a person and the
+tenth had been playable since V1 with nobody sitting with it. Joe sat with all
+of them twice in one day. Full record in AUDIO.md §9.0 (first sitting) and
+§9.0b (second); this is the consequence.
+
+### APPROVED — eight voices, the first sign-off this palette has ever had
+
+> *"All other audio sounds good."* · *"Everything else is fine."*
+
+| rows | what is approved |
+|---|---|
+| **A1 A2 A3** | the three room beds — the ×5 level fix (−59.8 → −45.9 dBFS), the `u³ → u^1.6` tick law, the fae `pink` make-up gains, the **pitched drips**, and the whole new `swell` layer |
+| **B1 B2** | Heartwood and Bastion, after exchanging voices — *"they feel reversed to what I'd expect"* |
+| **B3** | Black Anvil's new `bell` body — centroid −15%, Q 2.8 → 1.8, 5 ms attack, loudness held to 0.02 dB |
+| **B4 B5** | Nullstone and Hollow Bole, approved twice over (*"sounds good"* at both sittings) |
+
+`tests/voices.test.mjs` freezes these as `APPROVED_2026_08_18` and asserts
+**equality, not direction**. The reasoning is worth keeping: a verdict is the
+scarcest thing in this file. Getting these cost an hour of his time across two
+sittings, and an approved voice that drifts is not a regression you can measure
+your way out of — the information is gone, and the only way back is to spend
+the hour again.
+
+### KILLED — the ringing die (C1/C2/C3), and the defect that killed it
+
+> *"When the dice hit the ground it sounds horrible in the two venues… Just
+> use a normal sound I think.. The idea you had was fun but unfortunately is
+> just not working."*
+
+**The design:** the fae venues' staged Witchlight set carried its own impact
+voice — `sound: {body: 'chime', weight: 0.22, sustain: 65}`, "a long faint cold
+ring, glass struck in another room" — so a labradorite die landing in a night
+clearing rang like the stone it claims to be.
+
+**THE NAMED DEFECT, in one sentence:** *a resonant, partial-bearing body is a
+bell, and a landing in this app is never struck once — one die brings a sine
+partial plus a five-tap settle cluster inside 145 ms, times every die in the
+pour, so a voice that is an event at one strike is clanking at forty.*
+
+**Why that is a kill and not a fourth re-tuning.** The first sitting said *"I
+hate this sound. I'd prefer something far less sharp"* and got exactly that:
+the shared `chime` body came down 3400 → 1750 Hz with its Q opened 2.8 → 1.5
+and 7 ms of attack, taking a glade landing's centroid down 37% and its energy
+above the wood/metal boundary from 97% to 54%. **He heard that and said it
+still sounds horrible.** The band was never the variable. `tests/voices.test
+.mjs` freezes the rejected numbers as `REJECTED_2026_08_18` so the next pass
+can see that tuning was tried twice before anything was deleted.
+
+**The fix is a deletion, and that is the whole of it.** The set's `sound` key
+is gone (`js/themes.js`), so `impactVoice` returns null and `impactPresetOf`
+resolves `IMPACT_DEFAULT_BODY` at weight 0 — byte-for-byte the knock every
+unthemed die on the grounded table already makes. *"Just use a normal sound"*,
+expressed as the absence of a special one.
+
+**Three things deliberately NOT done, each with its reason:**
+
+1. **`IMPACT_VOICES.chime` was not removed.** Three grounded-table sets still
+   declare it (seaglass, a sealed resin, focuscrystal) and **none of them has
+   ever been heard**. Deleting the body would silently re-voice three sets
+   nobody complained about. Its 3400 → 1750 move is also *not* covered by any
+   approval — it was commissioned by a caller that no longer exists — and it is
+   not reverted either, because he never heard 3400 on those three and putting
+   the body back up an octave and a half on nobody's word is a second unjudged
+   change instead of one. **It belongs on the next listening page.**
+2. **The venues' `ground` trims were not zeroed**, and the arithmetic refuses
+   it rather than taste: a trim that only ever makes a contact duller, shorter
+   and quieter was the one element of that chain already pulling the way he
+   asked. Neutralising both rows — the naive reading of "use the grounded
+   table's sound" — would have taken a glade landing from **1745 Hz up to 2344
+   Hz** and from 54% to 83% of its energy over the boundary. The cost of
+   keeping them is that a fae landing is about a third of an octave darker than
+   a grounded one rather than identical to it; that is the one lever left, and
+   it is one edit if he wants it.
+3. **The fae bed drips were not touched.** See the near-miss below.
+
+### The near-miss — a well-evidenced wrong reading, kept on purpose
+
+His first message named *"the clankyness of the Moonrise glade and Foxfire
+Hollow"*, and this pass began by reading that as the **fae bed drips**. The
+evidence was real: the drips are the only pitched events in the app and sit at
+**Q 6 and Q 7**, against the Q 2.8 that earned the word "clanky" on Black Anvil
+— the two narrowest resonances anywhere in the codebase. The beds had also just
+changed, and the C family was *thought* to be exonerated because C1, the
+Witchlight chime, appeared to be covered by "all other audio sounds good".
+
+**Every step of that was defensible and the conclusion was wrong.** He named
+the venues, not the beds, and clarified: dice hitting the ground. Two lessons:
+
+- **"C1 is approved, therefore the chime is fine" was never available.** The
+  Witchlight set is `venueOnly` and the venue's ground rides every non-clunk
+  contact, so **the app cannot produce C1 without a fae floor under it** —
+  AUDIO.md §9's C1 and C2 are the same rendered sound, heard once. A row split
+  in a document was mistaken for a distinction in the audio.
+- **The drips are now APPROVED**, frozen with `pitched: true` and their Q in
+  `APPROVED_2026_08_18` — which is precisely the assertion that would have
+  caught this pass had it acted on its first reading.
+
+---
+
 # Moved out of ROADMAP.md (2026-08-14 cleanup)
 
 ROADMAP.md had grown to 3,723 lines, of which most was shipped narrative,

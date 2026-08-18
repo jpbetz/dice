@@ -7133,3 +7133,87 @@ finishes the transition (`getAnimations().forEach(a => a.finish())`) and prices
 the ring the eye gets — alpha and spread, both non-zero — which is TESTING.md
 P10's rule about gating the rendered quantity rather than the authored one,
 applied to a quantity nobody had noticed was authored.
+
+---
+
+### §7.60 — A bell is not a knock: the fae dice stop ringing (2026-08-18)
+
+*The audio counterpart of a UX rule this file states in a dozen other places:
+**a signal that fires once is a highlight, and the same signal fired forty
+times is noise.** There is no new pixel here and no new control. What changed
+is that the dice in Moonrise Glade and Foxfire Hollow now make the ordinary
+sound instead of a special one, and the reason is worth a section because the
+same mistake is available in every layer of this app.*
+
+#### ① What was built, and why it read as right
+
+The fae venues stage the **Witchlight** set — tumbled labradorite, witchlight
+in the carvings — and the set carried its own impact voice to match:
+`sound: {body: 'chime', weight: 0.22, sustain: 65}`, authored as *"a long faint
+cold ring — glass struck in another room"*. That is exactly the reasoning this
+file endorses everywhere else: a venue is chosen as **one coherent whole**
+(GOALS goal 13), and a stone die that looks like struck glass should sound like
+struck glass. Its own comment admitted the catch — *"REASONED FROM THE TABLE,
+NEVER LISTENED TO"*.
+
+#### ② The verdict, twice
+
+| sitting | his words | what was done |
+| --- | --- | --- |
+| first | *"I hate this sound. I'd prefer something far less sharp"* | the shared `chime` body re-voiced **3400 → 1750 Hz**, Q **2.8 → 1.5**, attack **0 → 7 ms** — a glade landing down **37%** of its centroid and from 97% to **54%** of its energy above the wood/metal line |
+| second | *"When the dice hit the ground it sounds horrible in the two venues… Just use a normal sound I think.. The idea you had was fun but unfortunately is just not working."* | **killed** |
+
+**The first fix was delivered in full and did not help**, and that is the
+finding. The complaint was never about *where the band sat*.
+
+#### ③ The named defect — the rule this section exists to state
+
+> **A resonant, partial-bearing body is a bell, and a landing in this app is
+> never struck once.** One die brings a sine partial plus a five-tap settle
+> cluster inside 145 ms, times every die in the pour. A voice that is an
+> *event* at one strike is *clanking* at forty, and no amount of moving its
+> band changes the arithmetic of how often it fires.
+
+That generalises past audio, which is why it is here rather than only in
+[AUDIO.md](AUDIO.md). This file already refuses result-valenced stings, capped
+the shock ring at one per roll, and keeps §1's "one bright element, as an
+isolated highlight, never as texture". **The chime broke that last rule in the
+time domain rather than the spectral one** — it *was* the one bright element,
+and it fired on every contact of every die.
+
+#### ④ The fix is a deletion
+
+The set's `sound` key is gone. `impactVoice` returns null, `impactPresetOf`
+resolves `IMPACT_DEFAULT_BODY` at weight 0, and a fae die lands as **the
+ordinary knock every unthemed die on the grounded table already makes** —
+*"just use a normal sound"* expressed as the absence of a special one. No new
+preset was authored, because a fourth set of numbers is exactly what he had
+already rejected twice.
+
+#### ⑤ What is deliberately still different, and what it costs
+
+The venues' **ground** rows are kept (`centre` ×0.72 / ×0.66, plus length and
+gain). They are not implicated: a trim that only ever makes a contact duller,
+shorter and quieter was the one part of the chain already pulling the way he
+asked, and the arithmetic is blunt about it — **zeroing them would have taken
+the rejected voice from 1745 Hz UP to 2344 Hz**. The honest cost, stated rather
+than buried: a fae landing is about **a third of an octave darker** than a
+grounded one rather than identical to it. That is the one lever left, it is one
+edit, and it is Joe's.
+
+#### ⑥ The near-miss, kept because the evidence was good
+
+This pass began by reading *"the clankyness of the Moonrise glade and Foxfire
+Hollow"* as a complaint about the **fae ambient drips**, which are the only
+pitched events in the app and sit at **Q 6 and Q 7** — against the Q 2.8 that
+earned the word "clanky" on Black Anvil, the two narrowest resonances anywhere
+in the codebase. The reading also leaned on "he approved C1, the Witchlight
+chime, so the chime is exonerated".
+
+**That last step was never available**, and the code says so: the Witchlight
+set is `venueOnly` and the venue's ground rides every non-clunk contact, so
+**the app cannot produce C1 without a fae floor under it**. [AUDIO.md](AUDIO.md)
+§9's C1 and C2 are one rendered sound listed as two rows. *A split in a document
+was mistaken for a distinction in the product* — which is the §7-wide hazard
+worth carrying away, and the reason the drips are now frozen as **approved**
+in `tests/voices.test.mjs` rather than merely left alone.

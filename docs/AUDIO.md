@@ -306,6 +306,24 @@ place says what that material does when it lands in it. A `moss` *body* was the
 other design and it is worse: the venue stages a set whose voice always wins,
 so a venue body would resolve on shrouded rolls only, i.e. almost never.
 
+**What the fae venues' dice now land as, and why the ground row outlived the
+die's own voice (2026-08-18, §9.0b).** The staged Witchlight set used to bring
+`chime 0.22/65` — "a long faint cold ring" — and Joe's verdict on the live
+table was *"when the dice hit the ground it sounds horrible in the two
+venues… just use a normal sound."* **The set's `sound` recipe is deleted**, so
+a fae die resolves `IMPACT_DEFAULT_BODY` at weight 0: the ordinary knock, with
+the venue's floor over it and nothing else. The multiplier design is what made
+that a one-line kill — because the venue's contribution was never a *body*,
+removing the die's voice left a working sound rather than a hole.
+
+**The trim itself was never implicated and is deliberately kept.** It only ever
+makes a contact duller, shorter and quieter, so it was the one part of that
+chain already pulling the way he asked; zeroing both fae rows — the naive
+reading of "use the grounded table's sound" — would have taken a glade landing
+from **1745 Hz up to 2344 Hz**. What it costs is that a fae landing is about a
+third of an octave darker than a grounded one rather than identical to it, and
+**that is the one lever left** if the next sitting says it is still not normal.
+
 Four properties hold this together, and each is checkable rather than promised:
 
 1. **The grounded room is inert BY CONSTRUCTION**, not by care — every `table`
@@ -611,6 +629,22 @@ rates and notes, `BED_SWELL`, the `chime` body, the new `bell` body, and which
 tower wears which voice. Every one of them is in `js/voices.js` and every one
 is measured in `tests/voices.test.mjs`.
 
+**And then APPROVED, later the same day** (§9.0b). Every dial in the list above
+except the `chime` body now carries a human verdict, which changes what this
+section is for: **these are no longer dials, they are settings.** A dial you
+turn without a new verdict is a verdict thrown away.
+
+- **`BED_PINK` / `BED_BROWN` / `BED_CRACKLE` / `BED_TICK_SHAPE` / `BED_SWELL`
+  and every `VENUE_AUDIO` bed row — APPROVED.** *"All other audio sounds
+  good."* Frozen in `tests/voices.test.mjs` as `APPROVED_2026_08_18`. The
+  fae drips keep their **note** and their Q 6 / Q 7 bands: they look like the
+  clankiest things in the app on paper and he judged them fine.
+- **All five `CLUNK_VOICES` rows — APPROVED**, including the B1/B2 swap and
+  B3's new `bell`. B4 and B5 are now approved twice over.
+- **The `chime` body is NOT approved and never was.** Its 3400 → 1750 re-voice
+  was commissioned by a caller that has since been deleted; three unheard
+  grounded-table sets carry it now. It belongs on the next listening page.
+
 **Still untouched and still his:**
 
 - `ROLL_GAIN` 0.05 and the 0.12 rolling sum clamp — the loudness of the
@@ -629,17 +663,20 @@ is measured in `tests/voices.test.mjs`.
 - Clunk density on 40-die pours. If it grates, drop `POUR.clunkMax` to 3
   rather than reshaping the plan.
 
-**The three single numbers most likely to want turning next**, in order, if
-the second sitting says "close, but":
+*(This section used to list three numbers "most likely to want turning next if
+the second sitting says close, but" — `BED_SWELL`, the two bed levels and the
+fae drip rates. **The second sitting said good.** All three are approved and
+none of them is a candidate any more.)*
 
-1. **`BED_SWELL` 0.022** — the slow layer is the biggest new thing in the room
-   and the one with no prior verdict at all. If the rooms move too much, this
-   is one number; `swell: null` on a row removes the layer from that room
-   outright.
-2. **`BED_PINK` 0.015 / `BED_BROWN` 0.030** — ×5 was derived from a dBFS
-   target, not heard. Everything scales together.
-3. **The fae drip rates** (1.15/s and 2.6/s) — still a *guess at how often a
-   wood drips*, and nothing else in the app is as easy to find annoying.
+**The one number still likely to want turning, after §9.0b:**
+
+1. **The two fae `ground` rows** — the only thing still separating a fae
+   landing from a grounded one, now that the ringing die is gone. They cost
+   about a third of an octave of darkness. `{centre: 1, length: 1, gain: 1}` on
+   both makes a landing in the glade byte-identical to one on the felt, which
+   is the strictest reading of *"just use a normal sound"*. Kept as-is because
+   a trim that only subtracts was never what he was objecting to (§9.0b
+   finding 3) — but it is his call, and it is one edit.
 
 ## 8. Where the tests are
 
@@ -676,6 +713,16 @@ Two choices in that ruler are load-bearing and are argued in the file:
 What it proves is that a change **moved, in the direction a word asked for, by
 an amount somebody wrote down** — which turns "please listen again" into
 "please listen again and tell me if the direction was right".
+
+**Since §9.0b it carries a second kind of constant, and the difference
+matters.** `BASELINE_2026_08_17` is a record of sounds that were *wrong*, kept
+so a fix can be shown to have moved; `APPROVED_2026_08_18` is a record of the
+eight that are *right*, and it is asserted with **equality rather than
+direction**. An approved voice that drifts is not a regression you can measure
+your way out of — the verdict is simply gone, and the only way back is another
+hour of Joe's time. A third block, `REJECTED_2026_08_18`, freezes the C rows as
+he heard them on the live table, which is what makes "this was tuned twice and
+tuning is not the answer" a claim with numbers behind it rather than a mood.
 
 `tools/steps/voice-spectra.mjs` is its partner and catches the other lie: it
 drives a real tab and asks `impactVoicingFor` / `venueAudioInfo` — the same
@@ -745,6 +792,10 @@ thing changes between consecutive rows.**
 
 ### 9.0 THE RECORD — first sitting, 2026-08-18
 
+*Every "re-listen?" in this table has since been answered — see §9.0b. Eight
+rows came back **approved** and the three C rows came back **killed**. The
+column is left as it was written because the record is the point.*
+
 | # | voice | **his words** | what changed | re-listen? |
 |---|---|---|---|---|
 | A1 | The Table (bed) | *"sounds like white noise mostly"* | bed +13.9 dB; tick law `u³→u^1.6`; new swell layer (fire's body, 1 per 12 s) | **YES** |
@@ -763,6 +814,70 @@ thing changes between consecutive rows.**
 They are the only two data points of his taste being *satisfied* and they are
 the reference the others were sized against — B3 was deliberately **not**
 taken down into their register.
+
+### 9.0b THE RECORD — second sitting, 2026-08-18, on the live table
+
+**He listened to all of the above and answered it in two sentences.** This is
+the sitting that turned this palette from a set of arguments into a set of
+verdicts, and §9.0 above is now history rather than a to-do list.
+
+> *"I still dislike the clankyness of the Moonrise glade and Foxfire Hollow.
+> Just use a normal sound I think.. The idea you had was fun but unfortunately
+> is just not working. **All other audio sounds good.**"*
+>
+> …and, asked which part: *"When the dice hit the ground it sounds horrible in
+> the two venues. **Everything else is fine.**"*
+
+| rows | verdict | what happened |
+|---|---|---|
+| **A1 A2 A3** the three beds | **APPROVED** | nothing. The ×5 level fix, the `u^1.6` tick law, the fae make-up gains, the **pitched drips** and the swell layer all stand |
+| **B1 B2 B3 B4 B5** the five clunks | **APPROVED** | nothing. The swap, the new `bell`, and the two that were already good |
+| **C1 C2 C3** the ringing die | **KILLED** | the Witchlight set's `sound` recipe is **deleted**. Its dice now land on `IMPACT_DEFAULT_BODY` — the ordinary knock — in both venues |
+
+**Eight voices are approved and it is the first sign-off this palette has ever
+had.** `tests/voices.test.mjs` freezes them as `APPROVED_2026_08_18` and
+asserts equality rather than direction: an approved voice that drifts is a lost
+verdict, and the only way to get it back is to spend another hour of his time.
+
+**Three findings, and the first one is a correction of §9.0's own headline.**
+
+1. **C1/C2/C3 were not merely one body — they were one rendered *sound*, and
+   the app could never have produced the other two.** §9.0 finding 1 got the
+   body right and stopped one step short. Two facts compose: the Witchlight set
+   is `venueOnly`, so it is reachable *only* as the staged set of the two fae
+   venues; and `groundFor(isClunk)` puts the standing venue's ground over every
+   non-clunk contact. **There is no way to ask this app for the Witchlight die
+   without a fae floor under it** — `tools/steps/voice-spectra.mjs` had already
+   run into exactly this and said so in a comment. §9.1's C route never leaves
+   Moonrise Glade, so C1 and C2 were the same sound heard twice. That is why
+   *"everything else is fine"* cannot be read as approving C1 while condemning
+   C2: **there was no separate C1 to approve.**
+2. **The defect was the body being used for a COLLISION, not the band it sat
+   at.** The first sitting's *"far less sharp"* was delivered in full — 3400 →
+   1750, Q 2.8 → 1.5, 7 ms of attack, a glade landing down 37% of its centroid
+   and from 97% to 54% of its energy over the wood/metal line — and he heard
+   *that* and said it still sounds horrible. A resonant, partial-bearing body
+   is a bell, and **this app never strikes a landing once**: one die brings a
+   sine partial plus a five-tap settle cluster inside 145 ms, times every die
+   in the pour. Struck once it is an event; struck forty times in two seconds
+   it is clanking. No band moves that.
+3. **The venue's ground trim was never a candidate**, and the arithmetic says
+   so rather than the taste. It only ever makes a contact duller, shorter and
+   quieter — it was the one element of that chain pulling the way he asked.
+   Zeroing the two fae ground rows, which is the naive reading of "use the
+   grounded table's sound", would have taken a glade landing from **1745 Hz up
+   to 2344 Hz** and from 54% to 83% of its energy above the boundary. **The
+   rows are kept**, and they are the one remaining lever if the next sitting
+   says it is still not normal enough.
+
+**One near-miss worth keeping**, because it is the shape of mistake this file
+exists to prevent: *"clankyness of the Moonrise glade and Foxfire Hollow"* was
+first read as a complaint about the **fae bed drips**, and the reading was well
+evidenced — the drips are pitched and sit at **Q 6 and Q 7**, against the Q 2.8
+that earned the word "clanky" on Black Anvil, making them the narrowest
+resonances anywhere in the app. It was wrong. He named the *venues*, and what
+he meant was dice landing. **The drips are approved and stay pitched**; the
+freeze in `tests/voices.test.mjs` is what would now catch a repeat.
 
 **Four things the first sitting taught that were not in any row:**
 
@@ -853,23 +968,33 @@ does not.
 
 Stay in **Moonrise Glade** from B5. Every roll is now Witchlight on moss.
 
-**These three rows are one body.** C1 is the Witchlight `chime`; C2 and C3 are
-that same chime with each venue's ground over it. It has moved a long way — the
-band is down 46%, the sine partial welded to its front is down with it, and it
-has 7 ms of attack where it used to start at full gain on its first sample.
+**THE THREE C ROWS ARE ONE ROW, and the script should stop pretending
+otherwise.** They were three *contexts* of the Witchlight set's `chime` — and
+because that set is `venueOnly` and the venue's ground rides every non-clunk
+contact, the app cannot make C1 without a fae floor under it. §9.0b finding 1.
+The route below never leaves the glade between C1 and C2, so those two were
+always the same sound heard twice.
+
+**And the body is gone.** The set's `sound` recipe was deleted 2026-08-18
+(§9.0b): a fae die now lands on `IMPACT_DEFAULT_BODY` — the same `felt` knock
+every unthemed die makes — with the venue's floor over it and nothing else.
 
 | # | Voice | The two clicks | Listen for | asked |
 |---|---|---|---|---|
-| C1 | **Witchlight** `chime 0.22/65` | *(a row)* → **Roll** | "a long faint cold ring — glass struck in another room", now an octave and a half of it lower. It should still be the **one bright element** on the table (§1) and no longer a whistle | is "far less sharp" far enough, or too far? |
-| C2 | **Moonrise ground** ×0.72 / ×0.85 / ×0.90 | *(a row ×8)* → **Roll** | the same die landing in moss: dull, short, absorbed — and now with **most of its energy under the wood/metal line**. Judge the **settle tail** hardest — five taps in ~145 ms is where a floor either sounds soft or sounds broken — then the grind as the pile rolls out | — |
-| C3 | **Foxfire ground** ×0.66 / ×0.78 / ×0.85 | **Foxfire Hollow** → **Roll** | the same again, deader. **If C2 and C3 are indistinguishable the two rows should collapse into one** — still open, and the 2026-08-18 pass did not widen the gap between them | — |
+| C1 + C2 | **Moonrise landing** — `felt` under ×0.72 / ×0.85 / ×0.90 | *(a row ×8)* → **Roll** | **a knock, not a bell.** No ring, no note under it, nothing above the wood/metal line. Judge the **settle tail** hardest — five taps in ~145 ms is where a floor either sounds soft or sounds broken — then the grind as the pile rolls out | is this "a normal sound"? |
+| C3 | **Foxfire landing** — `felt` under ×0.66 / ×0.78 / ×0.85 | **Foxfire Hollow** → **Roll** | the same again, a touch deader. **If C2 and C3 are indistinguishable the two rows should collapse into one** — still open, and neither 2026-08-18 pass widened the gap | — |
 
-**The single control that answers most of section C** is
-`VENUE_AUDIO[venue].ground.centre` in `js/voices.js`. It moves the impacts,
-the whole settle tail, the rolling surface band and the tilt curve *together*,
-by design — so one number per venue is the first thing to turn, and everything
-else in §2.5 is a detail beside it. **The single control that answers most of
-section A** is `BED_SWELL`, then the two bed levels.
+**The one lever left in section C**, and it is the answer if the knock still
+does not sound normal enough: the two fae `ground` rows in `js/voices.js`. They
+are kept because a trim that only ever *subtracts* was the one thing pulling
+the old voice the way he asked (§9.0b finding 3), and they cost the fae rooms
+about a third of an octave against the grounded felt. **Set both to all-1s and
+a fae landing becomes byte-identical to a grounded one** — one edit, and it
+should be his call. `ground.centre` moves the impacts, the whole settle tail,
+the rolling surface band and the tilt curve *together*, by design.
+
+**The single control that answers most of section A** is `BED_SWELL`, then the
+two bed levels — but note that section A is **approved** and needs no sitting.
 
 **Deliberately not in this script:** the duck (§5) is unchanged and keeps its
 own dials, and the living layer has no voice at all — refusal 13 says why.

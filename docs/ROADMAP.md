@@ -28,8 +28,12 @@ by *finishing what is in flight*.
    behind is closed. What remains is one half-built feature, one structural
    bet, and a long design-first tail.
 2. **Track B is BUILT and entirely blocked on Joe.** Tier W has no unbuilt
-   step. **Seven** LOOK verdicts and **ten** unheard voices stand between it
-   and done, plus two judgements no measurement can make. There is now a single
+   step. **Seven** LOOK verdicts stand between it and done, plus two judgements
+   no measurement can make. **The voices are no longer among them** — all ten
+   were heard on 2026-08-18, eight are approved and one design was killed
+   ([W6b](#w6b-the-listening--done-2026-08-18-no-audio-item-is-open)); one small
+   unheard row (`IMPACT_VOICES.chime`) is all that is left of the audio queue.
+   There is now a single
    page that turns all of it into one sitting — `shots/verdicts.html`, **which
    is rendered and then built, in that order**
    ([how](#the-sittings-page-is-rendered-then-built-in-that-order); the frames
@@ -54,7 +58,7 @@ by *finishing what is in flight*.
 | # | Item | Why it is here | Size | Track |
 | --- | --- | --- | --- | --- |
 | ~~1~~ | ~~Joe's LOOK and LISTEN sitting~~ — **SAT 2026-08-18, all eight answered** ([the record](#the-sitting--sat-2026-08-18-and-it-is-the-day-this-tier-stopped-waiting)) | **The whole of Track B was gated on this and is not any more.** Four approvals (W7 ②, W5, W4, C25 Stage 2), one *not yet* (the grounded stump — *"still a set piece… nothing to make it feel rooted"*), two decisions that are now build items (`preferDice` ON, the standard dice wear `round .090`) and ten voices heard, eight needing work. **Cost him about an hour; five separate askings over the previous fortnight had produced one verdict.** Refill the page to eight and ask once — never drip-feed it. | done | B |
-| 1b | **The re-asks the sitting created** | The stump's round 7, eight of the ten voices, and a re-listen. Same rule: they go back on ONE page, together, not one at a time. Rebuild it with the two commands in [the note below](#the-sittings-page-is-rendered-then-built-in-that-order). | ~20 min of Joe, once refilled | B |
+| 1b | **The re-asks the sitting created** | ~~The stump's round 7, eight of the ten voices, and a re-listen.~~ **The AUDIO half is CLOSED** — he re-listened the same day, approved eight voices and killed one design ([W6b](#w6b-the-listening--done-2026-08-18-no-audio-item-is-open)). What is left on this row is the **stump's round 7** plus one small unheard row (`IMPACT_VOICES.chime`, which three grounded sets still carry). Same rule: they go back on ONE page, together, not one at a time. Rebuild it with the two commands in [the note below](#the-sittings-page-is-rendered-then-built-in-that-order). | ~20 min of Joe, once refilled | B |
 | ~~2~~ | ~~[**§2l ⑥'s RENDERING**](#2l-pool-analysis--①⑥-all-shipped-the-last-of-them-2026-08-17)~~ **SHIPPED 2026-08-17** | The curve of the total renders in `#pop-preview` on every ± door, plus a target clause in the one-line validator. §2l is now ①–⑥ complete; **it is owed a move to SHIPPED.md**, which this pass did not own. Its two live dependents are #4's sibling (§5's local statistics, now unblocked — `sumForecast(…).mean`/`.sd` are the expected term) and UX §2.1's `showOdds`, still deliberately unbuilt. | — | A |
 | ~~3~~ | ~~C22's `room.setup` stamp~~ — **SHIPPED 2026-08-17** ([C22](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15-closed-2026-08-17), UX §7.49 ⑥) | Not ~10 lines and not `maybeRepushTable`: the server **rewrote** the payload field by field, so the stamp needed `server.js` and `js/net.js` too, and the authoring writer is `portablePushToTable`. The three wrong claims are recorded in C22. | small | A |
 | ~~4~~ | ~~§5 — roll-log export~~ — **SHIPPED 2026-08-17** ([§5](#5-capture-mechanisms), UX §7.49) | Plain-text transcript, `Copy` + `Download` in a log-flyout foot. `portableDownload()` was in `js/main.js`, not `js/portable.js`; **CSV was refused** and the reason is in UX §7.49 ②. | small | A |
@@ -1648,16 +1652,48 @@ client enters the venue — two people in one room would hear the ring speak at
 different moments while watching the same caps light. Marked at the site where
 the next person will reach for it.
 
-**What is left is LISTENING, and it is #1 in THE ORDER.** `docs/AUDIO.md` §9
-is the script: **ten** rows of exactly two clicks, ordered so one thing changes
-between consecutive rows. Note the count the roadmap had wrong — **there are
-FIVE tower clunk voices, not four** (`nullstone`'s hush was missed), so with
-the Witchlight chime and W6's numbers **every voice in the app is unheard**.
-
 *Five claims in docs/AUDIO.md were false against the code and are corrected in
 place — including `perHitBufferAllocs` "must stay 0", which actually reads 2
 whenever the bed is up and is 0 in every scenario only because ambience
 defaults off.*
+
+### W6b. The listening — DONE 2026-08-18. **NO AUDIO ITEM IS OPEN.**
+
+*This entry said "what is left is LISTENING, and it is #1 in THE ORDER". It was
+sat twice in one day and there is nothing left to ask. Record:
+[SHIPPED.md](SHIPPED.md) and [AUDIO.md](AUDIO.md) §9.0 / §9.0b.*
+
+**Eight voices APPROVED** — *"All other audio sounds good"* / *"Everything else
+is fine"*: the three room beds (with their ×5 level fix, the `u^1.6` tick law,
+the **pitched** fae drips and the new swell layer) and all five tower clunks
+(the Heartwood/Bastion swap, Black Anvil's new `bell`, and the two that were
+already good). **The first sign-off this palette has ever had.**
+`tests/voices.test.mjs` freezes them as `APPROVED_2026_08_18` with equality
+assertions — a verdict costs an hour of Joe and cannot be re-derived.
+
+**One design KILLED — the ringing die** (C1/C2/C3). *"When the dice hit the
+ground it sounds horrible in the two venues… just use a normal sound."* The
+Witchlight set's `sound: {body: 'chime'}` recipe is deleted, so the fae venues'
+dice land on `IMPACT_DEFAULT_BODY` — the ordinary knock. **The named defect:**
+*a resonant, partial-bearing body is a bell, and a landing here is never struck
+once* — one die brings a sine partial plus a five-tap settle cluster inside
+145 ms, times every die in the pour, so a voice that is an event at one strike
+is clanking at forty. It had already been re-tuned once for *"far less sharp"*
+(3400 → 1750, Q 2.8 → 1.5, −37% centroid) and he rejected that too, which is
+what makes this a kill rather than a third attempt.
+
+**Two things a follow-up pass should NOT re-open:** the venues' `ground` trims
+(zeroing them would have made the rejected voice *brighter* — 1745 → 2344 Hz —
+so they were never implicated; the remaining cost is that a fae landing is a
+third of an octave darker than a grounded one, and that is Joe's one lever if
+he wants it) and the **fae bed drips**, which this pass nearly deleted on a
+well-evidenced misreading and which are now frozen as approved.
+
+**The one audio thing still unheard, and it is small:** `IMPACT_VOICES.chime`
+survives for three grounded-table sets (seaglass, sealed resin, focuscrystal).
+Its 3400 → 1750 re-voice was commissioned by the caller that has just been
+deleted, so those three now carry an unjudged change. **One row for the next
+listening page** — not a blocker for anything.
 
 ### W3 round 9. The stump is rooted — SHIPPED 2026-08-18, **LOOK OPEN**
 
