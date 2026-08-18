@@ -23,13 +23,16 @@ limitations under the License.
 //
 // Four numbers, and only two of them are budgets:
 //
-//  · THE SHAPE, per type — the RESOLVED geo recipe beside its vertex count
-//    and its `minY`, the lowest point of the render mesh in its own frame.
-//    minY is NOT a budget, it is an EQUALITY: the physics hull does not know
-//    the mesh exists, so a recipe that moved a mesh's extent would have moved
-//    where the die visibly meets the felt while the body kept resting exactly
-//    where it always did. Every recipe insets INTO the base solid (the fillet's
-//    Bézier stays inside hull(q1, ctrl, q2)), so this number must not move.
+//  · THE SHAPE, per type — the RESOLVED geo recipe, its vertex count, and the
+//    one hard invariant: THE MESH LIVES INSIDE THE PHYSICS HULL. The body is
+//    the sharp base solid and does not know the mesh exists, so a mesh that
+//    reached past its own hull would poke through the felt the body is resting
+//    on. `r <= hullR` is therefore a PASS/FAIL, not a budget.
+//    `minY` (the mesh's lowest point in its own frame) rides along as a
+//    diagnostic and it DOES move with the recipe — a fillet bulges back toward
+//    the original sharp edge, so it sits nearer the hull than a flat chamfer's
+//    chord. Only the d6 is exactly still, because a cube's local frame puts a
+//    FACE down and a face plane is the one thing no bevel can move.
 //  · DRAW CALLS. A mesh's vertex count does not change how many draws it
 //    takes — a die is one mesh in `faces+1` material groups either way — so
 //    this number is the check that the change stayed in the vertex buffer.
@@ -94,20 +97,26 @@ export default async function edgePrice(stage, args) {
   console.log(`THE STANDARD EDGE: ${JSON.stringify(edge)}`);
   console.log(`  (7 die types built cold in ${cold.ms} ms — geometry is cached per type|variant,`);
   console.log('   so this is paid once per page, not once per die)\n');
-  console.log('type   verts   tris        r      minY   recipe');
-  console.log('-----  ------  -----  --------  --------  ------------------------------');
+  console.log('type   verts   tris    mesh r    hull R   inside      minY');
+  console.log('-----  ------  -----  --------  --------  ------  --------');
   let totalVerts = 0;
-  const minYs = new Set();
+  let outside = 0;
   for (const type of types) {
     const s = stats[type];
     totalVerts += s.verts;
-    minYs.add(s.minY);
+    const hullR = await t.dbg(`restCeiling(${JSON.stringify(type)})`);
+    const ok = s.r <= hullR;
+    if (!ok) outside++;
     console.log(`${type.padEnd(5)}  ${String(s.verts).padStart(6)}  ${String(s.tris).padStart(5)}`
-      + `  ${s.r.toFixed(4).padStart(8)}  ${s.minY.toFixed(4).padStart(8)}  ${JSON.stringify(s.geo)}`);
+      + `  ${s.r.toFixed(4).padStart(8)}  ${hullR.toFixed(4).padStart(8)}`
+      + `  ${(ok ? 'yes' : 'NO').padStart(6)}  ${s.minY.toFixed(4).padStart(8)}`);
   }
   console.log(`total  ${String(totalVerts).padStart(6)}`);
-  console.log(`\nMESH EXTENTS (minY): ${[...minYs].map((v) => v.toFixed(4)).join(', ')}`
-    + '\n  An EQUALITY, not a budget — compare it against the previous run.');
+  if (outside) {
+    console.log(`\n  ${outside} TYPE(S) REACH PAST THE PHYSICS HULL — the mesh would poke`);
+    console.log('  through the felt its body is resting on.');
+    process.exitCode = 1;
+  }
 
   // --- what a frame costs ------------------------------------------------
   const audit = (label) => t.dbg('renderAudit()').then((a) => {

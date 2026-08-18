@@ -627,7 +627,20 @@ const BEVEL = 0.055; // inset share of each corner's distance to its face centro
 // still means a lapidary CUT and not a 0.02 fillet. Wearers: the `std`
 // variant, the shroud, and the whole CLASSICS house — the sets that are the
 // standard die in another colour. Everything else names its own.
-const STD_EDGE = Object.freeze({ bevel: 0.055, profile: 'cut' });
+// Joe chose it on the lab bench 2026-08-18 from `std` ↕ `round .090` ↕
+// `round .130` — the soft candidate, neither the sharp cut that shipped for
+// a year nor the recipe ceiling. It is exactly the bench's `lab.round090`:
+// bevel .09, profile round, everything else default (3 arc strips per edge,
+// band ink .12 because a worn edge is frosted rather than inked). The d6's
+// mesh comes out BIT-IDENTICAL to that bench row, which is the check.
+//
+// It costs 3.4× the render vertices of the cut it replaces (1476 → 5040 over
+// the seven types) and ZERO draw calls — a die is one mesh in `faces+1`
+// material groups either way, so the frame's shipped budget (`scene-draw-budget`
+// asserts calls ≤ 220) does not move. Priced at the pool cap with
+// `node tools/drive.mjs tools/steps/edge-price.mjs 40 d20`. If a field report
+// ever names the cost, `segments: 2` is the lever: 3480 verts, ~69%, measured.
+const STD_EDGE = Object.freeze({ bevel: 0.09, profile: 'round' });
 function withStandardEdge(geo) {
   if (geo && (geo.bevel != null || geo.profile != null)) return geo;
   return geo ? { ...geo, ...STD_EDGE } : STD_EDGE;
