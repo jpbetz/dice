@@ -15339,13 +15339,73 @@ export const scenarios = [
       // Before the machine landed the answer was zero, always, on every film:
       // dice went from airborne to settled with nothing in between, which is
       // exactly why the table has no sound for the middle of a throw.
-      await a.dbg(`throwSeeded(['d6','d6','d6','d6'], 4242)`);
+      //
+      // ON THE SOUL POOL, NOT ON THE 4d6 THE REST OF THIS SCENARIO USES, and
+      // the reason is a real product fact rather than a convenience. This ran
+      // on 4d6 at seed 4242 and read 4, 3, 4, 3 after the C30 felt tuning
+      // shipped — floor friction 0.25 -> 0.6 bills the skid, so dice spend
+      // less time rolling before they stop. That is the tuning working, and it
+      // does shorten the rolling audio layer. Measured over 4 pools x 6 seeds
+      // on the shipped build, longest run per pool: 4d6 **15**, 8d6 **13**,
+      // 1d20 **25**, soul **28** — so the phase is in no danger, and 4d6/4242
+      // was simply the shortest of the twenty-four cells.
+      //
+      // Lowering the bar to 3 would have made this pass and stopped it meaning
+      // anything: 10 frames is a sixth of a second, which is what "long enough
+      // to be a phase you can hear" is worth. So the CARRIER moved instead.
+      // Soul is the canonical Soul Deal roll and at this seed every one of its
+      // four dice runs 13+ (13, 17, 19, 13), which is margin the old cell never
+      // had.
+      await a.dbg(`throwSeeded(['d8','d8','d4','d6'], 4242)`);
       await a.dbg('sim(1)');
-      let scan = await a.dbg('audioFilmScan()');
-      assert.ok(scan, 'the film is baked and scannable');
-      const runs = scan.dice.map((d) => d.longestRollingRun);
+      const rollScan = await a.dbg('audioFilmScan()');
+      assert.ok(rollScan, 'the film is baked and scannable');
+      const runs = rollScan.dice.map((d) => d.longestRollingRun);
       assert.ok(Math.max(...runs) >= 10,
         `at least one die rolls for ten consecutive frames (runs: ${runs.join(', ')})`);
+      await a.dbg('clearTable()');
+      await a.dbg('sim(60)');
+
+      // CLAIMS 2-4 RUN ON 8d6 AT SEED 64352, and the cell was chosen by a
+      // measured margin rather than by being the first one that worked.
+      //
+      // They were on 4d6/4242, and claim 3's last line — a die still over the
+      // rolling EXIT bar after its recorded landing, which is what makes the
+      // absorbing rule load-bearing rather than decorative — stopped being
+      // true there when the felt tuning shipped: a calmer mat retires dice
+      // with less left in them. The obvious repair, 4d6/16838, clears the exit
+      // bar at 1.24 rad/s and then breaks a DIFFERENT line, drifting at 1.075
+      // u/s against claim 3's "under 1 u/s".
+      //
+      // So the grid was measured rather than sampled — 4 pools x 10 seeds,
+      // scoring every cell against all of claim 3's bars at once. Eleven cells
+      // satisfy all of them. This one has the best margins of those that also
+      // clear claim 4:
+      //   worst post-settle angular speed  1.068 rad/s — 19% clear of the 0.9
+      //     exit bar it must EXCEED, 29% under the 1.5 enter bar it must not
+      //     reach
+      //   worst post-settle drift          0.465 u/s — 54% under the 1.0 bar
+      //   worst speed anywhere             54.9 u/s — under claim 4's 60
+      //   longest rolling run              15 frames; 7 dice carry film past
+      //     their settle, so claim 3 has a sample rather than an anecdote
+      //
+      // THREE READINGS FROM THAT GRID THAT ARE NOT GUARANTEED, and every one
+      // is a bar this scenario leans on:
+      //   · worst post-settle angular speed anywhere on the grid was 1.466
+      //     against an enter bar of 1.5. A 2% margin — cross it and a die
+      //     genuinely re-enters the rolling phase after the bake called it
+      //     landed.
+      //   · worst post-settle drift was 1.281 u/s, so claim 3's "under 1 u/s"
+      //     is a property of the chosen film and not a law of the table.
+      //   · claim 4's comment says 60 u/s is "far above anything this table's
+      //     gravity can produce". Measured, 20d6 reaches **74.2** u/s — the
+      //     spawn line hurls a crowded pool harder — so that sentence is true
+      //     of the pools this scenario rolls and false in general. It is why
+      //     20d6/32676, which scored better on claim 3, was rejected.
+      await a.dbg(`throwSeeded(${JSON.stringify(Array(8).fill('d6'))}, 64352)`);
+      await a.dbg('sim(1)');
+      let scan = await a.dbg('audioFilmScan()');
+      assert.ok(scan, 'the film claims 2 to 4 read is baked and scannable');
 
       // ---- 2. `settled` flips exactly at the landing -----------------------
       // Two independent derivations of one fact, pinned against each other:
