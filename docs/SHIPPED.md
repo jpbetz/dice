@@ -5541,3 +5541,131 @@ detail (POOL-ANALYSIS §9's last bullet). `showOdds` exists in this repo only as
 a line of UX.md — `grep -rn showOdds js/ index.html tests/` finds nothing —
 which is the honest state for a slot that is not a half-build.
 
+
+## C27 — the camera frames the DICE (SHIPPED ON 2026-08-18)
+
+*ROADMAP C27 asked a question no measurement could answer — with dice-preferring
+framing on the felt gets cropped, **does a cropped felt still read as a table?**
+Joe looked at the `v-crop` frames and answered **"turn preferDice on."** It is
+now the shipped default. UX §7.55.*
+
+**What changed, in one line.** `FRAMING.preferDice` went `false` → `true` in
+`js/main.js`. Everything else in this record is comments, instruments and the
+docs that had gone wrong around it.
+
+### The re-measured grid, and the command
+
+Nothing here is quoted from a document. **`node tools/drive.mjs
+tools/steps/frame-residual.mjs [--verbose]`** — 6 pools × 3 widths × 5 seeds,
+`off` and `on` read off ONE settled throw so the delta is the camera and
+provably nothing else. Median die span in px, 2026-08-18, zoom `medium`:
+
+| pool | phone 390 | iPad-p 834 | desktop 1600 |
+| --- | --- | --- | --- |
+| 1d20 | 215 → 239 [191..266] · fires 2/5 | 119 → **351** [306..405] · **5/5** | 200 → **246** [200..287] · 4/5 |
+| **3d6** | 73 → 74 [71..113] · 1/5 | 119 → **199** [184..242] · **5/5** | 200 → 200 [200..253] · 2/5 |
+| 6d6 | 62 → 68 [62..91] · 3/5 | 119 → **159** [119..227] · 4/5 | 200 → 200 · 0/5 |
+| 12d6 | 59 → 63 [59..69] · 2/5 | 119 → 119 [119..168] · 1/5 | 200 → 200 [200..235] · 1/5 |
+| 20d6 | 59 → 59 · 0/5 | 119 → 119 · 0/5 | 200 → 200 · 0/5 |
+| 40d6 | 59 → 59 · 0/5 | 119 → 119 · 0/5 | 200 → 200 · 0/5 |
+
+**Over 90 paired throws: 0 shrank, 0 lost a die, 30 fired.** The run was made
+twice — once on the tree before the flip and once after — and the two are
+**byte-identical**, which is the check that the shipped default really is the
+`on` column and not something adjacent to it.
+
+### The 40-die case: there was nothing to carve out
+
+The brief for this work said that if the large-pool case regressed it must not
+be carved out with a magic die-count threshold. **It does not regress, and the
+non-shrinking rule was already in the code.** `framingFor`'s gate keeps the
+dice rung only when `after.on >= before.on && after.span >= before.span *
+FRAMING.gain` — so the option returns rung 1's own span or a bigger one and
+can never return a smaller one. A forty-die heap is nearly as wide as the mat,
+framing it can only pull the eye *back*, the margin refuses it outright, and
+the frame stays exactly what it was: **200 → 200 on all five desktop seeds,
+119 → 119 on the tablet, 59 → 59 on the phone.**
+
+That rule is self-tuning — it reads the cluster that is actually on the felt —
+and there is **no die count anywhere in this feature.**
+
+**So where did `200 → 184` come from?** `framingProbe()`'s UNGATED scan: what
+the dice rung would give if nothing judged it. It is a real number about a
+frame that was never on offer, and it sat in ROADMAP C27 and in a comment in
+`js/main.js` under a heading that said `preferDice`. Both are now struck and
+both were replaced with the command instead of a new number.
+
+### Four things this entry believed that the tree does not
+
+1. **"It is a loss at 40d6."** Struck — structurally impossible, see above.
+2. **"At 390px it gains nothing at all."** Half struck. The MEDIAN phone throw
+   gains nothing (1.00 at every pool but 6d6's 1.06), but 8 of 30 phone throws
+   fire, at +6% to +69%. The honest sentence is **"it is not a phone feature"**,
+   and the reason is geometric: three settled d6 span most of an 11×6.7 mat, so
+   framing the dice *is* framing the mat at that pool size.
+3. **"A desktop keeps landscape and never even computes the second
+   candidate."** This was a comment in `computeFraming` and it stopped being
+   true the moment the option shipped: the turn is triggered by *landscape
+   cannot contain the mat*, and the dice rung gives the mat up **on purpose**.
+   Measured: **5 of 30 desktop and 5 of 30 tablet throws now come back
+   quarter-turned** that did not before, all at 1d20 / 3d6 / 12d6. Every one of
+   them grew the frame; none lost a die.
+4. **"Desktop 1440 is untouched."** The e2e suite asserted this and it is false
+   at small pools: at 1440 with panels collapsed, `1d20` takes the dice rung on
+   **6 of 6** seeds and goes **203 → 246..328 px** (1.21×–1.62×), and the trio
+   `1d8+1d6+1d10` on 6 of 6. `6d6` at the same width stays on the mat rung on 6
+   of 6, which is the shape of the whole feature: **small pools move, big pools
+   do not, and nothing had to be told which is which.**
+
+### The instruments, and the trap the day of a flip sets
+
+`frame-residual.mjs` and `frame-small.mjs` both read their `off` column
+**straight off the default** and only ever set the option ON. On the day the
+default flipped, that would have printed an on/on pair under an off/on heading
+— silently, on the two pages whose entire job is to stop exactly that. Both now
+set **both** sides by name, and every step that touches `setFraming` restores
+what SHIPS (`preferDice: true`) rather than `false`, so a later leg of a
+`--steps` chain cannot inherit the counterfactual camera.
+
+`tools/steps/frame-look.mjs` is new and exists because the win had never been
+**seen**: `verdict-shots.mjs crop` covers a 390px phone and a 1600px desktop —
+the two ends where the option changes least — and the 2.95× is on a tablet.
+It writes `shots/f-look-<view>-<pool>-{off,on}.png` at the same seeds, both
+sides of one settled throw, with `40d6` in the set as a negative control whose
+two files must be indistinguishable.
+
+### The one hole, written down because it is unobserved rather than closed
+
+`framingFor`'s gate cannot shrink the frame. `computeFraming`'s **orbit**
+comparison can, through its first disjunct: under `preferDice` a portrait
+candidate showing one more die at a smaller span wins, which is the 40d6 trade
+the code's own comment calls noise. It is reachable only when rung 1 was
+already dropping dice on a device where the dice rung then fires — a big pile
+that is nonetheless tight enough to gain 1.15× — which no cell of the grid
+produces (desktop 40d6's ungated rung 2 is 0.92×, so it never fires). **0 of 90
+throws hit it.**
+
+It is **not** closed in code, and that is a decision rather than an omission:
+every rule that closes it either re-breaks the case the current branch exists
+to fix (12d6 on a phone, where landscape had descended to the deciding rung and
+showed **1 die of 12** — completeness must be allowed to cost size when
+landscape has given up) or buys the distinction with a ratio constant, which is
+the magic threshold this work was told not to write. So the invariant is
+**asserted** instead: `framing-prefers-dice` pins `on.spanPx >= off.spanPx` and
+`on.diceOnScreen >= off.diceOnScreen` across the grid's own pools, so if the
+hole ever opens it opens loudly.
+
+### What was deliberately not done
+
+- **`FRAMING.floor` stays at 1.** The aggressive version of this feature lets
+  the eye come *closer* than the zoom preset (`{floor: 0.55}`). Nobody asked
+  about it, the 2.95× did not need it, and it is the only C27 dial unspent.
+- **No setting, no toggle, no device gate.** ROADMAP C27 had argued for a
+  device split (on for tablets, off for desktop) on the grounds that desktop's
+  gain straddles the 1.15 gate and the result is "a coin flip". The frames say
+  otherwise — the desktop frames the option produces are *better*, and the one
+  Joe approved is a desktop — so the split was not built and the constant was
+  not retuned. If it ever is, note that raising `gain` is the whole lever.
+- **C24 is not closed by this.** "Do not take another notch off the mat" still
+  binds; `frame-residual.mjs --pile` re-asks its measurement of the presets
+  that actually ship.

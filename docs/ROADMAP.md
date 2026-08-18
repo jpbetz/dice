@@ -948,110 +948,51 @@ write anything before Apply, offer OCCUPIED seats (the roster filter is the
 physical intuition — you cannot sit in Bob's chair while Bob is in it), or
 appear at a table with no prepared seats.
 
-### C27. The framing target was never the dice — **INSTRUMENT SHIPPED, THE CALL IS JOE'S**
+### C27. The framing target was never the dice — **SHIPPED ON 2026-08-18**
 
-**The spine still stands:** `framingPoints` returns four corners at `y = 0` — a
-floor-plane frame in a world with height — so "the mat is on screen" was only
-ever a proxy for "the dice are on screen", and it diverges exactly where the
-stacking is worst. Rung 1's descent and the portrait quarter-turn shipped in
-the immersion wave; containing the mat was priced and declined at ~24% of die
-size.
+Joe's answer on the `v-crop` frames was **"turn preferDice on"**, and it is the
+shipped default. `FRAMING.preferDice` is `true`: rung 1 stopped being a
+terminator, and where the mat fits the camera now frames the **dice** instead —
+kept only when it loses no die and makes them at least `gain` (1.15×) bigger.
+Record, the re-measured grid, the corrections and the four things this entry got
+wrong are in [SHIPPED.md](SHIPPED.md); the surface spec is **UX §7.55**.
 
-**The residual is a COMMAND now, not a date:**
-`node tools/drive.mjs tools/steps/frame-residual.mjs`. Die span in px, 5 seeds
-a cell, `preferDice` off and on read from ONE settled throw so the delta is the
-camera and provably nothing else. Seed #1 of each cell is the seed the old
-table used (`3d6` 7002, `6d6` 7004, `40d6` 7007, …), the rest +1000 apart.
-Measured 2026-08-17 at zoom `medium`:
+**The headline, re-run on the tree that shipped it** (2026-08-18, medians over
+5 seeds a cell): iPad-portrait **119 → 351 px** at 1d20 and **119 → 199** at
+3d6; desktop **200 → 246** at 1d20; a phone gains **nothing at the median** and
+40d6 is **unchanged at every width**. Over 90 paired throws: **0 shrank, 0 lost
+a die, 30 fired.**
 
-| pool | phone 390 | iPad-p 834 | desktop 1600 |
-| --- | --- | --- | --- |
-| 1d20 | 215 → 239 [191..266] · fires 2/5 | 119 → **351** [306..405] · **5/5** | 200 → 246 [200..287] · 4/5 |
-| **3d6** *(the canonical Soul Deal roll)* | 73 → 74 [71..113] · 1/5 | 119 → **199** [184..242] · **5/5** | 200 → 200 [200..253] · 2/5 |
-| 6d6 | 62 → 68 [62..91] · 3/5 | 119 → **159** [119..227] · **4/5** | 200 → 200 · 0/5 |
-| 12d6 | 59 → 63 [59..69] · 2/5 | 119 → 119 [119..168] · 1/5 | 200 → 200 [200..235] · 1/5 |
-| 20d6 | 59 → 59 · 0/5 | 119 → 119 · 0/5 | 200 → 200 · 0/5 |
-| 40d6 | 59 → 59 · 0/5 | 119 → 119 · 0/5 | 200 → 200 · 0/5 |
+**"IT IS A LOSS AT 40d6" IS STRUCTURALLY IMPOSSIBLE AND WAS NEVER TRUE.** The
+gain gate returns rung 1's own span or a bigger one and nothing else, so the
+big-pool carve-out is already in the code, is derived from the cluster on the
+felt, and needs no die-count constant. The archived `200 → 184` was
+`framingProbe()`'s UNGATED scan — the number the gate exists to throw away.
 
-**THE TABLE THAT WAS HERE WAS TWO INSTRUMENTS UNDER ONE HEADING, and it did
-not drift — it was wrong on the day.** The tree at `c29d429`, the commit that
-wrote it, runs the step above to numbers byte-identical with today's. Its phone
-and iPad columns are `frame-small`'s GATED `preferDice` readings and they
-reproduce exactly, every digit. Its desktop column is `frame-price`'s UNGATED
-probe grid — and not even one column of that: 3d6's `245` and 40d6's `184` are
-`land 1.0`, while 6d6's `236` is `land .55`, **a different option's column**
-(its `land 1.0` is 221). What `preferDice` actually does on those three seeds
-is 253 · no change · no change.
+**The one instruction that outlives this entry, because it is what two days
+were lost to:** a number anybody will later quote gets the command that
+reproduces it, not a date.
 
-**So "it makes 40d6 worse" is struck, and it was never a thing the option can
-do.** Rung 2 is kept only if it beats rung 1 by `FRAMING.gain` (1.15), so the
-instrument returns rung 1's span or a bigger one and nothing else. Over 90
-paired throws: **0 shrank, 0 lost a die, 30 fired.**
+```
+node tools/drive.mjs tools/steps/frame-residual.mjs [--verbose]   # the numbers
+node tools/drive.mjs tools/steps/frame-look.mjs                   # the pictures
+```
 
-**And "at 390px it gains nothing at all" is half struck.** The MEDIAN phone
-throw still gains nothing (1.00 at every pool but 6d6, which is 1.06) — but 8
-of 30 phone throws fire, at +6% to +69%, and the reason given here was wrong
-twice. The cluster for 3d6 is 3.5×6.2, not 3.9×3.0, and the ladder is NOT
-"correctly declining to act": on a phone it is already at rung 2 for every pool
-up to 12d6, which this entry's own prose says two paragraphs up.
-**`preferDice` is two options wearing one name** — where the mat fits it runs
-rung 2 and crops the felt; where the mat does not fit (every phone) rung 2 is
-already running and all it changes is `computeFraming`'s ORBIT tie-break, from
-"completeness" to "completeness, then size". That second half is what
-quarter-turns a table, **including a DESKTOP**, and nobody has looked at it.
+**C24's instruction is NOT closed by this and still binds: do not take another
+notch off the mat.** `frame-residual.mjs --pile` re-asks its dice-above-the-plane
+measurement of the presets that actually ship, so the instruction has a live
+number under it.
 
-**Where the win actually is: the tablet, and only the tablet.** iPad portrait
-fires 5/5, 5/5, 4/5 on 1d20 / 3d6 / 6d6 at 1.34×–2.95×. Desktop fires 7 of 30
-and turns the table when it does — the same roll, two orientations, decided by
-which way the dice happened to settle, because desktop's gain sits astride the
-1.15 gate (rung2 1.09–1.23) where the tablet's does not (1.31–3.40). **A coin
-flip is worse than either answer.** The camera is per-viewer — that is what
-makes it safe to vary by device where the MAT never can (C24) — so the honest
-shape of the decision is not on-or-off but a **device split**: on for the
-tablet band, off on desktop until the flip is fixed, near-no-op on a phone.
-
-*Cheap lever, argued and deliberately not made: the desktop coin flip is
-`FRAMING.gain` at 1.15 sitting inside desktop's distribution. Raising it makes
-desktop consistently off and leaves the tablet untouched — one constant, buying
-the device split with no device gate. Worth measuring before anyone writes one.*
-
-**It therefore still ships as an instrument, not a default.**
-`__diceDebug.setFraming({ preferDice: true })` (add `floor: 0.55` for the
-aggressive version) is inert, and `framing-instrument-is-inert` pins that.
-**The question is still not measurable and still his — but it is a different
-question now:** not "is +23% worth a loss at 40d6" (that trade does not exist),
-but **"is a 1.67×–2.95× tablet frame worth losing the felt on small rolls, and
-may a desktop table turn?"** Roll 3d6 then 6d6 then 40d6 with it on, at a
-tablet width.
-
-**The rail, not the camera, is the phone's real lever** — a 390px phone gives
-the felt 278px — but the two only pay off together: a full-width felt makes the
-mat *fit*, which sends the frame back to rung 1 and makes dice **smaller**
-(85 → 66).
-
-**THE RULE this entry named, in its FOURTH shape — *nothing fails loudly when a
-stand-in stops standing in*.** `SHELF_SLOT_W` stopped tracking `TABLE_W` (C25).
-The spawn-spread comment stopped tracking the mat (C28 ①). The framing TARGET
-stopped tracking the thing it stood for. And now the entry's own EVIDENCE: a
-probe reading wearing an instrument's label, for two days, load-bearing on a
-shipping decision. The verification run at the time ("every span matches the
-pre-change run") **could not** catch it — it compared the shipped frame, which
-is bit-identical by construction when the option is off, and never asked
-whether the ON column came from the option. **A number somebody will later
-quote gets a command, not a date.**
-
-*Also refuted while re-measuring: the suspicion that spawn geometry moved these
-numbers. At `medium` — the zoom every C27 figure is taken at — 0 of 30 throws
-is born inside a wall under either formula, and the three archived seeds clear
-by 0.13/0.21/0.14, so the two are bit-identical on the exact throws in
-question. The instrument is not blind: the same probe at `close` catches 3 of
-16 wall births, reproducing C28 ①.*
-
-*One thing found in passing and recorded nowhere else: on desktop at 40d6 with
-`preferDice` OFF, 39 of 40 dice are on screen on 2 of 5 seeds, mat fitting.
-Rung 1 guarantees only the DECIDING die, so a piled non-hero die can be cropped
-at rung 1 on a desktop. Consistent with the shipped design; simply never
-written down.*
+**Still open, and small.** ① `FRAMING.floor` — letting the eye come *closer*
+than the zoom preset — stays at 1. Nobody asked about it, and the 2.95× tablet
+win did not need it; it is the only dial C27 leaves unspent. ② The **rail** is
+still the phone's real lever (a 390px phone gives the felt 278px), and the two
+do not compose: a full-width felt makes the mat *fit*, which sends the frame
+back to rung 1 and makes dice **smaller** (85 → 66). ③ Quarter-turning a
+**desktop** is now reachable (5 of 30 throws, always for a bigger frame, never
+for a lost die) — Joe's approved frame `v-crop-desktop-3d6-on.png` is one of
+them, so it is inside the call rather than a side effect of it, but it has been
+looked at exactly once and only at 3d6.
 
 ### C28. Two more things the zoom ladder left behind — SHIPPED 2026-08-15
 
@@ -2065,7 +2006,7 @@ because four causes are indistinguishable from a client.
 | §0j's two bullets | shipped; §0j now holds one **decision** (do not buy Cloud Armor yet, with the pricing) and the nice-to-haves |
 | §2l ⑤ | shipped; ⑥ was the open half and became #2 in THE ORDER — **since shipped in full** (engine 08-16, rendering 08-17), record in SHIPPED.md |
 | §3b L4 / CUJ5 | shipped; L2's judgment call is all that is left of §3b |
-| C27's residual | **measured and refused as a default** — 0 px gain at 390, a loss at 40d6. Shipped as an inert instrument; the call is Joe's |
+| C27's residual | ~~**measured and refused as a default** — 0 px gain at 390, a loss at 40d6. Shipped as an inert instrument; the call is Joe's~~ **BOTH REASONS WERE FALSE and the entry SHIPPED ON 2026-08-18.** "A loss at 40d6" was an UNGATED probe reading of a frame the option cannot return; "0 px at 390" is true of the median phone and was never an argument about the tablet, where the win is 2.95×. See C27 |
 | C24's mat table | **its preset LABELS were a full notch stale** and are struck; the measurement still binds |
 | W7 ② | had already shipped 2026-08-13 — what landed 2026-08-15 was the frame-space verification it never had, plus two defects it found |
 | U28b | two shipped; the near-miss size families still open with their reasons |
