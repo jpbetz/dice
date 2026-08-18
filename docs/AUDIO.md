@@ -608,11 +608,15 @@ context on `visibilitychange`.
     pixel. **So: audio may be anonymous and unsynchronized, or synchronized
     and tied to a visible thing, but never unsynchronized AND tied to a
     visible thing.** Two lesser reasons, either of which would also be enough:
-    §1 permits ONE bright element as an isolated highlight, and in the glade
-    that seat is already taken by the staged set's chime on every landing; and
-    the layer leans IN exactly when dice are down and readable, which is the
-    worst possible moment to add a sound (goal 15). If it is ever built it
-    needs a film-derived or seed-derived clock, not the stage's.
+    **a repeating tuned voice in a fae venue is precisely what was killed on
+    2026-08-18** — this clause used to say the glade's one-bright-element seat
+    was "already taken by the staged set's chime on every landing", and that
+    chime is exactly the thing Joe called *horrible*; §1 permits one bright
+    element as an ISOLATED HIGHLIGHT, and a moot-ring voice would fail the same
+    way the chime did, by repeating (§9.0b, UX §7.60). And the layer leans IN
+    exactly when dice are down and readable, which is the worst possible moment
+    to add a sound (goal 15). If it is ever built it needs a film-derived or
+    seed-derived clock, not the stage's — **and it must not be a chime.**
 14. **A venue may not switch the bed on.** It changes what the room is made
     of, never whether the room is audible. Selecting a venue is a *visual*
     choice a player makes; flipping an audio switch inside it is refusal 7
@@ -903,6 +907,14 @@ freeze in `tests/voices.test.mjs` is what would now catch a repeat.
    made above it was made at the wrong volume.
 
 ### 9.1 The route — same script, second sitting
+
+> **THE SECOND SITTING HAPPENED (§9.0b) AND THIS ROUTE IS NOW A REFERENCE, NOT
+> A QUEUE.** Sections **A** (the three rooms) and **B** (the five towers) are
+> **APPROVED** — do not put them in front of him again without a reason. Only
+> **C** changed after he heard it, and it changed by deletion. The route is
+> kept because it is still the right way to *walk* this palette when something
+> new lands next to it, and because the "listen for" columns are the only
+> plain-English description of what each voice is supposed to be.
 
 **Preamble, once.** Open the table on **`?stability=beta`** — venue and tower
 are closed-beta rows and the pickers are simply absent without it (`BETA_ROWS`;
