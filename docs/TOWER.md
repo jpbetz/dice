@@ -411,6 +411,78 @@ red-checked by moving the mortar's blue channel by one (31067 / 33112 / 4728 /
   the COWL band, the slot stone is opaque, the lining stands behind it, and
   occlusion is 99/99 at all six eyes.
 
+## AO LAYER (d) — THE CONTACT SHADOW, and the floor that buried it (2026-08-18)
+
+**Every skin in this repo builds one and nobody had checked that it reaches the
+frame.** Heartwood, Bastion, the Black Anvil and the Hollow Bole all end their
+build with a pair of unlit gradient quads lying on the felt at **y 0.005–0.006**
+— `js/towerskin.js` and `js/towerhollow.js` both call the block "AO layer (d)".
+They are the reason a code-built tower does not read as pasted on, and they are
+deliberately excluded from every proof: `towerCastTargets` and
+`towerModelAudit`'s `solid` walk both gate on the **`towerSkin` NAME PREFIX**, so
+a quad outside that prefix is invisible to tower-fit, tower-occlusion, the
+cladding audit and the socket hull. (main.js's comment there says "the UNNAMED
+children"; the mechanism has always been the prefix, and `aoContactShadow` is
+named precisely so a look step can hide it.)
+
+**A VENUE CAN BURY THE WHOLE LAYER WITH ONE NUMBER, AND ONE DID.**
+`js/fae-lab.js` stands the glade's ground disc at **y 0.02** and its clearing
+detail at **y 0.035**. Both are opaque and both are nearer the eye, so from
+2026-08-13 to 2026-08-18 the Hollow Bole's contact shadows were under the floor
+in the only venues the Hollow Bole is ever socketed into. Nothing failed:
+tower-fit, tower-occlusion, the probe matrix, the pour and the tower tag all
+stayed green for five rounds, because **no proof in this repo had ever looked at
+the ground**. Measured at the resting eye on the buried build: hiding the whole
+tower changed 0.058% of the moonrise frame outside its own footprint (0.034%
+foxfire), and the ground *brightened* to 1.95× approaching the foot. With
+`faeGround` and `faeClearing` hidden the same difference is 22,114 pixels
+against 3,296 — which is the proof that the layer was built, correct, and
+covered.
+
+**The rule for a new tower:** a contact shadow's y is authored against the FELT,
+and a venue owns its own floor. State the clearance where the shadow is built,
+and prove it in the room the tower will stand in — `tools/steps/rooted.mjs` is
+that proof, and it fails a frame with no contact darkening rather than reporting
+a number nobody reads.
+
+**Two things about doing it well, both measured on this model.**
+- **A blob is not a contact.** The retired version was a square sized `2·R0 +
+  3.0` on a radius sampled at MID-TRUNK (2.47) while the root flare reaches
+  3.17 at the soil — and a radial gradient is darkest at its CENTRE, under the
+  trunk, where nobody can see it. The shipped ring follows the model's own
+  ground footprint per heading (`glbShellFor` publishes `footAt(θ)`, read off
+  the vertices — raycasting a footprint sweep is ~1.5M ray–triangle tests inside
+  a socket, which happens at a roll boundary) and is darkest AT the silhouette.
+- **Black at vertex alpha is a MULTIPLY, which is why this is not baked.** A
+  src-alpha blend of black is `dst · (1 − a)` and needs to know nothing about
+  the palette under it — one shape, correct in moonrise, in foxfire and on bare
+  felt. Painted into the GLB it would have to guess the ground's colour, which
+  is the drift the recipe's own `GROUND_MOSS` hand-copy already carries a
+  warning about.
+
+**AND THE VENUE CAPS IT.** Rendered fully opaque and black, the ring still only
+takes the moonrise ground to **0.70×** — `faeMoonShaft`, the moonbeam column
+over the resolve area, is a translucent volume between the eye and that ground
+and adds its light AFTER the ground is shaded. Hide the shaft and the same quad
+reads 0.59, and the ground itself falls 0.272 → 0.158, so ~42% of the brightness
+at the seam arrives from in front of it. The usable range at this seam is
+[0.70, 1.00] and nothing a model does can beat it. An alpha chosen for a normal
+room lands about a third of the darkening its arithmetic promises.
+
+**AND NO LIGHT IN THE FAE VENUES CAN SUPPLY CONTACT DARKENING AT ALL.** The
+preset runs `key: 0.6` (from 2.9) and carries the room on `MOOD.lamp`, a
+SpotLight that never sets `castShadow`. Turning it on buys nothing: both lights
+stand high and IN FRONT of a tower socketed at the back wall, so the lamp at
+(0, 22, 1) throws the crown's shadow to z ≈ −26 and the key at (8, 30, 10) to
+(−5.6, −25.6) — both about fifteen units behind the mat, off every shipped
+frame. A venue lit this way needs its objects to bring their own contact.
+
+**Still owed:** `nullstone` is a bare `towerGlbSkin` row with no dressing file,
+so it has **no AO layer (d) at all** — it stands in the grounded room where one
+would work. And T15 proposes re-baking the three classic skins through the
+forge: whatever replaces `buildTowerSkin` has to carry this layer over, or all
+three lose the thing that keeps them off the mat.
+
 ## DRESSING — the props every tower carries (2026-08-11)
 
 The three models were shipped as ARCHITECTURE and read as architecture: no
@@ -537,7 +609,10 @@ tool until the second model needed one — `tower-resting-eye.mjs [tower]`
 before a skin merges, whose sibling list now defaults to every other
 registered model. The dressing pass added three more:
 `tower-dress.mjs [tower…]` (triangles, draw calls and idle-motion
-registrations per group — the budget, measured), `dress-look.mjs [tower]`
+registrations per group — the budget, measured), `rooted.mjs [venue] [dump]
+[shots]` (**does the ground know the tower is there** — the AO layer (d)
+section above; it grades a RATIO of two renders and runs every gate against the
+frame that was rejected, so it can go red), `dress-look.mjs [tower]`
 (the resting eye plus a named close eye per prop cluster, because "does this
 prop earn its triangles" is a different question from "does this tower belong
 to the family" and needs a different distance), and `dress-bake-ab.mjs`

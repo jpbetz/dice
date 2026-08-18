@@ -1627,6 +1627,53 @@ place — including `perHitBufferAllocs` "must stay 0", which actually reads 2
 whenever the bed is up and is 0 in every scenario only because ambience
 defaults off.*
 
+### W3 round 9. The stump is rooted — SHIPPED 2026-08-18, **LOOK OPEN**
+
+Joe's round-8 verdict on the grounding work, verbatim: *"It's still a set piece
+in my eyes… nothing to make it feel rooted."* **It was one number, and it was
+not on the model.**
+
+`js/towerhollow.js` had always built AO layer (d) — the pair of unlit contact
+quads every code-built skin carries — at **y 0.006**, authored against the FELT
+at y 0. `js/fae-lab.js` stands the glade's ground at **y 0.02** and its clearing
+detail at **0.035**. So in the only venues this tower is ever raised in, its
+contact shadow was under the floor, and had been since the venue shipped. Every
+proof stayed green for five rounds because **no proof in this repo had ever
+looked at the ground.** Rounds 4, 6 and 8 spent themselves re-painting, growing
+and then deleting geometry on the OBJECT.
+
+Measured at the resting eye, before: hiding the entire twelve-unit stump changed
+**0.058%** of the moonrise frame outside its own footprint (0.034% foxfire), and
+the ground *brightened* to **1.95×** approaching the foot. Shipped: the ring
+follows the model's footprint and the re-bake takes the flare's own value down
+(`flare/ground` 1.32 → 1.13, geometry digest and triangle count unchanged, so
+the film provably did not move).
+
+| gate (`tools/steps/rooted.mjs`) | rejected | shipped moonrise | shipped foxfire |
+| --- | --- | --- | --- |
+| G1 seam — median R, k 4..18 (≤ 0.78) | 0.998 | 0.732 | 0.766 |
+| G2 reach — first k with R ≥ 0.96 (≥ 70 px) | 4 | 143 | 139 |
+| G3 depth — Σ(1−R) (≥ 18 px) | 0.06 | 22.5 | 19.5 |
+| G4 no rim (≤ 0.025) | 0.000 | 0.000 | 0.000 — a declared FLOOR |
+
+**OPEN, and it is Joe's:** `shots/rooted-before-{moonrise,foxfire}-resting.png` →
+`shots/rooted-after-{moonrise,foxfire}-resting.png`, the resting eye, four
+frames. One reservation worth his eye and the gates cannot answer it: the root
+flare is *less* bright than it was but it is still the lightest structure near
+the ground, and the next lever on it is the shape of the flare rather than its
+paint. Foxfire clears G1 by 0.014 — the tightest number in the round.
+
+**Two debts this turned up, both real and neither in scope here:** `nullstone`
+is a bare `towerGlbSkin` row with no dressing file and therefore **no AO layer
+(d) at all**; and T15's re-bake of the three classic skins would drop theirs
+unless whatever replaces `buildTowerSkin` carries the layer over. Both are in
+docs/TOWER.md under AO LAYER (d).
+
+*(Latent, not live: `DECAL_Y` is 0.021 — dice-impact marks on the felt would be
+z-fighting the glade ground at 0.02 and buried under the clearing detail at
+0.035. `DECALS_DEFAULT_ENABLED` is false, so nothing ships broken; anyone
+turning them back on inherits the same floor problem.)*
+
 ### W2c ledger — next tower round, not W2c
 
 The pale MACHINED FACE at the shell's x-clamp plane (x 3.13, y 0.70–0.85, z

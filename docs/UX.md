@@ -6806,3 +6806,53 @@ choice.
 mood (`audio-ambience` asserts the export says nothing about it), so a
 teammate never inherits your room. That was already true; the sitting did not
 give a reason to revisit it.
+
+### §7.56 — The stump stands in its own shadow (2026-08-18, W3 round 9)
+
+*Joe, on the round-6 grounding work: **"It's still a set piece in my eyes…
+nothing to make it feel rooted."***
+
+**What a player sees.** The Hollow Bole's foot now sits in a pool of shade
+that is darkest where the wood meets the soil and fades out over about three
+units. The root flare — the wide skirt of fingers and toes at the bottom of
+the trunk — has come down in value into that shade, so the pale barkless wood
+reads as catching the moon high up and losing it at the ground. Nothing about
+the tower's shape, its mouth, its doorway or the way dice fall through it has
+changed. Both fae skies get it; the felt room would too.
+
+**Why it was not there, and it is the whole story.** The tower did have a
+contact shadow — the same layer Heartwood, Bastion and the Black Anvil carry,
+which is why *those* three never looked pasted on. It sat at y 0.006, a hair
+above the felt, because the felt is where those three stand. The Moonrise
+Glade lays its ground at y 0.02 and its clearing detail at y 0.035. **In the
+only venues this tower is ever raised in, its own shadow was under the floor.**
+
+Measured before the fix, at the resting eye: hiding the entire twelve-unit
+stump changed **0.058%** of the moonrise frame outside the pixels it occupies
+(0.034% in foxfire) — the ground did not know it was there. Worse than
+neutral, the ground got **1.95× brighter** approaching the foot, because the
+moon pools on the clearing and nothing subtracted from it. So the one thing a
+picture does at a contact — go darker — this frame did in reverse, and the
+brightest structure anywhere near the ground was the model's own root flare.
+
+**Three rounds had been spent on the wrong noun.** Round 4 re-painted the
+delivery tongue, round 6 grew root fingers and moss creep, round 8 deleted the
+earth mound. All three changed the OBJECT. The missing thing was never on the
+object: it was the ground's answer, drawn and then covered up.
+
+**No lighting switch fixes it, and that is worth writing down** for the next
+venue. The glade's dominant light is a shadowless spot; the only
+shadow-casting light runs at a fifth of its room strength. And both stand high
+and in FRONT of a tower socketed at the back wall, so the stump's cast shadow
+lands about fifteen units BEHIND the mat — off every frame a player will ever
+see. A venue lit like this cannot produce contact darkening from its lights at
+all; the object has to bring its own.
+
+**What it costs.** One unlit ring, one draw call, no new light, no colliders,
+no change to any physics or film number: the re-baked model is bit-identical in
+geometry (same digest, same 7,270 triangles), so a roll cannot tell the
+difference. Proof: `rooted` states the claim as a ratio through the live camera
+and runs it twice in one pass — once on the shipped frame and once with the
+shadow hidden, which reproduces the frame that was rejected — and refuses to
+pass unless three gates separate them ([VENUE-COMPOSITION](VENUE-COMPOSITION.md)
+rule 15).
