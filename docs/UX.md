@@ -7470,11 +7470,18 @@ rather than adjusted. `edge-film.mjs` says it in one line: **collider
 hull — and RUN DIGEST `17dae9ba` → `424d10e4`**, every per-pool digest and frame
 count with it.
 
-The five pins re-anchored are listed in the ship commits. The one worth carrying
-into the next pass: **two of them were seeds chosen for an outcome**
-(`pile-refusal`'s 127704 and 175218, picked because they landed flat), and the
-new tuning piles both. A seed picked for a result is a recorded film wearing a
-number, and it will not announce itself as one.
+Seven sites were re-anchored and they are listed in the ship commits. The kind
+worth carrying into the next pass is the one that does not look like a pin at
+all: **a seed chosen for an outcome**. `pile-refusal` named two 6d6 seeds
+because they landed flat, and the new tuning piles both. `audio-phases` named
+one because a die on it was still turning after the bake called it landed, and
+the new tuning retires dice with less left in them, so no die on that seed
+qualifies any more. Neither reads as a recorded film. Both are.
+
+**Three of the seven were found by the full sweep and not by reasoning about
+the change**, which is the argument for running it: the two `audio-phases`
+carriers and the camera rung. The physics and perf tags alone would have
+missed the audio pair entirely.
 
 #### ⑨ What proves it is the thing that was measured
 

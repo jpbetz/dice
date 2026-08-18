@@ -1078,10 +1078,17 @@ strong.*
 
 **A third rule this ship earned.** A tuning change rewrites the film, so every
 recorded expectation that pins one is a deliberate update — re-measured, never
-adjusted by applying a quoted percentage. Five were re-anchored here, and the
-two that cost a red were **seeds chosen for an outcome** (`pile-refusal` pinned
-two 6d6 seeds because they landed flat; the new tuning piles both). A seed
-picked for a result is a recorded film wearing a number.
+adjusted by applying a quoted percentage. Seven sites were re-anchored here,
+and the kind that does not look like a pin at all is **a seed chosen for an
+outcome**: `pile-refusal` named two 6d6 seeds because they landed flat, and
+`audio-phases` named one because a die on it was still turning after the bake
+called it landed. The tuning broke both. A seed picked for a result is a
+recorded film wearing a number.
+
+**And three of the seven were found by the FULL sweep, not by reasoning about
+the change** — the two `audio-phases` carriers and a camera rung. The
+`physics,perf` tags alone would have missed the audio pair entirely, which is
+the argument for the sweep being the gate rather than the tags.
 
 ---
 

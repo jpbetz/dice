@@ -4247,10 +4247,28 @@ cell this tuning moved most.
 **The film moved, and every pin that recorded one was re-measured.** The
 collider did not move and must not: `edge-film.mjs` reads `4d6b5640` before and
 after. The keyframe RUN DIGEST went **`17dae9ba` → `424d10e4`**, with every
-per-pool digest and frame count moving with it. The re-anchored pins are listed
-in the commit that carries them; the two that were seeds chosen for an OUTCOME
-(`pile-refusal`) are the ones worth remembering, because a seed picked for a
-result is a recorded film wearing a number.
+per-pool digest and frame count moving with it.
+
+Seven sites were re-anchored and the commits list them. The kind worth
+remembering is the one that does not look like a pin: **a seed chosen for an
+outcome.** `pile-refusal` named two 6d6 seeds because they landed flat and the
+new tuning piles both. `audio-phases` named one because a die on it was still
+turning after the bake had called it landed, and a mat with grip retires dice
+with less left in them, so no die on that seed qualifies now. Both repairs were
+made by measuring a grid and picking on margin — 4 pools × 10 seeds scored
+against every bar at once — rather than by finding the first cell that passed.
+
+**Three of the seven were found by the FULL sweep rather than by reasoning
+about the change**: the two `audio-phases` carriers and a camera rung. The
+`physics,perf` tags would have missed the audio pair entirely.
+
+**And the tuning shortened the rolling phase, which is a product fact and not
+just a test problem.** `longestRollingRun` on 4d6 at seed 4242 went to 4, 3, 4,
+3 frames — grip bills the skid, so a die spends less time rolling before it
+stops, and the rolling audio layer plays for less of the throw. Measured over 4
+pools × 6 seeds the phase is in no danger (longest run per pool: 4d6 15, 8d6
+13, 1d20 25, soul 28), and 4d6/4242 was simply the shortest of twenty-four
+cells. Worth knowing before anyone tunes the rolling voice.
 
 **What was verified rather than assumed.** `feltgrip+gate4` run against the
 shipped build is a **no-op canary**: every cell of every table reads +0.0%, so
