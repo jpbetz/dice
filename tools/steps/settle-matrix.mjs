@@ -225,27 +225,37 @@ const PILE_ZOOMS = ['medium', 'close'];
 // The prior session's paired measurement of the SAME seed family. Not a
 // tuning target — a reproduction test for this rig.
 //
-// RE-ANCHORED TO THE POST-FLIP DEFAULTS, 2026-08-17. The values here were the
-// PRE-flip baseline (1.37 / 2.26 / 2.04 / 2.40 / 6.25 and shake 0.106 / 0.141 /
-// 0.152 / 0.191 / 0.212), and the 2026-08-11 flip — displacement terminator,
-// allowSleep false, the tempo curve, pileScale 1.05 — moved four of the five
-// duration cells by 9-38%. So the canary has MISSED on every run since the
-// flip, and printed "THE CANARY MISSED. The verdict above is not evidence."
-// under a verdict table that was in fact fine. A gate that is always red is a
-// gate everybody learns to scroll past, which is the same failure as one that
-// is always green.
+// THIS PAIR PINS A FILM, so it is re-anchored in the commit that moves one.
+// It has now been re-anchored twice, for two different reasons:
+//
+//   2026-08-17, to the post-flip defaults. The values had been the PRE-flip
+//   baseline (1.37 / 2.26 / 2.04 / 2.40 / 6.25 and shake 0.106 / 0.141 /
+//   0.152 / 0.191 / 0.212), and the 2026-08-11 flip — displacement
+//   terminator, allowSleep false, the tempo curve, pileScale 1.05 — moved
+//   four of the five duration cells by 9-38%. So the canary MISSED on every
+//   run for six days and printed "THE CANARY MISSED. The verdict above is not
+//   evidence." under verdict tables that were fine. A gate that is always red
+//   is a gate everybody learns to scroll past, which is the same failure as
+//   one that is always green.
+//
+//   2026-08-18, to the felt tuning (ROADMAP C30) — grip + deaden + the speed
+//   gate. Every duration cell fell 2-20% and every shake cell 30-43%, which is
+//   the ship diff and not drift. The values below are the `shipped` row of the
+//   run that shipped it; the row it replaces is exactly reproducible as the
+//   matrix's `classic` variant, and was: dur 1.39 / 1.47 / 1.26 / 2.19 / 4.15,
+//   shake 0.085 / 0.117 / 0.106 / 0.135 / 0.175.
 //
 // Measured, and REPRODUCED ACROSS TWO INDEPENDENT STAGE BOOTS (identical to
 // every digit printed here, plus a third agreement on the 4-seed determinism
-// quartet [1.6, 1.467, 1.167, 1.4]):
+// quartet [1.133, 1.033, 1.283, 1.367]):
 //
 //   node tools/drive.mjs tools/steps/settle-matrix.mjs 16 10 shipped
 //
 // Sixteen shake seeds. Re-anchor from a measured run, never by applying the
 // percentage deltas a record quotes: that is how two of the 2026-08-14
 // corrections went in wrong.
-const CANARY_DUR = { '1d20': 1.39, soul: 1.47, '4d6': 1.26, '8d6': 2.19, '20d6': 4.15 };
-const CANARY_SHAKE = { '1d20': 0.085, soul: 0.117, '4d6': 0.106, '8d6': 0.135, '20d6': 0.175 };
+const CANARY_DUR = { '1d20': 1.12, soul: 1.20, '4d6': 1.24, '8d6': 2.06, '20d6': 3.57 };
+const CANARY_SHAKE = { '1d20': 0.049, soul: 0.070, '4d6': 0.068, '8d6': 0.094, '20d6': 0.114 };
 
 const mean = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
 
@@ -643,6 +653,14 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
   // without breadth is one unlucky die on a short stack; breadth without depth
   // is a crowded mat, which at `close` is what the zoom is FOR (its own
   // tooltip sells density). Only both at once is a heap.
+  //
+  // AND IT IS CALIBRATED FOR POOLS THE MAT HAS ROOM FOR, which is what
+  // PILE_POOLS rolls: three dice and six. A pool that overflows the mat trips
+  // it legitimately, and that is not a bug in the pool — C24 measured 40d6 at
+  // `close` on the shipped ladder at 28 of 40 dice up and a max height of 5.3
+  // units, which for a d6 is 4.5 rest ceilings, so it clears both bars. Forty
+  // dice do not fit on a phone-sized mat and nobody claims they do. Do not
+  // extend PILE_POOLS past what the mat can lay out without re-deciding this.
   const HEAP_TIERS = 3;   // a die whose centre sits three of its own rest
                           // ceilings up is on a stack three deep
   const HEAP_SHARE = 0.5; // and more than half the throw is off the felt
