@@ -7333,9 +7333,9 @@ Frames: `shots/flare-{before,after}-{moonrise,foxfire}-resting.png`.
 
 *No new pixel and no new control. The dice on this table land quieter, settle
 sooner, and end up on each other more often than they did — and the third of
-those is why the first two waited four measured passes and five months of
-roadmap. What unblocked it was not a measurement. It was Joe answering a
-question nobody had put to him plainly.*
+those is why the first two waited four measured passes over eight days. What
+unblocked it was not a measurement. It was Joe answering a question nobody had
+put to him plainly.*
 
 #### ① The complaint, and how far short the table was
 

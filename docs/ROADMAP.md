@@ -1082,6 +1082,7 @@ adjusted by applying a quoted percentage. Five were re-anchored here, and the
 two that cost a red were **seeds chosen for an outcome** (`pile-refusal` pinned
 two 6d6 seeds because they landed flat; the new tuning piles both). A seed
 picked for a result is a recorded film wearing a number.
+
 ---
 
 ## Tier U — the converged UX: what is still open

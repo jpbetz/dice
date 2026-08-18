@@ -1282,7 +1282,7 @@ const wallMat = new CANNON.Material('wall');
 // THE FELT TUNING, SHIPPED 2026-08-18 (ROADMAP C30). Grip and deaden
 // together, with the speed-gated damping below at gate 4. It sat out four
 // measured passes; what changed is not the measurement but the ruling on the
-// one gate it fails.
+// one gate it failed.
 //
 // Measured against the numbers it replaces — floor .25/.35, dice .15/.45,
 // wall .05/.7, gate off — over 16 shake seeds and 40 pile seeds. That old
@@ -1307,7 +1307,7 @@ const wallMat = new CANNON.Material('wall');
 //   "Pilling is OK. If you throw a lot of dice, it's your fault if they pile
 //    up. Let's not try to prevent it."
 //
-// So nothing here tries to prevent it, and nothing new was added to. What
+// So nothing here tries to prevent it and no new mechanism was added. What
 // still has a floor is the HEAP — a pool in a tower rather than a die on a
 // die — and that floor lives in settle-matrix's gate d and in
 // `dice-land-flat`, both of which say there what they are and are not for.
