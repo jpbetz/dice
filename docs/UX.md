@@ -6644,3 +6644,87 @@ by an orphaned stake. That case is now rare rather than routine — it needs a
 browser that is gone for good, not a tab that closed. The rule stays exactly as
 written (it never discloses a value, so it is still the fail-closed direction),
 but it stops being the thing that happens every time somebody's laptop sleeps.
+
+---
+
+### §7.57 — The five seconds §7.52 was really promising (2026-08-18)
+
+*docs/IDENTITY.md §8. §7.52 above is true as written and its mechanism is
+unchanged — but the window it ran in was **five seconds**, and one boot of this
+app is longer than that. There is no new pixel here either. The surface being
+fixed is the same Reveal button, on the reload where §7.52 was quietly a coin
+toss.*
+
+#### ① The symptom, and why nobody would report it as one
+
+You reload. On a good day everything is exactly as §7.52 promises: same seat,
+same colour, the room never noticed, your held roll is still yours to turn
+over. On a bad day — a cold cache, a slow phone, a laptop that has been
+thinking about something else — your pill blinks out of everyone's roster,
+comes back in a new colour, and the die you were holding can now be swept by
+anybody and read by nobody.
+
+Same gesture, same app, different outcome, no explanation. A player cannot even
+describe this bug: it is *the same thing they did yesterday*, and the variable
+is the machine's mood.
+
+#### ② What it actually was: one clock doing two jobs
+
+`DISCONNECT_GRACE_MS` is five seconds. It was answering two different
+questions at once:
+
+| The question | What the answer must optimize for |
+| --- | --- |
+| How long do we keep SHOWING a seat whose browser is gone? | **Short.** An abandoned pill on the roster is the ghost bug (four seats, one real window, an hour each) that cost a whole liveness protocol to kill. |
+| How long do we REMEMBER a seat so its browser can sit back down? | **Longer than a boot.** Measured on this machine: a reload of this app announces itself 4.2–5.4 s after the old tab's socket closed — and it is module evaluation, not network (the document itself answers in 15 ms). |
+
+One number cannot be both, and five seconds was the wrong side of a browser
+boot. `seat-resume` — the scenario that asserts §7.52's promise — failed four
+runs in six.
+
+#### ③ The fix, said in felt terms
+
+**The roster and the memory are now two different clocks.**
+
+- **What everyone SEES is unchanged.** A browser that goes stops being drawn in
+  seconds, exactly as before. No ghost pill, no "away" state, no greyed seat
+  waiting to see if you come back. If someone walks away, the table looks like
+  they walked away.
+- **What the SERVER remembers outlasts it by a minute.** After the seat leaves
+  the roster the server still knows, invisibly, that this chair was yours: the
+  id, the colour, and the opaque browser key from §7.52. Come back inside that
+  minute and you are sat back down in it — same seat, same colour, same
+  authority over the roll you were holding.
+
+So a slow reload now costs you *a blink on other people's rosters* and nothing
+else. It used to cost you the stake.
+
+**And the blink itself got rarer**, by making the returning tab stop being
+polite: the join is now the first thing the boot does instead of the last
+(~300 ms in, not ~4700), so on an ordinary reload the seat never leaves the
+roster at all and the room genuinely does not notice. The knock is only ever
+sent by a tab that already holds a seat in that room — a reload — because that
+is the one join the server answers *silently*. Sending it for anyone else would
+put a pill on the table before the app that owns it exists, which is the ghost
+this section refuses to trade for.
+
+#### ④ What a player is told: still nothing, and now for a better reason
+
+§7.52 ④'s table is unchanged — three silent falls-through to a fresh seat — but
+its third row shrank. "The seat was reaped before you got back" now means *gone
+for more than a minute*, not *booted more slowly than five seconds*. That is
+the difference between a mechanism a player can hold in their head ("I was gone
+a while") and one they cannot ("my phone was cold").
+
+The rows that stay silent stay silent for §7.52's reasons, which get stronger,
+not weaker: a notice here would name the seat/key split, which is the account
+model PROFILES §6 refuses to build.
+
+#### ⑤ The boundary, kept where the owner put it
+
+This is still **rung 1**, widened by one minute — not rung 2, which IDENTITY §7
+CLOSED. A browser that is gone for good still cannot come back for its stake
+tomorrow: the held roll stays sweepable-unread, exactly as §7.52 ⑤ describes,
+and anything reporting *that* as a defect is still answered by IDENTITY §7's
+paragraph. The minute is sized to the accident (a cold boot, a crashed tab, a
+closed lid), not to durability the design deliberately does not offer.

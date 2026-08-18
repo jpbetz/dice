@@ -1,4 +1,4 @@
-# IDENTITY.md — what a "who" is at this table (2026-08-17)
+# IDENTITY.md — what a "who" is at this table (2026-08-17, §8 added 2026-08-18)
 
 *THE ORDER #9. The structural-bet entry said "schedule the later pass before
 the next feature that needs a stable who; B1 is that feature and it has
@@ -132,6 +132,12 @@ log line carries `by=seat|who` — one path, but which door opened is not
 inferable from anything else in the log. Proved in `tests/identity.test.mjs`
 (11 checks; three were written red and are quoted in ROADMAP B4).
 
+**And it shipped with a five-second window, which was the next defect** — the
+condition above is about a seat the roster still holds, and that is
+`DISCONNECT_GRACE_MS`. [§8](#8-rung-1s-window-was-the-next-defect--shipped-2026-08-18)
+is the pass that separated what the roster shows from what the server
+remembers; read it before touching either.
+
 *The design as written, kept below for the record:*
 
 **Rung 1 — the first commit (fixes §3 items 1–3 for the common case).**
@@ -207,7 +213,9 @@ worth stating so nobody re-opens it by accident:
 
 - **A LAPSED seat comes back** — same `playerId`, same authority, while the
   room lives. That is rung 1, shipped, and it is what makes an accidental
-  reload or a crashed tab a non-event rather than a lost reveal.
+  reload or a crashed tab a non-event rather than a lost reveal. *(As shipped
+  on 2026-08-17 that held for five seconds, which is shorter than this app's
+  own boot — §8 is the pass that made this sentence true.)*
 - **A GONE browser does not.** Clearing storage, a new device, a new profile:
   the stake is unrevealable and anyone at the table may sweep it. Not a bug.
   **Anything that reports this as a defect should be closed with this
@@ -216,3 +224,82 @@ worth stating so nobody re-opens it by accident:
   front door that can be told "no" because of who asked — the property that
   keeps this off [§4](#4-b1s-server-half-is-killed-and-the-defect-has-a-name)'s
   killed ground.
+
+## 8. Rung 1's WINDOW was the next defect — SHIPPED 2026-08-18
+
+*UX §7.57. §7 above says "a LAPSED seat comes back". It did — for five
+seconds, which is less than one boot of this app. This section is that
+sentence made true.*
+
+**The measurement, because the diagnosis is the whole of this record.**
+`resumableSeatFor` only answers for a seat with `clients.size === 0` — one
+the ROSTER still holds — and a closed stream arms `scheduleReap(...,
+DISCONNECT_GRACE_MS)`, which is 5 000 ms. A returning tab was landing its
+`/api/join` **4.2–5.4 s** after the old tab's socket closed. Measured three
+reloads at a time, on an idle machine, with a warm cache: the document
+answers in 15 ms and every module is loaded by 200 ms, but
+`DOMContentLoaded` and `/api/join` land in the *same millisecond* at
+4197 / 5278 / 5442 ms. It was never the network. `initNet()` is the last
+line of main.js's module body, so the join waited behind the whole scene
+build. Against a 5 s grace that is a coin toss, and `seat-resume` — the
+scenario asserting rung 1's own promise — failed **four runs in six**.
+
+**Why the naive fix is wrong.** Lengthening the grace makes every test of
+this pass and puts an abandoned pill back on everyone's roster: the
+production ghost bug (four seats, one real window, `/api/events` latencies
+of exactly 3601 s) whose fix cost the whole heartbeat/pong liveness
+protocol. So the fix is to stop one clock answering two questions:
+
+| | Clock | Question | Sized for |
+| --- | --- | --- | --- |
+| **Roster** | `DISCONNECT_GRACE_MS` = 5 s, **untouched** | what is SHOWN | a gone browser stops being drawn in seconds |
+| **Memory** | `RESUME_TTL_MS` = 60 s, new | what is REMEMBERED | a cold boot, a crashed tab, a closed lid |
+
+**The stub (`room.vacated`).** `removePlayer` writes one on the DISCONNECT
+reap: `{id, who, color, at}` — ~200 bytes, keyed by playerId, capped at
+`MAX_VACATED_PER_ROOM` = 8 per room with the oldest evicted, expired
+entries pruned on write. Deliberately NOT the pools or library: the
+returning client re-publishes those on its first hello anyway, and a stub
+that carried them would make the memory bound argument depend on caps that
+live elsewhere. There is no timer — expiry is checked on read — so nothing
+here can hold the event loop open or leak a handle. Rooms still die whole
+(goal 7); a lingering §G6 room keeps its stubs and they expire on their own
+clock, because the player who trips that path is the organizer reloading
+alone in a prepared room.
+
+**What it is NOT allowed to be, and how each is held:**
+
+- **Never a way to see a player who is not there.** `room.vacated` is not
+  `room.players`; `publicPlayers` walks the latter and every payload goes
+  through it. Asserted by grepping a bystander's bytes for the vacated id
+  *and* the key (tests/identity.test.mjs).
+- **Never a live seat.** A stub exists only for a player `removePlayer` has
+  already deleted, it is CONSUMED on return, and the lookup re-checks
+  `room.players` anyway.
+- **Never a refusal at the door.** A miss falls through to an ordinary
+  join, exactly as rung 1's does. §4's killed ground stays killed.
+- **Never the gesture.** `removePlayer(..., 'left')` — 'Leave & switch
+  seat' — buries nothing, and a seat that never streamed is an arrival that
+  gave up, not a lapse (`everStreamed`, same bit as rung 1's).
+- **Never rung 2.** Sixty seconds is the accident, not "come back
+  tomorrow". §7's paragraph still answers anything that asks for more, and
+  a browser past the window still holds no authority over the stake it
+  left — asserted, with the 403.
+
+**The client half, which is not the same fix.** The server no longer LOSES
+the race, but the roster blink was still real, so `js/net.js` gained
+`prejoinSeat` — the *door knock*: for a tab that already holds a seat in
+this room (a reload, the one join the server answers silently), the join
+POST is fired from the top of main.js's module body instead of the bottom.
+Measured: **~300 ms**, not ~4700. It is gated to that case on purpose — a
+knock for a browser with no seat would mint a pill before the app that owns
+it exists and hold it for the 60 s join grace if the boot died, which is a
+ghost. The lobby and `&as=` (which can end at a modal the player dismisses)
+do not knock.
+
+**The two claims, and where each fails if it stops being true:** the seat
+returns (`seat-revive` e2e + nine protocol checks, five written red) and the
+roster still lets a gone browser go on the old schedule — an upper BOUND,
+run against the real five seconds in `tests/identity.test.mjs` and again in
+the browser in `seat-revive`. That second one is the assertion that fails
+the day somebody "fixes" a flake by lengthening the grace.
