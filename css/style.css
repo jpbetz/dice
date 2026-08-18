@@ -2514,6 +2514,17 @@ html, body {
 /* Whichever list the switch is not showing is really gone, not merely dim:
    2i-C's third code, so nothing below it has to make room for a ghost. */
 #rail-pools.rail-list-off, #rail-dice.rail-list-off { display: none; }
+/* …and the scoped `.hidden` these two never had (C20's rule, UX §7.58).
+   There is no bare `.hidden` in this sheet, so a class with no rule is a
+   silent no-op — and `hidden-means-hidden` could not see it here, because
+   EXPANDED both lists are already `display: none` from the two rules above.
+   The check therefore read green off a rule that had nothing to do with the
+   class, and COLLAPSED — one click on the divider, and the default seeding
+   on a small viewport — `#rail-pools` came back `display: flex` with
+   `.hidden` on it. Nothing adds the class today; that is exactly why the
+   rule is cheap and why the next hand to reach for it must not be the one
+   who finds out. */
+#rail-pools.hidden, #rail-dice.hidden { display: none; }
 #rail-mode {
   flex: none;
   margin: 8px 6px 2px; /* one left edge with the chip, the rows and the foot */

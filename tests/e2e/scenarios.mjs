@@ -1169,7 +1169,12 @@ export const scenarios = [
     // cut, but THE DECIDING DIE IS NEVER CROPPED OUT OF FRAME. That is what
     // this pins — on every pool size, which is where it used to fail.
     async fn(ctx) {
-      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      // ITS OWN ORIGIN, like both of its siblings (`flyout-banner` on .182,
+      // `framing-prefers-dice` on .64) and for the reason their comments give:
+      // `setPanelState` and `setZoom` write PER-ORIGIN localStorage that
+      // outlives this room, and `localhost` is the origin ~forty other
+      // scenarios boot on. This one alone stayed there.
+      const a = await ctx.newTable({ origin: '127.0.0.183', name: 'Alice' });
       await a.settle();
       const viewport = async (w, h, mini) => {
         await a.page.browser.send('Emulation.setDeviceMetricsOverride',
@@ -1190,118 +1195,129 @@ export const scenarios = [
         return JSON.parse(await a.eval('JSON.stringify(window.__diceDebug.framingInfo())'));
       };
 
-      // BIG POOLS ARE UNTOUCHED ON A DESKTOP; SMALL ONES TAKE THE DICE RUNG.
-      //
-      // This block used to say "A DESKTOP MUST BE UNTOUCHED" and assert it of
-      // `1d20` as well as `6d6`. That was true of the shipped camera on the day
-      // it was written and stopped being true on 2026-08-18, when C27 turned
-      // `preferDice` on: a lone d20 on a desktop now reaches the dice rung and
-      // gains 40% of its size, which is the feature working. The claim that
-      // survived is sharper than the one it replaces, and nothing had to be
-      // told which pool is which — the gate does it by measurement.
-      await viewport(1440, 900, true);
-      const deskSix = await throwIt('6d6');
-      assert.equal(deskSix.mode, 'mat', 'desktop 6d6: a full-ish pool still frames the whole mat');
-      assert.ok(deskSix.matFits, 'desktop 6d6: and the mat actually fits (it always has here)');
-      const deskLone = await throwIt('1d20');
-      assert.equal(deskLone.mode, 'dice',
-        `desktop 1d20: a lone die takes the dice rung after C27 (mode ${deskLone.mode})`);
-      assert.equal(deskLone.diceOnScreen, deskLone.dice,
-        `desktop 1d20: …with every die still on screen (${deskLone.diceOnScreen}/${deskLone.dice})`);
-      assert.equal(deskLone.decidingOnScreen, true,
-        'desktop 1d20: …and the deciding die above all — ruling ② is the floor, whatever the rung');
+      try {
+        // BIG POOLS ARE UNTOUCHED ON A DESKTOP; SMALL ONES TAKE THE DICE RUNG.
+        //
+        // This block used to say "A DESKTOP MUST BE UNTOUCHED" and assert it of
+        // `1d20` as well as `6d6`. That was true of the shipped camera on the day
+        // it was written and stopped being true on 2026-08-18, when C27 turned
+        // `preferDice` on: a lone d20 on a desktop now reaches the dice rung and
+        // gains 40% of its size, which is the feature working. The claim that
+        // survived is sharper than the one it replaces, and nothing had to be
+        // told which pool is which — the gate does it by measurement.
+        await viewport(1440, 900, true);
+        const deskSix = await throwIt('6d6');
+        assert.equal(deskSix.mode, 'mat', 'desktop 6d6: a full-ish pool still frames the whole mat');
+        assert.ok(deskSix.matFits, 'desktop 6d6: and the mat actually fits (it always has here)');
+        const deskLone = await throwIt('1d20');
+        assert.equal(deskLone.mode, 'dice',
+          `desktop 1d20: a lone die takes the dice rung after C27 (mode ${deskLone.mode})`);
+        assert.equal(deskLone.diceOnScreen, deskLone.dice,
+          `desktop 1d20: …with every die still on screen (${deskLone.diceOnScreen}/${deskLone.dice})`);
+        assert.equal(deskLone.decidingOnScreen, true,
+          'desktop 1d20: …and the deciding die above all — ruling ② is the floor, whatever the rung');
 
-      // A PHONE CROPS, AND THE FLOOR HOLDS. Every pool size, including the ones
-      // whose dice cannot all fit — that is the whole point of the ladder.
-      await viewport(390, 844, true);
-      for (const pool of ['1d20', '1d8+1d6+1d10', '6d6', '20d6', '40d6']) {
-        const f = await throwIt(pool);
-        assert.ok(f.decidingOnScreen === true,
-          `phone ${pool}: the deciding die is in frame (mode ${f.mode}, `
-          + `${f.diceOnScreen}/${f.dice} dice on screen)`);
-        assert.notEqual(f.mode, 'mat-overflow',
-          `phone ${pool}: the camera aims at something rather than overflowing blindly`);
+        // A PHONE CROPS, AND THE FLOOR HOLDS. Every pool size, including the ones
+        // whose dice cannot all fit — that is the whole point of the ladder.
+        await viewport(390, 844, true);
+        for (const pool of ['1d20', '1d8+1d6+1d10', '6d6', '20d6', '40d6']) {
+          const f = await throwIt(pool);
+          assert.ok(f.decidingOnScreen === true,
+            `phone ${pool}: the deciding die is in frame (mode ${f.mode}, `
+            + `${f.diceOnScreen}/${f.dice} dice on screen)`);
+          assert.notEqual(f.mode, 'mat-overflow',
+            `phone ${pool}: the camera aims at something rather than overflowing blindly`);
+        }
+
+        // AND THE CROP BOUGHT SIZE — measured against the shipped framing through
+        // the same probe, not asserted from taste.
+        //
+        // ONE DIE ONLY, and that is a finding rather than a convenience. Dice
+        // SCATTER: a three-die pool's AABB measured anywhere from 5x3.4 to
+        // 7.7x5.3 on an 8.6x5.2 mat, so on many throws it does not fit a phone
+        // either and the ladder correctly declines to crop. Asserting a gain for
+        // the trio failed 2 runs in 4 at 78-80px — the honest claim is that the
+        // size win is GUARANTEED for a single die and OPPORTUNISTIC above it.
+        // `1d20 dc 15` is the most common check in the game, so the guaranteed
+        // case is also the frequent one.
+        for (const pool of ['1d20']) {
+          await throwIt(pool);
+          await a.eval('window.__diceDebug.setFramingLadder(false)');
+          await a.dbg('sim(1500)');
+          const off = (await a.eval('JSON.stringify(window.__diceDebug.zoomProbe())'));
+          await a.eval('window.__diceDebug.setFramingLadder(true)');
+          await a.dbg('sim(1500)');
+          const on = (await a.eval('JSON.stringify(window.__diceDebug.zoomProbe())'));
+          const o = JSON.parse(off).dieSpanPx, n = JSON.parse(on).dieSpanPx;
+          assert.ok(n > o * 1.5,
+            `phone ${pool}: framing the die makes it much bigger (${o}px → ${n}px)`);
+          const f = JSON.parse(await a.eval('JSON.stringify(window.__diceDebug.framingInfo())'));
+          assert.equal(f.diceOnScreen, f.dice,
+            `phone ${pool}: …and every die is still on screen (${f.diceOnScreen}/${f.dice})`);
+        }
+
+        // THE TABLE TURNS, AND ONLY WHERE IT PAYS. Portrait orbit is chosen by
+        // measurement at frame time, not by a viewport threshold: landscape must
+        // fail to contain the mat, portrait must contain it, and landscape must
+        // actually be dropping dice. The first rule tried here was "more dice,
+        // then bigger", and it turned a DESKTOP at 40d6 to gain one die at a 31%
+        // size cost — at forty dice a few are always piled above the mat plane
+        // and out of frame whichever way the table sits, so that tie-break was
+        // noise. These three assertions are the ones that would have caught it.
+        const big = await throwIt('40d6');
+        assert.notEqual(big.orbit, 0,
+          `phone 40d6: the table turns (orbit ${big.orbit}, ${big.diceOnScreen}/${big.dice})`);
+        assert.equal(big.diceOnScreen, big.dice,
+          `phone 40d6: …and every one of forty dice is on screen (${big.diceOnScreen}/${big.dice})`);
+        const lone = await throwIt('1d20');
+        // THE ORBIT EQUALITY HERE WAS A ~33% FLAKE after C27 and is deleted, not
+        // softened. A lone die on an unseeded roll lands anywhere, and once the
+        // dice rung is reachable the turn is decided by where it landed — so
+        // "a lone die does NOT turn the table" was asserting one outcome of a
+        // coin toss. What survived the measurement is the claim that actually
+        // matters and holds either way: whichever way it comes back, the lone die
+        // is never SMALLER for it (measured off → on: 266→266, 191→191, 201→222,
+        // 252→252, 215→239, 231→231).
+        assert.ok(lone.spanPx > 0 && lone.decidingOnScreen === true,
+          `phone 1d20: however the table sits, the lone die is framed and in view `
+          + `(orbit ${lone.orbit}, ${lone.spanPx}px)`);
+
+        // THE POOLS THAT STAY ON THE MAT RUNG NEVER TURN, at any size — which is
+        // what "a desktop never turns" was really saying, before C27 made a lone
+        // die on a desktop reach the dice rung and take the turn with it.
+        await viewport(1440, 900, true);
+        for (const pool of ['20d6', '40d6']) {
+          const f = await throwIt(pool);
+          assert.equal(f.orbit, 0, `desktop ${pool}: a mat-rung pool stays landscape`);
+          assert.ok(f.decidingOnScreen === true,
+            `desktop ${pool}: and the deciding die is in frame — the mat fitting `
+            + `does NOT imply the dice do, since a die resting on two others `
+            + `projects from above the mat plane (${f.diceOnScreen}/${f.dice})`);
+        }
+        await viewport(390, 844, true);
+      } finally {
+        // PUT THE ORIGIN BACK. `setPanelState` writes per-origin localStorage,
+        // which outlives this scenario's room — the same trap TESTING.md
+        // records for dice.diceset.v1. Leaving the panels collapsed made
+        // `hidden-means-hidden` and `a11y-modals` fail LATER IN THE SWEEP
+        // while both passed in isolation, which is the most expensive shape a
+        // test failure can take: it accuses the wrong commit.
+        //
+        // AND THE `finally` IS THE WHOLE FIX, not decoration. This cleanup
+        // already existed, sitting at the end of the body — where the only
+        // run that needs it is the one that never reaches it. On 2026-08-18
+        // the desktop leg above went red on a stale claim, the cleanup was
+        // skipped, and the two victims went red four scenarios later wearing
+        // the symptom of a bug in somebody else's commit. A cleanup that
+        // runs only when nothing went wrong is not a cleanup.
+        // (Each call is `.catch`ed for the same reason: a tab that died is
+        // not a reason to lose the rest of the restore.)
+        await a.dbg('setPanelState({pools: true, log: true})').catch(() => {});
+        await a.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, a.page.sessionId)
+          .catch(() => {});
+        await a.eval('window.dispatchEvent(new Event("resize"))').catch(() => {});
+        await a.dbg('sim(300)').catch(() => {});
       }
-
-      // AND THE CROP BOUGHT SIZE — measured against the shipped framing through
-      // the same probe, not asserted from taste.
-      //
-      // ONE DIE ONLY, and that is a finding rather than a convenience. Dice
-      // SCATTER: a three-die pool's AABB measured anywhere from 5x3.4 to
-      // 7.7x5.3 on an 8.6x5.2 mat, so on many throws it does not fit a phone
-      // either and the ladder correctly declines to crop. Asserting a gain for
-      // the trio failed 2 runs in 4 at 78-80px — the honest claim is that the
-      // size win is GUARANTEED for a single die and OPPORTUNISTIC above it.
-      // `1d20 dc 15` is the most common check in the game, so the guaranteed
-      // case is also the frequent one.
-      for (const pool of ['1d20']) {
-        await throwIt(pool);
-        await a.eval('window.__diceDebug.setFramingLadder(false)');
-        await a.dbg('sim(1500)');
-        const off = (await a.eval('JSON.stringify(window.__diceDebug.zoomProbe())'));
-        await a.eval('window.__diceDebug.setFramingLadder(true)');
-        await a.dbg('sim(1500)');
-        const on = (await a.eval('JSON.stringify(window.__diceDebug.zoomProbe())'));
-        const o = JSON.parse(off).dieSpanPx, n = JSON.parse(on).dieSpanPx;
-        assert.ok(n > o * 1.5,
-          `phone ${pool}: framing the die makes it much bigger (${o}px → ${n}px)`);
-        const f = JSON.parse(await a.eval('JSON.stringify(window.__diceDebug.framingInfo())'));
-        assert.equal(f.diceOnScreen, f.dice,
-          `phone ${pool}: …and every die is still on screen (${f.diceOnScreen}/${f.dice})`);
-      }
-
-      // THE TABLE TURNS, AND ONLY WHERE IT PAYS. Portrait orbit is chosen by
-      // measurement at frame time, not by a viewport threshold: landscape must
-      // fail to contain the mat, portrait must contain it, and landscape must
-      // actually be dropping dice. The first rule tried here was "more dice,
-      // then bigger", and it turned a DESKTOP at 40d6 to gain one die at a 31%
-      // size cost — at forty dice a few are always piled above the mat plane
-      // and out of frame whichever way the table sits, so that tie-break was
-      // noise. These three assertions are the ones that would have caught it.
-      const big = await throwIt('40d6');
-      assert.notEqual(big.orbit, 0,
-        `phone 40d6: the table turns (orbit ${big.orbit}, ${big.diceOnScreen}/${big.dice})`);
-      assert.equal(big.diceOnScreen, big.dice,
-        `phone 40d6: …and every one of forty dice is on screen (${big.diceOnScreen}/${big.dice})`);
-      const lone = await throwIt('1d20');
-      // THE ORBIT EQUALITY HERE WAS A ~33% FLAKE after C27 and is deleted, not
-      // softened. A lone die on an unseeded roll lands anywhere, and once the
-      // dice rung is reachable the turn is decided by where it landed — so
-      // "a lone die does NOT turn the table" was asserting one outcome of a
-      // coin toss. What survived the measurement is the claim that actually
-      // matters and holds either way: whichever way it comes back, the lone die
-      // is never SMALLER for it (measured off → on: 266→266, 191→191, 201→222,
-      // 252→252, 215→239, 231→231).
-      assert.ok(lone.spanPx > 0 && lone.decidingOnScreen === true,
-        `phone 1d20: however the table sits, the lone die is framed and in view `
-        + `(orbit ${lone.orbit}, ${lone.spanPx}px)`);
-
-      // THE POOLS THAT STAY ON THE MAT RUNG NEVER TURN, at any size — which is
-      // what "a desktop never turns" was really saying, before C27 made a lone
-      // die on a desktop reach the dice rung and take the turn with it.
-      await viewport(1440, 900, true);
-      for (const pool of ['20d6', '40d6']) {
-        const f = await throwIt(pool);
-        assert.equal(f.orbit, 0, `desktop ${pool}: a mat-rung pool stays landscape`);
-        assert.ok(f.decidingOnScreen === true,
-          `desktop ${pool}: and the deciding die is in frame — the mat fitting `
-          + `does NOT imply the dice do, since a die resting on two others `
-          + `projects from above the mat plane (${f.diceOnScreen}/${f.dice})`);
-      }
-      await viewport(390, 844, true);
-
-      // PUT THE ORIGIN BACK. `setPanelState` writes per-origin localStorage,
-      // which outlives this scenario's room — the same trap TESTING.md records
-      // for dice.diceset.v1. Leaving the panels collapsed made
-      // `hidden-means-hidden` and `a11y-modals` fail LATER IN THE SWEEP while
-      // both passed in isolation, which is the most expensive shape a test
-      // failure can take: it accuses the wrong commit. This scenario is the
-      // only one that visits a phone viewport, so it is the one that owes the
-      // cleanup.
-      await a.dbg('setPanelState({pools: true, log: true})');
-      await a.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, a.page.sessionId);
-      await a.eval('window.dispatchEvent(new Event("resize"))');
-      await a.dbg('sim(300)');
     },
   },
   {
@@ -1470,10 +1486,28 @@ export const scenarios = [
     // something everywhere at once is the kind of change this file has already
     // been bitten by four times. So the rules stay scoped and this is what
     // keeps them honest.
+    //
+    // BOTH PANEL STATES, and that is the 2026-08-18 amendment (UX §7.58).
+    // The sweep read this green off one state and the collapsed state hid a
+    // live no-op: EXPANDED, `#rail-pools` is already `display: none` from
+    // `#left-panel:not(.collapsed) #rail-pools`, so adding the class changed
+    // nothing and the check could not tell the difference between "the class
+    // works" and "something else was hiding it anyway". COLLAPSED — one click
+    // on the divider — the same element came back `flex` WITH `.hidden` on it.
+    // The scenario only ever saw it because another scenario leaked a
+    // collapsed panel onto this origin, i.e. by accident.
+    //
+    // So the sweep runs in both states and the state is DECLARED rather than
+    // inherited. That second half matters as much as the first: this ran on
+    // `localhost` and judged whatever panel state the previous forty scenarios
+    // happened to leave there, which is how it came to accuse the wrong commit.
     async fn(ctx) {
-      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      // Its own origin + a finally, because the sweep below WRITES panel state
+      // (dice.panels.v1, per-origin, outlives the room) — the exact leak this
+      // scenario was the victim of.
+      const a = await ctx.newTable({ origin: '127.0.0.184', name: 'Alice' });
       await a.settle();
-      const disobedient = await a.eval(`(() => {
+      const sweep = () => a.eval(`(() => {
         const ids = ${JSON.stringify([
           'result-banner', 'settings-modal', 'name-modal', 'help-overlay', 'kbd-overlay',
           'mods-popover', 'identity-menu', 'offer-menu', 'log-flyout', 'peek-card',
@@ -1496,8 +1530,22 @@ export const scenarios = [
         }
         return bad;
       })()`);
-      assert.deepEqual(disobedient, [],
-        `every element the code hides by class actually hides: ${disobedient.join(', ')}`);
+      try {
+        for (const open of [true, false]) {
+          await a.dbg(`setPanelState({pools: ${open}})`);
+          await a.dbg('sim(200)');
+          const where = open ? 'panel expanded' : 'panel COLLAPSED';
+          assert.equal(await a.eval(
+            `document.getElementById('left-panel').classList.contains('collapsed')`), !open,
+            `${where}: the state under test is the state on screen`);
+          const disobedient = await sweep();
+          assert.deepEqual(disobedient, [],
+            `${where}: every element the code hides by class actually hides: `
+            + `${disobedient.join(', ')}`);
+        }
+      } finally {
+        await a.dbg('setPanelState({pools: true})').catch(() => {});
+      }
     },
   },
   {
@@ -1565,15 +1613,53 @@ export const scenarios = [
       // The notation section is OFF by default (§7.23 demoted it), and a
       // display:none input cannot take focus — so :focus would never match
       // and the assertion would read `none` for the wrong reason.
+      //
+      // …AND SO IS A COLLAPSED PANEL, which is the same sentence with a second
+      // subject and cost a full sweep to learn (2026-08-18, UX §7.58).
+      // `#cmd-input` lives inside `#builder-panel`, and `#left-panel.collapsed
+      // #builder-panel` is `display: none` — so a scenario four rows earlier
+      // that left `dice.panels.v1` at `{pools:false}` on this origin made this
+      // assertion fail with a message about a focus ring, on a build whose
+      // focus ring was perfect. The panel state is now DECLARED, and the two
+      // preconditions are asserted separately so the next failure names itself
+      // instead of libelling the stylesheet.
+      await a.dbg(`setPanelState({pools: true})`);
       await a.dbg(`setSections({notation: true})`);
       const ring = await a.eval(`(() => {
         const i = document.getElementById('cmd-input');
         i.focus();
+        // THE SETTLED RING, not the first frame of it. .cmd-in transitions
+        // box-shadow over 0.15s, so reading straight after focus() samples the
+        // transition wherever the CDP round trip happens to land — measured at
+        // both "rgba(0,0,0,0) 0px 0px 0px 0px" (t=0) and a part-way
+        // "…0.298) 0 0 0 1.7px". The old assertion was !== 'none', which the
+        // t=0 value passes: a ring authored fully transparent and zero-spread
+        // would have read green forever. Finishing the transition costs nothing
+        // and makes the read the one the eye gets (TESTING.md P10).
+        for (const an of i.getAnimations()) an.finish();
         const cs = getComputedStyle(i);
-        return { outline: cs.outlineStyle, shadow: cs.boxShadow };
+        const alpha = /rgba?\\(\\s*[\\d.]+\\s*,\\s*[\\d.]+\\s*,\\s*[\\d.]+\\s*(?:,\\s*([\\d.]+))?/
+          .exec(cs.boxShadow);
+        const spread = /([\\d.]+)px\\s*$/.exec(cs.boxShadow);
+        return {
+          rendered: !!i.offsetParent,
+          focused: document.activeElement === i,
+          outline: cs.outlineStyle,
+          shadow: cs.boxShadow,
+          alpha: alpha ? Number(alpha[1] === undefined ? 1 : alpha[1]) : 0,
+          spreadPx: spread ? Number(spread[1]) : 0,
+        };
       })()`);
+      // The instrument first: an input nothing can focus proves nothing about
+      // rings, and saying so here is what stops the ring taking the blame.
+      assert.equal(ring.rendered, true,
+        'the notation box is on screen to be focused (panel expanded, section on)');
+      assert.equal(ring.focused, true, '…and it actually took focus');
       assert.ok(ring.shadow && ring.shadow !== 'none',
         `the notation box shows focus (outline:${ring.outline}, shadow:${ring.shadow})`);
+      assert.ok(ring.alpha > 0 && ring.spreadPx > 0,
+        `…and the ring is a ring the eye gets — ${ring.spreadPx}px at alpha `
+        + `${ring.alpha} (shadow: ${ring.shadow})`);
 
       // ---- a seg is a CHOICE, not a row of switches ----
       await a.eval(`document.querySelector('#die-buttons .die-btn').click()`);
