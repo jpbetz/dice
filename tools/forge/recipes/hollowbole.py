@@ -2537,6 +2537,21 @@ CREEP_K = 0.86          # strength where the creep is solid
 # the tip. Driven by how PROUD of the base cylinder a point stands, so it lands
 # on roots, toes and fingers and never on the bare trunk between them.
 SOIL_K = 0.72
+# THE GROUND'S OCCLUSION OF THE FOOT (round 9) — see the end of make_paint for
+# the measurement and for why it is a multiply and not a mix.
+#
+# H IS MEASURED IN THE FRAME, and the first cut got it wrong for a reason worth
+# keeping: 1.75 was reasoned from the flare's radius (a ground plane stops
+# subtending much beyond about half of it), and the render disagreed. Projected
+# at the resting eye, the pale fan the eye actually reads as "the foot" spans
+# world y 0.55 to 2.05, so a ramp dying at 1.75 spent its budget under the
+# visible band and moved the fan's 90th percentile by 7%. 2.85 puts the whole
+# fan on the slope. AND THE NUMBERS ARE sRGB-DEFLATED: this multiplies a LINEAR
+# albedo, so a 0.5x cut is a 0.74x cut in the frame — a coefficient that looks
+# brutal on paper is a quarter-stop on screen, which is most of why round 4's
+# 0.39 tongue gain did so much less than its own arithmetic promised.
+GROUND_AO = 0.78
+GROUND_AO_H = 2.85
 # THE DIAGONAL SCAR BAND (round 7, item 6). 0.52 rad is 30 degrees off
 # vertical; the half-width is in the same world units as the unrolled surface,
 # so a 1.35 band is about 2.7 units of wood measured across itself.
@@ -2736,6 +2751,35 @@ def make_paint(pal):
         if rimk > 0:
             c = lerp3(c, pal["wood_hi"], 0.42 * rimk)
             c = lerp3(c, pal["punk"], 0.20 * rimk)
+
+        # THE GROUND OCCLUDES THE WOOD (round 9). The other half of the same
+        # measurement that put a contact shadow on the ground, and it is a
+        # MULTIPLY at the end of the chain rather than another mix, because it
+        # is not a material — it is light that does not arrive.
+        #
+        # Joe: "It's still a set piece in my eyes." Measured at the resting eye
+        # on the bake that collected that verdict, the root flare — the LOWEST
+        # geometry on this model — rendered as the brightest structure anywhere
+        # near the ground, at the same value as the moss it stands on. That is
+        # not a paint error, it is geometry meeting light: the venue's key is a
+        # spotlight 22 units straight up, so a near-HORIZONTAL surface takes it
+        # at full N·L while the trunk's vertical wall takes it at a graze. The
+        # flare is the most horizontal thing on a stump. Every previous attempt
+        # on this surface mixed a darker COLOUR in (round 4's tongue at 0.39,
+        # round 6's soilk toward earth_dark) and every one of them lost, for the
+        # reason round 4 recorded in its own ledger: equal albedo is not equal
+        # value when the normals differ by ninety degrees.
+        #
+        # A real foot is dark because the soil takes half its sky, and that is a
+        # multiply — it survives whatever the light is doing. Weighted by
+        # PROUDNESS on top of height, so the flare, the toes and the fingers
+        # take the full bite (they are the surfaces the ground actually wraps)
+        # and the bare trunk between them takes 0.40 of it: a stump is not a
+        # black stocking, it is a pale trunk standing in its own shade.
+        gk = smoothstep(y, GROUND_AO_H, -0.10)
+        gw = 0.40 + 0.60 * smoothstep(proud, 0.02, 0.35)
+        gao = 1.0 - GROUND_AO * gk * gw
+        c = tuple(v * gao for v in c)
         return c
 
     return paint
