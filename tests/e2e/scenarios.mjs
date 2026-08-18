@@ -18397,6 +18397,15 @@ export const scenarios = [
       // Bram is watching the same roll, so HIS zoom is parked behind his own
       // copy of it — which is the deferral working per client, and the reason
       // the comparison at the end has to let him finish too.
+      //
+      // WAITED FOR, NOT READ. Ada's park gets a `waitFor` three lines up and
+      // Bram's used to be a bare read, so this asserted that the SPECTATOR had
+      // already processed the same event — over a second SSE connection, in the
+      // same tick. It failed at sweep position 194 and passed alone, which is
+      // what a race looks like from the outside. The claim is unchanged; only
+      // the impatience is gone.
+      await b.waitFor(`window.__diceDebug.pendingZoom === 'close'`,
+        { desc: 'the spectator defers his own change behind his own playback' });
       assert.equal(await b.dbg('pendingZoom'), 'close',
         'the spectator defers his own change behind his own playback');
 
