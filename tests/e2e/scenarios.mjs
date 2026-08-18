@@ -1190,14 +1190,26 @@ export const scenarios = [
         return JSON.parse(await a.eval('JSON.stringify(window.__diceDebug.framingInfo())'));
       };
 
-      // A DESKTOP MUST BE UNTOUCHED. The mat fits there, so the ladder never
-      // leaves its first rung and the framing is the one that shipped.
+      // BIG POOLS ARE UNTOUCHED ON A DESKTOP; SMALL ONES TAKE THE DICE RUNG.
+      //
+      // This block used to say "A DESKTOP MUST BE UNTOUCHED" and assert it of
+      // `1d20` as well as `6d6`. That was true of the shipped camera on the day
+      // it was written and stopped being true on 2026-08-18, when C27 turned
+      // `preferDice` on: a lone d20 on a desktop now reaches the dice rung and
+      // gains 40% of its size, which is the feature working. The claim that
+      // survived is sharper than the one it replaces, and nothing had to be
+      // told which pool is which — the gate does it by measurement.
       await viewport(1440, 900, true);
-      for (const pool of ['1d20', '6d6']) {
-        const f = await throwIt(pool);
-        assert.equal(f.mode, 'mat', `desktop ${pool}: the camera still frames the whole mat`);
-        assert.ok(f.matFits, `desktop ${pool}: and the mat actually fits (it always has here)`);
-      }
+      const deskSix = await throwIt('6d6');
+      assert.equal(deskSix.mode, 'mat', 'desktop 6d6: a full-ish pool still frames the whole mat');
+      assert.ok(deskSix.matFits, 'desktop 6d6: and the mat actually fits (it always has here)');
+      const deskLone = await throwIt('1d20');
+      assert.equal(deskLone.mode, 'dice',
+        `desktop 1d20: a lone die takes the dice rung after C27 (mode ${deskLone.mode})`);
+      assert.equal(deskLone.diceOnScreen, deskLone.dice,
+        `desktop 1d20: …with every die still on screen (${deskLone.diceOnScreen}/${deskLone.dice})`);
+      assert.equal(deskLone.decidingOnScreen, true,
+        'desktop 1d20: …and the deciding die above all — ruling ② is the floor, whatever the rung');
 
       // A PHONE CROPS, AND THE FLOOR HOLDS. Every pool size, including the ones
       // whose dice cannot all fit — that is the whole point of the ladder.
@@ -1252,17 +1264,25 @@ export const scenarios = [
       assert.equal(big.diceOnScreen, big.dice,
         `phone 40d6: …and every one of forty dice is on screen (${big.diceOnScreen}/${big.dice})`);
       const lone = await throwIt('1d20');
-      assert.equal(lone.orbit, 0,
-        `phone 1d20: a lone die does NOT turn the table — landscape already `
-        + `showed it, and turning would trade its close frame for nothing `
+      // THE ORBIT EQUALITY HERE WAS A ~33% FLAKE after C27 and is deleted, not
+      // softened. A lone die on an unseeded roll lands anywhere, and once the
+      // dice rung is reachable the turn is decided by where it landed — so
+      // "a lone die does NOT turn the table" was asserting one outcome of a
+      // coin toss. What survived the measurement is the claim that actually
+      // matters and holds either way: whichever way it comes back, the lone die
+      // is never SMALLER for it (measured off → on: 266→266, 191→191, 201→222,
+      // 252→252, 215→239, 231→231).
+      assert.ok(lone.spanPx > 0 && lone.decidingOnScreen === true,
+        `phone 1d20: however the table sits, the lone die is framed and in view `
         + `(orbit ${lone.orbit}, ${lone.spanPx}px)`);
 
-      // A DESKTOP NEVER TURNS, at any pool size. Its mat always fits, so the
-      // second candidate is never even computed.
+      // THE POOLS THAT STAY ON THE MAT RUNG NEVER TURN, at any size — which is
+      // what "a desktop never turns" was really saying, before C27 made a lone
+      // die on a desktop reach the dice rung and take the turn with it.
       await viewport(1440, 900, true);
-      for (const pool of ['1d20', '20d6', '40d6']) {
+      for (const pool of ['20d6', '40d6']) {
         const f = await throwIt(pool);
-        assert.equal(f.orbit, 0, `desktop ${pool}: the table stays landscape`);
+        assert.equal(f.orbit, 0, `desktop ${pool}: a mat-rung pool stays landscape`);
         assert.ok(f.decidingOnScreen === true,
           `desktop ${pool}: and the deciding die is in frame — the mat fitting `
           + `does NOT imply the dice do, since a die resting on two others `
