@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, SHADER_TIME } from './dice.js';
 import { dieArtURL } from './diceart.js';
-import { connect, forgetSeat, peekTable, LS_WHO } from './net.js';
+import { connect, forgetSeat, peekTable, prejoinSeat, LS_WHO } from './net.js';
 import { recentTables, rememberTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, validateMods, budgetOf } from './rollspec.js';
@@ -623,6 +623,30 @@ const LS_DICESET = 'dice.diceset.v1';    // "Just you" scope: dice-set identity 
 // that runs during the rack's module-eval block — a const down at the net
 // section is in TDZ there, which kills the whole module.
 const LS_NAME = 'dice.name.v1';
+
+// THE DOOR KNOCK (docs/IDENTITY.md §8, UX §7.57) — the first line of this boot
+// that touches the network, and deliberately the FIRST thing after the name key
+// it needs, because everything below is the 4-5 seconds it exists to get ahead
+// of. initNet runs at the bottom of this module; measured, its /api/join lands
+// in the same millisecond as DOMContentLoaded, 4.2-5.4 s in, against a server
+// grace of five. A reload was a coin toss over whether the room watched your
+// pill blink out and back.
+//
+// net.js owns every condition that matters (it knocks only for a tab that
+// already holds a seat in this room — a RELOAD, which the server answers with a
+// silent resume, so a boot that dies here leaves the roster exactly as it found
+// it). The two conditions THIS file owns are the two that can end at a modal
+// nobody has answered yet: the lobby has no table to knock on, and an `&as=`
+// link may put the seat picker in front of a returning player (U3), who may
+// dismiss it and never join at all. AS_PARAM itself is declared ~26k lines
+// below, next to the picker it belongs to, so it is read here rather than
+// hoisted — this is the only other reader, and hoisting it would put the seat
+// picker's constant at the top of the file for one boolean.
+if (!IN_LOBBY && !(new URLSearchParams(window.location.search).get('as') || '').trim()) {
+  let bootName = '';
+  try { bootName = (localStorage.getItem(LS_NAME) || '').trim(); } catch { /* no store, no knock */ }
+  if (bootName) prejoinSeat(ROOM, bootName);
+}
 
 // ---------------------------------------------------------------------------
 // Renderer / scene

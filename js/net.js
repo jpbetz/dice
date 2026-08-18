@@ -153,6 +153,65 @@ function browserWho() {
   } catch { return ''; }
 }
 
+// -- the door knock (docs/IDENTITY.md §8, UX §7.57) --------------------------
+//
+// A RELOAD SAYS "STILL HERE" BEFORE IT BUILDS A SCENE. The join used to be the
+// LAST thing a boot did — initNet runs at the bottom of main.js's module body —
+// so a returning tab announced itself 4.2-5.4 s after its old socket closed
+// (measured: DOMContentLoaded and /api/join land in the same millisecond, and
+// the document itself answers in 15 ms; it is module evaluation, not network).
+// The server's disconnect grace is five seconds. Every reload was therefore a
+// coin toss between "a refresh is the same player, and the room never noticed"
+// and "the seat is reaped, everyone watches the pill blink out".
+//
+// The server no longer LOSES that toss (a reaped seat is still resumable —
+// IDENTITY §8), but the roster blink is real and it is avoidable: the POST is
+// one round trip and it does not need three.js. Fired here, it lands ~200 ms
+// into the boot with 25x the margin it had.
+//
+// ONLY FOR A TAB THAT ALREADY HOLDS A SEAT IN THIS ROOM, which is exactly a
+// reload. That gate is not cosmetic: such a join RESUMES (the server broadcasts
+// nothing, the roster does not move), so a boot that then dies leaves the room
+// exactly as it found it. A knock for a browser with no seat would be a real
+// arrival — a new pill, minted before the app that owns it exists, sitting for
+// the full 60 s join grace if the boot never finishes. That is a ghost, and one
+// ghost is one too many.
+//
+// The caller passes the name; main.js's `&as=` and lobby paths do not knock,
+// because those can end at a modal the player dismisses.
+let knock = null; // {room, name, promise} — spent by the next connect()
+
+export function prejoinSeat(room, name) {
+  if (knock || !room || !name || !readSeat(room)) return false;
+  const promise = postJson('/api/join', joinBodyFor(room, name), JOIN_TIMEOUT_MS)
+    .then((joined) => {
+      // Keep the seat memory pointing at whatever the server actually gave us,
+      // exactly as connect() does. If the answer was a FRESH seat (the stub
+      // expired, the server restarted), connect's own join will then offer that
+      // one back and resume it — so the knock can never strand a seat nobody
+      // claims, whatever it was answered with.
+      if (joined.ok && joined.data && joined.data.playerId) {
+        writeSeat(room, joined.data.playerId, joined.data.color);
+      }
+      return joined;
+    })
+    .catch(() => ({ ok: false, status: 0, data: null }));
+  knock = { room, name, promise };
+  return true;
+}
+
+/** The join body, built identically for the knock and for connect(). */
+function joinBodyFor(room, name) {
+  const seat = readSeat(room);
+  const who = browserWho();
+  return {
+    room,
+    name,
+    ...(seat ? { playerId: seat.id, color: seat.color } : {}),
+    ...(who ? { who } : {}),
+  };
+}
+
 /**
  * Pre-join peek at a room's prepared table (GET /api/table — ROADMAP §G5).
  *
@@ -204,23 +263,20 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
   const report = typeof onStatus === 'function' ? onStatus : () => {};
   const refused = typeof onRefused === 'function' ? onRefused : () => {};
 
-  // The seat this tab last sat in (if any) rides the join: the server hands
-  // the same playerId and color back instead of minting a new player.
+  // The seat this tab last sat in (if any) rides the join — see joinBodyFor:
+  // the server hands the same playerId and color back instead of minting a new
+  // player, and the browser key rides beside it for the tab that closed.
   //
-  // …and BESIDE it, the browser key (see browserWho): the seat memory covers a
-  // reload, the key covers a tab that closed. Both, not either — the seat id is
-  // still the truth when this tab has one, and the server only falls back to
-  // the key when it does not (server.js resumableSeatFor).
-  const seat = readSeat(room);
-  const who = browserWho();
-  const joinBody = {
-    room,
-    name,
-    ...(seat ? { playerId: seat.id, color: seat.color } : {}),
-    ...(who ? { who } : {}),
-  };
-
-  let joined = await postJson('/api/join', joinBody, JOIN_TIMEOUT_MS);
+  // THE KNOCK (prejoinSeat) may already have sent exactly this, seconds ago,
+  // for the same room and name. Spent either way — a stale knock must never
+  // answer a later connect — and its FAILURE is not adopted: a knock that
+  // missed falls straight through to the ordinary join below, retries and all,
+  // so no server, a slow server and a refusal all behave exactly as they did
+  // before it existed.
+  const knocked = knock && knock.room === room && knock.name === name ? knock : null;
+  knock = null;
+  let joined = knocked ? await knocked.promise : null;
+  if (!joined || !joined.ok) joined = await postJson('/api/join', joinBodyFor(room, name), JOIN_TIMEOUT_MS);
   // status 0 = the fetch itself died (a transient network/browser hiccup —
   // observed in practice on a fresh origin's very first request). A real
   // static host answers instantly with 404/405, so ONE short-backoff retry
@@ -228,7 +284,7 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
   // from being silently stranded in solo play by a single dropped request.
   if (!joined.ok && joined.status === 0) {
     await new Promise((r) => setTimeout(r, 600));
-    joined = await postJson('/api/join', joinBody, JOIN_TIMEOUT_MS);
+    joined = await postJson('/api/join', joinBodyFor(room, name), JOIN_TIMEOUT_MS);
   }
   if (!joined.ok || !joined.data || !joined.data.playerId) {
     // No server (or it refused us): the caller falls back to solo play.

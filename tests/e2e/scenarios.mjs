@@ -4360,6 +4360,26 @@ export const scenarios = [
       assert.equal(await a.playerId(), seat, 'the same seat after a refresh');
       assert.equal(await a.color(), color, 'wearing the same color');
 
+      // THE KNOCK IS WHY THIS IS NOT A COIN TOSS (IDENTITY §8, UX §7.57), and
+      // it is asserted rather than assumed because its absence is invisible
+      // until it is a flake. This scenario failed FOUR RUNS IN SIX on
+      // 2026-08-18: the join used to be the last thing a boot did, landing
+      // 4.2-5.4 s after the old tab's socket closed, against a 5 s grace — so
+      // "a reload is invisible to the room" was true only when the boot won a
+      // race with the reaper. net.js knocks first now; the ceiling below is
+      // ~10x its measured 300 ms and ~half the grace it has to beat, so it
+      // catches the join sliding back behind module evaluation without
+      // pretending a loaded machine is a fast one.
+      const knockAt = await a.eval(`(() => {
+        const e = performance.getEntriesByType('resource').filter((r) => /\\/api\\/join/.test(r.name));
+        return e.length ? Math.round(e[0].startTime) : -1;
+      })()`);
+      assert.ok(knockAt >= 0 && knockAt < 2500,
+        `the returning tab announced itself at ${knockAt}ms into the boot — the seat is claimed before the scene is built`);
+      assert.equal(await a.eval(
+        `performance.getEntriesByType('resource').filter((r) => /\\/api\\/join/.test(r.name)).length`), 1,
+      'and exactly once: the knock is what connect() then adopts, never a second join');
+
       // Nobody else's table so much as blinks: no join, no leave, no rename,
       // and never two Alices.
       const churn = watcher.events().slice(seen)
@@ -4628,6 +4648,73 @@ export const scenarios = [
       assert.equal((await b.entryState(rollId)).canReveal, false, 'and Bob still does not');
       await a.dbg(`reveal(${JSON.stringify(rollId)})`);
       for (const t of [a, b]) await t.waitFor(revealSettled(rollId), { desc: 'the flip settles' });
+    },
+  },
+  {
+    name: 'seat-revive',
+    tags: ['seat', 'identity', 'visibility', 'cuj3'],
+    timeout: 120000,
+    // THE TWO LIFETIMES, IN A REAL BROWSER (docs/IDENTITY.md §8). Everything
+    // above resumes a seat the roster still holds. This is the case rung 1
+    // could not reach and which the field actually produces: the browser was
+    // gone long enough to be REAPED — the pill left everyone's roster, the room
+    // was told, `resumableSeatFor` has nothing to find — and then it comes back.
+    //
+    // Both halves are asserted here because each is the other's failure mode:
+    //   the seat must come back           …or a slow phone loses its held roll;
+    //   the roster must have let it go    …or an abandoned tab is a ghost pill,
+    //                                      which is the production bug (four
+    //                                      seats, one real window) whose fix
+    //                                      cost a whole liveness protocol.
+    // The second one is written as a BOUND, in a scenario that would still pass
+    // without it, because "no ghosts" is exactly the property that stops being
+    // true quietly.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await b.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+
+      const seat = await a.playerId();
+      const color = await a.color();
+      const who = await a.dbg('who');
+      await a.roll('d20 held');
+      const rollId = await a.rollId();
+
+      // The tab is gone for real — the pagehide beacon, which `seat-closed-tab`
+      // proves fires — and this time nobody comes back before the reap.
+      const t0 = Date.now();
+      await a.close();
+      await b.waitFor(`!window.__diceDebug.players.some((p) => p.name === 'Alice')`,
+        { desc: 'the abandoned seat leaves the roster', timeout: 20000 });
+      const gone = Date.now() - t0;
+      // THE GHOST BOUND. The disconnect grace is 5 s; a resume window that ever
+      // becomes the roster's window would show up here as tens of seconds.
+      assert.ok(gone < 12000,
+        `the roster let the abandoned seat go in ${gone}ms — a resume window must never become the roster's`);
+
+      // A NEW TAB of the same browser: same origin, so the same `dice.who.v1`,
+      // and NO seat memory (that was sessionStorage and it died with the tab).
+      // The seat it lands in can only come from the server's own memory.
+      const back = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      assert.equal(await back.dbg('who'), who, 'the browser key came with it');
+      assert.equal(await back.playerId(), seat,
+        'THE DEFECT: before this, a tab reaped before it could return came back a stranger');
+      assert.equal(await back.color(), color, 'wearing the same colour');
+      await ctx.waitForLog(/reseat .*by=who/,
+        { desc: 'the server says it reseated by the browser key' });
+
+      // AND THE AUTHORITY CAME WITH IT — the assertion the whole rung is for,
+      // and it is about a button on one screen and no other.
+      assert.equal((await back.entryState(rollId)).canReveal, true,
+        'the returning browser holds the reveal on its own screen');
+      assert.equal((await b.entryState(rollId)).canReveal, false, 'and Bob still does not');
+      await back.dbg(`reveal(${JSON.stringify(rollId)})`);
+      for (const t of [back, b]) await t.waitFor(revealSettled(rollId), { desc: 'the flip settles' });
+
+      // One Alice, not two: a revive is a return, not a second person.
+      assert.equal(await b.eval(
+        `window.__diceDebug.players.filter((p) => p.name === 'Alice').length`), 1,
+      'exactly one Alice at the table');
     },
   },
 
