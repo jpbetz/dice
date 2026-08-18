@@ -13557,6 +13557,34 @@ window.__diceDebug = {
   // 2026-08-17 for tools/steps/grip-look.mjs so a frame's pile count is on the
   // theorem rather than on a constant that happens to fit one type.
   restCeiling(type) { return DIE_DEFS[type] ? restCeiling(type) : null; },
+  // WHAT A DIE IS SHAPED LIKE, per type (ROADMAP §9c). The RESOLVED `geo`
+  // recipe beside the mesh it produced, so "the standard dice wear round
+  // .090" is an assertion about the recipe AND about the triangles, not
+  // about a screenshot. `verts` is the render mesh's price and `minY` is
+  // the resting plane — the number that must not move when an edge does,
+  // because the physics hull does not know the mesh exists.
+  // Cheap and cached (getDie memoises per type|variant), but it BUILDS the
+  // variant's textures on first ask: name only the types you need.
+  dieGeoStats(variant = 'std', types = DIE_TYPES) {
+    const out = {};
+    for (const type of types) {
+      if (!DIE_DEFS[type]) continue;
+      const die = getDie(type, variant);
+      const g = die.geometry;
+      if (!g.boundingSphere) g.computeBoundingSphere();
+      const pos = g.attributes.position;
+      let minY = Infinity;
+      for (let i = 0; i < pos.count; i++) minY = Math.min(minY, pos.getY(i));
+      out[type] = {
+        geo: die.geo ? { ...die.geo } : null,
+        verts: pos.count,
+        tris: pos.count / 3,
+        r: +g.boundingSphere.radius.toFixed(6),
+        minY: +minY.toFixed(6),
+      };
+    }
+    return out;
+  },
   tableDiceInfo() {
     return tableDice.map((d) => ({
       type: d.type,
