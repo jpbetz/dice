@@ -55,6 +55,20 @@ import { stepDress } from './towerdress.js';
 import { buildMotes, stepMotes, disposeMotes } from './motes.js';
 import { buildFaeConcept, brightenFog } from './fae-lab.js';
 import { LIFE_TUNE, stepLife, stepMootSession, disposeLife } from './faelife.js';
+// THE VOICE TABLES (js/voices.js, docs/AUDIO.md). They moved out of this file
+// on 2026-08-18, the day Joe first listened to all ten of them: six of his
+// eight complaints were about a measurable property, and nothing in a module
+// that imports three.js can be measured by `node tests/*.test.mjs`. The data
+// is imported rather than copied, so `tests/voices.test.mjs` asserts on the
+// numbers this file plays.
+import {
+  IMPACT_VOICES, IMPACT_DEFAULT_BODY,
+  IMPACT_SOFT_STRENGTH, IMPACT_SOFT_CENTRE, IMPACT_SOFT_LENGTH,
+  CLUNK_VOICES, VENUE_AUDIO, bedAirHz,
+  BED_PINK, BED_BROWN, BED_CRACKLE, BED_TICK_SHAPE,
+  BED_FADE_S, BED_VOICE_S, DUCK_DB, DUCK_ATTACK_S, DUCK_RECOVER_TAU,
+  MASTER_GAIN,
+} from './voices.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -292,16 +306,14 @@ const TOWERS = {
       // with idle dust. The mote layer (js/motes.js) keys on this flag via
       // towerSocket — it is a family trait like the ember, not a room fixture.
       motes: true,
-      // Dry wood on wood: a short, narrow-band knock with almost no tail.
-      // `shaft` is the CHUTE's colour, not the knock's (docs/AUDIO.md §2.4):
-      // a feedforward comb plus two resonant modes. A 0.4 m chute's 2.3 ms
-      // round trip is below the 128-sample feedback floor, so a true geometric
-      // model is unrepresentable here — this models the colour instead, with
-      // no feedback path and therefore no stability question.
-      clunkVoice: {
-        body: 'clack', weight: 0.35, sustain: 20,
-        shaft: { delayS: 0.0032, combGain: 0.55, mode1Hz: 430, mode2Hz: 860 },
-      },
+      // Dry wood on wood: a short, narrow-band knock with almost no tail
+      // (js/voices.js CLUNK_VOICES.heartwood). `shaft` is the CHUTE's colour,
+      // not the knock's (docs/AUDIO.md §2.4): a feedforward comb plus two
+      // resonant modes. A 0.4 m chute's 2.3 ms round trip is below the
+      // 128-sample feedback floor, so a true geometric model is
+      // unrepresentable here — this models the colour instead, with no
+      // feedback path and therefore no stability question.
+      clunkVoice: CLUNK_VOICES.heartwood,
     },
   },
   bastion: {
@@ -316,11 +328,9 @@ const TOWERS = {
       // strongest value contrast a grey tower has.
       ember: { at: [-0.38, 8.03, 0.54], color: '#ff9040', intensity: 2.4, dist: 4.0 },
       // Stone: heavier, lower, and it rings on in the shaft afterwards — a
-      // longer chute delay and lower modes than the wooden one.
-      clunkVoice: {
-        body: 'thud', weight: 0.7, sustain: 40,
-        shaft: { delayS: 0.0055, combGain: 0.5, mode1Hz: 300, mode2Hz: 600 },
-      },
+      // longer chute delay and lower modes than the wooden one (js/voices.js
+      // CLUNK_VOICES.bastion).
+      clunkVoice: CLUNK_VOICES.bastion,
     },
   },
   blackanvil: {
@@ -339,23 +349,13 @@ const TOWERS = {
       // that flatters pale masonry just flattens soot. It takes the lantern
       // at four-tenths and lets the ember carry the rest (A/B'd 2026-08-11).
       lantern: { rake: 0.4 },
-      // METAL, and the only voice in the palette that is not a knock. `chime`
-      // is the sine-partial body — glass at its default weight — but weighted
-      // right down it stops being crystal and becomes the ring a die gets out
-      // of a cast-iron baffle, and the long tail is the shaft carrying it.
-      // A FIRST TUNING, AND NOBODY HAS HEARD IT: these three numbers were
-      // reasoned from the voice table (weight shifts the centre frequency
-      // down, sustain extends the decay) and from wanting distance between
-      // this and the Emberforge die set's own thud 0.9 / 30 — not listened
-      // to. Of everything in this tower it is the thing most likely to want
-      // moving, and it is Joe's dial.
-      // The shaft row is Joe's dial for the same reason and in the same breath:
-      // the tightest delay and the highest modes of the three, which is what an
-      // iron flue does to a knock.
-      clunkVoice: {
-        body: 'chime', weight: 0.85, sustain: 70,
-        shaft: { delayS: 0.0025, combGain: 0.6, mode1Hz: 520, mode2Hz: 1040 },
-      },
+      // METAL, and the only voice in the palette that is not a knock
+      // (js/voices.js CLUNK_VOICES.blackanvil). THIS FILE PREDICTED IT WOULD
+      // BE THE ONE THAT WANTED MOVING AND IT WAS — Joe, 2026-08-18:
+      // *"Slightly to shrill / clanky for me.."*, which is the next commit's
+      // job. The shaft row is his dial in the same breath: the tightest delay
+      // and the highest modes of the set, which is what an iron flue does.
+      clunkVoice: CLUNK_VOICES.blackanvil,
     },
   },
   nullstone: {
@@ -410,17 +410,13 @@ const TOWERS = {
       // registry loop reads this flag and asks for what a row declares, so
       // "no dress" is a claim rather than an omission.
       dress: false,
-      // A SUBTRACTED CLICK. `hush` is the Void Grain die's own voice (js/
-      // themes.js) and this is the tower it came out of: the body is that
-      // hush at stone weight, and the shaft is the tightest, deadest comb in
-      // the set — a bore through solid rock returns almost nothing, so the
-      // comb gain is the lowest here and the two modes are low and close
-      // together. Reasoned from the table (docs/AUDIO.md §2.4), not yet
-      // listened to — Joe's dial, like every other voice in this registry.
-      clunkVoice: {
-        body: 'hush', weight: 0.75, sustain: 25,
-        shaft: { delayS: 0.0045, combGain: 0.34, mode1Hz: 240, mode2Hz: 430 },
-      },
+      // A SUBTRACTED CLICK (js/voices.js CLUNK_VOICES.nullstone). `hush` is
+      // the Void Grain die's own voice (js/themes.js) and this is the tower it
+      // came out of; the shaft is the tightest, deadest comb in the set — a
+      // bore through solid rock returns almost nothing.
+      // **"sounds good" — Joe, 2026-08-18.** One of exactly two voices in this
+      // app with a human verdict on it. Not a dial any more: a REFERENCE.
+      clunkVoice: CLUNK_VOICES.nullstone,
     },
   },
   hollowbole: {
@@ -503,16 +499,14 @@ const TOWERS = {
       // air (js/fae-lab.js's fog sheets and starfield), and a second idle
       // particle layer inside it would be two weathers in one room.
       motes: false,
-      // A DEAD DRUM. Deeper than Heartwood's dry clack and hollower than
-      // Bastion's stone thud: a `thud` body at middling weight with a short
-      // tail, over the longest comb in the set — 4 ms is a metre of hollow
-      // log, and the two low modes are the note an empty trunk gives back
-      // when you hit it. Joe's dial, like every other voice here: reasoned
-      // from the table (docs/AUDIO.md §2.4), not yet listened to.
-      clunkVoice: {
-        body: 'thud', weight: 0.5, sustain: 35,
-        shaft: { delayS: 0.004, combGain: 0.5, mode1Hz: 360, mode2Hz: 720 },
-      },
+      // A DEAD DRUM (js/voices.js CLUNK_VOICES.hollowbole): a `thud` body at
+      // middling weight with a short tail, over the longest comb in the set —
+      // 4 ms is a metre of hollow log, and the two low modes are the note an
+      // empty trunk gives back when you hit it.
+      // **"sounds good" — Joe, 2026-08-18.** The second of the two verdicts.
+      // Not a dial any more: a REFERENCE, and after the B1/B2 swap it is also
+      // Heartwood's nearest neighbour — see the note on its row in voices.js.
+      clunkVoice: CLUNK_VOICES.hollowbole,
     },
   },
 };
@@ -1633,12 +1627,22 @@ addStaticPlane(wallMat, [0, 22, 0], [Math.PI / 2, 0, 0]);                    // 
 // ---------------------------------------------------------------------------
 // Sound — the audio graph (docs/AUDIO.md)
 //
-// THE BUSES ARE BUILT ONCE, AT UNLOCK, AND NEVER TORN DOWN (~35 nodes):
+// THE BUSES ARE BUILT ONCE, AT UNLOCK, AND NEVER TORN DOWN (~12 nodes:
+// master, softClip and nine pan buses):
 //
-//   one-shots (impacts, settle taps) ─┐
-//   rolling voices (per-die panner) ──┼─▶ panBus[0..8] ─┐
-//   tower clunks ─▶ shaftBus ─────────┘                 ├─▶ master ─▶ softClip ─▶ out
-//   room bed (roomGain — the duck point) ───────────────┘
+//   one-shots (impacts, settle taps) ─▶ panBus[0..8] ────┐
+//   rolling voices ─▶ own StereoPanner ─────────────────┤
+//   tower clunks ─▶ shaftBus ───────────────────────────┼─▶ master ─▶ softClip ─▶ out
+//   room bed ─▶ air ─▶ duck ─▶ room ─────────────────────┘
+//
+// THIS DIAGRAM WAS WRONG IN THREE PLACES UNTIL 2026-08-18, and so was the
+// copy of it in docs/AUDIO.md §2.2. It said "~35 nodes" (it is 11 plus the
+// context); it routed rolling voices and the shaft send through the pan
+// buses (both go STRAIGHT to master — a rolling voice owns its panner, and
+// §2.1's prose beside the old picture said so); and it labelled `roomGain`
+// "the duck point", which is the one that could cost somebody an afternoon:
+// `AUDIO.room` is a unity gain that is written exactly once, at build, and
+// the duck is a ramp on `bed.duck` one node upstream.
 //
 // softClip is a tanh WaveShaper and it is the ONLY limiter in the path. There
 // is deliberately no DynamicsCompressorNode anywhere (docs/AUDIO.md §6.1): its
@@ -1655,8 +1659,9 @@ let audioCtx = null;
 // is a hoisted function declaration, so calling it here is safe.
 let soundOn = load(LS_SOUND, true) !== false;
 
-// DIAL FOR JOE — the whole table's level. Everything below is a fraction of it.
-const MASTER_GAIN = 0.7;
+// DIAL FOR JOE — the whole table's level (js/voices.js MASTER_GAIN, imported
+// so the bed's dBFS arithmetic in tests/voices.test.mjs is about the same 0.7
+// this graph actually applies). Everything below is a fraction of it.
 
 // THE ROOM TONE, declared HERE and not next to its setter, because tick()
 // reads it every frame and this file's TDZ trap (ROOM / LS_NAME / TOWERLAB)
@@ -1693,6 +1698,10 @@ const AUDIO = {
   buffersAtBuild: 0,
   oneShots: 0,
   tapClusters: 0,
+  // THE BED'S EVENT LAYER, counted (2026-08-18). "A place is made of events"
+  // is the whole answer to Joe's *"sounds like white noise"*, and an event
+  // layer nothing counts is exactly the shape this project keeps catching.
+  bedTicks: 0,
 };
 
 // Per-CLASS wall-clock gate cursors. There used to be one module-global
@@ -1795,7 +1804,10 @@ function depthGainFor(at) {
 //   clunk ─┬──────────────────────▶ sum ─▶ peak(mode1, Q 10, +8) ─▶ peak(mode2, Q 8, +6) ─▶ 0.9 ─▶ master
 //          └─▶ delay(delayS) ─▶ g ─▶ sum
 //
-// Five nodes, FEEDFORWARD ONLY. No feedback path, so no stability question
+// SIX nodes (in gain, delay, comb gain, two peaks, out gain), FEEDFORWARD
+// ONLY — "five" here counted the chain and forgot the input gain, which
+// docs/AUDIO.md §2.4 corrected on 2026-08-16 while noting this banner still
+// said it. No feedback path, so no stability question
 // and nothing to run away — the refusal list is explicit that a feedback
 // reverb is not earning its place until the dry table is proven (AUDIO.md
 // refusal 3).
@@ -1845,32 +1857,32 @@ function ensureShaft(spec) {
 //   · pink, plus a DETUNED DOUBLE of itself at rate 0.9973 — two copies of
 //     one buffer drifting apart is what stops a 23 s loop sounding like a
 //     23 s loop;
-//   · brown, the hearth — the low end that makes a room feel enclosed;
-//   · Poisson crackle at λ = 4/s with a u³ gain, so most pops are almost
-//     nothing and one in twenty is a real tick from the fire;
+//   · brown — the low end that makes a room feel enclosed;
+//   · a Poisson TICK layer, amp = BED_CRACKLE · u^BED_TICK_SHAPE: sparks off
+//     a hearth, condensation off a canopy;
 //   · three LFOs at 0.031 / 0.047 / 0.073 Hz — mutually prime, so the
 //     breathing pattern does not recur inside any sitting.
 // Buffer lengths are mutually prime for the same reason (23 s and 29 s).
+//
+// THE EVENT LAYER READS THE SHARED NOISE BUFFER. Nothing here allocates —
+// `perHitBufferAllocs` stays at the documented 2-with-the-bed-up.
 //
 // EVERYTHING HERE MAY USE Math.random (§4). The bed has no film relationship
 // at all: two people in one room hearing different crackle is unobservable,
 // and nobody should over-engineer it into a seeded stream.
 //
 // Duck direction is FIXED: the ambience ducks, the dice never. No compressor
-// does this — it is a scheduled ramp on roomDuck, −4 dB over 250 ms at roll
-// start, recovering with τ = 1.2 s from the last die's settle. Both edges are
-// slow enough to be imperceptible as gestures, and the recovery is the
-// strongest "the roll is over" cue the app has.
+// does this — it is a scheduled ramp on bed.duck (NOT on `roomGain`, which
+// docs/AUDIO.md §2.2 and §5 both misnamed until 2026-08-18), −4 dB over
+// 250 ms at roll start, recovering with τ = 1.2 s from the last die's settle.
+// Both edges are slow enough to be imperceptible as gestures, and the
+// recovery is the strongest "the roll is over" cue the app has.
+//
+// THE LEVEL CONSTANTS AND THE PALETTE LIVE IN js/voices.js as of 2026-08-18,
+// at exactly the values that shipped. They are §5's mix plan and they have
+// always been marked DIAL FOR JOE.
 // ---------------------------------------------------------------------------
 
-const BED_PINK = 0.003;      // DIAL FOR JOE
-const BED_BROWN = 0.006;     // DIAL FOR JOE
-const BED_CRACKLE = 0.02;    // DIAL FOR JOE — scaled by u³, so this is the rare peak
-const BED_CRACKLE_RATE = 4;  // pops per second, Poisson
-const BED_FADE_S = 6;        // the bed arrives over six seconds, never switches on
-const DUCK_DB = -4;          // DIAL FOR JOE
-const DUCK_ATTACK_S = 0.25;
-const DUCK_RECOVER_TAU = 1.2; // DIAL FOR JOE
 let bed = null;
 
 // ---------------------------------------------------------------------------
@@ -1897,89 +1909,34 @@ let bed = null;
 // SO THE PALETTE IS TWO ROWS AND NOTHING ELSE: what the room's own noise is
 // made of, and what the ground does to whatever lands on it.
 //
-// WHY IT LIVES HERE AND NOT ON THE `VENUES` ROW. The shaft dials live on the
-// TOWERS row and the die voice on the SETS row, so the honest precedent points
-// at `VENUES`. This is a table keyed by venue id instead, for the same reason
+// WHY IT IS KEYED BY VENUE ID AND NOT A FIELD ON THE `VENUES` ROW. The shaft
+// dials live on the TOWERS row and the die voice on the SETS row, so the
+// honest precedent points at `VENUES`. It is a table for the same reason
 // `IMPACT_VOICES` is a table rather than a field on every set: the whole thing
 // resolves in the sound drain and nowhere else, and keeping it beside the bed
-// it re-voices is what lets `bedRevoice` be five lines. `venueAudio()` is the
-// ONE reader; nothing else in the file may look at `VENUE_AUDIO` directly.
+// it re-voices is what lets `bedRevoice` be five lines.
 //
 // THE GROUNDED ROOM'S ROW IS ALL ONES AND A CUTOFF NOBODY CAN HEAR, so the
 // shipped table's audio is unchanged BY CONSTRUCTION rather than by care —
-// `venueAudioInfo().groundedInert` is that claim, watchable.
+// `venueAudioInfo().groundedInert` is that claim, watchable. It survived the
+// 2026-08-18 pass untouched: the rooms got louder because the DIALS moved,
+// not because the grounded row started asking for something.
 //
-// EVERY NUMBER BELOW IS UNHEARD. Reasoned from §1's material law (the
-// dominant material sits BELOW the ~1.5 kHz wood/metal perceptual boundary —
-// the same measure that demoted `click` and put `felt` in the default seat)
-// and from each venue's own one-line description, exactly the way the five
-// tower clunk voices and the Witchlight chime were reasoned and exactly as
-// un-listened-to. Joe's dial, all of it.
+// EVERY NUMBER HERE WAS UNHEARD UNTIL 2026-08-18, when Joe heard all three
+// rooms and reported the same failure three times — *"white noise"*, *"more
+// white noise, super faint"*, *"deeper white noise, VERY faint"*. Answering
+// that is the job of a later commit; this one only moves the rows somewhere
+// they can be measured.
 // ---------------------------------------------------------------------------
 
-// `pink`/`brown`/`tick.gain` are MULTIPLIERS of the BED_ constants above, and
-// the split is deliberate: Joe's dials set how loud the bed is, a venue sets
-// what it is made OF. A venue may re-balance the room; it may not turn it up.
-const VENUE_AUDIO = {
-  // THE ROOM YOU KNOW. Every multiplier is 1 and the air filter sits an
-  // octave above anything pink or brown noise contains, so this row is a
-  // written-down copy of what shipped rather than a re-voicing of it.
-  table: {
-    label: 'a warm room, a hearth, walls',
-    bed: {
-      pink: 1, brown: 1,
-      airHz: 20000, breathHz: 0.019, breathDepth: 0,
-      // The hearth: bright, frequent, sharp. 900–3500 Hz is the one bright
-      // element §1 permits, and u³ keeps it an isolated highlight.
-      tick: { rate: BED_CRACKLE_RATE, gain: 1, loHz: 900, spanHz: 2600, q: 3, decayS: 0.03 },
-    },
-    ground: { centre: 1, length: 1, gain: 1 },
-  },
-  // A NIGHT CLEARING: blue mist, teal moot-light, still cold air, open sky.
-  //   · brown is the ENCLOSURE layer — "the low end that makes a room feel
-  //     enclosed" (§5). A clearing has no walls, so it comes down hardest.
-  //   · the pink pair stays at level but goes through a 1200 Hz lowpass with
-  //     a very slow sweep: leaf hiss at the treeline, not room air. 1200 is
-  //     under §1's 1.5 kHz boundary on purpose — the same argument that put
-  //     the default impact at 700 rather than 2500.
-  //   · the tick layer is no longer a fire. It is CONDENSATION off the
-  //     canopy: rare (0.7/s against the hearth's 4), low (220–600 Hz, the
-  //     `felt`/`thud` family), pitched (Q 6 — a drip has a note where a spark
-  //     does not) and a touch longer on the tail, because water lands in moss.
-  //   · the ground is moss over soil: dull it (×0.72), shorten it (×0.85),
-  //     let it absorb a little (×0.9).
-  moonrise: {
-    label: 'a night clearing — treeline, open sky, moss over soil',
-    bed: {
-      pink: 1, brown: 0.58,
-      airHz: 1200, breathHz: 0.019, breathDepth: 420,
-      tick: { rate: 0.7, gain: 1, loHz: 220, spanHz: 380, q: 6, decayS: 0.045 },
-    },
-    ground: { centre: 0.72, length: 0.85, gain: 0.9 },
-  },
-  // OLDER AND DAMPER, and the row disagrees with its sibling in exactly the
-  // way the two names do. A HOLLOW is more enclosed than a clearing, so the
-  // brown comes back up; less wind reaches it, so the air sits lower and
-  // breathes shallower; it is wetter, so it drips more than twice as often
-  // and lower; and near-black moss over standing damp is the deadest floor in
-  // the app.
-  foxfire: {
-    label: 'a damp hollow — close air, standing water, near-black moss',
-    bed: {
-      pink: 1, brown: 0.75,
-      airHz: 900, breathHz: 0.013, breathDepth: 240,
-      tick: { rate: 1.6, gain: 1, loHz: 180, spanHz: 260, q: 7, decayS: 0.055 },
-    },
-    ground: { centre: 0.66, length: 0.78, gain: 0.85 },
-  },
-};
-
-// How long the room takes to become a different room. A bed does not switch
-// on (BED_FADE_S) and it does not switch OVER either — but the picture changes
-// on the frame, so the sound may not trail it by six seconds. Three, as a
-// setTargetAtTime τ of one.
-const BED_VOICE_S = 3;
-
+// THE TABLE ITSELF IS IN js/voices.js (VENUE_AUDIO), imported at the top of
+// this file. It moved on 2026-08-18 with every other voice number, so that
+// `tests/voices.test.mjs` measures the rows this graph plays instead of a
+// copy of them — `bedProfile('moonrise')` answers "how loud, how coloured,
+// how often does anything HAPPEN" for the row below, in Node, in milliseconds.
+// `venueAudio()` is still the ONE reader; nothing else in this file may look
+// at `VENUE_AUDIO` directly.
+//
 // THE ONE READER. Falls back to the grounded row for any venue that has not
 // declared a palette, which is what makes adding a venue a visual-only job
 // until somebody writes its sound down.
@@ -2070,14 +2027,10 @@ function bedDispose() {
   AUDIO.room = null;
 }
 
-// The air filter's cutoff, clamped clear of Nyquist. A biquad asked for
-// 20 kHz on a 44.1 kHz context is sitting at 0.91 of Nyquist, where the
-// response stops meaning what the number says; 0.4 is comfortably below
-// anything pink or brown noise carries, so the grounded room's filter stays
-// inaudible whichever hardware the page came up on.
-function bedAirHz(ctx, hz) {
-  return Math.min(hz, ctx.sampleRate * 0.4);
-}
+// The air filter's cutoff, clamped clear of Nyquist, lives in js/voices.js
+// (`bedAirHz(sampleRate, hz)`) because the bed-level measurements need the
+// same clamp the graph applies. This is the context-shaped adapter.
+const bedAir = (ctx, hz) => bedAirHz(ctx.sampleRate, hz);
 
 function bedBuild() {
   const ctx = ensureAudio();
@@ -2096,7 +2049,7 @@ function bedBuild() {
   const air = ctx.createBiquadFilter();
   air.type = 'lowpass';
   air.Q.value = 0.7;
-  air.frequency.value = bedAirHz(ctx, v.airHz);
+  air.frequency.value = bedAir(ctx, v.airHz);
   const duck = ctx.createGain();
   duck.gain.value = 1;
   const room = ctx.createGain();
@@ -2163,15 +2116,15 @@ function bedRevoice() {
   for (const l of bed.lfos.brown) l.g.gain.setTargetAtTime(BED_BROWN * v.brown * 0.35, t, tau);
   bed.lfos.air.osc.frequency.setTargetAtTime(v.breathHz, t, tau);
   bed.lfos.air.g.gain.setTargetAtTime(v.breathDepth, t, tau);
-  bed.air.frequency.setTargetAtTime(bedAirHz(ctx, v.airHz), t, tau);
-  bed.told = { airHz: bedAirHz(ctx, v.airHz), breathHz: v.breathHz,
+  bed.air.frequency.setTargetAtTime(bedAir(ctx, v.airHz), t, tau);
+  bed.told = { airHz: bedAir(ctx, v.airHz), breathHz: v.breathHz,
     breathDepth: v.breathDepth, pink: BED_PINK * v.pink, brown: BED_BROWN * v.brown };
 }
 
 // One pop of whatever the room ticks with — a spark off the hearth, a drip off
-// the canopy. u³ on the gain: most are inaudible, one in twenty is a real
-// tick, and none of them is on a grid. The venue owns the band, the Q and the
-// tail; §5's ceiling (BED_CRACKLE) stays Joe's.
+// the canopy. `BED_TICK_SHAPE` on the gain: most are almost nothing, and none
+// of them is on a grid. The venue owns the band, the Q and the tail; §5's
+// ceiling (BED_CRACKLE) stays Joe's.
 function bedPop(ctx, at) {
   const tk = bed.tick;
   const u = Math.random();
@@ -2180,14 +2133,16 @@ function bedPop(ctx, at) {
   src.buffer = AUDIO.noise;
   const f = ctx.createBiquadFilter();
   f.type = 'bandpass';
-  f.frequency.value = tk.loHz + Math.random() * tk.spanHz;
+  const fc = tk.loHz + Math.random() * tk.spanHz;
+  f.frequency.value = fc;
   f.Q.value = tk.q;
-  const amp = Math.max(1e-5, BED_CRACKLE * tk.gain * u * u * u);
+  const amp = Math.max(1e-5, BED_CRACKLE * tk.gain * Math.pow(u, BED_TICK_SHAPE));
   g.gain.setValueAtTime(amp, at);
   g.gain.exponentialRampToValueAtTime(1e-5, at + tk.decayS);
   src.connect(f).connect(g).connect(bed.mix);
   src.start(at, Math.random() * (AUDIO.noise.duration - 0.05));
   src.stop(at + tk.decayS + 0.01);
+  AUDIO.bedTicks++;
 }
 
 // Called from tick(). Lookahead scheduling off ctx.currentTime — not off dt,
@@ -2367,57 +2322,16 @@ const IMPACT_HARD_GAP_MS = 18;
 // remains the pre-curve reference gate.
 const CLICKGATE = { mode: 'film' };
 
-// IMPACT VOICE (Slice 1, Joe 2026-08-04 aesthetic pass): the per-set
-// sound identity — one function replaces the single hard-coded click
-// with five voices (chime / thud / crackle / clack / hush) modulated by
-// weight (heavier = lower + longer) and sustain (ms of tail). Sets
-// without a `sound` recipe field fall back to the legacy click, so the
-// Classics house — the "just dice" honest option — keeps the original
-// tone and every non-themed roll stays exactly as it sounded before.
+// THE IMPACT VOICE TABLE LIVES IN js/voices.js (IMPACT_VOICES,
+// IMPACT_DEFAULT_BODY, IMPACT_SOFT_*), imported at the top of this file.
 //
-// The bodies are shaped to sound like the material they claim:
-//   click   default — the original 45ms filtered white noise
-//   chime   glass/crystal — bright bandpass + a decaying sine partial
-//   thud    heavy iron/stone — lowpass, long noise tail
-//   crackle storm charge — sharp attack, jagged mid-noise
-//   clack   dry bone/lacquered wood — narrow bandpass, brief
-//   hush    umbra — barely-audible filtered breath (subtracted click)
-// Weight 0..1 shifts the center frequency down; sustain ms extends the
-// decay envelope. Every voice reads on top of the impact strength gain,
-// so a heavy die still needs a hard contact to be loud.
-const IMPACT_VOICES = {
-  // THE DEFAULT, AND THE MOST IMPORTANT SOUND IN THE APP. `click` used to
-  // hold this seat, and by the published spectral measure a 2500 Hz bandpass
-  // sits at 22.5–25.5 ERB — above the ~19 ERB wood/metal perceptual boundary.
-  // It is metal on metal. It is the casino sound. And it was what every
-  // untheme d roll on this table made, which is to say most of them.
-  // `felt` is the same synthesis a full octave and a half down, lowpassed:
-  // a soft wooden knock with a little body, in a quiet warm room.
-  // DIAL FOR JOE — 700/350 is the warm/dull boundary, judged by ear.
-  felt:    { filter: 'lowpass',  baseFreq:  700, freqSpread:  350, q: 0.8, decayShape: 0.50, gainScale: 0.06 },
-  click:   { filter: 'bandpass', baseFreq: 2500, freqSpread: 1800, q: 1.2, decayShape: 0.25, gainScale: 0.06 },
-  chime:   { filter: 'bandpass', baseFreq: 3400, freqSpread:  700, q: 2.8, decayShape: 0.42, gainScale: 0.045, partial: true },
-  thud:    { filter: 'lowpass',  baseFreq:  420, freqSpread:  200, q: 1.4, decayShape: 0.15, gainScale: 0.075 },
-  crackle: { filter: 'bandpass', baseFreq: 2200, freqSpread: 1400, q: 0.8, decayShape: 0.10, gainScale: 0.06 },
-  clack:   { filter: 'bandpass', baseFreq: 1150, freqSpread:  400, q: 2.2, decayShape: 0.22, gainScale: 0.055 },
-  hush:    { filter: 'lowpass',  baseFreq:  700, freqSpread:  200, q: 0.9, decayShape: 0.35, gainScale: 0.018 },
-};
-
-// Which body a voice with no recipe of its own falls back to — the most
-// common event in the whole app, so it is the one that decides what this table
-// sounds like. Named rather than inlined so `impactPresetFor` can be asked.
-// `click` remains in the registry for genuine die-on-die and bright sets; it
-// is no longer what an ordinary landing on felt sounds like.
-const IMPACT_DEFAULT_BODY = 'felt';
-
-// ONE TIMBRE TIER, and it is about HARDNESS rather than loudness: below this
-// strength a contact is voiced duller (centre ×0.85) and longer (×1.3), not
-// merely quieter. Without it the whole strength range is one timbre at
-// different volumes, which is the single most casino-sounding thing a dice
-// app can do. One tier, not a curve — a curve is a mix system.
-const IMPACT_SOFT_STRENGTH = 3.5;
-const IMPACT_SOFT_CENTRE = 0.85;
-const IMPACT_SOFT_LENGTH = 1.3;
+// It moved there on 2026-08-18 so that "less sharp than it was" could be a
+// number in `tests/voices.test.mjs` rather than a thing Joe has to re-listen
+// to and take on trust. NOT ONE VALUE CHANGED IN THE MOVE, and that test's
+// whole content in this commit is the measurement saying so.
+// Weight 0..1 still shifts the centre frequency down and sustain ms still
+// extends the decay; every voice still reads on top of the strength gain, so
+// a heavy die still needs a hard contact to be loud.
 
 // WHICH PRESET A VOICE RESOLVES TO. Split out of playImpact so a scenario can
 // ask the question without making a sound — `impactPresetFor` on __diceDebug
@@ -2481,7 +2395,10 @@ function impactVoicingOf(strength, voice, isClunk) {
 const TRANSIT_LOWPASS_HZ = 2200;
 const TRANSIT_LOWPASS_TRIM = 0.71; // ≈ −3 dB
 
-function noiseOneShot({ preset, freq, gain, durSec, bus, attack = 1, at = 0, transitLowpass = 0 }) {
+// `punch` is a GAIN multiple — crackle's 1.6 transient bump. It was called
+// `attack` until 2026-08-18, when a body first wanted an attack that was a
+// TIME; renamed here so the two cannot be confused when that lands.
+function noiseOneShot({ preset, freq, gain, durSec, bus, punch = 1, at = 0, transitLowpass = 0 }) {
   const ctx = AUDIO.ctx;
   const buf = AUDIO.noise;
   const t0 = at > 0 ? at : ctx.currentTime;
@@ -2498,9 +2415,9 @@ function noiseOneShot({ preset, freq, gain, durSec, bus, attack = 1, at = 0, tra
   // an exponential ramp to gain·exp(−1/decayShape) over the voice's length.
   if (transitLowpass > 0) gain *= TRANSIT_LOWPASS_TRIM;
   const end = Math.max(1e-4, gain * Math.exp(-1 / preset.decayShape));
-  if (attack !== 1) {
+  if (punch !== 1) {
     // crackle's sharp transient — 1 ms of gain bump, not a reshaped buffer.
-    g.gain.setValueAtTime(gain * attack, t0);
+    g.gain.setValueAtTime(gain * punch, t0);
     g.gain.exponentialRampToValueAtTime(Math.max(1e-4, gain), t0 + 0.001);
   } else {
     g.gain.setValueAtTime(gain, t0);
@@ -2689,7 +2606,7 @@ function playImpact(strength, voice, filmTime, ev) {
   const sh = (v && v.shaft && ev && ev.clunk) ? ensureShaft(v.shaft) : null;
   const bus = sh ? sh.in : (busFor(ev && ev.at ? ev.at[0] : 0) || AUDIO.master);
   const shot = noiseOneShot({
-    preset, freq, gain: gainV, durSec, bus, attack: body === 'crackle' ? 1.6 : 1,
+    preset, freq, gain: gainV, durSec, bus, punch: body === 'crackle' ? 1.6 : 1,
     // A die knocking about inside the tower is heard THROUGH the tower, and
     // the muffle is removed at the mouth: it is the contrast between the dull
     // knocks in the dark and the bright landing on the felt that sells the
@@ -13086,6 +13003,10 @@ window.__diceDebug = {
       soundOn,
       ambienceOn,
       bedSources: AUDIO.bedSources,
+      // THE ROOM'S EVENT LAYER, counted. `bedSources` says a bed EXISTS;
+      // this says something HAPPENS in it, which is the different claim Joe's
+      // *"sounds like white noise"* turned out to be about (docs/AUDIO.md §9).
+      bedTicks: AUDIO.bedTicks,
       roomDuckDb: bed && bed.ducked ? DUCK_DB : 0,
       bedFading: !!bed,
     };
@@ -13139,7 +13060,13 @@ window.__diceDebug = {
     const t = VENUE_AUDIO.table;
     return {
       id, venue: currentVenue, label: p.label,
-      declared: { bed: { ...p.bed, tick: { ...p.bed.tick } }, ground: { ...p.ground } },
+      declared: {
+        bed: {
+          ...p.bed,
+          tick: { ...p.bed.tick },
+        },
+        ground: { ...p.ground },
+      },
       groundedInert: t.ground.centre === 1 && t.ground.length === 1 && t.ground.gain === 1
         && t.bed.pink === 1 && t.bed.brown === 1 && t.bed.breathDepth === 0
         && t.bed.airHz >= 20000 && t.bed.tick.gain === 1,
