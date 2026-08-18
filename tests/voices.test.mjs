@@ -163,21 +163,6 @@ t('the measured buffer RMS constants still describe the generators', () => {
 });
 
 // ---------------------------------------------------------------------------
-// THE EXTRACTION MOVED NOTHING — the claim this commit exists to make.
-// ---------------------------------------------------------------------------
-//
-// The tables were CUT from js/main.js and PASTED here so they could be
-// measured. That is a refactor inside a file 27 000 lines long, in a tree
-// other agents are writing to, and the failure mode is obvious: a digit lost
-// in the move is a sound nobody can hear changing. So before a single voice
-// moves, every row is measured against what Joe actually heard.
-//
-// The next commits replace these assertions one family at a time, each with a
-// direction and a size. Until they do, this file's whole content is "nothing
-// changed" — and on a change nobody can hear, that is worth a commit of its
-// own.
-
-// ---------------------------------------------------------------------------
 // B4 / B5 — "sounds good". THE TWO ROWS NOTHING MAY TOUCH.
 // ---------------------------------------------------------------------------
 
@@ -282,16 +267,6 @@ t('B3 Black Anvil got less shrill, and only slightly', () => {
     + `(${now.centroidHz} Hz against Hollow Bole's ${bole.centroidHz} Hz)`);
 });
 
-t('the two he liked still measure exactly what he heard', () => {
-  for (const id of ['nullstone', 'hollowbole']) {
-    const was = BASELINE_2026_08_17.clunk[id];
-    const now = spectrumOf(CLUNK_VOICES[id]);
-    assert.equal(now.fcHz, was.fcHz, `${id}'s band`);
-    assert.equal(now.centroidHz, was.centroidHz, `${id}'s centroid`);
-    assert.equal(now.attackMs, was.attackMs, `${id}'s transient`);
-  }
-});
-
 // ---------------------------------------------------------------------------
 // C1 / C2 / C3 — "I hate this sound… far less sharp".
 // ---------------------------------------------------------------------------
@@ -366,27 +341,107 @@ t('the default body and the two he liked kept their transients', () => {
   }
 });
 
-t('the three rooms still measure exactly what he heard', () => {
-  for (const [id, was] of Object.entries(BASELINE_2026_08_17.bed)) {
+// ---------------------------------------------------------------------------
+// A1 / A2 / A3 — "white noise", "super faint", "VERY faint".
+// ---------------------------------------------------------------------------
+
+t('A1/A2/A3 are audible: every room came up, and the two faint ones most', () => {
+  for (const id of ['table', 'moonrise', 'foxfire']) {
+    const was = BASELINE_2026_08_17.bed[id];
     const now = bedProfile(id);
-    assert.equal(now.rmsDbfs, was.rmsDbfs, `${id}: level`);
-    assert.equal(now.centroidHz, was.centroidHz, `${id}: colour`);
-    assert.equal(now.eventsPerS, was.eventsPerS, `${id}: audible events`);
-    assert.equal(now.pitched, was.pitched, `${id}: no event has a note`);
-    assert.equal(now.swellsPerS, was.swellsPerS, `${id}: nothing slow moves`);
+    assert.ok(now.rmsDbfs > was.rmsDbfs + 3,
+      `${id}: "faint" is a level claim — ${was.rmsDbfs} → ${now.rmsDbfs} dBFS`);
+    assert.ok(now.rmsDbfs < -38,
+      `${id}: …and still far under a landing, which is the other half of the `
+      + `constraint (${now.rmsDbfs} dBFS)`);
   }
-  // …and the numbers those rest on.
-  assert.equal(BED_TICK_SHAPE, 3, 'the tick amplitude law is still u³');
-  assert.equal(BED_PINK, 0.003);
-  assert.equal(BED_BROWN, 0.006);
-  assert.equal(BED_CRACKLE, 0.02);
-  assert.ok(BED_SWELL > 0, 'the slow layer has a constant but no room asks for it yet');
+  // "SUPER FAINT" AND "VERY FAINT" WERE COMPARATIVE. The two fae rooms ran
+  // 4–6 dB under the grounded one because their air filter throws away most
+  // of a 1/f spectrum and the row did not compensate. They are now level.
+  const [T, M, F] = ['table', 'moonrise', 'foxfire'].map(bedProfile);
+  assert.ok(Math.abs(T.rmsDbfs - M.rmsDbfs) < 2.5,
+    `the clearing is no longer quieter than the room (${M.rmsDbfs} vs ${T.rmsDbfs} dBFS)`);
+  assert.ok(Math.abs(T.rmsDbfs - F.rmsDbfs) < 2.5,
+    `nor is the hollow (${F.rmsDbfs} vs ${T.rmsDbfs} dBFS)`);
 });
 
-t('the grounded row is inert BY CONSTRUCTION (venueAudioInfo agrees)', () => {
-  // js/main.js's `groundedInert` is a conjunction over exactly these fields
-  // and `audio-venue` asserts it is true, so this is the 40 ms copy of a
-  // 45-second browser claim.
+t('A1/A2/A3 stopped being white noise: something HAPPENS in every room', () => {
+  // The finding: steady broadband noise reads as "white noise" however you
+  // tilt it, so three rooms that differ only in tilt are one texture at three
+  // volumes — which is exactly the three sentences Joe wrote. A place is made
+  // of EVENTS. This is the count of events per second that clear the room's
+  // own hiss by 6 dB.
+  for (const id of ['table', 'moonrise', 'foxfire']) {
+    const was = BASELINE_2026_08_17.bed[id];
+    const now = bedProfile(id);
+    assert.ok(now.eventsPerS >= 0.6,
+      `${id}: at least one audible event every two seconds (${now.eventsPerS}/s, `
+      + `was ${was.eventsPerS}/s) — under that a room is hiss with a rumour`);
+    assert.ok(now.eventPeakDb >= 6,
+      `${id}: the median audible event stands ${now.eventPeakDb} dB over the bed`);
+  }
+  // THE TWO FAINT ROOMS AT LEAST DOUBLED, which is where the complaint was:
+  // one drip every three seconds is a room in which nothing happens. The
+  // hearth's rate is deliberately NOT chased — it was already firing ~2/s and
+  // "white noise mostly" was not a plea for more sparks; it was a room too
+  // quiet to hear them in, with nothing slow moving underneath.
+  for (const id of FAINT) {
+    const was = BASELINE_2026_08_17.bed[id];
+    const now = bedProfile(id);
+    assert.ok(now.eventsPerS >= was.eventsPerS * 1.8,
+      `${id}: audible events went ${was.eventsPerS}/s → ${now.eventsPerS}/s`);
+  }
+  // THE AMPLITUDE LAW is the mechanism, and it is one exponent. u³ has a
+  // median of 1/8: half of every room's events used to arrive under its hiss.
+  assert.ok(BED_TICK_SHAPE < 3,
+    `the tick law came off u³ (now u^${BED_TICK_SHAPE}, median ` +
+    `${Math.pow(0.5, BED_TICK_SHAPE).toFixed(2)} of peak against u³'s 0.13)`);
+  // …and the SLOW layer, which is the other half of "a place": motion.
+  for (const id of ['table', 'moonrise', 'foxfire']) {
+    const now = bedProfile(id);
+    assert.ok(now.swellsPerS > 0,
+      `${id}: the room moves — a swell every ${Math.round(1 / now.swellsPerS)} s`);
+    assert.ok(now.swellDepthDb >= 4 && now.swellDepthDb <= 16,
+      `${id}: and it moves ${now.swellDepthDb} dB, which is a breath rather `
+      + `than a second bed or a gesture nobody notices`);
+  }
+});
+
+t('the three rooms are three ROOMS — and they differ in what HAPPENS', () => {
+  // The test Joe's three near-identical sentences say the old table failed.
+  // No formula knows what a listener can name, so what is counted is which
+  // axes two rooms differ on — and the ones that matter are the EVENT axes.
+  // The shipped rooms differed mostly on level and colour, which is the same
+  // sound louder or darker, which is what "more white noise / deeper white
+  // noise" is the sound of.
+  const pairs = [['table', 'moonrise'], ['table', 'foxfire'], ['moonrise', 'foxfire']];
+  for (const [a, b] of pairs) {
+    const d = bedDistance(a, b);
+    assert.ok(d.nEvent >= 3,
+      `${a} vs ${b}: only ${d.nEvent} of 5 EVENT axes apart `
+      + `(${JSON.stringify(d.event)})`);
+    // …and the rooms are now level-matched, so none of that distinctness is
+    // being done by volume. That is the point of the make-up gains: a room
+    // that is only quieter is not another room.
+    assert.equal(d.texture.level, false,
+      `${a} vs ${b}: and none of it is volume (${d.a.rmsDbfs} vs ${d.b.rmsDbfs} dBFS)`);
+  }
+  // The identity cue that costs the least and carries the most: a drip has a
+  // note, a spark does not. Not one room had this before.
+  assert.equal(bedProfile('table').pitched, false, 'a spark has no note');
+  assert.equal(bedProfile('moonrise').pitched, true, 'a drip does');
+  assert.equal(bedProfile('foxfire').pitched, true, 'and so does water into water');
+  for (const id of ['table', 'moonrise', 'foxfire']) {
+    assert.equal(BASELINE_2026_08_17.bed[id].pitched, false,
+      `${id} had no pitched event at all on the tree he listened to`);
+  }
+});
+
+t('the grounded row is still inert BY CONSTRUCTION (venueAudioInfo agrees)', () => {
+  // js/main.js's `groundedInert` is a conjunction over exactly these fields,
+  // and `audio-venue` asserts it is true. The rooms got louder because the
+  // DIALS moved; if a future pass reaches for the table row instead, that
+  // scenario goes red in a browser and this goes red in 40 ms.
   const t0 = VENUE_AUDIO.table;
   assert.equal(t0.ground.centre, 1);
   assert.equal(t0.ground.length, 1);
@@ -398,17 +453,19 @@ t('the grounded row is inert BY CONSTRUCTION (venueAudioInfo agrees)', () => {
   assert.equal(t0.bed.tick.gain, 1);
 });
 
-t('the default body and the two he liked kept their transients', () => {
-  // The attack is opt-in per body, so this is the claim that the change did
-  // not quietly soften the most common sound in the app.
-  assert.equal(IMPACT_DEFAULT_BODY, 'felt');
-  assert.equal(FAINT.length, 2);
-  for (const body of ['felt', 'click', 'thud', 'clack', 'hush', 'crackle']) {
-    assert.ok(!IMPACT_VOICES[body].attackMs,
-      `${body} still begins on its first sample — it was not complained about`);
-  }
-  for (const body of ['chime', 'bell']) {
-    assert.ok(IMPACT_VOICES[body].attackMs > 0, `${body} has a rise`);
+t('a venue may re-balance the room and may never turn it up', () => {
+  // §5's mix plan is the ceiling and the venue rows sit under it. The bed
+  // levels are Joe's dials; `pink`/`brown` are multipliers of them, and the
+  // make-up gain the fae rooms now carry is a correction for a FILTER, which
+  // is why it is allowed to exceed 1 while the ground row's is not.
+  assert.ok(BED_PINK > 0 && BED_BROWN > 0 && BED_CRACKLE > 0 && BED_SWELL > 0);
+  for (const [id, v] of Object.entries(VENUE_AUDIO)) {
+    assert.ok(v.ground.centre <= 1 && v.ground.length <= 1 && v.ground.gain <= 1,
+      `${id}: the ground only ever subtracts`);
+    assert.ok(v.bed.pink <= 2 && v.bed.brown <= 1,
+      `${id}: and the bed's make-up gain stays inside the plan`);
+    assert.ok(v.bed.swell === null || v.bed.swell.rate > 0,
+      `${id}: a declared swell has a clock`);
   }
 });
 

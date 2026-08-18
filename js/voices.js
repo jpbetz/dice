@@ -254,26 +254,6 @@ export const IMPACT_VOICES = {
   // broadband gain (0.2509 at the anvil's centre) ÷ this body's (0.2760).
   // Black Anvil therefore lands at the loudness it had, to a tenth of a dB,
   // and the only thing that moved is the thing he named.
-  // NEW 2026-08-18, and it exists because Joe's two complaints about this
-  // family are DIFFERENT SIZES. Black Anvil is "slightly too shrill / clanky";
-  // the Witchlight chime is one he hates. One body cannot move a little for
-  // one caller and a lot for another, and compensating the anvil back up
-  // through `weight` alone would have left a cast-iron tower declaring
-  // weight 0.17 — a number that reads as "light" everywhere else it is used
-  // (it also sets the settle tail's walk-down). So: cast metal gets its own
-  // body, sized for the small move.
-  //
-  // Between chime and thud, and deliberately: wide enough not to ring (Q 1.8
-  // against the old 2.8 is the "clanky" half), low enough to have body, and
-  // 5 ms of attack so the strike is a strike rather than a click. SIZED for
-  // "slightly" — a −15% log centroid where the Witchlight chime takes −37%,
-  // which is what keeps Black Anvil recognisably the ringing tower and out of
-  // the two rows Joe said were already right.
-  //
-  // `gainScale` 0.041 is SOLVED, not chosen: 0.045 × the old chime's
-  // broadband gain (0.2509 at the anvil's centre) ÷ this body's (0.2760).
-  // Black Anvil therefore lands at the loudness it had, to a tenth of a dB,
-  // and the only thing that moved is the thing he named.
   bell:    { filter: 'bandpass', baseFreq: 2100, freqSpread:  450, q: 1.8, decayShape: 0.44, gainScale: 0.041, partial: true, attackMs: 5 },
   thud:    { filter: 'lowpass',  baseFreq:  420, freqSpread:  200, q: 1.4, decayShape: 0.15, gainScale: 0.075 },
   crackle: { filter: 'bandpass', baseFreq: 2200, freqSpread: 1400, q: 0.8, decayShape: 0.10, gainScale: 0.06 },
@@ -417,19 +397,19 @@ export const CLUNK_VOICES = {
 // which put the whole bed at −59.8 dBFS RMS. ×5 is +14 dB, to ≈−45.8 dBFS:
 // audible in a quiet room, still ~34 dB under a landing, still the quietest
 // thing in the app by a wide margin.
-export const BED_PINK = 0.003;
-export const BED_BROWN = 0.006;
+export const BED_PINK = 0.015;
+export const BED_BROWN = 0.030;
 // The rare PEAK of the tick layer, not its average (see BED_TICK_SHAPE).
 // Raised 0.02 → 0.05 with the level, so the events stay events against a bed
 // that is now five times louder.
-export const BED_CRACKLE = 0.02;
+export const BED_CRACKLE = 0.05;
 // THE AMPLITUDE LAW OF ONE TICK: amp = BED_CRACKLE · u^BED_TICK_SHAPE, u
 // uniform. WAS 3 (u³), which is why the room read as noise: E[u³] = 1/4 but
 // the MEDIAN is 1/8, so most pops arrived at an eighth of the peak and under
 // the hiss. At 1.6 the median is 0.33 and the layer becomes what it was
 // always described as — "most are almost nothing and one in twenty is a real
 // tick" was the intent; u³ delivered "almost all are nothing".
-export const BED_TICK_SHAPE = 3;
+export const BED_TICK_SHAPE = 1.6;
 // THE SLOW-MOTION LAYER'S PEAK (new 2026-08-18). Its own constant rather than
 // a multiplier of BED_CRACKLE, because a swell is a two-to-four-second breath
 // and a tick is a 30 ms pop: tying the two together means every future turn of
@@ -479,7 +459,7 @@ export const VENUE_AUDIO = {
       // the room is alive. Its band sits UNDER the tick layer (90–300 Hz
       // against 900–3500) so the two never compete for the same seat — the
       // fire's body and the fire's sparks are different sounds.
-      swell: null,
+      swell: { rate: 0.08, gain: 0.62, loHz: 90, spanHz: 210, q: 0.9, attackS: 1.6, decayS: 2.6 },
     },
     ground: { centre: 1, length: 1, gain: 1 },
   },
@@ -499,20 +479,20 @@ export const VENUE_AUDIO = {
   moonrise: {
     label: 'a night clearing — treeline, open sky, moss over soil',
     bed: {
-      pink: 1, brown: 0.58,
+      pink: 1.55, brown: 0.58,
       airHz: 1200, breathHz: 0.019, breathDepth: 420,
       // CONDENSATION OFF THE CANOPY, and now audibly so. Rate 0.7 → 1.15 (one
       // drip every four seconds was, with the old amplitude law, a room where
       // nothing happened); `tone: 0.55` gives each drip a decaying sine at
       // just over half its band centre, which is the whole difference between
       // "a drip" and "a click" — water lands in moss and RINGS a little.
-      tick: { rate: 0.7, gain: 1, loHz: 220, spanHz: 380, q: 6, decayS: 0.045, tone: 0 },
+      tick: { rate: 1.15, gain: 1.15, loHz: 220, spanHz: 380, q: 6, decayS: 0.055, tone: 0.55 },
       // WIND THROUGH THE TREELINE — the deepest swell of the three, because
       // this is the only one of the rooms with an open sky over it. Every
       // ~13 s, rising over two seconds and falling over three. This is the
       // layer that makes the clearing a clearing with your eyes shut, and it
       // is the one thing in the bed that is neither hiss nor a click.
-      swell: null,
+      swell: { rate: 0.085, gain: 1, loHz: 300, spanHz: 1100, q: 0.7, attackS: 2, decayS: 3.2 },
     },
     ground: { centre: 0.72, length: 0.85, gain: 0.9 },
   },
@@ -526,18 +506,18 @@ export const VENUE_AUDIO = {
       // cutoff takes even more out, and this room was the one Joe called
       // *"VERY faint"*. The hollow keeps more brown than the clearing, so it
       // needs less make-up.
-      pink: 1, brown: 0.75,
+      pink: 1.35, brown: 0.75,
       airHz: 900, breathHz: 0.013, breathDepth: 240,
       // WATER OFF STONE INTO WATER: more than twice the clearing's rate,
       // lower, wetter (a longer tail) and more strongly pitched — a drip into
       // standing water in a closed space is the most identifiable single
       // sound in this whole palette, and it is what A3 is FOR.
-      tick: { rate: 1.6, gain: 1, loHz: 180, spanHz: 260, q: 7, decayS: 0.055, tone: 0 },
+      tick: { rate: 2.6, gain: 1.3, loHz: 170, spanHz: 250, q: 7, decayS: 0.075, tone: 0.62 },
       // A DAMP DRAUGHT, not a gust: rarer than the clearing's, shallower, and
       // an octave and a half lower — the air of a closed hollow moving rather
       // than wind arriving. The pair (rate, gain) is what separates A3 from A2
       // on the swell axis the way (rate, tone) separates them on the tick one.
-      swell: null,
+      swell: { rate: 0.05, gain: 0.72, loHz: 120, spanHz: 300, q: 0.8, attackS: 2.4, decayS: 3.6 },
     },
     ground: { centre: 0.66, length: 0.78, gain: 0.85 },
   },

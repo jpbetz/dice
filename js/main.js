@@ -65,7 +65,7 @@ import {
   IMPACT_VOICES, IMPACT_DEFAULT_BODY,
   IMPACT_SOFT_STRENGTH, IMPACT_SOFT_CENTRE, IMPACT_SOFT_LENGTH,
   CLUNK_VOICES, VENUE_AUDIO, bedAirHz,
-  BED_PINK, BED_BROWN, BED_CRACKLE, BED_TICK_SHAPE,
+  BED_PINK, BED_BROWN, BED_CRACKLE, BED_TICK_SHAPE, BED_SWELL,
   BED_FADE_S, BED_VOICE_S, DUCK_DB, DUCK_ATTACK_S, DUCK_RECOVER_TAU,
   MASTER_GAIN,
 } from './voices.js';
@@ -1701,10 +1701,13 @@ const AUDIO = {
   buffersAtBuild: 0,
   oneShots: 0,
   tapClusters: 0,
-  // THE BED'S EVENT LAYER, counted (2026-08-18). "A place is made of events"
-  // is the whole answer to Joe's *"sounds like white noise"*, and an event
-  // layer nothing counts is exactly the shape this project keeps catching.
+  // THE BED'S TWO EVENT LAYERS, counted (2026-08-18). "A place is made of
+  // events" is the whole answer to Joe's *"sounds like white noise"*, and an
+  // event layer nothing counts is exactly the shape this project keeps
+  // catching: the fae rooms shipped with a tick layer whose amplitude law
+  // buried nine pops in ten, and no instrument anywhere could have said so.
   bedTicks: 0,
+  bedSwells: 0,
 };
 
 // Per-CLASS wall-clock gate cursors. There used to be one module-global
@@ -1856,19 +1859,28 @@ function ensureShaft(spec) {
 // ---------------------------------------------------------------------------
 // THE ROOM BED (docs/AUDIO.md §5) — off by default, behind its own switch.
 //
-// Four layers, all synthesized, none of them a loop you can hear repeat:
+// FIVE layers as of 2026-08-18, and the fifth one is why Joe stopped calling
+// this white noise:
 //   · pink, plus a DETUNED DOUBLE of itself at rate 0.9973 — two copies of
 //     one buffer drifting apart is what stops a 23 s loop sounding like a
 //     23 s loop;
 //   · brown — the low end that makes a room feel enclosed;
 //   · a Poisson TICK layer, amp = BED_CRACKLE · u^BED_TICK_SHAPE: sparks off
-//     a hearth, condensation off a canopy;
+//     a hearth, condensation off a canopy, water into standing water. The
+//     fae rooms' ticks are PITCHED (`tone`), because a drip has a note where
+//     a spark does not, and a pitched event is the one a listener can name;
+//   · a Poisson SWELL layer — the slow motion. A two-to-four-second filtered
+//     breath every 8–20 s: the fire's body, wind through a treeline, the
+//     draught of a closed hollow. NEW, and it is the layer that answers
+//     "a place is made of events, not a static bed";
 //   · three LFOs at 0.031 / 0.047 / 0.073 Hz — mutually prime, so the
 //     breathing pattern does not recur inside any sitting.
 // Buffer lengths are mutually prime for the same reason (23 s and 29 s).
 //
-// THE EVENT LAYER READS THE SHARED NOISE BUFFER. Nothing here allocates —
-// `perHitBufferAllocs` stays at the documented 2-with-the-bed-up.
+// BOTH EVENT LAYERS READ THE SHARED NOISE BUFFER. Nothing here allocates —
+// `perHitBufferAllocs` stays at the documented 2-with-the-bed-up, and the
+// swell layer costs three fire-and-forget nodes per gust, i.e. about one
+// noiseOneShot every ten seconds.
 //
 // EVERYTHING HERE MAY USE Math.random (§4). The bed has no film relationship
 // at all: two people in one room hearing different crackle is unobservable,
@@ -1881,9 +1893,10 @@ function ensureShaft(spec) {
 // Both edges are slow enough to be imperceptible as gestures, and the
 // recovery is the strongest "the roll is over" cue the app has.
 //
-// THE LEVEL CONSTANTS AND THE PALETTE LIVE IN js/voices.js as of 2026-08-18,
-// at exactly the values that shipped. They are §5's mix plan and they have
-// always been marked DIAL FOR JOE.
+// THE LEVEL CONSTANTS AND THE PALETTE LIVE IN js/voices.js. They are §5's mix
+// plan and they have always been marked DIAL FOR JOE; 2026-08-18 is the first
+// time anyone turned them after HEARING the result (the bed shipped at
+// −59.8 dBFS RMS, which is not quiet, it is inaudible).
 // ---------------------------------------------------------------------------
 
 let bed = null;
@@ -1927,9 +1940,10 @@ let bed = null;
 //
 // EVERY NUMBER HERE WAS UNHEARD UNTIL 2026-08-18, when Joe heard all three
 // rooms and reported the same failure three times — *"white noise"*, *"more
-// white noise, super faint"*, *"deeper white noise, VERY faint"*. Answering
-// that is the job of a later commit; this one only moves the rows somewhere
-// they can be measured.
+// white noise, super faint"*, *"deeper white noise, VERY faint"*. What that
+// says is that three continuous noise loops tilted three ways are ONE texture
+// at three volumes, and the fix is not a better tilt: it is EVENTS. See
+// js/voices.js §4 for what changed and what each number now answers.
 // ---------------------------------------------------------------------------
 
 // THE TABLE ITSELF IS IN js/voices.js (VENUE_AUDIO), imported at the top of
@@ -2074,7 +2088,7 @@ function bedBuild() {
     nodes: [a.src, b.src, c.src, l1.osc, l2.osc, l3.osc, l4.osc],
     layers: { pink: [a, b], brown: [c] },
     lfos: { pink: [l1, l2], brown: [l3], air: l4 },
-    voice, tick: v.tick,
+    voice, tick: v.tick, swell: v.swell || null,
     // WHAT THE BED WAS LAST TOLD TO BE, beside what it currently IS. A
     // re-voice is a setTargetAtTime with τ = 1 s, so for three seconds the
     // nodes and the intent legitimately disagree — and a reader that could
@@ -2083,7 +2097,11 @@ function bedBuild() {
     // reads the NODES for the other half.
     told: { airHz: air.frequency.value, breathHz: v.breathHz, breathDepth: v.breathDepth,
       pink: BED_PINK * v.pink, brown: BED_BROWN * v.brown },
-    nextCrackle: ctx.currentTime + 0.2, ducked: false,
+    // The two Poisson clocks. The swell's first one is deliberately close:
+    // a room whose slow layer only arrives after fifteen seconds is a room
+    // somebody switches off before hearing it.
+    nextCrackle: ctx.currentTime + 0.2, nextSwell: ctx.currentTime + 2.5,
+    ducked: false,
   };
   AUDIO.room = room;
   AUDIO.bedSources = bed.nodes.length;
@@ -2113,6 +2131,7 @@ function bedRevoice() {
   bed.voice = voice;
   bed.tick = v.tick;   // the next scheduled pop is the new room's; the ones
                        // already on the lookahead queue finish as themselves
+  bed.swell = v.swell || null;   // …and the same for the slow layer
   for (const l of bed.layers.pink) l.g.gain.setTargetAtTime(BED_PINK * v.pink, t, tau);
   for (const l of bed.layers.brown) l.g.gain.setTargetAtTime(BED_BROWN * v.brown, t, tau);
   for (const l of bed.lfos.pink) l.g.gain.setTargetAtTime(BED_PINK * v.pink * 0.4, t, tau);
@@ -2124,10 +2143,26 @@ function bedRevoice() {
     breathDepth: v.breathDepth, pink: BED_PINK * v.pink, brown: BED_BROWN * v.brown };
 }
 
-// One pop of whatever the room ticks with — a spark off the hearth, a drip off
-// the canopy. `BED_TICK_SHAPE` on the gain: most are almost nothing, and none
-// of them is on a grid. The venue owns the band, the Q and the tail; §5's
-// ceiling (BED_CRACKLE) stays Joe's.
+// ONE POP OF WHATEVER THE ROOM TICKS WITH — a spark off the hearth, a drip off
+// the canopy, water into standing water. None of them is on a grid.
+//
+// THE AMPLITUDE LAW WAS u³ AND IS NOW u^BED_TICK_SHAPE (1.6), and that single
+// exponent is most of why Joe heard three rooms as white noise. u³ has a
+// MEDIAN of 1/8: half of every room's events arrived at an eighth of the peak,
+// under the bed's own hiss, so the layer that was supposed to give the room an
+// identity was inaudible while costing three nodes a pop. At 1.6 the median is
+// a third of the peak and the comment this function always carried — "most are
+// almost nothing and one in twenty is a real tick" — is finally true instead of
+// aspirational.
+//
+// AND A DRIP HAS A NOTE. `tone` (fae rooms only) layers a decaying sine at
+// `tone × ` the pop's own band centre, which is the cheapest identity cue in
+// the whole palette: a filtered noise burst is a click from anywhere, and a
+// PITCHED one is water. The hearth declares `tone: 0` — a spark has no note,
+// and giving it one would make a fire sound like a music box.
+//
+// The venue owns the band, the Q, the tail and the note; §5's ceiling
+// (BED_CRACKLE) stays Joe's.
 function bedPop(ctx, at) {
   const tk = bed.tick;
   const u = Math.random();
@@ -2145,7 +2180,56 @@ function bedPop(ctx, at) {
   src.connect(f).connect(g).connect(bed.mix);
   src.start(at, Math.random() * (AUDIO.noise.duration - 0.05));
   src.stop(at + tk.decayS + 0.01);
+  if (tk.tone > 0) {
+    // Two more fire-and-forget nodes, and only in a room that declares a note.
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = fc * tk.tone;
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(Math.max(1e-5, amp * 0.7), at);
+    og.gain.exponentialRampToValueAtTime(1e-5, at + tk.decayS * 1.6);
+    osc.connect(og).connect(bed.mix);
+    osc.start(at);
+    osc.stop(at + tk.decayS * 1.6 + 0.01);
+  }
   AUDIO.bedTicks++;
+}
+
+// THE SLOW LAYER — the thing a static bed does not have (new 2026-08-18).
+//
+// A place is made of events AND of slow motion, and the bed had neither: its
+// only motion was three LFOs at 0.031–0.073 Hz, i.e. periods of 14 to 32
+// seconds at depths of 40% of an already-inaudible layer. Nobody perceives
+// that as a room breathing; they perceive it as nothing.
+//
+// A swell is one filtered noise breath — up over ~2 s, down over ~3 — fired on
+// its own Poisson clock every 8–20 s. Same three nodes as a pop, same shared
+// buffer, no allocation. The hearth's is the fire's body; the clearing's is
+// wind through the treeline and is the deepest of the three; the hollow's is
+// a low damp draught. If the rooms turn out to move too much, BED_SWELL is one
+// number and `swell: null` on a row removes the layer from that room outright.
+function bedSwell(ctx, at) {
+  const sw = bed.swell;
+  if (!sw) return;
+  const g = ctx.createGain();
+  const src = ctx.createBufferSource();
+  src.buffer = AUDIO.noise;
+  src.loop = true;   // a four-second breath must not run off a two-second buffer
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass';
+  f.frequency.value = sw.loHz + Math.random() * sw.spanHz;
+  f.Q.value = sw.q;
+  // ±20% on both edges, so two gusts are never the same shape.
+  const atk = sw.attackS * (0.8 + 0.4 * Math.random());
+  const dec = sw.decayS * (0.8 + 0.4 * Math.random());
+  const amp = Math.max(1e-5, BED_SWELL * sw.gain);
+  g.gain.setValueAtTime(1e-5, at);
+  g.gain.exponentialRampToValueAtTime(amp, at + atk);
+  g.gain.exponentialRampToValueAtTime(1e-5, at + atk + dec);
+  src.connect(f).connect(g).connect(bed.mix);
+  src.start(at, Math.random() * (AUDIO.noise.duration - 0.05));
+  src.stop(at + atk + dec + 0.02);
+  AUDIO.bedSwells++;
 }
 
 // Called from tick(). Lookahead scheduling off ctx.currentTime — not off dt,
@@ -2164,6 +2248,14 @@ function stepAmbience() {
     bedPop(ctx, bed.nextCrackle);
     // Exponential inter-arrival — a Poisson process, not a metronome.
     bed.nextCrackle += -Math.log(1 - Math.random()) / bed.tick.rate;
+  }
+  // The slow clock, on its own guard: a room with no swell row still has to
+  // advance its cursor or this loop spins on a rate of zero.
+  guard = 0;
+  while (bed.nextSwell < horizon && guard++ < 8) {
+    if (bed.swell) bedSwell(ctx, bed.nextSwell);
+    const rate = (bed.swell && bed.swell.rate) || 0.1;
+    bed.nextSwell += -Math.log(1 - Math.random()) / rate;
   }
 }
 
@@ -13031,10 +13123,11 @@ window.__diceDebug = {
       soundOn,
       ambienceOn,
       bedSources: AUDIO.bedSources,
-      // THE ROOM'S EVENT LAYER, counted. `bedSources` says a bed EXISTS;
-      // this says something HAPPENS in it, which is the different claim Joe's
+      // THE ROOM'S EVENT LAYERS, counted. `bedSources` says a bed EXISTS;
+      // these say something HAPPENS in it, which is the different claim Joe's
       // *"sounds like white noise"* turned out to be about (docs/AUDIO.md §9).
       bedTicks: AUDIO.bedTicks,
+      bedSwells: AUDIO.bedSwells,
       roomDuckDb: bed && bed.ducked ? DUCK_DB : 0,
       bedFading: !!bed,
     };
@@ -13092,6 +13185,7 @@ window.__diceDebug = {
         bed: {
           ...p.bed,
           tick: { ...p.bed.tick },
+          swell: p.bed.swell ? { ...p.bed.swell } : null,
         },
         ground: { ...p.ground },
       },
@@ -13113,6 +13207,8 @@ window.__diceDebug = {
         brownGain: Math.round(bed.layers.brown[0].g.gain.value * 1e6) / 1e6,
         tickRate: bed.tick.rate,
         tickLoHz: bed.tick.loHz,
+        tickTone: bed.tick.tone || 0,
+        swellRate: bed.swell ? bed.swell.rate : 0,
         sources: bed.nodes.length,
         told: { ...bed.told },
       } : null,
