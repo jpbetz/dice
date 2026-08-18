@@ -58,7 +58,7 @@ by *finishing what is in flight*.
 | # | Item | Why it is here | Size | Track |
 | --- | --- | --- | --- | --- |
 | ~~1~~ | ~~Joe's LOOK and LISTEN sitting~~ — **SAT 2026-08-18, all eight answered** ([the record](#the-sitting--sat-2026-08-18-and-it-is-the-day-this-tier-stopped-waiting)) | **The whole of Track B was gated on this and is not any more.** Four approvals (W7 ②, W5, W4, C25 Stage 2), one *not yet* (the grounded stump — *"still a set piece… nothing to make it feel rooted"*), two decisions that are now build items (`preferDice` ON, the standard dice wear `round .090`) and ten voices heard, eight needing work. **Cost him about an hour; five separate askings over the previous fortnight had produced one verdict.** Refill the page to eight and ask once — never drip-feed it. | done | B |
-| 1b | **The re-asks the sitting created** | ~~The stump's round 7, eight of the ten voices, and a re-listen.~~ **The AUDIO half is CLOSED** — he re-listened the same day, approved eight voices and killed one design ([W6b](#w6b-the-listening--done-2026-08-18-no-audio-item-is-open)). What is left on this row is the **stump's round 7** plus one small unheard row (`IMPACT_VOICES.chime`, which three grounded sets still carry). Same rule: they go back on ONE page, together, not one at a time. Rebuild it with the two commands in [the note below](#the-sittings-page-is-rendered-then-built-in-that-order). | ~20 min of Joe, once refilled | B |
+| 1b | **The re-asks the sitting created** — **PAGE REFILLED 2026-08-18, and it is THREE items** ([the record](#refilled-2026-08-18--and-it-is-three-items-not-eight)) | ~~The stump's round 7, eight of the ten voices, and a re-listen.~~ Rendered then built, 12 frames, 0 missing, 0 stale, opened and read. **① W3 round 10's re-baked base** (with the pale band stated first, before the frames), **② C30's pile** off the stills, **③ the two fae ground impacts** re-listened on the live table — the only item that is not answerable from the page. **`IMPACT_VOICES.chime` is deliberately NOT on it**: unheard is not rejected, and a question whose honest answer is "I don't know" costs him a click and buys nothing. Rebuild with the commands in [the note below](#the-sittings-page-is-rendered-then-built-in-that-order), which now point at the generator's header as the single copy. | ~15 min of Joe | B |
 | ~~2~~ | ~~[**§2l ⑥'s RENDERING**](#2l-pool-analysis--①⑥-all-shipped-the-last-of-them-2026-08-17)~~ **SHIPPED 2026-08-17** | The curve of the total renders in `#pop-preview` on every ± door, plus a target clause in the one-line validator. §2l is now ①–⑥ complete; **it is owed a move to SHIPPED.md**, which this pass did not own. Its two live dependents are #4's sibling (§5's local statistics, now unblocked — `sumForecast(…).mean`/`.sd` are the expected term) and UX §2.1's `showOdds`, still deliberately unbuilt. | — | A |
 | ~~3~~ | ~~C22's `room.setup` stamp~~ — **SHIPPED 2026-08-17** ([C22](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15-closed-2026-08-17), UX §7.49 ⑥) | Not ~10 lines and not `maybeRepushTable`: the server **rewrote** the payload field by field, so the stamp needed `server.js` and `js/net.js` too, and the authoring writer is `portablePushToTable`. The three wrong claims are recorded in C22. | small | A |
 | ~~4~~ | ~~§5 — roll-log export~~ — **SHIPPED 2026-08-17** ([§5](#5-capture-mechanisms), UX §7.49) | Plain-text transcript, `Copy` + `Download` in a log-flyout foot. `portableDownload()` was in `js/main.js`, not `js/portable.js`; **CSV was refused** and the reason is in UX §7.49 ②. | small | A |
@@ -1537,12 +1537,20 @@ moved too. Its stamp read *"every frame rendered fresh from this tree"* as a
 **hardcoded string**. The page whose whole job is to prevent a stale look was
 the thing asserting freshness without checking it.
 
-Fixed 2026-08-17, and the fix is a refusal rather than a warning:
+Fixed 2026-08-17, and the fix is a refusal rather than a warning.
+
+**THE RENDER COMMANDS LIVE IN THE GENERATOR'S OWN HEADER, not here.** They
+change every time the queue is refilled — this block listed four steps for the
+eight-item queue and every one of them was wrong within a day of the sitting —
+so `tools/verdict-sheet.mjs`'s header is the single copy and this is a worked
+example of the SHAPE. For the 2026-08-18 refill:
 
 ```
-node tools/drive.mjs tools/steps/verdict-shots.mjs
-node tools/drive.mjs --steps tools/steps/glade-look.mjs,tools/steps/life-look.mjs,tools/steps/record-look.mjs
-git checkout 9f1e592 -- js/fae-lab.js && node tools/drive.mjs tools/steps/glade-look.mjs tag=before && git checkout HEAD -- js/fae-lab.js
+node tools/drive.mjs tools/steps/flare-look.mjs                              # the AFTER leg
+git checkout 48bd128 -- models/towers/ \
+  && node tools/drive.mjs tools/steps/flare-look.mjs tag=before \
+  && git checkout HEAD -- models/towers/                                     # the BEFORE leg
+node tools/drive.mjs tools/steps/grip-look.mjs 1000
 node tools/verdict-sheet.mjs        # exits 1 if any frame predates the code it shows
 ```
 
@@ -1558,9 +1566,20 @@ node tools/verdict-sheet.mjs        # exits 1 if any frame predates the code it 
   files still count — they are real and have no commit to date them.
 - **Verified in both directions** (an uncommitted file under `js/` → 48 rows
   red, exit 1; removed → 48/0/0, exit 0) and the page was opened, not just
-  generated: 49 images, none broken, no console errors.
+  generated: 49 images, none broken, no console errors. Re-verified on the
+  refilled page 2026-08-18 against the path that was newly watched: an
+  untracked file under `models/` → 12 rows red, exit 1; removed → 12/0/0,
+  exit 0.
+- **`models` is watched too, since 2026-08-18.** A tower LOOK photographs a
+  baked GLB, so for that row the model IS the code the frame shows; without it
+  a re-bake could land while the frames stood still and the stamp would go on
+  saying every frame was newer than every source that could restage it.
 - What it still cannot catch: a frame carried in from a different tree. Only
   the steps writing their own provenance would close that, and they do not.
+  **A step that exists is worth more than a rename that worked:** round 10's
+  four flare frames were `rooted-<venue>-shipped.png` renamed by hand, which
+  is a provenance record nobody can re-run and nothing can date — hence
+  `tools/steps/flare-look.mjs`.
 
 **So a page built before a batch lands is stale by the time the batch lands.**
 Re-render after the merge, not before it.
@@ -1596,9 +1615,37 @@ die), and ③ is a re-do of the thing round 6 was already for.
 
 **The lesson for the next sitting: eight verdicts cost him about an hour and
 un-blocked an entire track.** Five separate askings over two weeks had produced
-one. The page is the mechanism (`shots/verdicts.html`, two commands — see
+one. The page is the mechanism (`shots/verdicts.html` — see
 [the note above](#the-sittings-page-is-rendered-then-built-in-that-order)), and
-the queue should be *refilled to eight and asked once*, never drip-fed.
+the queue is *refilled and asked once*, never drip-fed.
+
+#### REFILLED 2026-08-18 — and it is THREE items, not eight
+
+Everything the sitting opened has been built and deployed (`/health` reports
+`bcdb78a88300`). What is genuinely open is three, and the page is short on
+purpose:
+
+| # | item | the question, in his agent's own words |
+|---|---|---|
+| 1 | **W3 round 10** — the Hollow Bole's re-baked base | *"the foot no longer tucks under itself and the roots no longer end together — is the base a better shape, even though the pale band is still there?"* — and the page says the pale band is still there in its FIRST sentence, before the frames |
+| 2 | **C30's pile** — `feltgrip+gate4`, refused on one gate of six | is the heap worth calmer dice? The page tells him to judge the pile off the stills and never off the shake, because the shake is the half that flatters the candidate |
+| 3 | **the two fae ground impacts, re-listened** | not a frame — two clicks on the live table. The ringing die is deleted; the venues keep a trim that only darkens, so a fae landing is a third of an octave darker than the grounded table **by design**, not as a leftover |
+
+**"Refill it to eight" is a rule about not drip-feeding, NOT a quota.** Three
+questions that are all real beat eight where five are invented, and re-asking
+something he has answered is how a queue stops being trusted. **Deliberately
+NOT on the page:** `IMPACT_VOICES.chime`'s unjudged re-voice on three
+grounded-table sets. It is *unheard*, not rejected, on sets nobody has
+complained about, and the honest answer to "is this right?" about a sound he
+has never had a reason to play is "I don't know" — which costs him a click and
+buys nothing. It stays a named row in
+[W6b](#w6b-the-listening--done-2026-08-18-no-audio-item-is-open) for a future
+listening pass.
+
+**What the last sitting CLOSED is rendered at the top of the page**, above the
+queue, with no verdict control on any of its rows. The page's own argument for
+sitting again is that the queue went from eight to three, and an argument
+nobody can see is not an argument.
 
 ### W7 ②. The staging — SHIPPED 2026-08-13, VERIFIED 2026-08-15, **APPROVED 2026-08-18**
 
@@ -1782,12 +1829,24 @@ instrument this round wanted is a **paint bisect** — one diagnostic bake with
 each surface class at a flat separable colour. Ten minutes, and it replaces
 three bakes of guessing. Next round does that before touching geometry.
 
-**OPEN, and it is Joe's:** `shots/flare-before-{moonrise,foxfire}-resting.png` →
-`shots/flare-after-{moonrise,foxfire}-resting.png`, the resting eye, four
-frames. The honest ask is narrow: *the foot no longer tucks under itself and
-the roots no longer end together — is the base a better shape, even though the
-pale band is still there?* If the answer is "the pale band IS the complaint",
-that is the paint bisect's round and this one bought the ground under it.
+**OPEN, and it is Joe's — it is item ① of the refilled sitting page**
+(2026-08-18). The honest ask is narrow: *the foot no longer tucks under itself
+and the roots no longer end together — is the base a better shape, even though
+the pale band is still there?* If the answer is "the pale band IS the
+complaint", that is the paint bisect's round and this one bought the ground
+under it.
+
+The frames are `shots/flare-{before,after}-{moonrise,foxfire}-{resting,foot}.png`
+and they are **taken by `tools/steps/flare-look.mjs`**, not by hand. This round
+made them by running `rooted.mjs`, keeping `rooted-<venue>-shipped.png` and
+renaming it — twice, with a GLB swap between — which is a provenance record
+nobody can re-run and the freshness guard cannot date. Two commands now, and
+the BEFORE leg swaps the MODEL rather than the code (`git checkout 48bd128 --
+models/towers/`), because this round was forbidden to touch a colour and the
+A/B has to keep that true. The `-foot` pair is the same frame magnified, with
+the crop box derived from the built mesh's own world footprint through the live
+camera — the base is what the question is about and it is a third of the room's
+width in the wide frame.
 
 ### W2c ledger — next tower round, not W2c
 
