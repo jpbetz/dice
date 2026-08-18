@@ -79,8 +79,19 @@ sound and chips device-global.
 
 *The 2026-08-05 big pass shipped 20 commits across §0b/0d/0e/0g and killed 31
 designs with named defects. Both records are in [SHIPPED.md](SHIPPED.md) —
-read the killed list before re-proposing anything in this tier. Bench baseline
-is pinned in `.claude/…/memory/perf-baseline.md`.*
+read the killed list before re-proposing anything in this tier.*
+
+> **THERE IS NO PINNED BENCH BASELINE, and this file said there was.** Two
+> places cited `.claude/…/memory/perf-baseline.md` as the authority a perf
+> change is judged against; `find` says no such file exists, and the directory
+> it names holds fifteen other memories. Found 2026-08-18 by the 9c pass, which
+> went looking for the budget its 3.4× vertex count had to fit inside — the one
+> circumstance in which the citation mattered, and the file was not there.
+> **A missing authority is worse than no authority**: it stops the reader
+> measuring, and nothing fails when it is absent. Until one is generated, the
+> budget claims that ARE real are the ones with a command beside them —
+> `scene-draw-budget`'s `calls <= 220` in the suite, and
+> `node tools/drive.mjs tools/steps/edge-price.mjs 40 d20` for geometry cost.
 
 ### 0a. Roll-arrival Commit C — TWO ATTEMPTS REVERTED, and now DEMOTED
 

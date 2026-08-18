@@ -653,10 +653,13 @@ log still carries the departed player's roll — history is not presence).
 
 Bench + review pass 2026-08-04 (perf-audit workflow, 4 empirical benches
 under `tools/drive.mjs` × 4 hot-path code reviews × adversarial
-verification; the measured baseline is pinned in
-`.claude/…/memory/perf-baseline.md`, so future changes have a
-before/after). Findings sequenced by **impact** — player-felt magnitude ×
-frequency.
+verification; the measured baseline was said to be pinned in
+`.claude/…/memory/perf-baseline.md` — **amended 2026-08-18: that file does not
+exist and no `find` has ever located it**, so "future changes have a
+before/after" was not true of anything. The 9c pass discovered it by going to
+read the budget its 3.4× vertex count had to fit inside. What replaces it is
+per-claim: a number in this repo carries the command that reproduces it).
+Findings sequenced by **impact** — player-felt magnitude × frequency.
 
 ### 0a. The roll-arrival pass A+B — SHIPPED 2026-08-04
 
