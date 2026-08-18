@@ -58,12 +58,12 @@ by *finishing what is in flight*.
 | # | Item | Why it is here | Size | Track |
 | --- | --- | --- | --- | --- |
 | ~~1~~ | ~~Joe's LOOK and LISTEN sitting~~ — **SAT 2026-08-18, all eight answered** ([the record](#the-sitting--sat-2026-08-18-and-it-is-the-day-this-tier-stopped-waiting)) | **The whole of Track B was gated on this and is not any more.** Four approvals (W7 ②, W5, W4, C25 Stage 2), one *not yet* (the grounded stump — *"still a set piece… nothing to make it feel rooted"*), two decisions that are now build items (`preferDice` ON, the standard dice wear `round .090`) and ten voices heard, eight needing work. **Cost him about an hour; five separate askings over the previous fortnight had produced one verdict.** Refill the page to eight and ask once — never drip-feed it. | done | B |
-| 1b | **The re-asks the sitting created** — **PAGE REFILLED 2026-08-18, and it is THREE items** ([the record](#refilled-2026-08-18--and-it-is-three-items-not-eight)) | ~~The stump's round 7, eight of the ten voices, and a re-listen.~~ Rendered then built, 12 frames, 0 missing, 0 stale, opened and read. **① W3 round 10's re-baked base** (with the pale band stated first, before the frames), **② C30's pile** off the stills, **③ the two fae ground impacts** re-listened on the live table — the only item that is not answerable from the page. **`IMPACT_VOICES.chime` is deliberately NOT on it**: unheard is not rejected, and a question whose honest answer is "I don't know" costs him a click and buys nothing. Rebuild with the commands in [the note below](#the-sittings-page-is-rendered-then-built-in-that-order), which now point at the generator's header as the single copy. | ~15 min of Joe | B |
+| 1b | **The re-asks the sitting created** — **PAGE REFILLED 2026-08-18, and it is THREE items** ([the record](#refilled-2026-08-18--and-it-is-three-items-not-eight)) | ~~The stump's round 7, eight of the ten voices, and a re-listen.~~ Rendered then built, 12 frames, 0 missing, 0 stale, opened and read. **① W3 round 10's re-baked base** (with the pale band stated first, before the frames), ~~**② C30's pile** off the stills~~ — **answered 2026-08-17 without them, and the tuning shipped 2026-08-18** (row 6, [UX §7.61](UX.md)), **③ the two fae ground impacts** re-listened on the live table — the only item that is not answerable from the page. **`IMPACT_VOICES.chime` is deliberately NOT on it**: unheard is not rejected, and a question whose honest answer is "I don't know" costs him a click and buys nothing. Rebuild with the commands in [the note below](#the-sittings-page-is-rendered-then-built-in-that-order), which now point at the generator's header as the single copy. | ~15 min of Joe | B |
 | ~~2~~ | ~~[**§2l ⑥'s RENDERING**](#2l-pool-analysis--①⑥-all-shipped-the-last-of-them-2026-08-17)~~ **SHIPPED 2026-08-17** | The curve of the total renders in `#pop-preview` on every ± door, plus a target clause in the one-line validator. §2l is now ①–⑥ complete; **it is owed a move to SHIPPED.md**, which this pass did not own. Its two live dependents are #4's sibling (§5's local statistics, now unblocked — `sumForecast(…).mean`/`.sd` are the expected term) and UX §2.1's `showOdds`, still deliberately unbuilt. | — | A |
 | ~~3~~ | ~~C22's `room.setup` stamp~~ — **SHIPPED 2026-08-17** ([C22](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15-closed-2026-08-17), UX §7.49 ⑥) | Not ~10 lines and not `maybeRepushTable`: the server **rewrote** the payload field by field, so the stamp needed `server.js` and `js/net.js` too, and the authoring writer is `portablePushToTable`. The three wrong claims are recorded in C22. | small | A |
 | ~~4~~ | ~~§5 — roll-log export~~ — **SHIPPED 2026-08-17** ([§5](#5-capture-mechanisms), UX §7.49) | Plain-text transcript, `Copy` + `Download` in a log-flyout foot. `portableDownload()` was in `js/main.js`, not `js/portable.js`; **CSV was refused** and the reason is in UX §7.49 ②. | small | A |
 | 5 | [**9d follow-up** — `venue` in the portable YAML](#9d-follow-up-venue-in-the-portable-yaml--tower-shipped-2026-08-17) | **`tower` SHIPPED 2026-08-17** ([UX §7.50](UX.md)) — `TABLE_KEYS` is `{name, felt, system, zoom, tower}` and a prepared table arrives with its tower up. What is left is GOALS' punt: how a **venue** rides the file. Shipping the tower alone exposed that a file can now prepare *half a fae venue*, which is the argument for sequencing this next. | small | A |
-| 6 | [**C30 residual** — RUN 2026-08-17, REFUSED](#c30-residual-deadengrip--run-2026-08-17-and-refused-on-the-pile-alone) | **Closed as a build item; no longer sized.** `feltgrip+gate4` was run and passes **five of six gates** — shake −35%, hops −32%, every pool faster, clock 1.01× — and is refused on the pile: +6.3pp at close/6d6, flat throws 33/40 → 23/40, and it reaches the canonical trio. Five of the old row's claims were false; the flip had already moved the baseline. What remains is a **LOOK for Joe** (folded into row 1's sitting), not work. | — | A |
+| ~~6~~ | ~~**C30 residual**~~ — **SHIPPED 2026-08-18** ([the record](SHIPPED.md), [UX §7.61](UX.md)) | `feltgrip+gate4` is what the table now runs: shake −30% to −43%, hops −14% to −32%, every pool faster, caps 1 → 0, clock 1.03×. It was refused for four passes on the sixth gate — piling, +6.3pp at close/6d6 with flat throws 33/40 → 23/40 — and **Joe overturned that**: *"Pilling is OK. If you throw a lot of dice, it's your fault if they pile up. Let's not try to prevent it."* Gate d is now a **heap floor** and the pile rate is a reported number. The LOOK this row was waiting for was never needed; the answer was a ruling, not a frame. | done | A |
 | 7 | [**§3b L2**](#3b-the-lobby-and-the-table-flow--l4-shipped-l2-is-a-judgment-call) | **Decision record written 2026-08-17; recommends NO and needs Joe's yes/no.** The premise was stale: the peek has disclosed the display name of any seated player holding a profile since C17, and the join door renders them under a heading reading "At this table". A count's only new information is a player who published nothing. What the item actually owes is a corrected budget comment in `handleTableInfo` and the assertion that would have caught it. | small | A |
 | 8 | [**U16**, **U21**, **C26**](#u16-draft-intent-in-the-well--designed-2026-08-17-ready-to-build) | **All three are DESIGNS now, not stuck items** (2026-08-17) — each was adjudicated, one stale sub-claim struck per item, and each has a smallest-first-commit named. C26's label is killed for good: the name wipe is load-bearing, so the gesture returns as **`Take a prepared seat…`**. U21 carries the one fact the UX audit predates — a player who collapses the rail inside a breakout has **no way back on screen**. | med, now buildable | A |
 | ~~9~~ | ~~IDENTITY~~ — **the whole item is CLOSED 2026-08-17** ([IDENTITY.md](IDENTITY.md), UX §7.52) | **Rung 1 shipped**: `dice.who.v1` resumes a *lapsed* seat on the same `playerId`, which was also the fix for two bugs on no roadmap item — a held roll whose reveal died with its tab, and your own secret rolls vanishing from your own log. **B1's server half is killed** with a named defect (enrolment is an open keyword, so the entitlement is self-issued whoever carries it). **Rung 2 is closed by Joe's answer**: a stake that outlives its keeper is a different feature wearing goal 11's words, so a gone browser's held roll stays sweepable-unread by design — IDENTITY §7 is the paragraph to close any report of it with. | — | A |
@@ -1044,137 +1044,25 @@ Allowlist of roots. **This entry's "no credential or config exposure, verified p
 path" was false in two ways** and one of them was serving `deploy/config.mk` with the
 billing account in it to any local reader — see SHIPPED.md.
 
-### C30 residual. Deaden+grip — RUN 2026-08-17, and REFUSED on the pile alone
+### C30 residual. Deaden+grip — SHIPPED 2026-08-18
 
-*The settle campaign shipped (C30e's displacement terminator + `allowSleep
-false` + the tempo curve + `pileScale`, 2026-08-11). Full five-pass record in
-SHIPPED.md.* The residual rung has now been run. **It is the best physics
-candidate ever measured on this table — five of six gates pass — and it is
-refused, because the sixth is the pile and the pile got worse, not better.**
+**The full record moved to [SHIPPED.md](SHIPPED.md) in the commit that shipped
+it**, per CLAUDE.md. In one paragraph: `feltgrip+gate4` — grip + deaden + the
+speed-gated damping — is what `PHYS` and `DAMPGATE` now hold. Shake −30% to
+−43% on every pool, hops −14% to −32%, every pool faster, caps 1 → 0, clock
+1.03×, and piling worse on all four cells (close/6d6 +6.3pp, flat throws 33/40
+→ 23/40). It passed five of six gates for four passes and was refused on the
+sixth; Joe overturned that on 2026-08-17 — *"Pilling is OK. If you throw a lot
+of dice, it's your fault if they pile up. Let's not try to prevent it."* The
+pile rate is now a reported number in settle-matrix and gate d blocks only on a
+HEAP. UX [§7.61](UX.md).
 
-**The one command that reproduces every number below** (16 shake seeds, 40
-pile seeds; the two counts are separate arguments and no row mixes them):
+The A/B is repeatable in both directions — the old tuning is the matrix's new
+`classic` row:
 
 ```
-node tools/drive.mjs tools/steps/settle-matrix.mjs 16 40 feltgrip+gate4,deaden+gate4
+node tools/drive.mjs tools/steps/settle-matrix.mjs 16 40 classic
 ```
-
-`feltgrip+gate4` **is** the pairing this entry asked for: `GRIP` (floor
-friction 0.6 / dice 0.4 / wall 0.2) + `DEADEN` (floor restitution 0.15 / dice
-0.2 / wall 0.5) + the speed-gated damping. Per-gate, against the same run's
-`shipped` row:
-
-| gate | bar | `feltgrip+gate4` | `deaden+gate4` |
-| --- | --- | --- | --- |
-| a shake | ≥20% mean cut | **PASS −35%** (−30 to −43 per pool) | PASS −34% |
-| b dur | no pool over +5% | **PASS −2%** worst; every pool faster | fail **+19%** (4d6) |
-| c caps | ≤ shipped, 20d6 ≤1 | **PASS 0/1**, 20d6 0 | PASS 0/1 |
-| d pile | every cell ≤+2pp, flat ≥ | **fail +6.3pp, flat 33/40 → 23/40** | fail +6.3pp |
-| e clock | ≤1.5× | **PASS 1.01×** | PASS 1.10× |
-| f rest | forward: disp<eps, loose 0 | **PASS 0.019988 < 0.02, loose 0** | PASS 0.019994 |
-
-Hops, the meter that states Joe's complaint literally, run **−14% to −32%**.
-
-**FIVE OF THIS ENTRY'S OWN CLAIMS WERE FALSE, and four were false because the
-2026-08-11 flip moved the baseline they were measured against.**
-
-1. **"Four of six gates fail."** Two do, for `deaden+gate4` — and only one for
-   `feltgrip+gate4`. The flip already paid down most of the costs this entry
-   lists as outstanding.
-2. **"Fails on duration, 8d6 +57%."** 8d6 is **−6%** under grip and **+8%**
-   without it. The glide that "nobody has an answer to" **is answered**: grip
-   takes 8d6 from deaden-alone's 2.85 s past shipped's 2.19 s to 2.06 s —
-   120% of the glide recovered, not 70%.
-3. **"Clock 1.64×."** 1.01×. **"Creep +45%."** Unmeasurable as stated — see
-   below.
-4. **"Grip has never been run with sleep off."** Sleep-off has been the
-   *shipped default* since the flip, so `feltgrip+gate4` could not have been
-   run any other way. The `sleepoff` override in the matrix is now a **no-op**,
-   which also means `deaden+sleepoff+gate4` ≡ `deaden+gate4` and
-   `disp02+sleepoff` ≡ `shipped`: three rows that read as A/B pairs are the
-   same variant twice. Now commented at `SLEEPOFF`.
-5. **"The pile's untried lever is spawn geometry, which moved on 08-15."** It
-   moved on **2026-08-14** (`b2a3326`), and it is not a lever: what shipped was
-   `SPAWN.axis 'clamp'`, which is *bit-identical wherever the old line was
-   legal* and only moves the 16-of-144 dice that were born inside a wall. The
-   variant that does widen the spread — `'own'` — **was measured and refused
-   for piling** (close 6d6 flat 21/24 → 17/24). `js/main.js` says so at
-   `SPAWN`: *"Nor is the clamp a piling lever in either direction."* The pile's
-   untried lever is still unnamed.
-
-**Why it is refused.** The pile is worse on **all four cells**, and at 40 seeds
-it is worse than a 10-seed run says — the 10-seed probe read close/6d6 +3.3pp
-where 40 reads **+6.3pp** (23 of 240 dice against shipped's 8), and medium/trio
-reads clean at 10 seeds and +0.8pp at 40. *SHIPPED.md's warning that a 10-seed
-pile row is noise holds in the flattering direction too.* The damage reaches
-**the canonical trio** — attribute+skill+motivation, the roll `dice-land-flat`
-pins as a floor at every zoom — at close (flat 39/40 → 36/40) and at medium
-(40/40 → 39/40). The mechanism is C30c's, unchanged and now confirmed against
-a cheap terminator: **on this mat sliding apart is how dice separate**, and
-grip is the instrument that stops the slide. Deaden takes the bounce that
-separates them and grip takes the skid; the shake win and the pile loss are
-the same fact.
-
-**And `dice-land-flat` would not have caught it**, which is the part to keep.
-It samples three throws and needs 2 of 3 flat; at a per-throw flat rate of
-36/40 it passes ~99% of the time. It caught C30c because that regression was
-an order larger (3 clean throws in 10). **The C24 floor is a floor, not a pile
-meter** — a ±2.5pp trio regression sits under its sampling power, and only the
-40-seed matrix can see it.
-
-**Two harness defects found on the way, both fixed here** (`settle-matrix.mjs`):
-
-- **The canary had been missing on every run since the flip.** `CANARY_DUR`/
-  `CANARY_SHAKE` held the pre-flip baseline, so the rig printed *"THE CANARY
-  MISSED. The verdict above is not evidence"* under verdict tables that were
-  fine. Re-anchored to a measured run reproduced across **two independent stage
-  boots**, identical to every digit (soul 2.26 → **1.47** s, 20d6 6.25 →
-  **4.15** s). A gate that is always red is a gate everyone scrolls past.
-- **Gate f could not read a tuning row at all.** It judges creep *backward*
-  from each die's settle frame, and switched to the forward meter only for rows
-  that swap the terminator — but grip moves the settle frame too (duration
-  −20%), sliding the window into the tumble. That is why "creep +45%" cannot be
-  read: creep rose 17–171% on rows whose shake fell 35% and whose hops fell
-  32%, which is `restMotion`'s own documented ambiguous case. The anchor test
-  now also fires on a ≥5% duration move, and the forward bar asserts the
-  terminator's **promise** (`dispMax < eps`, `loose == 0`, caps ≤ shipped)
-  instead of *comparing* two quantities that both saturate at eps — the old
-  bar failed both rows by 3.4e-5 of a die-width, printed as `0.0200` vs
-  `0.0200`. Neither fix changes a ship decision: both rows are refused on d.
-
-**What is left, and it is one question.** Deaden+grip is a shake/hops/duration
-win with no cost anywhere except that dice end up on each other. Every
-instrument aimed at the pile has now been tried and priced: the nudge
-(`pileScale`, a die off the pile once in 24 seeds), the terminator (cheap, and
-it *causes* a little of it), and the spawn line (bit-identical where it was
-legal; the wide variant piles). **Nobody has proposed a mechanism that makes
-dice separate without the skid.** Until someone does, this rung stays refused
-and the entry is a record, not a task.
-
-**One thing for Joe, and only if the pile is negotiable.** This candidate is
-what *"really magnetize themselves to the surface once they're landed, no more
-bounding like they're on the moon"* actually looks like — hops −32% at 20d6 is
-the largest move on that meter ever measured here. The gate it fails is
-`close`/6d6, and `close` is opt-in density whose own tooltip says so. If Joe
-would trade +6.3pp of piling at `close` for the calmest dice on the table, that
-is a judgment no measurement can make and the refusal above is overturnable by
-his eye. **It needs a LOOK, not a re-measurement.**
-
-The pair is shot and waiting — `node tools/drive.mjs tools/steps/grip-look.mjs
-1000`, frames in `tools/out/grip-<zoom>-<pool>-<shipped|feltgrip>`:
-
-- **`grip-close-6d6-shipped` vs `grip-close-6d6-feltgrip`** — *the question.*
-  Shipped puts six dice flat and spread; the candidate clusters them and perches
-  one at maxY 2.03, plainly on top of another. **Is that heap worth calmer
-  dice?** If yes, the gate d bar is what should change, not the tuning.
-- **`grip-medium-trio-shipped` vs `grip-medium-trio-feltgrip`** — *the
-  reassurance.* Zero piled under both, and the candidate is arguably the cleaner
-  frame (it separates the d8/d6 shipped leaves touching). So the trio's 40/40 →
-  39/40 is a **counting** regression, not a reading one.
-
-*Judge the pile off these stills; do NOT judge the shake off them.* The win is
-motion over the last 0.6 s and a still cannot show it — that is what the shake
-and hops columns are for.
 
 **Also standing:** `C30b` — 20d6 can still reach the cap with dice genuinely
 tumbling (3 of 16 seeds). That is real motion, so shortening `SETTLE_CAP`
@@ -1188,6 +1076,12 @@ pool-generalized runner made shipped's 20d6 read 8/8 identical where running
 20d6 alone is 4/8. *A passing drift run is weak evidence; a failing one is
 strong.*
 
+**A third rule this ship earned.** A tuning change rewrites the film, so every
+recorded expectation that pins one is a deliberate update — re-measured, never
+adjusted by applying a quoted percentage. Five were re-anchored here, and the
+two that cost a red were **seeds chosen for an outcome** (`pile-refusal` pinned
+two 6d6 seeds because they landed flat; the new tuning piles both). A seed
+picked for a result is a recorded film wearing a number.
 ---
 
 ## Tier U — the converged UX: what is still open
@@ -1628,7 +1522,7 @@ purpose:
 | # | item | the question, in his agent's own words |
 |---|---|---|
 | 1 | **W3 round 10** — the Hollow Bole's re-baked base | *"the foot no longer tucks under itself and the roots no longer end together — is the base a better shape, even though the pale band is still there?"* — and the page says the pale band is still there in its FIRST sentence, before the frames |
-| 2 | **C30's pile** — `feltgrip+gate4`, refused on one gate of six | is the heap worth calmer dice? The page tells him to judge the pile off the stills and never off the shake, because the shake is the half that flatters the candidate |
+| ~~2~~ | ~~**C30's pile**~~ — **ANSWERED 2026-08-17, SHIPPED 2026-08-18** | He did not need the stills. *"Pilling is OK. If you throw a lot of dice, it's your fault if they pile up. Let's not try to prevent it."* The tuning shipped, gate d became a heap floor, and this row is closed — [UX §7.61](UX.md). **The lesson for the next page: the question was answerable in a sentence and had been queued as a LOOK.** Ask which it is before you spend a render. |
 | 3 | **the two fae ground impacts, re-listened** | not a frame — two clicks on the live table. The ringing die is deleted; the venues keep a trim that only darkens, so a fae landing is a third of an octave darker than the grounded table **by design**, not as a leftover |
 
 **"Refill it to eight" is a rule about not drip-feeding, NOT a quota.** Three
@@ -2233,7 +2127,7 @@ because four causes are indistinguishable from a client.
 | Tier 0 §0b/0d/0e/0g/0h killed-design catalogues | SHIPPED.md — "Tier 0 — the designs that were KILLED" |
 | §0i (closed), §2k (closed), §13 (moved to L4) | closed; §13 keeps a pointer |
 | §9d's build record (five towers, dressing, portal floors) | SHIPPED.md §9d; the portable-YAML follow-up stays here |
-| C6–C10, C16–C21, C23, C30–C33 | SHIPPED.md; C30's one unshipped rung and C24's binding measurement stay here |
+| C6–C10, C16–C21, C23, C30–C33 | SHIPPED.md; C24's binding measurement stays here. **C30's one unshipped rung shipped 2026-08-18** and its record moved too — what is left here is a pointer plus `C30b` and the three rules that bind a future physics claim |
 | V1, V2 | SHIPPED.md; V1's phase-two list stays here |
 | W0, W1, W2, W2b, W2c, W3, W4, W5 | SHIPPED.md; W5's LOOK, W6, W7 ② and the W2c ledger stay here |
 | T1, T2, T3, T4, T7, T8(a), T10, T14 | SHIPPED.md; T8(b) stays here |

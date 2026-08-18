@@ -1703,6 +1703,15 @@ DIGEST `17dae9ba`. It answers a question `perf-determinism` cannot:
 that one client agrees with a build from before the change, which is
 what a room spanning two deploys needs.
 
+*The RUN DIGEST above is no longer what the tool prints, and that is a
+deliberate update.* The C30 felt tuning moved the film on 2026-08-18:
+`17dae9ba` → **`424d10e4`**, every per-pool digest and frame count with
+it. The collider is unchanged at `4d6b5640` and must stay so — a physics
+tuning has no business touching a hull. Both halves were re-run at the
+commit either side of the tuning rather than reasoned about, and the
+pre-tuning run reproduced `17dae9ba` exactly, so the number above was
+still accurate right up to the day it moved.
+
 *The price*, `node tools/drive.mjs tools/steps/edge-price.mjs 40 d20`
 (new step; reads `__diceDebug.dieGeoStats`, new hook):
 
@@ -4153,6 +4162,124 @@ additions of 1/60 sum to 0.44999999999999996, which is under the bar — the
 window is **28 frames**. Harmless to the sim (the loop is self-consistent) and
 not harmless to anything re-deriving it: `settleProbe` disagreed with the
 mechanism by 11% of `eps` until it was fixed.
+
+### C30 residual. Deaden+grip — SHIPPED 2026-08-18, on a ruling rather than a new measurement
+
+*Four passes measured this tuning and four passes refused it. The fifth did not
+measure anything new. It asked Joe whether the one thing it costs is a defect,
+and he said no.*
+
+**What shipped.** `PHYS` goes to floor friction 0.6 / restitution 0.15, dice
+0.4 / 0.2, wall 0.2 / 0.5, and `DAMPGATE` turns on at gate 4 with the felt
+damping (0.1 linear / 0.14 angular). That is exactly settle-matrix's
+`feltgrip+gate4` — GRIP + DEADEN + the speed-gated damping — and nothing else
+moved. `NUDGE.pileScale` stays at 1.05.
+
+**The command, and it runs in both directions.** The tuning it replaces is
+still reachable as the matrix's new `classic` row, so this A/B is repeatable
+rather than historical:
+
+```
+node tools/drive.mjs tools/steps/settle-matrix.mjs 16 40 classic
+```
+
+16 shake seeds, 40 pile seeds, paired. Before (`classic`) → after (`shipped`):
+
+| meter | 1d20 | soul | 4d6 | 8d6 | 20d6 |
+| --- | --- | --- | --- | --- | --- |
+| shake | 0.085 → **0.049** (−43%) | 0.117 → **0.070** (−40%) | 0.106 → **0.068** (−35%) | 0.135 → **0.094** (−30%) | 0.175 → **0.114** (−35%) |
+| hops | 4.88 → **4.19** (−14%) | 4.66 → **3.50** (−25%) | 4.52 → **3.53** (−22%) | 4.89 → **3.90** (−20%) | 5.59 → **3.83** (−32%) |
+| duration s | 1.39 → **1.12** (−20%) | 1.47 → **1.20** (−18%) | 1.26 → **1.24** (−2%) | 2.19 → **2.06** (−6%) | 4.15 → **3.57** (−14%) |
+
+Throws reaching `SETTLE_CAP`: **1 → 0**. Worst per-pool wall clock: **1.03×**.
+`hops` is the complaint stated literally — the count of separate times a die
+goes back UP in its last 0.6 s — and −32% at 20d6 is the largest move on that
+meter ever measured here.
+
+**And the pile, which is the whole of the cost.** Worse on all four cells,
+over 40 paired seeds:
+
+| cell | before | after |
+| --- | --- | --- |
+| medium/trio | 0 of 120 dice, 40/40 flat throws | 1 of 120, 39/40 (+0.8pp) |
+| medium/6d6 | 4 of 240, 36/40 | 12 of 240, 28/40 (+3.3pp) |
+| close/trio | 1 of 120, 39/40 | 4 of 120, 36/40 (+2.5pp) |
+| close/6d6 | 8 of 240, 33/40 | 23 of 240, 23/40 (+6.3pp) |
+
+**The ruling.** Joe, 2026-08-17, on the refusal this overturns:
+
+> *"Pilling is OK. If you throw a lot of dice, it's your fault if they pile up.
+> Let's not try to prevent it."*
+
+So nothing was added to prevent it and nothing was tuned to soften it. The
+mechanism was never in doubt: on this mat sliding apart is how dice separate,
+deaden takes the bounce and grip takes the skid, and **the shake win and the
+pile loss are the same fact.**
+
+**Gate d is now a heap floor, and that distinction is the durable part.**
+Blocking on the pile RATE is what refused this candidate for four passes. The
+rate is now reported — printed in the pile table and inside gate d's own cell —
+and what blocks is a heap: one throw stacking a die **three or more of its own
+rest ceilings high** with **more than half the pool off the felt**. Both
+conditions AND-ed, because depth without breadth is one unlucky die and breadth
+without depth is a crowded mat, which at `close` is what the zoom is for.
+
+That bar is calibrated for pools the mat has room for, and says so in the code.
+C24 measured 40d6 at `close` on the shipped ladder at 28 of 40 dice up and a max
+height of 5.3 units — 4.5 rest ceilings for a d6 — so a pool that overflows the
+mat clears both bars legitimately. Forty dice do not fit on a phone-sized mat.
+
+Measured headroom, either tuning, worst cell of four: **1.95 tiers and 3 of 6
+dice off the felt.**
+
+**`dice-land-flat` moved the same way, and the more useful half of that is why
+its old bar could not have held the line.** It sampled three throws and needed
+2 of 3 flat. At the per-throw flat rates this table produces — close/trio 36/40
+now, 39/40 before — a 2-of-3 majority passes **97%** and **99.8%** of the time.
+It was green either side of the move it existed to catch. It caught C30c only
+because that regression was an order larger (3 clean throws in 10). Seeing a
+pile-rate move needs ~40 paired seeds a cell, which is a tool and not a
+scenario: `commandRoll` takes a server seed, so throws are unpaired and half
+the sample goes on seed variance. The scenario now asserts the heap at every
+zoom for both pools — **`close`/6d6 asserted nothing at all before**, and is the
+cell this tuning moved most.
+
+**The film moved, and every pin that recorded one was re-measured.** The
+collider did not move and must not: `edge-film.mjs` reads `4d6b5640` before and
+after. The keyframe RUN DIGEST went **`17dae9ba` → `424d10e4`**, with every
+per-pool digest and frame count moving with it. The re-anchored pins are listed
+in the commit that carries them; the two that were seeds chosen for an OUTCOME
+(`pile-refusal`) are the ones worth remembering, because a seed picked for a
+result is a recorded film wearing a number.
+
+**What was verified rather than assumed.** `feltgrip+gate4` run against the
+shipped build is a **no-op canary**: every cell of every table reads +0.0%, so
+what shipped is exactly what was measured. `replay-drift.mjs shipped 8 900
+20d6`, one pool per invocation as the campaign rule requires, is **8/8
+byte-identical** after 900 unrelated throws. `perf-determinism`,
+`one-seed-one-film` and `settle-displacement` are green.
+
+**Still standing after this ship:** `C30b` — 20d6 can reach the cap with dice
+genuinely tumbling. It is real motion, so shortening `SETTLE_CAP` would truncate
+it and show dice snapping. Left alone deliberately.
+
+**Two harness defects, both fixed 2026-08-17 and both worth the record.** The
+canary had been missing on every run since the 2026-08-11 flip, printing *"THE
+CANARY MISSED. The verdict above is not evidence"* under verdict tables that
+were fine — a gate that is always red is a gate everyone scrolls past, which is
+the same failure as one that is always green. And gate f could not read a
+tuning row at all: it judges creep backward from each die's settle frame, and
+grip moves that frame, so the window slid into the tumble and creep read +17%
+to +171% on rows whose shake fell 35%. The anchor test now also fires on a ≥5%
+duration move, and the forward bar asserts the terminator's promise
+(`dispMax < eps`, `loose == 0`, caps ≤ shipped) instead of comparing two
+quantities that both saturate at eps.
+
+**Five claims of the old roadmap entry were false when checked**, four of them
+because the 2026-08-11 flip had moved the baseline they were measured against.
+The one worth carrying: *"grip takes back 70% of deaden's glide"* — re-measured,
+grip takes 8d6 to 2.06 s against the old tuning's 2.19 s, which is not recovery
+but a net win. Re-derive before you build.
 
 ### C31. The same values, a different film — master does not replay 20d6
 
