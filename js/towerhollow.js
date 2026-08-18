@@ -567,7 +567,10 @@ function maps(pal, key) {
     // is a lottery at prop scale").
     hearth: bakeEmber({ size: 128, seed: 0xb01e05, heat: 2.0 }),
     veil: veilTexture(256, 0.92),
-    shadow: veilTexture(256, 0.55),
+    // No `shadow` print. AO layer (d) stopped being a textured quad — it is a
+    // vertex-alpha ring that follows the model's own footprint (see
+    // buildContactShadow), so the radial gradient this used to hold is now the
+    // falloff in the geometry. Its three siblings still bake one.
   };
   // THE TEXEL HALF OF THE AGED BASE, and this thing is DEAD AND OLD, so it
   // runs harder than any sibling: Bastion's stone takes grime at 2.3 and
@@ -626,6 +629,14 @@ function maps(pal, key) {
 //                                 only the shell knows, because only the
 //                                 shell knows where its buttresses are
 //             · zc, rIn, yRing, yCrown, zFO, zFI, sill, doorX, doorY, xLim
+//           OPTIONAL, each with a fallback at the call site, because a shell
+//           that cannot answer must cost a worse prop and never a throw:
+//             · topAt(th)         how high the wood stands at this heading
+//             · footAt(th)        the GROUND footprint — a different radius
+//                                 from rOut's mid-trunk one, and the one the
+//                                 contact shadow needs (AO layer (d))
+//             · liningTube        false on a baked shell, whose outer wall
+//                                 already IS the radius a tube would sit at
 //
 // RULES A SHELL MUST KEEP (the proofs gate all four):
 //   · every occluding group is named `towerSkin*` (this one uses
@@ -964,6 +975,180 @@ function buildLobedShell(ctx) {
     clipX: [Number(xClipL.toFixed(3)), Number(xClipR.toFixed(3))],
     sill, doorX, doorY, xLim, S, z0,
   };
+}
+
+// ---------------------------------------------------------------------------
+// AO LAYER (d) — THE CONTACT SHADOW, and it is the whole of "rooted"
+// ---------------------------------------------------------------------------
+// Joe, on the round-6 grounding work: *"It's still a set piece in my eyes…
+// nothing to make it feel rooted."* The diagnosis is one measurement and it is
+// not about geometry at all.
+//
+// **THE GROUND DID NOT KNOW THE TOWER WAS THERE.** Hide the entire twelve-unit
+// stump at the resting eye and 0.058% of the moonrise frame changes outside its
+// own footprint — 0.034% in foxfire — at a mean of 7.5/255, all of it fringe.
+// The ground's luminance just outside the foot measured 1.95x the ground at the
+// same depth nine hundred pixels away: it gets BRIGHTER at the contact, because
+// the only gradient there is the moon-spot's own cone and nothing subtracts
+// from it. A real object's contact zone is the one place in a picture that goes
+// darker, and it was the one thing this model's surroundings did not do.
+//
+// NO LIGHT IN THIS VENUE CAN SUPPLY IT, so this is not a lighting bug to be
+// fixed by turning something on. The fae preset runs `key: 0.6` (from 2.9) and
+// carries the room on `MOOD.lamp`, a SpotLight that never sets castShadow — and
+// even if it did, both lights stand high and IN FRONT of a tower socketed at
+// the back wall (z0 = −6.55): the lamp at (0, 22, 1) throws the crown's shadow
+// to z ≈ −26, fifteen units behind the mat, and the key at (8, 30, 10) throws
+// it to (−5.6, −25.6). Every shadow this tower casts lands off the ground the
+// player can see. That is a property of the composition, not a defect.
+//
+// AND THE LAYER ALREADY EXISTED. This block used to build two gradient-textured
+// quads at y 0.006 and y 0.005 — the same AO layer (d) heartwood, bastion and
+// blackanvil carry, authored against the FELT at y 0, where those three stand.
+// js/fae-lab.js stands the glade's ground disc at y 0.02 and its clearing
+// detail at y 0.035. Both are opaque and both are nearer the eye, so in the ONLY
+// venues this tower is ever socketed into, its contact shadows were under the
+// floor. Every gate stayed green for the whole of rounds 4 through 8, because
+// no gate had ever looked at the ground: tower-fit and tower-occlusion measure
+// NAMED `towerSkin*` meshes and these are deliberately unnamed. Proof of the
+// burial, before the fix: with `faeGround` and `faeClearing` hidden, the same
+// hide-the-tower difference goes from 3,296 changed pixels to 22,114.
+//
+// So round 4 re-painted the object, round 6 grew the object more geometry, and
+// round 8 deleted a mound — three rounds spent on the thing that was visible,
+// while the answer was a number in the thing that was not.
+//
+// WHAT IS BUILT NOW, and why it is a ring and not the square it replaces:
+//
+//  · IT CLEARS EVERY FLOOR THE TABLE CAN PUT UNDER THIS TOWER. `Y` is above
+//    the glade's 0.035 and the felt's 0. It is deliberately NOT a copy of
+//    those numbers with a fudge on top — `contact-floor` (tests/e2e) reads the
+//    live floor stack out of the scene and fails if anything rises past it,
+//    because a constant sized against something that stops following it is
+//    this repo's most-shipped bug shape.
+//  · IT FOLLOWS THE FOOTPRINT. The old square was sized `2·R0 + 3` on a radius
+//    sampled at mid-trunk (2.47) while the root flare reaches 3.17 at the soil,
+//    and a radial gradient is darkest at its CENTRE — under the trunk, where
+//    nobody can see it — so the annulus that actually shows got the tail of the
+//    falloff and the frame got two straight edges. This ring is darkest exactly
+//    AT the silhouette, per heading, and fades outward: contact darkening is a
+//    function of distance from the contact and of nothing else.
+//  · IT IS A MULTIPLY, SO IT IS VENUE-PROOF. Black at vertex alpha over a
+//    src-alpha blend is `dst · (1 − a)`, which needs to know nothing about the
+//    palette under it. That is what makes one shape correct in moonrise, in
+//    foxfire and on bare felt — and it is why this is not painted into the
+//    bake, where it would have to guess the ground's colour and would drift
+//    the moment the venue re-tuned its floor (the hazard the recipe's own
+//    GROUND_MOSS copy already carries a warning about).
+//  · IT PROVES NOTHING, AND IS EXCLUDED BY NAME. Both proofs gate on the
+//    PREFIX — js/main.js `towerCastTargets` takes `o.name.startsWith
+//    ('towerSkin')` and `towerModelAudit`'s `solid` walk asks the same of every
+//    ancestor — so `aoContactShadow` is outside tower-fit, tower-occlusion, the
+//    cladding audit and the socket hull exactly as the old unnamed quads were.
+//    It is NAMED rather than nameless because that costs nothing and buys the
+//    A/B: `setVisibleByName('aoContactShadow', false)` reproduces the frame Joe
+//    rejected, in one pass, which is what VENUE-COMPOSITION rule 15 asks a gate
+//    for. (main.js's comment there says "UNNAMED children"; the mechanism it
+//    describes has always been the prefix.)
+//  · THE TRAY SHADOW IS GONE, deliberately. It was the second of the two old
+//    quads, a rectangle out on the outrun where dice come to rest — and the
+//    outrun is DECLARED BARE on this tower (`bareColliders: ['ramp', 'lip']`).
+//    One shape, one job: the mound died of having four.
+const CONTACT = {
+  // Above the glade ground disc (0.02) and its clearing detail (0.035), which
+  // are the highest floors any shipped venue puts under a tower. The cost is
+  // that a die resting on the felt has its bottom 0.05 inside the sheet — 2 px
+  // at the resting eye, on a surface whose peak opacity is 0.72 of black, and
+  // measured on a settled 6-die pour before it was accepted.
+  Y: 0.050,
+  BINS: 96,
+  // HOW FAR THE DARKENING SPREADS, and it is set by the object's HEIGHT rather
+  // than by taste. Contact occlusion at distance d from a tall blocker of
+  // height h falls as ~½(1 − d/√(d²+h²)), so a 12-unit stump shades its own
+  // soil for several units and does it SLOWLY. The first cut of this ring used
+  // 1.45 with a square-ish falloff, measured at 64 px of visible band in front
+  // of the trunk, and the A/B against the rejected frame showed it: real,
+  // correct, and small enough to change nothing anybody would look at.
+  REACH: 3.20,
+  // How far it runs back UNDER the wood, so no lit sliver can open at the seam
+  // when the ring's smoothed footprint cuts inside a splinter's own.
+  TUCK: 0.30,
+  // AT THE SILHOUETTE — and it is high because THE VENUE CAPS IT. Measured by
+  // rendering this ring FULLY OPAQUE and black: the ground under the tower's
+  // foot still came back at 0.70x, not 0.02x, because `faeMoonShaft` — the
+  // moonbeam column standing over the resolve area — is a translucent volume
+  // between the eye and that ground and ADDS its light after the ground is
+  // shaded. Hide the shaft and the same quad reads 0.59; the ground itself
+  // falls 0.272 → 0.158, so ~42% of the brightness at the seam is arriving
+  // from in front of it. No shadow in this venue can beat that, so an alpha
+  // chosen for a normal room lands about a third of the darkening it looks
+  // like on paper. 0.88 spends most of what the beam leaves.
+  ALPHA: 0.88,
+  // GENTLE, for the same reason REACH is long: an exponent near 2 spends the
+  // whole budget in the first half-unit and leaves a hard-ish inner ring with
+  // clean ground right behind it, which is a rim — the exact defect rule 4
+  // names. 1.25 keeps ~0.30 of the peak two units out.
+  FALLOFF: 1.25,
+};
+
+function buildContactShadow(SURF, v) {
+  const { zc, R0 } = SURF;
+  // A shell that cannot answer for its own footprint gets the nominal radius
+  // plus the flare's typical overhang. Never a throw: a missing descriptor
+  // field must cost a slightly wrong shadow, not a tower that fails to build.
+  const foot = SURF.footAt || (() => R0 + 0.70);
+  const N = CONTACT.BINS;
+  // Radial offsets from the silhouette, in world units. The first is inside
+  // the wood; the rest sample the falloff where it moves fastest.
+  const offs = [-CONTACT.TUCK, 0, 0.18, 0.42, 0.75, 1.20, 1.75, 2.40, CONTACT.REACH];
+  const alphaAt = (d) => (d <= 0 ? CONTACT.ALPHA
+    : CONTACT.ALPHA * Math.pow(Math.max(0, 1 - d / CONTACT.REACH), CONTACT.FALLOFF));
+  const pos = new Float32Array(N * offs.length * 3);
+  const col = new Float32Array(N * offs.length * 4);
+  for (let i = 0; i < N; i++) {
+    const th = (i / N) * Math.PI * 2;
+    const r0 = Math.max(0.4, foot(th));
+    for (let k = 0; k < offs.length; k++) {
+      const r = Math.max(0.15, r0 + offs[k]);
+      const o = (i * offs.length + k);
+      pos[o * 3] = Math.cos(th) * r;
+      pos[o * 3 + 1] = CONTACT.Y;
+      pos[o * 3 + 2] = zc + Math.sin(th) * r;
+      col[o * 4] = col[o * 4 + 1] = col[o * 4 + 2] = 0;
+      col[o * 4 + 3] = alphaAt(offs[k]);
+    }
+  }
+  const idx = [];
+  for (let i = 0; i < N; i++) {
+    const j = (i + 1) % N;                       // wraps: bin 0 and bin N−1 are neighbours
+    for (let k = 0; k < offs.length - 1; k++) {
+      const a = i * offs.length + k, b = a + 1;
+      const c = j * offs.length + k, d = c + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  // itemSize 4 — the same vertex-alpha idiom Black Anvil's plume uses, and the
+  // reason there is no texture here at all.
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
+  geo.setIndex(idx);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, depthWrite: false,
+    side: THREE.DoubleSide,
+  }));
+  // The name is OUTSIDE the `towerSkin` prefix on purpose — see the block
+  // comment. userData carries the numbers a proof or a look step needs so
+  // nothing has to re-derive them off pixels.
+  mesh.name = 'aoContactShadow';
+  mesh.userData.contactShadow = {
+    y: CONTACT.Y, reach: CONTACT.REACH, alpha: CONTACT.ALPHA,
+    bins: N, footprint: [Math.min(...Array.from({ length: N },
+      (_, i) => foot((i / N) * Math.PI * 2))),
+    Math.max(...Array.from({ length: N }, (_, i) => foot((i / N) * Math.PI * 2)))]
+      .map((n) => Number(n.toFixed(3))),
+  };
+  return mesh;
 }
 
 export function buildHollowBoleSkin(v, { paletteId = 'moonrise', shell = buildStumpShell } = {}) {
@@ -1465,20 +1650,8 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise', shell = buildSt
     group.add(doorVeil);
   }
 
-  // --- AO layer (d): contact shadows, flat on the felt ---------------------
-  {
-    const shMat = () => new THREE.MeshBasicMaterial({
-      map: M.shadow, transparent: true, opacity: 0.5, depthWrite: false,
-    });
-    const base = new THREE.Mesh(new THREE.PlaneGeometry(2 * R0 + 3.0, 2 * R0 + 3.0), shMat());
-    base.rotation.x = -Math.PI / 2;
-    base.position.set(0, 0.006, zc + 0.25);
-    group.add(base);
-    const trayShadow = new THREE.Mesh(new THREE.PlaneGeometry(v.lip.s[0] + 1.6, 2.0), shMat());
-    trayShadow.rotation.x = -Math.PI / 2;
-    trayShadow.position.set(0, 0.005, v.lip.c[2] + v.lip.s[2] / 2 + 0.35);
-    group.add(trayShadow);
-  }
+  // --- AO layer (d): THE CONTACT SHADOW ------------------------------------
+  group.add(buildContactShadow(SURF, v));
 
   group.rotation.z = TILT;
   group.userData.socketMaxZ = zFO;

@@ -235,6 +235,66 @@ export function glbShellFor(url) {
       return null;
     };
 
+    // ---- the ground footprint, read off the VERTICES -----------------------
+    // NOT raycast, and the reason is cost: `radiusAt` memoizes per (θ, y) and
+    // three's raycaster is brute force over every triangle, so the ~200 casts a
+    // footprint sweep wants would be ~1.5M ray–triangle tests INSIDE a socket,
+    // which happens at a roll boundary. One pass over the position attribute
+    // answers the same question exactly (the max radius in an angular bin IS
+    // the silhouette, and the interior wall of a closed solid can never win it)
+    // for the price of reading the buffer once.
+    //
+    // The band is [-0.25, FOOT_BAND]: the shell's buried row sits at −0.09 and
+    // the root flare is widest at the soil, so anything above the band is the
+    // trunk narrowing away and would pull the footprint IN.
+    const FOOT_BINS = 96;
+    const FOOT_BAND = 0.34;
+    const footR = new Float32Array(FOOT_BINS);
+    {
+      const p = new THREE.Vector3();
+      for (const m of targets) {
+        const pos = m.geometry && m.geometry.attributes && m.geometry.attributes.position;
+        if (!pos) continue;
+        m.updateMatrixWorld(true);
+        for (let i = 0; i < pos.count; i++) {
+          p.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+          if (p.y < -0.25 || p.y > FOOT_BAND) continue;
+          const dx = p.x, dz = p.z - zc;
+          const r = Math.hypot(dx, dz);
+          // θ in the SHELL's convention (x = r·cos θ, z = zc + r·sin θ), so a
+          // caller can hand footAt the same heading it hands at() and rOut().
+          let b = Math.round((Math.atan2(dz, dx) / (Math.PI * 2)) * FOOT_BINS);
+          b = ((b % FOOT_BINS) + FOOT_BINS) % FOOT_BINS;
+          if (r > footR[b]) footR[b] = r;
+        }
+      }
+      // An empty bin means the band held no wood at that heading — it happens
+      // where the wound's sill cuts back — and the honest answer there is the
+      // neighbours', never zero (a zero would collapse the shadow onto the
+      // axis and open a bright gap exactly at the seam).
+      for (let pass = 0; pass < 3; pass++) {
+        for (let i = 0; i < FOOT_BINS; i++) {
+          if (footR[i] > 0.05) continue;
+          const a = footR[(i + FOOT_BINS - 1) % FOOT_BINS], c = footR[(i + 1) % FOOT_BINS];
+          footR[i] = Math.max(a, c);
+        }
+      }
+      // One box smooth: a contact shadow is softer than the silhouette that
+      // casts it, and an un-smoothed footprint puts a spike of shadow off every
+      // splinter. Wrapped, because bin 0 and bin 95 are neighbours.
+      const s = Float32Array.from(footR);
+      for (let i = 0; i < FOOT_BINS; i++) {
+        footR[i] = (s[(i + FOOT_BINS - 1) % FOOT_BINS] + 2 * s[i] + s[(i + 1) % FOOT_BINS]) / 4;
+      }
+    }
+    const footprint = (th) => {
+      const t = (th / (Math.PI * 2)) * FOOT_BINS;
+      const i = Math.floor(t), f = t - i;
+      const a = footR[((i % FOOT_BINS) + FOOT_BINS) % FOOT_BINS];
+      const b = footR[(((i + 1) % FOOT_BINS) + FOOT_BINS) % FOOT_BINS];
+      return a + (b - a) * f;
+    };
+
     const xm = (v.socket.s[0] / 2) - 0.55;
     const at = (th, y, inset = 0) => {
       const r = Math.max(0.05, radiusAt(th, y) - inset);
@@ -316,6 +376,16 @@ export function glbShellFor(url) {
         zFace: zFO,
       },
       doorPad: { x: DOOR_X, y: DOOR_Y, z: doorZ },
+      // footAt(θ): THE GROUND FOOTPRINT — how far the wood reaches at the
+      // height where it meets the floor, which is a different question from
+      // rOut's mid-trunk radius and is the one the CONTACT SHADOW has to ask.
+      // R0_Y's own comment already named the conflict ("R0 feeds two consumers
+      // that want different things … the contact shadow wants a ground
+      // footprint") and settled it in rOut's favour; this is the other answer,
+      // published rather than compromised. Measured here: R0 is 2.47 and the
+      // flare reaches 3.17 at the soil, so a shadow sized off R0 starts 0.7
+      // INSIDE the silhouette it is supposed to be darkening.
+      footAt: footprint,
       // Forensics for the look pass and the proofs — what the rays actually
       // found, so a frame that looks wrong can be checked against a number
       // instead of argued about.
