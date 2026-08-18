@@ -5541,3 +5541,71 @@ detail (POOL-ANALYSIS §9's last bullet). `showOdds` exists in this repo only as
 a line of UX.md — `grep -rn showOdds js/ index.html tests/` finds nothing —
 which is the honest state for a slot that is not a half-build.
 
+
+---
+
+## THE SITTING — every open LOOK and LISTEN, answered in one pass (2026-08-18)
+
+*ROADMAP THE ORDER #1, which had sat at the top of that file because nothing on
+Track B could move without it. Eight items, one page, about an hour of the
+owner's time. The previous fortnight of asking one question at a time had
+produced exactly one verdict.*
+
+**His answers, verbatim**, because the words are the specification for
+everything they opened:
+
+| # | item | verdict | his words |
+|---|---|---|---|
+| 1 | W7 ② the staging of the glade | approve | *"Focus is the dice. This looks perfectly fine."* |
+| 2 | W5 the living layer | approve | — |
+| 3 | the round-6 grounded stump | **not yet** | *"It's still a set piece in my eyes… nothing to make it feel rooted."* |
+| 4 | W4 the Moonmoot Witchlight set art | approve | — |
+| 5 | the ten voices | heard | per-voice below |
+| 6 | C25 Stage 2, where the record lives | approve | — |
+| 7 | C27, does a cropped felt still read as a table | **turn `preferDice` on** | — |
+| 8 | 9c, which edge the standard dice wear | **`round .090`** | — |
+
+**The ten voices, first hearing:**
+
+| id | voice | his words |
+|---|---|---|
+| A1 | The Table | *"sounds like white noise mostly"* |
+| A2 | Moonrise Glade | *"more white noise, super faint"* |
+| A3 | Foxfire Hollow | *"deeper white noise, VERY faint"* |
+| B1 | Heartwood | *"I'd probably switch the bastion and heartwood sounds, they feel reversed to what I'd expect"* |
+| B2 | Bastion | *(the same note)* |
+| B3 | Black Anvil | *"Slightly to shrill / clanky for me.."* |
+| B4 | Nullstone | **"sounds good"** |
+| B5 | Hollow Bole | **"sounds good"** |
+| C1 | Witchlight | *"I hate this sound. I'd prefer something far less sharp"* |
+| C2 | Moonrise ground | *"I hate this sound. I'd prefer something far less sharp"* |
+| C3 | Foxfire ground | *"Also to shrill / sharp"* |
+
+**What the answers cost and bought.**
+
+- **Four approvals closed four items outright**, including the W5 re-ask this
+  file had deliberately refused to bank off the W7 verdict (*"recording that
+  distinction rather than banking an approval nobody gave"*). Withholding it
+  was right: asked properly, it was answered properly.
+- **Two two-word verdicts are the largest build items in the set.**
+  `preferDice` gains **0 px at 390** and was measured a *loss* at 40d6, so
+  "turn it on" is a decision with a measured complication behind it; `round
+  .090` triples the vertex count of every die (132 → 468), which has to be
+  priced against a 40-die pool before it ships.
+- **8 of 10 voices need work, and the three beds are the finding.** A1, A2 and
+  A3 are meant to be three different *places*; to his ear they are one texture
+  at three volumes, and two of the three are too quiet to hear at all. Steady
+  broadband noise reads as "white noise" however its spectrum is tilted — a
+  place is made of sparse identifiable events and slow motion, not a bed.
+  B4 and B5 are the only two sounds in this app anyone has ever called good,
+  so they are now the reference for what his taste accepts.
+- **One dependency the sitting created**, and it would have cost three wasted
+  rounds if nobody noticed: **T15 re-bakes the three classic skins, and 9c just
+  changed what edge a standard die wears.** 9c first.
+
+**The mechanism is the transferable part.** One page, every frame beside the
+question it answers, the consequence of each answer written down before it is
+given, and a verdict box per item that copies out as text. It works because it
+turns *five interruptions* into *one sitting* — and the rule that follows is
+that re-asks are refilled to a full page and asked once, never drip-fed back
+one at a time.

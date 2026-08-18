@@ -53,7 +53,8 @@ by *finishing what is in flight*.
 
 | # | Item | Why it is here | Size | Track |
 | --- | --- | --- | --- | --- |
-| 1 | [**Joe's LOOK and LISTEN sitting**](#tier-w--the-first-fantasy-venue-the-fae-set--built-the-look-and-the-listen-are-joes) | **Not a build item, and that is why it is first.** Tier W is finished except for being *seen and heard*; **seven** LOOKs and ten voices gate it (the page's own item list — "five verdicts" was a notch stale), and nothing on Track B advances until they move. One page carries every frame beside the question it answers, and `docs/AUDIO.md` §9 is ten rows of two clicks. **`shots/verdicts.html`, and it is TWO commands, not one** — [see below](#the-sittings-page-is-rendered-then-built-in-that-order): re-render the frames from the tree you are judging, *then* `node tools/verdict-sheet.mjs`, which now REFUSES (exit 1) when a frame predates the code it shows. | ~1 hr of Joe | B |
+| ~~1~~ | ~~Joe's LOOK and LISTEN sitting~~ — **SAT 2026-08-18, all eight answered** ([the record](#the-sitting--sat-2026-08-18-and-it-is-the-day-this-tier-stopped-waiting)) | **The whole of Track B was gated on this and is not any more.** Four approvals (W7 ②, W5, W4, C25 Stage 2), one *not yet* (the grounded stump — *"still a set piece… nothing to make it feel rooted"*), two decisions that are now build items (`preferDice` ON, the standard dice wear `round .090`) and ten voices heard, eight needing work. **Cost him about an hour; five separate askings over the previous fortnight had produced one verdict.** Refill the page to eight and ask once — never drip-feed it. | done | B |
+| 1b | **The re-asks the sitting created** | The stump's round 7, eight of the ten voices, and a re-listen. Same rule: they go back on ONE page, together, not one at a time. Rebuild it with the two commands in [the note below](#the-sittings-page-is-rendered-then-built-in-that-order). | ~20 min of Joe, once refilled | B |
 | ~~2~~ | ~~[**§2l ⑥'s RENDERING**](#2l-pool-analysis--①⑥-all-shipped-the-last-of-them-2026-08-17)~~ **SHIPPED 2026-08-17** | The curve of the total renders in `#pop-preview` on every ± door, plus a target clause in the one-line validator. §2l is now ①–⑥ complete; **it is owed a move to SHIPPED.md**, which this pass did not own. Its two live dependents are #4's sibling (§5's local statistics, now unblocked — `sumForecast(…).mean`/`.sd` are the expected term) and UX §2.1's `showOdds`, still deliberately unbuilt. | — | A |
 | ~~3~~ | ~~C22's `room.setup` stamp~~ — **SHIPPED 2026-08-17** ([C22](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15-closed-2026-08-17), UX §7.49 ⑥) | Not ~10 lines and not `maybeRepushTable`: the server **rewrote** the payload field by field, so the stamp needed `server.js` and `js/net.js` too, and the authoring writer is `portablePushToTable`. The three wrong claims are recorded in C22. | small | A |
 | ~~4~~ | ~~§5 — roll-log export~~ — **SHIPPED 2026-08-17** ([§5](#5-capture-mechanisms), UX §7.49) | Plain-text transcript, `Copy` + `Download` in a log-flyout foot. `portableDownload()` was in `js/main.js`, not `js/portable.js`; **CSV was refused** and the reason is in UX §7.49 ②. | small | A |
@@ -62,7 +63,7 @@ by *finishing what is in flight*.
 | 7 | [**§3b L2**](#3b-the-lobby-and-the-table-flow--l4-shipped-l2-is-a-judgment-call) | **Decision record written 2026-08-17; recommends NO and needs Joe's yes/no.** The premise was stale: the peek has disclosed the display name of any seated player holding a profile since C17, and the join door renders them under a heading reading "At this table". A count's only new information is a player who published nothing. What the item actually owes is a corrected budget comment in `handleTableInfo` and the assertion that would have caught it. | small | A |
 | 8 | [**U16**, **U21**, **C26**](#u16-draft-intent-in-the-well--designed-2026-08-17-ready-to-build) | **All three are DESIGNS now, not stuck items** (2026-08-17) — each was adjudicated, one stale sub-claim struck per item, and each has a smallest-first-commit named. C26's label is killed for good: the name wipe is load-bearing, so the gesture returns as **`Take a prepared seat…`**. U21 carries the one fact the UX audit predates — a player who collapses the rail inside a breakout has **no way back on screen**. | med, now buildable | A |
 | ~~9~~ | ~~IDENTITY~~ — **the whole item is CLOSED 2026-08-17** ([IDENTITY.md](IDENTITY.md), UX §7.52) | **Rung 1 shipped**: `dice.who.v1` resumes a *lapsed* seat on the same `playerId`, which was also the fix for two bugs on no roadmap item — a held roll whose reveal died with its tab, and your own secret rolls vanishing from your own log. **B1's server half is killed** with a named defect (enrolment is an open keyword, so the entitlement is self-issued whoever carries it). **Rung 2 is closed by Joe's answer**: a stake that outlives its keeper is a different feature wearing goal 11's words, so a gone browser's held roll stays sweepable-unread by design — IDENTITY §7 is the paragraph to close any report of it with. | — | A |
-| 10 | [**T15**](#t15-re-bake-the-three-classic-skins-through-the-forge--large-scoped-2026-08-14) | Owner-commissioned, explicitly not a side quest. **Queued behind #1** — its bar is Joe's eye, and starting three more rounds while seven verdicts are outstanding lengthens the queue instead of clearing it. | large | B |
+| 10 | [**T15**](#t15-re-bake-the-three-classic-skins-through-the-forge--large-scoped-2026-08-14) | Owner-commissioned, explicitly not a side quest. **Un-queued 2026-08-18** — the reason it waited (seven outstanding verdicts) is gone. It is still three rounds that end at his eye, so it goes on the SAME page as #1b's re-asks rather than becoming a second queue. **Do 9c first**: T15 re-bakes the three classic skins, and 9c just changed what edge a standard die wears — baking three skins against the old edge would be three wasted rounds. | large | B |
 | 11 | [**§4b**, **V3**, **V5**, **U28b**'s two refused families](#4b-visibility-refinements--all-four-are-design-first-none-is-a-one-line-fix) | The tail, after triage (2026-08-17): **V4's instrument and U28b's rail foot shipped, and V4's pixel-ratio gap was never real on any day**. What is left is NOT small — §4b is four design-first bullets that all re-verified true, V3 is a sixth wear pass plus a LOOK, V5's hover half has no substrate (no pointer→die path exists at all), and both remaining touch families are priced refusals. The one build item left is V4's draw-budget **assertion**, whose contract is written and sabotage-checked. | design-first + 1 scenario | A |
 | — | everything else | Design-first, record-only, or deliberately deferred. Named in its tier with the reason. | | |
 
@@ -1587,16 +1588,42 @@ node tools/verdict-sheet.mjs        # exits 1 if any frame predates the code it 
 **So a page built before a batch lands is stale by the time the batch lands.**
 Re-render after the merge, not before it.
 
-### W5's LOOK read — OPEN, and it was never actually asked
+### THE SITTING — sat 2026-08-18, and it is the day this tier stopped waiting
 
-Joe's W7 verdict answered a question about the *composition and the model*,
-not about the living layer — nothing in it is about the fireflies or the
-procession. **Recording that distinction rather than banking an approval
-nobody gave.** Re-ask it on frames where the staging is no longer the loudest
-problem. `tools/steps/life-look.mjs` is the loop; a static room is fair to
-photograph once, a moving one is not.
+**Joe went through the page and answered all eight items in one pass.** His
+words are kept verbatim below because they are the specification for
+everything they opened, and because this is the first end-to-end judgement
+this venue work has ever had. Record and consequences in
+[SHIPPED.md](SHIPPED.md).
 
-### W7 ②. The staging — SHIPPED 2026-08-13, VERIFIED 2026-08-15, LOOK OPEN
+| # | item | verdict | his words |
+|---|---|---|---|
+| 1 | W7 ② the staging | **approve** | *"Focus is the dice. This looks perfectly fine."* |
+| 2 | W5 the living layer | **approve** | — |
+| 3 | the round-6 grounded stump | **not yet** | *"It's still a set piece in my eyes… nothing to make it feel rooted."* |
+| 4 | W4 the Witchlight set art | **approve** | — |
+| 5 | the ten voices | heard, 8 of 10 need work | see [AUDIO.md](AUDIO.md) §9 |
+| 6 | C25 Stage 2's location | **approve** | — the build's arithmetic refusal stands |
+| 7 | C27 the cropped felt | **turn `preferDice` on** | |
+| 8 | 9c the standard dice edge | **`round .090`** | the soft candidate, not the ceiling |
+
+**Four approvals close four items** (W7 ②, W5, W4, C25 Stage 2) — including
+one this file was deliberately withholding: the W5 re-ask, recorded as *"never
+actually asked"* rather than banked off the W7 verdict, was asked properly and
+answered.
+
+**Three verdicts are WORK, and the two-word ones are the biggest:** ⑦ and ⑧ are
+each a single instruction with a measured complication behind it (⑦ gains 0 px
+at 390 and was measured as a *loss* at 40d6; ⑧ triples the vertex count of every
+die), and ③ is a re-do of the thing round 6 was already for.
+
+**The lesson for the next sitting: eight verdicts cost him about an hour and
+un-blocked an entire track.** Five separate askings over two weeks had produced
+one. The page is the mechanism (`shots/verdicts.html`, two commands — see
+[the note above](#the-sittings-page-is-rendered-then-built-in-that-order)), and
+the queue should be *refilled to eight and asked once*, never drip-fed.
+
+### W7 ②. The staging — SHIPPED 2026-08-13, VERIFIED 2026-08-15, **APPROVED 2026-08-18**
 
 **This entry said "② has not started". It shipped on 2026-08-13** (`583b569`,
 `c67977f`) with `venue-set` claims. What had never happened was frame-space
