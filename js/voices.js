@@ -302,15 +302,15 @@ export const CLUNK_VOICES = {
   // over the longest comb of the pair, which is the low hollow knock a plank
   // box gives back. (Before the swap this row was `clack 0.35/20`.)
   heartwood: {
-    body: 'clack', weight: 0.35, sustain: 20,
-    shaft: { delayS: 0.0032, combGain: 0.55, mode1Hz: 430, mode2Hz: 860 },
+    body: 'thud', weight: 0.7, sustain: 40,
+    shaft: { delayS: 0.0055, combGain: 0.5, mode1Hz: 300, mode2Hz: 600 },
   },
   // WAS HEARTWOOD'S. Stone gives a die almost nothing back: a short,
   // narrow-band `clack` over the tightest comb of the pair — the tick off a
   // surface with a turret behind it. (Before the swap: `thud 0.7/40`.)
   bastion: {
-    body: 'thud', weight: 0.7, sustain: 40,
-    shaft: { delayS: 0.0055, combGain: 0.5, mode1Hz: 300, mode2Hz: 600 },
+    body: 'clack', weight: 0.35, sustain: 20,
+    shaft: { delayS: 0.0032, combGain: 0.55, mode1Hz: 430, mode2Hz: 860 },
   },
   // METAL, and the only voice in the palette that is not a knock. Joe,
   // 2026-08-18: *"Slightly too shrill / clanky for me.."* — SLIGHTLY, so this

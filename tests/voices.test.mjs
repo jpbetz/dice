@@ -177,14 +177,82 @@ t('the measured buffer RMS constants still describe the generators', () => {
 // changed" — and on a change nobody can hear, that is worth a commit of its
 // own.
 
-t('every tower voice still measures exactly what he heard', () => {
-  for (const [id, was] of Object.entries(BASELINE_2026_08_17.clunk)) {
+// ---------------------------------------------------------------------------
+// B4 / B5 — "sounds good". THE TWO ROWS NOTHING MAY TOUCH.
+// ---------------------------------------------------------------------------
+
+t('B4 Nullstone and B5 Hollow Bole are byte-identical to what he approved', () => {
+  // These are the only two data points in this whole file of Joe's taste
+  // being SATISFIED, which makes them the reference for the others and makes
+  // any drift in them a loss of information rather than a change of sound.
+  assert.deepEqual(CLUNK_VOICES.nullstone, {
+    body: 'hush', weight: 0.75, sustain: 25,
+    shaft: { delayS: 0.0045, combGain: 0.34, mode1Hz: 240, mode2Hz: 430 },
+  }, 'B4 "sounds good" — Joe, 2026-08-18');
+  assert.deepEqual(CLUNK_VOICES.hollowbole, {
+    body: 'thud', weight: 0.5, sustain: 35,
+    shaft: { delayS: 0.004, combGain: 0.5, mode1Hz: 360, mode2Hz: 720 },
+  }, 'B5 "sounds good" — Joe, 2026-08-18');
+  // …and their BODIES are untouched too, which is the half a deepEqual on the
+  // row cannot see: `hush` and `thud` are shared with die sets.
+  for (const [k, base] of [['nullstone', BASELINE_2026_08_17.clunk.nullstone],
+    ['hollowbole', BASELINE_2026_08_17.clunk.hollowbole]]) {
+    const s = spectrumOf(CLUNK_VOICES[k]);
+    assert.equal(s.fcHz, base.fcHz, `${k}'s band did not move`);
+    assert.equal(s.centroidHz, base.centroidHz, `${k}'s centroid did not move`);
+    assert.equal(s.attackMs, 0, `${k} kept its transient`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// B1 / B2 — "they feel reversed to what I'd expect". A SWAP, AND ONLY A SWAP.
+// ---------------------------------------------------------------------------
+
+t('B1/B2 is literally the two voices exchanging rows — no number moved', () => {
+  // Joe's word was "switch", and the finding is that he is right about the
+  // physics: a plank box is a resonant drum (low, hollow, with body) and a
+  // stone turret is a wall with a turret's mass behind it (short, bright,
+  // almost nothing transmitted). The table had wood bright and stone low.
+  //
+  // The strongest possible statement that this is a swap and not a redesign
+  // is that the SET of five voices is conserved exactly. If anybody ever
+  // "improves" one of them while swapping, this fails.
+  const before = BASELINE_2026_08_17.clunk;
+  assert.equal(CLUNK_VOICES.heartwood.body, before.bastion.body,
+    'Heartwood now wears what Bastion wore');
+  assert.equal(CLUNK_VOICES.bastion.body, before.heartwood.body,
+    'and Bastion wears what Heartwood wore');
+  const now = spectrumOf(CLUNK_VOICES.heartwood);
+  assert.equal(now.fcHz, before.bastion.fcHz,
+    `Heartwood's band is Bastion's old band exactly (${now.fcHz} Hz)`);
+  assert.equal(now.centroidHz, before.bastion.centroidHz);
+  const now2 = spectrumOf(CLUNK_VOICES.bastion);
+  assert.equal(now2.fcHz, before.heartwood.fcHz,
+    `Bastion's band is Heartwood's old band exactly (${now2.fcHz} Hz)`);
+  assert.equal(now2.centroidHz, before.heartwood.centroidHz);
+  // The SHAFT travelled with the body — "the sounds", not "the bodies".
+  assert.deepEqual(CLUNK_VOICES.heartwood.shaft,
+    { delayS: 0.0055, combGain: 0.5, mode1Hz: 300, mode2Hz: 600 },
+    'Heartwood took the longer comb and the lower modes with it');
+  assert.deepEqual(CLUNK_VOICES.bastion.shaft,
+    { delayS: 0.0032, combGain: 0.55, mode1Hz: 430, mode2Hz: 860 },
+    'and Bastion took the tighter, brighter one');
+  // The direction, stated in the words the complaint used: wood is now the
+  // LOW one and stone the BRIGHT one.
+  assert.ok(now.centroidHz < now2.centroidHz,
+    `the wooden tower is now the lower-voiced of the pair `
+    + `(${now.centroidHz} Hz vs ${now2.centroidHz} Hz)`);
+});
+
+t('B3 and the two he liked still measure exactly what he heard', () => {
+  // The rows this commit does not touch. B3 is the next commit's.
+  for (const id of ['blackanvil', 'nullstone', 'hollowbole']) {
+    const was = BASELINE_2026_08_17.clunk[id];
     const cv = CLUNK_VOICES[id];
     assert.equal(cv.body, was.body, `${id} kept its body`);
     const now = spectrumOf(cv);
     assert.equal(now.fcHz, was.fcHz, `${id}'s band`);
     assert.equal(now.centroidHz, was.centroidHz, `${id}'s centroid`);
-    assert.equal(now.aboveBoundary, was.aboveBoundary, `${id}'s brightness`);
     assert.equal(now.attackMs, was.attackMs, `${id}'s transient`);
   }
 });

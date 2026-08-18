@@ -306,13 +306,13 @@ const TOWERS = {
       // with idle dust. The mote layer (js/motes.js) keys on this flag via
       // towerSocket — it is a family trait like the ember, not a room fixture.
       motes: true,
-      // Dry wood on wood: a short, narrow-band knock with almost no tail
-      // (js/voices.js CLUNK_VOICES.heartwood). `shaft` is the CHUTE's colour,
-      // not the knock's (docs/AUDIO.md §2.4): a feedforward comb plus two
-      // resonant modes. A 0.4 m chute's 2.3 ms round trip is below the
-      // 128-sample feedback floor, so a true geometric model is
-      // unrepresentable here — this models the colour instead, with no
-      // feedback path and therefore no stability question.
+      // A PLANK BOX IS A DRUM (js/voices.js CLUNK_VOICES.heartwood). This row
+      // and Bastion's EXCHANGED voices on 2026-08-18 — Joe: *"I'd probably
+      // switch the bastion and heartwood sounds, they feel reversed to what
+      // I'd expect"* — so what stands here is what stood on the stone tower
+      // and not one number in the set of five moved. `shaft` is the CHUTE's
+      // colour, not the knock's (docs/AUDIO.md §2.4): a feedforward comb plus
+      // two resonant modes, and it travelled with the body.
       clunkVoice: CLUNK_VOICES.heartwood,
     },
   },
@@ -327,9 +327,10 @@ const TOWERS = {
       // reason it is there — a live flame beside a near-black slot is the
       // strongest value contrast a grey tower has.
       ember: { at: [-0.38, 8.03, 0.54], color: '#ff9040', intensity: 2.4, dist: 4.0 },
-      // Stone: heavier, lower, and it rings on in the shaft afterwards — a
-      // longer chute delay and lower modes than the wooden one (js/voices.js
-      // CLUNK_VOICES.bastion).
+      // STONE GIVES A DIE ALMOST NOTHING BACK (js/voices.js
+      // CLUNK_VOICES.bastion) — a short bright tick off a surface with a
+      // turret's mass behind it, over the tightest comb of the pair. This is
+      // Heartwood's old voice; see that row for the swap.
       clunkVoice: CLUNK_VOICES.bastion,
     },
   },
