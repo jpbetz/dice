@@ -373,8 +373,8 @@ export const CLUNK_VOICES = {
 // of gravity sits — which is exactly what "more white noise / deeper white
 // noise" reports. A PLACE is made of EVENTS: something intermittent, sparse
 // and identifiable, plus slow motion. The bed had an event layer already (the
-// hearth crackle) and it was scaled by u³, so 90% of its pops were below the
-// bed's own hiss and the fae rooms fired an audible one every four seconds.
+// hearth crackle) and it was scaled by u³, so most of its pops were below the
+// bed's own hiss and the glade fired an audible one every three seconds.
 //
 // So the fix is three things, and all three are countable:
 //   1. LEVEL — the bed dials up (see BED_PINK / BED_BROWN below).
@@ -394,7 +394,7 @@ export const CLUNK_VOICES = {
 // old table did not have.
 
 // DIAL FOR JOE — the bed's level. RAISED ×5 (2026-08-18) from 0.003/0.006,
-// which put the whole bed at −59.8 dBFS RMS. ×5 is +14 dB, to ≈−45.8 dBFS:
+// which put the whole bed at −59.8 dBFS RMS. ×5 is +14 dB, to −45.9 dBFS:
 // audible in a quiet room, still ~34 dB under a landing, still the quietest
 // thing in the app by a wide margin.
 export const BED_PINK = 0.015;
@@ -455,7 +455,7 @@ export const VENUE_AUDIO = {
       // law keeps it an isolated highlight without burying it.
       tick: { rate: 4, gain: 1, loHz: 900, spanHz: 2600, q: 3, decayS: 0.03, tone: 0 },
       // THE FIRE BREATHING. A hearth has no wind, so this is the shallowest
-      // of the three: a low broadband lift every ~14 s that says something in
+      // of the three: a low broadband lift every ~13 s that says something in
       // the room is alive. Its band sits UNDER the tick layer (90–300 Hz
       // against 900–3500) so the two never compete for the same seat — the
       // fire's body and the fire's sparks are different sounds.
