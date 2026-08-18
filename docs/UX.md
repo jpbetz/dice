@@ -7031,3 +7031,105 @@ crop on the die nearest the mat's centre, at a fixed seed so a before/after
 pair is the same throw. `tools/out/{cut055,round090}-hero-crop.png` is that
 pair for this change, and the dice sit at identical poses in both, which makes
 "render only" something you can see rather than something you are told.
+
+### §7.58 — Hidden means hidden in EVERY state (2026-08-18)
+
+*§7.21's visibility contract, tested a second time and found to have been
+passing for a reason unrelated to the claim. There is no new pixel here: the
+stylesheet gains one rule that nothing currently triggers, and the value of
+the section is the shape of the mistake rather than the fix.*
+
+#### ① The claim, and what was actually being measured
+
+`hidden-means-hidden` (C20) walks thirty-five ids, puts `.hidden` on each and
+insists the computed display is `none`. It exists because this stylesheet has
+**no bare `.hidden` rule** — every hide is scoped to its own element — so
+`classList.add('hidden')` on an element nobody wrote a rule for is a silent
+no-op that reads exactly like a fix. Four shipped that way once.
+
+Three of those thirty-five rows were proving nothing. They are `none` *without*
+the class:
+
+| id | why it is already hidden | verdict |
+| --- | --- | --- |
+| `#pools-head` | `#pools-head:not(.foreign):not(.profiled):not(.ledgered)` — a lone profile on your own rack | vacuous, but the scoped rule does exist |
+| `#rail-dice` | `#left-panel:not(.collapsed) #rail-dice` | vacuous |
+| `#rail-pools` | `#left-panel:not(.collapsed) #rail-pools` | vacuous — **and covering a live no-op** |
+
+Collapse the panel — one click on the divider, and the state a small viewport
+seeds by default — and `#rail-pools` computes `display: flex` with `.hidden`
+sitting on it. Nothing in `js/main.js` adds the class there today (the rail
+lists are switched with `.rail-list-off`), so no player has ever met this. It
+is a trap laid for the next hand, and the check that was supposed to find
+traps like it was reading green off a rule with nothing to do with the class.
+
+#### ② The remedy is the scoped rule, not the blanket one
+
+C20 refused `.hidden { display: none }` globally and that refusal stands: in a
+4.5k-line sheet where the class means nothing on its own, making it mean
+something everywhere at once is the change this file has been bitten by. So
+the two rail lists get what the other thirty-two already have, next to the
+`.rail-list-off` rule they sit beside:
+
+```css
+#rail-pools.hidden, #rail-dice.hidden { display: none; }
+```
+
+Zero rendered difference, by construction. **The test change is the load-
+bearing half**: the sweep now runs in BOTH panel states and asserts which one
+it is in before it judges. Sabotage-checked — remove the rule and the
+collapsed leg reports `rail-pools (flex)` on its own, which is the property
+that matters, because the way this was found the first time was by accident.
+
+#### ③ How it was found, which is the part worth keeping
+
+It was found by a **fixture** bug, in the most expensive shape a test failure
+takes: it accused the wrong commit. A full sweep came back 219/222 with
+`hidden-means-hidden` and `a11y-modals` red; both passed 1/1 alone.
+
+`framing-keeps-the-deciding-die` drives a phone viewport with the panel
+collapsed, and `setPanelState` writes `dice.panels.v1` — **per-origin**
+localStorage that outlives the room. Its restore already existed and was
+already commented, sitting at the end of its body. That day its desktop leg
+went red on a stale claim, so the restore never ran, and every later
+`localhost` scenario booted collapsed. Measured with the same failure forced:
+
+| | `localhost` after the failing run |
+| --- | --- |
+| before | `dice.panels.v1={"pools":false}`, `#left-panel.collapsed` |
+| after | untouched — `null`, expanded |
+
+Two victims, one leak, and they broke differently:
+
+- `#rail-pools` stopped obeying `.hidden` — the real no-op above, surfaced by
+  accident rather than by the guard written to catch it.
+- `a11y-modals` reported *"the notation box shows focus (outline:none,
+  shadow:none)"* — a sentence about a focus ring, on a build whose focus ring
+  was perfect. `#cmd-input` lives inside `#builder-panel`, which
+  `#left-panel.collapsed` sets to `display: none`; an unrendered input cannot
+  take focus, so `:focus` never matched. The scenario's own comment had
+  already anticipated exactly this failure mode for the *section* toggle and
+  guarded it — and the second subject of the same sentence took a sweep to
+  find.
+
+**Three rules come out of it.** A cleanup only reached when nothing went wrong
+is not a cleanup — it belongs in a `finally`. A scenario that mutates
+per-origin state takes its own origin (the two sibling viewport scenarios
+already did, with comments saying why; this one alone was on `localhost`). And
+a scenario **declares the state it judges** instead of inheriting it: the two
+victims now set the panel state themselves, and `a11y-modals` asserts its
+instrument — the box is on screen, the box took focus — before it asserts its
+subject, so the next dirty world accuses itself.
+
+#### ④ …and the ring assertion was reading the first frame
+
+Caught while fixing ③. `.cmd-in` transitions `box-shadow` over 0.15 s, and the
+old read sampled the computed style immediately after `focus()` — wherever the
+CDP round trip happened to land. Measured at both `rgba(0,0,0,0) 0px 0px 0px
+0px` (t=0) and a part-way `…0.298) 0 0 0 1.70px`. The assertion was
+`shadow !== 'none'`, which the t=0 value passes: **a focus ring authored fully
+transparent at zero spread would have read green forever.** The read now
+finishes the transition (`getAnimations().forEach(a => a.finish())`) and prices
+the ring the eye gets — alpha and spread, both non-zero — which is TESTING.md
+P10's rule about gating the rendered quantity rather than the authored one,
+applied to a quantity nobody had noticed was authored.
