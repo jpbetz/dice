@@ -506,6 +506,52 @@ FRONT_KEEP_TOE = 0.66              # ...but a TOE lives entirely UNDER the
 # table leg no matter how ragged the surface on top of it is.
 ROOT_HEADINGS = (-1.00, +0.92, -1.55, +1.75, -2.75, +2.20)
 
+# THE SHOULDER LADDER — round 10, and it is what stops the hem being a hem.
+#
+# Every root used to leave the trunk at the SAME height, because every root
+# read the same `toe_h`, whose zero is at y 0.92. Six feet dying on one level
+# circle is a hem however ragged each foot is in plan, and it is exactly what
+# the frame showed: one continuous, evenly-pleated collar of wood at a
+# constant height, tucking under to a smooth rolled edge on the soil.
+#
+# So each root now carries its OWN shoulder, by rank against ROOT_HEADINGS
+# above, chosen rather than hashed (this file has twice recorded what the hash
+# picks not being what the frame needs — R1's roots, round 7's spires):
+#
+#   -57 deg  1.42   the front-left diagonal, and the TALLEST on purpose: it
+#                   carries the lower-front mass the sill apron used to (see
+#                   r_out), so the wood runs unbroken from the soil up to the
+#                   wound's lower corner — "the ground rises in a root-bound
+#                   bank to the tear in the trunk", which is the sentence
+#                   VENUE-COMPOSITION rule 12 passes.
+#   +53 deg  1.02   its opposite number, and DELIBERATELY 0.40 shorter: a
+#                   matched pair either side of the doorway is the mirrored
+#                   read round 7 spent itself removing from the crown. 0.40 is
+#                   also what keeps the two KNEES from overlapping — each turn
+#                   into the trunk is a stretch of up-facing wood, and two of
+#                   them at the same height across the front is the ring in
+#                   miniature (measured: at 1.15 they shared 0.78..1.42).
+#   -89 deg  0.55   the flanks are where the mat wall is closest, so they are
+#   +100 deg 0.92   short-reaching anyway; the ladder makes them different
+#                   heights as well as different lengths.
+#   -158 deg 0.38   the back pair barely stand at all — a root that hardly
+#   +126 deg 0.74   leaves the trunk is what makes the ones that do read as
+#                   individuals rather than as a fluted skirt.
+#
+# Spread 0.38..1.42 with a minimum gap of 0.14 and no two within 0.10, which
+# assert_the_flare_is_not_a_skirt re-measures on the BUILT MESH rather than
+# trusting this tuple.
+ROOT_SHOULDER = (1.42, 1.02, 0.55, 0.92, 0.38, 0.74)
+# ...and how far each one actually runs, as a fraction of its own mat budget.
+# Round 9 gave every root 0.86-1.05 of `grip`: they all reached as far as the
+# wall let them, which is a second way of saying they all reached the same
+# place. A root system's arms differ by a factor of two or more.
+ROOT_REACH = (1.00, 0.86, 0.55, 0.78, 0.44, 0.62)
+# The share of a root's reach spent on the WEB (the part that climbs) rather
+# than on the foot. One budget, split at build time — which is what lets
+# flare() be full-strength on the soil without the pair blowing XLIM.
+WEB_SHARE = 0.34
+
 # THE ROOT-FLARE FINGERS (round 6). Seven narrow ridges INTERLEAVED between
 # the six buttress headings, budgeted against the same mat wall and running
 # out along the soil — the flare's job is to GRIP, and six heavy feet with
@@ -538,10 +584,12 @@ ROOT_HEADINGS = (-1.00, +0.92, -1.55, +1.75, -2.75, +2.20)
 # (c) are not mirrored.
 FINGER_HEADINGS = (-1.22, +1.16, -1.95, +1.83, -2.42, +2.55, -2.88)
 FINGERS = []                       # filled after r_out exists — see build_fingers
-FINGER_Y0 = SHELL_FLOOR            # longest at the buried row...
-FINGER_LEN = 0.62                  # ...and gone by y 0.53, well under the
-#                                    exit gate's floor (1.0875) and under the
-#                                    berm's lane, which covers the front
+# ROUND 10 GAVE THEM A LADDER TOO. FINGER_Y0/FINGER_LEN were one pair of
+# constants for all seven, so every finger's crest passed under the soil at
+# exactly y 0.53 — a second level circle inside the first one. These are their
+# own shoulders, none of them level with a buttress shoulder above, so the
+# ground line has fourteen different heights on it instead of two.
+FINGER_SHOULDER = (0.62, 0.28, 0.44, 0.81, 0.20, 0.51, 0.35)
 
 # How far in front of the socket plane a TOE may creep. ZERO since r3, and
 # the number that made it cheap is a measurement rather than a preference.
@@ -673,13 +721,24 @@ def build_ridges():
         # Round 2's first cut budgeted the foot and the web separately, both
         # peaking on the felt, and their sum overshot XLIM: the clamp then
         # planed the pair into a flat vertical wall over ten degrees of arc
-        # at each front diagonal — machined, not grown. flare() now holds the
-        # web off the ground so the two pieces of wood take turns, and grip
-        # is the single number they share.
+        # at each front diagonal — machined, not grown.
+        #
+        # ROUND 10 SPLITS IT INSTEAD OF STAGGERING IT. Round 7's answer was
+        # flare()'s shoulder — hold the web off the soil so the two pieces of
+        # wood take turns in HEIGHT — and that shoulder is the bell this round
+        # exists to remove. The two now take turns in SHARE: WEB_SHARE of the
+        # grip climbs, the rest lies on the soil, and their sum is `grip`
+        # identically at every row. The clamp has nothing to plane and the
+        # widest wood is on the ground, which is the whole point.
         grip = max(0.34, min(1.52, min(room_x, room_z) - 0.11))
+        grip *= ROOT_REACH[rank]
         R["root"] = True
-        R["butt"] = min(0.95, grip * (0.82 + 0.22 * h01(i, 139))
-                        * (1.0 - 0.06 * rank)
+        # ...and each root leaves the trunk at its OWN height (ROOT_SHOULDER).
+        # The knee scales with the shoulder because a tall buttress turns into
+        # the trunk over a longer run than an ankle-high toe does.
+        R["y0"] = ROOT_SHOULDER[rank]
+        R["knee"] = 0.20 + 0.22 * (R["y0"] / 1.45)
+        R["butt"] = min(0.95, grip * WEB_SHARE * (0.86 + 0.28 * h01(i, 139))
                         * smoothstep(abs(th), FRONT_KEEP, 0.98))
         R["w"] = max(R["w"], 0.16)
         # A TOE IS NARROW. Round 1's foot was a gaussian 2.3x the fin's
@@ -688,7 +747,7 @@ def build_ridges():
         # summed into one continuous skirt. Compact support at 0.23-0.32 rad
         # puts a true zero between neighbours — and 0.23 rad is still 5.3
         # columns at NPHI 72, so the foot is a mass and not a spike.
-        R["toe_len"] = (grip * (0.86 + 0.19 * h01(i, 131))
+        R["toe_len"] = (grip * (1.0 - WEB_SHARE)
                         * smoothstep(abs(th), FRONT_KEEP_TOE, 0.94))
         R["toe_w"] = 0.23 + 0.09 * h01(i, 133)
         R["toe_off"] = (h01(i, 137) - 0.5) * 0.26
@@ -734,15 +793,16 @@ def build_ridges():
     return ridges
 
 
-def finger_h(y):
-    """A finger's length with height: longest at the buried row, gone by 0.53.
+def finger_h(y, G):
+    """A finger's reach with height — the same plateau-and-knee a buttress
+    root gets (root_env), at a finger's scale and at ITS OWN shoulder.
 
-    toe_h peaks at the FELT and this peaks 0.11 under it, which is the whole
-    difference between a foot lying on the soil and a root going into it. The
-    outermost wood a finger owns is therefore never visible; what is visible
-    is the shoulder above it, narrowing as it goes out.
+    Round 6's version took one FINGER_Y0/FINGER_LEN pair for all seven, so
+    every finger's crest passed under the soil at y 0.53 and the seven of them
+    drew one more level circle on top of the roots'. The knee is smaller than a
+    buttress's (0.16) because a finger is thinner wood and turns tighter.
     """
-    return max(0.0, 1.0 - (y - FINGER_Y0) / FINGER_LEN) ** 1.05
+    return root_env(y, G["y0"], 0.16)
 
 
 def crest_at(R, y):
@@ -767,47 +827,112 @@ def blade(d, w):
 
 
 def flare(y):
-    """Buttress WEB reach with height — and it deliberately does NOT peak on
-    the ground.
+    """Buttress WEB reach with height — and since ROUND 10 it is WIDEST ON THE
+    SOIL, which is the whole of that round.
 
-    The web and the foot are two different pieces of wood and they were
-    fighting over the same radius: both at full strength on the felt, their
-    sum ran past the mat's x limit and the clamp planed the pair flat. Real
-    buttresses do not look like that either — the foot is the whole story
-    where it touches the soil, and the web takes over as the foot dies and
-    climbs to the waist. The shoulder at 0.05-0.62 is where they hand off,
-    and it is what lets each be budgeted against XLIM on its own.
+    Joe, on round 9's frame: the flare is *the shape*. Measured on the bake
+    that collected that verdict: at 38 of 72 headings the model's widest wood
+    stood ABOVE y 0.15 — at +-50 deg it peaked at y 0.77 and then tucked back
+    IN by 0.44 on its way down to the felt. A form whose maximum girth is
+    above its hem, with the material curving under it, is a BELL. That is the
+    definition of a skirt and no amount of paint argues with it; round 4
+    (tongue albedo), round 6 (more fingers) and round 9 (a ground multiply on
+    the same wood) each moved a number on a surface that was the wrong shape.
 
-    ROUND 7 STRETCHED ITS REACH. At 3.30 with a 1.55 power the web was dead
-    by y 3.3 and had spent most of itself under y 1.5, which is a ring of
-    bumps at the ankle rather than a base that flares — and a flare living in
-    one unit of height cannot read as the bottom of a taper that runs twelve.
-    4.60 with a 1.30 power spreads the same wood over three times the height:
-    0.83 / 0.60 / 0.25 at y 0.62 / 1.5 / 3.0 where it used to be 0.72 / 0.39 /
-    0.02. Re-budgeted against XLIM in build_ridges, whose head allowance reads
-    the (fatter) base(0), so no root reaches further into the mat than before.
+    The cause was this function's own shoulder, and it was honestly earned:
+    `smoothstep(y, 0.05, 0.62)` held the web OFF the ground so the web and the
+    foot would not both spend the mat's x budget at the same row and get
+    planed flat by the clamp (round 2's machined face). It worked, and it put
+    every unit of web the model owns between y 0.6 and y 1.5 — a ring of wood
+    at the ankle with clear air under it.
+
+    The budget conflict is real; the shoulder was the wrong way to spend it.
+    Round 10 gives each root ONE reach (`grip`) split between web and foot at
+    build time (see build_ridges), so the two cannot sum past the wall by
+    construction and neither needs to be held off the soil to prove it. What
+    is left here is a plain monotone fall: full strength on the buried row,
+    0.79 at y 0.75, 0.48 at 2.0, gone at 4.60.
     """
-    return smoothstep(y, 0.05, 0.62) * max(0.0, 1.0 - y / 4.60) ** 1.30
+    return max(0.0, 1.0 - y / 4.60) ** 1.30
 
 
-def toe_h(y):
-    """The FOOT, and it is a different animal from the fin.
+# THE ROOT ENVELOPE — round 10, and it is the shape of the answer.
+#
+# A ROOT IS A HALF-BURIED CYLINDER, NOT A CONE. The retired `toe_h` was
+# `(1 - y/0.92)**0.85`: reach falls from the first millimetre, so |dr/dy| at
+# the soil is ~1.0 and the wood's own surface faces UP. Under this venue's key
+# — a spotlight 22 units straight overhead — an up-facing surface takes the
+# light at full N.L while the trunk's vertical wall takes it at a graze, so
+# the flare rendered as the brightest structure on the model at exactly the
+# height a stump should be darkest. Round 9 wrote that sentence down and then
+# fought it with a multiply. It is a normal, and a normal is geometry.
+#
+# So: FULL REACH from the buried row up to this root's own shoulder, then a
+# rounded turn back into the trunk over `knee`. The flank the eye sees at the
+# soil is VERTICAL (|dr/dy| = 0 exactly, over most of the root's height), and
+# the only up-facing wood is the knee itself — narrow, and, because every root
+# carries a different `y0`, never joined into a ring.
+#
+# The knee is not a chamfer: smoothstep is C1 at both ends, so the turn is a
+# shoulder of wood and not the machined step a linear ramp would leave.
+def root_env(y, y0, knee):
+    return 1.0 - smoothstep(y, y0 - knee, y0)
 
-    Round 1 faded the foot over 1.15 units with a 1.35 power, which is the
-    skirt of a cone: at y 0.6 it was still at half strength, so the mass it
-    added was at the ANKLE, not on the ground, and the ground line itself
-    barely moved. A buttress toe is a finger of wood LYING ON THE SOIL. It
-    has to be low enough that the silhouette event happens where the model
-    meets the felt, and it has to END — the shoulder at 0.78 is what lets the
-    valley beside it be a valley.
 
-    0.92 is also a clearance: the exit gate's floor is 1.0875, so no toe can
-    ever be the thing that blocks the door. It was 0.78 until the first
-    round-2 look — the feet were there and correct and simply too low to
-    clear the delivery tongue's own shoulder, which stands at 0.5-1.0 across
-    the whole front and hid them from the one camera that has to see them.
+def bay_top(phi):
+    """THE HEIGHT THE SOIL BETWEEN TWO ROOTS COMES BACK UP TO — and it is the
+    ROOTS' height, not a constant. This is round 10's second correction and it
+    was caught by looking, not by arithmetic.
+
+    The first cut gave the bay a plain ground-referenced envelope closing at a
+    fixed y 1.05. Rendered against the venue's own key — a spot straight
+    overhead, so brightness IS |n.y| — that produced ONE CONTINUOUS LIT BAND
+    right across the front at a constant height: worse than the thing the round
+    exists to remove, because the cut's own ceiling is a near-horizontal
+    surface and a constant ceiling is a ring. Round 9 never showed it only
+    because its feet died at 0.92 and its valley closed at 0.92, so the lobes
+    filled the ceiling back in at exactly the row it appeared.
+
+    So the bay's ceiling is INTERPOLATED BETWEEN ITS TWO OWN NEIGHBOURS, and
+    it has to be that rather than a blend: a gaussian wide enough to be smooth
+    (0.75 rad, against roots ~1.0 rad apart) averages six shoulders into very
+    nearly their mean, and the render came back with the same stripe 0.15
+    thinner. Bracketing the heading between the two adjacent roots and
+    smoothstepping between their y0 gives the full 0.38..1.42 swing, hits each
+    root's own shoulder exactly at its own heading, and is C1 everywhere.
+
+    0.88 of it: the soil between two buttresses lies a little below the wood
+    that flanks it, which is what makes the flank read as a flank.
     """
-    return max(0.0, 1.0 - y / 0.92) ** 0.85
+    hs = sorted((R["th"], R["y0"]) for R in RIDGES if R["root"])
+    n = len(hs)
+    # ...AND THE CEILING WANDERS ON ITS OWN, which is the round's third
+    # correction and the one the frame demanded twice.
+    #
+    # Interpolating cleanly between two roots is a SINGLE SWEEP, and across the
+    # front arc there are only two roots to sweep between (-57 and +53 deg —
+    # FRONT_KEEP forbids a fin any nearer the doorway and the socket's front
+    # plane flattens the middle of it anyway). Measured at the resting eye on
+    # the build that had only the interpolation: the lit band under the door
+    # ran unbroken from one diagonal to the other, peaking at world y 0.62,
+    # and read as a pleated collar exactly as round 9's did — a hem is a hem
+    # whether its height is a constant or a smooth ramp. Nine lattice points of
+    # periodic noise at +-0.30 puts three or four rises and falls across that
+    # arc instead of one, so the ceiling breaks into separate lit patches.
+    #
+    # n1p, not fbm_ring: this has to be PERIODIC in phi to the last bit or the
+    # bay ceiling steps at the seam behind the tree, and it wants one clean
+    # wavelength rather than a spectrum.
+    wob = 0.30 * (n1p(phi, 9, SEED + 71) - 0.5) * 2.0
+    for k in range(n):
+        a, b = hs[k], hs[(k + 1) % n]
+        span = (b[0] - a[0]) % (2.0 * math.pi)
+        t = (phi - a[0]) % (2.0 * math.pi)
+        if t <= span:
+            return max(0.20, 0.88 * lerp(a[1], b[1],
+                                         smoothstep(t / max(span, 1e-6),
+                                                    0.0, 1.0)) + wob)
+    return max(0.20, 0.88 * hs[0][1] + wob)
 
 
 # --------------------------------------------------------------------------
@@ -1049,22 +1174,35 @@ def valley(phi, y):
     Subtracted from the inner surface as well as the outer, for two reasons.
     The wall then keeps its thickness, so no valley can become the thin spot
     a boolean fails on. And it costs nothing to be honest: every valley lives
-    under y 0.78 and the debris floor caps at 0.86, so no part of the liner
-    this touches is ever visible.
+    under y 1.05 and the debris floor caps at 0.86, so the only stretch of
+    liner this reaches at all is inside the doorway's own shadow.
 
     Gated to |phi| > 0.66 — the lower-front mass is R2's business and must
     not be hollowed out to make R1's valleys.
+
+    ROUND 10 UNPINNED IT FROM `toe_h` AND RE-PINNED IT TO THE ROOTS. The bay
+    used to ride the same envelope the feet did, so the soil between the roots
+    came back up to the trunk at exactly the height the roots left it: one hem,
+    cut on both sides of the same circle. It closes at `bay_top(phi)` now — a
+    blend of the neighbouring roots' own shoulders — so a bay beside the tall
+    front-left buttress stays open to 1.25 and one beside the ankle-high back
+    root closes at 0.33, and the surface the cut leaves overhead is a curve
+    with a metre of swing rather than a level ceiling. (See bay_top for the
+    render that caught the level version; it was WORSE than round 9's.)
+    0.58 where round 6 cut 0.52: the web no longer refills the valley from
+    above, so the same visual depth costs a little more wood.
     """
-    th_ = toe_h(y)
-    if th_ <= 0.0:
+    b = root_env(y, bay_top(phi), 0.42)
+    if b <= 0.0:
         return 0.0
     tmax = 0.0
     for R in RIDGES:
         if not R["root"]:
             continue
         dt = angdist(phi, crest_at(R, y) + R["toe_off"])
-        tmax = max(tmax, blade(dt, R["toe_w"] * 1.35))
-    return 0.52 * th_ * (1.0 - tmax) * smoothstep(abs(phi), 0.66, 1.02)
+        tmax = max(tmax, blade(dt, R["toe_w"] * 1.35)
+                   * root_env(y, R["y0"], R["knee"]))
+    return 0.58 * b * (1.0 - tmax) * smoothstep(abs(phi), 0.66, 1.02)
 
 
 def r_out(phi, y):
@@ -1079,26 +1217,52 @@ def r_out(phi, y):
         # stood at half strength where they met, which is how six buttresses
         # add up to one cone. The web gets blade()'s hard shoulder; the fiber
         # ridge keeps crest(), because a furrow that ends is a scar.
-        r += R["butt"] * fl * blade(d, R["w"] * 1.75)
-        r += fib * (0.35 + 0.65 * (1.0 - fl)) * crest(d, R["w"])
-    # THE FEET, compactly supported so that "no foot here" is a real zero.
-    th_ = toe_h(y)
-    if th_ > 0.0:
-        for R in RIDGES:
-            if not R["root"]:
-                continue
-            dt = angdist(phi, crest_at(R, y) + R["toe_off"])
-            r += R["toe_len"] * th_ * blade(dt, R["toe_w"])
+        # THE WEB CLIMBS THIS ROOT'S OWN FLANK. It used to ride the shared
+        # flare(y) alone, which meant every buttress web died at the same
+        # height; multiplying by this root's envelope makes the web part of
+        # the same object as the foot under it instead of a separate ring.
+        # The 0.30 floor is what keeps a BUTTRESS a buttress: 70% of the web
+        # belongs to the foot's own shoulder and dies with it, and the last
+        # 30% carries on up to the waist on flare(y) alone, so the root still
+        # merges into the trunk rather than stopping at a step. Blended, not
+        # max()'d — a max leaves a crease along one row of the loft.
+        wk = 0.0
+        if R["root"]:
+            wk = (fl * (0.30 + 0.70 * root_env(y, R["y0"], R["knee"]))
+                  * blade(d, R["w"] * 1.75))
+            r += R["butt"] * wk
+        # ...AND THE SUPPRESSION IS LOCAL, which round 10 had to fix the moment
+        # flare() stopped being zero on the soil. This term reads "quieten the
+        # grain where the web is doing the talking", and it used to ask the
+        # GLOBAL flare(y) — fine while that was ~0 at the felt, and an
+        # inverted taper the instant it was 1.0 there: every column, root or
+        # not, lost 65% of its grain on the ground and grew it back with
+        # height, which put the widest wood at y 1.05 on the whole back arc
+        # where there is no buttress at all. `wk` is this ridge's own web at
+        # this exact (phi, y), so the trade happens where the wood is.
+        r += fib * (0.35 + 0.65 * (1.0 - wk)) * crest(d, R["w"])
+    # THE FEET, compactly supported so that "no foot here" is a real zero —
+    # and each one on its own plateau-and-knee (root_env), so the ring of wood
+    # they make together has six different top edges instead of one.
+    for R in RIDGES:
+        if not R["root"]:
+            continue
+        e = root_env(y, R["y0"], R["knee"])
+        if e <= 0.0:
+            continue
+        dt = angdist(phi, crest_at(R, y) + R["toe_off"])
+        r += R["toe_len"] * e * blade(dt, R["toe_w"])
     r -= valley(phi, y)
     # THE ROOT FLARE (round 6) — after the valley, and that is the point.
     # These sit BETWEEN the buttresses, where valley() has just taken 0.52 of
     # wood back out; a finger 0.3-0.6 proud leaves a cut valley with a ridge
     # running through it instead of a refilled skirt.
-    fh = finger_h(y)
-    if fh > 0.0:
-        for G in FINGERS:
-            dg = angdist(phi, G["th"] + G["off"] * (1.0 - fh))
-            r += G["len"] * fh * blade(dg, G["w"])
+    for G in FINGERS:
+        fh = finger_h(y, G)
+        if fh <= 0.0:
+            continue
+        dg = angdist(phi, G["th"] + G["off"] * (1.0 - fh))
+        r += G["len"] * fh * blade(dg, G["w"])
     # THE JAMBS ARE THICK. The wound's side faces are radial, so the wall's
     # thickness at the jamb IS the depth the eye reads at the mouth's edge.
     # Round 1 measured 0.30 sRGB on the cut face against 0.23 on the liner
@@ -1110,31 +1274,44 @@ def r_out(phi, y):
     # It is held OFF THE GROUND on purpose. |phi| 1.30 is also where the
     # valley between each front-diagonal foot and its flank neighbour falls,
     # and a swell that reached the felt filled that valley back in — R2
-    # quietly undoing R1. Coming in at y 0.55 and peaking through 1.3-2.4
+    # quietly undoing R1. Coming in at y 0.95 and peaking through 1.3-2.4
     # puts the wood exactly where the mouth's lower corners are and nowhere
     # near the feet.
+    # ROUND 10 RAISED ITS ONSET FROM 0.55. The swell's rising edge is an
+    # up-facing shoulder wherever it happens, and at 0.55 that shoulder was
+    # inside the flare band, adding a third level ring to the two this round
+    # removed. Above the sill (1.00) it is a burl at the mouth's corner, which
+    # is trunk and reads as trunk.
     jam = math.exp(-0.5 * ((abs(phi) - 1.30) / 0.28) ** 2)
-    r += (0.34 * jam * smoothstep(y, 0.55, 1.30)
+    r += (0.34 * jam * smoothstep(y, 0.95, 1.55)
           * (1.0 - smoothstep(y, 2.6, 5.8)))
-    # THE SILL APRON — two lobes of wood flanking the doorway just under the
-    # threshold, and it does three jobs at once.
+    # THE SILL APRON IS DELETED — round 10, and it was the single biggest
+    # up-facing surface on the model.
     #
-    # It is the lower-front MASS R2 asks for, put where a hollow stump
-    # actually keeps it (beside the opening, not across it). It SEATS the
-    # delivery tongue: measured on round 1, the tongue's rolled shoulder
-    # overhung a 0.6-1.3 crevice all along its outer edge because the trunk's
-    # wall at |x| 2.6 stood almost a unit further back, and that shadowed
-    # slot is where frame 11's black rectangle was. And it is centred at
-    # |phi| 0.84 rather than at 0 so the front face never touches ZFRONT —
-    # a swell across the middle would be planed into a flat board by the
-    # socket clamp, which is the failure this whole model exists to undo.
-    # 0.84 at |phi| 0.90, and both numbers are the measurement talking: the
-    # crevice at the junction was 0.49 deep with a 0.52 apron centred at
-    # 0.84, and moving the centre out is what keeps phi 0.5 off the ZFRONT
-    # clamp while the lobe still reaches the tongue's edge heading.
-    ap = math.exp(-0.5 * ((abs(phi) - 0.90) / 0.28) ** 2)
-    r += (0.84 * ap * smoothstep(y, 0.35, 0.85)
-          * (1.0 - smoothstep(y, 0.60, 1.55)))
+    # It was a gaussian lens in phi at |phi| 0.90 times a LENS IN y:
+    # smoothstep(0.35, 0.85) rising, (1 - smoothstep(0.60, 1.55)) falling.
+    # A lens in y is a bulge with its maximum in mid-air — measured on the
+    # round-9 bake, +-50 deg peaked at y 0.77 and carried 0.44 of tuck back in
+    # underneath it, and because the lobe is wide and smooth in phi the two
+    # sides joined across the front into one continuous collar around the
+    # doorway. That collar, lit at full N.L by a key straight overhead and
+    # sampled by 72 loft columns, is the pleated skirt in Joe's frame.
+    #
+    # It had three jobs and two of them are dead. It SEATED THE DELIVERY
+    # TONGUE — the tongue was deleted in round 8 (`bareColliders`), so that
+    # crevice does not exist. It filled the CREVICE AT THE JUNCTION — same
+    # thing, same deletion. What survives is R2's LOWER-FRONT MASS, and a root
+    # is a better carrier of it than an apron: ROOT_SHOULDER gives the two
+    # front diagonals (-57 deg, +53 deg — within 0.09 rad of where this lens
+    # was centred) shoulders at 1.42 and 1.15, so the same wood now stands in
+    # the same place as one continuous run from the soil to the wound's lower
+    # corner instead of as a separate lobe floating over a hem. One job per
+    # shape (/new-tower §1b), and the job goes to the shape that was already
+    # there.
+    #
+    # assert_the_flare_is_not_a_skirt is what stops this coming back: any term
+    # whose maximum is above the soil fails it, by construction rather than by
+    # anyone remembering this paragraph.
     # The spires lean OUT above the rim. Two duties in one term: torn fibers
     # splay rather than curl in, and the approach column stays clear without
     # having to be defended by a clamp.
@@ -1154,7 +1331,27 @@ def r_out(phi, y):
     # left running they are twice the thing they are riding on and the tip
     # keeps a chisel edge however hard the summit is split. The liner's ribs
     # fade over the same last unit, in r_in.
-    r += ((0.085 * fbm_ring(phi, y * 0.30, 9.0, SEED + 2, 3) - 0.034)
+    # ...AND THEY GET COARSER AT THE FOOT — round 10, and it is the pleats.
+    #
+    # k 9 over three octaves is ~11 deg of feature, which at 72 columns is TWO
+    # COLUMNS. Up the trunk that is exactly right: a vertical wall crossed by
+    # a two-column ripple reads as grain, and smooth_by_angle keeps it soft.
+    # Lying almost FLAT at the foot the same ripple is a comb of radial creases
+    # converging on the axis — the pleats in Joe's frame, and the reason the
+    # base read as fabric rather than as wood however the mass under it was
+    # arranged. Same amplitude, a third of the frequency (k 3.2, two octaves,
+    # ~35 deg of feature) below y 0.2, blended back to the trunk's own grain by
+    # y 1.05, so nothing at or above the wound's sill changes at all.
+    #
+    # THE BLEND'S CEILING IS SET BY THE TAPER GATE, not by taste. At 2.00 the
+    # coarse field's crests land where the outline is judged and
+    # assert_taper_is_a_stump refused the bake: "widens at y 1.2, 2.956 ->
+    # 3.005" and again at 1.5. A different noise phase at the same amplitude is
+    # a different silhouette, and the silhouette has a law. Under the sill the
+    # outline is the roots' and the coarse field rides inside it.
+    fine = fbm_ring(phi, y * 0.30, 9.0, SEED + 2, 3)
+    broad = fbm_ring(phi, y * 0.30, 3.2, SEED + 2, 2)
+    r += ((0.085 * lerp(broad, fine, smoothstep(y, 0.20, 1.05)) - 0.034)
           * (1.0 - smoothstep(y, y_top(phi) - 0.95, y_top(phi) - 0.10)))
     # THE CHEEK'S GROOVES (see CHEEK_Y). Subtractive only — the crest line is
     # the outline, and item 8 forbids a local maximum above the foot.
@@ -1216,6 +1413,7 @@ def build_fingers():
             "len": grip * (0.50 + 0.28 * h01(k, 151)),
             "w": 0.155 + 0.055 * h01(k, 153),
             "off": (h01(k, 155) - 0.5) * 0.22,
+            "y0": FINGER_SHOULDER[k],
         })
     return out
 
@@ -3306,6 +3504,276 @@ def outline_peaks(prof, prom):
     return out
 
 
+# --------------------------------------------------------------------------
+# THE ROUND-10 GATE — the flare, measured as a SOLID OF REVOLUTION would fail
+# --------------------------------------------------------------------------
+# Round 7 put the crown's law in the frame. This is the same move at the other
+# end of the model, and it is stated in the three quantities that separate a
+# root system from a skirt. All three are read off the BUILT MESH's vertices
+# (post-boolean, so they cannot be a restatement of the constants that
+# generated them) and binned by heading.
+# THE BASE BAND, and its ceiling is the CONTRACT's, not a taste call: the exit
+# gate's floor is THROAT_Y0 = 1.0875, so everything under it is the flare's
+# business and everything over it is the doorway's. The jamb swell (|phi| 1.30,
+# onset 0.95) and the wound's own lower lip both live above the line and are
+# trunk, not flare — measured, including them put six ±75 deg headings on the
+# bell list for a burl at the mouth's corner.
+FLR_Y1 = 1.05
+FLR_BAND = 0.10          # height bin
+# THE ARC A PLAYER CAN SEE. This is a screen-space verdict ("a set piece"),
+# and the tower is socketed at the back wall: past ~110 deg the surface is
+# behind the trunk from every shipped eye, and the model's own back is inside
+# the glade's dark. Judging it would be judging pixels that do not exist.
+FLR_ARC = 1.92           # rad, ~110 deg either side of front
+# HOW MUCH WOOD OUTSIDE THE TRUNK COUNTS AS FLARE AT ALL. 0.30 is 12 px at
+# the resting eye (a world unit is ~42 px there) and about a quarter of the
+# longest root, and it is what separates two different KINDS of column rather
+# than two amounts of the same one. At 0.12 this gate reports three findings on
+# this build — bay walls at +78/+103/-108 deg whose whole excursion is 0.13 to
+# 0.28 — against thirteen on round 9's field running 0.34 to 1.21, which is the
+# skirt itself. Both numbers are printed every bake; the threshold is stated
+# here rather than buried so the next round can argue with it.
+FLR_MIN_PROUD = 0.30
+FLR_TOP_Y = 0.25         # where the widest wood has to be
+FLR_TOP_TOL = 0.10       # ...or within this much of the widest, at the soil
+# THE KNEE is measured over a TALLER band than (a) is judged in, because it is
+# the one quantity that has to be able to say "this root goes on past the
+# doorway's floor". Capped at 1.90 so the answer stays a number.
+FLR_HEM_Y1 = 1.90
+# ...and 0.40 is the WEAKER of the two gates, stated with both its numbers so
+# nobody has to trust it blind: this build measures 0.50 and round 9's field
+# 0.20. It is evidence rather than a floor (the rejected shape fails it), but
+# it is a 2.5x separation on nine headings, where (a) is 0 against 13-of-13.
+FLR_HEM_SPREAD = 0.40
+# THERE IS NO THIRD GATE, AND THAT COST THREE DRAFTS. The obvious way to state
+# "it is a pleated shelf" is to count up-facing wood, and every form of that
+# count turned out to be a FLOOR in VENUE-COMPOSITION rule 15a's sense — the
+# rejected shape passes it too. Recorded rather than hidden, because the next
+# person will reach for the same three:
+#
+#   AREA — "what share of the base band faces up": 13.2% here against 16.7% on
+#   round 9's field. A 1.26x separation with a threshold that would have to be
+#   hand-placed between two measured values is a number chosen to pass. It is
+#   arithmetically floored anyway: a root reaching 0.7 out of the trunk has to
+#   turn back in over SOME run, and a run long enough not to face up is a cone.
+#
+#   RING — "how far does one up-facing surface run around the trunk at one
+#   height": 6 columns here, 4 on round 9's. It measures the same on both.
+#
+#   CONCENTRATION — "what share of the up-facing rows sit in the busiest 0.30
+#   of height": 52% here, 52% on round 9's. Identical to the percent.
+#
+# So the shelf is REPORTED (the print below carries both numbers, declared as a
+# floor) and the two claims that do separate are the ones that gate. That is
+# the honest shape of the finding: what changed between the two bakes is not
+# how much wood faces the sky — it is WHERE the wood's maximum is and whether
+# the roots end together.
+FLR_CONC_WIN = 3         # bands, i.e. 0.30 of height — reported, not gated
+
+
+def socket_r(phi, y):
+    """The radius clamp_point will hold the surface at, at this (phi, y) — the
+    mat wall or the socket's front plane, whichever binds first."""
+    r = 9.9
+    sp, cp = abs(math.sin(phi)), math.cos(phi)
+    if sp > 0.06:
+        r = min(r, x_limit(phi, y) / sp)
+    if cp > 0.25:
+        r = min(r, (ZFRONT - AXIS_Z) / cp)
+    return r
+
+
+def flare_bins(segs):
+    """(heading bin, height band) -> the OUTER surface's radius there.
+
+    EDGES, NOT VERTICES, for exactly the reason outline_of records: the shell's
+    own rows in this band are 0.02 / 0.14 / 0.30 / 0.46 / 0.62 / 0.80 / 1.05 /
+    1.60, so a 0.10 band lands between two rows more often than on one. Binning
+    vertices alone left two thirds of the bands empty and reduced the whole
+    visible arc to four judgeable headings — a red check on four samples. Every
+    edge is rasterised into the bands and columns it spans.
+
+    The liner is dropped by radius rather than by name: wall(y) is 0.60 at the
+    foot and never under 0.15, so base(y) - 0.30 is a clean cut between the two
+    surfaces at every row this gate looks at.
+    """
+    grid = {}
+
+    def put(x, y, z):
+        if y < SHELL_FLOOR - 0.01 or y > FLR_HEM_Y1:
+            return
+        r = math.hypot(x, z - AXIS_Z)
+        if r < base(y) - 0.30:
+            return
+        i = min(int((math.atan2(x, z - AXIS_Z) + math.pi)
+                    / (2 * math.pi) * NPHI), NPHI - 1)
+        k = int(math.floor((y - SHELL_FLOOR) / FLR_BAND))
+        if r > grid.get((i, k), 0.0):
+            grid[(i, k)] = r
+
+    for a, b in segs:
+        n = max(1, int(abs(b[1] - a[1]) / (FLR_BAND * 0.5)) + 1,
+                int(math.hypot(b[0] - a[0], b[2] - a[2]) / 0.10) + 1)
+        for s in range(n + 1):
+            t = s / n
+            put(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t,
+                a[2] + (b[2] - a[2]) * t)
+    return grid
+
+
+def flare_findings(grid):
+    """The three numbers, and the headings that break each one."""
+    nk = int(math.ceil((FLR_Y1 - SHELL_FLOOR) / FLR_BAND))
+    nh = int(math.ceil((FLR_HEM_Y1 - SHELL_FLOOR) / FLR_BAND))
+
+    def yof(k):
+        return SHELL_FLOOR + (k + 0.5) * FLR_BAND
+
+    bells, hems, ups = [], [], {}
+    for i in range(NPHI):
+        phi = -math.pi + 2.0 * math.pi * (i + 0.5) / NPHI
+        if abs(phi) > FLR_ARC:
+            continue
+        # A ROW STANDING ON THE SOCKET WALL IS NOT THE MODEL'S SHAPE, and it
+        # has to come out of the profile rather than out of the heading. Where
+        # clamp_point holds the surface at x = x_limit (or z = ZFRONT) the
+        # radius is CONSTANT in y while base(y) tapers under it, so "proud"
+        # grows with height on a face the model did not choose — measured, that
+        # alone reported the whole -25..+25 deg arc and three flank headings as
+        # bells. Dropping the whole HEADING was tried first and is worse: round
+        # 9's flare stands on the mat wall over most of its front, so it threw
+        # away the very columns being judged (33 judgeable headings became 6,
+        # which is a red check on six samples).
+        prof = [(k, grid[(i, k)]) for k in range(nk) if (i, k) in grid
+                and grid[(i, k)] < socket_r(phi, yof(k)) - 0.03]
+        if len(prof) < 4:
+            continue
+        proud = [(k, r - base(yof(k))) for k, r in prof]
+        kmax, pmax = max(proud, key=lambda t: t[1])
+        # the soil rows this heading actually has. A heading with none of them
+        # is not judgeable rather than guilty — under the wound the outer
+        # surface is cut away and there is nothing down there to be widest.
+        soil = [p for k, p in proud if yof(k) <= FLR_TOP_Y]
+        if pmax >= FLR_MIN_PROUD and soil:
+            # (a) THE WIDEST WOOD IS ON THE SOIL — and the excursion has to be
+            # an OVERHANG, not a lean. Between the roots the soil banks against
+            # the trunk, so the wall there legitimately stands further out at
+            # the top of the bay than at its floor; what makes that a skirt
+            # instead of a bank is a SHELF on top of it. So a heading is only a
+            # bell if some row under its widest one faces the sky. (Without
+            # this the gate reported the back arc's bays, which are the one
+            # thing on this model that is supposed to lean outward as it
+            # rises.)
+            # STRICTLY BELOW the maximum, and the word is load-bearing. A bay's
+            # up-facing surface is its CEILING, which sits AT its maximum; a
+            # bell's is the tuck UNDER its maximum. Testing "at or below" put
+            # three flank bays on the list for having a roof.
+            p0 = max(soil)
+            over = any(abs(b[1] - a[1]) / FLR_BAND > 0.577
+                       for a, b in zip(prof, prof[1:])
+                       if b[0] == a[0] + 1 and b[0] < kmax)
+            if yof(kmax) > FLR_TOP_Y and p0 < pmax - FLR_TOP_TOL and over:
+                bells.append((i, yof(kmax), pmax, p0))
+        # (b) ...AND THIS HEADING'S FLARE ENDS SOMEWHERE OF ITS OWN. Stated as
+        # a pure PROFILE statistic — the height at which this heading's own
+        # radius has fallen halfway from what it has on the soil to what it has
+        # at the waist — and it has to be, because every version phrased in
+        # terms of `proud` measured the trunk instead: the jamb swell, the
+        # fibre crests and the clamp's constant-r-under-a-tapering-base all
+        # stand "outside base(y)" high up, and all three report a shoulder that
+        # belongs to the trunk. Halfway is unambiguous, needs no reference
+        # surface, and is exactly the question — where does this column stop
+        # being flare?
+        raw = [(k, grid[(i, k)]) for k in range(nh) if (i, k) in grid]
+        if len(raw) >= 6 and raw[0][1] - min(r for _, r in raw[-3:]) >= FLR_MIN_PROUD:
+            steps = [(a[1] - b[1], yof(b[0])) for a, b in zip(raw, raw[1:])
+                     if b[0] == a[0] + 1]
+            if steps:
+                hems.append(max(steps)[1])
+        # (c) AT WHICH HEIGHTS does this heading's wood face the sky? A row
+        # that moves further out than it moves up is a surface taking the key
+        # at full N.L, and this venue's key is a spotlight straight overhead.
+        for a, b in zip(prof, prof[1:]):
+            if b[0] == a[0] + 1 and abs(b[1] - a[1]) / FLR_BAND > 0.577:
+                ups[b[0]] = ups.get(b[0], 0) + 1
+    hems.sort()
+    spread = (hems[int(0.9 * (len(hems) - 1))] - hems[int(0.1 * (len(hems) - 1))]
+              if len(hems) >= 6 else 0.0)
+    tot = sum(ups.values())
+    conc, at = 0.0, None
+    for k in range(nk):
+        s = sum(ups.get(k + d, 0) for d in range(FLR_CONC_WIN))
+        if tot and s / tot > conc:
+            conc, at = s / tot, yof(k)
+    return {"bells": bells, "hem_spread": spread, "hems": hems,
+            "conc": conc, "conc_y": at, "ups": tot, "flared": len(hems)}
+
+
+def assert_the_flare_is_not_a_skirt(shell):
+    """THE WIDEST WOOD IS ON THE SOIL, AND THE ROOTS DO NOT TURN IN TOGETHER.
+
+    Joe, on the round-9 frame: the flare is *the shape*. Rounds 4, 6 and 9 all
+    went to its paint or to props beside it, and the object underneath was a
+    BELL — not a taste call, an arithmetic one. Measured on the field that
+    collected the verdict, at the resting eye's own arc:
+
+      · at 38 of 72 headings the widest wood stood ABOVE the soil, and at
+        +-50 deg the maximum sat at y 0.77 with 0.44 of tuck back in
+        underneath it. A form whose greatest girth is above its hem, with the
+        material curving under, is a skirt in any material.
+      · every root left the trunk at the SAME height, because every root read
+        one shared `toe_h` whose zero is y 0.92 (and every finger one shared
+        `finger_h`, zero at 0.53). Two level circles.
+      · the collar those two make is near-horizontal, so under a key that is a
+        spotlight 22 units straight overhead it takes the light at full N.L
+        while the trunk's wall takes it at a graze — the brightest wood on the
+        model at the one height a stump should be darkest, sampled by 72 loft
+        columns into a pleated fan.
+
+    RED-CHECKED AGAINST THE THING IT EXISTS TO REFUSE, over round 9's own
+    field (the shipped bake, digest `5278316c43df21ca`), through this same
+    code:
+
+        gate                          round 9      this build
+        (a) bell headings             13 of 13     0 of 9
+        (b) knee spread (p90-p10)     0.20         0.50
+
+    Round 9 does not merely fail (a): EVERY heading it has a flare on is a
+    bell. That bake was green on every other check in this file and on all four
+    of `tools/steps/rooted.mjs`'s gates.
+
+    THERE IS NO GATE ON HOW MUCH WOOD FACES THE SKY, and the reason is written
+    where the constants are: every form of that count is a floor round 9 passes
+    too. What the print carries instead is the pair of floors, declared.
+    """
+    vs = [app_of(v.co) for v in shell.data.vertices]
+    f = flare_findings(flare_bins(
+        [(vs[e.vertices[0]], vs[e.vertices[1]]) for e in shell.data.edges]))
+    bad = []
+    if f["bells"]:
+        worst = sorted(f["bells"], key=lambda t: t[3] - t[2])[:3]
+        bad.append("%d of %d flared headings are widest ABOVE the soil: %s"
+                   % (len(f["bells"]), f["flared"],
+                      ", ".join("%.0f deg widest at y %.2f (%.2f proud there "
+                                "vs %.2f on the soil)"
+                                % (math.degrees(-math.pi + 2 * math.pi
+                                                * (i + 0.5) / NPHI),
+                                   yk, pm, p0) for i, yk, pm, p0 in worst)))
+    if f["hem_spread"] < FLR_HEM_SPREAD:
+        bad.append("the roots turn in on one level: knee spread (p90-p10) is "
+                   "%.2f, want %.2f" % (f["hem_spread"], FLR_HEM_SPREAD))
+    print("[bole] flare: %d/%d headings widest above the soil | knee "
+          "spread %.2f (%.2f..%.2f) | up-facing rows %d, %.0f%% of them "
+          "inside one 0.30 at y %.2f  (that last pair is a FLOOR, printed as "
+          "one — see the docstring)"
+          % (len(f["bells"]), f["flared"], f["hem_spread"],
+             f["hems"][0], f["hems"][-1], f["ups"], f["conc"] * 100,
+             f["conc_y"]))
+    if bad:
+        raise RuntimeError("the flare still reads as a skirt:\n       "
+                           + "\n       ".join(bad))
+
+
 def assert_silhouette_is_not_a_face(shell):
     """NO HORIZONTAL BOUNDARY AND NO MIRRORED PAIR IN THE OUTLINE.
 
@@ -4020,6 +4488,7 @@ def build(variant):
         emissive=tuple(c * 0.11 for c in pal["glow_core"])))
 
     assert_silhouette_is_not_a_face(shell)
+    assert_the_flare_is_not_a_skirt(shell)
     assert_taper_is_a_stump(shell)
     assert_lintel_is_a_tear(meshes)
     assert_throat_clear(meshes)

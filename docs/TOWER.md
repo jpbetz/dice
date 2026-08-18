@@ -483,6 +483,55 @@ would work. And T15 proposes re-baking the three classic skins through the
 forge: whatever replaces `buildTowerSkin` has to carry this layer over, or all
 three lose the thing that keeps them off the mat.
 
+## THE FLARE IS A SHAPE, NOT A VALUE — and an overhead key makes the two look alike (2026-08-18)
+
+**A form whose greatest girth is above its hem, with the material curving back
+under it, is a SKIRT in any material.** The Hollow Bole's foot was one for five
+rounds and nobody could name it, because three separable terms each looked
+reasonable on its own: a buttress web held OFF the soil by a shoulder
+(`smoothstep(y, 0.05, 0.62)`, added in round 2 so the web and the foot would not
+both spend the mat's x budget on the same row and get planed flat by the socket
+clamp), a foot envelope shared by every root, and a sill apron that was a LENS
+in y with its maximum in mid-air. Measured at the resting eye's arc on the
+round-9 bake: **13 of the 13 headings that had a flare at all were widest ABOVE
+the soil**, by up to 0.52, with 0.44 of tuck back in underneath.
+
+**The general rule for the next model: state the flare's law as "no wood may
+reach its maximum radius above the soil", and gate it on the built mesh.** The
+budget conflict that produced the shoulder is real and the fix is to split ONE
+reach between web and foot at build time, not to stagger them in height.
+`assert_the_flare_is_not_a_skirt` in `tools/forge/recipes/hollowbole.py` is the
+gate; it also carries the ladder claim (the roots must not all turn in at one
+height) and, in its constants, the three statistics that turned out to be
+FLOORS — up-facing area share, longest up-facing run at one height, and
+concentration of up-facing rows in one band all measure the same on the rejected
+shape as on the accepted one.
+
+**AND THE LIGHTING MAKES A SHAPE PROBLEM LOOK LIKE A PAINT PROBLEM.** The fae
+key is a spotlight twenty-two units straight overhead, so any near-horizontal
+surface takes it at full N·L while a vertical wall takes it at a graze. On this
+model the flare was the most horizontal thing on a stump, so it rendered as the
+brightest wood at the one height a stump should be darkest — and four separate
+rounds reached for albedo (round 4's tongue, round 6's soil, round 9's ground
+multiply) before anyone asked about the normal. **In a venue lit from directly
+above, "this surface is too bright" is a question about its normal until proved
+otherwise.**
+
+**What is NOT recoverable, and the arithmetic that says so.** A root that
+reaches 0.7 out of the trunk has to turn back in over some run, and a run long
+enough that the turn does not face up is a cone — the shape being escaped. So
+the up-facing AREA has a floor. What is recoverable is whether it joins into a
+RING, which is what per-root shoulder heights buy.
+
+**AND ONE FINDING IS STILL OPEN ON THIS MODEL** (round 10, honest): the pale
+ruffled band at its foot survived the re-bake. It is the shell and nothing else
+(`tools/steps/flare-probe.mjs` hides each group in turn at the resting eye), but
+three separate changes to the shell's outer radius field left it untouched, so
+it is most likely the WOUND's own lower cut face — radial by construction, pale
+by design, level by construction. **The cheap instrument nobody built is a PAINT
+BISECT: one diagnostic bake with each surface class at a flat separable colour.
+Do that before changing geometry.** docs/UX.md §7.59.
+
 ## DRESSING — the props every tower carries (2026-08-11)
 
 The three models were shipped as ARCHITECTURE and read as architecture: no
