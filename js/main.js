@@ -353,9 +353,11 @@ const TOWERS = {
       // METAL, and the only voice in the palette that is not a knock
       // (js/voices.js CLUNK_VOICES.blackanvil). THIS FILE PREDICTED IT WOULD
       // BE THE ONE THAT WANTED MOVING AND IT WAS — Joe, 2026-08-18:
-      // *"Slightly to shrill / clanky for me.."*, which is the next commit's
-      // job. The shaft row is his dial in the same breath: the tightest delay
-      // and the highest modes of the set, which is what an iron flue does.
+      // *"Slightly to shrill / clanky for me.."* It moved on 2026-08-18 from
+      // `chime 0.85` to the new `bell 0.55` body, a −15% log centroid at the
+      // same loudness, and SLIGHTLY is the whole spec: the Witchlight chime
+      // beside it took −37% because he hated that one, and this one he nearly
+      // liked. The shaft row is untouched — the flue was never what he named.
       clunkVoice: CLUNK_VOICES.blackanvil,
     },
   },
@@ -2328,8 +2330,10 @@ const CLICKGATE = { mode: 'film' };
 //
 // It moved there on 2026-08-18 so that "less sharp than it was" could be a
 // number in `tests/voices.test.mjs` rather than a thing Joe has to re-listen
-// to and take on trust. NOT ONE VALUE CHANGED IN THE MOVE, and that test's
-// whole content in this commit is the measurement saying so.
+// to and take on trust. Two bodies changed with the move and the rest are
+// byte-identical: `chime` came down 3400 -> 1750 with its Q opened out and
+// 7 ms of attack (C1/C2/C3, *"I hate this sound"*), and a new `bell` body
+// carries Black Anvil's smaller move (B3, *"Slightly to shrill / clanky"*).
 // Weight 0..1 still shifts the centre frequency down and sustain ms still
 // extends the decay; every voice still reads on top of the strength gain, so
 // a heavy die still needs a hard contact to be loud.
@@ -2396,9 +2400,9 @@ function impactVoicingOf(strength, voice, isClunk) {
 const TRANSIT_LOWPASS_HZ = 2200;
 const TRANSIT_LOWPASS_TRIM = 0.71; // ≈ −3 dB
 
-// `punch` is a GAIN multiple — crackle's 1.6 transient bump. It was called
-// `attack` until 2026-08-18, when a body first wanted an attack that was a
-// TIME; renamed here so the two cannot be confused when that lands.
+// `punch` is a GAIN multiple (crackle's 1.6 transient bump); `preset.attackMs`
+// is a TIME. They used to be one argument called `attack`, which was fine
+// while nothing had a rise — see below for why something does now.
 function noiseOneShot({ preset, freq, gain, durSec, bus, punch = 1, at = 0, transitLowpass = 0 }) {
   const ctx = AUDIO.ctx;
   const buf = AUDIO.noise;
@@ -2416,7 +2420,19 @@ function noiseOneShot({ preset, freq, gain, durSec, bus, punch = 1, at = 0, tran
   // an exponential ramp to gain·exp(−1/decayShape) over the voice's length.
   if (transitLowpass > 0) gain *= TRANSIT_LOWPASS_TRIM;
   const end = Math.max(1e-4, gain * Math.exp(-1 / preset.decayShape));
-  if (punch !== 1) {
+  // THE ATTACK, AND IT IS HALF OF "SHARP" (2026-08-18). Every one-shot in this
+  // file used to begin at full gain on its first sample — an instantaneous
+  // rise, which is the steepest attack physically expressible and is heard as
+  // an ice pick no matter where the spectrum sits. Joe's *"far less sharp"*
+  // and *"slightly too shrill"* are about BOTH axes, and the spectral half
+  // alone would have left the transient exactly as it was. A body that
+  // declares `attackMs` rises over that many milliseconds instead; a body that
+  // does not is byte-identical to what shipped, which is most of them.
+  const atk = Math.min((preset.attackMs || 0) / 1000, durSec * 0.5);
+  if (atk > 0) {
+    g.gain.setValueAtTime(Math.max(1e-4, gain * 0.04), t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(1e-4, gain), t0 + atk);
+  } else if (punch !== 1) {
     // crackle's sharp transient — 1 ms of gain bump, not a reshaped buffer.
     g.gain.setValueAtTime(gain * punch, t0);
     g.gain.exponentialRampToValueAtTime(Math.max(1e-4, gain), t0 + 0.001);
@@ -2614,15 +2630,26 @@ function playImpact(strength, voice, filmTime, ev) {
     // model, more than the shaft colour itself does.
     transitLowpass: sh ? TRANSIT_LOWPASS_HZ : 0,
   });
-  // Chime bodies (glass, crystal, sealed resin) layer a decaying sine
-  // partial ~an octave below the filter center — the resonance that
+  // Chime bodies (glass, crystal, cast metal, sealed resin) layer a decaying
+  // sine partial ~an octave below the filter center — the resonance that
   // separates "glass rings" from "wood knocks" without recording samples.
+  // IT WEARS THE BODY'S ATTACK TOO (2026-08-18): a softened noise burst with
+  // a zero-rise sine welded to its front is still a sharp sound, and the
+  // partial is 40% of the gain, so leaving it alone would have thrown away
+  // most of what the attack was for.
   if (preset.partial) {
     const osc = ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.value = freq * 0.55;
     const oscGain = ctx.createGain();
-    oscGain.gain.setValueAtTime(Math.max(1e-4, gainV * 0.4), shot.t0);
+    const oAtk = Math.min((preset.attackMs || 0) / 1000, durSec * 0.5);
+    const oPeak = Math.max(1e-4, gainV * 0.4);
+    if (oAtk > 0) {
+      oscGain.gain.setValueAtTime(Math.max(1e-4, oPeak * 0.04), shot.t0);
+      oscGain.gain.exponentialRampToValueAtTime(oPeak, shot.t0 + oAtk);
+    } else {
+      oscGain.gain.setValueAtTime(oPeak, shot.t0);
+    }
     oscGain.gain.exponentialRampToValueAtTime(0.0005, shot.t0 + durSec);
     osc.connect(oscGain).connect(bus);
     osc.start(shot.t0);

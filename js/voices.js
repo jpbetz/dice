@@ -254,6 +254,27 @@ export const IMPACT_VOICES = {
   // broadband gain (0.2509 at the anvil's centre) ÷ this body's (0.2760).
   // Black Anvil therefore lands at the loudness it had, to a tenth of a dB,
   // and the only thing that moved is the thing he named.
+  // NEW 2026-08-18, and it exists because Joe's two complaints about this
+  // family are DIFFERENT SIZES. Black Anvil is "slightly too shrill / clanky";
+  // the Witchlight chime is one he hates. One body cannot move a little for
+  // one caller and a lot for another, and compensating the anvil back up
+  // through `weight` alone would have left a cast-iron tower declaring
+  // weight 0.17 — a number that reads as "light" everywhere else it is used
+  // (it also sets the settle tail's walk-down). So: cast metal gets its own
+  // body, sized for the small move.
+  //
+  // Between chime and thud, and deliberately: wide enough not to ring (Q 1.8
+  // against the old 2.8 is the "clanky" half), low enough to have body, and
+  // 5 ms of attack so the strike is a strike rather than a click. SIZED for
+  // "slightly" — a −15% log centroid where the Witchlight chime takes −37%,
+  // which is what keeps Black Anvil recognisably the ringing tower and out of
+  // the two rows Joe said were already right.
+  //
+  // `gainScale` 0.041 is SOLVED, not chosen: 0.045 × the old chime's
+  // broadband gain (0.2509 at the anvil's centre) ÷ this body's (0.2760).
+  // Black Anvil therefore lands at the loudness it had, to a tenth of a dB,
+  // and the only thing that moved is the thing he named.
+  bell:    { filter: 'bandpass', baseFreq: 2100, freqSpread:  450, q: 1.8, decayShape: 0.44, gainScale: 0.041, partial: true, attackMs: 5 },
   thud:    { filter: 'lowpass',  baseFreq:  420, freqSpread:  200, q: 1.4, decayShape: 0.15, gainScale: 0.075 },
   crackle: { filter: 'bandpass', baseFreq: 2200, freqSpread: 1400, q: 0.8, decayShape: 0.10, gainScale: 0.06 },
   clack:   { filter: 'bandpass', baseFreq: 1150, freqSpread:  400, q: 2.2, decayShape: 0.22, gainScale: 0.055 },
@@ -320,7 +341,7 @@ export const CLUNK_VOICES = {
   // the ring opened out and 5 ms of rise, at the same loudness. The shaft row
   // is untouched — the flue's colour was never what he named.
   blackanvil: {
-    body: 'chime', weight: 0.85, sustain: 70,
+    body: 'bell', weight: 0.55, sustain: 70,
     shaft: { delayS: 0.0025, combGain: 0.6, mode1Hz: 520, mode2Hz: 1040 },
   },
   // "sounds good" (Joe, 2026-08-18). DO NOT TOUCH. A subtracted click through

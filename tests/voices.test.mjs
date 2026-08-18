@@ -244,13 +244,48 @@ t('B1/B2 is literally the two voices exchanging rows — no number moved', () =>
     + `(${now.centroidHz} Hz vs ${now2.centroidHz} Hz)`);
 });
 
-t('B3 and the two he liked still measure exactly what he heard', () => {
-  // The rows this commit does not touch. B3 is the next commit's.
-  for (const id of ['blackanvil', 'nullstone', 'hollowbole']) {
+// ---------------------------------------------------------------------------
+// B3 — "Slightly to shrill / clanky". A SMALL MOVE, AND MEASURABLY SMALL.
+// ---------------------------------------------------------------------------
+
+t('B3 Black Anvil got less shrill, and only slightly', () => {
+  const was = BASELINE_2026_08_17.clunk.blackanvil;
+  const now = spectrumOf(CLUNK_VOICES.blackanvil);
+  const d = pct(now.centroidHz, was.centroidHz);
+  assert.ok(now.centroidHz < was.centroidHz,
+    `"shrill" is a centroid claim and it came down (${was.centroidHz} → ${now.centroidHz} Hz)`);
+  assert.ok(d <= -8 && d >= -25,
+    `and "slightly" is the spec: ${d}% is meant to sit between −8% and −25%, `
+    + `where the Witchlight chime beside it takes −35% or more`);
+  assert.ok(now.aboveBoundary < was.aboveBoundary - 0.1,
+    `and real energy crossed §1's ${MATERIAL_BOUNDARY_HZ} Hz line rather than shuffling `
+    + `above it (${was.aboveBoundary} → ${now.aboveBoundary} of power above it)`);
+  // "CLANKY" IS THE RESONANCE, and it is a separate number from "shrill":
+  // a high-Q band rings on one note, which is what a clank is.
+  assert.ok(IMPACT_VOICES[CLUNK_VOICES.blackanvil.body].q < 2.8,
+    `"clanky" is Q, and the ring opened out `
+    + `(2.8 → ${IMPACT_VOICES[CLUNK_VOICES.blackanvil.body].q})`);
+  // …and the third axis: a strike that begins at full gain on sample one.
+  assert.ok(now.attackMs >= 4,
+    `and the transient got a rise instead of an edge (${now.attackMs} ms)`);
+  // IT DID NOT GET QUIETER TO GET DULLER. Loudness is gainScale × the body's
+  // broadband gain; holding it is what stops "less shrill" being "turned down".
+  const loud = IMPACT_VOICES[CLUNK_VOICES.blackanvil.body].gainScale * now.noiseGain;
+  assert.ok(Math.abs(20 * Math.log10(loud / was.loudness)) < 0.5,
+    `and it is the same loudness it was, within half a dB `
+    + `(${was.loudness.toFixed(6)} → ${loud.toFixed(6)})`);
+  // AND IT DID NOT LAND IN B4/B5's LAP. Those two he liked; over-correcting
+  // this one into their register would have thrown away the palette's range.
+  const bole = spectrumOf(CLUNK_VOICES.hollowbole);
+  assert.ok(now.centroidHz > bole.centroidHz * 3,
+    `it is still unmistakably the ringing tower, not a drum `
+    + `(${now.centroidHz} Hz against Hollow Bole's ${bole.centroidHz} Hz)`);
+});
+
+t('the two he liked still measure exactly what he heard', () => {
+  for (const id of ['nullstone', 'hollowbole']) {
     const was = BASELINE_2026_08_17.clunk[id];
-    const cv = CLUNK_VOICES[id];
-    assert.equal(cv.body, was.body, `${id} kept its body`);
-    const now = spectrumOf(cv);
+    const now = spectrumOf(CLUNK_VOICES[id]);
     assert.equal(now.fcHz, was.fcHz, `${id}'s band`);
     assert.equal(now.centroidHz, was.centroidHz, `${id}'s centroid`);
     assert.equal(now.attackMs, was.attackMs, `${id}'s transient`);
@@ -300,12 +335,16 @@ t('the grounded row is inert BY CONSTRUCTION (venueAudioInfo agrees)', () => {
   assert.equal(t0.bed.tick.gain, 1);
 });
 
-t('the default body is untouched, and nothing has grown an attack yet', () => {
+t('only the body he complained about grew an attack', () => {
+  // The attack is opt-in per body, so this is the claim that the change did
+  // not quietly soften the most common sound in the app.
   assert.equal(IMPACT_DEFAULT_BODY, 'felt');
   assert.equal(FAINT.length, 2);
-  for (const [body, p] of Object.entries(IMPACT_VOICES)) {
-    assert.ok(!p.attackMs, `${body} begins on its first sample, as it shipped`);
+  for (const body of ['felt', 'click', 'chime', 'thud', 'clack', 'hush', 'crackle']) {
+    assert.ok(!IMPACT_VOICES[body].attackMs,
+      `${body} still begins on its first sample — it was not complained about`);
   }
+  assert.ok(IMPACT_VOICES.bell.attackMs > 0, 'bell has a rise');
 });
 
 console.log(`voices: ${n} assertions run`);
