@@ -81,6 +81,30 @@ paired seeds, so a before and an after are the same throw:
 Add new step files here (Apache header, like everything first-party) rather
 than writing one-off inline scripts — repeatable work belongs in the repo.
 
+## The dice-geometry steps (ROADMAP §9c)
+
+A `geo` recipe change is RENDER ONLY by contract, and these three are how that
+sentence stops being a promise. Run all three around any edit to `STD_EDGE` or
+to `buildBeveledGeometry`; the first two are the proof, the third is the look.
+
+- `edge-film.mjs [pools]` — **the proof the film did not move.** Digests the
+  CANNON hull per die type and every keyframe of 15 seeded throws at 9 dp
+  (through 40d20 at the pool cap) into ONE line to compare across builds.
+  Answers what `perf-determinism` cannot: not "do two tabs of this build
+  agree" but "does this build agree with the last one", which is what a room
+  spanning two deploys needs. **Simulates**: ~90 s.
+- `edge-price.mjs [count] [type]` — **what the edge costs.** The resolved geo
+  recipe and vertex count per type, the mesh-inside-the-physics-hull pass/fail,
+  and draw calls / triangles / real rAF frame intervals with a settled pool.
+  Draw calls are the budgeted number and a vertex count cannot move them; the
+  frame medians are headless SwiftShader and read as a stress test, not as a
+  player's frame. **Simulates**: ~60 s.
+- `edge-look.mjs [prefix] [seed]` — **the frame in the room.** Three cells
+  (close/4 mixed, medium/the Soul Deal trio, wide/40) as whole frames plus a
+  4× crop on the die nearest the mat's centre. Fixed seed, so running it either
+  side of a change with two prefixes gives a true A/B of one variable.
+  **Simulates**: ~60 s.
+
 ## The tower steps
 
 There are a dozen of them and until now this file indexed none, so "which

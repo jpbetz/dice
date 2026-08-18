@@ -697,9 +697,30 @@ pocket-dice look; today's `wear` displacement is a crude version. Constraint:
 the dead-flat digit plane (legibility) — face bulge stays subtle or
 shading-only, as `pillow` already is.
 
-**Waiting on Joe:** which recipe the standard dice wear. True fillets shipped;
-`std` is still the sharp cut because only he can pick. Decide on the lab bench
-(`lab.html`): `std` ↕ `round .090` ↕ `round .130`.
+**The edge question is CLOSED — Joe chose `round .090` on 2026-08-18** and it
+shipped the same day (SHIPPED §9c, "the standard edge"). This entry was the
+oldest open item in the file and its "waiting on Joe" line was the whole of
+it; what is left is Tier 3 above, which is a different question (face
+curvature, not edge width). Nothing here waits on anyone now.
+
+Three things that entry got wrong while it waited, all worth knowing before
+the Tier 3 work re-reads it:
+
+- **The bench recipes live in `js/lab.js`, not `js/fae-lab.js`** — the
+  `BENCH` table near the top. `js/fae-lab.js` is the venue lab and contains
+  the string `bevel` zero times.
+- **`std` was never a recipe.** It was the ABSENCE of one: `bevel` fell back
+  to a module constant and `profile` fell back to `'cut'`, independently. So
+  "make std wear round .090" could not be done by editing a `std` entry, and
+  flipping the profile default would have re-cut five themed sets that state a
+  bevel and say nothing about profile (focuscrystal's `0.02` means a lapidary
+  CUT). The standard edge is now one frozen object applied as a unit —
+  `STD_EDGE` in `js/dice.js` — to recipes that name neither field.
+- **`.claude/…/memory/perf-baseline.md`, cited at the head of Tier 0 and in
+  SHIPPED's Tier 0, does not exist.** There is no pinned bench baseline to
+  measure a change against; what does exist is `scene-draw-budget`'s
+  `calls <= 220` and the steps under `tools/`. Treat every "against the pinned
+  baseline" phrase in this file as unbacked until someone writes that file.
 
 **Rejected (record):** normal-map edge rounding (edge bands are deliberately
 UV-less; falls apart close-up — inferior to Tier 2 at similar effort) · SDF

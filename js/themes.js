@@ -67,7 +67,13 @@
 //   armed for experimentation via __diceDebug.decalsEnable(true).
 // · `geo` (Level 3.5, geometry identity): the die the player SEES —
 //   physics hull, values and reading stay canonical (dice.js).
-//   bevel    edge-cut share (std 0.055): 0.02 machined-crisp, 0.13 tumbled
+//   NAME BOTH OR NEITHER. A set that names no `bevel` and no `profile`
+//   wears THE STANDARD EDGE — `{bevel: .09, profile: 'round'}` since
+//   2026-08-18 (§9c decided; dice.js STD_EDGE) — as a unit, which is what
+//   the Classics do. Name either one and you are stating your own edge:
+//   the per-field fallbacks are then .055 and 'cut', so `bevel: 0.02`
+//   still means a lapidary CUT.
+//   bevel    edge-cut share: 0.02 machined-crisp, 0.13 tumbled
 //   profile  'cut' flat chamfer facets · 'round' TRUE fillet arcs (§9c
 //            Tier 2): Bézier strips bulged to the sharp edge, corner
 //            domes, analytic normals — curved shading AND silhouette

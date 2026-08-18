@@ -389,8 +389,13 @@ leverage order for this zero-dep codebase:
    character while the physics hull, values and reading stay canonical
    (createDieBody/readValue always use the std entry — a skin can never
    change how a die lands). **← SHIPPED 2026-08-03.** Per-set `geo`
-   recipe: `bevel` (edge-cut share — 0.015 razor to 0.13 tumbled; std is
-   0.055), `profile` ('cut' flat chamfer facets vs 'round' TRUE fillet
+   recipe: `bevel` (edge-cut share — 0.015 razor to 0.13 tumbled). **THE
+   STANDARD EDGE is `{bevel: 0.09, profile: 'round'}` since 2026-08-18**
+   (§9c decided; UX §7.54) and it applies as a UNIT to every recipe that
+   names NEITHER `bevel` nor `profile` — std, shroud and the eight
+   Classics. A recipe that names either one states its own edge and keeps
+   the per-field fallbacks (0.055, 'cut'), which is what stops
+   `bevel: 0.02` from meaning a 0.02 fillet. `profile` ('cut' flat chamfer facets vs 'round' TRUE fillet
    arcs since 2026-08-04, ROADMAP §9c Tier 2: each edge becomes
    `segments` (1..6, default 3) quadratic-Bézier strips bulged toward
    the original sharp edge — tangent to both faces by construction,
