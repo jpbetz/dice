@@ -289,6 +289,30 @@ step, and a scenery tier populates the foreground band and the
 between-space. Placement moves land as documented new claims in
 `venue-set`.
 
+**TWO CORRECTIONS TO THE PARAGRAPH ABOVE, and the second is a rule
+(2026-08-18, round 9).** (a) Its inventory of round 6 is stale in one more
+place than it admits: **the tongue is gone too.** The delivery ramp and the
+outrun lip are DECLARED BARE on this tower (`bareColliders: ['ramp','lip']`,
+enforced by `towerCladAudit` in both directions), so what actually survives of
+round 6 is the root fingers and the moss creep. Anyone reading this section for
+"what the model does at its base" was reading a list two thirds true.
+
+(b) **Rule 9's "nothing floats" and rule 11's contact darkening were both
+SATISFIED IN CODE AND ABSENT FROM THE FRAME for five rounds**, and the cause
+is a rule this document owed and did not have: *a venue owns its floor, and a
+feature's ground-contact layer is authored against y = 0.* The Hollow Bole's
+contact shadow sat at y 0.006, the glade's ground disc at 0.02 and its clearing
+detail at 0.035, so the shadow was drawn and then covered. Measured before the
+fix: hiding the whole hero changed 0.058% of the frame outside its own
+footprint, and the ground got **1.95× brighter** toward the foot rather than
+darker. Rule 9's CHECK — "every base, at the eye's distance, transitions rather
+than terminates" — was passed by every reviewer looking at it, because the
+transition was a *gradient of the lamp* and not of the object. **A base-contact
+claim has to be stated as a RATIO of two renders (the feature there, and the
+feature gone), never as an absolute reading of one frame**, or the venue's own
+lighting answers for the feature. `tools/steps/rooted.mjs` is that instrument
+for the hero; the same trick is what rule 15(b) already found for the staging.
+
 ## The glade, measured (W7 ② — the staging, in the frame)
 
 Joe's verdict on the W5 frames (ROADMAP W7, verbatim there): *"Looks too
