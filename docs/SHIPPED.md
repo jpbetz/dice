@@ -5655,6 +5655,16 @@ the magic threshold this work was told not to write. So the invariant is
 `on.diceOnScreen >= off.diceOnScreen` across the grid's own pools, so if the
 hole ever opens it opens loudly.
 
+### One thing found in passing, carried forward from C27 so it is not lost
+
+**On a desktop at 40d6, one or two dice are off screen with the mat FITTING** —
+39/40 and 38/40 across six seeds at 1440 (panels collapsed), and 39/40 on 2 of
+5 at 1600 (panels open). Rung 1 guarantees only the DECIDING die, so a piled
+non-hero die can be cropped at the mat rung on the one device that never used
+to descend. Consistent with the shipped design, **unchanged by this work** (the
+dice rung never fires at 40d6), and written down here because C27 was where it
+was recorded and C27 has now closed.
+
 ### What was deliberately not done
 
 - **`FRAMING.floor` stays at 1.** The aggressive version of this feature lets
