@@ -6644,3 +6644,63 @@ by an orphaned stake. That case is now rare rather than routine — it needs a
 browser that is gone for good, not a tab that closed. The rule stays exactly as
 written (it never discloses a value, so it is still the fail-closed direction),
 but it stops being the thing that happens every time somebody's laptop sleeps.
+
+### §7.53 — The ten voices, heard at last (2026-08-18)
+
+*The first human verdict this app's audio has ever had, and what it cost to
+answer it. **There is no new pixel in this section** — every surface it
+touches already exists (`⚙` → **You** → **Room tone**, and the venue and tower
+pickers under **Staging**). What is new is that the thing behind them has been
+listened to.*
+
+#### ① What happened
+
+Joe sat down and played every sound in `docs/AUDIO.md` §9's route: three room
+tones, five tower knocks, and the staged set's landing on two venue grounds.
+**Eight of the ten needed work. Two did not.** His words, verbatim, are the
+record in AUDIO.md §9.0 — this section is only about what a UX reader needs
+to know, which is three things.
+
+#### ② Two rows are now FIXED POINTS, and that is a UX fact
+
+Nullstone's knock and Hollow Bole's knock got **"sounds good"**. They are the
+only two places in this app where a synthesized voice has a human yes on it,
+and they are therefore worth more than their content: they are the **reference
+for what "good" sounds like here**, and anything that changes them loses
+information that cost a sitting to acquire.
+
+The same rule that governs a shipped visual — do not move a thing Joe has
+approved to make a neighbouring thing better — applies to them literally.
+Black Anvil's fix was deliberately sized *not* to land in their register.
+
+#### ③ The listening surface is the settings panel, and it held up
+
+The route needs `?stability=beta` (venue and tower are closed-beta rows,
+§7.38), **You → Room tone ON**, and then **Staging** for the two pickers. The
+whole sitting ran through that one panel with it left open the entire time,
+because it covers nothing that makes a sound. Nothing about the surface
+obstructed the judgment, and no UX change is asked for by this pass.
+
+**One thing the panel does not say and could not be expected to:** the room
+tone arrives over six seconds (`BED_FADE_S`) and its slow layer now fires
+about every twelve. A minute per room is the minimum for a fair listen, and
+under ~25 seconds you hear the hiss and none of the motion — which is very
+close to the state that produced the first verdict. That is written into the
+script (AUDIO.md §9.1) rather than into the UI: a settings panel that
+explained how long to listen for would be a settings panel apologising for
+itself.
+
+#### ④ What this section refuses
+
+**No audio settings beyond the two switches.** The temptation after a sitting
+like this is a mixer — bed level, drip rate, tower voice — and it is refused
+for the same reason AUDIO.md refusal 12 refuses a surface picker: the venue is
+chosen as one thing (GOALS goal 13), the dials are the author's, and a control
+with one honest value is UI debt. The eight complaints were answered by
+*changing the sound*, not by handing the player a slider and calling it
+choice.
+
+**And no "audio" line in the portable file.** Room tone stays device-local
+mood (`audio-ambience` asserts the export says nothing about it), so a
+teammate never inherits your room. That was already true; the sitting did not
+give a reason to revisit it.
