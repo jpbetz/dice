@@ -110,17 +110,32 @@ ENGINE_MIRROR = {
     "socket": {"c": (0.0, 5.0 * 1.25, -2.0 * 1.25),
                "s": (5.2 * 1.25, 10.0 * 1.25, 4.4 * 1.25)},
     # towerModelAudit's classification thresholds, coarsely. A mesh box that
-    # leaves the socket must be a backward VENUE-GROUNDS spender or a CLADDING
-    # piece sunk under the felt; anything else comes back UNCLASSIFIED and
-    # tower-fit is red. The app's audit remains the judge — these exist so
-    # that "bake gates green" and "the model fits" stop being different
-    # sentences.
+    # leaves the socket must be a GATE HOOD, a backward VENUE-GROUNDS spender
+    # or a CLADDING piece sunk under the felt; anything else comes back
+    # UNCLASSIFIED and tower-fit is red. The app's audit remains the judge —
+    # these exist so that "bake gates green" and "the model fits" stop being
+    # different sentences.
+    #
+    # THE GATE HOOD WAS MISSING HERE UNTIL 2026-08-18 (ROADMAP T15 round 1),
+    # and it was missing in the direction that costs a model: the app grants
+    # the class and this file did not, so the bake refused a cover the app
+    # would have accepted. It was found by trying to re-bake the Black Anvil,
+    # whose hood oversails to z0+0.85 — every code-built classic has one, so
+    # the gap would have blocked all three rounds of T15 and nothing else in
+    # the repo would have noticed, because a code skin never runs check.py.
+    #
+    # The band is PORTAL-DERIVED in the app (js/main.js, `v.cls`) and is here
+    # too: gateLoY follows the door's clear height and gateHiY the rim, so a
+    # tower that raises its doorway keeps its own legal hood.
     "auditClasses": {
         "footDip": -0.145,       # the audit's foot-dip floor is -0.15
         "venueZBack": -8.0,      # venueOnly towers may spend glade this far back
         "cladMinY": -0.5,        # the cladding classes require dipping this far
         "cladMaxZ": 3.85,        # lip front is 3.9
         "cladMaxY": 3.4,
+        "gateLoY": 3.4,          # + (clearH - default), as js/main.js's dH
+        "gateHiY": 6.6,          # + (rimY   - default), as js/main.js's dRim
+        "gateHoodPad": 0.02,     # the app's own `hoodZ + 0.02`
     },
 }
 
@@ -177,9 +192,40 @@ def engine_volumes(spec):
                 "s": (4.8 + d_w, 1.0, 2.2), "rx": ENGINE_MIRROR["lipTilt"]},
         "cowl": {"c": (0.0 + d_in_x, 7.4 * S + d_rim, 0.05 * S),
                  "s": (4.2 * S, 2.4 * S, 0.3 * S)},
+        # The HOOD, and the gate that needs it is the ENVELOPE one: the app
+        # grants a cover reaching this volume's own front face (js/main.js's
+        # `hoodZ`), which is the only legal way for a model to shadow its
+        # doorway. Deepened 0.5 -> 1.0 base by probe run 7, so the face sits
+        # at 1.25 rather than 0.9375; copying the number instead of the
+        # expression is how that retune would have silently stopped applying.
+        "hood": {"c": (0.0 + d_out_x, 2.0 * S + d_sill, 0.5 * S),
+                 "s": (4.6 * S + d_w, 2.4 * S, 1.0 * S)},
         "socket": ENGINE_MIRROR["socket"],
         "despawnY": spec["in"]["rimY"] - ENGINE_MIRROR["despawnDrop"],
     }
+
+
+def gate_hood_band(spec):
+    """(loY, hiY, maxZ) — the volume the app's audit calls a GATE HOOD.
+
+    MIRROR of js/main.js towerModelAudit()'s `classify()` branch:
+
+        b.max.z <= hoodZ + 0.02 && b.min.y >= K.gateLoY && b.max.y <= K.gateHiY
+
+    with `hoodZ` the HOOD volume's front face and K.gateLoY/gateHiY the
+    portal-derived pair. The app tests no x here because an x overrun is
+    caught before the ladder is consulted; the callers in this repo keep
+    their own x test, so the bake gate stays a subset of what the app
+    grants rather than a superset of it.
+    """
+    D = ENGINE_MIRROR["defaultPortals"]
+    cls = ENGINE_MIRROR["auditClasses"]
+    d_h = spec["out"]["clearH"] - D["out"]["clearH"]
+    d_rim = spec["in"]["rimY"] - D["in"]["rimY"]
+    v = engine_volumes(spec)
+    hood_z = v["hood"]["c"][2] + v["hood"]["s"][2] / 2.0
+    return (cls["gateLoY"] + d_h, cls["gateHiY"] + d_rim,
+            hood_z + cls["gateHoodPad"])
 
 
 def box_top_plane(box):

@@ -59,8 +59,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # are BINDINGS into the mirror, not copies of it.
 from towergates import (ENGINE_MIRROR, APPROACH_START, EXIT_FRONT,  # noqa: E402
                         THROAT_MARGIN, EXIT_CLAD_ALLOW, EXIT_BACK,
-                        disc_probes, exit_ray_start_z, hit_distance,
-                        hole_below_sill_failures, lane_failures,
+                        disc_probes, exit_ray_start_z, gate_hood_band,
+                        hit_distance, hole_below_sill_failures, lane_failures,
                         occlusion_failures, rect_probes)
 
 S = ENGINE_MIRROR["S"]    # d20 radius: the unit every tower bound is quoted in
@@ -85,10 +85,18 @@ ENV_CLAD_MAX_Z = _CLS["cladMaxZ"]
 ENV_CLAD_MAX_Y = _CLS["cladMaxY"]
 
 
-def envelope_check(scene, tilt_deg):
-    """Classify every mesh node's world box against the socket. -> failures[]"""
+def envelope_check(scene, tilt_deg, spec=None):
+    """Classify every mesh node's world box against the socket. -> failures[]
+
+    `spec` is the model's own portal declaration and it unlocks the GATE HOOD
+    class — a cover over the doorway, forward of the socket's front plane, in
+    a band the app's audit derives from the door's clear height and the rim.
+    Without a spec that class cannot be evaluated (its band is portal-derived),
+    so it is simply not offered: the check stays strict rather than guessing.
+    """
     import trimesh.transformations as tt  # noqa: F401  (documents the dep)
     sin_t = math.sin(math.radians(tilt_deg))
+    hood = gate_hood_band(spec) if spec else None
     fails, notes = [], []
     for node in scene.graph.nodes_geometry:
         mtx, gname = scene.graph[node]
@@ -107,6 +115,14 @@ def envelope_check(scene, tilt_deg):
             notes.append(f"{node}: spends venue grounds (z to {lo[2]:.2f}) — "
                          "legal only on a venueOnly row; the fit audit decides")
             continue                          # BACKWARD
+        # GATE HOOD — a cover forward of the facade, shadowing the doorway the
+        # engine's own HOOD volume asks to have shadowed. Its x and its BACK
+        # are still the socket's: only the front plane moves.
+        if (hood and x_ok and lo[1] >= hood[0] - 1e-6 and hi[1] <= hood[1] + 1e-6
+                and lo[2] >= ENV_SOCKET_Z[0] and hi[2] <= hood[2] + 1e-6):
+            notes.append(f"{node}: GATE HOOD (z to {hi[2]:.2f}, band "
+                         f"y [{hood[0]:.2f},{hood[1]:.2f}])")
+            continue                          # GATE HOOD
         if (lo[1] <= ENV_CLAD_MIN_Y and hi[1] <= ENV_CLAD_MAX_Y
                 and hi[2] <= ENV_CLAD_MAX_Z + 1e-6
                 and max(abs(lo[0]), abs(hi[0])) <= ENV_SOCKET_X + 1e-6):
@@ -115,7 +131,10 @@ def envelope_check(scene, tilt_deg):
             f"{node}: outside every envelope class — {box}; in-socket needs "
             f"x_eff<={ENV_SOCKET_X} (tilt {tilt_deg}°), y [{ENV_FOOT_DIP},"
             f"{ENV_SOCKET_Y_TOP}], z [{ENV_SOCKET_Z[0]},{ENV_SOCKET_Z[1]}]; "
-            f"cladding needs min.y<={ENV_CLAD_MIN_Y}, max.z<={ENV_CLAD_MAX_Z}")
+            f"cladding needs min.y<={ENV_CLAD_MIN_Y}, max.z<={ENV_CLAD_MAX_Z}"
+            + (f"; a GATE HOOD needs y [{hood[0]:.2f},{hood[1]:.2f}] and "
+               f"max.z<={hood[2]:.2f}" if hood else
+               "; the GATE HOOD class needs a portal spec and none was passed"))
     return fails, notes
 
 
@@ -388,7 +407,14 @@ def inspect(path, tower=False, tower_tilt_deg=0.45, bare_colliders=()):
             j, tris, tilt_deg=tower_tilt_deg, bare_colliders=bare_colliders,
             digest=out["digest"])
         out["tower"].update(info)
-        env_fails, env_notes = envelope_check(scene, tower_tilt_deg)
+        # The spec comes from `info` rather than from a second parse: a GATE
+        # HOOD band read off a different copy of the portals is a band that
+        # can disagree with the one every other gate used. `info` carries in/
+        # out only once the portal block above passed, so a model with broken
+        # portals gets the strict envelope and its portal failure, in that
+        # order — which is the right order to read them in.
+        env_spec = info if ("in" in info and "out" in info) else None
+        env_fails, env_notes = envelope_check(scene, tower_tilt_deg, env_spec)
         out["tower_failures"].extend(env_fails)
         out["envelope_notes"] = env_notes
     return out

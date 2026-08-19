@@ -573,6 +573,21 @@ socket wall is 3.25 and at `close` the mat's own wall is 3.35, so a sideways
 prop is a prop through the side of the room. Forward and upward are
 negotiable; sideways is not.
 
+**The BAKE gate mirrors that ladder, and until 2026-08-18 it was missing a
+rung.** `check.py --tower` and `towerkit.gate_envelopes` classify the same
+boxes so that "bake gates green" and "the model fits" are one sentence — but
+they knew only CLADDING, VENUE GROUNDS and FOOT DIP, so a baked model could
+not carry a **GATE HOOD** at all. It went unnoticed because the only towers
+with hoods are the three code-built classics, and a code skin never runs
+check.py; it surfaced the moment ROADMAP T15 tried to re-bake one. The band
+is portal-derived at both ends now — `towergates.gate_hood_band(spec)` returns
+`(3.4 + dH, 6.6 + dRim, hoodZ + 0.02)` off the same deltas `v.cls` uses, so a
+tower that raises its doorway keeps its own legal cover. The bake side stays a
+SUBSET of what the app grants: it also demands the box be inside the socket in
+x and behind the socket's back plane, neither of which the app's branch tests,
+because a gate that is looser than the audit is a gate that ships a refusal to
+the browser.
+
 **Budgets, and the 3-px rule that sets them.** At the resting eye a world
 unit is ~42 px, so 1 px ≈ 0.024 u: a feature needs ≥0.07 u to exist at all
 and ≥0.12 u to read as a shape. Stylise up about 2×, then DELETE anything

@@ -189,16 +189,28 @@ def gate_lane(meshes, spec, tag, bare=()):
           + (f"; declared bare: {declared}" if declared else ""))
 
 
-def gate_envelopes(meshes, tag, *, x_lim, crown_max, clad=(), foot_dip=None):
+def gate_envelopes(meshes, tag, *, x_lim, crown_max, clad=(), foot_dip=None,
+                   spec=None, hood=()):
     """The socket, per mesh node, exactly as check.py classifies it.
 
     `clad` names the meshes that reach past the socket's front plane and must
     therefore satisfy the CLADDING class instead — a set of names rather than
     a guess from geometry, because "is this the ramp skin or a lobe that has
-    escaped" is an authoring intent, not a measurement."""
+    escaped" is an authoring intent, not a measurement.
+
+    `hood` names the meshes claiming the GATE HOOD class — a cover over the
+    doorway, forward of the facade, in the portal-derived band the app's audit
+    grants (js/main.js towerModelAudit). Named for the same reason `clad` is:
+    a box that HAPPENS to sit in the band is not the same statement as a
+    model saying "this is my door's cover", and only the second one should
+    buy a relaxed front plane. Needs `spec` — the band is portal-derived."""
     import forge as F
     cls = EM["auditClasses"]
     dip = cls["footDip"] if foot_dip is None else foot_dip
+    hood_band = TG.gate_hood_band(spec) if spec is not None else None
+    if hood and hood_band is None:
+        raise RuntimeError(f"{sorted(hood)}: claim the GATE HOOD class but no "
+                           "portal spec was passed to gate_envelopes")
     z_back = EM["socket"]["c"][2] - EM["socket"]["s"][2] / 2.0
     z_front = EM["socket"]["c"][2] + EM["socket"]["s"][2] / 2.0
     for ob in meshes:
@@ -216,6 +228,15 @@ def gate_envelopes(meshes, tag, *, x_lim, crown_max, clad=(), foot_dip=None):
                     f"{ob.name}: not a CLADDING box — needs min.y <= "
                     f"{cls['cladMinY']} (is {a[1]:.3f}), max.z <= {cls['cladMaxZ']} "
                     f"(is {b[2]:.3f}), max.y <= {cls['cladMaxY']} (is {b[1]:.3f})")
+        elif ob.name in hood:
+            lo_y, hi_y, max_z = hood_band
+            if a[1] < lo_y - 1e-6 or b[1] > hi_y + 1e-6 or b[2] > max_z + 1e-6 \
+                    or a[2] < z_back - 1e-6:
+                raise RuntimeError(
+                    f"{ob.name}: not a GATE HOOD — needs y within "
+                    f"[{lo_y:.3f}, {hi_y:.3f}] (is [{a[1]:.3f}, {b[1]:.3f}]), "
+                    f"max.z <= {max_z:.3f} (is {b[2]:.3f}), min.z >= {z_back} "
+                    f"(is {a[2]:.3f})")
         elif a[2] < z_back - 1e-6 or b[2] > z_front + 1e-6 or a[1] < dip:
             raise RuntimeError(
                 f"{ob.name}: not IN-SOCKET — z [{a[2]:.3f},{b[2]:.3f}] vs "
@@ -314,7 +335,7 @@ def gate_front_carries_the_dark(occluder_meshes, spec, tag, front_top):
 
 
 def run_battery(meshes, spec, *, tag, tilt_deg=0.0, bare=(), x_lim, crown_max,
-                clad=(), occluder=None, front_top=None):
+                clad=(), hood=(), occluder=None, front_top=None):
     """The whole contract, in the order that names the cheapest failure first.
 
     Returns the gate names that ran — so a recipe's "every gate ran" check is
@@ -329,7 +350,8 @@ def run_battery(meshes, spec, *, tag, tilt_deg=0.0, bare=(), x_lim, crown_max,
     if occluder is not None and front_top is not None:
         gate_front_carries_the_dark(occluder, spec, tag, front_top)
         ran.append("front")
-    gate_envelopes(meshes, tag, x_lim=x_lim, crown_max=crown_max, clad=clad)
+    gate_envelopes(meshes, tag, x_lim=x_lim, crown_max=crown_max, clad=clad,
+                   hood=hood, spec=spec)
     ran.append("envelopes")
     print(f"[{tag}] battery {len(ran)}/{len(ran)}: {', '.join(ran)}")
     return ran
