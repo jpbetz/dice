@@ -222,13 +222,39 @@ VENT_BED_Z = 0.10
 # and is exactly how a black tower stops being black.
 
 
+# THE WHOLE PALETTE IS SCALED, and the number is measured rather than felt.
+# Round 1's sheet and the code skin's were shot in the same rig and decoded
+# (the zero-dep PNG reader in tools/steps/glade-frame.mjs): over the six views
+# the baked tower ran 1.08-1.22x the code skin's mean luminance, worst at the
+# doorway, and its mean pixel was 31,24,22 against 25,21,20 — brighter AND
+# warmer. The eye read that as "brown"; the pixels say 18% and a hue lean.
+#
+# WHY IT WAS BRIGHT AT ALL, since the ramps below are the code skin's own
+# numbers: that skin runs `bakeVertexAO` over every vertex of 75 meshes after
+# it is built, and a boxy tower with courses is nearly all corners. A baked
+# model gets no such pass — `bakeVertexAO` never runs on one — and the three
+# analytic cavity terms here cover the doorway, the firebox and two overhangs,
+# which is most of the deep shade and none of the shallow kind.
+#
+# So the flat scale stands in for the AO that is not there. It is applied at
+# the ramp rather than per-paint-function so there is ONE number to move.
+VALUE = 0.84
+# ...and the hue lean comes off the same way: the ramps are warm because fired
+# brick is warm, but the code skin's rendered mean sits at r/b 1.25 and this
+# one at 1.41. Half the difference is the AO again (shade is neutral), so the
+# blue channel is lifted back toward it rather than the red pulled down, which
+# would have cost the value a second time.
+BLUE_BACK = 0.10
+
+
 def srgb(*bytes_):
     """sRGB bytes -> linear, the same transfer three.js applies to a texture."""
     out = []
     for b in bytes_:
         c = b / 255.0
         out.append(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4)
-    return tuple(out)
+    r, g, bl = (v * VALUE for v in out)
+    return (r, g, bl + (r - bl) * BLUE_BACK)
 
 
 SOOT = srgb(0x3E, 0x39, 0x33)          # the stone: warm dark
@@ -245,9 +271,17 @@ SOOT_JOINT = srgb(0x22, 0x1E, 0x1A)    # ...and the stone's, which runs darker
 BRONZE = srgb(0x49, 0x3F, 0x2E)        # oxidised: a warm grey with green in it
 BRONZE_HI = srgb(0x64, 0x58, 0x42)
 VERDIGRIS = srgb(0x4C, 0x67, 0x59)
-SAND = srgb(0x62, 0x5D, 0x54)          # the casting channel, and the ONE light
-SAND_LO = srgb(0x45, 0x41, 0x3A)       # thing here: a black-iron die has to
-SAND_HI = srgb(0x80, 0x7A, 0x6F)       # read against what it lands on
+# THE CASTING CHANNEL, and the ONE light thing here: a black-iron die has to
+# read against what it comes to rest on. It is ALSO the thing round 1 got most
+# wrong — on that sheet the sand was the brightest object in every view, which
+# is the exact failure js/toweranvil.js records against its own first cut
+# ("the delivery run was a white slab that owned the frame … a tower's tray
+# should not be the first thing seen"). Taken down by a third; a die still
+# reads against it, and nothing else on the model has to fight it.
+SAND_K = 0.66
+SAND = tuple(c * SAND_K for c in srgb(0x62, 0x5D, 0x54))
+SAND_LO = tuple(c * SAND_K for c in srgb(0x45, 0x41, 0x3A))
+SAND_HI = tuple(c * SAND_K for c in srgb(0x80, 0x7A, 0x6F))
 STEEL = srgb(0x9A, 0x95, 0x8C)         # the one bright material: worn tools
 DARK = srgb(0x0A, 0x08, 0x06)          # the interior, where light never arrives
 
@@ -278,8 +312,14 @@ def lit(hue, luminance, white=0.0):
     return tuple(c * (luminance / lum_of(h)) for c in h)
 
 
-GRATE_EMIT = lit(COAL, 0.155, white=0.06)
-VENT_EMIT = lit(COAL, 0.072, white=0.04)
+# COALS AT REST, and round 1 was not. At 0.155 the firebox rendered as a bright
+# orange letterbox behind hard bars — a heater, not a forge — where the code
+# skin's reads as a dull red wash you notice rather than look at. The tiers
+# come down by 40%, and the bed's own relief (see build_bed) does the rest:
+# what makes banked coals read is that most of the bed is DEAD and the light
+# comes out of the cracks between lumps.
+GRATE_EMIT = lit(COAL, 0.094, white=0.05)
+VENT_EMIT = lit(COAL, 0.044, white=0.03)
 
 
 # --------------------------------------------------------------------------
@@ -440,24 +480,74 @@ def refine(ob, target, keep=None):
 # interior a real interior — the bore's wall IS the mass, so this model needs
 # no separate lining mesh the way the code skin does.
 
-COURSES = [
-    # (y0,     y1,     half-width, back z)
-    (Y_FOOT, Y_PL1, X_PL1, Z_PL1),
-    (Y_PL1, Y_PL2, X_PL2, Z_PL2),
-    (Y_PL2, Y_BLK, X_BLK, Z_BLK),
-    (Y_BLK, Y_FIL, X_FIL, Z_FIL),
-    (Y_FIL, Y_CAP, X_CAP, Z_CAP),
-    (Y_CAP, Y_CHM[0], X_CHM[0], Z_CHM),
-    (Y_CHM[0], Y_CHM[1], X_CHM[1], Z_CHM + 0.04),
-    (Y_CHM[1], Y_CHM[2], X_CHM[2], Z_CHM + 0.08),
-    (Y_CHM[2], Y_CR, X_CR_A, Z_CR_A),
-    (Y_CR, Y_CROWN, X_CR_B, Z_CR_B),
+STRUCTURE = [
+    # (y0,     y1,     half-width, back z,  course height or None)
+    (Y_FOOT, Y_PL1, X_PL1, Z_PL1, None),
+    (Y_PL1, Y_PL2, X_PL2, Z_PL2, None),
+    (Y_PL2, Y_BLK, X_BLK, Z_BLK, 0.54),        # the anvil block, laid in stone
+    (Y_BLK, Y_FIL, X_FIL, Z_FIL, None),
+    (Y_FIL, Y_CAP, X_CAP, Z_CAP, None),
+    (Y_CAP, Y_CHM[0], X_CHM[0], Z_CHM, 0.38),  # the stack, laid in fire-brick
+    (Y_CHM[0], Y_CHM[1], X_CHM[1], Z_CHM + 0.04, 0.38),
+    (Y_CHM[1], Y_CHM[2], X_CHM[2], Z_CHM + 0.08, 0.38),
+    (Y_CHM[2], Y_CR, X_CR_A, Z_CR_A, None),
+    (Y_CR, Y_CROWN, X_CR_B, Z_CR_B, None),
 ]
+
+# HOW DEEP A COURSE IS SET BACK. Round 1's walls came out flat, and the reason
+# is not the paint: vertex colour cannot carry the code skin's `bakeStone`
+# canvas at ANY affordable tessellation. A mortar line is ~0.076 tall and the
+# triangle budget buys vertices 0.38 apart, so a painted course line falls
+# between two vertex rows and simply does not exist. Halving the spacing until
+# it does would put the mass past 25000 triangles against a 15000 cap.
+#
+# So the courses are BUILT: alternate courses step back by this much, which
+# costs one box each and gives every course a real edge with a real value
+# break across it. It also does the thing the paint could not — it puts a
+# vertex row at every course line, so `joint_darken` now lands exactly on one
+# instead of being averaged away between two.
+COURSE_SET = 0.035
+
+
+def course_rows():
+    """The STRUCTURE table expanded into the boxes that actually get unioned:
+    a plain course where the table says None, and an alternating in/out stack
+    of them where it names a course height. The set-back is returned rather
+    than folded in, because it comes off the half-width AND the front face and
+    never off the back — which stands against the room's wall, where a step is
+    triangles nobody can see."""
+    rows = []
+    for y0, y1, hw, zb, ch in STRUCTURE:
+        if ch is None:
+            rows.append((y0, y1, hw, zb, 0.0))
+            continue
+        n = max(1, int(round((y1 - y0) / ch)))
+        for i in range(n):
+            rows.append((y0 + (y1 - y0) * i / n, y0 + (y1 - y0) * (i + 1) / n,
+                         hw, zb, COURSE_SET if i % 2 else 0.0))
+    return rows
+
+
+COURSE_ROWS = course_rows()
+# The course LINES, for the paint: every y where one course meets the next.
+COURSE_LINES = sorted({r[0] for r in COURSE_ROWS} | {r[1] for r in COURSE_ROWS})
 
 
 def build_mass():
-    parts = [box(f"course{i}", -hw, hw, y0, y1, zb, Z_FIELD)
-             for i, (y0, y1, hw, zb) in enumerate(COURSES)]
+    # THE FRONT ONLY STEPS WHERE THE FRONT IS THICK. Above the bore floor the
+    # facade is the 0.03 between the bore's front tangent (0.16 at x 0) and
+    # the field at 0.19 — so a 0.035 set-back there does not recess a course,
+    # it DELETES the wall, and the first bake of this pass proved it: two cowl
+    # samples leaked at wide.full through a course that had stopped existing.
+    # Below the bore floor the block is 0.59 thick and can afford it.
+    #
+    # The flue keeps its coursing in silhouette (the sides still step) and on
+    # the face it is carried by `joint_darken` — which works up there now for
+    # the reason this whole change exists: every course boundary is a real box
+    # boundary, so the paint has a vertex row to land on.
+    parts = [box(f"course{i}", -(hw - s), hw - s, y0, y1, zb,
+                 Z_FIELD - (s if y1 <= Y_BORE0 + 1e-6 else 0.0))
+             for i, (y0, y1, hw, zb, s) in enumerate(COURSE_ROWS)]
     mass = parts[0]
     mass.name = "towerSkinAnvilMass"
     F.boolean_each(mass, parts[1:], op="UNION")
@@ -639,16 +729,52 @@ def build_hood():
 # still reads as coal in the ember's own light).
 
 def build_bed(name, x0, x1, y0, y1, z_face, depth, nx, ny, lump):
-    """A raked coal bed: a back plate with a grid of lumps standing off it."""
-    parts = [box(f"{name}Back", x0, x1, y0, y1, z_face - depth, z_face - depth + 0.04)]
+    """A raked coal bed: a back plate with a field of lumps standing off it.
+
+    THE LUMPS ARE THE PICTURE, and round 1 had them too small and too even.
+    That bake read as a bright orange panel with bars in front of it — a
+    heater — because the bed was nearly flat and nearly all of it faced the
+    player at the same angle, so every eye saw the whole emitting area at once.
+    Banked coals are the opposite: most of what you see is a dead lump, and
+    the light arrives from the CRACKS between them, which is a function of
+    where you are standing.
+
+    Emissive is a material constant and is not multiplied by COLOR_0, so this
+    is the only gradient available (nullstone: "gradients made of geometry").
+    Bigger lumps, fewer of them, standing off the plate by most of the recess,
+    and jittered in all three axes so no two present the same face."""
+    parts = [box(f"{name}Back", x0, x1, y0, y1, z_face - depth,
+                 z_face - depth + 0.03)]
+    return merge(name, parts)
+
+
+def build_coals(name, x0, x1, y0, y1, z_face, depth, nx, ny, lump):
+    """THE LUMPS, and they are a SEPARATE MESH because they do not glow.
+
+    Round 2 had them in the emissive bed and the firebox rendered as a row of
+    flat lit rectangles behind bars — a radiator. The reason is that one
+    material is one emissive value, so every lump face emitted as hard as the
+    bed did, and a coal that emits from its own front face is not a coal.
+
+    Banked coals are DARK objects with light coming out from BETWEEN them.
+    Same geometry, opposite job: these stand in front of the emissive plate,
+    take the char albedo, and what a given eye sees of the fire is how much
+    plate they fail to cover from where it is standing — which is the only
+    kind of gradient a constant emissive can have (nullstone's rule, one
+    level further down than it had to take it)."""
+    parts = []
     for i in range(nx):
         for j in range(ny):
             cx = x0 + (x1 - x0) * (i + 0.5) / nx
             cy = y0 + (y1 - y0) * (j + 0.5) / ny
-            r = lump * (0.55 + 0.45 * h01(i * 31 + j, 7))
-            d = depth * (0.30 + 0.55 * h01(i * 17 + j, 11))
-            parts.append(box(f"{name}L{i}_{j}", cx - r, cx + r, cy - r, cy + r,
-                             z_face - depth + 0.03, z_face - depth + 0.03 + d))
+            jx = (h01(i * 41 + j, 3) - 0.5) * lump * 0.7
+            jy = (h01(i * 43 + j, 5) - 0.5) * lump * 0.7
+            r = lump * (0.70 + 0.55 * h01(i * 31 + j, 7))
+            rh = lump * (0.55 + 0.60 * h01(i * 37 + j, 13))
+            d = depth * (0.45 + 0.50 * h01(i * 17 + j, 11))
+            parts.append(box(f"{name}L{i}_{j}", cx + jx - r, cx + jx + r,
+                             cy + jy - rh, cy + jy + rh,
+                             z_face - depth + 0.04, z_face - depth + 0.04 + d))
     return merge(name, parts)
 
 
@@ -790,15 +916,71 @@ def course_of(y):
 def joint_darken(y, joints):
     """A mortar line at each course break: a recess is shadow, and shadow in a
     warm room is never #000."""
-    for jy in joints:
+    for jy, depth, half in joints:
         d = abs(y - jy)
-        if d < 0.055:
-            return 1.0 - 0.45 * (1.0 - d / 0.055)
+        if d < half:
+            return 1.0 - depth * (1.0 - d / half)
     return 1.0
 
 
-JOINTS = [Y_PL1, Y_PL2, Y_BLK, Y_FIL, Y_CAP, Y_CHM[0], Y_CHM[1], Y_CHM[2], Y_CR]
+def _joints():
+    """THE MORTAR, painted onto lines the GEOMETRY already put a vertex row on.
 
+    This was tried as paint alone first and it does not work: a mortar line is
+    ~0.076 tall, the triangle budget buys vertices 0.38 apart, and a painted
+    line between two vertex rows is a line that does not exist. `COURSE_SET`
+    is the repair — every course is a real step, so every course line has real
+    vertices — and this puts the shadow colour on them.
+
+    The structural joints (the plinth's own steps, the shoulder, the cap, the
+    crown's spring line) take it harder: those are steps in the silhouette
+    rather than a bed of mortar."""
+    structural = {Y_PL1, Y_PL2, Y_BLK, Y_FIL, Y_CAP, Y_CHM[0], Y_CHM[1],
+                  Y_CHM[2], Y_CR}
+    out = []
+    for y in COURSE_LINES:
+        if y in structural:
+            out.append((y, 0.45, 0.055))
+        elif Y_PL2 < y < Y_CROWN:
+            out.append((y, 0.30, 0.045))
+    return out
+
+
+JOINTS = _joints()
+
+
+# THE PERPENDS ARE REFUSED, and the refusal is the round's most useful finding.
+#
+# Round 3 read as stained WOOD rather than soot-blackened stone. The hue was
+# not the cause — the rendered mean was 27,22,21 against the code skin's
+# 25,21,20 — and neither was the value, which is inside 6% at every eye. The
+# cause is that the only lines on the model run HORIZONTALLY: courses without
+# perpends are planks, and the eye sorts planks from masonry instantly.
+#
+# So a running-bond generator was written, staggered per course, seeded block
+# lengths, applied only between bed joints. It was baked twice: at a 0.10
+# half-width with 0.34 of darkening, and again at 0.15 with 0.60. NEITHER IS
+# VISIBLE IN A SINGLE FRAME, and the arithmetic says why it never could be.
+#
+#   a perpend that reads is ~0.09 wide     (docs/TOWER.md: 0.07 u to exist)
+#   vertex colour resolves a feature only if a VERTEX ROW lands inside it
+#   the front face refines to 0.24 before the 15000-triangle cap binds
+#   0.24 > 0.09, so most joints fall between two rows and are averaged away;
+#   the few that do land get one darkened vertex, which renders as a soft
+#   blob rather than a line.
+#
+# Halving to 0.08 would put the mass at ~90000 triangles. There is no version
+# of this that fits, and the third refine pass it needed cost 3300 triangles
+# for nothing, so it is gone.
+#
+# WHAT THIS MEANS FOR T15, and it is worth more than this tower: a baked model
+# CANNOT carry the classics' fine surface story. That story lives in 1024px
+# seeded canvases with Sobel normal maps, and its replacement is not paint at
+# a finer grid — it is GEOMETRY (the stepped courses above, which do read, at
+# every distance and in silhouette) and VALUE. A re-baked classic is a
+# monolithic object with real relief, not a textured one. Heartwood and
+# Bastion are more texture-dependent than this tower, so their rounds should
+# start from that sentence rather than rediscover it.
 
 def paint_mass(poly, co):
     x, y, z = co.x, co.z, -co.y
@@ -827,6 +1009,7 @@ def paint_mass(poly, co):
     jd = joint_darken(y, JOINTS)
     if jd < 1.0:
         c = lerp3(c, joint, 1.0 - jd)
+
     # UPWARD FACES OUT-VALUE WALLS AT EQUAL ALBEDO (the hollowbole tongue, and
     # the forge's trap list): they aim at the key light. Compensate in the bake.
     if ny > 0.5:
@@ -1045,14 +1228,18 @@ def main():
     iron = build_iron()
     bronze = build_bronze()
     hood = build_hood()
-    grate = build_bed("towerSkinAnvilGrate", -GRATE_HW + 0.06, GRATE_HW - 0.06,
-                      Y_GRATE0 + 0.05, Y_GRATE1 - 0.05, GRATE_BED_Z + 0.20,
-                      0.20, 7, 3, 0.12)
-    vent = build_bed("towerSkinAnvilVent", VENT_X0 + 0.02, VENT_X1 - 0.02,
-                     VENT_Y0 + 0.04, VENT_Y1 - 0.04, VENT_BED_Z + 0.10,
-                     0.10, 1, 9, 0.05)
+    GRATE_BOX = (-GRATE_HW + 0.06, GRATE_HW - 0.06,
+                 Y_GRATE0 + 0.04, Y_GRATE1 - 0.04, GRATE_BED_Z + 0.24, 0.24)
+    VENT_BOX = (VENT_X0 + 0.02, VENT_X1 - 0.02,
+                VENT_Y0 + 0.04, VENT_Y1 - 0.04, VENT_BED_Z + 0.10, 0.10)
+    grate = build_bed("towerSkinAnvilGrate", *GRATE_BOX, 5, 2, 0.20)
+    vent = build_bed("towerSkinAnvilVent", *VENT_BOX, 1, 9, 0.05)
+    coals = merge("towerSkinAnvilCoals", [
+        build_coals("gc", *GRATE_BOX, 5, 2, 0.20),
+        build_coals("vc", *VENT_BOX, 1, 7, 0.045),
+    ])
     chute = build_chute()
-    meshes = [mass, iron, bronze, hood, grate, vent, chute]
+    meshes = [mass, iron, bronze, hood, grate, vent, coals, chute]
 
     # PAINT RESOLUTION FIRST, then the clean-up — and that order was a bug for
     # one bake. Subdividing AFTER triangulate leaves 245 degenerate faces and
@@ -1108,6 +1295,11 @@ def main():
     F.single_material(vent, F.vertex_color_material(
         "anvilVent", "Col", roughness=0.95, specular_level=0.08,
         emission=VENT_EMIT))
+    # THE COALS: char, and nothing else. They are the only mesh here whose job
+    # is to be DARK in front of something bright.
+    F.paint_corners(coals, "Col", paint_bed)
+    F.single_material(coals, F.vertex_color_material(
+        "anvilCoals", "Col", roughness=0.96, specular_level=0.10))
     F.paint_corners(chute, "Col", paint_chute)
     F.single_material(chute, F.vertex_color_material(
         "anvilChute", "Col", roughness=0.90, specular_level=0.18))
@@ -1122,7 +1314,8 @@ def main():
                         occluder=[mass], front_top=Y_CROWN)
     assert_the_door_head_is_between_the_gates(meshes)
     assert_the_fire_is_countable(meshes)
-    assert_the_fire_is_seen([grate, vent], [mass, iron, bronze, hood, chute])
+    assert_the_fire_is_seen([grate, vent],
+                            [mass, iron, bronze, hood, coals, chute])
     assert_the_silhouette_has_three_parts(meshes)
     if len(ran) != 7:
         raise RuntimeError(f"the battery ran {len(ran)} gates, not 7: {ran}")
