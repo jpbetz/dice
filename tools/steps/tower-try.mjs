@@ -110,10 +110,18 @@ export default async function run(stage, [target = '', seed = '42', light = ''])
   await t.dbg('holdClock(true)');
   await t.dbg('towerEcho(false)');
 
-  // A RAW BAKE IS A THROWAWAY ROW. The stage's server serves the whole repo,
-  // so `tools/forge/out/x.glb` is reachable from the page exactly as a
-  // promoted model is — which is the point: nothing is copied into
-  // models/towers/ to be looked at, so a rejected round leaves no trace.
+  // A RAW BAKE IS A THROWAWAY ROW. `tools/forge/out/` is one of the server's
+  // allowlisted asset roots, so `tools/forge/out/x.glb` is reachable from the
+  // page exactly as a promoted model is — which is the point: nothing is
+  // copied into models/towers/ to be looked at, so a rejected round leaves no
+  // trace.
+  //
+  // THAT SENTENCE USED TO SAY "the stage's server serves the whole repo", and
+  // it stopped being true on 2026-08-14 when the static allowlist shipped.
+  // Between then and 2026-08-18 this tool could not load a fresh bake at all;
+  // it reported "the table wears 'none'" and nothing else, and nobody saw it
+  // because no tower was baked in between. If this ever comes back, check
+  // server.js's APP_DIRS before suspecting the model.
   if (isPath) {
     const url = `/${target.replace(/^\.?\//, '')}`;
     const opts = { label: slug, title: 'tower-try' };

@@ -3500,12 +3500,28 @@ function isVendor(absPath) {
 //                   ORIGIN (the tower-glb-loader scenario), so a 404 here is a
 //                   red suite. Inert in production: `.gcloudignore` excludes
 //                   tests/ entirely, so the path is simply absent there.
+//   tools/forge/out/  THE SAME CASE, and it was missed when this list was
+//                   derived (2026-08-14). `tools/steps/tower-try.mjs` sockets
+//                   a RAW BAKE by registering `/tools/forge/out/<slug>.glb`
+//                   as a throwaway row — that is the whole review loop for a
+//                   new or re-baked tower, and the /new-tower skill's §1.9
+//                   names it as the step that decides whether a round was
+//                   worth anything. The allowlist 404'd it and the tool
+//                   reported only "the table wears 'none'", so the loop had
+//                   been dead since the day the allowlist shipped and nobody
+//                   noticed, because no tower was baked in between (found
+//                   2026-08-18, ROADMAP T15 round 1). Inert in production for
+//                   the same reason as the fixtures: `.gcloudignore` excludes
+//                   tools/ entirely.
 // Everything else — server.js, package.json, README.md, LICENSE, Makefile,
-// docs/, tools/, tests/*.mjs — 404s. Nothing in js/ or index.html fetches any
-// of them; verified, so narrowing costs nothing today.
+// docs/, the rest of tools/, tests/*.mjs — 404s. Nothing in js/ or index.html
+// fetches any of them; verified, so narrowing costs nothing today. The root
+// is `tools/forge/out` and not `tools/`, so `/tools/drive.mjs` still 404s and
+// the assertion that says so stays green.
 //
 // 404 rather than 403, because "forbidden" would confirm the file exists.
-const APP_DIRS = ['js', 'css', 'vendor', 'models', 'tests/e2e/fixtures']
+const APP_DIRS = ['js', 'css', 'vendor', 'models', 'tests/e2e/fixtures',
+  'tools/forge/out']
   .map((rel) => path.join(ROOT, ...rel.split('/')));
 const APP_FILES = new Set(['index.html', 'lab.html', 'chrome-lab.html']
   .map((rel) => path.join(ROOT, rel)));

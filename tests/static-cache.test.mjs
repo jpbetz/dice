@@ -34,7 +34,7 @@ limitations under the License.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -380,6 +380,29 @@ try {
     ['/lab.html', 'the dice lab'],
     ['/chrome-lab.html', 'the 2D lab that iframes index.html'],
   ];
+  // tools/forge/out/ is the same case as the e2e fixture and it was MISSED
+  // when the allowlist was derived: tools/steps/tower-try.mjs sockets a raw
+  // bake by registering `/tools/forge/out/<slug>.glb`, which is the whole
+  // review loop for a new or re-baked tower. It 404'd from 2026-08-14 to
+  // 2026-08-18 and the tool's only symptom was "the table wears 'none'".
+  // Asserted against a file the harness writes rather than a checked-in one,
+  // because the forge's output directory is .gitignored — so this proves the
+  // ROOT is served, which is the thing that regressed.
+  await t('allowlist serves tools/forge/out/ (the raw-bake review loop)', async () => {
+    const dir = new URL('../tools/forge/out/', import.meta.url);
+    await mkdir(dir, { recursive: true });
+    const probe = new URL('allowlist-probe.glb', dir);
+    await writeFile(probe, 'glTF-shaped-enough-for-a-status-code');
+    try {
+      const res = await fetch(`${base}/tools/forge/out/allowlist-probe.glb`);
+      assert.equal(res.status, 200,
+        'tools/forge/out/*.glb must be served — tower-try registers a raw bake '
+        + 'from that path and the loader fetches it through the page origin');
+      await res.arrayBuffer();
+    } finally {
+      await rm(probe, { force: true });
+    }
+  });
   for (const [p, why] of ALLOWED) {
     await t(`allowlist serves ${p} (${why})`, async () => {
       const res = await fetch(`${base}${p}`);
