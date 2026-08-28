@@ -287,7 +287,7 @@ limitations under the License.
            css/style.css; UX.md §7.23 carries the prose. -->
       <div id="section-bar" class="seg section-seg" role="group" aria-label="Panel sections">
         <button data-sec="dice" aria-pressed="true" title="Build by tapping dice">Dice</button>
-        <button data-sec="notation" aria-pressed="false" title="Type dice notation — 2d6+3, 4d6dl1, 1d20 adv dc15">2d6</button>
+        <button data-sec="notation" aria-pressed="false" title="Type dice notation — 2d6+3, 4d6dl1, 1d20 adv dc15, 6d6 t3">2d6</button>
         <button data-sec="pools" aria-pressed="true" title="Your saved pools">Pools</button>
       </div>
 
@@ -310,6 +310,13 @@ limitations under the License.
             <tr><td><code>ro&lt;=N</code></td><td>reroll ≤N, once per die (<code>r&lt;N</code> accepted)</td></tr>
             <tr><td><code>!</code></td><td>explode on the max face, chains 3 deep</td></tr>
             <tr><td><code>adv</code> / <code>dis</code></td><td>pair every d20; <code>2d20kh1</code> reads as adv</td></tr>
+            <!-- MECHANICS M2/M4/M6. These were shipped without a row here, and
+                 that omission WAS the feature's discoverability: this table is
+                 the app's only list of what may be typed, so a flag missing
+                 from it does not exist as far as a player is concerned. -->
+            <tr><td><code>tN</code></td><td>a turn — throw up to N times (2–5), keeping the dice you click between throws (<code>6d6 t3</code>)</td></tr>
+            <tr><td><code>push&gt;=N</code> / <code>push=1,5</code></td><td>push-your-luck — those faces score; a throw with none busts; Bank to stop (<code>6d6 push&gt;=5</code>)</td></tr>
+            <tr><td><code>bag:6@std,4@symbols.fate</code></td><td>draw the pool at random from a cup of mixed dice</td></tr>
             <tr><td><code>dcN</code> / <code>vs N</code></td><td>target number — result shows Success/Failure</td></tr>
             <tr><td><code>check</code> / <code>cinematic</code></td><td>roll moment — staged declaration + verdict (<code>cine</code> too)</td></tr>
             <tr><td><code>held</code></td><td>face down for everyone — hidden until the roller reveals</td></tr>
@@ -703,6 +710,22 @@ limitations under the License.
             <code>dc 15</code> — a target to beat. <code># words</code> —
             label the roll. <code>check</code> / <code>cinematic</code> —
             stage the moment.</p>
+          <h3>Turns — throwing more than once</h3>
+          <p><code>6d6 t3</code> — a <b>turn</b>: throw up to three times.
+            When the dice land, click the ones you want to <b>keep</b> (or
+            walk them with <span class="kbd">←</span> <span class="kbd">→</span>
+            and press <span class="kbd">K</span>) and the card offers
+            <b>Throw N again</b> for the rest. That is the roll-and-lock
+            mechanic — Yahtzee, and the monster-brawl dice game with the
+            energy, claw and heart faces. For those faces, pick the
+            <b>Monster</b> dice set under <b>Settings → You → Dice set</b>.</p>
+          <p><code>6d6 push&gt;=5</code> — <b>push-your-luck</b>: you say which
+            faces score, keep the ones you like, and throw the rest. A throw
+            with nothing scoring in it <b>busts</b> and the turn ends with
+            nothing; <b>Bank</b> stops while you are ahead. <code>push=1,5</code>
+            names a set of faces instead of a threshold.</p>
+          <p><code>3d6 bag:6@std,4@symbols.fate</code> — draw the pool at
+            random from a <b>cup</b> of mixed dice.</p>
         </section>
         <section id="help-visibility">
           <h3>Visibility</h3>
