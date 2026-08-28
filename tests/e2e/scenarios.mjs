@@ -658,6 +658,9 @@ const splitGhosts = async (t) => (await ghostLabels(t)).filter((l) => SPLIT_GHOS
 // that reason). Reaching for gotoRoom in a scenario that means to test the
 // walk is how this defect stayed invisible the first time.
 
+// MECHANICS M1/M2b share one question: what is picked right now.
+const picked = (a) => a.dbg('picked');
+
 export const scenarios = [
   {
     name: 'shared-roll',
@@ -20757,16 +20760,20 @@ export const scenarios = [
       // the log growing, which is a positive fact.
       await a.roll('4d6');
 
-      // ① DARK BY DEFAULT. PICK_DEFAULT_ENABLED is false and ships false
-      // until M2 gives a picked die a meaning; a click must do nothing at all.
+      // ① NOTHING TO PICK, NOTHING PICKS. Picking means "keep this die", and
+      // that only means something while a TURN of yours is open (M2b). This
+      // roll is a plain 4d6, so the dice are on the felt, perfectly visible,
+      // and inert — which is the arming rule stated from the outside.
       const spot = await a.dbg('dieScreen(0)');
       assert.ok(spot && Number.isFinite(spot.x),
         `a settled die projects to a screen point (${JSON.stringify(spot)})`);
       const before = await picked();
-      assert.equal(before.enabled, false, 'the gesture ships dark');
+      assert.equal(before.enabled, false, 'the force flag is off');
+      assert.equal(before.pickable, 0,
+        'and with no open turn there is nothing to pick, however visible the dice are');
       await clickAt(Math.round(spot.x), Math.round(spot.y));
       assert.equal((await picked()).dice.length, 0,
-        'and a click on a die while it is dark picks nothing');
+        'so a click straight onto a die does nothing at all');
 
       // ② ARMED, a click picks the die it landed on — and the marker draws.
       // `marks` is the InstancedMesh's live count: asserting the Set alone
@@ -21085,6 +21092,118 @@ export const scenarios = [
       })()`).then(JSON.parse);
       assert.equal(plain.svg, 0, 'a standard d6 reads as a numeral');
       assert.match(plain.text, /4/, 'showing its value');
+    },
+  },
+  {
+    name: 'turn-keep-gesture',
+    tags: ['mechanics', 'm2b', 'input', 'smoke'],
+    // MECHANICS M2b — the gesture that joins M1's pick path to M2's turn.
+    //
+    // Everything below M2b was drivable only from the API, so this is the
+    // first scenario in which a PERSON plays a turn: real clicks on real dice
+    // to say which ones survive, then the verb on the card.
+    //
+    // The arming rule is half the point and is asserted from both sides: a
+    // die is pickable while a turn of yours is open and inert otherwise, so
+    // the same click on the same die does opposite things depending on
+    // whether there is anything to keep.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      const state = (rid) => a.dbg(`turnState(${JSON.stringify(rid)})`);
+      const verb = () => a.eval(`(() => {
+        const b = document.querySelector('.throw-again');
+        if (!b) return null;
+        return JSON.stringify({
+          hidden: !!b.hidden, disabled: !!b.disabled,
+          text: b.textContent.trim(), title: b.title,
+        });
+      })()`).then((v) => (v ? JSON.parse(v) : null));
+      const clickDie = async (i) => {
+        const p = await a.dbg(`dieScreen(${i})`);
+        assert.ok(p, `die ${i} is on screen`);
+        await a.eval(`(() => {
+          document.querySelector('canvas').dispatchEvent(new MouseEvent('click',
+            { clientX: ${Math.round(p.x)}, clientY: ${Math.round(p.y)}, bubbles: true }));
+          return true;
+        })()`);
+      };
+
+      await a.roll('6d6 t3');
+      const rid = await a.rollId();
+      const one = await state(rid);
+
+      // ① THE VERB IS THERE, AND KEEPING NOTHING IS A NORMAL MOVE. Throwing
+      // all six again is most turns' first decision, so the verb is live from
+      // the start and names all six.
+      const idle = await verb();
+      assert.ok(idle && !idle.hidden, `Throw again is offered on a turn (${JSON.stringify(idle)})`);
+      assert.equal(idle.disabled, false, 'and keeping nothing is a legal throw');
+      assert.match(idle.text, /\b6\b/, `naming all six (${idle.text})`);
+      assert.match(idle.title, /pick/i, 'while saying how to keep some');
+
+      // ② A REAL CLICK KEEPS A DIE, and the verb counts what is left.
+      await clickDie(0);
+      await clickDie(2);
+      await a.dbg('sim(2)');
+      const two = await picked(a);
+      assert.equal(two.dice.length, 2, `two dice picked (${JSON.stringify(two.dice)})`);
+      assert.equal(two.marks, 2, 'and both are marked on the felt');
+      const armed = await verb();
+      assert.equal(armed.disabled, false, 'the verb arms');
+      assert.match(armed.text, /\b4\b/,
+        `and names the four dice it will throw, not the six on the table (${armed.text})`);
+
+      // ③ THE ACT. The picked dice are the KEPT dice.
+      const keptIdx = two.dice.map((d) => d.dieIndex).sort((x, y) => x - y);
+      await a.eval(`document.querySelector('.throw-again').click()`);
+      await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        { desc: 'the throw plays out', timeout: 30000 });
+      await a.dbg('sim(240)');
+      const after = await state(rid);
+      assert.deepEqual(after.throws, { max: 3, used: 2 }, 'a throw was spent');
+      for (const k of keptIdx) {
+        assert.equal(after.values[k], one.values[k], `die ${k} was picked, so it was kept`);
+        assert.deepEqual(after.positions[k], one.positions[k], `…and it did not move`);
+      }
+      for (let k = 0; k < 6; k++) {
+        if (keptIdx.includes(k)) continue;
+        assert.notDeepEqual(after.positions[k], one.positions[k],
+          `die ${k} was not picked, so it was thrown`);
+      }
+
+      // ④ THE SELECTION DOES NOT SURVIVE THE THROW. It described THAT throw;
+      // carrying it forward would silently keep dice nobody has looked at.
+      assert.equal((await picked(a)).dice.length, 0, 'the picks are dropped after the throw');
+
+      // ⑤ AND IT ALL GOES AWAY WHEN THE TURN DOES. Spend the last throw; the
+      // verb retires and the dice stop being pickable, so a stray click on a
+      // finished turn cannot mark anything.
+      await clickDie(0);
+      await a.dbg('sim(2)');
+      await a.eval(`document.querySelector('.throw-again').click()`);
+      await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        { desc: 'the last throw plays out', timeout: 30000 });
+      await a.dbg('sim(240)');
+      const spent = await state(rid);
+      assert.deepEqual(spent.throws, { max: 3, used: 3 }, 'the budget is spent');
+      const done = await verb();
+      assert.ok(!done || done.hidden, 'the verb retires with the turn');
+      assert.equal((await picked(a)).pickable, 0, 'and the dice stop being pickable');
+      await clickDie(0);
+      assert.equal((await picked(a)).dice.length, 0, 'so a stray click marks nothing');
+
+      // ⑥ KEEPING EVERY DIE IS NOT A THROW, and the button must not offer an
+      // act the server would refuse (nothing_thrown). A fresh turn, all six
+      // picked through the debug seam.
+      await a.dbg('clearTable()');
+      await a.dbg('sim(60)');
+      await a.roll('4d6 t2');
+      for (let i = 0; i < 4; i++) await a.dbg(`pickToggle(${i})`);
+      const all = await picked(a);
+      assert.equal(all.dice.length, 4, `every die picked (${JSON.stringify(all.dice)})`);
+      const stuck = await verb();
+      assert.equal(stuck.disabled, true, 'the verb refuses: there is nothing left to throw');
+      assert.match(stuck.title, /unpick/i, 'and says how to get out of it');
     },
   },
 ];

@@ -220,7 +220,7 @@ to be answered.
 | --- | --- | --- | --- | --- |
 | ~~**M1**~~ | ~~**Touch a die.**~~ **SHIPPED 2026-08-28** — see "M1, and the two bugs only a screenshot could find" below. | med | no | everything below; also V5's felt echo and §7.1 physical pool building, both stalled on exactly this |
 | ~~**M2**~~ | ~~**The throw becomes a turn.**~~ **SHIPPED 2026-08-28**, minus the player gesture — see the record below. | large | no | Yahtzee, King of Tokyo, Farkle, Can't Stop, Pig — with the human judging the bust |
-| **M2b** | **Pick becomes keep** — the gesture M2 is missing. Arm `PICK_DEFAULT_ENABLED`, wire a picked die to a kept one, name the verb, and give it the keyboard path M1 deliberately did not invent. Keyed `M2b` because M4 is taken. | small–med | no | any of Track C being usable without the API |
+| ~~**M2b**~~ | ~~**Pick becomes keep.**~~ **SHIPPED 2026-08-28** — a turn is playable by a person; see the record below. | small–med | no | any of Track C being usable without the API |
 | ~~**M3**~~ | ~~**Faces that are not numbers.**~~ **SHIPPED 2026-08-28** — `symbols.monster` and `symbols.fate`; see "M3, and the game we are not naming" below. | med | no | King of Tokyo's actual dice, Fudge, and ROADMAP §8's first half |
 | **M4** | **Procedures as a registry.** `PROCEDURES` beside `SYSTEMS`: throws, keep rule, bust rule, tally, bank verb. Farkle and Zombie Dice become assisted rather than merely possible. | med–large | **yes — this is the goal 6 decision** | automatic bust, running tally, the bank verb |
 | **M5** | **The decision as a beat.** Ceremony at the choice point: the tally at stake, the live bust odds, the moment. `js/odds.js` already forecasts; UX §2.1's `showOdds` exists and is deliberately unbuilt, and push-your-luck is the case that makes odds obviously worth showing rather than a crutch. | med | no (rides ⑤) | the reason to use this instead of physical dice |
@@ -357,6 +357,52 @@ dice back through the tower, you scoop the ones you are not keeping.
 **Still open:** the player-facing gesture. M1's pick path is dark and nothing
 wires pick → keep yet, so today a turn is driven from `__diceDebug.throwAgain`
 or the API. That is the next slice, and it is where M1 gets switched on.
+
+
+## M2b, pick becomes keep — SHIPPED 2026-08-28
+
+**A turn is now playable by a person.** Click the dice you want to keep, press
+**Throw N again** on the card, and the rest are thrown. Three throws, then the
+verb retires.
+
+**The arming rule is the whole design.** M1 shipped dark because a die that
+highlights and then does nothing teaches the wrong thing. What gives a pick
+meaning is a turn, so a die is pickable exactly while a turn of yours is open
+with throws left — and nowhere else. That rule lives in ONE place
+(`pickableDice`); the click handler does not test a flag at all, because when
+nothing is pickable the raycast has no targets and the click is inert.
+
+**Keeping nothing is a normal move.** Throwing all six again is most turns'
+first decision, so the verb is live from the start and says "Throw 6 again".
+The one refusal is keeping EVERY die — that is "I am done", not a throw, and
+the server refuses it too (`nothing_thrown`), so the button must not offer an
+act that would 400.
+
+**The selection does not survive the throw.** It described *that* throw;
+carrying it forward would silently keep dice nobody has looked at yet.
+
+**Three things this cost, all the same shape.** The budget had to be threaded
+through four separate explicit field lists — the SSE roll dispatch, the solo
+roll, the reload replay, and `currentRoll` — and each one silently dropped it
+until it was added. A whitelist is the right pattern here (it is what keeps a
+plain roll's payload byte-identical), but it means a new field is invisible
+until every list names it, and the symptom each time was a verb that simply
+did not appear.
+
+**And one that was a real bug:** the verb is painted by `updateCardActions`,
+which the banner AND the verdict card both go through. Repainting only the
+banner left the other one saying "Throw again" (disabled) with three dice
+picked, and `document.querySelector` finds whichever is first. The repaint now
+walks the same `mountedActionHolders` registry `repaintAwayVerbs` uses, and
+one function decides what the verb says — so the mount, the repaint and a
+selection change cannot drift.
+
+**Still owed: the keyboard path.** M1 deliberately did not invent a binding
+for an action that did nothing; the action exists now, so the binding is real
+work with a real name to choose. `toggleDiePick` is input-agnostic and the
+verb is a real `<button>` that already takes Enter, so what is missing is a
+way to reach the DICE without a pointer. That is the next small thing, and it
+is an *Always interruptible* obligation, not a nice-to-have.
 
 ## M3, and the game we are not naming — SHIPPED 2026-08-28
 

@@ -830,12 +830,15 @@ renderer.domElement.addEventListener('click', (e) => {
 // deliberately swallows the click that follows a pivot (ROADMAP V5, checked
 // 2026-08-17 and true until this commit).
 //
-// IT IS OFF FOR PLAYERS, ON PURPOSE. Nothing consumes a picked die yet, and a
-// die that highlights when you tap it and then does nothing is chrome that
-// teaches the wrong thing. So the gesture is dark until M2 gives it meaning —
-// the same trade js/decals.js makes with DECALS_DEFAULT_ENABLED, and the same
-// one the dormant `experiences` settings key makes: machinery whole, switched
-// off, re-armable per page. M2 flips one constant.
+// IT IS LIVE EXACTLY WHEN IT MEANS SOMETHING (MECHANICS M2b). This shipped
+// dark, because a die that highlights when you tap it and then does nothing is
+// chrome that teaches the wrong thing. What gives it meaning is a TURN: while
+// one of yours is on the felt with throws left, a picked die is a KEPT die and
+// `Throw again` throws the rest. Everywhere else there is nothing to pick, so
+// nothing picks — see pickableDice, which is where the rule actually lives.
+//
+// The constant survives as a FORCE, for the debug seam and for scenarios that
+// need to prove the path itself rather than the turn.
 const PICK_DEFAULT_ENABLED = false;
 
 const PICK = {
@@ -874,7 +877,20 @@ const pickKey = (d) => `${d.rollId || 'solo'}:${d.dieIndex}`;
 //     name a die that is about to be somewhere else.
 function pickableDice() {
   return tableDice.filter((d) => d.mesh && d.mesh.visible && !d.shrouded
-    && !(currentRoll && !currentRoll.done && d.rollId === currentRoll.rollId));
+    && !(currentRoll && !currentRoll.done && d.rollId === currentRoll.rollId)
+    // …and it belongs to a turn this viewer can actually throw again. That is
+    // the whole of M2b's arming rule: no open turn, nothing to pick. The
+    // force flag is for the debug seam and for scenarios proving the pick
+    // path itself, which must not need a turn to exist.
+    && (PICK.enabled || turnOpenFor(d.rollId)));
+}
+
+// Is `rollId` a turn this viewer may throw again? Read off the live turn's
+// own payload — the log entry is a different shape and does not carry the
+// budget in the same place.
+function turnOpenFor(rollId) {
+  const p = rollId ? liveTurns.get(rollId) : null;
+  return !!p && canThrowAgain(p);
 }
 
 // Screen point -> die, or null. Exact hit first, then the slop ring.
@@ -920,7 +936,7 @@ function diePicked(d) { return PICK.ids.has(pickKey(d)); }
 // players have to unlearn, and M2 owns what keeping is called.
 function toggleDiePick(d) {
   const k = pickKey(d);
-  if (PICK.ids.has(k)) { PICK.ids.delete(k); return false; }
+  if (PICK.ids.has(k)) { PICK.ids.delete(k); refreshTurnVerb(); return false; }
   // Cache the die's own contact plane at pick time. DERIVED FROM THE DIE, not
   // from a floor constant: the felt is y 0, the glade's ground is 0.02 and its
   // clearing detail 0.035, and the tower's contact shadow spent five rounds
@@ -941,7 +957,50 @@ function toggleDiePick(d) {
     _pickBox.max.z - _pickBox.min.z) / 2;
   d.pickBaseY = Math.max(d.pickBaseY, surfaceUnder(d, _pickBox));
   PICK.ids.add(k);
+  refreshTurnVerb();
   return true;
+}
+
+// The `Throw again` verb counts the dice it is about to throw, so it repaints
+// whenever the selection changes — from the SELECTION, not from one input
+// path, because a click, the debug seam and (later) a keyboard binding all
+// change the same state.
+//
+// EVERY MOUNTED HOLDER, not just the banner. The verb is painted by
+// `updateCardActions`, which the banner AND the verdict card both go through,
+// so repainting one left the other saying "Throw again" (disabled) with three
+// dice picked — and `document.querySelector` finds whichever is first. Same
+// registry `repaintAwayVerbs` uses, for the same reason it exists.
+function refreshTurnVerb() {
+  for (const holder of mountedActionHolders) {
+    if (!holder.isConnected || !holder._acts || !holder._acts.again) continue;
+    const entry = holder._entry;
+    if (!entry || !entry.throws) continue;
+    paintThrowAgain(holder._acts.again, entry);
+  }
+}
+
+// One place decides what the verb says and whether it is live, so the mount,
+// the repaint and the selection change cannot drift.
+function paintThrowAgain(again, entry) {
+  const show = canThrowAgain(entry);
+  again.hidden = !show;
+  if (!show) return;
+  const total = turnDieCount(entry);
+  const n = turnThrowCount(entry);
+  const left = entry.throws.max - entry.throws.used;
+  const plural = `${left} throw${left === 1 ? '' : 's'} left`;
+  // KEEPING NOTHING IS A NORMAL MOVE — you throw all of them again, which is
+  // most turns' first decision. The one refusal is keeping EVERY die: that is
+  // "I am done", not a throw, and the server refuses it too (nothing_thrown),
+  // so the button must not offer an act that would 400.
+  again.textContent = `Throw ${n} again`;
+  again.disabled = n === 0;
+  again.title = n === 0
+    ? 'You have kept every die — unpick one to throw it'
+    : (n === total
+      ? `Throw all ${n} again — ${plural}. Pick dice first to keep them.`
+      : `Keep the ${total - n} you picked and throw the other ${n} — ${plural}`);
 }
 
 // THE HEIGHT OF THE SURFACE THIS DIE IS STANDING ON — which is NOT the same
@@ -985,7 +1044,7 @@ function surfaceUnder(d, box) {
 
 
 
-function clearDiePicks() { PICK.ids.clear(); }
+function clearDiePicks() { PICK.ids.clear(); refreshTurnVerb(); }
 function pickedDice() { return tableDice.filter(diePicked); }
 
 // Drop keys whose dice have left the table, so the set cannot grow without
@@ -1080,10 +1139,13 @@ function stepPickMarks() {
 // and the ceremony layer, which are elsewhere in the tree). So this repeats
 // the peek test rather than relying on being shielded from it.
 renderer.domElement.addEventListener('click', (e) => {
-  if (!PICK.enabled) return;
   if (CAMPEEK.yaw || CAMPEEK.pitch) return; // a pivot's click is not a pick
+  // No flag test here on purpose: pickableDice decides what may be picked, so
+  // when nothing is pickable the raycast has no targets and the click is
+  // inert. One rule, one place.
   const d = pickDieAt(e.clientX, e.clientY);
-  if (d) toggleDiePick(d);
+  if (!d) return;
+  toggleDiePick(d); // …which repaints the verb; see refreshTurnVerb
 });
 
 // Half-width of the box kept around the deciding die when nothing larger
@@ -4749,6 +4811,57 @@ function applyRethrow(data) {
   playRoll(payload, { thrown: data.thrown, seed: data.seed });
 }
 
+// MECHANICS M2b — the gesture. Three questions the surfaces ask.
+//
+// May this viewer throw again? A turn, with throws left, still on the felt,
+// and THEIRS: the server refuses anyone else, and advertising a verb that
+// 403s is worse than not advertising one (U19's rule for Reveal).
+function canThrowAgain(entry) {
+  if (!entry || !entry.rollId || !entry.throws) return false;
+  if (entry.throws.used >= entry.throws.max) return false;
+  if (collected.has(entry.rollId) || !rollState(entry.rollId)) return false;
+  if (entryHidden(entry)) return false; // you cannot choose faces you cannot see
+  return isMine(entry);
+}
+
+// How many of this turn's dice would be thrown — that is, the ones NOT picked.
+// The picked dice are the KEPT ones: you point at what you want to survive,
+// which is what a hand does at a table.
+function turnThrowCount(entry) {
+  const n = turnDieCount(entry);
+  if (!n) return 0;
+  return n - keptIndicesFor(entry.rollId).length;
+}
+
+// How many dice this turn has. A LOG ENTRY carries `parts`, a roll payload
+// carries `dice`, and both reach these functions — the banner paints from an
+// entry while `turnOpenFor` reads a payload.
+function turnDieCount(entry) {
+  if (!entry) return 0;
+  if (Array.isArray(entry.parts)) return entry.parts.length;
+  if (Array.isArray(entry.dice)) return entry.dice.length;
+  return 0;
+}
+
+// The picked dice belonging to this roll, as die indices, sorted. M1's
+// selection is table-wide and permissive on purpose; the turn scopes it.
+function keptIndicesFor(rollId) {
+  return pickedDice()
+    .filter((d) => d.rollId === rollId)
+    .map((d) => d.dieIndex)
+    .sort((a, b) => a - b);
+}
+
+// The act. Keeps what is picked, throws the rest, and drops the selection —
+// the picks described THAT throw, and carrying them into the next one would
+// silently keep dice the player has not looked at yet.
+function requestThrowAgain(rollId) {
+  const keep = keptIndicesFor(rollId);
+  const p = requestRethrow(rollId, keep);
+  clearDiePicks();
+  return p;
+}
+
 // Ask for another throw. `keep` is the die indices staying put. Solo has no
 // server to author the values, so it composes locally through the same shared
 // rollspec — one mechanic, two callers, exactly as composeRoll already is.
@@ -5783,6 +5896,11 @@ function playRoll(roll, rethrow = null) {
     // reroll provenance (B3): server-substantiated; entryFromRoll reads it
     // off currentRoll at completion, so dropping it here unmarks the roll
     rerollOfId: typeof roll.rerollOfId === 'string' ? roll.rerollOfId : null,
+    // MECHANICS M2: the turn's budget, for the same reason as the line above
+    // — entryFromRoll reads the completed roll off THIS object, so a field
+    // dropped here is a field the log entry never sees, and the banner's
+    // `Throw again` verb is painted from the entry.
+    throws: roll.throws || null,
     // dice-set identity (Tier 6 §9): the burst drain and entryFromRoll read it
     set: typeof roll.set === 'string' ? roll.set : null,
     sets: Array.isArray(roll.sets) && roll.sets.length ? roll.sets : null, // per-die (§9 mixed pools)
@@ -6527,6 +6645,11 @@ function entryFromRoll(roll) {
     // dice-set identity (Tier 6 §9): shelf reconstruction re-skins from this
     set: typeof roll.set === 'string' ? roll.set : undefined,
     sets: Array.isArray(roll.sets) && roll.sets.length ? roll.sets : undefined, // per-die (§9)
+    // MECHANICS M2: a turn's budget rides the log entry too, because the
+    // BANNER is where the `Throw again` verb lives and the banner is painted
+    // from an entry, not from the roll payload. Present-or-absent, so a plain
+    // roll's entry is byte-for-byte what it always was.
+    throws: roll.throws ? { max: roll.throws.max, used: roll.throws.used } : undefined,
     spec,
   };
 }
@@ -7400,11 +7523,26 @@ function mountCardActions(holder, opts) {
   });
   foot.appendChild(keep);
 
+  // THROW AGAIN (MECHANICS M2b). The verb that joins M1's pick path to M2's
+  // turn: the dice you have picked are the ones you KEEP, and this throws the
+  // rest. It lives beside Reveal because it is the same kind of act — a thing
+  // only the roller may do, to a roll that is still open — and it names how
+  // many dice will move, because "throw again" on a turn where you have kept
+  // five of six is a very different act from one where you have kept none.
+  const again = document.createElement('button');
+  again.className = 'reveal-verb banner-btn throw-again';
+  again.hidden = true;
+  again.addEventListener('click', () => {
+    const e = holder._entry;
+    if (e && e.rollId) requestThrowAgain(e.rollId);
+  });
+  foot.appendChild(again);
+
   holder.append(primary, foot, strip);
   holder._entry = null;
   // Named children beat a positional walk: the row's shape is now a fact the
   // update path reads, not a chain of nextElementSibling it has to re-derive.
-  holder._acts = { primary, foot, strip, keep, reveal };
+  holder._acts = { primary, foot, strip, keep, reveal, again };
   holder._cardActionsMounted = true;
   mountedActionHolders.add(holder);
 }
@@ -7422,7 +7560,7 @@ function updateCardActions(holder, entry, opts) {
   // Kept for the repaint: the verb is a FUNCTION of roster state, not a
   // constant, and the repaint has to ask the same question this call did.
   holder._verbFor = opts.verbFor || null;
-  const { primary, foot, strip, keep, reveal } = holder._acts;
+  const { primary, foot, strip, keep, reveal, again } = holder._acts;
   paintPrimaryAct(primary, opts.verbFor
     ? opts.verbFor(entry)
     : (entry && entry.rollId && (isMine(entry) || rollerAway(entry)) ? 'clear' : 'dismiss'));
@@ -7436,9 +7574,14 @@ function updateCardActions(holder, entry, opts) {
   // the foot alone carried Reveal's gate, adding a second child to it made a
   // face-up roll paint a live Reveal — the exact defect the `hidden` fold
   // shipped once before, caught here by the pins that were written for it.
+  // MECHANICS M2b: a turn with throws left, and only for the roller — the
+  // server refuses anyone else, and offering a verb that 403s is worse than
+  // not offering it (U19's rule for Reveal, applied to the same shape).
+  const showAgain = canThrowAgain(entry);
+  if (again) paintThrowAgain(again, entry);
   if (keep) keep.hidden = !showKeep;
   if (reveal) reveal.hidden = !showReveal;
-  foot.hidden = !showReveal && !showKeep;
+  foot.hidden = !showReveal && !showKeep && !showAgain;
   strip.hidden = !showStrip;
   if (showStrip) strip.setAttribute('aria-label', `Reroll — ${entry.label}`);
 }
@@ -11128,7 +11271,11 @@ window.__diceDebug = {
   // Projection and raycasting are opposite operations, so agreement between
   // this and pickAt is a real check rather than a tautology.
   dieScreen(i) {
-    const d = pickableDice()[i];
+    // Indexes the DICE ON THE FELT, not the pickable ones: this is a locator,
+    // and a scenario has to be able to aim at a die precisely in order to
+    // prove that clicking it does NOTHING.
+    const d = tableDice.filter((x) => x.mesh && x.mesh.visible)
+      .sort((a, b) => a.dieIndex - b.dieIndex)[i];
     if (!d) return null;
     const rect = renderer.domElement.getBoundingClientRect();
     const v = (d.finalPos ? d.finalPos.clone() : d.mesh.position.clone()).project(camera);
