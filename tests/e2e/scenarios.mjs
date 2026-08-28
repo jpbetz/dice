@@ -21260,10 +21260,27 @@ export const scenarios = [
       assert.doesNotMatch(one.line, /should|try|better|recommend|keep these|stop now/i,
         `the readout reports and does not advise (${one.line})`);
 
-      // ④ BANKING. Keep the scoring dice and bank them; the tally is what
-      // those dice are worth and the turn ends.
-      assert.equal(await a.dbg(`bankTurn(${JSON.stringify(rid)}, ${JSON.stringify(expected)})`),
-        true, 'the turn banks');
+      // ④ BANKING, THROUGH THE VERB. Pick the scoring dice and press Bank —
+      // the same path a player takes, so this proves the gesture rather than
+      // the endpoint.
+      for (const i of expected) await a.dbg(`pickToggle(${i})`);
+      await a.dbg('sim(2)');
+      const verbs = await a.eval(`(() => {
+        const t = document.querySelector('.throw-again');
+        const b = document.querySelector('.bank-turn');
+        return JSON.stringify({
+          again: t ? { hidden: !!t.hidden, text: t.textContent.trim() } : null,
+          bank: b ? { hidden: !!b.hidden, disabled: !!b.disabled, title: b.title } : null,
+        });
+      })()`).then(JSON.parse);
+      assert.ok(verbs.bank && !verbs.bank.hidden, 'Bank is offered on a push turn');
+      assert.equal(verbs.bank.disabled, false,
+        'and it is never disabled — banking is always a legal move');
+      assert.match(verbs.bank.title, new RegExp(`${expected.length}\\s+(die|dice)`),
+        `its title says what it will bank (${verbs.bank.title})`);
+      assert.ok(verbs.again && !verbs.again.hidden,
+        'and Throw again stands beside it — the two ARE the decision');
+      await a.eval(`document.querySelector('.bank-turn').click()`);
       await a.dbg('sim(30)');
       const banked = await push(rid);
       assert.equal(banked.state.banked, true, 'and is marked banked');
@@ -21271,6 +21288,13 @@ export const scenarios = [
       assert.equal(banked.state.tally.sum,
         expected.reduce((t, i) => t + one.values[i], 0), 'the sum is their faces');
       assert.match(banked.line, /Banked/, `and the readout says so (${banked.line})`);
+      const after = await a.eval(`(() => {
+        const b = document.querySelector('.bank-turn');
+        const t = document.querySelector('.throw-again');
+        return JSON.stringify({ bank: b ? !!b.hidden : true, again: t ? !!t.hidden : true });
+      })()`).then(JSON.parse);
+      assert.equal(after.bank, true, 'both verbs retire with the turn');
+      assert.equal(after.again, true, 'including the throw');
       // A banked turn throws no more.
       assert.equal(await a.dbg(`throwAgain(${JSON.stringify(rid)}, [])`), false,
         'a banked turn is over');

@@ -50,8 +50,8 @@ export default async function run(stage) {
   console.log(`live: ${(await a.dbg(`pushState(${JSON.stringify(rid)})`)).line}`);
   console.log('  ' + await stage.shot(a, 'push-live.png'));
 
-  // ② Banked.
-  await a.dbg(`bankTurn(${JSON.stringify(rid)}, ${JSON.stringify(st.state.scoring)})`);
+  // ② Banked — through the verb, which is what a player presses.
+  await a.eval(`document.querySelector('.bank-turn').click()`);
   await a.dbg('sim(30)');
   console.log(`banked: ${(await a.dbg(`pushState(${JSON.stringify(rid)})`)).line}`);
   console.log('  ' + await stage.shot(a, 'push-banked.png'));

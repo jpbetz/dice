@@ -994,9 +994,44 @@ function refreshTurnVerb() {
   for (const holder of mountedActionHolders) {
     if (!holder.isConnected || !holder._acts || !holder._acts.again) continue;
     const entry = holder._entry;
-    if (!entry || !entry.throws) continue;
-    paintThrowAgain(holder._acts.again, entry);
+    if (!entry) continue;
+    if (entry.throws) paintThrowAgain(holder._acts.again, entry);
+    if (entry.push && holder._acts.bank) paintBankTurn(holder._acts.bank, entry);
   }
+}
+
+// May this viewer bank? A push turn of theirs, still open, on the felt. Same
+// authority as throwing again, because it is the same decision seen from the
+// other side.
+function canBankTurn(entry) {
+  if (!entry || !entry.rollId || !entry.push) return false;
+  if (entry.push.busted || entry.push.banked) return false;
+  if (collected.has(entry.rollId) || !rollState(entry.rollId)) return false;
+  if (entryHidden(entry)) return false;
+  return isMine(entry);
+}
+
+function paintBankTurn(bank, entry) {
+  const show = canBankTurn(entry);
+  bank.hidden = !show;
+  if (!show) return;
+  const { count, sum } = pushTally(entry.parts.map((p) => p.value),
+    keptIndicesFor(entry.rollId), entry.push.rule);
+  bank.textContent = 'Bank';
+  // NEVER DISABLED, even at nothing. Banking an empty hand is a legal move —
+  // it is "I am done" — and the invariant says the procedure never hides a
+  // legal option. What it does instead is SAY what it is about to bank, so
+  // nobody banks zero by accident.
+  bank.title = count === 0
+    ? 'End the turn with nothing — you have kept no scoring dice'
+    : `End the turn holding ${count} ${count === 1 ? 'die' : 'dice'}, ${sum}`;
+}
+
+// The act. Banks whatever is picked, and drops the selection with the turn.
+function requestBankTurn(rollId) {
+  const p = requestBank(rollId, keptIndicesFor(rollId));
+  clearDiePicks();
+  return p;
 }
 
 // One place decides what the verb says and whether it is live, so the mount,
@@ -7986,11 +8021,25 @@ function mountCardActions(holder, opts) {
   });
   foot.appendChild(again);
 
+  // BANK (MECHANICS M4). The other half of a push turn's decision: stop, and
+  // keep what you are holding. It sits beside `Throw again` because the two
+  // ARE the decision — the whole mechanic is choosing between them — and a
+  // verb tucked somewhere else would be the app quietly nudging you toward
+  // the one on screen.
+  const bank = document.createElement('button');
+  bank.className = 'reveal-verb banner-btn bank-turn';
+  bank.hidden = true;
+  bank.addEventListener('click', () => {
+    const e = holder._entry;
+    if (e && e.rollId) requestBankTurn(e.rollId);
+  });
+  foot.appendChild(bank);
+
   holder.append(primary, foot, strip);
   holder._entry = null;
   // Named children beat a positional walk: the row's shape is now a fact the
   // update path reads, not a chain of nextElementSibling it has to re-derive.
-  holder._acts = { primary, foot, strip, keep, reveal, again };
+  holder._acts = { primary, foot, strip, keep, reveal, again, bank };
   holder._cardActionsMounted = true;
   mountedActionHolders.add(holder);
 }
@@ -8008,7 +8057,7 @@ function updateCardActions(holder, entry, opts) {
   // Kept for the repaint: the verb is a FUNCTION of roster state, not a
   // constant, and the repaint has to ask the same question this call did.
   holder._verbFor = opts.verbFor || null;
-  const { primary, foot, strip, keep, reveal, again } = holder._acts;
+  const { primary, foot, strip, keep, reveal, again, bank } = holder._acts;
   paintPrimaryAct(primary, opts.verbFor
     ? opts.verbFor(entry)
     : (entry && entry.rollId && (isMine(entry) || rollerAway(entry)) ? 'clear' : 'dismiss'));
@@ -8027,9 +8076,11 @@ function updateCardActions(holder, entry, opts) {
   // not offering it (U19's rule for Reveal, applied to the same shape).
   const showAgain = canThrowAgain(entry);
   if (again) paintThrowAgain(again, entry);
+  const showBank = canBankTurn(entry);
+  if (bank) paintBankTurn(bank, entry);
   if (keep) keep.hidden = !showKeep;
   if (reveal) reveal.hidden = !showReveal;
-  foot.hidden = !showReveal && !showKeep && !showAgain;
+  foot.hidden = !showReveal && !showKeep && !showAgain && !showBank;
   strip.hidden = !showStrip;
   if (showStrip) strip.setAttribute('aria-label', `Reroll — ${entry.label}`);
 }
