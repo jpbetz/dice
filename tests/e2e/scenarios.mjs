@@ -20909,4 +20909,109 @@ export const scenarios = [
       assert.ok((await picked()).pickable > 0, 'and they all are once it lands');
     },
   },
+  {
+    name: 'turn-throws',
+    tags: ['mechanics', 'm2', 'roll', 'smoke'],
+    // MECHANICS M2 — a throw becomes a turn (docs/MECHANICS.md).
+    //
+    // The server half is tests/turns.test.mjs; this is the half only a browser
+    // can hold down: that the FELT agrees with the record. The whole mechanic
+    // is "the dice you keep stay where they are", and every way of getting
+    // that wrong looks fine in a payload:
+    //
+    //   * re-filming the whole pool would give the right values on dice that
+    //     had visibly jumped;
+    //   * filming only the thrown subset would misalign every result surface,
+    //     because renderChips walks entry.parts and indexes dice[i];
+    //   * correcting the faces off the wrong throw would leave the felt
+    //     showing values the log does not.
+    //
+    // So it asserts POSITIONS as well as faces, and reads the faces off the
+    // dice themselves (`readValue` of each die's final quaternion) rather than
+    // off the payload that produced them.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      const state = (rid) => a.dbg(`turnState(${JSON.stringify(rid)})`);
+
+      await a.roll('6d6 t3');
+      const rid = await a.rollId();
+      const one = await state(rid);
+      assert.deepEqual(one.throws, { max: 3, used: 1 },
+        'the first throw is a throw, so the budget opens at 1 of 3');
+      assert.deepEqual(one.indices, [0, 1, 2, 3, 4, 5], 'six dice, in roll order');
+      assert.deepEqual(one.faces, one.values,
+        `the felt shows what the record says (${one.faces} vs ${one.values})`);
+
+      // ---- throw two: keep 0, 2, 4 ----------------------------------------
+      const keep = [0, 2, 4];
+      const thrown = [1, 3, 5];
+      assert.equal(await a.dbg(`throwAgain(${JSON.stringify(rid)}, ${JSON.stringify(keep)})`), true,
+        'the turn accepts a second throw');
+      await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        { desc: 'throw two plays out', timeout: 30000 });
+      await a.dbg('sim(240)');
+      const two = await state(rid);
+
+      assert.deepEqual(two.throws, { max: 3, used: 2 }, 'a throw was spent');
+      assert.deepEqual(two.indices, [0, 1, 2, 3, 4, 5],
+        'still six dice — a re-throw neither adds nor loses one');
+
+      // THE MECHANIC. A kept die does not move and does not change its face.
+      for (const k of keep) {
+        assert.equal(two.values[k], one.values[k], `die ${k} was kept: its value holds`);
+        assert.deepEqual(two.positions[k], one.positions[k],
+          `die ${k} was kept: it does not move (${one.positions[k]} -> ${two.positions[k]})`);
+      }
+      // …and a thrown die really is thrown. Position, not value: a d6 lands on
+      // its own old face 1 time in 6, but landing on the exact same spot after
+      // a real tumble does not happen.
+      for (const k of thrown) {
+        assert.notDeepEqual(two.positions[k], one.positions[k],
+          `die ${k} was thrown and came to rest somewhere new`);
+      }
+
+      // THE FELT AGREES WITH THE RECORD, which is the assertion that catches a
+      // film built from the wrong throw's values.
+      assert.deepEqual(two.faces, two.values,
+        `every die shows its recorded face (${two.faces} vs ${two.values})`);
+      assert.deepEqual(two.entryParts, two.values,
+        'and the log row carries the same six — the record was replaced, not appended');
+
+      // ---- the budget is real, and every throw is its own tumble ----------
+      // Throw three keeps the SAME dice as throw two, which is what makes the
+      // position comparison below mean something: same cast, same starting
+      // felt, so if the two throws landed identically they were baked from
+      // one seed. They were, once — reusing `roll.seed` for a re-throw passed
+      // every other assertion in this scenario because face correction fixes
+      // the values either way, and the only visible symptom is that the dice
+      // trace the same arc twice.
+      assert.equal(await a.dbg(`throwAgain(${JSON.stringify(rid)}, ${JSON.stringify(keep)})`),
+        true, 'throw three');
+      await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        { desc: 'throw three plays out', timeout: 30000 });
+      await a.dbg('sim(240)');
+      const three = await state(rid);
+      assert.deepEqual(three.throws, { max: 3, used: 3 }, 'three of three');
+      for (const k of keep) {
+        assert.deepEqual(three.positions[k], two.positions[k],
+          `die ${k} is still kept and still has not moved`);
+      }
+      assert.notDeepEqual(
+        thrown.map((k) => three.positions[k]),
+        thrown.map((k) => two.positions[k]),
+        'the same dice thrown again land somewhere else — each throw has its own seed');
+      assert.equal(await a.dbg(`throwAgain(${JSON.stringify(rid)}, [0])`), false,
+        'and a fourth is refused');
+
+      // ---- a plain roll is not a turn -------------------------------------
+      await a.dbg('clearTable()');
+      await a.dbg('sim(60)');
+      await a.roll('4d6');
+      const plainId = await a.rollId();
+      const plain = await state(plainId);
+      assert.equal(plain.throws, null, 'a plain roll has no budget');
+      assert.equal(await a.dbg(`throwAgain(${JSON.stringify(plainId)}, [0])`), false,
+        'and cannot be thrown again');
+    },
+  },
 ];

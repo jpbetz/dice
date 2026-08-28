@@ -24,7 +24,7 @@ import { dieArtURL } from './diceart.js';
 import { connect, forgetSeat, peekTable, prejoinSeat, LS_WHO } from './net.js';
 import { recentTables, rememberTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
-import { composeRoll, validateMods, budgetOf, MAX_PHYSICAL_DICE } from './rollspec.js';
+import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE } from './rollspec.js';
 import { previewOf, countingPmfs, sumForecast, sumAtLeast, sumBins, sumPeak } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealStartingRack, dealRack, dealName } from './seed.js';
@@ -4049,6 +4049,7 @@ function resetTableSurface() {
   dieLights.releaseAll(); // the sweep takes every glow with it
   tableDice = [];
   prunePicks();          // MECHANICS M1: a pick cannot outlive its die
+  liveTurns.clear();     // MECHANICS M2: nor a turn outlive its dice
   // THE FRAME FOLLOWS THE FELT. Since the camera may be cropped onto dice
   // (2026-08-10), an emptied table would otherwise leave the player looking at
   // a close, off-centre frame of nothing — measured after a clear: mode=dice,
@@ -4121,6 +4122,7 @@ function removeRollDice(rollId, instant = false) {
   if (!going.length) return false;
   tableDice = tableDice.filter((d) => d.rollId !== rollId);
   prunePicks();           // MECHANICS M1: a pick cannot outlive its die
+  liveTurns.delete(rollId); // MECHANICS M2: nor a turn outlive its dice
   reframeForFeltChange(); // the frame follows the felt; see resetTableSurface
   const goingSet = new Set(going);
   for (let i = chips.length - 1; i >= 0; i--) {
@@ -4719,6 +4721,60 @@ function soloAutoCollect() {
   soloCollectEntries(ids);
 }
 
+// THE TURNS ON THE FELT (MECHANICS M2), by rollId. A log entry is
+// `entryFromRoll`'s shape and a film needs the ROLL payload's — dice, values,
+// seed, sets — so the payload is kept while its turn is live. Solo has no
+// server holding one, and online this is what a second throw is filmed from.
+// Cleared when the dice leave, beside every other per-roll state.
+const liveTurns = new Map();
+
+// THROW AGAIN. Every client runs this, including the one whose click caused
+// it: the values are the server's and the film is a function of the seed, so
+// a roller who applied it optimistically would watch a different tumble from
+// the rest of the table.
+function applyRethrow(data) {
+  const payload = data && data.roll;
+  if (!payload || !payload.rollId) return;
+  if (!Array.isArray(data.thrown) || !data.thrown.length) return;
+  liveTurns.set(payload.rollId, payload);
+  // The record has to be REPLACED, not appended: addLogEntry dedupes by
+  // rollId and would silently drop the update, leaving the log row showing
+  // the faces from two throws ago while the felt showed the new ones.
+  const idx = log.findIndex((e) => e.rollId === payload.rollId);
+  if (idx >= 0) {
+    log[idx] = rollToLogEntry(payload);
+    if (!netOnline) save(LS_LOG, log);
+    renderLog();
+  }
+  playRoll(payload, { thrown: data.thrown, seed: data.seed });
+}
+
+// Ask for another throw. `keep` is the die indices staying put. Solo has no
+// server to author the values, so it composes locally through the same shared
+// rollspec — one mechanic, two callers, exactly as composeRoll already is.
+function requestRethrow(rollId, keep) {
+  if (netOnline && net) return net.rethrow(rollId, keep);
+  return Promise.resolve(soloRethrow(rollId, keep));
+}
+
+function soloRethrow(rollId, keep) {
+  const payload = liveTurns.get(rollId);
+  if (!payload || !payload.throws) return false;
+  if (payload.throws.used >= payload.throws.max) return false;
+  const kept = new Set(keep);
+  const thrown = [];
+  for (let i = 0; i < payload.dice.length; i++) if (!kept.has(i)) thrown.push(i);
+  if (!thrown.length) return false; // keeping everything is "done", not a throw
+  const next = {
+    ...payload,
+    values: composeThrow(payload.dice, payload.values, thrown, Math.random),
+    throws: { max: payload.throws.max, used: payload.throws.used + 1 },
+  };
+  next.total = next.values.reduce((a, b) => a + b, 0) + (payload.modifier || 0);
+  applyRethrow({ roll: next, thrown, seed: (Math.random() * 2 ** 32) >>> 0 });
+  return true;
+}
+
 // Roller-side Collect (§7.7). Online the server validates (roller only) and
 // everyone — us included — reacts to the 'roll-collected' burst; solo runs
 // the same machine locally. Resolves whether the collect actually happened.
@@ -4772,7 +4828,24 @@ function clearTable() {
 // numberless obsidian dice and no face correction — there is nothing to
 // correct to. A solo/legacy face-down roll keeps its values but plays
 // shrouded too, so the felt never leaks what the chips withhold.
-function playRoll(roll) {
+// `rethrow` = {thrown: [die indices], seed} turns this into THROW N OF A TURN
+// (MECHANICS M2): the dice named in `thrown` are thrown again and every other
+// die stays exactly where it is, keeping its face.
+//
+// THE WHOLE TURN RIDES THE FILM, not just the dice that moved. `dice`,
+// `values`, `perDie`, `keyframes` and `chips` are index-aligned to the roll
+// throughout this app — renderChips walks `entry.parts` and indexes `dice[i]`
+// — so a film covering only the thrown subset would misalign every result
+// surface. Instead the kept dice join the cast as STATIC, PRE-FROZEN bodies:
+// they bake a constant track, the thrown dice collide with them (which is the
+// fun of it), and not one downstream reader has to know a re-throw happened.
+//
+// A RE-THROW IS ALWAYS THROWN, never poured, even with a tower up. You do not
+// pick dice up off the felt and post them back through the tower — you scoop
+// the ones you are not keeping and throw them again. That is the physical
+// story, and it also keeps the pour machine (which assumes every die in the
+// cast is making the journey) out of a case it was never built for.
+function playRoll(roll, rethrow = null) {
   const types = roll && Array.isArray(roll.dice) ? roll.dice : [];
   const values = roll && Array.isArray(roll.values) ? roll.values : null;
   if (!types.length) return;
@@ -4802,14 +4875,31 @@ function playRoll(roll) {
   hideBanner();
   dismissCeremonyUI(); // a lingering verdict card/decal yields to the new roll
 
+  // A TURN keeps its payload while it is on the felt (MECHANICS M2): the film
+  // of throw two is built from it, and solo has no server holding a copy.
+  if (roll.rollId && roll.throws) liveTurns.set(roll.rollId, roll);
+
   // --- spawn with seeded throw params -------------------------------------
-  const rng = mulberry32(roll.seed >>> 0);
+  // A turn's second throw needs its own tumble; the roll's seed already played
+  // the first one.
+  const rng = mulberry32(((rethrow ? rethrow.seed : roll.seed) >>> 0));
+  // Which dice are staying put, and the ordinal of each thrown die within the
+  // dice actually being thrown — spawnDie lines a throw up across the mat by
+  // (index, count), and passing the ROLL's index and count would spread three
+  // dice as if they were six.
+  const thrownSet = rethrow ? new Set(rethrow.thrown) : null;
+  const keptDice = rethrow ? tableDice.filter(
+    (d) => d.rollId === roll.rollId && !thrownSet.has(d.dieIndex)) : [];
+  const keptByIndex = new Map(keptDice.map((d) => [d.dieIndex, d]));
+  const throwOrdinal = new Map();
+  if (rethrow) rethrow.thrown.forEach((di, n) => throwOrdinal.set(di, n));
+  const throwCount = rethrow ? rethrow.thrown.length : types.length;
   // A TOWER ROLL POURS INSTEAD OF BEING THROWN (docs/TOWER.md §3). The die is
   // not hurled from a table edge: it is dropped into the mouth, vanishes, and
   // arrives out of the doorway. So it gets no throw params and, crucially, no
   // BODY until it exits — a hidden die has no physics at all, which is what
   // makes a model unable to deflect an entry.
-  const pouring = towerOn();
+  const pouring = towerOn() && !rethrow; // see the header: a re-throw is thrown
   const side = pouring ? 0 : Math.floor(rng() * 4);
   // A pour never touches spawnDie, so nothing would clear the last THROWN
   // roll's spawn line and the instrument would report a stale one as this
@@ -4817,7 +4907,28 @@ function playRoll(roll) {
   if (pouring) spawnLine = [];
   const dice = pouring
     ? types.map((t, i) => spawnPourDie(t, shrouded, rollDieSet(roll, i)))
-    : types.map((t, i) => spawnDie(t, i, types.length, side, rng, shrouded, rollDieSet(roll, i)));
+    : types.map((t, i) => {
+      // A kept die is not spawned at all: the object already on the felt IS
+      // the die, with its pose, its skin and its resting cadence. Spawning a
+      // replacement would teleport a die the player is looking at.
+      const held = keptByIndex.get(i);
+      if (held) return held;
+      return spawnDie(t, rethrow ? throwOrdinal.get(i) : i, throwCount, side, rng,
+        shrouded, rollDieSet(roll, i));
+    });
+  if (rethrow) {
+    // The dice being thrown again leave the table as objects — their meshes
+    // and bodies are replaced by the ones just spawned. The kept ones are
+    // removed here too and re-pushed with the rest below, so `tableDice` ends
+    // up holding each die exactly once and in roll order.
+    for (const d of tableDice) {
+      if (d.rollId !== roll.rollId) continue;
+      if (keptByIndex.get(d.dieIndex) === d) continue;
+      world.removeBody(d.body);
+      scene.remove(d.mesh);
+    }
+    tableDice = tableDice.filter((d) => d.rollId !== roll.rollId);
+  }
   // Every die on the table is tagged with its roll (§7.5): a per-roll Done
   // removes exactly these dice and never touches a concurrent roll's.
   dice.forEach((d, i) => {
@@ -5772,6 +5883,12 @@ function rollDice(types, label, opts = {}) {
     sets: Array.isArray(opts.sets) && opts.sets.some(Boolean) ? opts.sets.map((s) => s || null) : null,
     seed: randomSeed(),
     label: label || formula(types),
+    // MECHANICS M2: solo authors its own budget, exactly as executeRoll does
+    // online — the first throw is a throw, so `used` starts at 1. Absent on
+    // every non-turn, so a plain solo roll's payload is unchanged.
+    throws: spec.mods && spec.mods.throws
+      ? { max: spec.mods.throws, used: 1 }
+      : undefined,
   });
 }
 
@@ -10843,6 +10960,33 @@ window.__diceDebug = {
     };
   },
   pickClear() { clearDiePicks(); },
+  // A TURN (MECHANICS M2). `throwAgain` keeps the dice named by index and
+  // re-throws the rest, through the SAME path a player's gesture will use, so
+  // a scenario proves the mechanic rather than a test-only shortcut.
+  throwAgain(rollId, keep) { return requestRethrow(rollId, keep); },
+  // What the felt says about the turn: the faces as rendered, which dice
+  // exist, and the budget. `values` comes off the log entry (the record) and
+  // `faces` off the DICE (what the eye gets) — the two must agree, and a
+  // scenario that only checked the record would pass on a felt that never
+  // moved.
+  turnState(rollId) {
+    const payload = liveTurns.get(rollId) || null;
+    const entry = log.find((e) => e.rollId === rollId) || null;
+    const dice = tableDice.filter((d) => d.rollId === rollId)
+      .sort((a, b) => a.dieIndex - b.dieIndex);
+    return {
+      throws: payload ? payload.throws : null,
+      values: payload ? payload.values : null,
+      entryParts: entry && Array.isArray(entry.parts)
+        ? entry.parts.map((p) => p.value) : null,
+      faces: dice.map((d) => readValue(d.type, d.finalQuat || d.mesh.quaternion).value),
+      indices: dice.map((d) => d.dieIndex),
+      positions: dice.map((d) => {
+        const p = d.finalPos || d.mesh.position;
+        return [Math.round(p.x * 1000) / 1000, Math.round(p.z * 1000) / 1000];
+      }),
+    };
+  },
   // WHAT COULD PAINT OVER THE MARKER. The bug this exists for: at
   // renderOrder 2 the ring drew under a fae venue's three fog sheets and was
   // invisible in the frame while `picked.marks` cheerfully said 3.
@@ -26333,6 +26477,7 @@ function replaySettledRoll(r) {
     revealAuthority: r.revealAuthority,
     notation: r.notation,
     rerollOfId: r.rerollOfId,   // B3: a reload's on-felt roll keeps its mark
+    throws: r.throws,           // MECHANICS M2: …and a turn keeps its budget
     set: r.set,                 // Tier 6 §9: a reload keeps the roller's skin
     sets: r.sets,               // §9 per-die (mixed pools survive a reload)
     playerId: r.playerId,
@@ -26542,6 +26687,7 @@ function handleNetEvent(type, data) {
         revealAuthority: data.revealAuthority,
         notation: data.notation,
         rerollOfId: data.rerollOfId,   // B3: server-substantiated provenance
+        throws: data.throws,           // MECHANICS M2: a turn's budget, if this is one
         set: data.set,                 // Tier 6 §9: the roller's dice-set skin
         sets: data.sets,               // §9 per-die (mixed pools)
         playerId: data.playerId,
@@ -26585,6 +26731,14 @@ function handleNetEvent(type, data) {
         (data.roll && data.roll.rollId) || data.rollId,
         data.roll || (Array.isArray(data.values) ? data : undefined)
       );
+      break;
+    case 'rethrow':
+      // Throw N of a turn (MECHANICS M2). The event carries the whole
+      // projected entry — the new truth — plus which dice moved and the seed
+      // their tumble is baked from. A shrouded viewer gets `thrown` and
+      // `seed` with a redacted entry: they watch the dice move and learn
+      // nothing about the faces, which is the turn-level visibility Q2 chose.
+      applyRethrow(data);
       break;
     case 'roll-cleared': // per-roll Done (§7.5) / shelf aging (§7.7)
       applyClearRoll(data.rollId);

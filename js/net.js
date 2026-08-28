@@ -38,7 +38,7 @@ const REOPEN_MIN_MS = 1000;
 const REOPEN_MAX_MS = 15000;
 const SSE_EVENTS = [
   'hello', 'player-joined', 'player-left', 'player-renamed', 'pools-changed',
-  'roll', 'clear', 'reveal', 'roll-cleared', 'roll-collected',
+  'roll', 'clear', 'reveal', 'rethrow', 'roll-cleared', 'roll-collected',
   'offer', 'offer-claimed', 'offer-rescinded',
   'settings-changed', 'table-setup', 'table-split',
 ];
@@ -439,6 +439,16 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     // this return value.
     async collectRoll(rollId) {
       const res = await withPlayer('/api/collect-roll', { rollId });
+      return res.ok;
+    },
+
+    // Throw again (MECHANICS M2). `keep` is a list of die INDICES that stay
+    // as they are; everything else is re-thrown. The server owns the budget
+    // and the values, and answers everyone — us included — with a 'rethrow'
+    // event, so nothing is applied optimistically here: our own dice move
+    // when the room's do.
+    async rethrow(rollId, keep) {
+      const res = await withPlayer('/api/rethrow', { rollId, keep });
       return res.ok;
     },
 
