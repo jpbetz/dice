@@ -19,13 +19,20 @@ organization, ops — sequenced by GOALS' ladder. Track B is the owner's track �
 venues, towers, dice art, immersion — sequenced by what Joe asks for next and
 by *finishing what is in flight*.
 
-**A third track is PROPOSED and unsequenced: [MECHANICS.md](MECHANICS.md)**
-(2026-08-27). Joe's read is that the product is bad at roll-and-lock and
-push-your-luck — King of Tokyo's mechanic cannot be played here at all. The
-proposal says why (this system models a roll; those are turns), what it would
-cost, and which GOALS lines would have to move. **It is awaiting his ruling and
-nothing in it is buildable yet.** Do not sequence it into THE ORDER until he
-answers its four questions.
+**Track C is MECHANICS, opened and ruled on 2026-08-27**
+([MECHANICS.md](MECHANICS.md)). Joe's read: the product is bad at
+roll-and-lock and push-your-luck, and King of Tokyo's mechanic cannot be
+played here at all. The cause is structural — **this system models a ROLL and
+those mechanics are TURNS** — so it is a campaign, not a feature. His rulings:
+**M1–M3 are in scope, M4 waits, and mechanics go before T15.** Coverage is now
+a stated goal ([GOALS.md](GOALS.md) goal 16) with a family table that has six
+open rows.
+
+**Track C's rows in THE ORDER are keyed `M1`/`M2`, not integers.** The
+integers 1–11 are taken, several by struck rows that keep their numbers as
+history (C4: one owner per numbering namespace, and a reused number is how
+that rule got written). They sit in priority position, which is what the
+ordering means; their key is an identifier, not a rank.
 
 **Two batches, 2026-08-15 and 2026-08-16, took nineteen entries off this file**
 (record in [SHIPPED.md](SHIPPED.md)). What is left has a different shape:
@@ -66,16 +73,19 @@ answers its four questions.
 | # | Item | Why it is here | Size | Track |
 | --- | --- | --- | --- | --- |
 | ~~1~~ | ~~Joe's LOOK and LISTEN sitting~~ — **SAT 2026-08-18, all eight answered** ([the record](#the-sitting--sat-2026-08-18-and-it-is-the-day-this-tier-stopped-waiting)) | **The whole of Track B was gated on this and is not any more.** Four approvals (W7 ②, W5, W4, C25 Stage 2), one *not yet* (the grounded stump — *"still a set piece… nothing to make it feel rooted"*), two decisions that are now build items (`preferDice` ON, the standard dice wear `round .090`) and ten voices heard, eight needing work. **Cost him about an hour; five separate askings over the previous fortnight had produced one verdict.** Refill the page to eight and ask once — never drip-feed it. | done | B |
-| 1b | **The re-asks the sitting created** — **PAGE REFILLED 2026-08-18, and it is THREE items** ([the record](#refilled-2026-08-18--and-it-is-three-items-not-eight)) | ~~The stump's round 7, eight of the ten voices, and a re-listen.~~ Rendered then built, 12 frames, 0 missing, 0 stale, opened and read. **① W3 round 10's re-baked base** (with the pale band stated first, before the frames), ~~**② C30's pile** off the stills~~ — **answered 2026-08-17 without them, and the tuning shipped 2026-08-18** (row 6, [UX §7.61](UX.md)), **③ the two fae ground impacts** re-listened on the live table — the only item that is not answerable from the page. **`IMPACT_VOICES.chime` is deliberately NOT on it**: unheard is not rejected, and a question whose honest answer is "I don't know" costs him a click and buys nothing. Rebuild with the commands in [the note below](#the-sittings-page-is-rendered-then-built-in-that-order), which now point at the generator's header as the single copy. | ~15 min of Joe | B |
+| ~~1b~~ | ~~**The re-asks the sitting created**~~ — **ALL THREE ANSWERED 2026-08-18 in a second sitting; the queue is EMPTY** (`794374d`, "Write the sitting page plainly, and empty the queue" — see `tools/verdict-sheet.mjs`, whose `ITEMS` is `[]` on purpose and whose header carries the record). **This row said three questions were open and stood for nine days after they were answered** — found 2026-08-27. The base shape was approved; the pale band at the foot is what is still unsettled, and its next step is the paint bisect, not another verdict. | ~~The stump's round 7, eight of the ten voices, and a re-listen.~~ Rendered then built, 12 frames, 0 missing, 0 stale, opened and read. **① W3 round 10's re-baked base** (with the pale band stated first, before the frames), ~~**② C30's pile** off the stills~~ — **answered 2026-08-17 without them, and the tuning shipped 2026-08-18** (row 6, [UX §7.61](UX.md)), **③ the two fae ground impacts** re-listened on the live table — the only item that is not answerable from the page. **`IMPACT_VOICES.chime` is deliberately NOT on it**: unheard is not rejected, and a question whose honest answer is "I don't know" costs him a click and buys nothing. Rebuild with the commands in [the note below](#the-sittings-page-is-rendered-then-built-in-that-order), which now point at the generator's header as the single copy. | ~15 min of Joe | B |
 | ~~2~~ | ~~[**§2l ⑥'s RENDERING**](#2l-pool-analysis--①⑥-all-shipped-the-last-of-them-2026-08-17)~~ **SHIPPED 2026-08-17** | The curve of the total renders in `#pop-preview` on every ± door, plus a target clause in the one-line validator. §2l is now ①–⑥ complete; **it is owed a move to SHIPPED.md**, which this pass did not own. Its two live dependents are #4's sibling (§5's local statistics, now unblocked — `sumForecast(…).mean`/`.sd` are the expected term) and UX §2.1's `showOdds`, still deliberately unbuilt. | — | A |
 | ~~3~~ | ~~C22's `room.setup` stamp~~ — **SHIPPED 2026-08-17** ([C22](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15-closed-2026-08-17), UX §7.49 ⑥) | Not ~10 lines and not `maybeRepushTable`: the server **rewrote** the payload field by field, so the stamp needed `server.js` and `js/net.js` too, and the authoring writer is `portablePushToTable`. The three wrong claims are recorded in C22. | small | A |
 | ~~4~~ | ~~§5 — roll-log export~~ — **SHIPPED 2026-08-17** ([§5](#5-capture-mechanisms), UX §7.49) | Plain-text transcript, `Copy` + `Download` in a log-flyout foot. `portableDownload()` was in `js/main.js`, not `js/portable.js`; **CSV was refused** and the reason is in UX §7.49 ②. | small | A |
+| M1 | [**Touch a die**](MECHANICS.md) | **The substrate the whole of Track C stands on, and it is stuck work already on this file.** There is no pointer→die path in the app at all (V5, re-checked 2026-08-17): the only canvas `pointermove` is CAMPEEK's hold-drag. Keeping dice between throws is a per-die choice by a human, so M2 cannot start until a human can point at one. Independently closes V5's blocked half and §7.1's physical pool building, both stalled on this same missing path. **Do it even if the campaign stops here.** | med | C |
+| M2 | [**The throw becomes a turn**](MECHANICS.md) | Throw up to N times, keeping what you choose between throws. **Needs no goals change and no game knowledge** — it is what hands do at a physical table — and it makes Yahtzee, King of Tokyo, Farkle, Pig and Can't Stop playable with the human judging the bust. The large bet, and the one that beat T15 in a straight comparison on 2026-08-27. **Q2 (does visibility belong to a turn or a throw?) gates the build** and is unanswered. | large | C |
+| M3 | [**Faces that are not numbers**](MECHANICS.md) | A face-set registry behind the `glyph` seam that already exists (`js/dice.js:283`, where `glyph:'pip'` draws Vegas pips on a d6). Fudge first — three faces, no ambiguity — then King of Tokyo's six. **Closes ROADMAP §8**, which has been blocked on this exact line since it was written ("needs dice.js custom face sets"), and success counting rides the same work. Cheap enough to interleave; the chips and the log must learn glyphs too, or the *results readable* invariant breaks. | med | C |
 | 5 | [**9d follow-up** — `venue` in the portable YAML](#9d-follow-up-venue-in-the-portable-yaml--tower-shipped-2026-08-17) | **`tower` SHIPPED 2026-08-17** ([UX §7.50](UX.md)) — `TABLE_KEYS` is `{name, felt, system, zoom, tower}` and a prepared table arrives with its tower up. What is left is GOALS' punt: how a **venue** rides the file. Shipping the tower alone exposed that a file can now prepare *half a fae venue*, which is the argument for sequencing this next. | small | A |
 | ~~6~~ | ~~**C30 residual**~~ — **SHIPPED 2026-08-18** ([the record](SHIPPED.md), [UX §7.61](UX.md)) | `feltgrip+gate4` is what the table now runs: shake −30% to −43%, hops −14% to −32%, every pool faster, caps 1 → 0, clock 1.03×. It was refused for four passes on the sixth gate — piling, +6.3pp at close/6d6 with flat throws 33/40 → 23/40 — and **Joe overturned that**: *"Pilling is OK. If you throw a lot of dice, it's your fault if they pile up. Let's not try to prevent it."* Gate d is now a **heap floor** and the pile rate is a reported number. The LOOK this row was waiting for was never needed; the answer was a ruling, not a frame. | done | A |
 | 7 | [**§3b L2**](#3b-the-lobby-and-the-table-flow--l4-shipped-l2-is-a-judgment-call) | **Decision record written 2026-08-17; recommends NO and needs Joe's yes/no.** The premise was stale: the peek has disclosed the display name of any seated player holding a profile since C17, and the join door renders them under a heading reading "At this table". A count's only new information is a player who published nothing. What the item actually owes is a corrected budget comment in `handleTableInfo` and the assertion that would have caught it. | small | A |
 | 8 | [**U16**, **U21**, **C26**](#u16-draft-intent-in-the-well--designed-2026-08-17-ready-to-build) | **All three are DESIGNS now, not stuck items** (2026-08-17) — each was adjudicated, one stale sub-claim struck per item, and each has a smallest-first-commit named. C26's label is killed for good: the name wipe is load-bearing, so the gesture returns as **`Take a prepared seat…`**. U21 carries the one fact the UX audit predates — a player who collapses the rail inside a breakout has **no way back on screen**. | med, now buildable | A |
 | ~~9~~ | ~~IDENTITY~~ — **the whole item is CLOSED 2026-08-17** ([IDENTITY.md](IDENTITY.md), UX §7.52) | **Rung 1 shipped**: `dice.who.v1` resumes a *lapsed* seat on the same `playerId`, which was also the fix for two bugs on no roadmap item — a held roll whose reveal died with its tab, and your own secret rolls vanishing from your own log. **B1's server half is killed** with a named defect (enrolment is an open keyword, so the entitlement is self-issued whoever carries it). **Rung 2 is closed by Joe's answer**: a stake that outlives its keeper is a different feature wearing goal 11's words, so a gone browser's held roll stays sweepable-unread by design — IDENTITY §7 is the paragraph to close any report of it with. | — | A |
-| 10 | [**T15**](#t15-re-bake-the-three-classic-skins-through-the-forge--large-scoped-2026-08-14) | Owner-commissioned, explicitly not a side quest. **Un-queued 2026-08-18** — the reason it waited (seven outstanding verdicts) is gone. It is still three rounds that end at his eye, so it goes on the SAME page as #1b's re-asks rather than becoming a second queue. **Do 9c first**: T15 re-bakes the three classic skins, and 9c just changed what edge a standard die wears — baking three skins against the old edge would be three wasted rounds. | large | B |
+| 10 | [**T15**](#t15-re-bake-the-three-classic-skins-through-the-forge--large-scoped-2026-08-14) | **DEMOTED 2026-08-27 behind MECHANICS M2, by Joe, on a straight comparison** — a re-baked skin makes an existing thing prettier, M2 makes the product cover a family it cannot play at all. Nothing decays while it waits. Owner-commissioned, explicitly not a side quest. **Un-queued 2026-08-18** — the reason it waited (seven outstanding verdicts) is gone. It is still three rounds that end at his eye, so it goes on the SAME page as #1b's re-asks rather than becoming a second queue. **Do 9c first**: T15 re-bakes the three classic skins, and 9c just changed what edge a standard die wears — baking three skins against the old edge would be three wasted rounds. | large | B |
 | 11 | [**§4b**, **V3**, **V5**, **U28b**'s two refused families](#4b-visibility-refinements--all-four-are-design-first-none-is-a-one-line-fix) | The tail, after triage (2026-08-17): **V4's instrument and U28b's rail foot shipped, and V4's pixel-ratio gap was never real on any day**. What is left is NOT small — §4b is four design-first bullets that all re-verified true, V3 is a sixth wear pass plus a LOOK, V5's hover half has no substrate (no pointer→die path exists at all), and both remaining touch families are priced refusals. The one build item left is V4's draw-budget **assertion**, whose contract is written and sabotage-checked. | design-first + 1 scenario | A |
 | — | everything else | Design-first, record-only, or deliberately deferred. Named in its tier with the reason. | | |
 
@@ -1652,7 +1662,7 @@ Its 3400 → 1750 re-voice was commissioned by the caller that has just been
 deleted, so those three now carry an unjudged change. **One row for the next
 listening page** — not a blocker for anything.
 
-### W3 round 9. The stump is rooted — SHIPPED 2026-08-18, **LOOK OPEN**
+### W3 round 9. The stump is rooted — SHIPPED 2026-08-18, **LOOK SUPERSEDED by round 10**
 
 Joe's round-8 verdict on the grounding work, verbatim: *"It's still a set piece
 in my eyes… nothing to make it feel rooted."* **It was one number, and it was
@@ -1681,7 +1691,12 @@ the film provably did not move).
 | G3 depth — Σ(1−R) (≥ 18 px) | 0.06 | 22.5 | 19.5 |
 | G4 no rim (≤ 0.025) | 0.000 | 0.000 | 0.000 — a declared FLOOR |
 
-**OPEN, and it is Joe's:** `shots/rooted-before-{moonrise,foxfire}-resting.png` →
+**NOT open, and it was never answered on its own terms — round 10 replaced the
+question before it was asked** (deliberately: a superseded frame in front of him
+is how a queue starts getting ignored). Its reservation *was* round 10's brief,
+round 10 shipped, and Joe approved the base shape on 2026-08-18. Corrected
+2026-08-27, when this heading still read "LOOK OPEN". The frames it was going to
+ask with: `shots/rooted-before-{moonrise,foxfire}-resting.png` →
 `shots/rooted-after-{moonrise,foxfire}-resting.png`, the resting eye, four
 frames. One reservation worth his eye and the gates cannot answer it: the root
 flare is *less* bright than it was but it is still the lightest structure near
@@ -1699,7 +1714,7 @@ z-fighting the glade ground at 0.02 and buried under the clearing detail at
 0.035. `DECALS_DEFAULT_ENABLED` is false, so nothing ships broken; anyone
 turning them back on inherits the same floor problem.)*
 
-### W3 round 10. The flare is re-baked — SHIPPED 2026-08-18, **LOOK OPEN, and read ⑤ first**
+### W3 round 10. The flare is re-baked — SHIPPED 2026-08-18, **LOOK ANSWERED 2026-08-18** (read ⑤ first)
 
 Joe on round 9's frame: the flare "is still the lightest structure near the
 ground", and the next lever is **the shape, not the paint**. He and the reviewer
@@ -1739,8 +1754,12 @@ instrument this round wanted is a **paint bisect** — one diagnostic bake with
 each surface class at a flat separable colour. Ten minutes, and it replaces
 three bakes of guessing. Next round does that before touching geometry.
 
-**OPEN, and it is Joe's — it is item ① of the refilled sitting page**
-(2026-08-18). The honest ask is narrow: *the foot no longer tucks under itself
+**ANSWERED 2026-08-18, in the second sitting: the base shape is APPROVED and
+settled.** The pale band is not, and its next step is the paint bisect above —
+a diagnostic bake, not another guess and not another verdict. *(This paragraph
+read "OPEN, and it is Joe's" until 2026-08-27, nine days after he answered it.
+The record was in `tools/verdict-sheet.mjs`'s `CLOSED_LAST_SITTING` the whole
+time; the roadmap was never re-read against it.)* The ask that was put to him: *the foot no longer tucks under itself
 and the roots no longer end together — is the base a better shape, even though
 the pale band is still there?* If the answer is "the pale band IS the
 complaint", that is the paint bisect's round and this one bought the ground

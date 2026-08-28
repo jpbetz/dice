@@ -145,6 +145,44 @@ note).
     roll looks like, never what it is. If an effect cannot meet these, the
     effect is cut, not the rule.
 
+## The coverage (added 2026-08-27)
+
+16. **The families of dice mechanic are the coverage target.** "The best
+    possible virtual dice rolling simulator" is the ambition (Joe,
+    2026-08-27), and it is only a goal if it can be checked — until this
+    section existed, the answer to "are we there yet" could only be a
+    feeling. The unit of coverage is the **family**, not the game: a family
+    is a way dice get used that needs machinery of its own. The table is
+    maintained HERE and nowhere else, and an open row is a legitimate thing
+    to prioritise against immersion work.
+
+| family | example | today |
+| --- | --- | --- |
+| single-throw resolution vs a target | `d20+5 dc15` | shipped |
+| pools with attributed modifiers | `2d8[Wisdom]+3` | shipped |
+| keep/drop inside one throw | `4d6dl1` | shipped |
+| advantage / disadvantage pairs | `2d20kh1` | shipped |
+| exploding, chained | `d6!` | shipped (chain cap 3) |
+| per-die reading, no sum | *Your Soul Deal* | shipped |
+| rule-driven rerolls | `4d6r<2` | shipped |
+| the secrecy ladder | held / secret / whisper | shipped |
+| success counting | pool vs a threshold, count hits | **open** — ROADMAP §8 |
+| symbol faces | Fudge, King of Tokyo, Zombie Dice | **open** — ROADMAP §8 names it; MECHANICS M3 |
+| roll-and-lock across throws | Yahtzee, King of Tokyo | **open** — no primitive; MECHANICS M2 |
+| push-your-luck | Farkle, Zombie Dice, Pig | **open** — no primitive; MECHANICS M2/M4 |
+| dice drawn from a bag | Zombie Dice | **open** — MECHANICS M6 |
+| opposed rolls | two players, one comparison | **open** — every roll is read alone; nothing on any surface compares two |
+| initiative order | one shared action, sorted | **open** — ROADMAP §7 |
+
+    **A family may be deliberately refused**, and a refused row says so with
+    its reason — coverage is a goal, not a mandate, and this project kills
+    designs on purpose. What a family may not be is *unnamed*: the opposed-roll
+    row was found by writing this table and appears on no roadmap item.
+
+    [MECHANICS.md](MECHANICS.md) holds the campaign that closes the open rows
+    and the evidence for why they are open. **Goal 6 draws the line this table
+    may never cross** — a family is a way DICE are used, never a game's rules.
+
 *Punted, recorded so nobody re-litigates them by accident (2026-08-15,
 Joe: "let's punt on that sort of thing"): whether a venue can host multiple
 dice sets; whether venue pieces later unbundle for à-la-carte use; how a

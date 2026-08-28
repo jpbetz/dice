@@ -16,11 +16,22 @@ limitations under the License.
 
 # MECHANICS.md — what a dice simulator has to cover
 
-**Status: PROPOSAL, written 2026-08-27 at Joe's ask. Nothing here is
-authority yet.** [GOALS.md](GOALS.md) still wins every tie and none of its
-lines have moved. This file argues that a few of them should, states the
-replacement text so the decision is a yes/no rather than an essay, and
-sequences the work that follows. The open questions are at the bottom.
+**Status: RULED ON 2026-08-27, the same day it was written.** Joe answered
+two of its four questions plus the sequencing call, and the answers are
+recorded where they were asked. Q2 and Q3 are still open; **Q2 gates M2.**
+What was settled:
+
+- **Scope: M1 through M3, and M4 waits.** Build the substrate, the turn and
+  symbol faces. Decide whether the app should detect a bust and keep a tally
+  once there is a turn on the felt to play with.
+- **Sequencing: mechanics before T15.** The three classic skins wait.
+- **Goal 16 is adopted** — the coverage table now lives in
+  [GOALS.md](GOALS.md) and this file cites it rather than holding a copy.
+
+[GOALS.md](GOALS.md) still wins every tie. Of the five goal edits proposed
+below, **only ② shipped**: ① (goal 6) is deferred to M4 by Joe's scope
+ruling, and ③④⑤ are rules the M2 build must honour — they land in the commit
+that ships it, not before, so nothing dangles.
 
 ## The ask
 
@@ -77,32 +88,19 @@ What each named game needs:
 
 ## What "best possible" would have to mean
 
-The project has never had a definition of "best" that anything could be
-measured against, which is why the answer to "are we there yet" has to be a
-feeling. Proposed: **the coverage target is the families of dice mechanic**,
-written down, with an honest status column. That turns the question into a
-checklist and makes a gap visible before somebody plays into it.
+The project had no definition of "best" that anything could be measured
+against, which is why the answer to "are we there yet" had to be a feeling.
+**That is now [GOALS.md](GOALS.md) goal 16**, adopted 2026-08-27: the unit of
+coverage is the *family of dice mechanic*, the table is maintained there and
+nowhere else, and an open row is a legitimate thing to prioritise against
+immersion work.
 
-| family | example | today |
-| --- | --- | --- |
-| single-throw resolution vs a target | `d20+5 dc15` | shipped |
-| pools with attributed modifiers | `2d8[Wisdom]+3` | shipped |
-| keep/drop inside one throw | `4d6dl1` | shipped |
-| advantage / disadvantage pairs | `2d20kh1` | shipped |
-| exploding, chained | `d6!` | shipped (chain cap 3) |
-| per-die reading, no sum | *Your Soul Deal* | shipped |
-| rule-driven rerolls | `4d6r<2` | shipped |
-| secrecy ladder | held / secret / whisper | shipped |
-| **success counting** | pool vs a threshold, count hits | **not shipped** (§8) |
-| **symbol faces** | Fudge, King of Tokyo, Zombie Dice | **not shipped** (§8 names it) |
-| **roll-and-lock across throws** | Yahtzee, King of Tokyo | **not shipped — no primitive** |
-| **push-your-luck** | Farkle, Zombie Dice, Pig | **not shipped — no primitive** |
-| **dice drawn from a bag** | Zombie Dice | **not shipped** |
-| **opposed rolls** | two players, one comparison | **not shipped** — every roll is read alone; nothing on any surface compares two |
-| initiative order | §7 | not shipped, already on the roadmap |
-
-Five of those are one campaign. The three at the top of the "not shipped"
-block are the campaign this file proposes.
+Five rows are open and this campaign closes four of them — symbol faces
+(M3), roll-and-lock (M2), push-your-luck (M2/M4) and the bag (M6). Success
+counting is ROADMAP §8 and rides M3's face-set work. Two more rows are open
+and are *not* this campaign: initiative order (§7) and **opposed rolls**,
+which was found by writing the table and appears on no roadmap item — every
+roll in this product is read alone and nothing on any surface compares two.
 
 ## The line: procedures, not game rules
 
@@ -252,6 +250,9 @@ This is a third track. Track A is debt, Track B is the owner's track
 would be Track C. It does not fit inside either, and pretending it does is
 how it would get starved.
 
+**RULED 2026-08-27: mechanics first, T15 waits.** The reasoning below is what
+was put to him and what he chose.
+
 Honest sequencing: **M1 and M3 are cheap enough to interleave with Track B**
 and both close items already on the roadmap (V5's substrate, §8). **M2 is the
 large bet and it competes directly with T15** — three baked skins versus the
@@ -259,25 +260,32 @@ mechanic Joe says the product is bad at. Recommendation: M1 now, then M2,
 and let T15 wait, because a re-baked skin makes the existing thing prettier
 while M2 makes the product cover a family it cannot play at all today.
 
-## Open questions — these are Joe's
+## The questions, and the answers — 2026-08-27
 
-**Q1. How far does the app go?** Recommendation: **through M3 under today's
+**Q1 and Q4 were put to Joe and answered the day this was written, along with
+the sequencing call under "What this displaces". Q2 and Q3 were not asked and
+are still open** — neither blocks M1, and Q2 must be answered before M2 is
+built. The recommendations are kept below as written, so a later reader can
+see what was recommended and what was chosen.
+
+**Q1. How far does the app go?** — **ANSWERED: through M3, decide M4 later.** Recommendation: **through M3 under today's
 goals, and decide M4 when M2 has been played with.** M2+M3 make King of Tokyo
 work with the human doing the thinking, which is what a physical table does
 anyway. M4 is the first thing that requires the app to know what a face
 *means*, and that judgement is much easier to make with a working turn on the
 felt than in the abstract.
 
-**Q2. Does visibility belong to a turn or a throw?** Recommendation: the
+**Q2. Does visibility belong to a turn or a throw? — STILL OPEN, and it
+gates M2.** Recommendation: the
 turn. Simplest, safe, matches the secrecy ladder we have.
 
-**Q3. Do symbol dice get real art, or placeholder glyphs first?** The forge
+**Q3. Do symbol dice get real art, or placeholder glyphs first?** — **STILL OPEN**, and it does not block M1 or M2. The forge
 and the dice-art work say this project's bar is high; the counter-argument is
 that Fudge dice are three flat glyphs and shipping them plainly proves the
 whole registry in a fraction of the time. Recommendation: plain glyphs to
 prove M3, art as a separate owner-track round.
 
-**Q4. Is "the best possible dice simulator" the goal statement you want?**
+**Q4. Is "the best possible dice simulator" the goal statement you want?** — **ANSWERED: yes**, and it shipped as GOALS goal 16.
 It is not in GOALS.md today in those words, and if it is the real ambition
 then goal 16's family table is the version of it that can be checked. Worth
 saying out loud, because it reprioritises: it makes coverage a first-class
