@@ -972,4 +972,58 @@ t('t is not the keep family', () => {
   assert.deepEqual(ok('6d6 d3').spec.mods.keep, { mode: 'dl', n: 3 });
 });
 
+// ---- push, a declared scoring rule (MECHANICS M4) --------------------------
+t('push takes a threshold or a set of faces', () => {
+  assert.deepEqual(ok('6d6 push>=5').spec.mods.push, { min: 5 });
+  assert.deepEqual(ok('6d6 push=1,5').spec.mods.push, { faces: [1, 5] });
+  assert.equal(ok('6d6 push>=5').canonical, '6d6 push>=5');
+  assert.equal(ok('6d6 push=1,5').canonical, '6d6 push=1,5');
+});
+
+t('a face set is sorted and deduped, so canonical is a fixed point', () => {
+  // The grammar normalizes and rollspec REFUSES an unsorted list, which is
+  // what guarantees the two never disagree about the same input.
+  assert.equal(ok('6d6 push=5,1,5').canonical, '6d6 push=1,5');
+  assert.equal(validateMods(['d6'], { push: { faces: [5, 1] } }), 'bad_push');
+  assert.equal(validateMods(['d6'], { push: { faces: [1, 5] } }), null);
+});
+
+t('a push nothing in the pool can score is refused, in both places', () => {
+  bad('6d6 push>=7');
+  bad('6d6 push=9');
+  assert.equal(validateMods(['d6', 'd6'], { push: { min: 7 } }), 'push_unreachable');
+  assert.equal(validateMods(['d6', 'd20'], { push: { min: 7 } }), null,
+    'one die that can reach it is enough');
+});
+
+t('push refuses what it cannot answer for', () => {
+  bad('6d6 push>=5 t3');            // two different end conditions
+  bad('4d6dl1 push>=5');            // within-throw selection
+  bad('6d6! push>=5');
+  bad('1d20 push>=5 adv');
+  bad('6d6 push>=5 held');          // face down from the roller too
+  bad('6d6 push>=5 push>=4');
+  assert.equal(validateMods(['d6'], { throws: 3, push: { min: 5 } }), 'throws_and_push');
+  assert.equal(validateMods(['d6', 'd6'], { push: { min: 5 }, explode: true }),
+    'push_needs_plain_pool');
+});
+
+t('a push can be secret or whispered — the roller sees their own dice in both', () => {
+  assert.equal(ok('6d6 push>=5 secret').canonical, '6d6 push>=5 secret');
+  assert.equal(ok('6d6 push>=5 w:Bo').canonical, '6d6 push>=5 w:Bo');
+});
+
+t('a half-typed push reads as unfinished input, not as an unknown flag', () => {
+  for (const s of ['6d6 pus', '6d6 push', '6d6 push>', '6d6 push>=', '6d6 push=1,']) {
+    bad(s, 'incomplete');
+  }
+});
+
+t('a push carries every other flag, and the whole thing round-trips', () => {
+  const s = '6d6+2 push=1,5 check dc10 # Farkle night | round 2';
+  const r = ok(s);
+  assert.equal(r.canonical, s);
+  assert.equal(ok(r.canonical).canonical, s);
+});
+
 console.log(process.exitCode ? `${n} tests, FAILURES above` : `all ${n} notation tests pass`);

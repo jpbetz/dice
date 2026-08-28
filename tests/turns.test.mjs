@@ -305,6 +305,162 @@ try {
       'which dice moved describes ONE throw and must not ride the entry');
     assert.equal('throwSeed' in r, false, 'nor how they tumbled');
   });
+  // ---- PUSH-YOUR-LUCK (MECHANICS M4) --------------------------------------
+
+  const startPush = async (room, notation = '6d6 push>=5', name = 'Alice') => {
+    const me = await joinRoom(room, name);
+    const res = await post('/api/roll', { room, playerId: me.playerId, notation });
+    assert.equal(res.status, 200, `push roll failed: ${JSON.stringify(res.data)}`);
+    return { me, roll: res.data.roll };
+  };
+
+  await t('a push roll is born with its rule, its scoring dice and a budget', async () => {
+    const { roll } = await startPush('push-born');
+    assert.deepEqual(roll.push.rule, { min: 5 }, 'the rule it was declared with');
+    assert.equal(roll.throws.max, 20,
+      'push is a turn with a big budget — the cap bounds the felt, it is not the end condition');
+    // The scoring set is a FACT about the faces, so it is checkable against them.
+    const expected = roll.values.map((v, i) => (v >= 5 ? i : -1)).filter((i) => i >= 0);
+    assert.deepEqual(roll.push.scoring, expected,
+      `every die showing 5 or 6 is named (${roll.values})`);
+    assert.equal(roll.push.busted, expected.length === 0,
+      'and a first throw with nothing scoring in it busts immediately');
+    assert.equal(roll.push.banked, false);
+  });
+
+  await t('a plain roll and a t3 turn carry no push state at all', async () => {
+    assert.equal('push' in (await startTurn('push-absent-plain', '6d6')).roll, false);
+    assert.equal('push' in (await startTurn('push-absent-turn')).roll, false);
+  });
+
+  await t('the tally counts the kept SCORING dice, and nothing else — over 40 turns', async () => {
+    let sawNonScoringKept = 0;
+    for (let i = 0; i < 40; i++) {
+      const room = `push-tally-${i}`;
+      const { me, roll } = await startPush(room);
+      if (roll.push.busted) continue;
+      // Keep everything, so the tally has to do the discriminating.
+      const keep = roll.values.map((_, k) => k);
+      const res = await post('/api/rethrow', { room, playerId: me.playerId, rollId: roll.rollId, keep });
+      // Keeping every die is refused as a throw — bank instead, which is the
+      // same arithmetic through the other door.
+      assert.equal(res.status, 400, 'keeping everything is not a throw');
+      const bank = await post('/api/bank', { room, playerId: me.playerId, rollId: roll.rollId, keep });
+      assert.equal(bank.status, 200, JSON.stringify(bank.data));
+      const scoring = roll.values.filter((v) => v >= 5);
+      assert.equal(bank.data.roll.push.tally.count, scoring.length,
+        `count is the scoring dice only (${roll.values})`);
+      assert.equal(bank.data.roll.push.tally.sum, scoring.reduce((a, b) => a + b, 0),
+        `sum is their faces only (${roll.values})`);
+      if (scoring.length < roll.values.length) sawNonScoringKept++;
+    }
+    assert.ok(sawNonScoringKept > 0,
+      'and at least one of those turns kept a die that does not score, which is what the test is for');
+  });
+
+  await t('a throw with nothing scoring in it busts, and the tally goes with it', async () => {
+    // Driven to a real bust rather than mocked: throw one die on `push>=6`
+    // until a throw misses. 5/6 of throws miss, so this ends fast.
+    const room = 'push-bust';
+    const me = await joinRoom(room, 'Alice');
+    let busted = null;
+    for (let i = 0; i < 200 && !busted; i++) {
+      const res = await post('/api/roll', {
+        room, playerId: me.playerId, notation: '1d6 push>=6',
+      });
+      assert.equal(res.status, 200);
+      if (res.data.roll.push.busted) busted = res.data.roll;
+    }
+    assert.ok(busted, 'a bust happens within 200 single-die throws');
+    assert.deepEqual(busted.push.tally, { count: 0, sum: 0 }, 'a bust keeps nothing');
+    assert.deepEqual(busted.push.scoring, [], 'and nothing scored, which is why');
+    // …and the turn is over: no more throwing, no banking a bust.
+    const again = await post('/api/rethrow', {
+      room, playerId: me.playerId, rollId: busted.rollId, keep: [],
+    });
+    assert.equal(again.status, 400);
+    assert.equal(again.data.code, 'turn_is_over');
+    const bank = await post('/api/bank', {
+      room, playerId: me.playerId, rollId: busted.rollId, keep: [],
+    });
+    assert.equal(bank.status, 400);
+    assert.equal(bank.data.code, 'already_busted');
+  });
+
+  await t('banking ends the turn, and only the roller may do it', async () => {
+    const room = 'push-bank';
+    const { me, roll } = await startPush(room);
+    const bob = await joinRoom(room, 'Bob');
+    const theirs = await post('/api/bank', {
+      room, playerId: bob.playerId, rollId: roll.rollId, keep: [0],
+    });
+    assert.equal(theirs.status, 403);
+    assert.equal(theirs.data.code, 'not_roller');
+
+    const mine = await post('/api/bank', {
+      room, playerId: me.playerId, rollId: roll.rollId, keep: [0],
+    });
+    assert.equal(mine.status, 200, JSON.stringify(mine.data));
+    assert.equal(mine.data.roll.push.banked, true);
+    // Idempotent, like reveal — and a banked turn throws no more.
+    assert.equal((await post('/api/bank', {
+      room, playerId: me.playerId, rollId: roll.rollId, keep: [0],
+    })).status, 200, 'banking twice is idempotent');
+    const after = await post('/api/rethrow', {
+      room, playerId: me.playerId, rollId: roll.rollId, keep: [0],
+    });
+    assert.equal(after.status, 400);
+    assert.equal(after.data.code, 'turn_is_over');
+  });
+
+  await t('a held push is refused at BOTH doors', async () => {
+    const room = 'push-held';
+    const me = await joinRoom(room, 'Alice');
+    // The grammar door.
+    const viaNotation = await post('/api/roll', {
+      room, playerId: me.playerId, notation: '6d6 push>=5 held',
+    });
+    assert.equal(viaNotation.status, 400, JSON.stringify(viaNotation.data));
+    // The explicit-spec door, which never sees a notation string. A refusal
+    // that only exists in the grammar is a suggestion.
+    const viaSpec = await post('/api/roll', {
+      room, playerId: me.playerId,
+      dice: ['d6', 'd6'], mods: { push: { min: 5 } }, faceDown: true,
+    });
+    assert.equal(viaSpec.status, 400, JSON.stringify(viaSpec.data));
+    assert.equal(viaSpec.data.code, 'push_cannot_be_held');
+  });
+
+  await t('a push turn cannot be re-thrown by someone else, and does not exist if secret', async () => {
+    const room = 'push-secret';
+    const { roll } = await startPush(room, '6d6 push>=5 secret');
+    const bob = await joinRoom(room, 'Bob');
+    const res = await post('/api/bank', {
+      room, playerId: bob.playerId, rollId: roll.rollId, keep: [],
+    });
+    assert.equal(res.status, 404, 'the same answer as a rollId that never existed');
+  });
+
+  await t('a whispered push leaks no faces to the room, and still shows its rule', async () => {
+    const room = 'push-whisper';
+    const alice = await joinRoom(room, 'Alice');
+    const bob = await joinRoom(room, 'Bob');
+    const res = await post('/api/roll', {
+      room, playerId: alice.playerId, notation: '6d6 push>=5 w:Bob',
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+    // Carol is outside the audience: she gets the projection everyone else does.
+    const carol = await joinRoom(room, 'Carol');
+    const seen = (carol.log || []).find((e) => e.rollId === res.data.roll.rollId);
+    assert.ok(seen, 'the roll exists for her');
+    assert.equal(seen.redacted, true, 'redacted');
+    assert.deepEqual(seen.push, { rule: { min: 5 } },
+      'she is told what would score — a public stake — and nothing about what did');
+    assert.equal(seen.push.scoring, undefined, 'no scoring set');
+    assert.equal(seen.push.tally, undefined, 'no tally');
+    assert.equal(seen.values, undefined, 'and no values');
+  });
+
 } finally {
   await stopServer(proc);
 }

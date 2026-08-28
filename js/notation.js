@@ -64,6 +64,15 @@ limitations under the License.
 //               typed (roster matching downstream is case-insensitive);
 //               duplicate names (case-insensitive) collapse with a warning.
 //               A name cannot contain '#' — the comment split runs first)
+//   push     := "push" (">=" int | "=" int ("," int)*)
+//               (MECHANICS M4: PUSH-YOUR-LUCK. Declares which FACES score —
+//               "push>=5" or "push=1,5". Throw, keep whichever scoring dice
+//               you like, throw the rest; a throw with nothing scoring in it
+//               busts. The predicate is DECLARED, never looked up in a table
+//               of games — "5s and 6s score" is a fact about dice a player
+//               types, exactly like "drop the lowest", and that is what keeps
+//               GOALS goal 6's line where it is. Refused alongside adv/keep/
+//               reroll/! and alongside tN — see js/rollspec.js validateMods.)
 //   throws   := "t" int                    (2..5 — throw up to N times, keeping
 //               whichever dice you choose between throws. Yahtzee and King of
 //               Tokyo are both t3. Refused alongside adv/keep/reroll/! — see
@@ -81,7 +90,7 @@ limitations under the License.
 //               convenience, not grammar)
 //
 // Canonical flag order:
-//   [adv|dis] [trailing keep] [trailing reroll] [!] [tN] [check|cinematic]
+//   [adv|dis] [trailing keep] [trailing reroll] [!] [tN] [push] [check|cinematic]
 //   [held|secret|w:names] [dcN] [# comment [| subtitle]]
 //
 // The term 2d20kh1 collapses to 1d20 + advantage (2d20kl1 → disadvantage)
@@ -166,6 +175,7 @@ function couldExtend(frag) {
     /^(kh|kl|dh|dl|k|d)$/.test(frag) ||
     /^(a|ad|adv?|d|di|dis?)$/.test(frag) ||
     /^(d|dc|v|vs)$/.test(frag) ||
+    /^(p|pu|pus|push|push>|push>=|push=)(\d{1,2}(,\d{1,2})*,?)?$/.test(frag) || // partial push
     /^[+-]$/.test(frag) ||
     /^\d{1,3}\[[^\]]{0,40}$/.test(frag)             // open label bracket
   );
@@ -471,6 +481,7 @@ export function parseNotation(input, opts = {}) {
   let flagReroll = null;
   let flagExplode = false;
   let flagThrows = null;
+  let flagPush = null;
   let expKind = null;
   let dc = null;
 
@@ -527,6 +538,22 @@ export function parseNotation(input, opts = {}) {
     } else if (tok === '!') {
       if (flagExplode) return invalid('! specified twice');
       flagExplode = true;
+    } else if ((m = /^push(>=|=)(\d{1,2}(?:,\d{1,2})*)$/.exec(tok))) {
+      if (flagPush) return invalid('push specified twice');
+      const nums = m[2].split(',').map((x) => parseInt(x, 10));
+      if (m[1] === '>=') {
+        if (nums.length !== 1) {
+          return invalid('push>= takes one number', 'use push=1,5 for a set of faces');
+        }
+        flagPush = { min: nums[0] };
+      } else {
+        // Sorted and deduped HERE, so the canonical form is a fixed point
+        // rather than an echo of the order they were typed in. rollspec's
+        // validateMods refuses an unsorted list, and this is what guarantees
+        // the two never disagree about the same input.
+        const set = [...new Set(nums)].sort((a2, b2) => a2 - b2);
+        flagPush = { faces: set };
+      }
     } else if ((m = /^t(\d{1,2})$/.exec(tok))) {
       // tN — a TURN (MECHANICS M2). No collision with the keep family: those
       // are kh/kl/dh/dl/k/d, and bare 't' is not among them.
@@ -716,6 +743,47 @@ export function parseNotation(input, opts = {}) {
     warnings.push('percentile dice never explode');
   }
 
+  // A HELD PUSH IS A CONTRADICTION, and refusing it here is kinder than
+  // letting it roll. `held` is face down for EVERYONE INCLUDING THE ROLLER
+  // (UX §3.2), and push-your-luck is nothing but a series of choices about
+  // faces you can see. Secret and whisper are fine — the roller sees their own
+  // dice in both — so only this one rung is refused.
+  const visMode = (visFlag && visFlag.mode) || visPrefix || null;
+  if (flagPush && visMode === 'held') {
+    return invalid(
+      'a push turn cannot be held',
+      'held hides the faces from you too, and push is a choice about faces'
+    );
+  }
+  if (flagPush && flagThrows) {
+    return invalid(
+      'a push turn cannot also set a throw count',
+      'push ends when it busts or you bank; tN ends after N throws'
+    );
+  }
+  if (flagPush && (flagAdv || keep || reroll || explode)) {
+    return invalid(
+      'a push turn cannot also keep, drop, reroll or explode',
+      'those choose dice within ONE throw; push sets dice aside between throws'
+    );
+  }
+  if (flagPush) {
+    // The same unreachability refusal rollspec makes, said in the grammar's
+    // voice: a predicate no die in this pool can satisfy is a turn that busts
+    // on its first throw, every time.
+    const reach = (t) => {
+      const max = DIE_MAX[t] || 0;
+      if (flagPush.min !== undefined) return max >= flagPush.min;
+      return flagPush.faces.some((f) => (t === 'd10x'
+        ? (f % 10 === 0 && f <= 90) : (f >= 1 && f <= max)));
+    };
+    if (!dice.some(reach)) {
+      const what = flagPush.min !== undefined
+        ? `${flagPush.min} or more` : flagPush.faces.join(', ');
+      return invalid(`no die in this pool can show ${what}`,
+        'a push that can never score busts on its first throw');
+    }
+  }
   if (flagThrows && (flagAdv || keep || reroll || explode)) {
     return invalid(
       'a turn cannot also keep, drop, reroll or explode',
@@ -733,6 +801,7 @@ export function parseNotation(input, opts = {}) {
   if (reroll) mods.reroll = reroll;
   if (explode) mods.explode = true;
   if (flagThrows) mods.throws = flagThrows;
+  if (flagPush) mods.push = flagPush;
   const spec = { dice, mods: Object.keys(mods).length ? mods : null };
   // Source labels ride present-or-absent: an unlabeled pool has NO sources
   // key, so every pre-Rack payload and canonical stays byte-identical.
@@ -841,6 +910,11 @@ export function canonicalNotation(spec, extras = {}) {
   // (mixed pools, the d100 pool, and the collapse-avoiding 2d20-keep-1 case)
   if (!glueInline && glue.length) flags.push(...glue);
   if (m.throws) flags.push(`t${m.throws}`);
+  if (m.push) {
+    flags.push(m.push.min !== undefined
+      ? `push>=${m.push.min}`
+      : `push=${[...m.push.faces].sort((a, b) => a - b).join(',')}`);
+  }
   if (exp && exp.kind) flags.push(exp.kind);
   if (visibility && visibility.mode) {
     if (visibility.mode === 'whisper') {

@@ -42,7 +42,8 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { composeRoll, composeThrow, validateMods, DIE_MAX } from './js/rollspec.js';
+import { composeRoll, composeThrow, validateMods, DIE_MAX,
+  scoringIndices, pushTally, MAX_PUSH_THROWS } from './js/rollspec.js';
 import { parseNotation } from './js/notation.js';
 import { SET_IDS } from './js/themes.js';
 // C22: the stamp's SHAPE only. The server carries `ver` on a table setup and
@@ -2027,6 +2028,13 @@ function projectEntryFor(entry, viewerId) {
   // on the felt — the table watches them get re-thrown — so it survives
   // redaction while every face stays omitted.
   if (entry.throws) out.throws = entry.throws;
+  // A PUSH STATE IS MADE OF VALUES. Which dice scored, what they are worth and
+  // whether the throw busted are all read straight off the faces, so a
+  // shrouded viewer gets the RULE and nothing else — they can see that this is
+  // a push turn and what would score, which is a public stake, and learn no
+  // face from it. `held` is refused for push at the door (js/notation.js), so
+  // in practice this covers a whisper's non-audience.
+  if (entry.push) out.push = { rule: entry.push.rule };
   if (entry.collected) out.collected = entry.collected;
   if (entry.cleared) out.cleared = entry.cleared;
   // Cosmetic identity, not content: which dice-set skin the roller's dice
@@ -2177,6 +2185,17 @@ function executeRoll(room, player, spec) {
   // reroll-last replays, and a replayed turn must start its budget over.
   if (spec.mods && spec.mods.throws) {
     roll.throws = { max: spec.mods.throws, used: 1 };
+  } else if (spec.mods && spec.mods.push) {
+    // PUSH IS A TURN WITH A BIG BUDGET, A BUST RULE AND A BANK VERB
+    // (MECHANICS M4). Giving it `throws` is not a trick: a push turn really
+    // does throw repeatedly and keep dice between throws, so every line of
+    // M2's machinery — the re-throw endpoint, the per-throw film, the kept
+    // dice staying put — is already exactly right and gets reused unchanged.
+    // What push adds is which faces score, when you have busted, and a way to
+    // stop. The cap bounds the felt's lifetime; it is not a rule.
+    roll.throws = { max: MAX_PUSH_THROWS, used: 1 };
+    // Every die moved on the first throw, so it can bust like any other.
+    roll.push = pushStateFor(roll, spec.mods.push, roll.values.map((_, i) => i), []);
   }
   // Dice-set identity (Tier 6 §9): cosmetic, present-or-absent — a plain
   // roll's payload stays byte-for-byte what it always was. It does NOT ride
@@ -2272,6 +2291,17 @@ async function handleRoll(req, res) {
   if (vis.error) return sendError(res, ...vis.error);
   spec.visibility = vis.visibility;
 
+  // A HELD PUSH IS A CONTRADICTION (MECHANICS M4). `held` is face down for
+  // everyone INCLUDING the roller, and push-your-luck is nothing but a series
+  // of choices about faces you can see. js/notation.js refuses it in the
+  // grammar; this is the EXPLICIT-spec door, which a client can POST straight
+  // through without ever writing a notation string. Both, or the refusal is a
+  // suggestion.
+  if (spec.mods && spec.mods.push
+      && ((spec.visibility && spec.visibility.mode === 'held') || spec.faceDown)) {
+    return sendError(res, 400, 'a push turn cannot be held', 'push_cannot_be_held');
+  }
+
   // Reroll provenance (rerollOfId) — read HERE and only here: offers/claims
   // are fresh rolls and their parser must never see this key. It is a CLAIM
   // ABOUT HISTORY and the server is the only party that can substantiate one.
@@ -2312,6 +2342,33 @@ async function handleRoll(req, res) {
   // roll is face down for its roller too, so even this reply carries no
   // values.
   sendJson(res, 200, { roll: projectEntryFor(roll, player.id) });
+}
+
+// The push state after a throw (MECHANICS M4). Everything here is a FACT
+// about values this server authored — which dice show a scoring face, what
+// the kept ones are worth, and whether the throw busted — so no client has to
+// be trusted and no two clients can disagree.
+//
+// BUST IS ABOUT THE DICE THAT MOVED, not the whole felt: a throw that turns up
+// nothing scoring ends the turn, and the dice you had already set aside are
+// exactly what you lose. On the first throw every die moved, so a pool that
+// comes up with nothing busts immediately, which is the mechanic working.
+//
+// THE TALLY IS NOT ENFORCED, only reported. A player may keep a die that does
+// not score (nothing forbids it) and it adds nothing; a player may un-keep a
+// scoring die and the tally drops. Making set-aside permanent would be a game
+// rule, and the invariant is that the procedure never plays for you.
+function pushStateFor(roll, rule, thrown, kept) {
+  const scoring = scoringIndices(roll.values, rule);
+  const scoringSet = new Set(scoring);
+  const busted = thrown.length > 0 && !thrown.some((i) => scoringSet.has(i));
+  return {
+    rule,
+    scoring,
+    tally: busted ? { count: 0, sum: 0 } : pushTally(roll.values, kept, rule),
+    busted,
+    banked: false,
+  };
 }
 
 // Re-throw part of a turn (MECHANICS M2, docs/MECHANICS.md).
@@ -2363,6 +2420,11 @@ async function handleRethrow(req, res) {
   if (roll.collected || roll.cleared) {
     return sendError(res, 400, 'this turn is over', 'turn_is_over');
   }
+  // A push turn that has busted or banked is finished, whatever the budget
+  // says. Its `throws` cap is a bound on the felt, never the end condition.
+  if (roll.push && (roll.push.busted || roll.push.banked)) {
+    return sendError(res, 400, 'this turn is over', 'turn_is_over');
+  }
 
   const keep = body.value.keep;
   if (!Array.isArray(keep)) return sendError(res, 400, 'keep must be a list of die indices', 'bad_keep');
@@ -2386,6 +2448,7 @@ async function handleRethrow(req, res) {
   // is ever lifted, this line is the first thing that becomes wrong.
   roll.total = roll.values.reduce((a, b) => a + b, 0) + (roll.modifier || 0);
   roll.throws.used += 1;
+  if (roll.push) roll.push = pushStateFor(roll, roll.push.rule, thrown, [...kept]);
   // A fresh seed per throw: the film is a function of the seed, and reusing
   // the turn's original one would replay the first throw's tumble.
   // NOT stored on the entry. `thrown` and `seed` describe one throw's film,
@@ -2396,6 +2459,7 @@ async function handleRethrow(req, res) {
 
   logDebug(() => `rethrow ${logField('room', room.name)} ${logField('name', player.name)} `
     + `rollId=${rollId} throw=${roll.throws.used}/${roll.throws.max} thrown=${thrown.join(',')}`
+    + (roll.push ? ` push=${roll.push.busted ? 'BUST' : `${roll.push.tally.count}/${roll.push.tally.sum}`}` : '')
     + (roll.visibility ? ` vis=${roll.visibility.mode}` : ` values=${roll.values.join(',')}`));
 
   // The event carries the whole projected entry for the same reason reveal
@@ -2406,6 +2470,62 @@ async function handleRethrow(req, res) {
   broadcast(room, 'rethrow', { rollId }, (viewerId) => {
     const projected = projectEntryFor(roll, viewerId);
     return projected === null ? null : { rollId, thrown, seed, used: roll.throws.used, roll: projected };
+  });
+  sendJson(res, 200, { roll: projectEntryFor(roll, player.id) });
+}
+
+// BANK (MECHANICS M4). The verb that ends a push turn with what you have.
+//
+// It exists as a server act rather than a client one for the same reason the
+// values do: the tally is a fact about faces this server authored, and a
+// client that computed its own would be a client the table has to trust. The
+// player chooses WHICH dice they are banking — that is their decision, and the
+// invariant says the procedure never makes it — but what those dice are WORTH
+// is arithmetic the server does.
+//
+// There is no auto-bank and there will not be one. A turn that banked itself
+// at some threshold would be the app playing.
+async function handleBank(req, res) {
+  const body = await readJsonBody(req);
+  if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
+
+  const found = lookup(body.value);
+  if (found.error) return sendError(res, ...found.error);
+  const { room, player } = found;
+
+  const rollId = cleanString(body.value.rollId, 64);
+  if (!rollId) return sendError(res, 400, 'rollId is required', 'bad_request');
+
+  const roll = room.log.find((r) => r.rollId === rollId);
+  if (!roll || !entryExistsFor(roll, player.id)) return sendError(res, 404, 'unknown roll', 'unknown_roll');
+  if (player.id !== roll.playerId) {
+    return sendError(res, 403, 'only the roller may bank', 'not_roller');
+  }
+  if (!roll.push) return sendError(res, 400, 'this roll is not a push turn', 'not_a_push');
+  if (roll.push.busted) return sendError(res, 400, 'a busted turn has nothing to bank', 'already_busted');
+  if (roll.push.banked) return sendJson(res, 200, { roll: projectEntryFor(roll, player.id) }); // idempotent
+
+  const keep = body.value.keep;
+  if (!Array.isArray(keep)) return sendError(res, 400, 'keep must be a list of die indices', 'bad_keep');
+  const kept = [];
+  for (const k of keep) {
+    if (!Number.isInteger(k) || k < 0 || k >= roll.dice.length) {
+      return sendError(res, 400, 'keep holds a die index this roll does not have', 'bad_keep');
+    }
+    kept.push(k);
+  }
+
+  roll.push = {
+    ...roll.push,
+    tally: pushTally(roll.values, kept, roll.push.rule),
+    banked: true,
+  };
+  log(`bank    ${logField('room', room.name)} ${logField('name', player.name)} `
+    + `rollId=${rollId} count=${roll.push.tally.count} sum=${roll.push.tally.sum}`);
+
+  broadcast(room, 'banked', { rollId }, (viewerId) => {
+    const projected = projectEntryFor(roll, viewerId);
+    return projected === null ? null : { rollId, roll: projected };
   });
   sendJson(res, 200, { roll: projectEntryFor(roll, player.id) });
 }
@@ -3759,6 +3879,7 @@ const server = http.createServer((req, res) => {
     if (route === '/api/leave' && req.method === 'POST') return handleLeave(req, res);
     if (route === '/api/roll' && req.method === 'POST') return handleRoll(req, res);
     if (route === '/api/rethrow' && req.method === 'POST') return handleRethrow(req, res);
+    if (route === '/api/bank' && req.method === 'POST') return handleBank(req, res);
     if (route === '/api/reveal' && req.method === 'POST') return handleReveal(req, res);
     if (route === '/api/rename' && req.method === 'POST') return handleRename(req, res);
     if (route === '/api/pools' && req.method === 'POST') return handlePools(req, res);

@@ -44,6 +44,70 @@ export const EXPLODE_CHAIN_CAP = 3;
 // throws more, and an unbounded turn is a roll that never ends.
 export const MAX_THROWS = 5;
 
+// PUSH-YOUR-LUCK (MECHANICS M4, docs/MECHANICS.md). `mods.push` declares which
+// FACES score, and everything else about the mechanic follows from that one
+// fact plus the dice:
+//
+//   throw -> the faces that score are named -> you keep whichever of them you
+//   want -> throw the rest -> a throw with nothing scoring in it is a BUST,
+//   and the turn ends with nothing -> or you BANK what you have and stop.
+//
+// THE PREDICATE IS DECLARED, NOT LOOKED UP. There is no table of games in
+// this file and there is not going to be one: "5s and 6s score" is a fact
+// about dice that a player TYPES, exactly like "drop the lowest". That is
+// what keeps goal 6's line where it is — the app is literate in dice
+// conventions and ignorant of games. Pig is `1d6 push>=2`. A Farkle-shaped
+// game is `6d6 push=1,5`. Neither name appears anywhere in this codebase and
+// neither needs to.
+//
+//   { min: n }        faces >= n score
+//   { faces: [...] }  faces in the set score
+//
+// THE TALLY IS REPORTED IN BOTH CURRENCIES — the count of scoring dice and
+// their sum — because which one a game wants is the game's business and
+// asking for a flag would be asking the player to teach us their rules. A
+// game that counts brains reads the count; a game that adds pips reads the
+// sum.
+//
+// The cap is a bound on the felt's lifetime, not a rule: a push turn ends when
+// it busts, when it banks, or when it runs out of dice, and none of those is
+// guaranteed to happen soon on a big pool.
+export const MAX_PUSH_THROWS = 20;
+
+// Which of `values` show a scoring face under `push`. Indices into the roll's
+// dice, in order. A pure function of values the server authored, so client and
+// server always agree about what scored — the two do not have to negotiate.
+export function scoringIndices(values, push) {
+  const out = [];
+  if (!push || !Array.isArray(values)) return out;
+  for (let i = 0; i < values.length; i++) {
+    if (faceScores(values[i], push)) out.push(i);
+  }
+  return out;
+}
+
+export function faceScores(value, push) {
+  if (typeof value !== 'number' || !push) return false;
+  if (Array.isArray(push.faces)) return push.faces.includes(value);
+  return typeof push.min === 'number' && value >= push.min;
+}
+
+// What the dice at `indices` are worth: how many of them score, and what those
+// faces add up to. Non-scoring indices contribute nothing — a player may keep
+// a die that does not score (there is no rule against it) and it must not
+// inflate the tally.
+export function pushTally(values, indices, push) {
+  let count = 0;
+  let sum = 0;
+  for (const i of indices || []) {
+    const v = values[i];
+    if (!faceScores(v, push)) continue;
+    count++;
+    sum += v;
+  }
+  return { count, sum };
+}
+
 // Dice value of a pool: the sum of DIE_MAX over the physical dice guaranteed
 // to hit the felt (base list post-d100 expansion + advantage partners, capped
 // exactly as composeRoll caps them). Reroll replacements and explosion
@@ -72,7 +136,7 @@ export function rollValue(type, rng) {
 export function validateMods(dice, mods) {
   if (mods == null) return null;
   if (typeof mods !== 'object' || Array.isArray(mods)) return 'bad_mods';
-  const { modifier, adv, keep, reroll, explode, parts, throws } = mods;
+  const { modifier, adv, keep, reroll, explode, parts, throws, push } = mods;
   if (modifier !== undefined && (!Number.isInteger(modifier) || modifier < -99 || modifier > 99)) return 'bad_modifier';
   if (parts !== undefined) {
     // display-only decomposition of the modifier into named sources
@@ -116,6 +180,48 @@ export function validateMods(dice, mods) {
     // a rule (goal 6). A modifier is arithmetic on the total, not a choice
     // about dice, so it rides.
     if (adv || keep || reroll || explode) return 'throws_needs_plain_pool';
+    if (push) return 'throws_and_push';
+  }
+  if (push !== undefined) {
+    if (!push || typeof push !== 'object' || Array.isArray(push)) return 'bad_push';
+    const hasMin = push.min !== undefined;
+    const hasFaces = push.faces !== undefined;
+    // Exactly one predicate. Both would be two rules for one question, and
+    // neither is a `push` that can never score anything.
+    if (hasMin === hasFaces) return 'bad_push';
+    if (hasMin && (!Number.isInteger(push.min) || push.min < 1 || push.min > 99)) return 'bad_push';
+    if (hasFaces) {
+      if (!Array.isArray(push.faces) || !push.faces.length || push.faces.length > 12) return 'bad_push';
+      for (const f of push.faces) {
+        if (!Number.isInteger(f) || f < 1 || f > 99) return 'bad_push';
+      }
+      if (new Set(push.faces).size !== push.faces.length) return 'bad_push';
+      // Sorted, so the canonical form is a fixed point rather than an echo of
+      // whatever order it was typed in.
+      for (let i = 1; i < push.faces.length; i++) {
+        if (push.faces[i] <= push.faces[i - 1]) return 'bad_push';
+      }
+    }
+    // A PREDICATE NO DIE IN THIS POOL CAN SATISFY IS A TURN THAT ALWAYS BUSTS,
+    // which is a typo every time it is not a joke. `push>=7` on a pool of d6s
+    // is the case: it parses, it validates, and the first throw ends the game.
+    // Refuse it here rather than let it play out once.
+    let reachable = false;
+    for (const t of dice) {
+      const max = DIE_MAX[t] || 0;
+      if (hasMin) { if (max >= push.min) { reachable = true; break; } continue; }
+      for (const f of push.faces) {
+        // d10x shows 0,10,20…90; every other die shows 1..max.
+        const ok = t === 'd10x' ? (f % 10 === 0 && f <= 90) : (f >= 1 && f <= max);
+        if (ok) { reachable = true; break; }
+      }
+      if (reachable) break;
+    }
+    if (!reachable) return 'push_unreachable';
+    // The same refusal `throws` makes, for the same reason: adv/keep/reroll/!
+    // decide which dice COUNT inside one throw, and a procedure that sets dice
+    // aside between throws has no answer for how the two compose.
+    if (adv || keep || reroll || explode) return 'push_needs_plain_pool';
   }
   return null;
 }
