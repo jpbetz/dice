@@ -23,7 +23,10 @@ belongs to the turn) and Q3 is still open, blocking nothing. What was settled:
 
 - **Scope: M1 through M3, and M4 waits.** Build the substrate, the turn and
   symbol faces. Decide whether the app should detect a bust and keep a tally
-  once there is a turn on the felt to play with.
+  once there is a turn on the felt to play with. **All three shipped
+  2026-08-28**, and they turned up one more item that was not on the list:
+  M2b, the player-facing gesture — M2 works from the API and the debug seam,
+  and M1's pick path is still dark, so nothing yet joins them up.
 - **Sequencing: mechanics before T15.** The three classic skins wait.
 - **Goal 16 is adopted** — the coverage table now lives in
   [GOALS.md](GOALS.md) and this file cites it rather than holding a copy.
@@ -216,7 +219,9 @@ to be answered.
 | # | item | size | needs a goal change | what it unblocks |
 | --- | --- | --- | --- | --- |
 | ~~**M1**~~ | ~~**Touch a die.**~~ **SHIPPED 2026-08-28** — see "M1, and the two bugs only a screenshot could find" below. | med | no | everything below; also V5's felt echo and §7.1 physical pool building, both stalled on exactly this |
-| **M2** | **The throw becomes a turn.** `throws:N` + free keep, end to end: `composeThrow` beside `composeRoll`, an entry that carries N throws, a film per throw baked over the kept dice as static bodies, the `t3` flag in the notation, the verdict and log reading a turn rather than a roll. | large | no | Yahtzee, King of Tokyo, Farkle, Can't Stop, Pig — with the human judging the bust | ~~**M3**~~ | ~~**Faces that are not numbers.**~~ **SHIPPED 2026-08-28** — `symbols.monster` and `symbols.fate`; see "M3, and the game we are not naming" below. | med | no | King of Tokyo's actual dice, Fudge, and ROADMAP §8's first half |
+| ~~**M2**~~ | ~~**The throw becomes a turn.**~~ **SHIPPED 2026-08-28**, minus the player gesture — see the record below. | large | no | Yahtzee, King of Tokyo, Farkle, Can't Stop, Pig — with the human judging the bust |
+| **M2b** | **Pick becomes keep** — the gesture M2 is missing. Arm `PICK_DEFAULT_ENABLED`, wire a picked die to a kept one, name the verb, and give it the keyboard path M1 deliberately did not invent. Keyed `M2b` because M4 is taken. | small–med | no | any of Track C being usable without the API |
+| ~~**M3**~~ | ~~**Faces that are not numbers.**~~ **SHIPPED 2026-08-28** — `symbols.monster` and `symbols.fate`; see "M3, and the game we are not naming" below. | med | no | King of Tokyo's actual dice, Fudge, and ROADMAP §8's first half |
 | **M4** | **Procedures as a registry.** `PROCEDURES` beside `SYSTEMS`: throws, keep rule, bust rule, tally, bank verb. Farkle and Zombie Dice become assisted rather than merely possible. | med–large | **yes — this is the goal 6 decision** | automatic bust, running tally, the bank verb |
 | **M5** | **The decision as a beat.** Ceremony at the choice point: the tally at stake, the live bust odds, the moment. `js/odds.js` already forecasts; UX §2.1's `showOdds` exists and is deliberately unbuilt, and push-your-luck is the case that makes odds obviously worth showing rather than a crutch. | med | no (rides ⑤) | the reason to use this instead of physical dice |
 | **M6** | **The bag.** Dice drawn at random from a defined cup. | small–med | no | Zombie Dice; and it is the honest primitive behind any "draw 3 of these 13" |
