@@ -3511,6 +3511,40 @@ html, body {
   box-shadow: 0 2px 10px rgba(0,0,0,0.6);
   animation: chip-pop 0.3s cubic-bezier(0.2, 1.6, 0.4, 1);
 }
+/* SYMBOL FACES (MECHANICS M3). A chip whose die shows a drawn symbol carries
+   the same path inline instead of a numeral. Sized off the chip's own font
+   size so it matches the numerals beside it in a mixed pool, and it inherits
+   `color`, so every tier tint (max/min/discarded, the Soul Deal words) keeps
+   working with no second rule. */
+/* The banner/verdict evidence chip's symbol, and the name that rides with it
+   for copy/paste and screen readers without printing twice on screen. */
+.oc-die .chip-glyph {
+  width: 0.95em;
+  height: 0.95em;
+  display: inline-block;
+  vertical-align: -0.14em;
+  overflow: visible;
+}
+.oc-sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+.value-chip.chip-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+}
+.value-chip .chip-glyph {
+  width: 1em;
+  height: 1em;
+  display: block;
+  overflow: visible;
+}
+
 .value-chip.max {
   color: #2b1d02;
   background: linear-gradient(180deg, #ffe27a, #d4a017);

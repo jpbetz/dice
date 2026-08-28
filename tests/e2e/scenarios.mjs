@@ -21014,4 +21014,77 @@ export const scenarios = [
         'and cannot be thrown again');
     },
   },
+  {
+    name: 'symbol-faces',
+    tags: ['mechanics', 'm3', 'dice', 'smoke'],
+    // MECHANICS M3 — dice whose faces are not numbers (docs/MECHANICS.md).
+    //
+    // The failure this exists for is silent by construction: a face name that
+    // does not resolve to a drawn shape throws nothing, breaks no layout, and
+    // simply falls through to the digit painter — so the die prints the very
+    // number the symbol was meant to replace, and looks like a perfectly
+    // ordinary d6. Nobody would file that as a bug; they would just never
+    // notice the set was broken.
+    //
+    // It also holds the readout to the felt. The value chips over the dice
+    // are OFF by default, so the banner is what a player actually reads, and
+    // a banner saying "5" beside a die showing a claw is the app's own
+    // *results readable on screen* invariant broken in the most confusing
+    // direction there is.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+
+      // ① EVERY DECLARED FACE RESOLVES, for every set that declares any.
+      const sets = await a.dbg('faceSets()');
+      const ids = Object.keys(sets);
+      assert.ok(ids.length >= 2, `symbol sets are registered (${ids.join(', ')})`);
+      for (const [id, info] of Object.entries(sets)) {
+        assert.deepEqual(info.unresolved, [],
+          `${id}: every face name is either a digit or a drawn shape `
+          + `(unresolved: ${JSON.stringify(info.unresolved)})`);
+        assert.equal(info.count, 6, `${id}: a d6 face table has six entries`);
+      }
+
+      // ② THE READOUT WEARS THE SYMBOL. Forced values, so the assertion names
+      // the face it expects instead of hoping the dice cooperate.
+      await a.dbg("setDiceSet('symbols.monster')");
+      await a.eval('window.__diceDebug.throwSeeded(["d6","d6","d6"], 4242, [1,4,6])');
+      await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        { desc: 'the monster dice settle', timeout: 30000 });
+      await a.dbg('sim(240)');
+
+      const read = await a.eval(`(() => {
+        const rows = [...document.querySelectorAll('.oc-chip .oc-die')];
+        return JSON.stringify(rows.map((r) => ({
+          text: r.textContent.replace(/\\s+/g, ' ').trim(),
+          svg: r.querySelectorAll('svg.chip-glyph').length,
+        })));
+      })()`).then(JSON.parse);
+      assert.equal(read.length, 3, `three dice are read out (${JSON.stringify(read)})`);
+      // value 1 is a digit face on this set…
+      assert.equal(read[0].svg, 0, 'the die showing 1 reads as a numeral');
+      assert.match(read[0].text, /1/, 'and the numeral is the one it landed on');
+      // …4 and 6 are symbols, and they are DRAWN, not typed.
+      assert.equal(read[1].svg, 1, 'the die showing the energy face reads as a drawn symbol');
+      assert.match(read[1].text, /bolt/, 'which still says its name for copy and screen readers');
+      assert.equal(read[2].svg, 1, 'and the heal face too');
+      assert.match(read[2].text, /heart/, 'by name');
+      assert.doesNotMatch(read[1].text, /\b4\b/,
+        'a symbol face never also prints the number underneath it');
+
+      // ③ AN ORDINARY SET IS UNTOUCHED — no set, no symbols, no change.
+      await a.dbg("setDiceSet('std')");
+      await a.dbg('clearTable()');
+      await a.eval('window.__diceDebug.throwSeeded(["d6"], 99, [4])');
+      await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        { desc: 'the plain die settles', timeout: 30000 });
+      await a.dbg('sim(240)');
+      const plain = await a.eval(`(() => {
+        const r = document.querySelector('.oc-chip .oc-die');
+        return JSON.stringify({ text: r.textContent.trim(), svg: r.querySelectorAll('svg').length });
+      })()`).then(JSON.parse);
+      assert.equal(plain.svg, 0, 'a standard d6 reads as a numeral');
+      assert.match(plain.text, /4/, 'showing its value');
+    },
+  },
 ];

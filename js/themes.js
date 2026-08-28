@@ -609,6 +609,53 @@ export const THEMES = {
     },
   },
 
+  // SYMBOL DICE (MECHANICS M3, docs/MECHANICS.md). A d6 whose faces are not
+  // all numbers. The `faces` array is one entry per value: a numeric string
+  // paints as a digit, a shape name paints as a drawn symbol (js/dice.js
+  // FACE_SHAPES). d6 only — these are d6 games, and a six-entry table on a
+  // d20 would leave fourteen faces undecided.
+  //
+  // THE HOUSE IS NAMED FOR THE MECHANIC, NOT FOR A GAME. The monster set's
+  // faces are the ones a monster-brawl push-your-luck dice game uses, and the
+  // obvious published example is somebody's trademark: shipping a set under
+  // that name would be borrowing their brand to describe our dice. What the
+  // app provides is symbol dice; which game you play with them is yours
+  // (GOALS goal 6 — dice and their procedures, never a game's rules).
+  symbols: {
+    label: 'Symbols',
+    line: 'faces that are not numbers — monster brawls and Fate',
+    sets: {
+      monster: {
+        label: 'Monster',
+        body: '#e8e4dc', text: '#2f2a3a', accent: '#c9c2b4',
+        feel: { rough: 0.34, metal: 0 },
+        glyph: 'faces',
+        // 1 · 2 · 3 · energy · attack · heal — the six faces the mechanic
+        // needs. Values stay 1..6 on the wire: the server rolls a d6 and the
+        // FACE is a reading of it, so nothing about the RNG, the physics or
+        // the log format changes.
+        faces: ['1', '2', '3', 'bolt', 'claw', 'heart'],
+        geo: { bevel: 0.03 },
+      },
+      fate: {
+        label: 'Fate',
+        line: 'plus, minus, blank',
+        body: '#2b3340', text: '#eef2f7', accent: '#8fa6c4',
+        feel: { rough: 0.4, metal: 0 },
+        glyph: 'faces',
+        // The Fudge/Fate die: two plus, two minus, two blank. Closes the
+        // first half of ROADMAP §8, which has named "Fate/Fudge dice… needs
+        // dice.js custom face sets" since it was written.
+        //
+        // A BLANK FACE IS AN EMPTY STRING, and it has to be a real entry
+        // rather than a missing one: `faces[value - 1]` returning undefined
+        // would fall through to the digit painter and print a 5.
+        faces: ['minus', 'minus', 'blank', 'blank', 'plus', 'plus'],
+        geo: { bevel: 0.03 },
+      },
+    },
+  },
+
   gildhall: {
     label: 'Gildhall',
     line: 'royal & heraldic — oxblood lacquer, gold leaf',

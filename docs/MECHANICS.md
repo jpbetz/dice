@@ -216,8 +216,7 @@ to be answered.
 | # | item | size | needs a goal change | what it unblocks |
 | --- | --- | --- | --- | --- |
 | ~~**M1**~~ | ~~**Touch a die.**~~ **SHIPPED 2026-08-28** — see "M1, and the two bugs only a screenshot could find" below. | med | no | everything below; also V5's felt echo and §7.1 physical pool building, both stalled on exactly this |
-| **M2** | **The throw becomes a turn.** `throws:N` + free keep, end to end: `composeThrow` beside `composeRoll`, an entry that carries N throws, a film per throw baked over the kept dice as static bodies, the `t3` flag in the notation, the verdict and log reading a turn rather than a roll. | large | no | Yahtzee, King of Tokyo, Farkle, Can't Stop, Pig — with the human judging the bust |
-| **M3** | **Faces that are not numbers.** A face-set registry behind the existing `glyph` seam, symbol dice (Fudge first — three faces, no ambiguity), the chips and the log learning glyphs, `odds.js` refusing non-numeric sums honestly rather than summing nonsense. | med | no | King of Tokyo's actual dice, Fudge, Zombie Dice, and ROADMAP §8, which has been blocked on this line since it was written |
+| **M2** | **The throw becomes a turn.** `throws:N` + free keep, end to end: `composeThrow` beside `composeRoll`, an entry that carries N throws, a film per throw baked over the kept dice as static bodies, the `t3` flag in the notation, the verdict and log reading a turn rather than a roll. | large | no | Yahtzee, King of Tokyo, Farkle, Can't Stop, Pig — with the human judging the bust | ~~**M3**~~ | ~~**Faces that are not numbers.**~~ **SHIPPED 2026-08-28** — `symbols.monster` and `symbols.fate`; see "M3, and the game we are not naming" below. | med | no | King of Tokyo's actual dice, Fudge, and ROADMAP §8's first half |
 | **M4** | **Procedures as a registry.** `PROCEDURES` beside `SYSTEMS`: throws, keep rule, bust rule, tally, bank verb. Farkle and Zombie Dice become assisted rather than merely possible. | med–large | **yes — this is the goal 6 decision** | automatic bust, running tally, the bank verb |
 | **M5** | **The decision as a beat.** Ceremony at the choice point: the tally at stake, the live bust odds, the moment. `js/odds.js` already forecasts; UX §2.1's `showOdds` exists and is deliberately unbuilt, and push-your-luck is the case that makes odds obviously worth showing rather than a crutch. | med | no (rides ⑤) | the reason to use this instead of physical dice |
 | **M6** | **The bag.** Dice drawn at random from a defined cup. | small–med | no | Zombie Dice; and it is the honest primitive behind any "draw 3 of these 13" |
@@ -324,6 +323,73 @@ floor. Sabotage-verified in both directions.
 `tools/steps/pick-look.mjs` renders the marker in both registers and on both
 viewports and **fails** if either list is non-empty, so the look is
 re-runnable and the claim is stated in the frame rather than in a count.
+
+
+## M2, a throw becomes a turn — SHIPPED 2026-08-28 (no player gesture yet)
+
+`6d6 t3` declares a turn: throw up to three times, keeping whichever dice you
+choose between throws. `/api/rethrow` spends one throw; the server owns the
+budget and the values.
+
+**A turn is a plain pool**, and the refusal is deliberate. `adv/keep/reroll/!`
+are within-throw mechanics that decide which dice count, and stacking them on
+a procedure that re-throws a chosen subset asks questions this repo has no
+answer to — does `4d6dl1 t3` drop the lowest of each throw or of the final
+faces? Answering would be inventing a rule (goal 6). A modifier rides, because
+it is arithmetic rather than a choice about dice.
+
+**The whole turn rides one film.** `dice`, `values`, `perDie`, `keyframes` and
+`chips` are index-aligned to the roll everywhere in this app, so a film of just
+the thrown subset would misalign every result surface. The kept dice join the
+cast as the static, already-frozen bodies they became when they last landed:
+constant track, real collisions, and no downstream reader knows a re-throw
+happened. Face correction needed no special case — a die that has not moved is
+already showing its target, so the correction comes out identity.
+
+**A re-throw is thrown, never poured**, even with a tower up: you do not post
+dice back through the tower, you scoop the ones you are not keeping.
+
+**Still open:** the player-facing gesture. M1's pick path is dark and nothing
+wires pick → keep yet, so today a turn is driven from `__diceDebug.throwAgain`
+or the API. That is the next slice, and it is where M1 gets switched on.
+
+## M3, and the game we are not naming — SHIPPED 2026-08-28
+
+Two sets, both d6: **`symbols.monster`** (1 · 2 · 3 · energy · attack · heal)
+and **`symbols.fate`** (two plus, two minus, two blank — which closes the first
+half of ROADMAP §8, blocked on "needs dice.js custom face sets" since it was
+written).
+
+**Values stay 1–6 on the wire.** The server rolls a d6 and the FACE is a
+reading of it, so nothing about the RNG, the physics, the log format or
+redaction changes. A face set is a skin, and skins are already per-die (§9
+mixed pools), so a pool can hold three symbol dice and three ordinary ones and
+each chip answers for its own die.
+
+**The symbols are drawn, not typed, and defined once.** A glyph like U+26A1
+renders as a colour emoji in some font stacks, an outline in others, and
+nothing in a few — and on a texture baked once at load, "nothing" is a blank
+face nobody notices until a player says the dice are broken. So each symbol is
+one SVG path used in both places it has to appear: filled into the die texture
+with `Path2D`, and inlined into the readout chip. Two hand-kept copies drift;
+a chip reading "5" beside a die showing a claw is the *results readable on
+screen* invariant broken in the most confusing direction there is.
+
+**THE HOUSE IS NAMED FOR THE MECHANIC, NOT FOR A GAME.** These are the faces a
+monster-brawl push-your-luck game uses, and the obvious published example is
+somebody's trademark. Shipping a set under that name would be borrowing their
+brand to describe our dice. What this app provides is symbol dice; which game
+you play with them is yours.
+
+**Known and NOT fixed: a numeric interpretation system reads symbol faces.**
+With the room set to *Your Soul Deal*, a monster die showing a claw is read as
+"5 — Success", because the system reads the value under the face. That is not
+wrong so much as meaningless, and the honest fix is the table setting the
+system to **None**, which CUJ12 already makes a per-table choice. Making a
+skin suppress the interpretation layer would be a cosmetic field silently
+overriding the meaning layer, which is worse. The real answer is M4: a
+procedure that knows what a face means is exactly what a procedure registry
+is for.
 
 ## The questions, and the answers — 2026-08-27
 

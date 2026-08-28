@@ -284,6 +284,23 @@ function paintDigits(ctx, face, spec, color) {
     paintPips(ctx, face, spec, color);
     return;
   }
+  // SYMBOL FACES (MECHANICS M3). A set may carry `faces` — one entry per
+  // value — so a d6 can read ⚡ / claw / heart instead of 4 / 5 / 6, which is
+  // what a push-your-luck or roll-and-lock game's dice actually look like.
+  // A numeric entry falls through to the digit painter, so 1/2/3 stay digits
+  // on a die whose other three faces are symbols.
+  //
+  // THE SYMBOLS ARE DRAWN, NOT TYPED, and that is the pips' precedent rather
+  // than a preference: a glyph like U+26A1 renders as a colour emoji in some
+  // font stacks, as a thin outline in others, and not at all in a few — on a
+  // canvas texture baked once at load, "not at all" is a blank face nobody
+  // notices until a player says the dice are broken. A path is a path
+  // everywhere.
+  const sym = spec.faces && spec.value >= 1 ? spec.faces[spec.value - 1] : null;
+  if (sym !== null && sym !== undefined && sym in FACE_SHAPES && !spec.corners) {
+    paintFaceShape(ctx, face, spec, color, facePath(sym));
+    return;
+  }
   const { center, r } = inradius2d(face);
   const rPx = r * face.pxScale;
   if (spec.corners) {
@@ -310,6 +327,69 @@ function paintDigits(ctx, face, spec, color) {
 // same `color` argument so every baked channel (color map, emissiveMap,
 // relief height) draws pips in its own tone — layout identical by
 // construction (the digit-glow / relief coupling already assumes this).
+// The symbol library (MECHANICS M3). ONE definition per symbol, as SVG path
+// data in a y-up box spanning roughly ±1, because the same symbol has to be
+// drawn in two places that could not otherwise share code: baked into the die
+// texture on a canvas, and rendered into the value chip as an inline SVG. A
+// chip that said "5" while the die showed a claw would break the app's own
+// *results readable on screen* invariant in the most confusing possible way,
+// and two hand-kept copies of a shape drift.
+//
+// THE SYMBOLS ARE DRAWN, NOT TYPED, and that is the pips' precedent rather
+// than a preference: a glyph like U+26A1 renders as a colour emoji in some
+// font stacks, as a thin outline in others, and not at all in a few — on a
+// canvas texture baked once at load, "not at all" is a blank face nobody
+// notices until a player says the dice are broken. A path is a path.
+export const FACE_SHAPES = {
+  // Energy. Narrow and steeply raked: the first cut spanned the full width
+  // and read as a letter Z on a die at table distance.
+  bolt: 'M 0.34 1 L -0.46 0.06 L -0.06 0.06 L -0.34 -1 L 0.46 -0.12 L 0.06 -0.12 Z',
+  // Attack: three raking claw marks.
+  claw: 'M -0.72 -0.86 Q -0.42 0 -0.50 0.88 Q -0.36 0 -0.50 -0.86 Z'
+      + ' M -0.20 -0.90 Q 0.10 0 0.02 0.92 Q 0.16 0 0.02 -0.90 Z'
+      + ' M 0.32 -0.86 Q 0.62 0 0.54 0.88 Q 0.68 0 0.54 -0.86 Z',
+  // Heal.
+  heart: 'M 0 0.92 C -1.15 0.02 -0.66 -0.98 0 -0.36 C 0.66 -0.98 1.15 0.02 0 0.92 Z',
+  // Fate/Fudge.
+  plus: 'M -0.86 -0.20 L 0.86 -0.20 L 0.86 0.20 L -0.86 0.20 Z'
+      + ' M -0.20 -0.86 L 0.20 -0.86 L 0.20 0.86 L -0.20 0.86 Z',
+  minus: 'M -0.86 -0.20 L 0.86 -0.20 L 0.86 0.20 L -0.86 0.20 Z',
+  // A REAL ENTRY, not a missing one: an absent face falls through to the
+  // digit painter and prints the number the face was meant to replace.
+  blank: '',
+};
+
+// Cached Path2D per symbol — the texture bake walks every face of every die
+// type, and re-parsing the same path string each time is waste.
+const _facePaths = new Map();
+function facePath(name) {
+  if (!_facePaths.has(name)) {
+    const d = FACE_SHAPES[name];
+    _facePaths.set(name, d ? new Path2D(d) : null);
+  }
+  return _facePaths.get(name);
+}
+
+// Draw one symbol on a face, placed and turned exactly the way a digit is:
+// canvasPoint for the position and drawLabel's own up-vector convention for
+// the angle, rather than a second transform that would drift from it.
+function paintFaceShape(ctx, face, spec, color, draw) {
+  const { center, r } = inradius2d(face);
+  const rPx = r * face.pxScale;
+  const [px, py] = canvasPoint(face, center);
+  const up = spec.upDir || new THREE.Vector2(0, 1);
+  const upCanvas = new THREE.Vector2(up.x, -up.y).normalize();
+  const angle = Math.atan2(upCanvas.x, -upCanvas.y);
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.rotate(angle);
+  // The shapes are authored y-up in a ±1 box; canvas is y-down.
+  ctx.scale(rPx * 0.58, -rPx * 0.58);
+  ctx.fillStyle = color;
+  if (draw) ctx.fill(draw);
+  ctx.restore();
+}
+
 const PIP_OFFSETS = [
   null, // no 0
   [[0, 0]],
@@ -1106,6 +1186,13 @@ function buildDie(type, variant = 'std') {
     // idiom only). Decorate here so all three paint channels (color,
     // digit-glow emissive, relief engrave) see the same dispatch.
     if (skin.glyph) for (const s of specs) s.glyph = skin.glyph;
+    // Symbol faces ride the same decoration so all three paint channels
+    // (colour, emissive, engrave) get the same dispatch. Only a d6 for now:
+    // the sets that need them are d6 games, and a six-entry table on a d20
+    // would leave fourteen faces undecided.
+    if (Array.isArray(skin.faces) && type === 'd6') {
+      for (const s of specs) s.faces = skin.faces;
+    }
     materials = faces.map((f, i) =>
       shroud ? materialFor(skin, f, { blank: true }, true)
         : materialFor(skin, f, specs[i], false, faceSeed(type, i))

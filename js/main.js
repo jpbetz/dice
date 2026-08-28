@@ -19,7 +19,7 @@ limitations under the License.
 
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, SHADER_TIME } from './dice.js';
+import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, SHADER_TIME, FACE_SHAPES } from './dice.js';
 import { dieArtURL } from './diceart.js';
 import { connect, forgetSeat, peekTable, prejoinSeat, LS_WHO } from './net.js';
 import { recentTables, rememberTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
@@ -6539,6 +6539,38 @@ function modPartsOf(entry) {
 
 let lastEntry = null; // the roll currently shown on the banner/chips
 
+// Which symbol this die's face shows, or null if it shows a number. The set
+// is per-die (§9 mixed pools), so a pool can legitimately hold three symbol
+// dice and three ordinary ones and each chip answers for its own die.
+function faceSymbolFor(entry, i, part) {
+  if (!part || typeof part.value !== 'number') return null;
+  const setId = rollDieSet(entry, i);
+  const skin = setId ? SETS[setId] : null;
+  if (!skin || !Array.isArray(skin.faces)) return null;
+  if (part.type !== 'd6') return null; // faces are a d6 table; see js/dice.js
+  const name = skin.faces[part.value - 1];
+  return (name !== undefined && name in FACE_SHAPES) ? name : null;
+}
+
+// The chip's symbol, as an inline SVG of the very path the die face was baked
+// from. `-1 -1 2 2` with a y-flip matches the shapes' y-up authoring.
+function faceSymbolSvg(name) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '-1 -1 2 2');
+  svg.setAttribute('class', 'chip-glyph');
+  svg.setAttribute('aria-hidden', 'true');
+  const d = FACE_SHAPES[name];
+  if (d) {
+    const path = document.createElementNS(NS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('transform', 'scale(1,-1)');
+    path.setAttribute('fill', 'currentColor');
+    svg.append(path);
+  }
+  return svg;
+}
+
 // Per-die value chips over the table. staged=true is the ceremony's §2.4
 // chorus: chips pop in with a stagger, counting dice first, discards last —
 // purely decorative CSS delays; ceremony state stays dt-driven. The default
@@ -6588,7 +6620,22 @@ function renderChips(entry, dice, staged = false) {
     el.className = cls;
     el.style.setProperty('--die-color', DIE_DEFS[p.type].color);
     if (staged) el.style.setProperty('--chip-delay', `${delays[i].toFixed(2)}s`);
-    el.textContent = hidden ? '?' : (p.child ? '✴' : '') + p.label;
+    // SYMBOL FACES (MECHANICS M3): a chip reading "5" beside a die showing a
+    // claw is the *results readable on screen* invariant broken in the most
+    // confusing way there is — the readout contradicting the felt. The chip
+    // wears the same path the die face was baked from (js/dice.js
+    // FACE_SHAPES), so the two cannot drift.
+    const sym = hidden ? null : faceSymbolFor(entry, i, p);
+    if (sym !== null) {
+      el.classList.add('chip-symbol');
+      el.textContent = '';
+      el.append(faceSymbolSvg(sym));
+      // The name is what a screen reader and a copy/paste get: a path has no
+      // text, and a chip that reads as nothing is worse than one reading "5".
+      el.setAttribute('aria-label', sym === 'blank' ? 'blank' : sym);
+    } else {
+      el.textContent = hidden ? '?' : (p.child ? '✴' : '') + p.label;
+    }
     chipsLayer.appendChild(el);
     chips.push({ el, die });
   });
@@ -6867,7 +6914,22 @@ function renderOutcomeRows(el, entry, key = false) {
         : o.word ? ` oc-b-${o.tier}` : ' oc-quiet');
       const ev = document.createElement('span');
       ev.className = 'oc-die';
-      ev.textContent = `${o.type} ${o.value}`; // the evidence, in the text layer
+      // SYMBOL FACES (MECHANICS M3). This is the readout a player actually
+      // looks at — the felt's own value chips are off by default — so a die
+      // showing a claw has to say claw here, or the banner contradicts the
+      // dice it is describing. The die type stays in the text layer beside
+      // it, and the symbol carries its own name for copy/paste and readers.
+      const evSym = faceSymbolFor(entry, o.dieIndex, { type: o.type, value: o.value });
+      if (evSym !== null) {
+        ev.append(`${o.type} `);
+        ev.appendChild(faceSymbolSvg(evSym));
+        const said = document.createElement('span');
+        said.className = 'oc-sr';
+        said.textContent = evSym === 'blank' ? 'blank' : evSym;
+        ev.appendChild(said);
+      } else {
+        ev.textContent = `${o.type} ${o.value}`; // the evidence, in the text layer
+      }
       // An explosion child rides the die it came from (meanings.js): it is
       // more of that die, not a die of its own, so it joins the EVIDENCE and
       // never the answer slot. Inside `.oc-die` on purpose — that span is the
@@ -10960,6 +11022,24 @@ window.__diceDebug = {
     };
   },
   pickClear() { clearDiePicks(); },
+  // SYMBOL FACES (MECHANICS M3). Every face name a set declares, and whether
+  // it resolves to a drawn shape. A typo here does not throw and does not
+  // look broken in code — `faces[value - 1]` simply misses, the digit painter
+  // takes over, and the die prints the number the symbol was supposed to
+  // replace. This is the assertion that catches it, and it can only run in a
+  // browser: js/dice.js imports three.
+  faceSets() {
+    const out = {};
+    for (const [id, skin] of Object.entries(SETS)) {
+      if (!Array.isArray(skin.faces)) continue;
+      out[id] = {
+        faces: skin.faces,
+        unresolved: skin.faces.filter((f) => !(f in FACE_SHAPES) && !/^\d+$/.test(f)),
+        count: skin.faces.length,
+      };
+    }
+    return out;
+  },
   // A TURN (MECHANICS M2). `throwAgain` keeps the dice named by index and
   // re-throws the rest, through the SAME path a player's gesture will use, so
   // a scenario proves the mechanic rather than a test-only shortcut.
