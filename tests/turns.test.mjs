@@ -314,6 +314,25 @@ try {
     return { me, roll: res.data.roll };
   };
 
+  // A push turn that is STILL ALIVE, which is not the same thing as a push
+  // turn that was rolled.
+  //
+  // `6d6 push>=5` busts on its first throw whenever all six dice come up
+  // under 5 — (2/3)^6, about ONE TURN IN ELEVEN — and a busted turn correctly
+  // refuses to be banked or thrown again. A test that rolls once and assumes
+  // it can bank therefore fails about 9% of the time, which is exactly the
+  // rate that gets dismissed as noise and switched off. It cost one run to
+  // find and is fixed here rather than retried: any case that needs a live
+  // turn asks for one.
+  const startLivePush = async (room, notation = '6d6 push>=5', name = 'Alice') => {
+    for (let i = 0; i < 40; i++) {
+      const got = await startPush(`${room}-${i}`, notation, name);
+      if (!got.roll.push.busted) return { ...got, room: `${room}-${i}` };
+    }
+    throw new Error('forty consecutive push rolls busted on their first throw — '
+      + 'that is 1 in 10^40 by chance, so the bust rule is wrong');
+  };
+
   await t('a push roll is born with its rule, its scoring dice and a budget', async () => {
     const { roll } = await startPush('push-born');
     assert.deepEqual(roll.push.rule, { min: 5 }, 'the rule it was declared with');
@@ -388,8 +407,7 @@ try {
   });
 
   await t('banking ends the turn, and only the roller may do it', async () => {
-    const room = 'push-bank';
-    const { me, roll } = await startPush(room);
+    const { me, roll, room } = await startLivePush('push-bank');
     const bob = await joinRoom(room, 'Bob');
     const theirs = await post('/api/bank', {
       room, playerId: bob.playerId, rollId: roll.rollId, keep: [0],

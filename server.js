@@ -42,7 +42,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { composeRoll, composeThrow, validateMods, DIE_MAX,
+import { composeRoll, composeThrow, validateMods, validateSpec, DIE_MAX,
   scoringIndices, pushTally, MAX_PUSH_THROWS } from './js/rollspec.js';
 import { parseNotation } from './js/notation.js';
 import { SET_IDS } from './js/themes.js';
@@ -2297,10 +2297,8 @@ async function handleRoll(req, res) {
   // grammar; this is the EXPLICIT-spec door, which a client can POST straight
   // through without ever writing a notation string. Both, or the refusal is a
   // suggestion.
-  if (spec.mods && spec.mods.push
-      && ((spec.visibility && spec.visibility.mode === 'held') || spec.faceDown)) {
-    return sendError(res, 400, 'a push turn cannot be held', 'push_cannot_be_held');
-  }
+  const specErr = validateSpec(spec);
+  if (specErr) return sendError(res, 400, `invalid roll: ${specErr}`, specErr);
 
   // Reroll provenance (rerollOfId) — read HERE and only here: offers/claims
   // are fresh rolls and their parser must never see this key. It is a CLAIM

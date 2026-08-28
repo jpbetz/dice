@@ -24,7 +24,8 @@ import { dieArtURL } from './diceart.js';
 import { connect, forgetSeat, peekTable, prejoinSeat, LS_WHO } from './net.js';
 import { recentTables, rememberTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
-import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE } from './rollspec.js';
+import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
+  scoringIndices, pushTally, faceScores, MAX_PUSH_THROWS } from './rollspec.js';
 import { previewOf, countingPmfs, sumForecast, sumAtLeast, sumBins, sumPeak } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealStartingRack, dealRack, dealName } from './seed.js';
@@ -4862,6 +4863,53 @@ function requestThrowAgain(rollId) {
   return p;
 }
 
+// BANK (MECHANICS M4). Ends a push turn with what the kept dice are worth.
+// Nothing moves, so there is no film — the record changes and the surfaces
+// repaint.
+function applyBanked(data) {
+  const payload = data && data.roll;
+  if (!payload || !payload.rollId) return;
+  const live = liveTurns.get(payload.rollId);
+  if (live) liveTurns.set(payload.rollId, payload);
+  if (currentRoll && currentRoll.rollId === payload.rollId) currentRoll.push = payload.push || null;
+  const idx = log.findIndex((e) => e.rollId === payload.rollId);
+  if (idx >= 0) {
+    log[idx] = rollToLogEntry(payload);
+    if (!netOnline) save(LS_LOG, log);
+    renderLog();
+  }
+  // Repaint the banner through `currentRoll`, never through the log entry.
+  // showResults takes a ROLL payload and hands its `.dice` straight to
+  // renderChips, which indexes them as DIE OBJECTS with meshes — a log entry's
+  // `.dice` is a list of type strings, and passing one would anchor every chip
+  // to a string. currentRoll is the object that holds the real dice, and its
+  // push state was updated above.
+  if (currentRoll && currentRoll.rollId === payload.rollId
+      && lastEntry && lastEntry.rollId === payload.rollId) {
+    showResults(currentRoll);
+  }
+}
+
+function requestBank(rollId, keep) {
+  if (netOnline && net) return net.bank(rollId, keep);
+  return Promise.resolve(soloBank(rollId, keep));
+}
+
+function soloBank(rollId, keep) {
+  const payload = liveTurns.get(rollId);
+  if (!payload || !payload.push || payload.push.busted || payload.push.banked) return false;
+  const next = {
+    ...payload,
+    push: {
+      ...payload.push,
+      tally: pushTally(payload.values, keep, payload.push.rule),
+      banked: true,
+    },
+  };
+  applyBanked({ roll: next });
+  return true;
+}
+
 // Ask for another throw. `keep` is the die indices staying put. Solo has no
 // server to author the values, so it composes locally through the same shared
 // rollspec — one mechanic, two callers, exactly as composeRoll already is.
@@ -4878,12 +4926,14 @@ function soloRethrow(rollId, keep) {
   const thrown = [];
   for (let i = 0; i < payload.dice.length; i++) if (!kept.has(i)) thrown.push(i);
   if (!thrown.length) return false; // keeping everything is "done", not a throw
+  if (payload.push && (payload.push.busted || payload.push.banked)) return false;
   const next = {
     ...payload,
     values: composeThrow(payload.dice, payload.values, thrown, Math.random),
     throws: { max: payload.throws.max, used: payload.throws.used + 1 },
   };
   next.total = next.values.reduce((a, b) => a + b, 0) + (payload.modifier || 0);
+  if (payload.push) next.push = soloPushState(next.values, payload.push.rule, thrown, [...kept]);
   applyRethrow({ roll: next, thrown, seed: (Math.random() * 2 ** 32) >>> 0 });
   return true;
 }
@@ -5901,6 +5951,7 @@ function playRoll(roll, rethrow = null) {
     // dropped here is a field the log entry never sees, and the banner's
     // `Throw again` verb is painted from the entry.
     throws: roll.throws || null,
+    push: roll.push || null,   // MECHANICS M4: same reason as the line above
     // dice-set identity (Tier 6 §9): the burst drain and entryFromRoll read it
     set: typeof roll.set === 'string' ? roll.set : null,
     sets: Array.isArray(roll.sets) && roll.sets.length ? roll.sets : null, // per-die (§9 mixed pools)
@@ -6006,8 +6057,34 @@ function rollDice(types, label, opts = {}) {
     // every non-turn, so a plain solo roll's payload is unchanged.
     throws: spec.mods && spec.mods.throws
       ? { max: spec.mods.throws, used: 1 }
+      : (spec.mods && spec.mods.push
+        ? { max: MAX_PUSH_THROWS, used: 1 }
+        : undefined),
+    // MECHANICS M4: solo authors its own push state through the same shared
+    // functions the server uses — one mechanic, two callers. Every die moved
+    // on the first throw, so it can bust like any other.
+    push: spec.mods && spec.mods.push
+      ? soloPushState(composed.values, spec.mods.push,
+        composed.values.map((_, i) => i), [])
       : undefined,
   });
+}
+
+// The push state after a throw, offline. Mirrors server.js pushStateFor
+// exactly, off the same rollspec functions — the two are one mechanic, and
+// the reason they are not one function is that one of them runs where the
+// crypto RNG is.
+function soloPushState(values, rule, thrown, kept) {
+  const scoring = scoringIndices(values, rule);
+  const set = new Set(scoring);
+  const busted = thrown.length > 0 && !thrown.some((i) => set.has(i));
+  return {
+    rule,
+    scoring,
+    tally: busted ? { count: 0, sum: 0 } : pushTally(values, kept, rule),
+    busted,
+    banked: false,
+  };
 }
 
 // Advance the active playback by dt: interpolate meshes between keyframes
@@ -6221,6 +6298,7 @@ function stepPlayback(dt, tempo = 1, curve = false, realtime = curve) {
 // ---------------------------------------------------------------------------
 
 const chipsLayer = document.getElementById('chips-layer');
+const resultPushEl = document.getElementById('result-push'); // MECHANICS M4
 const banner = document.getElementById('result-banner');
 // Banner cells hoisted alongside `banner` — same pattern as chipsLayer/peekEl.
 // renderRollResults and renderBannerActions repaint on every roll arrival; the
@@ -6650,6 +6728,9 @@ function entryFromRoll(roll) {
     // from an entry, not from the roll payload. Present-or-absent, so a plain
     // roll's entry is byte-for-byte what it always was.
     throws: roll.throws ? { max: roll.throws.max, used: roll.throws.used } : undefined,
+    // MECHANICS M4: the push state rides the entry too — the banner is
+    // painted from an entry, and the banner is where a bust has to be said.
+    push: roll.push ? { ...roll.push } : undefined,
     spec,
   };
 }
@@ -6692,6 +6773,50 @@ function faceSymbolSvg(name) {
     svg.append(path);
   }
   return svg;
+}
+
+// Does this die's face score, under this roll's push rule? A fact about the
+// values, computed the same way on the server (pushStateFor) and here — the
+// shared predicate is js/rollspec.js faceScores, so the two cannot disagree
+// about the same face.
+//
+// Returns false for anything that is not a push turn, and for a shrouded
+// entry: a push state is made of values, and a viewer who may not see the
+// faces may not see which of them scored either.
+function faceScoresIn(entry, part) {
+  if (!entry || !entry.push || !entry.push.rule) return false;
+  if (!part || typeof part.value !== 'number') return false;
+  return faceScores(part.value, entry.push.rule);
+}
+
+// A PUSH TURN'S RUNNING STATE (MECHANICS M4): what the kept dice are worth,
+// or that this throw busted, or that it was banked. Facts only — no advice,
+// no "you should stop now". The invariant is that the procedure never plays
+// for you, and a line that said "bank it" would be the app playing.
+//
+// BOTH CURRENCIES, always. Which one a game counts is the game's business,
+// and this app does not know which game this is.
+function renderPushState(el, entry, hidden) {
+  if (!el) return;
+  el.textContent = '';
+  el.className = 'result-push';
+  const push = entry && entry.push;
+  if (!push || !push.rule || hidden || !push.tally) { el.hidden = true; return; }
+  el.hidden = false;
+  const rule = push.rule.min !== undefined
+    ? `${push.rule.min}+ scores`
+    : `${push.rule.faces.join(' and ')} score`;
+  if (push.busted) {
+    el.classList.add('push-bust');
+    el.textContent = `Bust — nothing scored on that throw (${rule})`;
+    return;
+  }
+  const { count, sum } = push.tally;
+  const dice = `${count} ${count === 1 ? 'die' : 'dice'}`;
+  el.textContent = push.banked
+    ? `Banked — ${dice}, ${sum}`
+    : `Holding ${dice}, ${sum} · ${rule}`;
+  if (push.banked) el.classList.add('push-banked');
 }
 
 // Per-die value chips over the table. staged=true is the ceremony's §2.4
@@ -7042,6 +7167,10 @@ function renderOutcomeRows(el, entry, key = false) {
       // showing a claw has to say claw here, or the banner contradicts the
       // dice it is describing. The die type stays in the text layer beside
       // it, and the symbol carries its own name for copy/paste and readers.
+      // MECHANICS M4: a die showing a scoring face is marked, because "which
+      // of these counted" is the question a push turn asks every throw. It is
+      // a FACT about the face, not a recommendation to keep it.
+      if (faceScoresIn(entry, { value: o.value })) chip.classList.add('oc-scored');
       const evSym = faceSymbolFor(entry, o.dieIndex, { type: o.type, value: o.value });
       if (evSym !== null) {
         ev.append(`${o.type} `);
@@ -7188,6 +7317,8 @@ function renderRollResults(entry, dice, fx = true) {
     resultVerdictEl.textContent = '';
     resultVerdictEl.className = '';
   }
+
+  renderPushState(resultPushEl, entry, hidden);
 
   banner.classList.remove('hidden', 'crit-success', 'crit-fail');
   // One composed sentence per result, into a node that holds nothing else.
@@ -11165,6 +11296,24 @@ window.__diceDebug = {
     };
   },
   pickClear() { clearDiePicks(); },
+  // A PUSH TURN (MECHANICS M4). `bankTurn` goes through the same path the
+  // player's verb will, so a scenario proves the mechanic and not a shortcut.
+  bankTurn(rollId, keep) { return requestBank(rollId, keep); },
+  // What the felt and the readout say about the push. `state` comes off the
+  // live payload (the record) and `line`/`scoredChips` off the DOM (what the
+  // eye gets) — a scenario that checked only the record would pass on a
+  // banner that never repainted.
+  pushState(rollId) {
+    const payload = liveTurns.get(rollId) || null;
+    const el = document.getElementById('result-push');
+    return {
+      state: payload ? payload.push || null : null,
+      values: payload ? payload.values : null,
+      line: el && !el.hidden ? el.textContent.replace(/\s+/g, ' ').trim() : null,
+      scoredChips: document.querySelectorAll('.oc-chip.oc-scored').length,
+      totalChips: document.querySelectorAll('.oc-chip').length,
+    };
+  },
   // SYMBOL FACES (MECHANICS M3). Every face name a set declares, and whether
   // it resolves to a drawn shape. A typo here does not throw and does not
   // look broken in code — `faces[value - 1]` simply misses, the digit painter
@@ -26705,6 +26854,7 @@ function replaySettledRoll(r) {
     notation: r.notation,
     rerollOfId: r.rerollOfId,   // B3: a reload's on-felt roll keeps its mark
     throws: r.throws,           // MECHANICS M2: …and a turn keeps its budget
+    push: r.push,               // MECHANICS M4: …and a push keeps its rule and tally
     set: r.set,                 // Tier 6 §9: a reload keeps the roller's skin
     sets: r.sets,               // §9 per-die (mixed pools survive a reload)
     playerId: r.playerId,
@@ -26915,6 +27065,7 @@ function handleNetEvent(type, data) {
         notation: data.notation,
         rerollOfId: data.rerollOfId,   // B3: server-substantiated provenance
         throws: data.throws,           // MECHANICS M2: a turn's budget, if this is one
+        push: data.push,               // MECHANICS M4: …and its scoring rule and tally
         set: data.set,                 // Tier 6 §9: the roller's dice-set skin
         sets: data.sets,               // §9 per-die (mixed pools)
         playerId: data.playerId,
@@ -26966,6 +27117,11 @@ function handleNetEvent(type, data) {
       // `seed` with a redacted entry: they watch the dice move and learn
       // nothing about the faces, which is the turn-level visibility Q2 chose.
       applyRethrow(data);
+      break;
+    case 'banked':
+      // MECHANICS M4: a push turn was banked. No film — nothing moved — so
+      // this is a record update and a repaint, not a playback.
+      applyBanked(data);
       break;
     case 'roll-cleared': // per-roll Done (§7.5) / shelf aging (§7.7)
       applyClearRoll(data.rollId);

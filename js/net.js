@@ -38,7 +38,7 @@ const REOPEN_MIN_MS = 1000;
 const REOPEN_MAX_MS = 15000;
 const SSE_EVENTS = [
   'hello', 'player-joined', 'player-left', 'player-renamed', 'pools-changed',
-  'roll', 'clear', 'reveal', 'rethrow', 'roll-cleared', 'roll-collected',
+  'roll', 'clear', 'reveal', 'rethrow', 'banked', 'roll-cleared', 'roll-collected',
   'offer', 'offer-claimed', 'offer-rescinded',
   'settings-changed', 'table-setup', 'table-split',
 ];
@@ -449,6 +449,14 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     // when the room's do.
     async rethrow(rollId, keep) {
       const res = await withPlayer('/api/rethrow', { rollId, keep });
+      return res.ok;
+    },
+
+    // Bank a push turn (MECHANICS M4). `keep` is the dice being banked; the
+    // server works out what they are worth, because a tally a client computed
+    // is a tally the table has to trust.
+    async bank(rollId, keep) {
+      const res = await withPlayer('/api/bank', { rollId, keep });
       return res.ok;
     },
 

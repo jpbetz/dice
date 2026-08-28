@@ -956,6 +956,16 @@ export function specEquals(a, b) {
       keep: m.keep || null,
       reroll: m.reroll ? { below: m.reroll.below } : null,
       explode: !!m.explode,
+      // THE PROCEDURE FLAGS, and their absence here was a check that could
+      // not fail. This function's only caller is the test suite — including
+      // the fuzzer's property that a spec does not drift through its own
+      // canonical form — so from the day `throws` shipped until 2026-08-28,
+      // two specs differing ONLY in their procedure were "equal", and the
+      // fuzzer would not have noticed a canonical form that dropped tN or
+      // push entirely. Found by the M6 design pass reading this file, not by
+      // anything going red. Anything added to `mods` belongs on this list.
+      throws: m.throws || null,
+      push: m.push ? { min: m.push.min ?? null, faces: m.push.faces || null } : null,
     });
   };
   return norm(a) === norm(b);

@@ -131,6 +131,34 @@ export function rollValue(type, rng) {
   return 1 + Math.floor(rng() * DIE_MAX[type]);
 }
 
+// Validate a WHOLE roll spec, including the rules that span more than one
+// field. `validateMods` deliberately sees only (dice, mods) and cannot answer
+// a question about visibility, and that gap had a consequence worth recording:
+// "a push turn cannot be held" lived in js/notation.js's parser and in
+// server.js's handler, and in NEITHER of the places that decide whether a
+// spec object is legal. So `canonicalNotation` would happily render a
+// push-and-held spec into a string the parser then refused — a canonical form
+// that is not a fixed point, which is the one thing notation totality
+// promises. Found 2026-08-28 by the fuzzer, the first run after its generator
+// learned to emit procedure flags at all.
+//
+// Anything that is a rule about a spec rather than about its mods belongs
+// here, and the callers are the server's door and the fuzzer's own notion of
+// "a spec worth testing".
+export function validateSpec(spec) {
+  if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return 'bad_spec';
+  const modsErr = validateMods(spec.dice || [], spec.mods === undefined ? null : spec.mods);
+  if (modsErr) return modsErr;
+  const mode = spec.visibility && spec.visibility.mode;
+  // Held is face down for EVERYONE INCLUDING THE ROLLER, and push-your-luck is
+  // nothing but a series of choices about faces you can see. Secret and
+  // whisper are fine: the roller sees their own dice in both.
+  if (spec.mods && spec.mods.push && (mode === 'held' || spec.faceDown === true)) {
+    return 'push_cannot_be_held';
+  }
+  return null;
+}
+
 // Validate a mods spec against a base dice list. Returns null if valid,
 // otherwise a short error string. A missing/empty spec is valid.
 export function validateMods(dice, mods) {

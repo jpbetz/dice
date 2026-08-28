@@ -45,7 +45,7 @@ limitations under the License.
 
 import assert from 'node:assert/strict';
 import { parseNotation, canonicalNotation, specEquals, DIE_ORDER } from '../js/notation.js';
-import { validateMods, composeRoll, DIE_MAX } from '../js/rollspec.js';
+import { validateMods, validateSpec, composeRoll, DIE_MAX, MAX_THROWS } from '../js/rollspec.js';
 
 const N_SPECS = Number(process.env.FUZZ_SPECS) || 5000;
 const N_JUNK = Number(process.env.FUZZ_JUNK) || 5000;
@@ -59,7 +59,12 @@ const MAX_LABEL = 20;
 const MAX_COMMENT = 64;
 const MAX_SUBTITLE = 40;
 const EXP_KINDS = new Set(['check', 'cinematic']);
-const MOD_KEYS = new Set(['modifier', 'parts', 'adv', 'keep', 'reroll', 'explode']);
+// THE CONTRACT'S OWN KEY LIST, and it is a THIRD place a procedure flag has
+// to be named. Turning the generator on for `throws` and `push` made this
+// list reject them on the first run — which is the list doing its job, and
+// also the proof that nothing had ever put a procedure flag through here.
+const MOD_KEYS = new Set(['modifier', 'parts', 'adv', 'keep', 'reroll', 'explode',
+  'throws', 'push']);
 const TYPES = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20'];
 // eslint-disable-next-line no-control-regex
 const CTL = /[\x00-\x1f\x7f]/;
@@ -225,6 +230,27 @@ function checkOkContract(kind, input, r) {
       }
     }
     if (m.adv !== undefined && m.adv !== 'adv' && m.adv !== 'dis') d(`bad adv: ${m.adv}`);
+    // The procedure flags' own shape, checked here rather than left to
+    // validateMods alone: this pass is about what a PARSE may produce, and a
+    // parse that emitted `throws: '3'` would satisfy a looser validator.
+    if (m.throws !== undefined
+        && (!Number.isInteger(m.throws) || m.throws < 2 || m.throws > MAX_THROWS)) {
+      d(`throws out of contract: ${m.throws}`);
+    }
+    if (m.push !== undefined) {
+      const hasMin = m.push && m.push.min !== undefined;
+      const hasFaces = m.push && Array.isArray(m.push.faces);
+      if (!m.push || typeof m.push !== 'object') d('push is not an object');
+      else if (hasMin === hasFaces) d('push carries both a threshold and a face set, or neither');
+      else if (hasFaces) {
+        for (let i = 1; i < m.push.faces.length; i++) {
+          if (m.push.faces[i] <= m.push.faces[i - 1]) {
+            d(`push faces are not sorted and deduped: ${m.push.faces.join(',')}`);
+            break;
+          }
+        }
+      }
+    }
   }
   const vErr = validateMods(spec.dice, m);
   if (vErr) d(`rollspec.validateMods rejects an ok parse: ${vErr}`, { mods: JSON.stringify(m) });
@@ -449,6 +475,39 @@ function genMods(dice) {
   }
   if (chance(0.3)) mods.reroll = { below: between(1, 9), once: true };
   if (chance(0.25)) mods.explode = true;
+
+  // THE PROCEDURE FLAGS (MECHANICS M2/M4). Until 2026-08-28 this generator
+  // emitted none of them, so P1 -- "a spec does not drift through its own
+  // canonical form" -- had never once been asked about a turn or a push, and
+  // specEquals could not have told the difference anyway. Both halves are
+  // fixed together, because either alone is still a check that cannot fail.
+  //
+  // They are mutually exclusive with each other and with everything above
+  // that selects dice within a throw (validateMods refuses those pairs), so
+  // they only generate onto a pool that has none of them.
+  const plain = !mods.adv && !mods.keep && !mods.reroll && !mods.explode;
+  if (plain && chance(0.2)) {
+    mods.throws = between(2, MAX_THROWS);
+  } else if (plain && chance(0.2)) {
+    // Reachability: validateMods refuses a predicate no die in the pool can
+    // satisfy, so generate against the pool's own biggest face.
+    const faceMax = Math.max(...dice.map((t) => (t === 'd10x' ? 90 : DIE_MAX[t] || 0)));
+    if (faceMax >= 1) {
+      if (chance(0.5)) {
+        mods.push = { min: between(1, faceMax) };
+      } else {
+        const n = between(1, Math.min(4, faceMax));
+        const set = new Set();
+        while (set.size < n) {
+          const f = between(1, faceMax);
+          // d10x shows 0,10,...,90 and never 1..9; a face no die can show
+          // would be refused, and the fuzzer's job is legal specs.
+          if (dice.some((t) => (t === 'd10x' ? (f % 10 === 0) : f <= (DIE_MAX[t] || 0)))) set.add(f);
+        }
+        mods.push = { faces: [...set].sort((a, b) => a - b) };
+      }
+    }
+  }
   return Object.keys(mods).length ? mods : null;
 }
 
@@ -475,8 +534,11 @@ for (let i = 0; i < N_SPECS; i++) {
     spec.visibility = expectVis;
   }
 
-  // generator sanity: only in-contract specs are interesting for P1
-  if (validateMods(dice, mods) !== null) { p1Skipped++; continue; }
+  // Generator sanity: only in-contract specs are interesting for P1 — and the
+  // contract is the WHOLE spec, not just its mods. validateMods cannot see
+  // visibility, so a push-and-held pair looked in-contract here and then had
+  // no legal canonical form; that is what caught the missing shared rule.
+  if (validateSpec({ ...spec, faceDown: extras.faceDown }) !== null) { p1Skipped++; continue; }
 
   const c1 = canonicalNotation(spec, extras);
   // Pipe escaping + max-length parts + comment + subtitle can push a wire-fed

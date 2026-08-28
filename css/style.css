@@ -6672,3 +6672,27 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
      never raise it. */
   max-height: min(60vh, calc(100dvh - var(--banner-lift, 0px) - 24px));
 }
+
+/* MECHANICS M4 — a push turn's running state, and the dice that scored.
+   Appended at the end of the file on purpose: three branches were editing
+   this stylesheet at once and a rule added at the tail merges cleanly with
+   rules added anywhere else. */
+.result-push {
+  margin-top: 4px;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+.result-push.push-bust {
+  color: #ff8f7a;
+  font-weight: 700;
+}
+.result-push.push-banked {
+  color: #ffd479;
+  font-weight: 700;
+}
+/* A scoring face. A KEY, not a verdict: it says this die counts under the
+   rule the player declared, and says nothing about whether to keep it. */
+.oc-chip.oc-scored {
+  box-shadow: inset 0 0 0 1px rgba(255, 212, 121, 0.55);
+}

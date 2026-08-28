@@ -876,6 +876,11 @@ limitations under the License.
       <div id="result-label"></div>
       <div id="result-total"></div>
       <div id="result-verdict"></div>
+      <!-- MECHANICS M4: a push turn's running state — what the kept dice are
+           worth, or that the throw busted. Its own node rather than a share of
+           the verdict line, because a push turn may also carry a dc and two
+           different answers must never take turns in one slot. -->
+      <div id="result-push" class="result-push" hidden></div>
       <div id="result-meaning"></div>
       <div id="result-breakdown"></div>
     </div>
