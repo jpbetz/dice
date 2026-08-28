@@ -42,7 +42,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { composeRoll, validateMods, DIE_MAX } from './js/rollspec.js';
+import { composeRoll, composeThrow, validateMods, DIE_MAX } from './js/rollspec.js';
 import { parseNotation } from './js/notation.js';
 import { SET_IDS } from './js/themes.js';
 // C22: the stamp's SHAPE only. The server carries `ver` on a table setup and
@@ -2022,6 +2022,11 @@ function projectEntryFor(entry, viewerId) {
     revealAuthority: vis.revealAuthority,
   };
   if (entry.exp) out.exp = entry.exp;
+  // A TURN'S BUDGET IS A STAKE, not a value (MECHANICS M2). How many throws
+  // a turn has and how many are spent is exactly as public as which dice are
+  // on the felt — the table watches them get re-thrown — so it survives
+  // redaction while every face stays omitted.
+  if (entry.throws) out.throws = entry.throws;
   if (entry.collected) out.collected = entry.collected;
   if (entry.cleared) out.cleared = entry.cleared;
   // Cosmetic identity, not content: which dice-set skin the roller's dice
@@ -2165,6 +2170,14 @@ function executeRoll(room, player, spec) {
   // come back pointing one hop up instead — the client stamps each reroll
   // with ITS parent's id.)
   if (spec.rerollOfId) roll.rerollOfId = spec.rerollOfId;
+  // A TURN (MECHANICS M2). Present-or-absent like every field above, so a
+  // plain roll's payload stays byte-for-byte what it always was. `used` counts
+  // throws taken, so it is 1 the moment the dice land — the first throw is a
+  // throw. It rides `roll`, NOT `roll.spec`: the spec is the request that
+  // reroll-last replays, and a replayed turn must start its budget over.
+  if (spec.mods && spec.mods.throws) {
+    roll.throws = { max: spec.mods.throws, used: 1 };
+  }
   // Dice-set identity (Tier 6 §9): cosmetic, present-or-absent — a plain
   // roll's payload stays byte-for-byte what it always was. It does NOT ride
   // roll.spec: the set belongs to whoever THROWS (reroll-last and a claimed
@@ -2298,6 +2311,102 @@ async function handleRoll(req, res) {
   // The roller's own response is projected like every other egress: a held
   // roll is face down for its roller too, so even this reply carries no
   // values.
+  sendJson(res, 200, { roll: projectEntryFor(roll, player.id) });
+}
+
+// Re-throw part of a turn (MECHANICS M2, docs/MECHANICS.md).
+//
+// The one endpoint that gives an existing entry NEW VALUES, which is why its
+// rules are stricter than any other mutation here:
+//
+//   * only the ROLLER may throw again — same authority as collect, and for
+//     the same reason: the dice belong to the moment and the person holding
+//     them says what happens next. (Reveal's authority is the visibility
+//     CHOOSER, which is a different question — who may show a result — and
+//     an offered turn's re-throws still belong to whoever is rolling it.)
+//   * the budget is the server's. A client that asks for a fourth throw of a
+//     t3 turn is refused; nothing about `used` is taken on trust.
+//   * `keep` is a set of die INDICES. Everything not kept is re-thrown, so
+//     keeping all of them is refused — that is "I am done", which is not a
+//     throw and must not spend one.
+//   * VISIBILITY BELONGS TO THE TURN, not the throw (MECHANICS Q2, answered
+//     by Joe 2026-08-28). A held turn reveals once, at the end; there is no
+//     turn whose audience sees throw two but not throw one. So this changes
+//     no visibility state at all and every egress runs the same projection —
+//     a shrouded viewer learns THAT dice were re-thrown (they can see them
+//     move) and never what they came up.
+async function handleRethrow(req, res) {
+  const body = await readJsonBody(req);
+  if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
+
+  const found = lookup(body.value);
+  if (found.error) return sendError(res, ...found.error);
+  const { room, player } = found;
+
+  const rollId = cleanString(body.value.rollId, 64);
+  if (!rollId) return sendError(res, 400, 'rollId is required', 'bad_request');
+
+  const roll = room.log.find((r) => r.rollId === rollId);
+  // Same existence stance as reveal: a secret roll does not exist for anyone
+  // but its roller, not even as a 403.
+  if (!roll || !entryExistsFor(roll, player.id)) return sendError(res, 404, 'unknown roll', 'unknown_roll');
+  if (player.id !== roll.playerId) {
+    return sendError(res, 403, 'only the roller may throw again', 'not_roller');
+  }
+  if (!roll.throws) return sendError(res, 400, 'this roll is not a turn', 'not_a_turn');
+  if (roll.throws.used >= roll.throws.max) {
+    return sendError(res, 400, 'no throws left', 'no_throws_left');
+  }
+  // Off the felt is out of the turn: a collected or cleared roll's dice are
+  // gone, and re-throwing dice nobody can see would put values on an entry
+  // whose film can never be played.
+  if (roll.collected || roll.cleared) {
+    return sendError(res, 400, 'this turn is over', 'turn_is_over');
+  }
+
+  const keep = body.value.keep;
+  if (!Array.isArray(keep)) return sendError(res, 400, 'keep must be a list of die indices', 'bad_keep');
+  const kept = new Set();
+  for (const k of keep) {
+    if (!Number.isInteger(k) || k < 0 || k >= roll.dice.length) {
+      return sendError(res, 400, 'keep holds a die index this roll does not have', 'bad_keep');
+    }
+    kept.add(k);
+  }
+  const thrown = [];
+  for (let i = 0; i < roll.dice.length; i++) if (!kept.has(i)) thrown.push(i);
+  if (!thrown.length) {
+    return sendError(res, 400, 'keeping every die is not a throw', 'nothing_thrown');
+  }
+
+  roll.values = composeThrow(roll.dice, roll.values, thrown, rng);
+  // The total is the sum of the faces plus the modifier, and it can be that
+  // simple ONLY because validateMods refuses `throws` alongside every mod
+  // that makes a die stop counting (adv/keep/reroll/explode). If that refusal
+  // is ever lifted, this line is the first thing that becomes wrong.
+  roll.total = roll.values.reduce((a, b) => a + b, 0) + (roll.modifier || 0);
+  roll.throws.used += 1;
+  // A fresh seed per throw: the film is a function of the seed, and reusing
+  // the turn's original one would replay the first throw's tumble.
+  // NOT stored on the entry. `thrown` and `seed` describe one throw's film,
+  // and a film is watched once — a late joiner gets settled dice and has
+  // nothing to replay. Parking them on the entry would broadcast a stale
+  // "which dice moved" with every future projection of it.
+  const seed = crypto.randomInt(0, 2 ** 32);
+
+  logDebug(() => `rethrow ${logField('room', room.name)} ${logField('name', player.name)} `
+    + `rollId=${rollId} throw=${roll.throws.used}/${roll.throws.max} thrown=${thrown.join(',')}`
+    + (roll.visibility ? ` vis=${roll.visibility.mode}` : ` values=${roll.values.join(',')}`));
+
+  // The event carries the whole projected entry for the same reason reveal
+  // does: a client's copy has to become the new truth, and a redacted viewer
+  // has no values to patch. `thrown` and `seed` ride OUTSIDE the projection
+  // because they are not values — they are which dice moved and how they
+  // tumbled, which is exactly what a shrouded viewer is allowed to watch.
+  broadcast(room, 'rethrow', { rollId }, (viewerId) => {
+    const projected = projectEntryFor(roll, viewerId);
+    return projected === null ? null : { rollId, thrown, seed, used: roll.throws.used, roll: projected };
+  });
   sendJson(res, 200, { roll: projectEntryFor(roll, player.id) });
 }
 
@@ -3649,6 +3758,7 @@ const server = http.createServer((req, res) => {
     if (route === '/api/clienterror' && req.method === 'POST') return handleClientError(req, res);
     if (route === '/api/leave' && req.method === 'POST') return handleLeave(req, res);
     if (route === '/api/roll' && req.method === 'POST') return handleRoll(req, res);
+    if (route === '/api/rethrow' && req.method === 'POST') return handleRethrow(req, res);
     if (route === '/api/reveal' && req.method === 'POST') return handleReveal(req, res);
     if (route === '/api/rename' && req.method === 'POST') return handleRename(req, res);
     if (route === '/api/pools' && req.method === 'POST') return handlePools(req, res);

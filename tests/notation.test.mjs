@@ -924,4 +924,52 @@ for (let i = 0; i < 500; i++) {
   });
 }
 
+// ---- tN, a TURN (MECHANICS M2) --------------------------------------------
+t('tN parses, and rides mods.throws', () => {
+  const r = ok('6d6 t3');
+  assert.equal(r.spec.mods.throws, 3);
+  assert.equal(r.canonical, '6d6 t3');
+  assert.equal(validateMods(r.spec.dice, r.spec.mods), null,
+    'the grammar and the shared validator agree');
+});
+
+t('tN glues to the pool the way the other flags do', () => {
+  assert.equal(ok('6d6t3').canonical, '6d6 t3');
+});
+
+t('a turn needs at least two throws, and at most MAX_THROWS', () => {
+  bad('6d6 t1');
+  bad('6d6 t6');
+  bad('6d6 t0');
+  bad('6d6 t3 t3');
+});
+
+t('a turn refuses the within-throw mods, in BOTH the grammar and the validator', () => {
+  // The refusal has to hold in two places or the wire is a way around it:
+  // notation is what a player types, an explicit spec is what a client POSTs.
+  for (const s of ['4d6dl1 t3', '1d20 t3 adv', '6d6! t3', '6d6ro<=2 t3']) bad(s);
+  assert.equal(validateMods(['d6', 'd6'], { throws: 3, keep: { mode: 'kh', n: 1 } }),
+    'throws_needs_plain_pool');
+  assert.equal(validateMods(['d6', 'd6'], { throws: 3, explode: true }),
+    'throws_needs_plain_pool');
+  assert.equal(validateMods(['d6', 'd6'], { throws: 3, modifier: 2 }), null,
+    'a modifier is arithmetic, not a choice about dice, so it rides');
+});
+
+t('a turn carries every other flag, and the whole thing is a fixed point', () => {
+  const s = '6d6+2 t3 check held dc10 # Tokyo | round 2';
+  const r = ok(s);
+  assert.equal(r.canonical, s);
+  assert.equal(ok(r.canonical).canonical, s);
+  assert.equal(r.spec.mods.throws, 3);
+  assert.equal(r.spec.visibility.mode, 'held');
+});
+
+t('t is not the keep family', () => {
+  // kh/kl/dh/dl/k/d are the keep words; a bare `t` is not among them, and the
+  // two must never be read as each other.
+  assert.equal(ok('6d6 t3').spec.mods.keep, undefined);
+  assert.deepEqual(ok('6d6 d3').spec.mods.keep, { mode: 'dl', n: 3 });
+});
+
 console.log(process.exitCode ? `${n} tests, FAILURES above` : `all ${n} notation tests pass`);

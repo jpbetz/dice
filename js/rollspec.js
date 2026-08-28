@@ -33,6 +33,17 @@ export const KEEP_MODES = ['kh', 'kl', 'dh', 'dl'];
 export const MAX_PHYSICAL_DICE = 40;
 export const EXPLODE_CHAIN_CAP = 3;
 
+// A TURN'S THROWS (MECHANICS M2, docs/MECHANICS.md). `mods.throws = N` means
+// "throw up to N times, keeping whichever dice you choose between throws" —
+// Yahtzee and King of Tokyo are both 3. It is a DICE PROCEDURE, not a game
+// rule: the app manages the dice and the human decides what to keep and what
+// the result means (GOALS goal 6).
+//
+// 2 is the floor because 1 is just a roll, and 5 is a cap picked to bound the
+// felt's lifetime rather than to model anything — no game this file knows of
+// throws more, and an unbounded turn is a roll that never ends.
+export const MAX_THROWS = 5;
+
 // Dice value of a pool: the sum of DIE_MAX over the physical dice guaranteed
 // to hit the felt (base list post-d100 expansion + advantage partners, capped
 // exactly as composeRoll caps them). Reroll replacements and explosion
@@ -61,7 +72,7 @@ export function rollValue(type, rng) {
 export function validateMods(dice, mods) {
   if (mods == null) return null;
   if (typeof mods !== 'object' || Array.isArray(mods)) return 'bad_mods';
-  const { modifier, adv, keep, reroll, explode, parts } = mods;
+  const { modifier, adv, keep, reroll, explode, parts, throws } = mods;
   if (modifier !== undefined && (!Number.isInteger(modifier) || modifier < -99 || modifier > 99)) return 'bad_modifier';
   if (parts !== undefined) {
     // display-only decomposition of the modifier into named sources
@@ -94,7 +105,35 @@ export function validateMods(dice, mods) {
     if (!Number.isInteger(reroll.below) || reroll.below < 1 || reroll.below > 9) return 'bad_reroll_below';
   }
   if (explode !== undefined && explode !== true) return 'bad_explode';
+  if (throws !== undefined) {
+    if (!Number.isInteger(throws) || throws < 2 || throws > MAX_THROWS) return 'bad_throws';
+    // A TURN IS A PLAIN POOL, and the refusal is deliberate rather than
+    // unfinished. adv/keep/reroll/explode are all WITHIN-throw mechanics that
+    // decide which dice count, and stacking them on a procedure that re-throws
+    // a chosen subset asks questions this file has no answer to: does `4d6dl1
+    // t3` drop the lowest of each throw or of the final faces? Does a kept
+    // exploding die keep its children? Inventing an answer would be inventing
+    // a rule (goal 6). A modifier is arithmetic on the total, not a choice
+    // about dice, so it rides.
+    if (adv || keep || reroll || explode) return 'throws_needs_plain_pool';
+  }
   return null;
+}
+
+// Compose ONE THROW of a turn (MECHANICS M2). `dice` is the turn's full type
+// list and `thrown` the indices being re-thrown; every other index keeps the
+// value it already had. Returns the new full values array.
+//
+// It is separate from composeRoll rather than a flag on it because the two
+// answer different questions: composeRoll expands a pool (advantage partners,
+// reroll replacements, explosion children — the physical dice list can GROW),
+// while a re-throw must leave the die list exactly as it is. `validateMods`
+// refuses `throws` alongside every mod that expands, which is what makes this
+// a safe one-for-one replacement.
+export function composeThrow(dice, values, thrown, rng) {
+  const out = [...values];
+  for (const i of thrown) out[i] = rollValue(dice[i], rng);
+  return out;
 }
 
 // Compose a roll. dice: base type list (validated by caller). mods: validated

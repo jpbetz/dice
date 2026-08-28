@@ -44,6 +44,7 @@ limitations under the License.
 //   reroll   := (ro|r) ("<="|"<") int      (Roll20 "<" is inclusive → same N;
 //                                           always once-per-die here)
 //   flag     := adv | dis | keep | reroll | "!"   (group-wide trailing form)
+//             | throws                     (MECHANICS M2: "tN" = a TURN)
 //             | kind                       (docs/UX.md §7.6 moment flags)
 //             | vis                        (GOALS.md goal 11 visibility)
 //   kind     := "check" | "cinematic" | "cine"    (alias cine → cinematic)
@@ -63,6 +64,13 @@ limitations under the License.
 //               typed (roster matching downstream is case-insensitive);
 //               duplicate names (case-insensitive) collapse with a warning.
 //               A name cannot contain '#' — the comment split runs first)
+//   throws   := "t" int                    (2..5 — throw up to N times, keeping
+//               whichever dice you choose between throws. Yahtzee and King of
+//               Tokyo are both t3. Refused alongside adv/keep/reroll/! — see
+//               js/rollspec.js validateMods for why, and note the TRANSCRIPT
+//               of what was kept on which throw is an OUTCOME, not part of the
+//               declaration, so it rides the log entry beside `values` and
+//               notation totality is unaffected)
 //   dc       := ("dc"|"vs") int            (1..999; the experience Target)
 //   comment  := "#" title ["|" subtitle]   (title ≤64 chars, roll label / mat
 //               text; the FIRST unescaped "|" splits off the moment subtitle,
@@ -73,7 +81,7 @@ limitations under the License.
 //               convenience, not grammar)
 //
 // Canonical flag order:
-//   [adv|dis] [trailing keep] [trailing reroll] [!] [check|cinematic]
+//   [adv|dis] [trailing keep] [trailing reroll] [!] [tN] [check|cinematic]
 //   [held|secret|w:names] [dcN] [# comment [| subtitle]]
 //
 // The term 2d20kh1 collapses to 1d20 + advantage (2d20kl1 → disadvantage)
@@ -97,6 +105,12 @@ const MAX_LABEL = 20;
 const MAX_COMMENT = 64;
 const MAX_SUBTITLE = 40;
 const MAX_PARTS = 12;
+// Mirrors js/rollspec.js MAX_THROWS, which is the authority — this file is
+// dependency-free by design (it runs in Node and the browser with no imports),
+// so it keeps its own copy exactly as MAX_DICE mirrors MAX_PHYSICAL_DICE.
+// Both are refused by validateMods on the server regardless, so a drift here
+// costs a worse error message, never a bad roll.
+const MAX_THROWS = 5;
 
 // Moment-kind flag words (UX.md §7.6): input aliases → normalized kind.
 const KIND_WORDS = { check: 'check', cinematic: 'cinematic', cine: 'cinematic' };
@@ -456,6 +470,7 @@ export function parseNotation(input, opts = {}) {
   let flagKeep = null;
   let flagReroll = null;
   let flagExplode = false;
+  let flagThrows = null;
   let expKind = null;
   let dc = null;
 
@@ -512,6 +527,14 @@ export function parseNotation(input, opts = {}) {
     } else if (tok === '!') {
       if (flagExplode) return invalid('! specified twice');
       flagExplode = true;
+    } else if ((m = /^t(\d{1,2})$/.exec(tok))) {
+      // tN — a TURN (MECHANICS M2). No collision with the keep family: those
+      // are kh/kl/dh/dl/k/d, and bare 't' is not among them.
+      if (flagThrows) return invalid('throws specified twice');
+      const n = parseInt(m[1], 10);
+      if (n < 2) return invalid('a turn needs at least 2 throws', 'one throw is just a roll');
+      if (n > MAX_THROWS) return invalid(`throws must be 2-${MAX_THROWS}`);
+      flagThrows = n;
     } else if (Object.hasOwn(KIND_WORDS, tok)) {
       if (expKind) return invalid('check/cinematic specified twice');
       expKind = KIND_WORDS[tok];
@@ -693,6 +716,12 @@ export function parseNotation(input, opts = {}) {
     warnings.push('percentile dice never explode');
   }
 
+  if (flagThrows && (flagAdv || keep || reroll || explode)) {
+    return invalid(
+      'a turn cannot also keep, drop, reroll or explode',
+      'those choose dice within ONE throw; tN re-throws the dice you do not keep'
+    );
+  }
   const mods = {};
   if (modifier) mods.modifier = modifier;
   if (parts) {
@@ -703,6 +732,7 @@ export function parseNotation(input, opts = {}) {
   if (keep) mods.keep = keep;
   if (reroll) mods.reroll = reroll;
   if (explode) mods.explode = true;
+  if (flagThrows) mods.throws = flagThrows;
   const spec = { dice, mods: Object.keys(mods).length ? mods : null };
   // Source labels ride present-or-absent: an unlabeled pool has NO sources
   // key, so every pre-Rack payload and canonical stays byte-identical.
@@ -810,6 +840,7 @@ export function canonicalNotation(spec, extras = {}) {
   // glue rides as trailing flags whenever it is not glued to a single term
   // (mixed pools, the d100 pool, and the collapse-avoiding 2d20-keep-1 case)
   if (!glueInline && glue.length) flags.push(...glue);
+  if (m.throws) flags.push(`t${m.throws}`);
   if (exp && exp.kind) flags.push(exp.kind);
   if (visibility && visibility.mode) {
     if (visibility.mode === 'whisper') {
