@@ -33,10 +33,16 @@ belongs to the turn) and Q3 is still open, blocking nothing. What was settled:
 - **Visibility belongs to the TURN, not the throw** (2026-08-28, Q2).
 - **M1 is SHIPPED** (2026-08-28). M2 is next and nothing gates it.
 
-[GOALS.md](GOALS.md) still wins every tie. Of the five goal edits proposed
-below, **only ② shipped**: ① (goal 6) is deferred to M4 by Joe's scope
-ruling, and ③④⑤ are rules the M2 build must honour — they land in the commit
-that ships it, not before, so nothing dangles.
+[GOALS.md](GOALS.md) still wins every tie. **All five goal edits have now
+shipped** (2026-08-28): ② with the coverage table, and ①③④⑤ when Joe said
+*"continue through all of Track C"*, which is the decision ① was waiting for —
+M4 is in Track C and M4 is the goal 6 change.
+
+*Recorded because it is the failure this repo names most often: ③④⑤ were
+written as "they land in the commit that ships M2, so nothing dangles", and
+then M2 shipped without them. A promise about a future commit is not a
+mechanism. They landed three commits late, found by re-reading GOALS rather
+than by anything failing.*
 
 ## The ask
 

@@ -25,7 +25,12 @@ note).
    after core mechanics; see Priorities.)
 3. **Excitement outranks physicality.** Rolls are planned experiences: stakes
    declared, anticipation built, reveals accentuated and connected back to
-   the stakes. Where drama and realism conflict, drama wins.
+   the stakes. Where drama and realism conflict, drama wins. *(Rider, added
+   2026-08-28 with MECHANICS M5: **the decision can be the beat.** Ceremony
+   has attached to the throw and the reveal. In a push-your-luck turn the
+   drama is neither — it is the moment before the next throw, with a tally on
+   the felt you are about to risk. A ceremony must be able to attach to a
+   DECISION POINT, not only to a throw.)*
 4. **Supplement the table; eliminate the toil.** Players never have to
    emulate the tedious parts: picking up and positioning dice, summing
    values, applying modifiers, cleaning the table. When dice settle, the
@@ -36,17 +41,39 @@ note).
    system actively keeps rolls visually separate — allocating table space
    per roll, whisking settled dice aside or away (per-roll Done), and
    keeping the surface legible. A clean look-and-feel beats simulation
-   fidelity.
+   fidelity. *(Rider, added 2026-08-28 with MECHANICS M2: **a turn holds its
+   space.** A turn occupies its zone across several throws and possibly
+   minutes of thinking, and the kept dice sitting where they landed ARE the
+   read. Nothing may reclaim, collect or tidy a turn's zone until the turn
+   ends — auto-collect's clock is the specific hazard.)*
 
 ## The scope
 
-6. **Dice, not game rules.** This is a dice-rolling system. How rolls fit
-   into an RPG's mechanics is the players' business. But the system is
-   *literate* in major dice-rolling conventions: it understands
-   interpretation systems (starting with "Your Soul Deal"; D&D-style and
-   others addable) and lets the table **toggle** between them as a room
-   setting. The interpretation layer (meaning words, DC verdicts, success
-   counting) is pluggable per system — not hardcoded.
+6. **Dice and their procedures, not game rules.** *(Amended 2026-08-28. The
+   entry read "Dice, not game rules" and drew its line in one layer only;
+   MECHANICS M4 is the work that needed the second one. What it always
+   protected — that this is not a game implementation — is unchanged and is
+   restated at the end.)* This is a dice-rolling system. How rolls fit into a
+   game's rules is the players' business. But the system is *literate in the
+   conventions of dice*, in two layers, both pluggable and neither hardcoded:
+
+   - how a roll is **READ** — interpretation systems (meaning words, DC
+     verdicts, success counting), starting with "Your Soul Deal", D&D-style
+     and others addable, toggled by the table as a room setting;
+   - how a roll is **STRUCTURED** — procedures: how many throws a turn may
+     take, what may be kept between them, what ends a turn, and what the
+     running tally is.
+
+   Both are conventions of *dice*. Neither is a rule of any game.
+
+   **What stays outside, permanently: game state.** Victory points, health,
+   resources, the board, whose turn it is. A procedure knows about dice; it
+   never knows what the answer means. The worked example is the one that
+   opened this: for a monster-brawl dice game the app throws six symbol dice,
+   lets you keep any of them, throws the rest, up to three times, and shows
+   you the six faces you ended with — and never knows what a claw does, never
+   tracks your energy, and never knows the city exists. We are not
+   implementing that game. We are making its dice work.
 
 ## The architecture
 
@@ -191,6 +218,13 @@ the first fantasy venue.*
 
 ## Invariants (every feature must preserve these)
 
+- **The procedure never plays for you.** *(Added 2026-08-28 with goal 6's
+  second layer.)* Every choice a procedure creates — which dice to keep,
+  whether to throw again, whether to bank — belongs to the player. The app
+  may show what is at stake and what the odds are; it never chooses, never
+  auto-keeps, never auto-banks, and never hides a legal option. This is goal
+  10's "no roles, ever" applied to automation rather than to people: the
+  reason to trust this table is that nothing acts for you.
 - **Notation totality.** Every possible roll has a text notation, and every
   notation is buildable through the UI. The canonical form is a byte-stable
   round-trip fixed point. *(The two violations audited 2026-07-30 are
