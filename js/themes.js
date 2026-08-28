@@ -627,6 +627,13 @@ export const THEMES = {
     sets: {
       monster: {
         label: 'Monster',
+        // CLOSED BETA (Joe, 2026-08-28). A CATALOGUE rule on the same axis as
+        // `venueOnly` above: it decides where this set may be PICKED, never
+        // what it does. A production browser at a beta player's table still
+        // renders monster faces on their dice, because the film is a function
+        // of the core and the seed and a client that refused would bake a
+        // different one (js/stability.js, the one law).
+        beta: true,
         body: '#e8e4dc', text: '#2f2a3a', accent: '#c9c2b4',
         feel: { rough: 0.34, metal: 0 },
         glyph: 'faces',

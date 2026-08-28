@@ -786,6 +786,20 @@ re-checked the pointer.** The visible symptom was the workaround in the
 answer I gave him: "set the system to Numbers only", which is not a setting,
 it is an apology.
 
+**It is a CLOSED BETA feature** (Joe, 2026-08-28) — the set and the system
+both. The gate is a catalogue rule on the same axis as a tower's `venueOnly`:
+it decides where the feature may be PICKED and never what it does. A
+production browser at a beta host's table still reads every roll through the
+system the host chose, because goal 8's one shared truth means the table reads
+a result the same way for everyone and a client reading its own would be
+playing a different game one seat over. Both halves are pinned, and the
+sabotage that leaks the gate into the room turns the scenario red.
+
+*Not gated, and worth a decision: `symbols.fate`, `symbols.kind` and
+`symbols.cruel` stay on production. Fudge dice are a finished, long-settled
+thing; the monster set is the one tied to an unjudged game. Say if that line
+is wrong.*
+
 **`monster` is now a rolling system**, `aggregate: 'per-die'`,
 `usesTotal: false`, mapping 4/5/6 to Energy/Claw/Heart. The number faces stay
 QUIET on purpose — a number needs no interpretation, and "3 — Three" beside a

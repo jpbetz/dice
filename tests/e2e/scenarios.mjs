@@ -21964,7 +21964,17 @@ export const scenarios = [
     // words alone would not have found it either; only asking whether the
     // change SURVIVED the round trip does.
     async fn(ctx) {
-      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', query: '?stability=beta' });
+
+      // ⓪ IT IS A CLOSED-BETA FEATURE, and the gate is on the OFFER only.
+      // Production is not offered the chip or the dice; a production browser
+      // sitting at a beta host's table still READS the room's system, because
+      // goal 8 says the table reads a result the same way for everyone and a
+      // client reading its own would be playing a different game one seat
+      // over. Both halves are asserted — the second one at the end.
+      assert.ok(await a.eval(`[...document.querySelectorAll('.system-chip')]
+        .some((c) => c.textContent.trim() === 'Monster dice')`),
+      'beta is offered the system');
 
       // ① IT SURVIVES THE ROUND TRIP TO THE SERVER AND BACK.
       assert.equal(await a.dbg("setSystem('monster')"), true, 'the client accepts it');
@@ -22017,6 +22027,97 @@ export const scenarios = [
         .then(JSON.parse);
       assert.doesNotMatch(after.join(' '), /Energy|Claw|Heart/,
         `the words are gone with the lens (${JSON.stringify(after)})`);
+
+      // ⑤ THE CHANNEL GATES THE OFFER, NEVER THE CAPABILITY. A production
+      // browser joins the same room: it is offered neither the system chip
+      // nor the Monster dice, and it still reads the table's rolls through
+      // the system the beta host chose.
+      await a.dbg("setSystem('monster')");
+      await a.waitFor(`(window.__diceDebug.sim(30), [...document.querySelectorAll('.system-chip')]
+          .some((c) => c.textContent.trim() === 'Monster dice'
+            && c.getAttribute('aria-pressed') === 'true'))`,
+      { desc: 'the beta host sets the table to Monster dice', timeout: 15000 });
+
+      // A SECOND SEAT AT THE SAME TABLE, ON STABLE. `clean` is the documented
+      // way to get one: every harness tab is SEEDED onto beta (harness.mjs
+      // says so and says why), so `newTable` alone would have produced a
+      // second beta browser and this leg would have proved nothing. It very
+      // nearly did — the first run of this assertion passed for that reason.
+      const prod = await tableTab(ctx, {
+        origin: '127.0.0.2',
+        seed: { 'dice.name.v1': 'Bob' },
+        clean: ['dice.stability.v1'],
+      });
+      await prod.waitOnline();
+      const chan = await prod.dbg('stability()');
+      assert.equal(chan.beta, false, 'the second seat really is production');
+      assert.deepEqual(chan.betaCatalogue.systems, ['monster'],
+        'and the app names this system as the one it withholds');
+      assert.deepEqual(chan.betaCatalogue.sets, ['symbols.monster'],
+        '…and the monster dice with it');
+
+      // AND THE PICKER IS NOT LEFT WITH A HOLE. Filtering entries out of a
+      // catalogue can leave a house heading standing over nothing, which
+      // reads as a broken menu rather than a withheld feature. The Symbols
+      // house keeps its other three sets on stable, so it must still render
+      // WITH rows — and any house emptied by the filter must not render at
+      // all. (Checked here rather than by eye: the harness seeds every tab
+      // onto beta, so `clean` above is the only way to see a stable menu.)
+      await prod.eval(`document.getElementById('toggle-settings').click()`);
+      await prod.eval(`[...document.querySelectorAll('button,[role="tab"]')]
+        .find((b) => b.textContent.trim() === 'You')?.click()`);
+      await prod.eval(`document.querySelector('#diceset-picker .set-select')?.click()`);
+      await prod.dbg('sim(10)');
+      const menu = await prod.eval(`JSON.stringify((() => {
+        const heads = [...document.querySelectorAll('.set-house-head')];
+        return {
+          symbols: heads.some((h) => h.textContent.trim() === 'Symbols'),
+          monster: document.body.innerText.includes('Monster'),
+          emptyHouses: heads.filter((h) => {
+            let n = h.nextElementSibling, rows = 0;
+            while (n && !n.classList.contains('set-house-head')) { rows++; n = n.nextElementSibling; }
+            return rows === 0;
+          }).map((h) => h.textContent.trim()),
+        };
+      })())`).then(JSON.parse);
+      assert.equal(menu.monster, false, 'production is not offered the Monster dice');
+      assert.equal(menu.symbols, true, 'but the Symbols house is still there for its other sets');
+      assert.deepEqual(menu.emptyHouses, [],
+        `no house heading is left standing over nothing (${JSON.stringify(menu.emptyHouses)})`);
+      await prod.eval(`document.getElementById('toggle-settings').click()`);
+      assert.equal(await prod.eval(`[...document.querySelectorAll('.system-chip')]
+        .some((c) => c.textContent.trim() === 'Monster dice')`), false,
+      'production is NOT offered the chip');
+      assert.equal(await prod.eval(`document.body.innerHTML.includes('symbols.monster')
+        || [...document.querySelectorAll('.set-row')].some((r) => /Monster/.test(r.textContent))`), false,
+      'nor the dice');
+      // THE LAW ITSELF, on the browser it is about: this client is not
+      // OFFERED the system, and still APPLIES it. That is the same path a
+      // room echo takes — applyRoomSettings deliberately does not filter room
+      // state, only the browser's own stored settings — so a production seat
+      // at a beta host's table reads the table's rolls the host's way.
+      //
+      // Asserted here rather than by syncing two seats: the claim is about
+      // one client's behaviour, and proving it on one tab is both sharper and
+      // free of a broadcast race that would make a failure ambiguous.
+      assert.equal(await prod.dbg("setSystem('monster')"), true,
+        'a system with no chip is still a system this client can be set to');
+      await prod.dbg('sim(60)');
+      await prod.eval(`window.__diceDebug.throwSeeded(["d6","d6","d6"], 4242, [4,5,6])`);
+      await prod.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        { desc: 'production reads a roll under the gated system', timeout: 30000 });
+      await prod.dbg('sim(240)');
+      const seen = await prod.eval(`JSON.stringify(
+        [...document.querySelectorAll('.oc-chip')].map((c) => c.textContent.replace(/\\s+/g, ' ').trim()))`)
+        .then(JSON.parse);
+      const prodWords = seen.join(' ');
+      assert.match(prodWords, /Energy/, `it reads Energy (${JSON.stringify(seen)})`);
+      assert.match(prodWords, /Claw/, 'and Claw');
+      assert.match(prodWords, /Heart/, 'and Heart');
+      // …while STILL not offering the chip. The gate did not move.
+      assert.equal(await prod.eval(`[...document.querySelectorAll('.system-chip')]
+        .some((c) => c.textContent.trim() === 'Monster dice')`), false,
+      'and it is still not offered — the capability worked, the offer stayed shut');
     },
   },
 ];

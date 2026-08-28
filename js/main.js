@@ -14397,6 +14397,20 @@ window.__diceDebug = {
       mirror: stabilityMirror(),
       offers: { staging: IS_BETA, tower: IS_BETA, venue: IS_BETA },
       gated: [...BETA_SETTINGS],
+      // THE CATALOGUE GATE, which is a different axis from `gated` above and
+      // must not be folded into it. `gated` names room-settings KEYS this
+      // browser declines to restore from its own storage; this names
+      // CATALOGUE ENTRIES it is not offered a chip for — the same axis as a
+      // tower's `venueOnly`. `system` could never join `gated`: stripping it
+      // would make a production browser forget the system it is set to,
+      // where the rule is only that it may not PICK this one.
+      //
+      // Named by the app so a scenario asserts against the app's own
+      // statement rather than a list it keeps itself.
+      betaCatalogue: {
+        sets: Object.entries(SETS).filter(([, r]) => r.beta).map(([id]) => id),
+        systems: Object.values(SYSTEMS).filter((sys) => sys.beta).map((sys) => sys.id),
+      },
     };
   },
   // Your data → the file door (§G1), minus the native picker no headless run
@@ -23388,7 +23402,11 @@ function openSetMenuFor(anchor, { value, allowDefault, pick }) {
     // venueOnly sets take no chip anywhere a player picks (W4 — the
     // tower flag's twin): a venue stages them; offering one à la carte
     // is exactly the incoherence GOALS 13 exists to prevent.
-    const pickable = Object.entries(house.sets).filter(([, r]) => !r.venueOnly);
+    // …and a `beta` set takes no chip on the stable channel, which is the
+    // same kind of rule one line up: both decide where a set may be PICKED
+    // and neither decides what it does.
+    const pickable = Object.entries(house.sets)
+      .filter(([, r]) => !r.venueOnly && (IS_BETA || !r.beta));
     if (!pickable.length) continue;
     const head = document.createElement('div');
     head.className = 'set-house-head';
@@ -23481,6 +23499,11 @@ function renderSystemPicker() {
   const holder = document.getElementById('system-picker');
   if (!holder.childElementCount) {
     for (const sys of Object.values(SYSTEMS)) {
+      // A beta system takes no chip on the stable channel. The gate is on the
+      // OFFER only: selectSystem, applyRoomSettings and activeSystem all still
+      // resolve it, so a production player sitting at a beta host's table
+      // reads the room's system exactly as the host does.
+      if (!IS_BETA && sys.beta) continue;
       const chip = document.createElement('button');
       chip.className = 'system-chip';
       chip.dataset.system = sys.id;

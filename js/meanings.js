@@ -529,6 +529,13 @@ export const SYSTEMS = {
   monster: {
     id: 'monster',
     label: 'Monster dice',
+    // CLOSED BETA (Joe, 2026-08-28). A picker rule, not a capability: a
+    // production client whose TABLE is set to this system still reads every
+    // roll through it — goal 8's one shared truth means the table reads a
+    // result the same way for everyone, and a client that opted out would be
+    // reading a different game from the seat next to it. js/main.js filters
+    // the chips; applyRoomSettings deliberately does not filter the room.
+    beta: true,
     aggregate: 'per-die',
     usesTotal: false,
     targetWord: 'Target',
