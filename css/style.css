@@ -5900,6 +5900,78 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
 .keep-verb { font-size: 11.5px; padding: 4px 12px; }
 .keep-verb[hidden] { display: none; }
 
+/* ---------- MECHANICS M5: THE DECISION READOUT (docs/MECHANICS.md) --------- */
+/* The numbers for the moment before a turn's next throw, sitting ABOVE the
+   fold on both card surfaces — under the result, over the verb they are about,
+   which is the order the decision is read in.
+   NOT INSIDE THE FOLD, deliberately: #banner-actions.banner-fold and
+   .verdict-fold are one `flex-direction: row; flex-wrap: nowrap` rule, so a
+   readout parked among the verbs would compress them into a column of
+   ellipses. It is a sibling of the fold instead (js/main.js mountCardActions).
+   IT IS A READING, NOT A CONTROL, and the dress says so: no border of its own
+   and no hue, one hairline rule to separate it from the result above, the
+   numerals in the evidence register (ivory, tabular) and everything that is
+   words in muted. Nothing here may compete with a verb — HUE = ACT, and this
+   surface performs no act. */
+.turn-odds {
+  margin: 7px 4px 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--hair);
+  text-align: center;
+}
+.turn-odds[hidden] { display: none; }
+.to-head, .to-main, .to-note { margin: 0; }
+.to-head[hidden], .to-main[hidden] { display: none; }
+/* The eyebrow says WHICH dice the numbers are about — the same small-caps
+   register every other eyebrow on the card family uses, so it reads as a
+   caption and not as a second answer. */
+.to-head {
+  font: 700 9.5px/1.5 var(--font-ui);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.to-main {
+  font: 13px/1.5 var(--font-ui);
+  color: var(--ivory);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+/* The refusal line, and the "worth N now" line, share one quiet register: both
+   are the sentence UNDER the answer, and a refusal that shouted would read as
+   an error rather than as an honest limit. */
+.to-note {
+  font: 11px/1.45 var(--font-ui);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.to-lead { display: block; color: var(--muted); font-size: 11px; }
+/* ONE GROUP, ONE LINE. A group is one chance and the labels that share it, and
+   it is a BLOCK so that a label list too wide for a phone card wraps under its
+   own number instead of pushing that number onto a line of its own — which is
+   what a wrapped inline-flex row did, and it read as if the percentage
+   belonged to the last label. */
+.to-group { display: block; margin: 1px 0; }
+.to-group b { font-weight: 700; margin-right: 7px; }
+/* The within-group separator. It carries real weight because the labels it
+   divides are not always single words: `--muted` at 0.65 vanished on a phone
+   and "Fail · Partial Success · Success" read as one four-word phrase, which
+   is the one thing this line must not do. Ivory at 0.5 with its own margin —
+   quiet next to the labels, unmistakably present between them. */
+.to-sep { color: var(--ivory); opacity: 0.5; font-style: normal; margin: 0 4px; }
+/* Symbol faces are the SAME path the die was baked from (js/dice.js
+   FACE_SHAPES), at the chips' own sizing — a readout drawing its own claw
+   would be the second hand-kept copy M3 exists to avoid.
+   INLINE-BLOCK, on the text baseline: here a face is a WORD in a sentence,
+   not an icon in a row, which is the opposite of the chips' need. ONE RULE,
+   because the first build had a second `.to-group .chip-glyph` above this one
+   at equal specificity and this one, being later, silently won — three
+   full-width block SVGs stacked down the left edge of the card, outside it.
+   Every count was green; only the frame said so. */
+.turn-odds .chip-glyph {
+  width: 1em; height: 1em; overflow: visible;
+  display: inline-block; vertical-align: -0.12em;
+}
+
 /* hit-stop radial flash (§2.4 phase 3) */
 #hit-flash {
   position: absolute; inset: 0; pointer-events: none; opacity: 0;

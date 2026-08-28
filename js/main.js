@@ -26,7 +26,8 @@ import { recentTables, rememberTable, forgetTable, mintRoomKey, isMintedKey } fr
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
   scoringIndices, pushTally, faceScores, drawBag, MAX_PUSH_THROWS } from './rollspec.js';
-import { previewOf, countingPmfs, sumForecast, sumAtLeast, sumBins, sumPeak } from './odds.js';
+import { previewOf, countingPmfs, sumForecast, sumAtLeast, sumBins, sumPeak,
+  throwForecast, facesOf } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealStartingRack, dealRack, dealName } from './seed.js';
 import { resolveChannel, PARAM as STABILITY_PARAM } from './stability.js';
@@ -997,6 +998,10 @@ function refreshTurnVerb() {
     if (!entry) continue;
     if (entry.throws) paintThrowAgain(holder._acts.again, entry);
     if (entry.push && holder._acts.bank) paintBankTurn(holder._acts.bank, entry);
+    // MECHANICS M5: the decision readout counts the same dice the verb counts,
+    // so it repaints on the same beat. Split them and the card would offer to
+    // throw four while quoting the odds for six.
+    if (entry.throws && holder._acts.odds) paintTurnOdds(holder._acts.odds, entry);
   }
 }
 
@@ -8036,12 +8041,277 @@ function mountCardActions(holder, opts) {
   foot.appendChild(bank);
 
   holder.append(primary, foot, strip);
+
+  // THE DECISION READOUT (MECHANICS M5) goes ABOVE the fold, not inside it.
+  // The fold is `flex-direction: row; flex-wrap: nowrap` on both surfaces
+  // (#banner-actions.banner-fold and .verdict-fold share the rule), so a
+  // fourth child of it would squeeze the verbs into a column of ellipses.
+  // The holder's PARENT is the right home in both places and for the same
+  // reason: #result-banner is a block whose last child is the fold, and
+  // .verdict-actions is a column whose last child is the fold — so inserting
+  // before the holder puts the numbers under the result and over the act they
+  // describe, which is the reading order the decision has.
+  const odds = document.createElement('div');
+  odds.className = 'turn-odds';
+  odds.hidden = true;
+  odds._head = document.createElement('div');
+  odds._head.className = 'to-head';
+  odds._main = document.createElement('div');
+  odds._main.className = 'to-main';
+  odds._note = document.createElement('div');
+  odds._note.className = 'to-note';
+  odds.append(odds._head, odds._main, odds._note);
+  if (holder.parentNode) holder.parentNode.insertBefore(odds, holder);
+
   holder._entry = null;
   // Named children beat a positional walk: the row's shape is now a fact the
   // update path reads, not a chain of nextElementSibling it has to re-derive.
-  holder._acts = { primary, foot, strip, keep, reveal, again, bank };
+  holder._acts = { primary, foot, strip, keep, reveal, again, bank, odds };
   holder._cardActionsMounted = true;
   mountedActionHolders.add(holder);
+}
+
+// ---------------------------------------------------------------------------
+// MECHANICS M5 — THE DECISION IS THE BEAT
+// ---------------------------------------------------------------------------
+//
+// GOALS goal 3 attaches ceremony to the throw and the reveal; its 2026-08-28
+// rider says a ceremony must be able to attach to a DECISION POINT, and this
+// is the first one. Before it, the moment before a turn's next throw was
+// silent: you picked some dice and the button counted them. A player weighing
+// two hearts against a third had nothing whatsoever to go on, which is the
+// whole reason to do this with real dice instead.
+//
+// WHAT IT SAYS, and it is the only thing it says: if you throw those N again,
+// what happens to THEM. js/odds.js does every bit of the arithmetic and owns
+// every refusal; this paints what comes back and adds nothing to it.
+//
+// IT NEVER ADVISES, and that is the invariant rather than a style note ("the
+// procedure never plays for you"). There is no recommendation, no highlight on
+// a "good" pick, no default selection, and the numeric line says HIGHER, not
+// BETTER — whether a bigger total is a good thing is the player's game. The
+// closest this comes to an opinion is putting the faces in one group when
+// their odds are equal, which is a statement that there is nothing to choose
+// between them.
+//
+// THE GATE IS THE TURN, NOT `showOdds` — considered and rejected, so nobody
+// re-opens it by accident. UX §2.1's `showOdds` is a field of an EXPERIENCE
+// record (plain / check / cinematic / user templates): it gates "72% to clear
+// 15" on the intent card, for a DECLARED TARGET, at the roll-moment beat, and
+// its two open questions (ROADMAP §2l: what a refused curve does to a drama
+// beat, and whether a derived number belongs on a card whose ruling is that it
+// shows what was DECLARED) are questions about that surface. Three reasons it
+// is the wrong gate here:
+//   * it defaults false and is per-experience, and `6d6 t3` carries no
+//     experience at all — so gating on it would hide the readout in precisely
+//     the case that motivated the feature;
+//   * this is not a declared target and not a drama beat before a throw. It is
+//     the player's own decision, on their own open turn, about dice they can
+//     see;
+//   * the scoping `showOdds` exists to provide is already provided, and more
+//     tightly: this appears only on a turn of YOURS, open, with throws left,
+//     face up (canThrowAgain), and it is gone the moment any of that stops
+//     being true. There is no state to switch off.
+// If a table ever wants to mute it, that is a room setting of its own and a
+// deliberate design; borrowing an unbuilt field with different semantics is
+// how two features come to share one confusing switch.
+//
+// IT COSTS NOTHING WHEN THERE IS NO TURN: two divs built once at mount,
+// `hidden` and empty otherwise, and the forecast runs only when the readout is
+// actually painted — a turn arriving, or a pick changing. Nothing per frame.
+
+// WHAT THIS TABLE READS EACH FACE OF ONE DIE TYPE AS — one word per value, or
+// null where the table reads a TOTAL instead and there is nothing per-die to
+// say. This is what makes the readout forecast in the shape the room reads:
+// under Your Soul Deal a total is not a fact of play (js/meanings.js says so,
+// and `usesTotal: false` is why the verdict ring folds and no total renders),
+// so quoting odds on one would be this feature contradicting the rest of the
+// app.
+//
+// ASKED THROUGH THE PROFILE'S OWN `outcomesFor`, with a synthetic entry of one
+// part per value, rather than by reaching for `outcomeForDie`. That function is
+// Soul Deal's chart, and Soul Deal is merely the only per-die system TODAY —
+// calling it here would hardcode one rulebook into a surface that is supposed
+// to ask the registry (goal 6: pluggable, not hardcoded). The probe is a legal
+// use of the interface: interpretation is a render-time lens over raw facts,
+// and these are raw facts.
+//
+// CACHED PER (system, type). The chart cannot change for a given system, and
+// the alternative is rebuilding twenty synthetic parts on every pick toggle.
+// The label a face carries when the system reads nothing off it. One constant
+// because two places need it to be the same string — the table that goes to
+// js/odds.js, and the display that leaves it out again.
+const TURN_QUIET_READ = 'no word';
+const _faceReads = new Map();
+function faceReadsFor(type) {
+  const sys = activeSystem();
+  if (!sys || sys.usesTotal || typeof sys.outcomesFor !== 'function') return null;
+  const key = `${sys.id}:${type}`;
+  if (_faceReads.has(key)) return _faceReads.get(key);
+  // THE DIE'S OWN FACES, not its value RANGE: d10x runs 0,10..90, and walking
+  // the range would build ninety-one parts for a ten-face die and hand
+  // js/odds.js a table it must (correctly) reject. `facesOf` is the same list
+  // odds.js measures against, so the two cannot disagree about the length.
+  const parts = facesOf(type).map(
+    (v) => ({ type, value: v, counts: true, child: false, origin: null, reason: null }));
+  const rows = sys.outcomesFor({ parts }) || [];
+  const words = new Array(parts.length).fill(null);
+  for (const r of rows) words[r.dieIndex] = r.word || null;
+  // A QUIET FACE IS A DESIGNED ANSWER, not missing data — the chart has null
+  // rows and a rankless die (d10x) has no column at all — so it gets a LABEL
+  // rather than being dropped from the die. It has to be in the table for the
+  // arithmetic to be about the right die: js/odds.js requires one label per
+  // face, and a six-face die handed four labels would be a different die.
+  // (It is dropped from the DISPLAY, not from the maths — see paintTurnOdds.)
+  const out = words.map((w) => w || TURN_QUIET_READ);
+  // …and a die the system says nothing at all about has no read to offer.
+  // Null falls that pool back to the total, which is the honest answer for a
+  // rankless die under a per-die system.
+  const table = out.every((w) => w === TURN_QUIET_READ) ? null : out;
+  _faceReads.set(key, table);
+  return table;
+}
+
+// The dice a `Throw again` would MOVE, in the shape js/odds.js wants: the
+// turn's dice minus the ones picked (a picked die is a KEPT die, M2b).
+//
+// PART INDEX IS DIE INDEX HERE, and that holds because a turn is a plain pool
+// — M2 refuses adv/keep/reroll/! on one precisely so that nothing inserts,
+// drops or reorders a die between the roll and its parts. `entryDieSet` is the
+// entry-side set lookup (§9 mixed pools), so a pool holding three symbol dice
+// and three ordinary ones is classified per die rather than per roll.
+function turnThrowDice(entry) {
+  const parts = entry && Array.isArray(entry.parts) ? entry.parts : [];
+  const kept = new Set(keptIndicesFor(entry && entry.rollId));
+  const out = [];
+  for (let i = 0; i < parts.length; i++) {
+    if (kept.has(i)) continue;
+    const setId = entryDieSet(entry, i);
+    const skin = setId ? SETS[setId] : null;
+    out.push({
+      type: parts[i].type,
+      value: parts[i].value,
+      faces: skin && Array.isArray(skin.faces) ? skin.faces : null,
+      reads: faceReadsFor(parts[i].type),
+    });
+  }
+  return out;
+}
+
+// One face of a group, drawn the way the chips draw it: a symbol as the very
+// SVG path its die face was baked from, a number as a numeral. Same argument
+// as the chips' (MECHANICS M3) — a readout that says "5" beside a die showing
+// a claw breaks *results readable on screen* in the most confusing direction
+// there is, and two hand-kept copies of a shape drift.
+function turnOddsFace(name) {
+  if (name in FACE_SHAPES) return faceSymbolSvg(name);
+  const s = document.createElement('span');
+  s.textContent = name;
+  return s;
+}
+
+// The readout, painted from one forecast. Called from updateCardActions (the
+// turn arrived, or its budget changed) and from refreshTurnVerb (the selection
+// changed) — the same two callers the verb has, for the same reason: the verb
+// and the numbers describe one act and must never disagree about it.
+function paintTurnOdds(el, entry) {
+  if (!el) return;
+  const show = canThrowAgain(entry);
+  el.hidden = !show;
+  if (!show) {
+    // EMPTIED, not merely hidden. A stale forecast left in the DOM is a number
+    // that outlives its turn, and `hidden` is one attribute away from being
+    // shown again by something that never meant to publish it.
+    el._head.textContent = '';
+    el._main.textContent = '';
+    el._note.textContent = '';
+    return;
+  }
+  const fc = throwForecast(turnThrowDice(entry));
+  const head = el._head;
+  const main = el._main;
+  const note = el._note;
+  head.textContent = `if you throw ${fc.n === 1 ? 'this one' : `these ${fc.n}`}`;
+  main.textContent = '';
+  note.textContent = '';
+  if (fc.kind === 'total') {
+    // HIGHER / SAME / LOWER, about the total — never "better". Each is rounded
+    // on its own through pctText (which says `<1%` rather than a false `0%`),
+    // so the three can print 99 or 101; forcing them to 100 would misstate one
+    // of them to flatter the arithmetic.
+    main.textContent = `${pctText(fc.higher)} higher · ${pctText(fc.same)} same · ${pctText(fc.lower)} lower`;
+    note.textContent = `worth ${fc.now} now · ${fc.mean.toFixed(1)} on average`;
+    head.hidden = false;
+    main.hidden = false;
+    return;
+  }
+  if (fc.kind === 'faces') {
+    const lead = document.createElement('span');
+    lead.className = 'to-lead';
+    lead.textContent = 'at least one:';
+    main.append(lead);
+    // THE QUIET GROUP IS DROPPED FROM THE DISPLAY, and dropping it changes no
+    // other number: these are INDEPENDENT per-label chances, not a partition,
+    // so they already sum past 1 and no mass moves when one row goes. Under
+    // Your Soul Deal a d6 has two rows the chart leaves blank, so the honest
+    // full list led with "no word 91%" — the odds that at least one die says
+    // nothing, which is a true fact and not a thing anybody is deciding on.
+    // It stays in the maths (faceReadsFor) because the die really has six
+    // faces; it leaves the card because it is not a decision input.
+    for (const g of fc.groups) {
+      // Filtered PER LABEL rather than per group, because nothing stops a real
+      // word from happening to share the quiet run's chance and riding into a
+      // group with it.
+      const labels = g.faces.filter((f) => f !== TURN_QUIET_READ);
+      if (!labels.length) continue;
+      const span = document.createElement('div');
+      span.className = 'to-group';
+      // THE NUMBER LEADS ITS GROUP, and that is a wrapping fix rather than a
+      // taste: with it trailing, a label list too wide for a 209px phone card
+      // wrapped and left "52% each" alone on the last line, reading as if it
+      // belonged to the final label. Leading, it can never be orphaned from
+      // the list it is about, and it puts the evidence first besides.
+      const pct = document.createElement('b');
+      // "EACH", and it is not a flourish. A group is N labels that happen to
+      // share one chance, so a bare "52%" over six faces invites the reading
+      // "52% for at least one of these six" — which is false, and badly so
+      // (for a fair set that union is 100%). One word makes the grouping mean
+      // what it is: each of these, on its own, 52%.
+      pct.textContent = labels.length > 1 ? `${pctText(g.p)} each` : pctText(g.p);
+      span.append(pct);
+      // The names are what a screen reader and a copy/paste get: a path has no
+      // text, and a group that reads as nothing is worse than one reading "5".
+      // Built from the same two pieces the eye gets, so the two cannot drift.
+      span.setAttribute('aria-label', `${pct.textContent}: ${labels.join(', ')}`);
+      // SEPARATED, because a group's labels are not always glyphs. Drawn faces
+      // are distinct enough to sit side by side; the words a system reads
+      // ("Fail", "Partial Success", "Success") are not, and run together into
+      // one unreadable phrase. One separator serves both rather than a rule
+      // that has to guess which kind of label it is looking at.
+      labels.forEach((f, i) => {
+        if (i) {
+          const dot = document.createElement('i');
+          dot.className = 'to-sep';
+          dot.textContent = '·';
+          span.append(dot);
+        }
+        span.append(turnOddsFace(f));
+      });
+      main.append(span);
+    }
+    // The refusal is SAID, under the answer it stands in for. A missing line
+    // would read as a surface that forgot; this one says why the usual numbers
+    // are not there and what took their place.
+    note.textContent = fc.noTotal.reason;
+    head.hidden = false;
+    main.hidden = false;
+    return;
+  }
+  // Refused outright: the reason alone, and no numbers of any kind. A refusal
+  // with a reason is a better answer than a confident wrong number.
+  note.textContent = fc.refusal.reason;
+  main.hidden = true;
+  head.hidden = fc.n === 0;
 }
 
 // Every card-actions holder ever mounted. The banner and the verdict card are
@@ -8057,7 +8327,7 @@ function updateCardActions(holder, entry, opts) {
   // Kept for the repaint: the verb is a FUNCTION of roster state, not a
   // constant, and the repaint has to ask the same question this call did.
   holder._verbFor = opts.verbFor || null;
-  const { primary, foot, strip, keep, reveal, again, bank } = holder._acts;
+  const { primary, foot, strip, keep, reveal, again, bank, odds } = holder._acts;
   paintPrimaryAct(primary, opts.verbFor
     ? opts.verbFor(entry)
     : (entry && entry.rollId && (isMine(entry) || rollerAway(entry)) ? 'clear' : 'dismiss'));
@@ -8078,6 +8348,9 @@ function updateCardActions(holder, entry, opts) {
   if (again) paintThrowAgain(again, entry);
   const showBank = canBankTurn(entry);
   if (bank) paintBankTurn(bank, entry);
+  // MECHANICS M5: the numbers ride the same gate as the verb — one decision,
+  // one condition — so a readout can never outlive the act it is about.
+  paintTurnOdds(odds, entry);
   if (keep) keep.hidden = !showKeep;
   if (reveal) reveal.hidden = !showReveal;
   foot.hidden = !showReveal && !showKeep && !showAgain && !showBank;
@@ -11773,6 +12046,41 @@ window.__diceDebug = {
   // `faces` off the DICE (what the eye gets) — the two must agree, and a
   // scenario that only checked the record would pass on a felt that never
   // moved.
+  // THE DECISION READOUT (MECHANICS M5). Two claims, reported separately
+  // because they fail separately: `forecast` is what js/odds.js says about the
+  // throw the current selection would make, and `cards` is what each mounted
+  // card ACTUALLY SAYS. A right number painted into a box with no height is
+  // this repo's dominant failure shape (docs/TESTING.md P10), so the rect is
+  // reported rather than a boolean — a scenario asserting only `hidden` would
+  // pass on a readout collapsed to nothing.
+  //
+  // EACH CARD REPORTS THE ROLL IT IS ABOUT, and that is not decoration. The
+  // banner and the verdict card have independent lifecycles: mid-ceremony the
+  // verdict card can be painted for the roll on screen while the banner still
+  // holds the previous one, invisible behind it. A cross-card assertion has to
+  // compare the cards showing the SAME turn, or it goes red on a difference
+  // that is correct. Walks the mount registry rather than the DOM, because
+  // `_entry` lives on the holder and a bare querySelectorAll cannot reach it.
+  turnOdds(rollId) {
+    const entry = rollId ? (log.find((e) => e.rollId === rollId) || null) : null;
+    const thrown = entry ? turnThrowDice(entry) : [];
+    const cards = [];
+    for (const holder of mountedActionHolders) {
+      const el = holder._acts && holder._acts.odds;
+      if (!el || !el.isConnected) continue;
+      const r = el.getBoundingClientRect();
+      cards.push({
+        rollId: (holder._entry && holder._entry.rollId) || null,
+        hidden: !!el.hidden,
+        w: Math.round(r.width), h: Math.round(r.height),
+        head: el._head.textContent,
+        main: el._main.textContent,
+        note: el._note.textContent,
+        glyphs: el.querySelectorAll('svg').length,
+      });
+    }
+    return { forecast: entry ? throwForecast(thrown) : null, thrown: thrown.length, cards };
+  },
   turnState(rollId) {
     const payload = liveTurns.get(rollId) || null;
     const entry = log.find((e) => e.rollId === rollId) || null;

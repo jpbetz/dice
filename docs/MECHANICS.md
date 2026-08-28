@@ -16,24 +16,32 @@ limitations under the License.
 
 # MECHANICS.md — what a dice simulator has to cover
 
-**Status: RULED ON 2026-08-27, the same day it was written.** Joe answered
-two of its four questions plus the sequencing call, and the answers are
-recorded where they were asked. **Q2 was answered on 2026-08-28** (visibility
-belongs to the turn) and Q3 is still open, blocking nothing. What was settled:
+**Status: SHIPPED. Every row of Track C landed on 2026-08-28.**
 
-- **Scope: M1 through M3, and M4 waits.** Build the substrate, the turn and
-  symbol faces. Decide whether the app should detect a bust and keep a tally
-  once there is a turn on the felt to play with. **All three shipped
-  2026-08-28**, and they turned up two more items that were not on the list:
-  M2b, the player-facing gesture (M2 worked from the API and the debug seam
-  while M1's pick path stayed dark, so nothing joined them up), and then M2c,
-  the keyboard path M2b's own record says it still owed. Both shipped the same
-  day.
+Joe's first ruling (2026-08-27) was M1–M3 with M4 deferred until a turn
+existed to play with; the next day he said *"continue through all of Track
+C"*, which is the decision M4 was waiting for. Q2 was answered the same day
+(visibility belongs to the turn). **Q3 is the only question still open and it
+blocks nothing.**
+
+**One bug is owed and is NOT fixed here** — a ceremony turn auto-collects with
+throws left, found by M5 and recorded in its section, because it lives in the
+ceremony retire path rather than anywhere M5 touched. It is GOALS goal 5
+rider ④ violated by the *second* clock in the app; M2's own risk list named
+only the first.
+
+What was settled:
+
+- **Scope: M1 through M3 first, then all of it.** Two items were not on the
+  original list and were found by building: **M2b**, the player-facing gesture
+  (M2 worked from the API and the debug seam while M1's pick path stayed
+  dark, so nothing joined them up), and **M2c**, the keyboard path M2b's own
+  record said it still owed.
 - **Sequencing: mechanics before T15.** The three classic skins wait.
 - **Goal 16 is adopted** — the coverage table now lives in
   [GOALS.md](GOALS.md) and this file cites it rather than holding a copy.
 - **Visibility belongs to the TURN, not the throw** (2026-08-28, Q2).
-- **M1 is SHIPPED** (2026-08-28). M2 is next and nothing gates it.
+- **All of M1, M2, M2b, M2c, M3, M4, M5 and M6 are SHIPPED** (2026-08-28).
 
 [GOALS.md](GOALS.md) still wins every tie. **All five goal edits have now
 shipped** (2026-08-28): ② with the coverage table, and ①③④⑤ when Joe said
@@ -231,8 +239,8 @@ to be answered.
 | ~~**M2b**~~ | ~~**Pick becomes keep.**~~ **SHIPPED 2026-08-28** — a turn is playable by a person; see the record below. | small–med | no | any of Track C being usable without the API |
 | ~~**M2c**~~ | ~~**The keyboard path to the dice.**~~ **SHIPPED 2026-08-28** — `← →` and `k`, with a cursor; see the record below. | small | no | the *Always interruptible* debt M1 deferred and M2b named |
 | ~~**M3**~~ | ~~**Faces that are not numbers.**~~ **SHIPPED 2026-08-28** — `symbols.monster` and `symbols.fate`; see "M3, and the game we are not naming" below. | med | no | King of Tokyo's actual dice, Fudge, and ROADMAP §8's first half |
-| ~~**M4**~~ | ~~**Procedures as a registry.**~~ **SHIPPED 2026-08-28 — and NOT as a registry;** see the record below. Was:  `PROCEDURES` beside `SYSTEMS`: throws, keep rule, bust rule, tally, bank verb. Farkle and Zombie Dice become assisted rather than merely possible. | med–large | **yes — this is the goal 6 decision** | automatic bust, running tally, the bank verb |
-| **M5** | **The decision as a beat.** Ceremony at the choice point: the tally at stake, the live bust odds, the moment. `js/odds.js` already forecasts; UX §2.1's `showOdds` exists and is deliberately unbuilt, and push-your-luck is the case that makes odds obviously worth showing rather than a crutch. | med | no (rides ⑤) | the reason to use this instead of physical dice |
+| ~~**M4**~~ | ~~**Procedures as a registry.**~~ **SHIPPED 2026-08-28 — and NOT as a registry;** see the record below. Was: `PROCEDURES` beside `SYSTEMS`: throws, keep rule, bust rule, tally, bank verb. | med–large | **yes — this is the goal 6 decision** | automatic bust, running tally, the bank verb |
+| ~~**M5**~~ | ~~**The decision as a beat.**~~ **SHIPPED 2026-08-28** — the readout forecasts in the shape the table READS, and refuses in writing where it cannot. See the record below. | med | no (rides ⑤) | the reason to use this instead of physical dice |
 | ~~**M6**~~ | ~~**The bag.**~~ **SHIPPED 2026-08-28** — a cup you draw from; see the record below. | small–med | no | the honest primitive behind any "draw 3 of these" |
 
 **M1 first, and it is worth doing even if Joe stops the campaign there** — it
@@ -621,6 +629,134 @@ rather than half-built.
 **A client cannot choose its own draw** (goal 8 applied to the composition of
 the pool), and the draw happens in `executeRoll` and nowhere else — so a bag
 OFFER is drawn when it is CLAIMED, not when it is written.
+
+## M5, the decision is the beat — SHIPPED 2026-08-28
+
+**The question it answers, and it is the only one it answers:** *if I throw
+these N again, what happens to THEM?* It appears on the card while a turn of
+yours is open with throws left, it recounts the moment you keep or unkeep a
+die, and it goes when the turn goes.
+
+**THE KEPT DICE AND THE MODIFIER CANCEL,** which is what makes the read both
+cheap and exact. A re-throw leaves the kept dice where they landed and adds the
+same modifier either way, so `new total > old total ⟺ sum(fresh N) > sum(those
+N now)` — the whole question collapses onto the subset in your hand, and
+nothing here needs the turn's total, its budget or its meaning.
+
+### It forecasts in the shape the table READS
+
+This is the whole design, and it is goal 6's two layers meeting at the decision
+point. "Improving" is not one thing:
+
+| what is being thrown | the read | why |
+| --- | --- | --- |
+| number dice, at a table that reads TOTALS | `48% higher · 9% same · 43% lower`, plus `worth 12 now · 14.0 on average` | a total is a fact of play there; the three come exactly off `sumForecast` |
+| number dice, at a table that reads PER DIE | for each word the system reads — `67% each  Fail · Partial Success · Success · Success & Bonus` | under a per-die profile *"a sum is not a fact of play"* (`js/meanings.js`): the ring folds and no total renders, so forecasting one would quote odds on a number the rest of the app refuses to show |
+| SYMBOL dice (M3) | the same at-least-one read over the drawn faces | their values are 1–6 on the wire so a total is computable and meaningless — a claw is not greater than a bolt |
+
+**"HIGHER", NEVER "BETTER".** The three numbers are a statement about the
+total, which is a fact; whether a bigger total is a good thing is the player's
+game. The invariant *the procedure never plays for you* is written into the
+copy, and the e2e asserts the absence of the advisory words.
+
+**The words are the SYSTEM'S, asked through its own `outcomesFor`** with a
+synthetic one-part-per-value entry — not by reaching for `outcomeForDie`, which
+is Soul Deal's chart, and Soul Deal is merely the only per-die system *today*.
+Cached per (system, die type).
+
+### What it refuses, in writing
+
+A refusal with a reason beats a confident wrong number, so each one says why
+and the surface prints the sentence rather than going blank:
+
+- **`no-total`** — symbol faces. **This bites the FUDGE die too, for a subtler
+  reason worth keeping:** plus really *is* better than minus, so "higher is
+  better" looks safe there — but the raw values map 1,2 → minus · 3,4 → blank ·
+  5,6 → plus, so a forecast on raw sums scores a 1→2 change as an improvement
+  when the die did not move. Forecasting the Fudge *scale* instead would mean
+  reading a face **as** a number, which is M4's job and not `js/odds.js`'s.
+- **`no-sum`** — the table reads each die on its own.
+- **`mixed-faces`** — symbol dice and number dice in one throw. Neither read
+  covers both and choosing one silently drops the other half.
+- **`no-values`** — a face-down turn. `canThrowAgain` already refuses there
+  ("you cannot choose faces you cannot see"); this is the belt to that brace,
+  because a sum over `null` prints a confident NaN.
+- **`nothing-thrown`** — every die kept. The box says so instead of blanking,
+  which is also the explanation for the disabled verb beside it.
+- …**plus every `SUM_REFUSALS` code, passed through.** Unreachable today (a
+  turn is a plain pool, so `sumForecast` is called with no mods and none of its
+  three refusals can fire) and kept anyway, because that is a RULE rather than
+  a construction. Recorded here so a later reader does not mistake an
+  untestable line for an untested one.
+
+### `showOdds` is the WRONG gate — considered and rejected
+
+UX §2.1's `showOdds` is a field of an **experience record** (plain / check /
+cinematic / user templates). It gates *"72% to clear 15"* on the intent card,
+for a **declared target**, at the roll-moment beat, and ROADMAP §2l's two open
+questions about it are questions about *that* surface. Three reasons:
+
+- it defaults false and is per-experience, and `6d6 t3` carries no experience
+  at all — so gating on it would hide the readout in exactly the case that
+  motivated the feature;
+- this is not a declared target and not a drama beat before a throw; it is the
+  player's own decision, on their own open turn, about dice they can see;
+- the scoping it would provide already exists and is tighter: the readout is
+  `canThrowAgain`'s gate exactly — yours, open, throws left, face up — and
+  there is no state to switch off. It costs two `div`s at mount and nothing per
+  frame.
+
+If a table ever wants to mute it, that is a room setting of its own; borrowing
+an unbuilt field with different semantics is how two features come to share one
+confusing switch. **`showOdds` stays unbuilt.**
+
+### Three things only the frame could say
+
+`tools/steps/decision-look.mjs` renders five states on two viewports and fails
+if a card offers the readout with no geometry.
+
+1. **The whole per-die branch exists because of a frame.** The first build
+   forecast the total under every system, and the screenshot showed
+   `55% higher · 9% same · 36% lower` sitting directly under a row of
+   *Success / Partial Success / Fail* chips. Every test was green. It was not
+   *false* — it was a forecast of a number that table does not read.
+2. **Three SVG faces stacked down the left edge, outside the card.** A second
+   `.chip-glyph` rule at equal specificity, later in the file, won `display`
+   and made the glyphs full-width blocks. `turnOdds().cards[].glyphs` counted a
+   cheerful 3 throughout — the same lesson M1's marker taught, one surface
+   over. One rule now, with the story attached.
+3. **The within-group separator vanished on a phone.** At `--muted` and 0.65
+   opacity, *"Fail · Partial Success · Success"* read as one four-word phrase,
+   which is the one thing that line must not do. Ivory at 0.5 with its own
+   margin.
+
+And one copy fix that is an honesty fix: a group is N labels that *share* one
+chance, so a bare `52%` after six faces invites "52% for at least one of these
+six" — false, and badly so, since for a fair set that union is 100%. The word
+is **`52% each`**.
+
+### Found while building it, NOT fixed — a ceremony turn auto-collects
+
+**A turn declared with a moment (`6d6 t3 check`) is collected out from under
+the player after 7 s with throws left.** `armCeremonyRetire`'s
+`CEREMONY_DISMISS_MS` clock calls `retireCeremonyFlow`, which calls
+`requestCollectRoll` for any of your own face-up rolls without asking whether a
+turn is still open. That is **GOALS goal 5 rider ④** — *"nothing may reclaim,
+collect or tidy a turn's zone until the turn ends"* — violated by the second
+clock in the app, while the M2 risk list only ever named auto-collect's.
+Measured: `throws {max:3,used:1}` at +3 s, the roll gone at +9 s. It lives in
+the ceremony retire path rather than anywhere M5 owns, so it is recorded here
+rather than patched in passing. **It is M2's bug and it is owed a fix.**
+
+A second, milder thing the same probe turned up: a retired card holder keeps
+its last paint — a stale `Throw again` and now a stale readout — until
+something repaints it. Nobody can see it (the card itself is `display: none`)
+and the readout deliberately matches the verb beside it rather than
+self-cleaning, because one of the two going quiet while the other lies would be
+worse. The consequence is for TESTS: `document.querySelector` finds the verdict
+card first, so any DOM read of these surfaces must be scoped to the roll it
+means. `turnOdds()` reports each card's `rollId` for exactly that reason, and
+the scenario's ⑧ pins it.
 
 ## The questions, and the answers — 2026-08-27
 
