@@ -24,7 +24,7 @@ import { dieArtURL } from './diceart.js';
 import { connect, forgetSeat, peekTable, prejoinSeat, LS_WHO } from './net.js';
 import { recentTables, rememberTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
-import { composeRoll, validateMods, budgetOf } from './rollspec.js';
+import { composeRoll, validateMods, budgetOf, MAX_PHYSICAL_DICE } from './rollspec.js';
 import { previewOf, countingPmfs, sumForecast, sumAtLeast, sumBins, sumPeak } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealStartingRack, dealRack, dealName } from './seed.js';
@@ -818,6 +818,274 @@ renderer.domElement.addEventListener('pointercancel', camPeekRelease);
 renderer.domElement.addEventListener('click', (e) => {
   if (CAMPEEK.yaw || CAMPEEK.pitch) { e.stopPropagation(); e.preventDefault(); }
 }, true);
+// ---------------------------------------------------------------------------
+// THE PICK PATH — MECHANICS M1 (docs/MECHANICS.md)
+// ---------------------------------------------------------------------------
+//
+// WHAT IT IS. A way to answer "which die did the player just point at?", and
+// a selection to put the answer in. It is the substrate M2 (a throw becomes a
+// turn) stands on: keeping dice between throws is a per-die choice by a
+// human, and until this existed there was no path from a pointer to a die at
+// all — the only `pointermove` on the canvas was CAMPEEK's hold-drag, and it
+// deliberately swallows the click that follows a pivot (ROADMAP V5, checked
+// 2026-08-17 and true until this commit).
+//
+// IT IS OFF FOR PLAYERS, ON PURPOSE. Nothing consumes a picked die yet, and a
+// die that highlights when you tap it and then does nothing is chrome that
+// teaches the wrong thing. So the gesture is dark until M2 gives it meaning —
+// the same trade js/decals.js makes with DECALS_DEFAULT_ENABLED, and the same
+// one the dormant `experiences` settings key makes: machinery whole, switched
+// off, re-armable per page. M2 flips one constant.
+const PICK_DEFAULT_ENABLED = false;
+
+const PICK = {
+  enabled: PICK_DEFAULT_ENABLED,
+  // Keyed "rollId:dieIndex", NOT by die object. A hello/resync reconstruction
+  // builds new die objects for the same roll (playRoll re-spawns), so object
+  // identity does not survive a reconnect and a key does. A rollId is unique
+  // per roll for the life of a room, so a key left behind by a departed roll
+  // can never re-match a later one — it is pruned anyway, but it could not
+  // resurrect a selection even if it were not.
+  ids: new Set(),
+  // Tap slop. A d6 at the resting eye on a 390px phone is a small target and
+  // a finger is not a mouse, so an exact-point miss retries on a ring of
+  // offsets before giving up. Eight points, one radius: enough to forgive a
+  // fingertip, not enough to pick a die you were not aiming at.
+  slopPx: 14,
+  ring: null,
+};
+const _pickRc = new THREE.Raycaster();
+const _pickNdc = new THREE.Vector2();
+const _pickBox = new THREE.Box3();
+
+const pickKey = (d) => `${d.rollId || 'solo'}:${d.dieIndex}`;
+
+// WHAT MAY BE PICKED. Deliberately permissive — this is a substrate, and the
+// policy of WHOSE dice may be kept belongs to M2, which is the thing that
+// gives keeping a meaning. Three exclusions, each for a reason that does not
+// depend on M2:
+//   * an invisible die — a poured die parked inside the tower is not on the
+//     table as far as the player is concerned;
+//   * a shrouded die — it is face-down under goal 11, and letting a pointer
+//     single it out is a per-die gesture aimed at a roll whose dice are not
+//     supposed to be distinguishable;
+//   * a die whose own film is still running — playback owns the mesh
+//     transform (the same gate stepResting uses at its top), so a pick would
+//     name a die that is about to be somewhere else.
+function pickableDice() {
+  return tableDice.filter((d) => d.mesh && d.mesh.visible && !d.shrouded
+    && !(currentRoll && !currentRoll.done && d.rollId === currentRoll.rollId));
+}
+
+// Screen point -> die, or null. Exact hit first, then the slop ring.
+//
+// THE CAMERA MUST BE THE ONE THAT DREW THE PIXELS. CAMPEEK is a render-time
+// offset applied after the managed camera has done everything it does and
+// restored before the next frame's logic, so at event time `camera` is in its
+// managed pose while the pixels under the finger were drawn from the peeked
+// one. Every caller here is gated on the peek being home (see the click
+// handler), which is why this can read `camera` directly — if a future caller
+// picks during a live peek, it must applyCamPeek() first or it will pick the
+// wrong die and there will be nothing on screen to explain why.
+function pickDieAt(clientX, clientY) {
+  const targets = pickableDice();
+  if (!targets.length) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+  const meshes = targets.map((d) => d.mesh);
+  const shoot = (px, py) => {
+    _pickNdc.set(((px - rect.left) / rect.width) * 2 - 1,
+      -((py - rect.top) / rect.height) * 2 + 1);
+    _pickRc.setFromCamera(_pickNdc, camera);
+    const hit = _pickRc.intersectObjects(meshes, false)[0];
+    return hit ? targets[meshes.indexOf(hit.object)] : null;
+  };
+  const exact = shoot(clientX, clientY);
+  if (exact) return exact;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const d = shoot(clientX + Math.cos(a) * PICK.slopPx,
+      clientY + Math.sin(a) * PICK.slopPx);
+    if (d) return d;
+  }
+  return null;
+}
+
+function diePicked(d) { return PICK.ids.has(pickKey(d)); }
+
+// Toggle, and return the new state. INPUT-AGNOSTIC on purpose: the click
+// handler, the debug seam and M2's keyboard path all come through here, so
+// the rules live in one place. The keyboard gesture itself is deliberately
+// NOT invented here — a binding for an action that does nothing is a binding
+// players have to unlearn, and M2 owns what keeping is called.
+function toggleDiePick(d) {
+  const k = pickKey(d);
+  if (PICK.ids.has(k)) { PICK.ids.delete(k); return false; }
+  // Cache the die's own contact plane at pick time. DERIVED FROM THE DIE, not
+  // from a floor constant: the felt is y 0, the glade's ground is 0.02 and its
+  // clearing detail 0.035, and the tower's contact shadow spent five rounds
+  // under the floor for exactly this reason (W3 round 9). A resting die knows
+  // where the ground is because it is standing on it; nothing else here does.
+  // Corrected for the rest cadence's sub-mm bob so the marker does not inherit
+  // it — d.finalPos is the still anchor, d.mesh.position is where it is this
+  // frame.
+  _pickBox.setFromObject(d.mesh);
+  const bob = d.finalPos ? d.mesh.position.y - d.finalPos.y : 0;
+  d.pickBaseY = _pickBox.min.y - bob;
+  // …and its FOOTPRINT, from the same box, for the marker's radius. The
+  // bounding SPHERE is the wrong measure and the first render proved it: a
+  // d6's circumradius is 1.73x its half-width, so a ring scaled off it came
+  // out more than twice the die's width and read as loose. The box is taken
+  // in the die's actual resting orientation, so it fits a d4 and a d20 alike.
+  d.pickRadius = Math.max(_pickBox.max.x - _pickBox.min.x,
+    _pickBox.max.z - _pickBox.min.z) / 2;
+  d.pickBaseY = Math.max(d.pickBaseY, surfaceUnder(d, _pickBox));
+  PICK.ids.add(k);
+  return true;
+}
+
+// THE HEIGHT OF THE SURFACE THIS DIE IS STANDING ON — which is NOT the same
+// as the height of the die's own underside, and that is the entire lesson of
+// W3 round 9 repeating itself.
+//
+// A settled die SINKS slightly into whatever it rests on. In a fae venue the
+// dice come to rest with their undersides at y ~0.001 while `faeGround` — an
+// OPAQUE, depth-writing disc — stands at y 0.02. A marker placed just above
+// the die's underside is therefore placed a centimetre UNDER the floor, and
+// it vanishes completely while every count and every gate still reads green.
+// That is exactly how the tower's contact shadow spent five rounds hidden,
+// and it was reintroduced here in a commit whose comment cited it.
+//
+// So the floor is MEASURED, not assumed and not derived from the die: a ray
+// straight down from just above the die, through everything, taking the
+// highest surface that WRITES DEPTH — because a surface that writes depth is
+// exactly a surface that can hide the marker. Transparent atmosphere does not
+// write depth and is handled by the marker's renderOrder instead.
+//
+// The die's own mesh is skipped (a ray from above hits its top face first),
+// and so is the marker. Another DIE is a legitimate answer: a die resting on
+// a die is standing on it, and that is where its ring belongs.
+const _surfRc = new THREE.Raycaster();
+const _surfDown = new THREE.Vector3(0, -1, 0);
+const _surfOrigin = new THREE.Vector3();
+function surfaceUnder(d, box) {
+  _surfOrigin.set(box.min.x / 2 + box.max.x / 2, box.max.y + 0.05,
+    box.min.z / 2 + box.max.z / 2);
+  _surfRc.set(_surfOrigin, _surfDown);
+  _surfRc.far = 40;
+  const hits = _surfRc.intersectObjects(scene.children, true);
+  for (const h of hits) {
+    if (h.object === d.mesh || h.object === PICK.ring) continue;
+    const m = Array.isArray(h.object.material) ? h.object.material[0] : h.object.material;
+    if (!m || m.depthWrite === false) continue;
+    return h.point.y;
+  }
+  return -Infinity; // nothing under it: Math.max leaves the die's own base
+}
+
+
+
+function clearDiePicks() { PICK.ids.clear(); }
+function pickedDice() { return tableDice.filter(diePicked); }
+
+// Drop keys whose dice have left the table, so the set cannot grow without
+// bound across an evening. Called wherever dice leave.
+function prunePicks() {
+  if (!PICK.ids.size) return;
+  const live = new Set(tableDice.map(pickKey));
+  for (const k of PICK.ids) if (!live.has(k)) PICK.ids.delete(k);
+}
+
+// THE MARKER IS PROVISIONAL AND M2 OWNS THE REAL ONE. A picked die gets a
+// plain ring on the ground it is standing on — enough to see the path work
+// and to judge tap accuracy on a phone, and no more. What a KEPT die looks
+// like is a turn's vocabulary, and inventing it here would be designing M2's
+// surface before M2 has a shape.
+//
+// ONE DRAW CALL, whatever the count. `scene-draw-budget` asserts calls <= 220
+// and forty separate rings would be forty of them, so it is an InstancedMesh
+// sized once at MAX_PHYSICAL_DICE with its live `count` set per frame.
+// Materials are SHARED per die type and variant (js/dice.js getDie), so
+// tinting a picked die's material would tint every die wearing that skin —
+// which is why this is an added object rather than a material write.
+const PICK_RING_SEGMENTS = 32;
+function ensurePickRing() {
+  if (PICK.ring) return PICK.ring;
+  const geo = new THREE.RingGeometry(0.82, 1, PICK_RING_SEGMENTS);
+  geo.rotateX(-Math.PI / 2); // lie flat; the ring is drawn on the ground
+  const mat = new THREE.MeshBasicMaterial({
+    color: '#ffd479', transparent: true, opacity: 0.75,
+    // Reads over the felt without z-fighting it, and never writes depth: a
+    // marker that occluded the die it marks would be the wrong way round.
+    depthWrite: false, side: THREE.DoubleSide, fog: false,
+  });
+  const m = new THREE.InstancedMesh(geo, mat, MAX_PHYSICAL_DICE);
+  m.frustumCulled = false;
+  // IT PAINTS AFTER THE ATMOSPHERE, and that is not a preference.
+  //
+  // At renderOrder 2 this was INVISIBLE in both fae venues while the debug
+  // seam happily reported three marks drawn — found 2026-08-28 by looking at
+  // the frame, which is the only thing that could have found it. A fae venue
+  // hangs three fog sheets over the felt at renderOrder 5/6/7 (js/fae-lab.js),
+  // and a marker lying on the ground at y ~0.01 is behind all of them: gold at
+  // 0.75 opacity under three stacked teal sheets is nothing at all.
+  //
+  // The sheets set `depthWrite: false`, so drawing after them does NOT cost
+  // the occlusion that matters — the dice are opaque and write depth, so a
+  // ring still disappears correctly behind the die standing on it. It only
+  // stops the atmosphere hiding it, which is GOALS goal 15 exactly: results
+  // stay readable, fog thins or the dice burn through it, and a mood that eats
+  // information loses. 10 clears every renderOrder the venues use (9 is the
+  // highest, js/fae-lab.js:1091). `pickRingProbe` asserts this rather than
+  // trusting the number, because the venues are free to add a sheet.
+  m.renderOrder = 10;
+  m.count = 0;
+  scene.add(m);
+  PICK.ring = m;
+  return m;
+}
+
+const _pickMat = new THREE.Matrix4();
+const _pickPos = new THREE.Vector3();
+const _pickQuat = new THREE.Quaternion();
+const _pickScale = new THREE.Vector3();
+function stepPickMarks() {
+  if (!PICK.ids.size) { if (PICK.ring) PICK.ring.count = 0; return; }
+  const marked = pickedDice();
+  const ring = ensurePickRing();
+  let n = 0;
+  for (const d of marked) {
+    if (n >= MAX_PHYSICAL_DICE) break;
+    const anchor = d.finalPos || d.mesh.position;
+    // Radius from the die's own resting footprint (cached by toggleDiePick),
+    // so a d4 and a d20 both get a ring that fits them. 1.35 leaves a clear
+    // band of felt between the die and the ring at every type.
+    const r = (d.pickRadius || 0.5) * 1.35;
+    const y = (d.pickBaseY !== undefined ? d.pickBaseY : anchor.y) + 0.012;
+    _pickPos.set(anchor.x, y, anchor.z);
+    _pickQuat.identity();
+    _pickScale.set(r, 1, r);
+    ring.setMatrixAt(n++, _pickMat.compose(_pickPos, _pickQuat, _pickScale));
+  }
+  ring.count = n;
+  ring.instanceMatrix.needsUpdate = true;
+}
+
+// THE GESTURE. A plain click on the felt, and only when the peek is home.
+//
+// `stopPropagation` in the swallower above is NOT what protects this. Both
+// listeners sit on the same element, and stopPropagation does not stop other
+// listeners on the node it fires at — only stopImmediatePropagation would, and
+// the swallower deliberately does not use it (it is protecting the peek cards
+// and the ceremony layer, which are elsewhere in the tree). So this repeats
+// the peek test rather than relying on being shielded from it.
+renderer.domElement.addEventListener('click', (e) => {
+  if (!PICK.enabled) return;
+  if (CAMPEEK.yaw || CAMPEEK.pitch) return; // a pivot's click is not a pick
+  const d = pickDieAt(e.clientX, e.clientY);
+  if (d) toggleDiePick(d);
+});
+
 // Half-width of the box kept around the deciding die when nothing larger
 // fits. Measured on a 390px phone against today's flat 80px: 1.1 → 175-247px
 // but as few as 2 of 6 dice in frame; 2.2 → 80-107px, barely better than the
@@ -3780,6 +4048,7 @@ function resetTableSurface() {
   }
   dieLights.releaseAll(); // the sweep takes every glow with it
   tableDice = [];
+  prunePicks();          // MECHANICS M1: a pick cannot outlive its die
   // THE FRAME FOLLOWS THE FELT. Since the camera may be cropped onto dice
   // (2026-08-10), an emptied table would otherwise leave the player looking at
   // a close, off-centre frame of nothing — measured after a clear: mode=dice,
@@ -3851,6 +4120,7 @@ function removeRollDice(rollId, instant = false) {
   const going = tableDice.filter((d) => d.rollId === rollId);
   if (!going.length) return false;
   tableDice = tableDice.filter((d) => d.rollId !== rollId);
+  prunePicks();           // MECHANICS M1: a pick cannot outlive its die
   reframeForFeltChange(); // the frame follows the felt; see resetTableSurface
   const goingSet = new Set(going);
   for (let i = chips.length - 1; i >= 0; i--) {
@@ -8722,6 +8992,7 @@ function tick(dt, render = true, realtime = false) {
   stepPlayback(dt, realtime ? TEMPO.k : 1, realtime, realtime);
   stepSinking(dt);   // per-roll Done departures (§7.5)
   stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
+  stepPickMarks();   // MECHANICS M1: the picked-die marker follows finalPos
   stepRevealing(dt); // reveal correction flips (goal 11)
   // A DEFERRED ROOM CHANGE RIDES THE PREDICATE, NOT THE CALL SITE (C28 ②).
   // `tableIsBusyForZoom()` names three things that hold a zoom or a tower back
@@ -10539,6 +10810,123 @@ function stepTowerLab(dt) {
 // manual stepping hook for automated tests (headless tabs never fire rAF)
 window.__diceDebug = {
   tick,
+  // THE PICK PATH (MECHANICS M1). Four seams, and they exist because the
+  // gesture ships DARK: `PICK_DEFAULT_ENABLED` is false until M2 gives a
+  // picked die a meaning, so a scenario has to arm it, and no scenario can
+  // reach this through the DOM — a die is a mesh, not an element.
+  //
+  // pickAt() takes VIEWPORT coordinates and returns what a click there would
+  // pick without picking it, which is the half that proves the raycast rather
+  // than the toggle. It is also the honest way to test the slop ring: aim
+  // deliberately beside a die and assert it still lands.
+  pickEnable(on) { PICK.enabled = !!on; return PICK.enabled; },
+  pickAt(x, y) {
+    const d = pickDieAt(x, y);
+    return d ? { rollId: d.rollId, dieIndex: d.dieIndex, type: d.type } : null;
+  },
+  // Toggle by index within the current table, so a scenario can drive the
+  // selection without owning screen geometry.
+  pickToggle(i) {
+    const d = pickableDice()[i];
+    return d ? { picked: toggleDiePick(d), dieIndex: d.dieIndex } : null;
+  },
+  // The selection AND what is drawing it. `marks` is the InstancedMesh's live
+  // count — the two must agree, and asserting only the Set would let a
+  // selection that draws nothing pass green.
+  get picked() {
+    return {
+      keys: [...PICK.ids],
+      dice: pickedDice().map((d) => ({ dieIndex: d.dieIndex, type: d.type })),
+      marks: PICK.ring ? PICK.ring.count : 0,
+      pickable: pickableDice().length,
+      enabled: PICK.enabled,
+    };
+  },
+  pickClear() { clearDiePicks(); },
+  // WHAT COULD PAINT OVER THE MARKER. The bug this exists for: at
+  // renderOrder 2 the ring drew under a fae venue's three fog sheets and was
+  // invisible in the frame while `picked.marks` cheerfully said 3.
+  //
+  // `marks` alone can never catch that — it counts instances, and an instance
+  // that renders behind a curtain is still an instance. So this reports the
+  // CAUSE: every object that paints over the felt without writing depth (the
+  // atmosphere's own signature) and outranks the marker. The list must be
+  // empty in every venue. A venue that adds a fourth sheet at a higher
+  // renderOrder turns this red instead of quietly hiding the marker again.
+  // IS THE MARKER ACTUALLY IN FRONT OF ANYTHING? `marks` cannot answer that —
+  // it counts instances, and an instance buried under a floor is still an
+  // instance. Both of this feature's real bugs were invisible to it:
+  //
+  //   1. renderOrder 2 put the ring under a fae venue's three fog sheets;
+  //   2. deriving its height from the DIE put it under `faeGround`, an opaque
+  //      disc at y 0.02 that the dice sink 0.019 into.
+  //
+  // The second is W3 round 9's stump bug exactly. So this reports the two
+  // causes rather than the count: anything that paints over the felt and
+  // outranks the marker, and any DEPTH-WRITING surface standing above it at
+  // its own spot. Both lists must be empty in every venue.
+  pickRingProbe() {
+    const m = PICK.ring;
+    if (!m) return { ring: null };
+    const over = [];
+    scene.traverse((o) => {
+      if (o === m || !o.material || !o.visible) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      if (!mats.some((x) => x && x.transparent && x.depthWrite === false)) return;
+      if (o.renderOrder >= m.renderOrder) {
+        over.push({ name: o.name || o.type, renderOrder: o.renderOrder });
+      }
+    });
+    const buried = [];
+    const rc = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, 40);
+    for (const d of pickedDice()) {
+      const p = d.finalPos || d.mesh.position;
+      const ringY = (d.pickBaseY !== undefined ? d.pickBaseY : p.y) + 0.012;
+      rc.set(new THREE.Vector3(p.x, ringY + 20, p.z), new THREE.Vector3(0, -1, 0));
+      for (const h of rc.intersectObjects(scene.children, true)) {
+        if (h.object === m || h.object === d.mesh) continue;
+        const mat = Array.isArray(h.object.material) ? h.object.material[0] : h.object.material;
+        if (!mat || mat.depthWrite === false) continue;
+        if (h.point.y > ringY + 1e-4) {
+          buried.push({ die: d.dieIndex, name: h.object.name || h.object.type,
+            surfaceY: +h.point.y.toFixed(4), ringY: +ringY.toFixed(4) });
+        }
+        break; // only the FIRST depth-writing surface can hide it
+      }
+    }
+    return { count: m.count, renderOrder: m.renderOrder, inScene: !!m.parent, over, buried };
+  },
+  // The INVERSE of pickAt, and the reason it exists: a scenario cannot find a
+  // die on screen any other way. A die is a mesh, so there is no element to
+  // query and no rect to read — chips are DOM and sit near dice, but they are
+  // a result readout whose placement is free to move, and pinning a pick test
+  // to them would be scraping exactly the fragile thing docs/TESTING.md bans.
+  // Projection and raycasting are opposite operations, so agreement between
+  // this and pickAt is a real check rather than a tautology.
+  dieScreen(i) {
+    const d = pickableDice()[i];
+    if (!d) return null;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const v = (d.finalPos ? d.finalPos.clone() : d.mesh.position.clone()).project(camera);
+    return {
+      x: rect.left + ((v.x + 1) / 2) * rect.width,
+      y: rect.top + ((1 - v.y) / 2) * rect.height,
+      dieIndex: d.dieIndex,
+    };
+  },
+  // Set the tap slop so a scenario can separate the exact ray from the ring
+  // that forgives it. Without this the two cannot be told apart from outside,
+  // and a slop test would be asserting that a hit is a hit.
+  pickSlop(px) { const was = PICK.slopPx; PICK.slopPx = px; return was; },
+  // Put the camera peek somewhere, so a scenario can prove the pick gesture
+  // declines while it is off home. Driving the real pivot from a test is not
+  // available: the handler calls setPointerCapture on the pointer id, which
+  // throws for an id no real pointer ever owned, and the throw would abandon
+  // the handler before it ever touched CAMPEEK. So this covers the GATE — the
+  // part that rots, because the peek's own click swallower does not shield a
+  // second listener on the same element — and not the drag that sets it.
+  // stepCamPeek springs it home on its own; nothing has to put it back.
+  peekSet(yaw, pitch = 0) { CAMPEEK.yaw = yaw; CAMPEEK.pitch = pitch; },
   rollDice,
   playRoll,
   clearTable,

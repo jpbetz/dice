@@ -20722,4 +20722,191 @@ export const scenarios = [
       }
     },
   },
+  {
+    name: 'die-pick',
+    tags: ['mechanics', 'm1', 'input', 'smoke'],
+    // MECHANICS M1 — the pointer->die path (docs/MECHANICS.md).
+    //
+    // WHY IT IS IN THE SMOKE SET despite nothing consuming a pick yet: this is
+    // the substrate M2 stands on, and every one of its failure modes is
+    // silent. A raycast that picks the wrong die, a marker that draws nothing,
+    // a selection that outlives its dice, a gesture that fires while it is
+    // supposed to be dark — none of them throws, and none of them shows up in
+    // any other scenario.
+    //
+    // THE GESTURE IS A REAL CLICK, dispatched at coordinates derived from the
+    // die's own projected position, not a call to the toggle. The listener is
+    // where the CAMPEEK gate lives, and the gate is the part most likely to
+    // rot: `stopPropagation` in the peek's own swallower does NOT shield a
+    // second listener on the same element, so the pick handler repeats the
+    // test itself and this proves the repeat is there.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      const picked = () => a.dbg('picked');
+      const clickAt = (x, y) => a.eval(`(() => {
+        const c = document.querySelector('canvas');
+        c.dispatchEvent(new MouseEvent('click',
+          { clientX: ${x}, clientY: ${y}, bubbles: true }));
+        return true;
+      })()`);
+
+      // `a.roll` and not a bare `!busy` wait: !busy is ALSO true in the moment
+      // before the roll starts, so a waitFor on it alone passes on the pre-roll
+      // table and every assertion after it reads an empty felt. That is how
+      // this scenario failed the first time it ran; the harness helper waits on
+      // the log growing, which is a positive fact.
+      await a.roll('4d6');
+
+      // ① DARK BY DEFAULT. PICK_DEFAULT_ENABLED is false and ships false
+      // until M2 gives a picked die a meaning; a click must do nothing at all.
+      const spot = await a.dbg('dieScreen(0)');
+      assert.ok(spot && Number.isFinite(spot.x),
+        `a settled die projects to a screen point (${JSON.stringify(spot)})`);
+      const before = await picked();
+      assert.equal(before.enabled, false, 'the gesture ships dark');
+      await clickAt(Math.round(spot.x), Math.round(spot.y));
+      assert.equal((await picked()).dice.length, 0,
+        'and a click on a die while it is dark picks nothing');
+
+      // ② ARMED, a click picks the die it landed on — and the marker draws.
+      // `marks` is the InstancedMesh's live count: asserting the Set alone
+      // would pass a selection that nothing renders.
+      await a.dbg('pickEnable(true)');
+      await clickAt(Math.round(spot.x), Math.round(spot.y));
+      await a.dbg('sim(2)');
+      const one = await picked();
+      assert.equal(one.dice.length, 1, `one die is picked (${JSON.stringify(one.dice)})`);
+      assert.equal(one.dice[0].dieIndex, spot.dieIndex,
+        'and it is the die that was under the pointer, not a neighbour');
+      assert.equal(one.marks, 1, 'the marker draws exactly one ring');
+
+      // ③ TOGGLE. The same click again releases it, and the ring goes with it.
+      await clickAt(Math.round(spot.x), Math.round(spot.y));
+      await a.dbg('sim(2)');
+      const off = await picked();
+      assert.equal(off.dice.length, 0, 'clicking it again releases it');
+      assert.equal(off.marks, 0, 'and stops drawing its ring');
+
+      // ④ EMPTY FELT PICKS NOTHING. Far enough out to be off any die, which
+      // is what stops a miss from grabbing whatever is nearest.
+      assert.equal(await a.dbg(`pickAt(${Math.round(spot.x)}, 5)`), null,
+        'a point up in the empty frame picks nothing');
+
+      // ⑤ THE SLOP RING IS REAL, and this separates it from the exact ray
+      // rather than asserting that a hit is a hit.
+      //
+      // Finding a point that is genuinely OFF the dice is the whole difficulty
+      // and the first version of this got it wrong: it walked right from the
+      // die's centre and never missed inside 60px, because a settled pool
+      // lines its dice up and the walk simply crossed onto the neighbour. So
+      // the search goes out in eight directions and takes the SMALLEST miss
+      // across all of them — the nearest empty pixel to this die, wherever it
+      // happens to be — with slop at 0 so the exact ray is what is being
+      // measured. It runs as one page-side scan rather than ~300 round trips.
+      const nearestMiss = await a.eval(`(() => {
+        const dbg = window.__diceDebug, was = dbg.pickSlop(0);
+        const c = dbg.dieScreen(0);
+        let best = null;
+        for (let k = 0; k < 8; k++) {
+          const a2 = (k / 8) * Math.PI * 2, cx = Math.cos(a2), cy = Math.sin(a2);
+          for (let r = 2; r <= 90; r += 2) {
+            const x = Math.round(c.x + cx * r), y = Math.round(c.y + cy * r);
+            if (!dbg.pickAt(x, y)) {
+              if (!best || r < best.r) best = { x, y, r };
+              break;
+            }
+          }
+        }
+        dbg.pickSlop(was);
+        return JSON.stringify({ best, slop: was });
+      })()`).then(JSON.parse);
+      assert.ok(nearestMiss.best,
+        'the exact ray misses somewhere within 90px in at least one direction');
+      // Only meaningful when the nearest empty point is inside the slop
+      // radius. If the dice are drawn large enough that it is not, the ring
+      // has nothing to forgive here and the case is skipped rather than faked.
+      if (nearestMiss.best.r <= nearestMiss.slop) {
+        const forgiven = await a.dbg(
+          `pickAt(${nearestMiss.best.x}, ${nearestMiss.best.y})`);
+        assert.ok(forgiven,
+          `the slop ring forgives a ${nearestMiss.best.r}px miss that the exact `
+          + `ray refused (slop ${nearestMiss.slop}px)`);
+      }
+
+      // ⑤b A CLICK THAT ENDS A PIVOT IS NOT A PICK. The peek's own swallower
+      // uses stopPropagation, which does NOT stop a second listener on the
+      // same element — only stopImmediatePropagation would — so the pick
+      // handler has to repeat the test itself. This is that repeat. It covers
+      // the gate, not the drag: see peekSet's note for why the drag cannot be
+      // driven from here.
+      await a.dbg('peekSet(0.3)');
+      await clickAt(Math.round(spot.x), Math.round(spot.y));
+      assert.equal((await picked()).dice.length, 0,
+        'a click landing on a die while the camera is pivoted picks nothing');
+      await a.dbg('peekSet(0)');
+
+      // ⑤c NOTHING PAINTS OVER THE MARKER — asserted in a FAE VENUE, because
+      // that is where it was false. The marker shipped at renderOrder 2 and a
+      // fae venue's three fog sheets sit at 5/6/7, so it drew under the
+      // atmosphere and was invisible in the frame while `marks` said it was
+      // drawn. Counting instances cannot see that; the cause can. GOALS goal
+      // 15: results stay readable, and the mood loses when they conflict.
+      await a.dbg("setVenue('moonrise')");
+      await a.dbg('sim(120)');
+      // Re-pick in the venue: the marker's height is measured at pick time,
+      // so a pick made on the felt says nothing about the glade's floor.
+      await a.dbg('pickClear()');
+      await a.roll('4d6');
+      await a.dbg('pickToggle(0)');
+      await a.dbg('sim(2)');
+      const fae = await a.dbg('pickRingProbe()');
+      assert.ok(fae && fae.renderOrder, 'the marker exists to be checked');
+      assert.equal(fae.count, 1, 'and it is drawing the pick made in the venue');
+      assert.deepEqual(fae.over, [],
+        `nothing that paints over the felt outranks the marker `
+        + `(marker ${fae.renderOrder}, over: ${JSON.stringify(fae.over)})`);
+      // AND IT IS NOT UNDER THE FLOOR. This is the assertion that would have
+      // caught the second bug: the glade's ground disc is opaque and stands at
+      // y 0.02 while the dice settle with their undersides at ~0.001, so a
+      // marker placed off the DIE rather than off the SURFACE is buried and
+      // every count still reads green.
+      assert.deepEqual(fae.buried, [],
+        `the marker stands on the surface, not under it (${JSON.stringify(fae.buried)})`);
+      await a.dbg('pickClear()');
+      await a.dbg("setVenue('table')");
+      await a.dbg('sim(120)');
+
+      // ⑥ A PICK CANNOT OUTLIVE ITS DIE. The keys are strings, so a set that
+      // is never pruned would grow all evening and — if a rollId could ever
+      // repeat — resurrect a selection nobody made. A fresh roll, because the
+      // venue round trip above swept the felt this scenario started on.
+      await a.dbg('clearTable()');
+      await a.roll('4d6');
+      await a.dbg('pickToggle(0)');
+      assert.equal((await picked()).dice.length, 1, 'one die picked, to sweep');
+      await a.dbg('clearTable()');
+      await a.dbg('sim(60)');
+      const swept = await picked();
+      assert.deepEqual(swept.keys, [], 'the sweep takes the selection with it');
+      assert.equal(swept.marks, 0, 'and nothing is left drawing');
+
+      // ⑦ NOTHING IS PICKABLE WHILE ITS OWN FILM RUNS. Playback owns the mesh
+      // transform, so a pick during the throw would name a die that is about
+      // to be somewhere else. Stepped in small increments and asserted on the
+      // first frame that is genuinely mid-film, so this cannot pass by reading
+      // a table the roll has not reached yet.
+      await a.dbg('commandRoll("4d6")');
+      await a.waitFor('(window.__diceDebug.sim(2), window.__diceDebug.busy)',
+        { desc: 'the throw is running', timeout: 30000 });
+      const midFlight = await picked();
+      assert.equal(midFlight.pickable, 0,
+        `no die is pickable mid-throw (${midFlight.pickable} were)`);
+      await a.waitFor('(window.__diceDebug.sim(120), '
+        + "document.getElementById('log-list').childElementCount >= 2"
+        + ' && !window.__diceDebug.busy)',
+      { desc: 'the throw finishes', timeout: 30000 });
+      await a.dbg('sim(240)');
+      assert.ok((await picked()).pickable > 0, 'and they all are once it lands');
+    },
+  },
 ];

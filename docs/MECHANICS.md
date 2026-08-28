@@ -213,7 +213,7 @@ to be answered.
 
 | # | item | size | needs a goal change | what it unblocks |
 | --- | --- | --- | --- | --- |
-| **M1** | **Touch a die.** A pointer→die path: raycast against `tableDice`, a selection model, touch-first (hover does not exist there), a keyboard equivalent, and a debug hook so scenarios can select without scraping. | med | no | everything below; also V5's felt echo and §7.1 physical pool building, both stalled on exactly this |
+| ~~**M1**~~ | ~~**Touch a die.**~~ **SHIPPED 2026-08-28** — see "M1, and the two bugs only a screenshot could find" below. | med | no | everything below; also V5's felt echo and §7.1 physical pool building, both stalled on exactly this |
 | **M2** | **The throw becomes a turn.** `throws:N` + free keep, end to end: `composeThrow` beside `composeRoll`, an entry that carries N throws, a film per throw baked over the kept dice as static bodies, the `t3` flag in the notation, the verdict and log reading a turn rather than a roll. | large | no | Yahtzee, King of Tokyo, Farkle, Can't Stop, Pig — with the human judging the bust |
 | **M3** | **Faces that are not numbers.** A face-set registry behind the existing `glyph` seam, symbol dice (Fudge first — three faces, no ambiguity), the chips and the log learning glyphs, `odds.js` refusing non-numeric sums honestly rather than summing nonsense. | med | no | King of Tokyo's actual dice, Fudge, Zombie Dice, and ROADMAP §8, which has been blocked on this line since it was written |
 | **M4** | **Procedures as a registry.** `PROCEDURES` beside `SYSTEMS`: throws, keep rule, bust rule, tally, bank verb. Farkle and Zombie Dice become assisted rather than merely possible. | med–large | **yes — this is the goal 6 decision** | automatic bust, running tally, the bank verb |
@@ -259,6 +259,69 @@ large bet and it competes directly with T15** — three baked skins versus the
 mechanic Joe says the product is bad at. Recommendation: M1 now, then M2,
 and let T15 wait, because a re-baked skin makes the existing thing prettier
 while M2 makes the product cover a family it cannot play at all today.
+
+
+## M1, and the two bugs only a screenshot could find — SHIPPED 2026-08-28
+
+**What shipped.** `pickDieAt(x, y)` raycasts the settled dice and returns one
+or null; a tap toggles it; picked dice wear a ring on the ground. The gesture
+is DARK by default (`PICK_DEFAULT_ENABLED = false`) — nothing consumes a pick
+until M2, and a die that highlights and then does nothing teaches the wrong
+thing. M2 flips one constant. The trade is the one `js/decals.js` already
+makes with `DECALS_DEFAULT_ENABLED`: machinery whole, switched off, armable.
+
+**What may be picked** is deliberately permissive — this is a substrate, and
+WHOSE dice may be kept is M2's policy. Three exclusions that do not depend on
+M2: an invisible die (a poured die parked in the tower), a shrouded die (goal
+11 — its dice are not supposed to be distinguishable), and a die whose own
+film is still running (playback owns the mesh transform).
+
+**The keyboard path is deliberately NOT here.** `toggleDiePick` is
+input-agnostic so M2 only adds a binding, but inventing a keybinding for an
+action that does nothing is a binding players have to unlearn. It is owed by
+M2, with the word for "keep".
+
+**The marker is provisional and M2 owns the real one.** What a KEPT die looks
+like is a turn's vocabulary. This is a plain ring, enough to judge tap
+accuracy on a phone. It reads as a crescent from the resting eye, because the
+die standing in it occludes the far side — correct, and worth revisiting when
+the look is designed.
+
+### The two bugs, because both were invisible to every green check
+
+The e2e asserted the selection AND `marks` — the InstancedMesh's live count —
+specifically so a selection that draws nothing could not pass. It passed
+anyway, twice, because **an instance drawn where nobody can see it is still an
+instance**. Only rendering the frame and looking at it found either one.
+
+1. **The marker drew under the atmosphere.** At `renderOrder 2` it was behind
+   a fae venue's three fog sheets (5/6/7, `js/fae-lab.js`). Gold at 0.75
+   opacity under three stacked teal sheets is nothing at all. Fixed by
+   drawing after them at 10 — which costs no occlusion that matters, because
+   the sheets set `depthWrite: false` while the dice are opaque, so a ring
+   still disappears correctly behind the die standing on it. GOALS goal 15
+   exactly: the mood loses to readability.
+
+2. **The marker drew under the floor, and this one is W3 round 9 repeating.**
+   Its height came from the DIE — the bottom of its bounding box. A settled
+   die *sinks* into what it rests on: in a fae venue the dice come to rest
+   with their undersides at y ~0.001 while `faeGround`, an opaque
+   depth-writing disc, stands at y 0.02. So the ring sat a centimetre under
+   the floor. **This was reintroduced in a comment that cited the stump bug as
+   the reason for the very line that caused it** — "derive the floor from the
+   object" is not the lesson; *measure the surface* is. Fixed by raycasting
+   down for the highest depth-writing surface under the die.
+
+**The assertion that now catches both** is `pickRingProbe()`, and it reports
+CAUSES rather than counts: anything that paints over the felt and outranks the
+marker, and any depth-writing surface standing above it at its own spot. Both
+lists must be empty, and the scenario checks them **in a fae venue with a pick
+made in that venue** — a pick made on the felt says nothing about the glade's
+floor. Sabotage-verified in both directions.
+
+`tools/steps/pick-look.mjs` renders the marker in both registers and on both
+viewports and **fails** if either list is non-empty, so the look is
+re-runnable and the claim is stated in the frame rather than in a count.
 
 ## The questions, and the answers — 2026-08-27
 
