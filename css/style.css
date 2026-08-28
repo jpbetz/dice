@@ -6814,3 +6814,29 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
   width: max-content;
   max-width: calc(100vw - var(--table-left) - 20px);
 }
+
+/* MECHANICS M4 — THE ACTION ROW LEARNS TO WRAP, because Track C gave it a
+   fourth item and `nowrap` had no answer.
+
+   The fold was built for at most three: a primary act, one fold verb, and the
+   reroll strip. A push turn carries Clear + `Throw N again` + Bank + REROLL,
+   and at 390px that row overflowed its own card — "Clear" clipped to "clea"
+   and REROLL left the screen entirely. Found by rendering the most loaded
+   state Track C can produce, which is the only frame where all four appear at
+   once; no single item's own look pass could show it.
+
+   Wrapping rather than shrinking: these are verbs, and a verb that has been
+   squeezed until it reads "clea" is worse than one on a second line. The
+   strip keeps its own basis so it does not stretch across a row of its own. */
+@media (max-width: 560px) {
+  #banner-actions.banner-fold, .pk-fold, .verdict-fold {
+    flex-wrap: wrap;
+  }
+  #banner-actions.banner-fold > *, .pk-fold > *, .verdict-fold > * {
+    flex: 1 1 auto;
+    min-width: max-content;
+  }
+  #banner-actions .pk-strip, .pk-fold .pk-strip, .verdict-fold .pk-strip {
+    flex: 0 0 auto;
+  }
+}

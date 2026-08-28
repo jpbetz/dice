@@ -21606,8 +21606,20 @@ export const scenarios = [
       // a place to stand, and taking it away would make every throw cost the
       // player their position on the felt for nothing.
       assert.equal((await picked(a)).dice.length, 0, 'the picks are dropped after the throw');
+      // WAIT FOR THE CLAIM'S OWN MOMENT. `focus().dieIndex` resolves the cursor
+      // through pickableDice(), which is empty for as long as playback owns
+      // the roll — so between `!busy` and the turn being armed again there is
+      // a window where the cursor is perfectly intact and this reads null.
+      // Asserting inside that window is asserting a timing, not the cursor.
+      // Measured at roughly one full-suite run in twelve, and it passed 6/6 in
+      // isolation and 4/4 in suite order, which is exactly the shape that gets
+      // called noise and retried.
+      await a.waitFor('(window.__diceDebug.sim(30), window.__diceDebug.picked.pickable > 0)',
+        { desc: 'the turn is armed again after the throw', timeout: 15000 });
       const rethrown = await focus();
       assert.equal(rethrown.dieIndex, 4, 'the cursor is still on the die it was left on');
+      assert.equal(rethrown.key, `${rid}:4`,
+        '…and it is the same cursor, not a fresh one that happened to land there');
       assert.ok(rethrown.drawn > 0, 'and still drawn');
 
       // …AND IT STANDS ON THE GROUND UNDER A DIE THAT WAS THROWN, without

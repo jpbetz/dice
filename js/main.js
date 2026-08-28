@@ -7111,6 +7111,28 @@ function faceSymbolSvg(name) {
     path.setAttribute('transform', 'scale(1,-1)');
     path.setAttribute('fill', 'currentColor');
     svg.append(path);
+  } else {
+    // A BLANK FACE IS BLANK ON THE DIE AND MUST NOT BE BLANK IN A LIST.
+    // `FACE_SHAPES.blank` is empty on purpose — a Fate die's third face
+    // carries no mark, and painting one would be painting a die that does not
+    // exist. But a READOUT is a list of labels, and a label with nothing in it
+    // is not a quiet label, it is a missing one: on a mixed bag the decision
+    // forecast printed "67% −", then a bare "56%" on its own line, then
+    // "44% +", and the middle row read as an unexplained second number rather
+    // than as the blank face's chance.
+    //
+    // So the readout gets a MARKER FOR THE ABSENCE — a hollow ring, drawn
+    // here and nowhere else. It is not a second copy of a face shape (M3's
+    // single-definition rule is about the shapes dice actually wear); it is
+    // this surface's way of pointing at a face that has none.
+    const ring = document.createElementNS(NS, 'circle');
+    ring.setAttribute('r', '0.62');
+    ring.setAttribute('fill', 'none');
+    ring.setAttribute('stroke', 'currentColor');
+    ring.setAttribute('stroke-width', '0.16');
+    ring.setAttribute('stroke-dasharray', '0.30 0.26');
+    ring.setAttribute('opacity', '0.75');
+    svg.append(ring);
   }
   return svg;
 }
