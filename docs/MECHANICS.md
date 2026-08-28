@@ -18,8 +18,8 @@ limitations under the License.
 
 **Status: RULED ON 2026-08-27, the same day it was written.** Joe answered
 two of its four questions plus the sequencing call, and the answers are
-recorded where they were asked. Q2 and Q3 are still open; **Q2 gates M2.**
-What was settled:
+recorded where they were asked. **Q2 was answered on 2026-08-28** (visibility
+belongs to the turn) and Q3 is still open, blocking nothing. What was settled:
 
 - **Scope: M1 through M3, and M4 waits.** Build the substrate, the turn and
   symbol faces. Decide whether the app should detect a bust and keep a tally
@@ -27,6 +27,8 @@ What was settled:
 - **Sequencing: mechanics before T15.** The three classic skins wait.
 - **Goal 16 is adopted** — the coverage table now lives in
   [GOALS.md](GOALS.md) and this file cites it rather than holding a copy.
+- **Visibility belongs to the TURN, not the throw** (2026-08-28, Q2).
+- **M1 is SHIPPED** (2026-08-28). M2 is next and nothing gates it.
 
 [GOALS.md](GOALS.md) still wins every tie. Of the five goal edits proposed
 below, **only ② shipped**: ① (goal 6) is deferred to M4 by Joe's scope
@@ -326,9 +328,8 @@ re-runnable and the claim is stated in the frame rather than in a count.
 ## The questions, and the answers — 2026-08-27
 
 **Q1 and Q4 were put to Joe and answered the day this was written, along with
-the sequencing call under "What this displaces". Q2 and Q3 were not asked and
-are still open** — neither blocks M1, and Q2 must be answered before M2 is
-built. The recommendations are kept below as written, so a later reader can
+the sequencing call under "What this displaces". Q2 was answered on 2026-08-28
+and Q3 is still open**, blocking nothing. The recommendations are kept below as written, so a later reader can
 see what was recommended and what was chosen.
 
 **Q1. How far does the app go?** — **ANSWERED: through M3, decide M4 later.** Recommendation: **through M3 under today's
@@ -338,8 +339,10 @@ anyway. M4 is the first thing that requires the app to know what a face
 *means*, and that judgement is much easier to make with a working turn on the
 felt than in the abstract.
 
-**Q2. Does visibility belong to a turn or a throw? — STILL OPEN, and it
-gates M2.** Recommendation: the
+**Q2. Does visibility belong to a turn or a throw? — ANSWERED 2026-08-28: the
+TURN.** Joe took the recommendation. So a held turn is revealed once, at the
+end; a secret turn is secret throughout; and there is no such thing as a turn
+whose audience sees throw two but not throw one. M2 is no longer gated. Recommendation: the
 turn. Simplest, safe, matches the secrecy ladder we have.
 
 **Q3. Do symbol dice get real art, or placeholder glyphs first?** — **STILL OPEN**, and it does not block M1 or M2. The forge
