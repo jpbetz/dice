@@ -231,9 +231,9 @@ to be answered.
 | ~~**M2b**~~ | ~~**Pick becomes keep.**~~ **SHIPPED 2026-08-28** — a turn is playable by a person; see the record below. | small–med | no | any of Track C being usable without the API |
 | ~~**M2c**~~ | ~~**The keyboard path to the dice.**~~ **SHIPPED 2026-08-28** — `← →` and `k`, with a cursor; see the record below. | small | no | the *Always interruptible* debt M1 deferred and M2b named |
 | ~~**M3**~~ | ~~**Faces that are not numbers.**~~ **SHIPPED 2026-08-28** — `symbols.monster` and `symbols.fate`; see "M3, and the game we are not naming" below. | med | no | King of Tokyo's actual dice, Fudge, and ROADMAP §8's first half |
-| **M4** | **Procedures as a registry.** `PROCEDURES` beside `SYSTEMS`: throws, keep rule, bust rule, tally, bank verb. Farkle and Zombie Dice become assisted rather than merely possible. | med–large | **yes — this is the goal 6 decision** | automatic bust, running tally, the bank verb |
+| ~~**M4**~~ | ~~**Procedures as a registry.**~~ **SHIPPED 2026-08-28 — and NOT as a registry;** see the record below. Was:  `PROCEDURES` beside `SYSTEMS`: throws, keep rule, bust rule, tally, bank verb. Farkle and Zombie Dice become assisted rather than merely possible. | med–large | **yes — this is the goal 6 decision** | automatic bust, running tally, the bank verb |
 | **M5** | **The decision as a beat.** Ceremony at the choice point: the tally at stake, the live bust odds, the moment. `js/odds.js` already forecasts; UX §2.1's `showOdds` exists and is deliberately unbuilt, and push-your-luck is the case that makes odds obviously worth showing rather than a crutch. | med | no (rides ⑤) | the reason to use this instead of physical dice |
-| **M6** | **The bag.** Dice drawn at random from a defined cup. | small–med | no | Zombie Dice; and it is the honest primitive behind any "draw 3 of these 13" |
+| ~~**M6**~~ | ~~**The bag.**~~ **SHIPPED 2026-08-28** — a cup you draw from; see the record below. | small–med | no | the honest primitive behind any "draw 3 of these" |
 
 **M1 first, and it is worth doing even if Joe stops the campaign there** — it
 is the substrate for M2, and it independently unblocks two design-first items
@@ -525,6 +525,103 @@ overriding the meaning layer, which is worse. The real answer is M4: a
 procedure that knows what a face means is exactly what a procedure registry
 is for.
 
+
+## M4, push-your-luck — SHIPPED 2026-08-28, and NOT as a registry
+
+**The proposal was wrong about its own shape, and this is the correction.**
+M4 was written as `PROCEDURES` beside `SYSTEMS`: a registry with an entry per
+game holding its bust rule and its scoring faces. Building it made the better
+answer obvious — **declare the predicate in the notation.**
+
+`6d6 push>=5` or `6d6 push=1,5`. Throw, keep whichever scoring dice you like,
+throw the rest; a throw with nothing scoring in it BUSTS and the turn ends
+with nothing; or BANK what you have and stop.
+
+"5s and 6s score" is a fact about dice that a player TYPES, exactly like
+"drop the lowest". So there is no table of games in this codebase and there
+is not going to be one: Pig is `1d6 push>=2`, a Farkle-shaped game is
+`6d6 push=1,5`, and neither name appears anywhere. That is a stronger version
+of goal 6's line than the registry would have been — the app stays literate
+in dice conventions and ignorant of every game that uses one.
+
+**Push is a turn with a big budget**, which is why it cost so little: a push
+turn really does throw repeatedly and keep dice between throws, so all of M2's
+machinery is already right and is reused unchanged. What push adds is which
+faces score, when you have busted, and a way to stop.
+
+**Both currencies, always** — the count of scoring dice AND their sum —
+because which one a game counts is the game's business, and a flag for it
+would be asking the player to teach us their rules.
+
+**Nothing is enforced, only reported.** Keep a die that does not score and it
+adds nothing; un-keep a scoring die and the tally drops. Making set-aside
+permanent would be a game rule. There is no auto-bank and there will not be
+one: `Bank` is never disabled, even holding nothing, because banking an empty
+hand is a legal move and the invariant says the procedure never hides a legal
+option.
+
+**Refused, each with a reason:** `push` + `tN` (two different end conditions),
+`push` + adv/keep/reroll/! (within-throw selection), `push` + `held` (held is
+face down for the ROLLER too, and push is nothing but choices about faces you
+can see — refused in the grammar AND at the explicit-spec door), and a
+predicate no die in the pool can satisfy.
+
+### What it cost, and what it caught
+
+Three defects, none of which anything went red for, and two of which were in
+work already shipped:
+
+1. **A 1-in-11 flake in my own test.** `6d6 push>=5` busts on its first throw
+   about 9% of the time, and a busted turn correctly refuses to bank. Exactly
+   the rate that gets dismissed as noise.
+2. **`specEquals` could not see a single procedure flag**, and the fuzzer had
+   never generated one — so from the day `tN` shipped, two specs differing
+   only in their procedure were "equal" and nothing would have noticed a
+   canonical form that dropped it. Turning the generator on rejected `throws`
+   at `MOD_KEYS`, a third place that had never been told.
+3. **`canonicalNotation` could render a string the parser refuses.** The
+   push-and-held rule lived in the parser and the server and in neither place
+   that judges a spec — so a valid-looking spec had no legal canonical form,
+   which is the one thing notation totality promises. Fixed with
+   `validateSpec` in rollspec: the whole spec, including rules that span more
+   than one field.
+
+And two the LOOK caught: the tally read "Holding 0 dice" with three scoring
+dice visibly picked (the server's tally is what it saw at the last throw, so
+it is now derived live from the selection), and a **busted** turn went on
+offering `Throw 4 again` — an act the server refuses.
+
+## M6, a cup you draw from — SHIPPED 2026-08-28
+
+`3d6 bag:6@symbols.fate,4@symbols.kind,3@symbols.cruel` puts thirteen dice in
+the cup and three on the felt.
+
+**It adds no new payload field**, which is the whole design. A drawn die is a
+dice SET — which already carries a face table (M3), is already per-die on the
+wire, already validated and resolved per die. After three Track C items that
+each had to be threaded through five payload whitelists, this is the first
+that does not.
+
+**And a weighted family shipped with it**, because without one the feature
+is a mechanism pretending to be a feature: a cup whose dice all share a face
+table is statistically identical to rolling the pool straight — a skin
+lottery. `symbols.kind` (3 plus, 2 blank, 1 minus) and `symbols.cruel` (1, 2,
+3) join `symbols.fate` (2, 2, 2). One vocabulary, three weightings, no new
+shapes, named for the weighting rather than for a game.
+
+**The bag has no memory, and that is the goal-6 line.** It is declared per
+roll and empty of history. What is left in it, who drew what, when it refills
+— all of that is game state. So a re-throw throws dice already out of the cup
+and never reaches back in.
+
+**Say plainly what it does not buy:** the draw-back-up-to-three loop of a
+zombie-themed dice game. That is a stateful procedure and it is refused
+rather than half-built.
+
+**A client cannot choose its own draw** (goal 8 applied to the composition of
+the pool), and the draw happens in `executeRoll` and nowhere else — so a bag
+OFFER is drawn when it is CLAIMED, not when it is written.
+
 ## The questions, and the answers — 2026-08-27
 
 **Q1 and Q4 were put to Joe and answered the day this was written, along with
@@ -545,7 +642,9 @@ end; a secret turn is secret throughout; and there is no such thing as a turn
 whose audience sees throw two but not throw one. M2 is no longer gated. Recommendation: the
 turn. Simplest, safe, matches the secrecy ladder we have.
 
-**Q3. Do symbol dice get real art, or placeholder glyphs first?** — **STILL OPEN**, and it does not block M1 or M2. The forge
+**Q3. Do symbol dice get real art, or placeholder glyphs first?** — **STILL
+OPEN, and it is now the only open question in Track C.** Five symbol sets
+ship as drawn SVG paths shared by the die texture and the readout chip. The forge
 and the dice-art work say this project's bar is high; the counter-argument is
 that Fudge dice are three flat glyphs and shipping them plainly proves the
 whole registry in a fraction of the time. Recommendation: plain glyphs to

@@ -193,13 +193,20 @@ note).
 | per-die reading, no sum | *Your Soul Deal* | shipped |
 | rule-driven rerolls | `4d6r<2` | shipped |
 | the secrecy ladder | held / secret / whisper | shipped |
-| success counting | pool vs a threshold, count hits | **open** — ROADMAP §8 |
-| symbol faces | Fudge, King of Tokyo, Zombie Dice | **open** — ROADMAP §8 names it; MECHANICS M3 |
-| roll-and-lock across throws | Yahtzee, King of Tokyo | **open** — no primitive; MECHANICS M2 |
-| push-your-luck | Farkle, Zombie Dice, Pig | **open** — no primitive; MECHANICS M2/M4 |
-| dice drawn from a bag | Zombie Dice | **open** — MECHANICS M6 |
+| success counting | pool vs a threshold, count hits | **mostly** — `6d6 push>=5` reports how many dice scored, which IS a success count (M4). What is still open is success counting as an INTERPRETATION system, so a table can read every roll that way without declaring it: ROADMAP §8 |
+| symbol faces | Fudge, monster brawls | **shipped 2026-08-28** — MECHANICS M3; `symbols.fate` closes §8's Fudge half |
+| roll-and-lock across throws | Yahtzee, King of Tokyo | **shipped 2026-08-28** — `6d6 t3`; MECHANICS M2/M2b/M2c |
+| push-your-luck | Pig, Farkle-shaped games | **shipped 2026-08-28** — `1d6 push>=2`, bust and bank; MECHANICS M4 |
+| dice drawn from a bag | a cup of mixed dice | **shipped 2026-08-28** — `3d6 bag:6@a,4@b`; MECHANICS M6. It does NOT do a cup that DEPLETES across a turn — that is stateful and the bag has no memory by design |
 | opposed rolls | two players, one comparison | **open** — every roll is read alone; nothing on any surface compares two |
 | initiative order | one shared action, sorted | **open** — ROADMAP §7 |
+
+    **Five rows closed on 2026-08-28** (MECHANICS M1–M6, one day's Track C
+    campaign). Two remain open and neither is a dice mechanic in the same
+    sense: initiative order is a table's shared act, and opposed rolls is a
+    comparison between two rolls that nothing on any surface makes. Both are
+    still worth having; neither was found by playing, which is why the table
+    exists.
 
     **A family may be deliberately refused**, and a refused row says so with
     its reason — coverage is a goal, not a mandate, and this project kills
