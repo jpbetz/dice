@@ -21206,4 +21206,108 @@ export const scenarios = [
       assert.match(stuck.title, /unpick/i, 'and says how to get out of it');
     },
   },
+  {
+    name: 'push-turn',
+    tags: ['mechanics', 'm4', 'roll', 'smoke'],
+    // MECHANICS M4 — push-your-luck (docs/MECHANICS.md).
+    //
+    // The server half is tests/turns.test.mjs. This is the half only a browser
+    // can hold down: that the FELT and the READOUT agree with the record. A
+    // push turn is nothing but a series of decisions about faces you can see,
+    // so a readout that disagrees with the dice is the whole feature broken,
+    // and every way of getting it wrong looks fine in a payload.
+    //
+    // It also pins the line: the app REPORTS and never plays. The readout
+    // says what is held and what scored; it must never say what to do.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      const push = (rid) => a.dbg(`pushState(${JSON.stringify(rid)})`);
+
+      // A LIVE turn: `6d6 push>=5` busts on its first throw about one time in
+      // eleven, and a busted turn is a different set of assertions. Asking for
+      // what the case needs beats retrying a flake — see tests/turns.test.mjs.
+      let rid = null;
+      let one = null;
+      for (let i = 0; i < 40 && !rid; i++) {
+        await a.dbg('clearTable()');
+        await a.dbg('sim(30)');
+        await a.roll('6d6 push>=5');
+        const id = await a.rollId();
+        const st = await push(id);
+        if (st.state && !st.state.busted) { rid = id; one = st; }
+      }
+      assert.ok(rid, 'a push turn that did not bust on its first throw');
+
+      // ① THE SCORING SET IS A FACT, and it is checkable against the faces.
+      const expected = one.values.map((v, i) => (v >= 5 ? i : -1)).filter((i) => i >= 0);
+      assert.deepEqual(one.state.scoring, expected,
+        `every die showing 5 or 6 is named (${one.values})`);
+      assert.deepEqual(one.state.rule, { min: 5 }, 'under the rule that was declared');
+
+      // ② THE READOUT SAYS SO, and the marked chips match the scoring set.
+      // Counting the record alone would pass on a banner that never repainted.
+      assert.ok(one.line, `the push line is on screen (${one.line})`);
+      assert.match(one.line, /Holding/, 'saying what is held');
+      assert.equal(one.scoredChips, expected.length,
+        `and exactly the scoring dice are marked (${one.scoredChips} of ${one.totalChips})`);
+      // Nothing kept yet, so nothing is held: the tally counts KEPT scoring
+      // dice, and a tally that counted every scoring die on the felt would be
+      // counting dice the player has not chosen.
+      assert.deepEqual(one.state.tally, { count: 0, sum: 0 },
+        'and the tally is zero until dice are kept');
+
+      // ③ IT NEVER ADVISES. The whole invariant, asserted as text.
+      assert.doesNotMatch(one.line, /should|try|better|recommend|keep these|stop now/i,
+        `the readout reports and does not advise (${one.line})`);
+
+      // ④ BANKING. Keep the scoring dice and bank them; the tally is what
+      // those dice are worth and the turn ends.
+      assert.equal(await a.dbg(`bankTurn(${JSON.stringify(rid)}, ${JSON.stringify(expected)})`),
+        true, 'the turn banks');
+      await a.dbg('sim(30)');
+      const banked = await push(rid);
+      assert.equal(banked.state.banked, true, 'and is marked banked');
+      assert.equal(banked.state.tally.count, expected.length, 'the count is the dice banked');
+      assert.equal(banked.state.tally.sum,
+        expected.reduce((t, i) => t + one.values[i], 0), 'the sum is their faces');
+      assert.match(banked.line, /Banked/, `and the readout says so (${banked.line})`);
+      // A banked turn throws no more.
+      assert.equal(await a.dbg(`throwAgain(${JSON.stringify(rid)}, [])`), false,
+        'a banked turn is over');
+
+      // ⑤ A BUST SAYS BUST. Driven to a real one with a single die on a
+      // predicate it misses 5 times in 6, rather than mocked.
+      let bustLine = null;
+      for (let i = 0; i < 60 && !bustLine; i++) {
+        await a.dbg('clearTable()');
+        await a.dbg('sim(30)');
+        await a.roll('1d6 push>=6');
+        const st = await push(await a.rollId());
+        if (st.state && st.state.busted) bustLine = st;
+      }
+      assert.ok(bustLine, 'a bust happens within 60 single-die throws');
+      assert.match(bustLine.line, /Bust/, `the readout says it (${bustLine.line})`);
+      assert.deepEqual(bustLine.state.tally, { count: 0, sum: 0 }, 'and it keeps nothing');
+      assert.equal(bustLine.scoredChips, 0, 'with no die marked as scoring');
+      // A BUSTED TURN OFFERS NO THROW. Found by looking at one: the budget
+      // still had throws in it, so the card went on advertising `Throw 4
+      // again` — an act the server refuses, which is worse than not offering
+      // one at all.
+      const bustVerb = await a.eval(`(() => {
+        const b = document.querySelector('.throw-again');
+        return JSON.stringify({ present: !!b, hidden: b ? !!b.hidden : null });
+      })()`).then(JSON.parse);
+      assert.ok(!bustVerb.present || bustVerb.hidden,
+        `the throw verb retires on a bust (${JSON.stringify(bustVerb)})`);
+
+      // ⑥ A PLAIN ROLL HAS NO PUSH ANYTHING.
+      await a.dbg('clearTable()');
+      await a.dbg('sim(30)');
+      await a.roll('4d6');
+      const plain = await push(await a.rollId());
+      assert.equal(plain.state, null, 'a plain roll carries no push state');
+      assert.equal(plain.line, null, 'and shows no push line');
+      assert.equal(plain.scoredChips, 0, 'and marks nothing');
+    },
+  },
 ];

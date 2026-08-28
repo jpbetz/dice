@@ -6692,7 +6692,12 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
   font-weight: 700;
 }
 /* A scoring face. A KEY, not a verdict: it says this die counts under the
-   rule the player declared, and says nothing about whether to keep it. */
-.oc-chip.oc-scored {
-  box-shadow: inset 0 0 0 1px rgba(255, 212, 121, 0.55);
+   rule the player declared, and says nothing about whether to keep it. On the
+   evidence span rather than the chip, so it does not compete with the tier
+   colour the chip's border already carries. */
+.oc-die.oc-scored {
+  color: var(--gold, #ffd479);
+  font-weight: 700;
+  border-bottom: 2px solid rgba(255, 212, 121, 0.75);
+  padding-bottom: 1px;
 }

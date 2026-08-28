@@ -973,6 +973,7 @@ function toggleDiePick(d) {
 // dice picked — and `document.querySelector` finds whichever is first. Same
 // registry `repaintAwayVerbs` uses, for the same reason it exists.
 function refreshTurnVerb() {
+  refreshPushLine(); // MECHANICS M4: its tally follows the selection too
   for (const holder of mountedActionHolders) {
     if (!holder.isConnected || !holder._acts || !holder._acts.again) continue;
     const entry = holder._entry;
@@ -4820,6 +4821,12 @@ function applyRethrow(data) {
 function canThrowAgain(entry) {
   if (!entry || !entry.rollId || !entry.throws) return false;
   if (entry.throws.used >= entry.throws.max) return false;
+  // MECHANICS M4: a push turn ends when it busts or banks, whatever its
+  // budget says — the cap only bounds the felt. Found by LOOKING at a busted
+  // turn, which was still offering `Throw 4 again`: the server refuses it
+  // (turn_is_over), so the button was advertising an act that 400s, which is
+  // the exact thing the rule two lines below forbids.
+  if (entry.push && (entry.push.busted || entry.push.banked)) return false;
   if (collected.has(entry.rollId) || !rollState(entry.rollId)) return false;
   if (entryHidden(entry)) return false; // you cannot choose faces you cannot see
   return isMine(entry);
@@ -6811,12 +6818,32 @@ function renderPushState(el, entry, hidden) {
     el.textContent = `Bust — nothing scored on that throw (${rule})`;
     return;
   }
-  const { count, sum } = push.tally;
+  // THE TALLY IS LIVE WHILE THE TURN IS OPEN, and that is not a nicety. The
+  // server's tally is what it saw at the last throw — nothing is kept at the
+  // moment a throw lands — so a player mid-decision was reading "Holding 0
+  // dice, 0" with three scoring dice visibly picked in front of them. The
+  // whole point of the line is to answer "what am I about to risk", and the
+  // answer has to follow the selection.
+  //
+  // Derived, never authoritative: this is a pure function of faces the server
+  // authored, the rule it was declared with, and the player's own current
+  // choice. What gets RECORDED is still whatever the server computes when the
+  // dice are actually thrown or banked.
+  const done = push.busted || push.banked;
+  const { count, sum } = done
+    ? push.tally
+    : pushTally(entry.parts.map((p) => p.value), keptIndicesFor(entry.rollId), push.rule);
   const dice = `${count} ${count === 1 ? 'die' : 'dice'}`;
   el.textContent = push.banked
     ? `Banked — ${dice}, ${sum}`
     : `Holding ${dice}, ${sum} · ${rule}`;
   if (push.banked) el.classList.add('push-banked');
+}
+
+// Repaint the push line when the SELECTION changes — its tally follows the
+// picks, so it has to move with them exactly as the throw verb does.
+function refreshPushLine() {
+  if (lastEntry && lastEntry.push) renderPushState(resultPushEl, lastEntry, entryHidden(lastEntry));
 }
 
 // Per-die value chips over the table. staged=true is the ceremony's §2.4
@@ -7160,17 +7187,24 @@ function renderOutcomeRows(el, entry, key = false) {
       const chip = document.createElement('span');
       chip.className = 'oc-chip' + (o.struck ? ' oc-struck'
         : o.word ? ` oc-b-${o.tier}` : ' oc-quiet');
+      // MECHANICS M4: a die showing a scoring face is marked, because "which
+      // of these counted" is the question a push turn asks every throw. It is
+      // a FACT about the face, never a recommendation to keep it.
+      //
+      // The mark goes on the EVIDENCE span, not the whole chip. The chip's
+      // border already carries the interpretation system's tier colour, and a
+      // second ring around it read as noise competing with a meaning — two
+      // lenses fighting over one outline. The die-and-face span is neutral, so
+      // a mark there says "this face counts under the rule you declared"
+      // without arguing with the word beside it.
+      const scored = faceScoresIn(entry, { value: o.value });
       const ev = document.createElement('span');
-      ev.className = 'oc-die';
+      ev.className = scored ? 'oc-die oc-scored' : 'oc-die';
       // SYMBOL FACES (MECHANICS M3). This is the readout a player actually
       // looks at — the felt's own value chips are off by default — so a die
       // showing a claw has to say claw here, or the banner contradicts the
       // dice it is describing. The die type stays in the text layer beside
       // it, and the symbol carries its own name for copy/paste and readers.
-      // MECHANICS M4: a die showing a scoring face is marked, because "which
-      // of these counted" is the question a push turn asks every throw. It is
-      // a FACT about the face, not a recommendation to keep it.
-      if (faceScoresIn(entry, { value: o.value })) chip.classList.add('oc-scored');
       const evSym = faceSymbolFor(entry, o.dieIndex, { type: o.type, value: o.value });
       if (evSym !== null) {
         ev.append(`${o.type} `);
@@ -11310,7 +11344,7 @@ window.__diceDebug = {
       state: payload ? payload.push || null : null,
       values: payload ? payload.values : null,
       line: el && !el.hidden ? el.textContent.replace(/\s+/g, ' ').trim() : null,
-      scoredChips: document.querySelectorAll('.oc-chip.oc-scored').length,
+      scoredChips: document.querySelectorAll('.oc-die.oc-scored').length,
       totalChips: document.querySelectorAll('.oc-chip').length,
     };
   },
