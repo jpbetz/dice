@@ -6701,3 +6701,44 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
   border-bottom: 2px solid rgba(255, 212, 121, 0.75);
   padding-bottom: 1px;
 }
+/* ---------- the keep cursor's hint (MECHANICS M2c) ---------- */
+/* THE ONLY CHROME THE KEYBOARD PATH ADDS, and it is not standing chrome:
+   js/main.js does not create this element until a turn of yours is open with
+   dice to keep, and hides it the moment one is not. It rides the TURN, on the
+   same arming rule as the dice themselves.
+
+   Top of the felt, centered on the FELT and not the viewport — the same
+   `50% + var(--table-left) / 2` shift every felt-anchored overlay carries.
+   Top rather than bottom because the result banner owns bottom 26px and the
+   ± popover drops from the panel's left edge; the top strip is the one band
+   over the felt that nothing else stands in. Ambient ink, no fill contest
+   with the dice: this is a caption, not a control, and it never takes a
+   pointer (the click underneath it is a pick). */
+#pick-hint {
+  position: fixed;
+  top: 14px;
+  left: calc(50% + var(--table-left) / 2);
+  transform: translateX(-50%);
+  z-index: var(--z-table-labels);
+  pointer-events: none;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--surface-card);
+  border: 1px solid var(--panel-border);
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-align: center;
+  /* IT WRAPS RATHER THAN CLIPS, and the first render is why: `nowrap` +
+     ellipsis rendered "← → move between dice · K keeps o…", which is an
+     instruction that has cut off the instruction. One line wherever it fits,
+     two on a narrow felt.
+
+     `width: max-content` is load-bearing and not tidiness. A fixed element
+     given only `left` shrink-to-fits into the space BETWEEN that edge and the
+     viewport's right — here 390 − 251 = 139px on a phone — so the bound below
+     never got a say and the line broke into three. (#result-banner buys the
+     same thing with its min-width floor; this one has no floor to spend.) */
+  width: max-content;
+  max-width: calc(100vw - var(--table-left) - 20px);
+}

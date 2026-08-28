@@ -857,6 +857,13 @@ const PICK = {
   // fingertip, not enough to pick a die you were not aiming at.
   slopPx: 14,
   ring: null,
+  // MECHANICS M2c — the keyboard cursor: which die the arrows are pointing at
+  // right now. Keyed exactly like `ids`, and for the same reason a key beats
+  // an object reference here (see above). null = no cursor, which is the state
+  // every turn starts in: the first press SHOWS you a die, it does not act on
+  // one.
+  focus: null,
+  cursor: null,
 };
 const _pickRc = new THREE.Raycaster();
 const _pickNdc = new THREE.Vector2();
@@ -930,22 +937,22 @@ function pickDieAt(clientX, clientY) {
 
 function diePicked(d) { return PICK.ids.has(pickKey(d)); }
 
-// Toggle, and return the new state. INPUT-AGNOSTIC on purpose: the click
-// handler, the debug seam and M2's keyboard path all come through here, so
-// the rules live in one place. The keyboard gesture itself is deliberately
-// NOT invented here — a binding for an action that does nothing is a binding
-// players have to unlearn, and M2 owns what keeping is called.
-function toggleDiePick(d) {
-  const k = pickKey(d);
-  if (PICK.ids.has(k)) { PICK.ids.delete(k); refreshTurnVerb(); return false; }
-  // Cache the die's own contact plane at pick time. DERIVED FROM THE DIE, not
-  // from a floor constant: the felt is y 0, the glade's ground is 0.02 and its
-  // clearing detail 0.035, and the tower's contact shadow spent five rounds
-  // under the floor for exactly this reason (W3 round 9). A resting die knows
-  // where the ground is because it is standing on it; nothing else here does.
-  // Corrected for the rest cadence's sub-mm bob so the marker does not inherit
-  // it — d.finalPos is the still anchor, d.mesh.position is where it is this
-  // frame.
+// WHERE A MARKER STANDS FOR THIS DIE — its contact plane and its footprint,
+// measured once and cached on the die itself.
+//
+// IT LIVES HERE RATHER THAN INSIDE `toggleDiePick` because there are now TWO
+// markers and only one of them follows a pick: M2c's keyboard cursor lands on
+// dice nobody has kept, and a cursor that measured its own height its own way
+// would be the third instance of the buried-marker bug rather than the first
+// one to avoid it.
+function measureDieFooting(d) {
+  // The contact plane is DERIVED FROM THE DIE, not from a floor constant: the
+  // felt is y 0, the glade's ground is 0.02 and its clearing detail 0.035, and
+  // the tower's contact shadow spent five rounds under the floor for exactly
+  // this reason (W3 round 9). A resting die knows where the ground is because
+  // it is standing on it; nothing else here does. Corrected for the rest
+  // cadence's sub-mm bob so the marker does not inherit it — d.finalPos is the
+  // still anchor, d.mesh.position is where it is this frame.
   _pickBox.setFromObject(d.mesh);
   const bob = d.finalPos ? d.mesh.position.y - d.finalPos.y : 0;
   d.pickBaseY = _pickBox.min.y - bob;
@@ -957,6 +964,16 @@ function toggleDiePick(d) {
   d.pickRadius = Math.max(_pickBox.max.x - _pickBox.min.x,
     _pickBox.max.z - _pickBox.min.z) / 2;
   d.pickBaseY = Math.max(d.pickBaseY, surfaceUnder(d, _pickBox));
+}
+
+// Toggle, and return the new state. INPUT-AGNOSTIC on purpose: the click
+// handler, the debug seam and M2c's keyboard path all come through here, so
+// the rules live in one place — which is what made the keyboard slice a
+// binding plus a cursor rather than a second copy of the gesture.
+function toggleDiePick(d) {
+  const k = pickKey(d);
+  if (PICK.ids.has(k)) { PICK.ids.delete(k); refreshTurnVerb(); return false; }
+  measureDieFooting(d);
   PICK.ids.add(k);
   refreshTurnVerb();
   return true;
@@ -1052,9 +1069,103 @@ function pickedDice() { return tableDice.filter(diePicked); }
 // Drop keys whose dice have left the table, so the set cannot grow without
 // bound across an evening. Called wherever dice leave.
 function prunePicks() {
+  // The CURSOR is pruned even when nothing is selected — it is a key of the
+  // same shape and it outlives its die by the same mechanism. (The early
+  // return below guards the selection's cost, not the cursor's correctness;
+  // putting the cursor after it would leave a cursor pointing at a swept die
+  // whenever the sweep happened to catch an empty selection, which is most
+  // sweeps.)
+  if (PICK.focus && !tableDice.some((d) => pickKey(d) === PICK.focus)) PICK.focus = null;
   if (!PICK.ids.size) return;
   const live = new Set(tableDice.map(pickKey));
   for (const k of PICK.ids) if (!live.has(k)) PICK.ids.delete(k);
+}
+
+// ---------------------------------------------------------------------------
+// THE KEYBOARD PATH — MECHANICS M2c
+// ---------------------------------------------------------------------------
+//
+// WHY IT IS OWED. GOALS' *Always interruptible* says "keyboard paths exist for
+// the common actions", and keeping dice between throws became a common action
+// the day M2b shipped. M1 declined to invent a binding for an action that did
+// nothing; the action exists, so this is the debt being paid rather than a
+// feature being added.
+//
+// WHAT IT ADDS: a CURSOR. `toggleDiePick` was already input-agnostic and the
+// verb is a real <button> that already takes Enter, so the only thing missing
+// was a way to say WHICH die without a pointer — and, inseparably, a way to
+// SEE which one you are about to act on. A binding with no visible cursor is
+// not a keyboard path, it is a guess.
+//
+// THE ORDER IS THE DIE INDEX, which is the order the player already reads:
+// the result card's chips, the log line and `turnState` all walk `dieIndex`.
+// Sorting by screen position would be the order the player *sees on the felt*,
+// and it was refused: it changes under the camera peek and under every throw,
+// so "the third die" would mean a different die between two presses of the
+// same key. Across two open turns the rollId breaks the tie, so the sequence
+// is total and stable even though one turn at a time is the only case that
+// exists today.
+function pickCursorDice() {
+  return pickableDice().sort((a, b) => (
+    String(a.rollId || '').localeCompare(String(b.rollId || '')) || a.dieIndex - b.dieIndex
+  ));
+}
+
+// The die the cursor is on, or null. Resolved against `pickableDice` every
+// time rather than held as a reference: the cursor must go dark the moment its
+// turn closes or its film starts, and that is exactly what the arming rule
+// already computes. No second copy of the rule.
+function focusedDie() {
+  if (!PICK.focus) return null;
+  return pickableDice().find((d) => pickKey(d) === PICK.focus) || null;
+}
+
+// Announce position, not the face. A symbol die's face is a drawn shape (M3)
+// and the number under it is meaningless — "showing 5" for a claw is the
+// *results readable* invariant broken in the confusing direction. Naming the
+// face here needs the symbol-aware wording the chips already have, and one
+// copy of that is the whole reason M3 keeps its shapes in a single place.
+function announceDieFocus(d, list, verb) {
+  const at = list.indexOf(d);
+  if (at < 0) return;
+  const where = `die ${at + 1} of ${list.length}`;
+  announce(verb ? `${verb} — ${where}` : `${where}${diePicked(d) ? ', kept' : ''}`);
+}
+
+function moveDieFocus(step) {
+  const list = pickCursorDice();
+  if (!list.length) { PICK.focus = null; return null; }
+  const at = list.findIndex((d) => pickKey(d) === PICK.focus);
+  // With no cursor yet the first press lands on an END rather than stepping
+  // from a phantom position: → takes the first die, ← the last. Anything else
+  // makes the first press of ← and → do the same thing.
+  const next = at < 0
+    ? list[step > 0 ? 0 : list.length - 1]
+    : list[(at + step + list.length) % list.length];
+  PICK.focus = pickKey(next);
+  measureDieFooting(next); // the cursor stands on the measured surface too
+  announceDieFocus(next, list, null);
+  return next;
+}
+
+// NOTHING ACTS BLIND. Pressed with no cursor, `k` shows you the die it would
+// act on and stops there; the second press keeps it. That is the *procedure
+// never plays for you* invariant at the scale of one keystroke — the app may
+// show you what is at stake, and the choice stays a thing you make while
+// looking at it.
+function keepFocusedDie() {
+  const list = pickCursorDice();
+  if (!list.length) return null;
+  const d = focusedDie();
+  if (!d) {
+    PICK.focus = pickKey(list[0]);
+    measureDieFooting(list[0]);
+    announceDieFocus(list[0], list, null);
+    return null;
+  }
+  const kept = toggleDiePick(d);
+  announceDieFocus(d, list, kept ? 'kept' : 'released');
+  return kept;
 }
 
 // THE MARKER IS PROVISIONAL AND M2 OWNS THE REAL ONE. A picked die gets a
@@ -1106,11 +1217,120 @@ function ensurePickRing() {
   return m;
 }
 
+// THE CURSOR IS NOT A SECOND RING, and that is the whole readability
+// argument. A KEPT die and a FOCUSED die have to be told apart at a glance and
+// a die can be both at once, so the two markers differ on three axes at the
+// same time rather than on colour alone:
+//
+//   * SHAPE — the kept marker is a closed ring; this is two opposed arcs, a
+//     bracket. A gap is legible at the size a die actually occupies on screen,
+//     where two solid rings in two golds are one ring somebody recoloured.
+//   * RADIUS — 1.9 against the kept ring's 1.35, so a die wearing both reads
+//     as a ring inside a bracket rather than as one thick smear.
+//   * HUE — cool white against the kept marker's gold, which is the house
+//     rule rather than a taste: HUE = ACT (UX's colour ladder), a PICK is
+//     ivory or steel and never gold, and gold here means the die is kept.
+//
+// Two meshes, one shared material, drawn only while a cursor exists — so the
+// standing frame pays nothing and `scene-draw-budget` is untouched.
+const PICK_RING_SCALE = 1.35;
+const PICK_CURSOR_SCALE = 1.9;
+const PICK_CURSOR_COLOR = '#e6f1ff';
+function ensurePickCursor() {
+  if (PICK.cursor) return PICK.cursor;
+  const mat = new THREE.MeshBasicMaterial({
+    color: PICK_CURSOR_COLOR, transparent: true, opacity: 0.95,
+    depthWrite: false, side: THREE.DoubleSide, fog: false,
+  });
+  const g = new THREE.Group();
+  for (const start of [Math.PI * 0.15, Math.PI * 1.15]) {
+    // Thinner band than the kept ring (0.93 against 0.82): a cursor is a
+    // pointer and the ring is a state, so the state gets the weight.
+    const geo = new THREE.RingGeometry(0.93, 1, 24, 1, start, Math.PI * 0.7);
+    geo.rotateX(-Math.PI / 2); // lie flat; it is drawn on the ground
+    const m = new THREE.Mesh(geo, mat);
+    m.name = 'pickCursor'; // named so pickRingProbe's lists read as English
+    m.frustumCulled = false;
+    // THE SAME renderOrder AS THE KEPT RING, deliberately — it inherits that
+    // marker's whole painting argument (a fae venue's fog sheets sit at 5/6/7
+    // and a marker at renderOrder 2 is invisible under them). Asserted rather
+    // than trusted: pickRingProbe reports the cursor's rank beside the ring's.
+    m.renderOrder = 10;
+    g.add(m);
+  }
+  g.visible = false;
+  scene.add(g);
+  PICK.cursor = g;
+  return g;
+}
+
+function stepPickCursor(armed) {
+  const d = PICK.focus ? armed.find((x) => pickKey(x) === PICK.focus) : null;
+  if (!d) { if (PICK.cursor) PICK.cursor.visible = false; return; }
+  // MEASURE LAZILY IF THIS DIE HAS NO FOOTING YET, and it is not a defensive
+  // `||` — it is a case that happens on every second throw. The cursor's key is
+  // `rollId:dieIndex`, which is exactly what a re-throw preserves, so a cursor
+  // resting on a die that gets thrown comes back pointing at a BRAND NEW die
+  // object (playRoll swaps the thrown ones and keeps the rest). Without this
+  // the marker falls back to the die's centre height and a default radius: it
+  // floats a half-unit up inside the die, where nothing is buried, no count is
+  // wrong, and no probe that only looks downward can see it. The same line
+  // covers a resync rebuilding the felt under a live cursor.
+  //
+  // Once per die, not per frame — `surfaceUnder` raycasts the whole scene, and
+  // `pickableDice` has already excluded anything still under its own film, so
+  // what is measured here is always a die that has stopped.
+  if (d.pickBaseY === undefined || d.pickRadius === undefined) measureDieFooting(d);
+  const g = ensurePickCursor();
+  const anchor = d.finalPos || d.mesh.position;
+  const y = (d.pickBaseY !== undefined ? d.pickBaseY : anchor.y) + 0.014;
+  g.position.set(anchor.x, y, anchor.z);
+  g.scale.set((d.pickRadius || 0.5) * PICK_CURSOR_SCALE, 1,
+    (d.pickRadius || 0.5) * PICK_CURSOR_SCALE);
+  g.visible = true;
+}
+
+// THE HINT, AND WHERE IT LIVES. A binding nobody can find is not a keyboard
+// path either, and the two obvious homes were both refused: the `Throw N
+// again` button's title only reaches a pointer that is already hovering it,
+// and the cheatsheet is a standing list of shortcuts that work everywhere,
+// which these two deliberately do not.
+//
+// So it rides the TURN, on the same arming rule as the dice themselves — one
+// quiet line at the top of the felt, present exactly while there is something
+// to keep. NO NEW STANDING CHROME: with no turn open the element is not merely
+// hidden, it has never been created.
+//
+// aria-hidden because a screen reader gets the same information better from
+// announceDieFocus, which says which die you are on; a decorative line read
+// out on every table update would be noise over the top of it.
+let pickHintEl = null;
+const PICK_HINT_TEXT = '← →  move between dice  ·  K  keeps one';
+function syncPickHint(armed) {
+  const show = armed.length > 0;
+  if (!pickHintEl) {
+    if (!show) return;
+    pickHintEl = document.createElement('div');
+    pickHintEl.id = 'pick-hint';
+    pickHintEl.setAttribute('aria-hidden', 'true');
+    pickHintEl.textContent = PICK_HINT_TEXT;
+    document.body.appendChild(pickHintEl);
+  }
+  if (pickHintEl.hidden === show) pickHintEl.hidden = !show;
+}
+
 const _pickMat = new THREE.Matrix4();
 const _pickPos = new THREE.Vector3();
 const _pickQuat = new THREE.Quaternion();
 const _pickScale = new THREE.Vector3();
 function stepPickMarks() {
+  // One arming read per frame, shared by everything that hangs off it. The
+  // cursor and the hint are stepped BEFORE the selection's early return: they
+  // exist whether or not anything is kept, and hanging them off `ids.size`
+  // would make the cursor visible only once you had already used it.
+  const armed = pickableDice();
+  stepPickCursor(armed);
+  syncPickHint(armed);
   if (!PICK.ids.size) { if (PICK.ring) PICK.ring.count = 0; return; }
   const marked = pickedDice();
   const ring = ensurePickRing();
@@ -1118,10 +1338,11 @@ function stepPickMarks() {
   for (const d of marked) {
     if (n >= MAX_PHYSICAL_DICE) break;
     const anchor = d.finalPos || d.mesh.position;
-    // Radius from the die's own resting footprint (cached by toggleDiePick),
-    // so a d4 and a d20 both get a ring that fits them. 1.35 leaves a clear
-    // band of felt between the die and the ring at every type.
-    const r = (d.pickRadius || 0.5) * 1.35;
+    // Radius from the die's own resting footprint (cached by
+    // measureDieFooting), so a d4 and a d20 both get a ring that fits them.
+    // 1.35 leaves a clear band of felt between the die and the ring at every
+    // type.
+    const r = (d.pickRadius || 0.5) * PICK_RING_SCALE;
     const y = (d.pickBaseY !== undefined ? d.pickBaseY : anchor.y) + 0.012;
     _pickPos.set(anchor.x, y, anchor.z);
     _pickQuat.identity();
@@ -1148,6 +1369,61 @@ renderer.domElement.addEventListener('click', (e) => {
   const d = pickDieAt(e.clientX, e.clientY);
   if (!d) return;
   toggleDiePick(d); // …which repaints the verb; see refreshTurnVerb
+});
+
+// A LAYER OWNS THE KEYBOARD WHILE IT IS UP. This mirrors the table-shortcut
+// ladder in the main keydown handler rather than sharing it — that handler
+// computes its `modalOpen` as a local, and lifting it out is a change to a
+// region three other things are editing.
+//
+// `container.inert` is the half that cannot drift: openModal marks every other
+// body child inert, so ONE test covers settings, the cheatsheet, help and the
+// seat picker, and a dialog added later is covered the day it is written. The
+// four below are the layers that do not go through openModal. The menus that
+// own arrow keys of their own (the rail menu, the dice-set menu, the popover's
+// fields) never reach here at all — they stopPropagation, which is this file's
+// existing rule for "no table shortcuts underneath".
+function pickKeysBlocked() {
+  return container.inert || isPaletteOpen() || !!pop
+    || isRailMenuOpen() || isIdentityMenuOpen() || isOfferMenuOpen() || isPeekOpen();
+}
+
+// THE BINDING. Two keys, and both of them are inert unless there is a die to
+// keep — which is `pickableDice()`, the same one place the pointer gesture
+// asks. That is what makes claiming the ARROWS safe: outside an open turn of
+// yours this handler returns before it touches the event, so every existing
+// arrow behaviour (the radiogroup's roving focus, a panel scrolled with the
+// keyboard) is exactly what it was. Inside one, the cursor on screen is the
+// explanation for where the arrows went.
+//
+// `k` for keep, and it was free: the audited table shortcuts are
+// / ? r c m n b g l i s, Enter, Esc, Space and 1-9, and the only k in the file
+// is Ctrl/Cmd+K for the palette — which returns above, because a modifier is
+// not this gesture.
+//
+// AUTO-REPEAT IS ALLOWED ON THE ARROWS AND REFUSED ON `k`. The file's blanket
+// `if (e.repeat) return` exists because no shortcut there has a hold-to-repeat
+// use; a cursor is the first one that does, while a held `k` would flap a die
+// in and out of the selection dozens of times a second.
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return; // Ctrl/Cmd+K stays the palette
+  const t = e.target;
+  const el = t instanceof HTMLElement ? t : null;
+  if (el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
+    || el.isContentEditable)) return;
+  // The one arrow consumer that does NOT stop propagation: the document-level
+  // radiogroup walker, which is how a segmented control is a single tab stop.
+  if (el && el.closest('[role="radio"]')) return;
+  const step = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1
+    : (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 0;
+  const keep = e.key === 'k' || e.key === 'K';
+  if (!step && !keep) return;
+  if (keep && e.repeat) return;
+  if (pickKeysBlocked()) return;
+  if (!pickableDice().length) return; // nothing to keep: not our key
+  e.preventDefault();
+  if (step) moveDieFocus(step);
+  else keepFocusedDie();
 });
 
 // Half-width of the box kept around the deciding die when nothing larger
@@ -11371,6 +11647,54 @@ window.__diceDebug = {
       totalChips: document.querySelectorAll('.oc-chip').length,
     };
   },
+  // THE KEYBOARD CURSOR (MECHANICS M2c). Everything a scenario needs to prove
+  // the cursor is a cursor: where it is, what ORDER it walks, that it is drawn,
+  // and — the assertion that matters — that it is TOLD APART from a kept die.
+  // Reporting the two markers' colour and world radius side by side is what
+  // makes "distinguishable at a glance" a claim a test can fail: recolouring
+  // the cursor gold or shrinking it onto the ring turns this red, where a
+  // count of drawn instances would stay perfectly green.
+  pickFocusProbe() {
+    const g = PICK.cursor;
+    const d = focusedDie();
+    const cur = g && g.children[0] ? g.children[0] : null;
+    const ringMat = PICK.ring ? PICK.ring.material : null;
+    return {
+      key: PICK.focus,
+      dieIndex: d ? d.dieIndex : null,
+      order: pickCursorDice().map((x) => x.dieIndex),
+      // Drawn, in the scene, and visible — three separate ways to be absent.
+      drawn: g && g.parent && g.visible ? g.children.length : 0,
+      renderOrder: cur ? cur.renderOrder : null,
+      ringRenderOrder: PICK.ring ? PICK.ring.renderOrder : null,
+      color: cur ? `#${cur.material.color.getHexString()}` : null,
+      keptColor: ringMat ? `#${ringMat.color.getHexString()}` : null,
+      radius: g && g.visible ? +g.scale.x.toFixed(4) : null,
+      keptRadius: d && d.pickRadius ? +(d.pickRadius * PICK_RING_SCALE).toFixed(4) : null,
+      kept: d ? diePicked(d) : null,
+      // IS IT STANDING ON THE GROUND OR FLOATING IN THE DIE? `buried` cannot
+      // answer that — a marker at the die's CENTRE has nothing above it, so
+      // every downward probe reports it clear. So the two heights are reported
+      // raw: `y` is where the cursor is drawn and `anchorY` is the die's own
+      // centre, and a cursor on the floor is always the LOWER of the two.
+      // `footed` says the die was measured at all, which is the state a
+      // re-thrown die arrives in with no cache.
+      footed: !!(d && d.pickBaseY !== undefined && d.pickRadius !== undefined),
+      y: g && g.visible ? +g.position.y.toFixed(4) : null,
+      anchorY: d ? +((d.finalPos || d.mesh.position).y).toFixed(4) : null,
+    };
+  },
+  // The hint that names the binding. `mounted` is the no-standing-chrome
+  // claim — with no turn ever opened the element does not exist at all — and
+  // `text` is the discoverability one: a scenario asserts the keys are SAID,
+  // so renaming a binding without renaming the hint fails.
+  pickHint() {
+    return {
+      mounted: !!pickHintEl,
+      shown: !!(pickHintEl && !pickHintEl.hidden),
+      text: pickHintEl ? pickHintEl.textContent : null,
+    };
+  },
   // SYMBOL FACES (MECHANICS M3). Every face name a set declares, and whether
   // it resolves to a drawn shape. A typo here does not throw and does not
   // look broken in code — `faces[value - 1]` simply misses, the digit painter
@@ -11444,6 +11768,11 @@ window.__diceDebug = {
     const over = [];
     scene.traverse((o) => {
       if (o === m || !o.material || !o.visible) return;
+      // The M2c cursor is transparent, depth-writeless and deliberately at the
+      // marker's OWN rank, so it answers this probe's description of the
+      // atmosphere exactly. It is the marker's sibling, not something painting
+      // over it, and leaving it in made the list report itself.
+      if (PICK.cursor && o.parent === PICK.cursor) return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       if (!mats.some((x) => x && x.transparent && x.depthWrite === false)) return;
       if (o.renderOrder >= m.renderOrder) {
@@ -11452,7 +11781,14 @@ window.__diceDebug = {
     });
     const buried = [];
     const rc = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, 40);
-    for (const d of pickedDice()) {
+    // THE CURSOR IS CHECKED HERE TOO (M2c). It is a second marker standing on
+    // the same measured surface, so it can be buried by the same floor — and a
+    // focused die is very often NOT a kept one, so a loop over the selection
+    // alone would leave the new marker with no burial check whatever.
+    const standing = new Set(pickedDice());
+    const cursorDie = focusedDie();
+    if (cursorDie) standing.add(cursorDie);
+    for (const d of standing) {
       const p = d.finalPos || d.mesh.position;
       const ringY = (d.pickBaseY !== undefined ? d.pickBaseY : p.y) + 0.012;
       rc.set(new THREE.Vector3(p.x, ringY + 20, p.z), new THREE.Vector3(0, -1, 0));
