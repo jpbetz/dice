@@ -21206,4 +21206,267 @@ export const scenarios = [
       assert.match(stuck.title, /unpick/i, 'and says how to get out of it');
     },
   },
+  {
+    name: 'turn-decision-odds',
+    tags: ['mechanics', 'm5', 'odds', 'smoke'],
+    // MECHANICS M5 — the decision is the beat (docs/MECHANICS.md).
+    //
+    // The readout that makes the moment before the next throw worth having.
+    // Three claims, and they fail separately, so they are asserted separately:
+    //   * it is THERE at a decision point and NOWHERE else;
+    //   * it describes the dice the button would actually throw — the M2b
+    //     defect shape, where the verb counted four while something else still
+    //     said six;
+    //   * it REFUSES where it cannot honestly answer, out loud, and the refusal
+    //     is legible copy rather than a blank.
+    //
+    // THE CARDS ARE READ, NOT THE MODEL, and the rect comes back with them.
+    // `turnOdds` reports the forecast AND what each mounted card says, because
+    // a correct number painted into a box of zero height is this repo's
+    // dominant failure shape (TESTING P10) — an assertion on the forecast
+    // alone could not fail for that.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      const odds = (rid) => a.dbg(`turnOdds(${JSON.stringify(rid)})`);
+      const state = (rid) => a.dbg(`turnState(${JSON.stringify(rid)})`);
+      // The cards OFFERING the readout for one turn, and the one a player can
+      // actually see. Both matter, and the `rollId` filter is load-bearing: the
+      // banner and the verdict card have independent lifecycles, so mid-ceremony
+      // one can hold the previous roll while the other holds this one, and a
+      // blanket "every card agrees" would go red on a difference that is right.
+      const shown = (o, rid) => o.cards.filter((c) => !c.hidden && (!rid || c.rollId === rid));
+      const agree = (o, why, rid) => {
+        const s = shown(o, rid);
+        for (const c of s) {
+          assert.equal(c.head, s[0].head, `${why}: every card's eyebrow agrees`);
+          assert.equal(c.main, s[0].main, `${why}: every card's numbers agree`);
+          assert.equal(c.note, s[0].note, `${why}: every card's note agrees`);
+        }
+        const vis = s.filter((c) => c.h > 0 && c.w > 0);
+        assert.ok(vis.length >= 1, `${why}: the readout is on screen (${JSON.stringify(o.cards)})`);
+        return vis[0];
+      };
+
+      // ① A PLAIN ROLL IS NOT A DECISION, so there is nothing to say. This is
+      // the "costs nothing when there is no turn" half, and it is asserted on
+      // the CONTENT too: hidden-but-populated would leave a stale forecast one
+      // attribute away from being shown.
+      await a.roll('6d6');
+      const plainId = await a.rollId();
+      const quiet = await odds(plainId);
+      assert.equal(shown(quiet, plainId).length, 0,
+        `no turn, no readout (${JSON.stringify(quiet.cards)})`);
+      for (const c of quiet.cards) {
+        assert.equal(c.head + c.main + c.note, '', 'and nothing stale is left in it');
+      }
+      await a.dbg('clearTable()');
+      await a.dbg('sim(60)');
+
+      // ② A TURN OPENS AND THE NUMBERS ARRIVE.
+      // THE SYSTEM IS SET, and it is not incidental: the readout forecasts in
+      // the shape the table READS, so the higher/same/lower line exists only
+      // where a total is a fact of play. `none` is the plainest such system;
+      // the default room is Your Soul Deal, whose own read is asserted at ⑦.
+      await a.dbg("setSystem('none')");
+      await a.roll('6d6 t3');
+      const rid = await a.rollId();
+      const one = await state(rid);
+      const o1 = await odds(rid);
+      assert.equal(o1.forecast.kind, 'total', 'six ordinary d6 have a total worth forecasting');
+      assert.equal(o1.thrown, 6, 'and nothing is kept yet, so all six are in play');
+      const c1 = agree(o1, 'a fresh turn', rid);
+      assert.match(c1.head, /\b6\b/, `the eyebrow names the six dice (${c1.head})`);
+      assert.match(c1.main, /higher/, `the read is higher/same/lower (${c1.main})`);
+      assert.match(c1.main, /same/, c1.main);
+      assert.match(c1.main, /lower/, c1.main);
+      // IT NEVER ADVISES. The GOALS invariant, asserted as copy: "higher" is a
+      // statement about the total, "better" would be a statement about the
+      // player's game, and no surface here may recommend a move.
+      assert.doesNotMatch(`${c1.head} ${c1.main} ${c1.note}`,
+        /better|worse|should|recommend|best|advis|try |keep the/i,
+        `the readout states, never advises (${c1.main} / ${c1.note})`);
+      // THE STAKE IS THE DICE ON THE FELT, not a number of its own invention.
+      const sumAll = one.values.reduce((x, y) => x + y, 0);
+      assert.match(c1.note, new RegExp(`worth ${sumAll}\\b`),
+        `it quotes what the six dice are actually worth, ${sumAll} (${c1.note})`);
+
+      // ③ KEEPING DICE RE-COUNTS THE READ. This is the assertion that would
+      // have caught M2b's bug in its own shape: the readout must be about the
+      // dice the verb would throw, and the two must move together.
+      await a.dbg('pickToggle(0)');
+      await a.dbg('pickToggle(1)');
+      await a.dbg('sim(2)');
+      const kept = (await a.dbg('picked')).dice.map((d) => d.dieIndex);
+      assert.equal(kept.length, 2, `two dice kept (${JSON.stringify(kept)})`);
+      const o2 = await odds(rid);
+      assert.equal(o2.thrown, 4, 'four would be thrown');
+      const c2 = agree(o2, 'two dice kept', rid);
+      assert.match(c2.head, /\b4\b/, `the eyebrow follows the selection (${c2.head})`);
+      const sumThrown = one.values.reduce((s, v, i) => (kept.includes(i) ? s : s + v), 0);
+      assert.match(c2.note, new RegExp(`worth ${sumThrown}\\b`),
+        `and the stake is the FOUR (${sumThrown}), not the six (${sumAll}) — "${c2.note}"`);
+      assert.notEqual(sumThrown, sumAll, 'the two numbers really are different (values are ≥ 1)');
+      // The printed percentages are the forecast's own, field by field: a paint
+      // that swapped higher for lower would still contain three percentages.
+      for (const [k, word] of [['higher', 'higher'], ['lower', 'lower'], ['same', 'same']]) {
+        const r = Math.round(o2.forecast[k] * 100);
+        if (r >= 1 && r <= 99) {
+          assert.ok(c2.main.includes(`${r}% ${word}`),
+            `"${c2.main}" prints ${k} as ${r}% (forecast ${o2.forecast[k]})`);
+        }
+      }
+
+      // ④ KEEPING EVERY DIE IS NOT A THROW, and the readout says why instead of
+      // printing a confident nothing. (The verb is disabled here too — M2b —
+      // and the two explanations must not contradict each other.)
+      // (pickToggle indexes pickableDice, which is every die of the turn
+      // whether or not it is already picked — so 0 and 1 are skipped rather
+      // than toggled back off.)
+      for (let i = 2; i < 6; i++) await a.dbg(`pickToggle(${i})`);
+      await a.dbg('sim(2)');
+      assert.equal((await a.dbg('picked')).dice.length, 6, 'all six are kept');
+      const o3 = await odds(rid);
+      assert.equal(o3.thrown, 0, 'nothing would be thrown');
+      assert.equal(o3.forecast.kind, 'refused');
+      assert.equal(o3.forecast.refusal.code, 'nothing-thrown');
+      const c3 = agree(o3, 'every die kept', rid);
+      assert.match(c3.note, /no throw to forecast/i,
+        `the box says why rather than going blank (${JSON.stringify(c3)})`);
+      assert.equal(c3.main, '', 'and prints no numbers at all beside the refusal');
+
+      // ⑤ IT GOES WHEN THE TURN GOES. Unpick one, spend both remaining throws,
+      // and the readout must be hidden AND emptied — a stale forecast that
+      // outlives its turn is a number about dice nobody is holding.
+      await a.dbg('pickToggle(0)');
+      for (let t = 0; t < 2; t++) {
+        await a.eval(`document.querySelector('.throw-again').click()`);
+        await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+          { desc: `throw ${t + 2} plays out`, timeout: 30000 });
+        await a.dbg('sim(240)');
+      }
+      const spent = await state(rid);
+      assert.deepEqual(spent.throws, { max: 3, used: 3 }, 'the budget is spent');
+      const gone = await odds(rid);
+      assert.equal(shown(gone, rid).length, 0,
+        `the readout retires with the turn (${JSON.stringify(gone.cards)})`);
+      for (const c of gone.cards) {
+        assert.equal(c.head + c.main + c.note, '', 'and takes its numbers with it');
+      }
+
+      // ⑥ SYMBOL DICE GET A REFUSAL AND A DIFFERENT ANSWER. Their values are
+      // 1..6 on the wire (M3) so a total is computable and meaningless — a claw
+      // is not greater than a bolt — so the numeric line is refused IN WRITING
+      // and replaced by a question that needs no ordering.
+      await a.dbg('clearTable()');
+      await a.dbg('sim(60)');
+      await a.dbg("setDiceSet('symbols.monster')");
+      await a.roll('4d6 t2');
+      const srid = await a.rollId();
+      const o4 = await odds(srid);
+      assert.equal(o4.forecast.kind, 'faces', 'no total read on symbol dice');
+      assert.equal(o4.forecast.now, null, 'and no total leaks out beside the refusal');
+      const c4 = agree(o4, 'a monster turn', srid);
+      assert.match(c4.note, /not numbers/,
+        `the refusal is said, not implied (${c4.note})`);
+      assert.doesNotMatch(c4.main, /higher|lower/,
+        `and no higher/lower number appears anywhere (${c4.main})`);
+      assert.match(c4.main, /at least one/i, `the substitute question is named (${c4.main})`);
+      // THE FACES ARE DRAWN, NOT TYPED — the same paths the dice were baked
+      // from (M3). Three of the monster set's six faces are symbols; the other
+      // three are digits and stay digits.
+      assert.equal(c4.glyphs, 3,
+        `bolt, claw and heart are drawn shapes (${c4.glyphs} svgs in "${c4.main}")`);
+      assert.match(c4.main, /1.*2.*3/s, `and 1/2/3 stay numerals (${c4.main})`);
+      // One group: every face of a fair set has the same chance, and saying it
+      // once is the honest statement that there is nothing here to rank.
+      assert.equal(o4.forecast.groups.length, 1,
+        `one chance across all six faces (${JSON.stringify(o4.forecast.groups)})`);
+      assert.ok(c4.main.match(/%/g).length === 1,
+        `so the percentage is printed once (${c4.main})`);
+      await a.dbg("setDiceSet('std')");
+
+      // ⑦ A PER-DIE TABLE GETS ITS OWN VOCABULARY. Under Your Soul Deal a
+      // total is not a fact of play — the verdict ring folds and no total
+      // renders — so quoting odds on one would be this feature contradicting
+      // the rest of the app. The words the system reads take the total's place.
+      // (Found by looking at a frame: "55% higher" sat directly under a row of
+      // Success / Partial Success / Fail chips.)
+      await a.dbg('clearTable()');
+      await a.dbg('sim(60)');
+      await a.dbg("setSystem('soul-deal')");
+      await a.roll('6d6 t3');
+      const prid = await a.rollId();
+      const o5 = await odds(prid);
+      assert.equal(o5.forecast.kind, 'faces', 'no total read where a total is not the read');
+      assert.equal(o5.forecast.noTotal.code, 'no-sum');
+      const c5 = agree(o5, 'a per-die table', prid);
+      assert.doesNotMatch(c5.main, /higher|lower/, `and no higher/lower line (${c5.main})`);
+      assert.match(c5.note, /reads each die/, `the reason is said (${c5.note})`);
+      // The words are the SYSTEM'S, asked through its own outcomesFor — never
+      // a copy of one rulebook's chart living on this surface.
+      const words = o5.forecast.faces.map((f) => f.face);
+      assert.ok(words.includes('Success'), `the chart's words are the labels (${words.join(', ')})`);
+      assert.ok(words.includes('Fail'), words.join(', '));
+      // A QUIET FACE STAYS IN THE MATHS AND LEAVES THE CARD. Soul Deal's d6
+      // column has blank rows, so "no word" is a real label of the die and a
+      // real (and useless) 91% — it must not reach the readout, and its
+      // presence must not have moved anybody else's number.
+      assert.ok(words.includes('no word'),
+        `the quiet faces are counted as part of the die (${words.join(', ')})`);
+      assert.doesNotMatch(c5.main, /no word/, `but never printed (${c5.main})`);
+      const real = o5.forecast.faces.filter((f) => f.face !== 'no word');
+      for (const f of real) {
+        // one face in six, six dice thrown
+        const want = 1 - Math.pow(5 / 6, 6);
+        assert.ok(Math.abs(f.p - want) < 1e-9,
+          `${f.face}: ${f.p} is P(at least one) over six dice, ${want}`);
+      }
+      // "EACH" — without it, one percentage over four words reads as the union
+      // of the four, which is false and badly so.
+      assert.match(c5.main, /each/, `the grouped percentage says "each" (${c5.main})`);
+
+      // ⑧ A SECOND CARD MUST NOT BE MISTAKEN FOR THIS ONE — and this is M2b's
+      // own bug shape rather than a hypothetical. There are two mount targets
+      // (the banner and the verdict card); a ceremony turn paints the verdict
+      // card and a plain one paints the banner, and the verdict card is FIRST
+      // in the DOM, so `document.querySelector` on a stale one finds the wrong
+      // answer with total confidence. M2b shipped that exact defect: a card
+      // saying "Throw again" (disabled) while three dice were picked.
+      //
+      // A retired card keeps its last paint until something repaints it — the
+      // verb does too, and matching the verb is right, because a readout that
+      // self-cleaned while the button beside it went stale would be worse. So
+      // the claim is not "no stale holder exists": it is that exactly ONE
+      // readout is on screen and it is the one about the open turn.
+      await a.dbg('clearTable()');
+      await a.dbg('sim(60)');
+      await a.dbg("setSystem('none')");
+      await a.roll('6d6 t3 check');
+      await a.dbg('sim(300)');
+      const crid = await a.rollId();
+      const cere = await odds(crid);
+      assert.ok(cere.cards.length >= 2, `both holders are mounted (${cere.cards.length})`);
+      const ceremonyLive = cere.cards.filter((c) => !c.hidden && c.w > 0 && c.h > 0);
+      assert.equal(ceremonyLive.length, 1, 'exactly one readout is on screen');
+      assert.equal(ceremonyLive[0].rollId, crid,
+        `and it is the ceremony card's, about the open turn (${JSON.stringify(cere.cards)})`);
+      // The picks reach whichever card is showing, through the same registry
+      // walk `repaintAwayVerbs` uses — not through a query that could find the
+      // other one.
+      await a.dbg('pickToggle(0)');
+      await a.dbg('pickToggle(1)');
+      await a.dbg('pickToggle(2)');
+      await a.dbg('sim(2)');
+      const o6 = await odds(crid);
+      assert.equal(o6.thrown, 3, 'three would be thrown');
+      const c6 = agree(o6, 'a ceremony turn after picking', crid);
+      assert.match(c6.head, /\b3\b/, `the card on screen recounts (${c6.head})`);
+      const stale = o6.cards.filter((c) => c.rollId !== crid);
+      for (const c of stale) {
+        assert.ok(c.w === 0 || c.h === 0 || c.hidden,
+          `a holder about another roll is never on screen (${JSON.stringify(c)})`);
+      }
+      await a.dbg("setSystem('soul-deal')");
+    },
+  },
 ];

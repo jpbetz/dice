@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import assert from 'node:assert/strict';
-import { previewOf, facesOf } from '../js/odds.js';
+import { previewOf, facesOf, throwForecast, THROW_REFUSALS } from '../js/odds.js';
 import { budgetOf, composeRoll, validateMods, DIE_MAX } from '../js/rollspec.js';
 import { parseNotation } from '../js/notation.js';
 
@@ -295,6 +295,315 @@ t('facesOf d10x is 0..90 by tens', () => {
 });
 t('empty pool is just the modifier', () => {
   assert.deepEqual(previewOf([], { modifier: 3 }), { min: 3, avg: 3, max: 3, exact: true });
+});
+
+// ---------------------------------------------------------------------------
+// THE DECISION READ — throwForecast (MECHANICS M5).
+//
+// Every numeric claim below is checked against a BRUTE-FORCE product over the
+// dice's own faces, not against another closed form. That matters here more
+// than usual: the thing under test forwards to sumForecast, so a check written
+// in sumForecast's own idiom would agree with it about a shared mistake. A
+// Cartesian product of equally likely tuples shares nothing with it.
+// ---------------------------------------------------------------------------
+
+// Every outcome of throwing these plain dice, as a flat list of totals. All
+// outcomes are equally likely, so a probability is a count over the length.
+const allSums = (types) => {
+  const out = [];
+  const walk = (i, s) => {
+    if (i === types.length) { out.push(s); return; }
+    for (const v of facesOf(types[i])) walk(i + 1, s + v);
+  };
+  walk(0, 0);
+  return out;
+};
+
+// The same product over FACE LABELS: every tuple of faces those dice could
+// show, for the symbol read.
+const allFaces = (lists) => {
+  const out = [];
+  const walk = (i, acc) => {
+    if (i === lists.length) { out.push(acc); return; }
+    for (const f of lists[i]) walk(i + 1, acc.concat(f));
+  };
+  walk(0, []);
+  return out;
+};
+
+const near = (a, b, eps = 1e-12) => Math.abs(a - b) <= eps;
+const MONSTER = ['1', '2', '3', 'bolt', 'claw', 'heart']; // js/themes.js symbols.monster
+const FATE = ['minus', 'minus', 'blank', 'blank', 'plus', 'plus']; // symbols.fate
+
+// The core claim, against the product. `now` is what the dice show at the
+// decision point; higher/same/lower must be exactly the three counts.
+const checkTotal = (name, dice) => t(name, () => {
+  const fc = throwForecast(dice);
+  assert.equal(fc.kind, 'total', `${name}: kind`);
+  const types = dice.map((d) => d.type);
+  const now = dice.reduce((s, d) => s + d.value, 0);
+  assert.equal(fc.now, now, `${name}: now`);
+  assert.equal(fc.n, dice.length, `${name}: n`);
+  const sums = allSums(types);
+  const N = sums.length;
+  const hi = sums.filter((s) => s > now).length / N;
+  const eq = sums.filter((s) => s === now).length / N;
+  const lo = sums.filter((s) => s < now).length / N;
+  const mean = sums.reduce((a, b) => a + b, 0) / N;
+  assert.ok(near(fc.higher, hi, 1e-10), `${name}: higher ${fc.higher} != ${hi}`);
+  assert.ok(near(fc.same, eq, 1e-10), `${name}: same ${fc.same} != ${eq}`);
+  assert.ok(near(fc.lower, lo, 1e-10), `${name}: lower ${fc.lower} != ${lo}`);
+  assert.ok(near(fc.mean, mean, 1e-9), `${name}: mean ${fc.mean} != ${mean}`);
+  assert.ok(near(fc.higher + fc.same + fc.lower, 1, 1e-9),
+    `${name}: the three do not partition (${fc.higher + fc.same + fc.lower})`);
+});
+
+checkTotal('throwForecast 2d6 showing 8', [{ type: 'd6', value: 3 }, { type: 'd6', value: 5 }]);
+checkTotal('throwForecast 3d6 showing 11', [
+  { type: 'd6', value: 2 }, { type: 'd6', value: 4 }, { type: 'd6', value: 5 }]);
+// MIXED TYPES are the ordinary case for a turn (`2d6+1d8 t3` is a legal pool),
+// and they are the case a per-die shortcut would get wrong.
+checkTotal('throwForecast d6+d8 showing 10', [{ type: 'd6', value: 3 }, { type: 'd8', value: 7 }]);
+// d10x's faces are 0,10..90 — the read must be indexed by ordinal, not value.
+checkTotal('throwForecast 2d10x showing 60', [{ type: 'd10x', value: 40 }, { type: 'd10x', value: 20 }]);
+
+// THE TWO EDGES, where a cumulative read is most likely to lie. Holding the
+// maximum means P(higher) is a TRUE zero and must print as one, not as a
+// vanished tail; holding the minimum is the same claim at the other end.
+t('throwForecast at the ceiling: higher is a true zero', () => {
+  const fc = throwForecast([{ type: 'd6', value: 6 }, { type: 'd6', value: 6 }]);
+  assert.equal(fc.higher, 0);
+  assert.ok(near(fc.same, 1 / 36, 1e-12), `same ${fc.same}`);
+  assert.ok(near(fc.lower, 35 / 36, 1e-12), `lower ${fc.lower}`);
+});
+t('throwForecast at the floor: lower is a true zero', () => {
+  const fc = throwForecast([{ type: 'd6', value: 1 }, { type: 'd6', value: 1 }]);
+  assert.equal(fc.lower, 0);
+  assert.ok(near(fc.higher, 35 / 36, 1e-12), `higher ${fc.higher}`);
+});
+
+// A 40-DIE POOL is what MAX_PHYSICAL_DICE allows, and it is the case where a
+// deep tail underflows if the cumulative read is taken as `1 - cdf` (the bug
+// sumAtLeast's comment records). Holding one under the maximum, P(higher) is
+// exactly the one all-max outcome.
+t('throwForecast survives a 40-die pool at the far tail', () => {
+  const dice = Array.from({ length: 40 }, (_, i) => ({ type: 'd6', value: i === 0 ? 5 : 6 }));
+  const fc = throwForecast(dice);
+  assert.equal(fc.kind, 'total');
+  assert.equal(fc.now, 239);
+  assert.ok(fc.higher > 0, 'the one better outcome is not zero');
+  assert.ok(near(fc.higher, Math.pow(1 / 6, 40), Math.pow(1 / 6, 40) * 1e-6),
+    `higher ${fc.higher} != 6^-40`);
+});
+
+// ---- THE REFUSALS, which are the design rather than its edges --------------
+
+// SYMBOL DICE HAVE NO TOTAL, and this is the honest-refusal case. Values are
+// 1..6 on the wire (MECHANICS M3), so a sum is computable and meaningless: a
+// claw is not greater than a bolt.
+t('symbol dice: the total is refused in writing', () => {
+  const fc = throwForecast([
+    { type: 'd6', value: 5, faces: MONSTER }, { type: 'd6', value: 6, faces: MONSTER }]);
+  assert.equal(fc.kind, 'faces');
+  assert.equal(fc.now, null, 'and no total leaks out beside the refusal');
+  assert.equal(fc.higher, null);
+  assert.equal(fc.noTotal.code, 'no-total');
+  assert.equal(fc.noTotal.reason, THROW_REFUSALS['no-total']);
+  assert.match(fc.noTotal.reason, /not numbers/);
+});
+
+// THE FUDGE DIE IS THE TRAP. Plus really is better than minus, so "higher is
+// better" LOOKS safe here — but 1,2 both read minus and 3,4 both read blank, so
+// a forecast on raw sums would score a 1 to 2 change as an improvement when the
+// die did not move. Forecasting the Fudge scale instead would mean reading a
+// face AS a number, which is a procedure's job (M4). So: refused.
+t('the Fudge die gets no numeric forecast', () => {
+  const fc = throwForecast([{ type: 'd6', value: 1, faces: FATE }, { type: 'd6', value: 6, faces: FATE }]);
+  assert.equal(fc.kind, 'faces', 'no "higher" read on a die whose values are not its faces');
+  assert.equal(fc.higher, null);
+  assert.deepEqual(fc.groups.map((g) => g.faces), [['minus', 'blank', 'plus']],
+    'three faces, one chance between them');
+  assert.ok(near(fc.groups[0].p, 1 - (4 / 6) * (4 / 6), 1e-12), `p ${fc.groups[0].p}`);
+});
+
+t('mixed symbol and number dice are refused', () => {
+  const fc = throwForecast([{ type: 'd6', value: 5, faces: MONSTER }, { type: 'd6', value: 2 }]);
+  assert.equal(fc.kind, 'refused');
+  assert.equal(fc.refusal.code, 'mixed-faces');
+  assert.equal(fc.refusal.reason, THROW_REFUSALS['mixed-faces']);
+  assert.equal(fc.now, null);
+  assert.deepEqual(fc.groups, [], 'a refusal carries no half-answer');
+});
+
+t('nothing thrown is refused', () => {
+  const fc = throwForecast([]);
+  assert.equal(fc.kind, 'refused');
+  assert.equal(fc.refusal.code, 'nothing-thrown');
+  assert.equal(fc.n, 0);
+});
+
+// A REDACTED TURN has parts with `value: null` (goal 11). canThrowAgain already
+// refuses there — you cannot choose faces you cannot see — so this is the belt
+// to that brace: without it the sum would be NaN and print as a confident
+// nothing.
+t('a face-down turn is refused rather than summed', () => {
+  const fc = throwForecast([{ type: 'd6', value: null }, { type: 'd6', value: 4 }]);
+  assert.equal(fc.kind, 'refused');
+  assert.equal(fc.refusal.code, 'no-values');
+});
+
+// (There is no test for the SUM_REFUSALS passthrough because it cannot fire:
+// throwForecast calls sumForecast with no mods, and all three of its refusals
+// are mod-driven. The line stays because a turn is a plain pool by M2's RULE
+// rather than by construction, and the day that loosens is the day a silent
+// wrong number would appear. Recorded so a later reader does not mistake an
+// untestable line for an untested one.)
+
+// ---- THE FACE READ, against the product -----------------------------------
+
+t('monster face odds are P(at least one), exactly', () => {
+  for (const n of [1, 2, 4, 6]) {
+    const dice = Array.from({ length: n }, () => ({ type: 'd6', value: 1, faces: MONSTER }));
+    const fc = throwForecast(dice);
+    assert.equal(fc.kind, 'faces', `${n} dice: kind`);
+    const tuples = n <= 4 ? allFaces(Array.from({ length: n }, () => MONSTER)) : null;
+    for (const f of fc.faces) {
+      const want = 1 - Math.pow(5 / 6, n);
+      assert.ok(near(f.p, want, 1e-12), `${n} dice, ${f.face}: ${f.p} != ${want}`);
+      if (tuples) {
+        const brute = tuples.filter((row) => row.includes(f.face)).length / tuples.length;
+        assert.ok(near(f.p, brute, 1e-12), `${n} dice, ${f.face}: ${f.p} != product ${brute}`);
+      }
+    }
+    // ONE GROUP: on a fair set every face returns the same number, and saying
+    // so once is the honest statement that there is nothing here to rank.
+    assert.equal(fc.groups.length, 1, `${n} dice: one chance for all six faces`);
+    assert.deepEqual(fc.groups[0].faces, MONSTER, `${n} dice: in face order`);
+  }
+});
+
+// A MIXED SYMBOL POOL is where grouping earns its keep — two sets, two
+// populations, and the numbers really do differ per face.
+t('monster + fate together: two groups, both exact', () => {
+  const fc = throwForecast([
+    { type: 'd6', value: 4, faces: MONSTER },
+    { type: 'd6', value: 5, faces: FATE }]);
+  assert.equal(fc.kind, 'faces');
+  const tuples = allFaces([MONSTER, FATE]);
+  const brute = (f) => tuples.filter((row) => row.includes(f)).length / tuples.length;
+  for (const f of fc.faces) {
+    assert.ok(near(f.p, brute(f.face), 1e-12), `${f.face}: ${f.p} != ${brute(f.face)}`);
+  }
+  assert.equal(fc.groups.length, 2, `two distinct chances (${JSON.stringify(fc.groups)})`);
+  const byP = [...fc.groups].sort((a, b) => a.p - b.p);
+  assert.deepEqual(byP[0].faces, MONSTER, 'the monster faces, on one die each: 1/6');
+  assert.ok(near(byP[0].p, 1 / 6, 1e-12));
+  assert.deepEqual(byP[1].faces, ['minus', 'blank', 'plus'], 'the fate faces: 2/6');
+  assert.ok(near(byP[1].p, 2 / 6, 1e-12));
+});
+
+// ---- THE WORD READ: forecasting in the shape the TABLE reads ---------------
+// Under a per-die profile "a sum is not a fact of play" (js/meanings.js) — the
+// verdict ring folds and no total renders anywhere — so a total forecast there
+// would be this feature quoting odds on a number the rest of the app refuses
+// to show. The caller resolves the words; odds.js only has to prefer them.
+
+// Soul Deal's d6 column, as the caller resolves it: four words and two blank
+// rows, which the caller labels rather than dropping.
+const SD6 = ['Fail', 'no word', 'no word', 'Partial Success', 'Success', 'Success & Bonus'];
+
+t('a per-die table gets its words, not a total', () => {
+  const dice = Array.from({ length: 6 }, () => ({ type: 'd6', value: 3, reads: SD6 }));
+  const fc = throwForecast(dice);
+  assert.equal(fc.kind, 'faces');
+  assert.equal(fc.higher, null, 'no higher/same/lower where a total is not the read');
+  assert.equal(fc.noTotal.code, 'no-sum');
+  assert.equal(fc.noTotal.reason, THROW_REFUSALS['no-sum']);
+  // Closed form here (6^6 is 46656 tuples); the product check is the next case.
+  for (const f of fc.faces) {
+    const rows = SD6.filter((w) => w === f.face).length;
+    const want = 1 - Math.pow(1 - rows / 6, 6);
+    assert.ok(near(f.p, want, 1e-12), `${f.face}: ${f.p} != ${want}`);
+  }
+  // The quiet rows are TWO faces of the die, so their label's chance is the
+  // higher one — which is exactly why it is a label and not a hole. Dropping it
+  // from the die would have made every other word's number wrong.
+  const quiet = fc.faces.find((f) => f.face === 'no word');
+  assert.ok(near(quiet.p, 1 - Math.pow(4 / 6, 6), 1e-12), `no word: ${quiet.p}`);
+  assert.equal(fc.groups.length, 2, 'four words at one chance, the quiet pair at another');
+});
+
+t('the word read is checked against the product on a small pool', () => {
+  const dice = [{ type: 'd6', value: 1, reads: SD6 }, { type: 'd6', value: 2, reads: SD6 }];
+  const fc = throwForecast(dice);
+  const tuples = allFaces([SD6, SD6]);
+  for (const f of fc.faces) {
+    const brute = tuples.filter((row) => row.includes(f.face)).length / tuples.length;
+    assert.ok(near(f.p, brute, 1e-12), `${f.face}: ${f.p} != product ${brute}`);
+  }
+});
+
+// THE FACES WIN over the table's words, and MECHANICS M3 is why: with the room
+// set to a numeric system a monster die showing a claw is read as "5 — Success",
+// which is not wrong so much as meaningless. What is on the die outranks a
+// reading of the number underneath it.
+t('symbol faces outrank the system words', () => {
+  const fc = throwForecast([{ type: 'd6', value: 5, faces: MONSTER, reads: SD6 }]);
+  assert.equal(fc.noTotal.code, 'no-total', 'the refusal names the FACES, not the system');
+  assert.deepEqual(fc.faces.map((f) => f.face), MONSTER);
+});
+
+t('a malformed or partial word table falls back to the total', () => {
+  // wrong length — a d6 handed four words is a different die
+  const short = throwForecast([{ type: 'd6', value: 3, reads: ['a', 'b', 'c', 'd'] }]);
+  assert.equal(short.kind, 'total', 'four labels for six faces is refused, not stretched');
+  // a hole in the table
+  const holed = throwForecast([{ type: 'd6', value: 3, reads: ['a', null, 'c', 'd', 'e', 'f'] }]);
+  assert.equal(holed.kind, 'total');
+  // ALL OR NONE: the system is a property of the TABLE, so a pool where only
+  // some dice resolved is a bug rather than a mixture, and the total is the
+  // answer that cannot be half-right.
+  const half = throwForecast([
+    { type: 'd6', value: 3, reads: SD6 }, { type: 'd6', value: 4 }]);
+  assert.equal(half.kind, 'total');
+});
+
+// A FACE TABLE OF THE WRONG LENGTH IS IGNORED ENTIRELY, not half-applied.
+// js/dice.js paints `faces` on d6 only; this mirrors that by MEASURING rather
+// than naming the type. Half a symbol die would be a d20 with six labels and
+// fourteen holes, and the holes would read as numbers.
+t('a d6 face table on a d20 is ignored, not half-applied', () => {
+  const fc = throwForecast([{ type: 'd20', value: 11, faces: MONSTER }]);
+  assert.equal(fc.kind, 'total', 'it stays a number die');
+  assert.equal(fc.now, 11);
+  assert.ok(near(fc.mean, 10.5, 1e-12), `mean ${fc.mean}`);
+  assert.ok(near(fc.higher, 9 / 20, 1e-12), `higher ${fc.higher}`);
+});
+
+// A SWEEP: whatever the pool, the three numbers partition the outcome space and
+// the mean sits inside the achievable range. Randomised over the die types a
+// turn can actually hold.
+t('throwForecast partitions and stays in range across random pools', () => {
+  const rng = mulberry32(0x5ec1de);
+  const types = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd10x'];
+  for (let i = 0; i < 200; i++) {
+    const count = 1 + Math.floor(rng() * 6);
+    const dice = Array.from({ length: count }, () => {
+      const type = types[Math.floor(rng() * types.length)];
+      const f = facesOf(type);
+      return { type, value: f[Math.floor(rng() * f.length)] };
+    });
+    const fc = throwForecast(dice);
+    assert.equal(fc.kind, 'total', `${dice.map((d) => d.type)}: kind`);
+    const sum = fc.higher + fc.same + fc.lower;
+    assert.ok(near(sum, 1, 1e-9), `${dice.map((d) => d.type)}: partition ${sum}`);
+    const f0 = dice.map((d) => facesOf(d.type));
+    const lo = f0.reduce((s, f) => s + f[0], 0);
+    const hi = f0.reduce((s, f) => s + f[f.length - 1], 0);
+    assert.ok(fc.mean >= lo - 1e-9 && fc.mean <= hi + 1e-9,
+      `${dice.map((d) => d.type)}: mean ${fc.mean} outside [${lo}, ${hi}]`);
+    assert.ok(fc.now >= lo && fc.now <= hi, `${dice.map((d) => d.type)}: now ${fc.now} outside`);
+  }
 });
 
 console.log(process.exitCode ? `${n} tests, FAILURES above` : `all ${n} odds tests pass`);

@@ -776,3 +776,238 @@ export function sumPeak(fc) {
   }
   return { value, p, tied, of: fc.values.length };
 }
+
+// ---------------------------------------------------------------------------
+// THE DECISION READ (MECHANICS M5; GOALS goal 3's rider, "the decision can be
+// the beat").
+//
+// Everything above answers a question about a roll that is ABOUT to happen or
+// has just happened. This answers the one question this app had nothing to say
+// to: a turn is open, some dice are kept, and the player is standing over the
+// felt deciding. IF I THROW THESE N AGAIN, WHAT HAPPENS TO THEM?
+//
+// THE KEPT DICE AND THE MODIFIER CANCEL, which is what makes the read both
+// cheap and exact. A re-throw leaves the kept dice exactly where they landed
+// and adds the same modifier either way, so
+//       new total > old total   <=>   sum(fresh N) > sum(those N right now)
+// and the whole question collapses onto the subset in the player's hand.
+// Nothing here needs the turn's total, its budget, or what any of it means —
+// which is also why it can never drift out of step with the turn.
+//
+// "HIGHER", NEVER "BETTER". The three numbers are a statement about the TOTAL,
+// which is a fact; whether a higher total is a good thing is the player's game
+// and none of ours (GOALS invariant: the procedure never plays for you). The
+// word choice is that invariant written as copy.
+//
+// WHAT IT REFUSES, and the refusals are the design rather than its edges:
+//   no-total     the thrown dice wear SYMBOL faces. Their values are 1..6 on
+//                the wire (MECHANICS M3), so a total is computable and it is
+//                meaningless — a claw is not greater than a bolt.
+//                THIS BITES THE FUDGE DIE TOO, for a subtler reason worth
+//                writing down: plus really IS better than minus there, so
+//                "higher is better" looks safe — but the raw values map
+//                1,2 -> minus, 3,4 -> blank, 5,6 -> plus, so a forecast on raw
+//                sums scores a 1->2 change as an improvement when the die did
+//                not move at all. Forecasting the Fudge SCALE instead would
+//                mean reading a face as a number, and reading faces is a
+//                procedure's job (MECHANICS M4), not this file's.
+//   mixed-faces  symbol dice and number dice in the same throw. Neither read
+//                covers both, and choosing one silently drops the other half.
+//   no-sum       THE TABLE DOES NOT READ TOTALS. Under a per-die profile "a
+//                sum is not a fact of play" (js/meanings.js) — the verdict
+//                ring folds and no total renders anywhere — so forecasting one
+//                would be this feature quoting odds on a number the rest of
+//                the app deliberately refuses to show. Found by looking at the
+//                frame, not by any assertion: the readout printed
+//                "55% higher" directly under a row of Success / Partial
+//                Success / Fail chips.
+//   no-values    a turn whose faces this viewer cannot see. Defensive: the
+//                verb is already refused there ("you cannot choose faces you
+//                cannot see"), and a forecast off null values would print a
+//                confident NaN rather than nothing.
+//   nothing-thrown  every die kept. There is no throw to forecast, and the
+//                verb refuses that act anyway (the server calls it
+//                nothing_thrown).
+//   ...plus every SUM_REFUSALS code, PASSED THROUGH untouched. A turn is a
+//   plain pool by M2's rule so none of them can fire today; the passthrough is
+//   what keeps this honest on the day that loosens, and it costs one line.
+//
+// BOTH OF THOSE TWO ANSWER A DIFFERENT QUESTION rather than nothing at all,
+// and it is the same question in both cases: for each thing one of those dice
+// can SAY — a drawn face, or the word the table's own system reads off it —
+// the chance the next throw says it AT LEAST ONCE. That needs no ordering and
+// no preference, and on a fair set every label comes back with the same
+// number, which is itself the honest statement that there is nothing here to
+// rank. What it will not do is say which one you want.
+//
+// SO THE RULE IS: FORECAST IN THE SHAPE THE TABLE READS. A total where a total
+// is the read, the faces where the faces are, the words where the words are.
+// That is goal 6's two layers (how a roll is READ, how it is STRUCTURED)
+// meeting at the decision point, and it is the whole of "improving means
+// something different per pool".
+//
+// Expected COUNT was the other candidate for the label reads and was dropped
+// for one reason: the surface already prints percentages for the numeric read,
+// and two units on one readout is a way to be misread.
+// ---------------------------------------------------------------------------
+
+export const THROW_REFUSALS = {
+  'no-total': 'these faces are not numbers — no total to be higher than',
+  'no-sum': 'this table reads each die on its own, not a total',
+  'mixed-faces': 'symbol dice and number dice in one throw — no single read covers both',
+  'no-values': 'this turn is face down — there are no faces to forecast from',
+  'nothing-thrown': 'every die is kept — there is no throw to forecast',
+};
+
+// What each face of one die READS as: a set's `faces` table where it has one
+// (MECHANICS M3), the plain number otherwise. Indexed by the die's face
+// ORDINAL rather than by value, because d10x's values are 0,10..90 and
+// `faces[value - 1]` would be nonsense there.
+//
+// The length test is what keeps a d6 table off a d20 — js/dice.js applies
+// `faces` to d6 only, and this mirrors that rule by MEASURING instead of
+// naming the type, so a future eight-face set needs no edit here. A table of
+// the wrong length is ignored entirely rather than half-applied: half a symbol
+// die is a die whose fourteen unlabelled faces would quietly read as numbers
+// and drag the whole pool into the numeric branch.
+function faceLabels(type, faces) {
+  const vals = facesOf(type);
+  const ok = Array.isArray(faces) && faces.length === vals.length;
+  return vals.map((v, i) => {
+    const f = ok ? faces[i] : null;
+    return typeof f === 'string' && f ? f : String(v);
+  });
+}
+
+const isNumericFace = (label) => /^\d+$/.test(label);
+
+// What the TABLE'S SYSTEM reads each face of this die as, if the caller has
+// supplied it. Same length rule as `faces` and for the same reason: a partial
+// table is worse than none, because the holes would silently read as something
+// else. The caller resolves the words (js/meanings.js owns the charts and this
+// file stays dependency-free); all this does is refuse a malformed one.
+function readLabels(type, reads) {
+  if (!Array.isArray(reads) || reads.length !== facesOf(type).length) return null;
+  return reads.every((r) => typeof r === 'string' && r) ? reads : null;
+}
+
+// P(at least one of each label) across independent dice, grouped by chance.
+// The shared body of the two label reads — the faces a die shows and the words
+// a system reads off it are the same arithmetic over different vocabularies,
+// and a second copy would be a second place for them to drift.
+//
+// Kept as the MISS product and complemented once at the end; accumulating hits
+// instead loses the tail on a wide pool for no gain.
+function labelRead(lists, n, code) {
+  const order = [];
+  const miss = new Map();
+  for (const labels of lists) {
+    const F = labels.length;
+    const own = new Map();
+    for (const l of labels) own.set(l, (own.get(l) || 0) + 1 / F);
+    for (const l of labels) if (!miss.has(l)) { miss.set(l, 1); order.push(l); }
+    // Every label known so far, not just this die's: one this die cannot show
+    // has miss probability 1 and is unchanged, which is what the `|| 0` says.
+    // (Re-`set`ting existing keys mid-iteration is defined; none is ADDED.)
+    for (const [l, p] of miss) miss.set(l, p * (1 - (own.get(l) || 0)));
+  }
+  const faces = order.map((l) => ({ face: l, p: 1 - miss.get(l) }));
+  // GROUPED BY CHANCE, because on a fair set every label returns the same
+  // number and six identical percentages in a row read as noise rather than as
+  // the fact they are. One group is the statement "there is nothing to choose
+  // between these"; two groups say where the difference actually is.
+  const groups = [];
+  for (const f of faces) {
+    const g = groups.find((x) => Math.abs(x.p - f.p) < 1e-12);
+    if (g) g.faces.push(f.face);
+    else groups.push({ p: f.p, faces: [f.face] });
+  }
+  return {
+    kind: 'faces',
+    n,
+    refusal: null,
+    noTotal: { code, reason: THROW_REFUSALS[code] },
+    now: null, mean: null, higher: null, same: null, lower: null,
+    faces, groups,
+  };
+}
+
+function throwRefusal(code, n, reason) {
+  return {
+    kind: 'refused',
+    n,
+    refusal: { code, reason: reason || THROW_REFUSALS[code] || SUM_REFUSALS[code] || code },
+    noTotal: null,
+    now: null, mean: null, higher: null, same: null, lower: null,
+    faces: [], groups: [],
+  };
+}
+
+// The forecast for ONE candidate throw. `thrown` is the dice that would move,
+// `{ type, value, faces, reads }` each:
+//   value  what the die shows right now
+//   faces  its set's face table (MECHANICS M3), or null for a number die
+//   reads  what the TABLE'S system reads each face as, one string per face —
+//          supplied only when this table does not read totals, and it is the
+//          caller's job to resolve them (js/meanings.js owns the charts).
+// The caller decides which dice those are and what its table reads; this
+// decides what can honestly be said about them.
+//
+// Returns one of three shapes, never a mixture:
+//   kind 'total'    now / mean / higher / same / lower  (exact, never sampled)
+//   kind 'faces'    groups of labels sharing one "at least one" chance, plus
+//                   `noTotal` — the refusal that explains why the numeric line
+//                   is absent, and which of the two reasons it is
+//   kind 'refused'  `refusal` only
+export function throwForecast(thrown) {
+  const list = Array.isArray(thrown) ? thrown : [];
+  const n = list.length;
+  if (!n) return throwRefusal('nothing-thrown', 0);
+  if (list.some((d) => typeof d.value !== 'number' || !Number.isFinite(d.value))) {
+    return throwRefusal('no-values', n);
+  }
+
+  const dice = list.map((d) => ({
+    type: d.type,
+    value: d.value,
+    labels: faceLabels(d.type, d.faces),
+    reads: readLabels(d.type, d.reads),
+  }));
+  const symbolic = dice.map((d) => d.labels.some((l) => !isNumericFace(l)));
+  if (symbolic.some(Boolean) && !symbolic.every(Boolean)) return throwRefusal('mixed-faces', n);
+
+  // THE FACES WIN over the table's words, and MECHANICS M3 is why: with the
+  // room set to a numeric system a monster die showing a claw is read as
+  // "5 — Success", which is not wrong so much as meaningless. What is actually
+  // on the die outranks a reading of the number underneath it.
+  if (symbolic[0]) return labelRead(dice.map((d) => d.labels), n, 'no-total');
+  // ALL OR NONE for the word read: the system is a property of the table, so
+  // a pool where only some dice resolved is a bug rather than a mixture, and
+  // falling back to the total is the answer that cannot be half-right.
+  if (dice.every((d) => d.reads)) return labelRead(dice.map((d) => d.reads), n, 'no-sum');
+
+  // No mods: a turn is a plain pool (MECHANICS M2 refuses adv/keep/reroll/! on
+  // one), and the turn's own modifier is constant across the decision and
+  // cancels. Exact for every pool a turn can hold; a refusal is passed through.
+  const fc = sumForecast(dice.map((d) => d.type), {});
+  if (fc.refusal) return throwRefusal(fc.refusal.code, n, fc.refusal.reason);
+  const now = dice.reduce((s, d) => s + d.value, 0);
+  // P(exactly `now`) is read off the pmf rather than taken as 1 - higher -
+  // lower: the two cumulative reads are each summed from whichever tail is
+  // smaller (see sumAtLeast), so differencing them would hand their rounding
+  // residue to the one number that is most often nearest zero.
+  let same = 0;
+  for (let i = 0; i < fc.values.length; i++) if (fc.values[i] === now) { same = fc.probs[i]; break; }
+  return {
+    kind: 'total',
+    n,
+    refusal: null,
+    noTotal: null,
+    now,
+    mean: fc.mean,
+    higher: sumAtLeast(fc, now + 1),
+    same,
+    lower: sumAtMost(fc, now - 1),
+    faces: [], groups: [],
+  };
+}
