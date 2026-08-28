@@ -21324,6 +21324,41 @@ export const scenarios = [
       assert.ok(!bustVerb.present || bustVerb.hidden,
         `the throw verb retires on a bust (${JSON.stringify(bustVerb)})`);
 
+      // ⑤b A CEREMONY MUST NOT TIDY A TURN AWAY. GOALS goal 5's rider: a turn
+      // holds its space until the turn ends. The ceremony's own retire clock
+      // collects on the roller's behalf, and it did not ask whether the roll
+      // was finished — measured by M5 as `6d6 t3 check` alive at +3s and GONE
+      // at +9s. Worse than a tidy-away: the card is where Throw again, Bank
+      // and the forecast live, so retiring it takes the decision surface too.
+      await a.dbg('clearTable()');
+      await a.dbg('sim(30)');
+      await a.roll('6d6 t3 check');
+      const crid = await a.rollId();
+      // Drive the handoff directly rather than waiting out seven seconds.
+      const flowed = await a.dbg('retireCeremony()');
+      assert.equal(flowed, false,
+        'the ceremony refuses to flow a turn that still has throws left');
+      await a.dbg('sim(120)');
+      const alive = await a.dbg(`turnState(${JSON.stringify(crid)})`);
+      assert.equal(alive.indices.length, 6,
+        `the dice are still on the felt (${JSON.stringify(alive.indices)})`);
+      assert.deepEqual(alive.throws, { max: 3, used: 1 }, 'with the turn still open');
+      // …and it flows normally once the turn is spent.
+      for (let i = 0; i < 2; i++) {
+        await a.dbg(`throwAgain(${JSON.stringify(crid)}, [0])`);
+        await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+          { desc: `throw ${i + 2}`, timeout: 30000 });
+        await a.dbg('sim(240)');
+      }
+      assert.equal((await a.dbg(`turnState(${JSON.stringify(crid)})`)).throws.used, 3,
+        'the budget is spent');
+      // …AND THEN IT FLOWS NORMALLY. Without this the fix could over-block —
+      // a turn that never tidies itself away is as wrong as one that tidies
+      // itself away too early, and the ceremony-retire scenario only covers
+      // plain rolls, so nothing else would notice.
+      assert.equal(await a.dbg('retireCeremony()'), true,
+        'a spent turn hands off like any other ceremony');
+
       // ⑥ A PLAIN ROLL HAS NO PUSH ANYTHING.
       await a.dbg('clearTable()');
       await a.dbg('sim(30)');

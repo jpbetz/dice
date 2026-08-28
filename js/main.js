@@ -1005,6 +1005,16 @@ function refreshTurnVerb() {
   }
 }
 
+// IS THIS TURN STILL BEING PLAYED? Deliberately NOT scoped to the viewer, and
+// that is the difference from canThrowAgain: whether a roll may be tidied away
+// is a fact about the roll, not about who is looking at it. A spectator's
+// client must not collect someone else's live turn either.
+function turnIsOpen(entry) {
+  if (!entry || !entry.rollId || !entry.throws) return false;
+  if (entry.push && (entry.push.busted || entry.push.banked)) return false;
+  return entry.throws.used < entry.throws.max;
+}
+
 // May this viewer bank? A push turn of theirs, still open, on the felt. Same
 // authority as throwing again, because it is the same decision seen from the
 // other side.
@@ -8880,6 +8890,17 @@ function retireCeremonyFlow(roll) {
   const sv = stagedVerdict;
   if (!sv || !sv.entry) { dismissCeremonyUI(); return true; }
   const entry = sv.entry;
+  // AN OPEN TURN IS NOT OVER, so nothing may tidy it away (GOALS goal 5's
+  // rider: a turn holds its space until the turn ends). Found by M5 on
+  // 2026-08-28: `6d6 t3 check` was measured with throws left at +3 s and GONE
+  // at +9 s, because this clock collects on the roller's behalf without ever
+  // asking whether the roll is finished.
+  //
+  // M2's own risk list named auto-collect's clock and stopped there. This is
+  // the SECOND one, and it is worse than a tidy-away: the ceremony card is
+  // where `Throw again`, `Bank` and the forecast live, so retiring it does
+  // not just take the dice, it takes the decision surface with them.
+  if (turnIsOpen(entry)) return false;
   const st = entry.rollId ? rollStates.get(entry.rollId) : null;
   if (st && (st.cleared || st.collected !== null)) { dismissCeremonyUI(); return true; }
   if (entryHidden(entry)) return false; // stands until the reveal
@@ -8902,6 +8923,10 @@ function armCeremonyRetire(roll) {
   if (!roll || !roll.ceremony || roll.ceremony.phase !== 'done') return;
   if (!stagedVerdict || !stagedVerdict.entry) return;
   if (entryHidden(stagedVerdict.entry)) return;
+  // …and an open turn never arms it at all, so the card stands while you are
+  // deciding. Belt as well as braces: retireCeremonyFlow refuses too, because
+  // it has a second caller (the debug seam, and any future one).
+  if (turnIsOpen(stagedVerdict.entry)) return;
   ceremonyDismissTimer = setTimeout(() => retireCeremonyFlow(roll), CEREMONY_DISMISS_MS);
 }
 
@@ -14642,7 +14667,8 @@ window.__diceDebug = {
   // The CEREMONY_DISMISS_MS handoff, driven directly (tests can't wait out
   // a real 7 s timer): the card FLOWS TO COLLECTED (Joe 2026-08-04) — the
   // roller's collect fires, a spectator's card retires locally. Returns
-  // false when the card stands instead (a hidden roll awaiting its reveal).
+  // false when the card stands instead (a hidden roll awaiting its reveal —
+  // or, since MECHANICS M2, a TURN that still has throws left).
   retireCeremony() {
     if (!currentRoll) return false;
     return retireCeremonyFlow(currentRoll);

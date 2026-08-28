@@ -24,11 +24,21 @@ C"*, which is the decision M4 was waiting for. Q2 was answered the same day
 (visibility belongs to the turn). **Q3 is the only question still open and it
 blocks nothing.**
 
-**One bug is owed and is NOT fixed here** — a ceremony turn auto-collects with
-throws left, found by M5 and recorded in its section, because it lives in the
-ceremony retire path rather than anywhere M5 touched. It is GOALS goal 5
-rider ④ violated by the *second* clock in the app; M2's own risk list named
-only the first.
+**The one bug M5 found and could not fix in passing is FIXED** — a ceremony
+turn was auto-collected out from under the player, GOALS goal 5 rider ④
+violated by the *second* clock in the app (M2's own risk list named only the
+first). `retireCeremonyFlow` collected on the roller's behalf without ever
+asking whether the roll was finished, so `6d6 t3 check` was alive at +3 s and
+gone at +9 s. Worse than a tidy-away: the ceremony card is where `Throw
+again`, `Bank` and the forecast live, so retiring it took the decision
+surface with the dice.
+
+`turnIsOpen` is deliberately NOT scoped to the viewer, which is the whole
+difference from `canThrowAgain`: whether a roll may be tidied away is a fact
+about the roll, not about who is looking at it. Pinned in BOTH directions —
+an open turn must not flow, and a spent one must — because a turn that never
+tidies itself away is as wrong as one that goes too early, and the existing
+`ceremony-retire` scenario only covers plain rolls.
 
 What was settled:
 
