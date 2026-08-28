@@ -19,6 +19,14 @@ organization, ops — sequenced by GOALS' ladder. Track B is the owner's track �
 venues, towers, dice art, immersion — sequenced by what Joe asks for next and
 by *finishing what is in flight*.
 
+**A third track is PROPOSED and unsequenced: [MECHANICS.md](MECHANICS.md)**
+(2026-08-27). Joe's read is that the product is bad at roll-and-lock and
+push-your-luck — King of Tokyo's mechanic cannot be played here at all. The
+proposal says why (this system models a roll; those are turns), what it would
+cost, and which GOALS lines would have to move. **It is awaiting his ruling and
+nothing in it is buildable yet.** Do not sequence it into THE ORDER until he
+answers its four questions.
+
 **Two batches, 2026-08-15 and 2026-08-16, took nineteen entries off this file**
 (record in [SHIPPED.md](SHIPPED.md)). What is left has a different shape:
 
