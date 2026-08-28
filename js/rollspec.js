@@ -74,6 +74,52 @@ export const MAX_THROWS = 5;
 // guaranteed to happen soon on a big pool.
 export const MAX_PUSH_THROWS = 20;
 
+// THE BAG (MECHANICS M6, docs/MECHANICS.md). A cup of dice you draw from:
+// `3d6 bag:6@symbols.fair,4@symbols.kind,3@symbols.cruel` puts thirteen dice
+// in the cup and three of them on the felt. The pool size says how many are
+// DRAWN; the flag says what they are drawn from.
+//
+// A BAG HOLDS ONE DIE TYPE — the pool's. Every consumer of a spec takes the
+// die list as given (checkDice, validateMods, budgetOf, the whole of
+// canonicalNotation's grouping), so the draw has to be knowable at parse
+// time, and it is the FACE TABLE that varies between cup colours anyway, not
+// the solid. What a drawn die IS, is a dice SET — which already carries a
+// face table (js/themes.js `faces`), is already per-die on the wire
+// (`roll.sets`), and is already resolved per die by the client. So the whole
+// mechanic adds no new payload field.
+//
+// THE BAG HAS NO MEMORY, and that is the goal-6 line. It is declared per
+// roll and it is empty of history: what is left in it, who drew what, when it
+// refills — all of that is game state, and the moment it lives on a server
+// this app is keeping score. A depleting cup across a turn is a stateful
+// procedure, which is a different feature and should be refused rather than
+// half-built.
+export const MAX_BAG_KINDS = 12;
+
+// Draw `n` dice from the bag, uniformly and WITHOUT replacement. Returns a
+// list of set ids aligned to the pool. A pure function of rng, so the server
+// and a solo table draw the same way.
+export function drawBag(bag, n, rng) {
+  const cup = [];
+  for (const { count, set } of bag) for (let i = 0; i < count; i++) cup.push(set);
+  const out = [];
+  for (let i = 0; i < n && cup.length; i++) {
+    // Draw from a shrinking cup: a die that comes out does not go back, which
+    // is what makes "6 of one and 4 of another" a distribution rather than a
+    // weighting. Sampling WITH replacement passes any naive "every id came
+    // from the bag" check, which is why tests/rollspec.test.mjs asserts the
+    // exact-permutation case instead.
+    out.push(cup.splice(Math.floor(rng() * cup.length), 1)[0]);
+  }
+  return out;
+}
+
+export function bagSize(bag) {
+  let n = 0;
+  for (const b of bag) n += b.count;
+  return n;
+}
+
 // Which of `values` show a scoring face under `push`. Indices into the roll's
 // dice, in order. A pure function of values the server authored, so client and
 // server always agree about what scored — the two do not have to negotiate.
@@ -164,7 +210,7 @@ export function validateSpec(spec) {
 export function validateMods(dice, mods) {
   if (mods == null) return null;
   if (typeof mods !== 'object' || Array.isArray(mods)) return 'bad_mods';
-  const { modifier, adv, keep, reroll, explode, parts, throws, push } = mods;
+  const { modifier, adv, keep, reroll, explode, parts, throws, push, bag } = mods;
   if (modifier !== undefined && (!Number.isInteger(modifier) || modifier < -99 || modifier > 99)) return 'bad_modifier';
   if (parts !== undefined) {
     // display-only decomposition of the modifier into named sources
@@ -250,6 +296,37 @@ export function validateMods(dice, mods) {
     // decide which dice COUNT inside one throw, and a procedure that sets dice
     // aside between throws has no answer for how the two compose.
     if (adv || keep || reroll || explode) return 'push_needs_plain_pool';
+  }
+  if (bag !== undefined) {
+    if (!Array.isArray(bag) || !bag.length || bag.length > MAX_BAG_KINDS) return 'bad_bag';
+    const seen = new Set();
+    for (const b of bag) {
+      if (!b || typeof b !== 'object' || Array.isArray(b)) return 'bad_bag';
+      if (!Number.isInteger(b.count) || b.count < 1 || b.count > MAX_PHYSICAL_DICE) return 'bad_bag';
+      if (typeof b.set !== 'string' || !/^(std|[a-z][a-z0-9]{0,23}\.[a-z][a-z0-9]{0,23})$/.test(b.set)) {
+        return 'bad_bag';
+      }
+      // A set named twice would have to be merged, and merging is a silent
+      // rewrite of what the player wrote. Refuse instead, exactly as a
+      // repeated keep flag is refused.
+      if (seen.has(b.set)) return 'bad_bag';
+      seen.add(b.set);
+    }
+    const size = bagSize(bag);
+    if (size > MAX_PHYSICAL_DICE) return 'bad_bag';
+    // You cannot draw five from a cup of three. Same shape as the keep/drop
+    // count check: a declaration that cannot be satisfied is a typo.
+    if (size < dice.length) return 'bag_too_small';
+    // ONE DIE TYPE, because the draw has to be knowable at parse time and
+    // every consumer of a spec takes the die list as given.
+    if (new Set(dice).size > 1) return 'bag_needs_one_die_type';
+    // Advantage MANUFACTURES a die — composeRoll pushes an unpaired d20 that
+    // the bag never drew, and there is no honest answer for what colour it
+    // would be. Every other list-growing mod (reroll replacements, explosion
+    // children) carries provenance the client chases back to the die it came
+    // from, so a re-rolled green die stays green; those compose fine and are
+    // deliberately allowed.
+    if (adv) return 'bag_and_adv';
   }
   return null;
 }

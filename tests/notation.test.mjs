@@ -1026,4 +1026,71 @@ t('a push carries every other flag, and the whole thing round-trips', () => {
   assert.equal(ok(r.canonical).canonical, s);
 });
 
+// ---- bag, a CUP (MECHANICS M6) --------------------------------------------
+t('a bag parses, round-trips, and leads the flags', () => {
+  const s = '3d6 bag:6@symbols.fair,4@symbols.kind,3@std';
+  const r = parseNotation(s.replace('symbols.fair', 'symbols.fate'));
+  assert.equal(r.ok, true, r.error);
+  assert.equal(r.canonical, '3d6 bag:6@symbols.fate,4@symbols.kind,3@std');
+  assert.deepEqual(r.spec.mods.bag, [
+    { count: 6, set: 'symbols.fate' },
+    { count: 4, set: 'symbols.kind' },
+    { count: 3, set: 'std' },
+  ]);
+  assert.equal(validateMods(r.spec.dice, r.spec.mods), null,
+    'the grammar and the shared validator agree');
+});
+
+t('the bag comes FIRST in the flag order, and the whole thing is a fixed point', () => {
+  // The sentence reads in the order the dice travel: pool, cup, throw,
+  // procedure. Getting this wrong still parses, so only a fixed-point check
+  // catches it.
+  const s = '3d6+2 bag:6@symbols.fate,4@std t3 check secret dc10 # Draw | round two';
+  const r = ok(s);
+  assert.equal(r.canonical, s);
+  assert.equal(ok(r.canonical).canonical, s);
+});
+
+t('a bag refuses what it cannot answer for', () => {
+  bad('3d6 bag:2@std');                 // cannot draw 3 from a cup of 2
+  bad('1d6+1d8 bag:4@std');             // two die types
+  bad('3d20 bag:6@std adv');            // advantage adds a die the bag never drew
+  bad('3d6 bag:2@std,2@std');           // a set named twice would have to be merged
+  bad('3d6 bag:0@std,3@std');
+  assert.equal(validateMods(['d6', 'd6', 'd6'], { bag: [{ count: 2, set: 'std' }] }),
+    'bag_too_small');
+  assert.equal(validateMods(['d6', 'd8'], { bag: [{ count: 4, set: 'std' }] }),
+    'bag_needs_one_die_type');
+  assert.equal(validateMods(['d20', 'd20'], { bag: [{ count: 4, set: 'std' }], adv: 'adv' }),
+    'bag_and_adv');
+});
+
+t('a bag composes with the procedures and with within-throw mods', () => {
+  // Unlike tN and push, there is nothing to invent: the draw resolves first,
+  // then the throw composes exactly as it always has. Pinning it here means
+  // the ruling cannot erode into a refusal by tidying.
+  assert.equal(validateMods(['d6', 'd6', 'd6'],
+    { bag: [{ count: 6, set: 'std' }], throws: 3 }), null);
+  assert.equal(validateMods(['d6', 'd6', 'd6'],
+    { bag: [{ count: 6, set: 'std' }], keep: { mode: 'kh', n: 2 } }), null);
+  assert.equal(ok('3d6 bag:6@std t3').canonical, '3d6 bag:6@std t3');
+});
+
+t('a half-typed bag reads as unfinished input', () => {
+  for (const s of ['3d6 ba', '3d6 bag', '3d6 bag:', '3d6 bag:6', '3d6 bag:6@sym', '3d6 bag:6@std,']) {
+    bad(s, 'incomplete');
+  }
+});
+
+t('specEquals sees a bag, and does not compare key order', () => {
+  // JSON.stringify preserves key order, so `{set, count}` and `{count, set}`
+  // — the same bag from two callers — compared unequal until specEquals
+  // normalized. The fuzzer found it; this pins it.
+  const a2 = { dice: ['d6'], mods: { bag: [{ count: 2, set: 'std' }] } };
+  const b2 = { dice: ['d6'], mods: { bag: [{ set: 'std', count: 2 }] } };
+  assert.equal(specEquals(a2, b2), true, 'key order is not a difference');
+  const c2 = { dice: ['d6'], mods: { bag: [{ count: 3, set: 'std' }] } };
+  assert.equal(specEquals(a2, c2), false, 'a different cup is a different spec');
+});
+
 console.log(process.exitCode ? `${n} tests, FAILURES above` : `all ${n} notation tests pass`);

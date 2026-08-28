@@ -21310,4 +21310,69 @@ export const scenarios = [
       assert.equal(plain.scoredChips, 0, 'and marks nothing');
     },
   },
+  {
+    name: 'bag-draw',
+    tags: ['mechanics', 'm6', 'roll', 'smoke'],
+    // MECHANICS M6 — a cup you draw from (docs/MECHANICS.md).
+    //
+    // The server half is tests/turns.test.mjs. This is the half only a browser
+    // can hold down: that the dice ON THE FELT wear the skins that were drawn.
+    // A bag adds no new payload field — it rides `sets`, which is already
+    // per-die — so the failure mode is one of the payload whitelists dropping
+    // it somewhere between the draw and the dice, and the symptom is ivory
+    // dice on a table whose record says otherwise. A payload agreeing with
+    // itself would never show that.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      const BAG = 'bag:4@symbols.fate,4@symbols.kind,4@symbols.cruel';
+
+      await a.roll(`4d6 ${BAG}`);
+      const rid = await a.rollId();
+      const st = await a.dbg(`bagState(${JSON.stringify(rid)})`);
+
+      assert.equal(st.count, 4, 'four dice were drawn onto the felt');
+      assert.ok(Array.isArray(st.record) && st.record.length === 4,
+        `the record names four drawn sets (${JSON.stringify(st.record)})`);
+      const cup = ['symbols.fate', 'symbols.kind', 'symbols.cruel'];
+      for (const id of st.record) assert.ok(cup.includes(id), `${id} came out of the cup`);
+      // THE ASSERTION THIS SCENARIO EXISTS FOR.
+      assert.deepEqual(st.felt, st.record,
+        `every die WEARS the skin it was drawn as (felt ${JSON.stringify(st.felt)} `
+        + `vs record ${JSON.stringify(st.record)})`);
+
+      // The drawn sets all carry symbol faces, so every chip reads as a drawn
+      // symbol rather than a numeral — the M3 machinery reading the PER-DIE
+      // set, not the roll-level one.
+      const chips = await a.eval(`(() => {
+        const rows = [...document.querySelectorAll('.oc-chip .oc-die')];
+        return JSON.stringify(rows.map((r) => r.querySelectorAll('svg.chip-glyph').length));
+      })()`).then(JSON.parse);
+      assert.equal(chips.length, 4, 'four dice are read out');
+      assert.ok(chips.every((n) => n === 1),
+        `each drawn die reads as its own symbol (${JSON.stringify(chips)})`);
+
+      // A DRAW IS A DRAW. Roll the same cup repeatedly; the felt must not
+      // show one fixed answer.
+      const seen = new Set([st.record.join('|')]);
+      for (let i = 0; i < 25; i++) {
+        await a.dbg('clearTable()');
+        await a.dbg('sim(30)');
+        await a.roll(`4d6 ${BAG}`);
+        const s2 = await a.dbg(`bagState(${JSON.stringify(await a.rollId())})`);
+        assert.deepEqual(s2.felt, s2.record, 'and it keeps agreeing, every time');
+        seen.add(s2.record.join('|'));
+      }
+      assert.ok(seen.size > 3,
+        `the draw actually varies (${seen.size} distinct draws in 26 rolls)`);
+
+      // A PLAIN ROLL IS UNTOUCHED: no bag, no drawn sets, ordinary dice.
+      await a.dbg('clearTable()');
+      await a.dbg('sim(30)');
+      await a.roll('4d6');
+      const plain = await a.dbg(`bagState(${JSON.stringify(await a.rollId())})`);
+      assert.equal(plain.record, null, 'a plain roll draws nothing');
+      assert.ok(plain.felt.every((v) => v === 'std'),
+        `and its dice are standard (${JSON.stringify(plain.felt)})`);
+    },
+  },
 ];

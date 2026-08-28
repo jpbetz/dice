@@ -479,6 +479,119 @@ try {
     assert.equal(seen.values, undefined, 'and no values');
   });
 
+  // ---- THE BAG (MECHANICS M6) ---------------------------------------------
+
+  const BAG = 'bag:6@symbols.fate,4@symbols.kind,3@symbols.cruel';
+
+  await t('a bag draws its dice server-side, from the cup that was declared', async () => {
+    const room = 'bag-draw';
+    const me = await joinRoom(room, 'Alice');
+    const res = await post('/api/roll', { room, playerId: me.playerId, notation: `3d6 ${BAG}` });
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+    const { sets } = res.data.roll;
+    assert.equal(sets.length, 3, 'one set per die drawn');
+    const allowed = { 'symbols.fate': 6, 'symbols.kind': 4, 'symbols.cruel': 3 };
+    const seen = {};
+    for (const id of sets) {
+      assert.ok(id in allowed, `${id} is in the cup`);
+      seen[id] = (seen[id] || 0) + 1;
+      assert.ok(seen[id] <= allowed[id], `no more ${id} drawn than the cup holds`);
+    }
+  });
+
+  await t('the draw is random — forty rolls of one cup are not one answer', async () => {
+    const room = 'bag-random';
+    const me = await joinRoom(room, 'Alice');
+    const seen = new Set();
+    for (let i = 0; i < 40; i++) {
+      const res = await post('/api/roll', { room, playerId: me.playerId, notation: `3d6 ${BAG}` });
+      seen.add(res.data.roll.sets.join('|'));
+    }
+    // A deterministic draw scores exactly 1.
+    assert.ok(seen.size > 3, `forty draws gave ${seen.size} distinct results, not one`);
+  });
+
+  await t('a client cannot choose its own draw', async () => {
+    // Goal 8 applied to the composition of the pool: values are
+    // server-authored and so is which dice came out of the cup.
+    const room = 'bag-owns';
+    const me = await joinRoom(room, 'Alice');
+    const res = await post('/api/roll', {
+      room, playerId: me.playerId,
+      dice: ['d6', 'd6', 'd6'],
+      mods: { bag: [{ count: 3, set: 'symbols.cruel' }] },
+      sets: ['symbols.kind', 'symbols.kind', 'symbols.kind'],
+    });
+    assert.equal(res.status, 400, JSON.stringify(res.data));
+    assert.equal(res.data.code, 'bag_owns_sets');
+  });
+
+  await t('an unknown set in the cup is refused at BOTH doors', async () => {
+    const room = 'bag-unknown';
+    const me = await joinRoom(room, 'Alice');
+    const viaNotation = await post('/api/roll', {
+      room, playerId: me.playerId, notation: '3d6 bag:6@symbols.nope',
+    });
+    assert.equal(viaNotation.status, 400, JSON.stringify(viaNotation.data));
+    assert.equal(viaNotation.data.code, 'unknown_set');
+    // The explicit-spec door never sees a notation string. A refusal that
+    // lives in only one of them is a suggestion.
+    const viaSpec = await post('/api/roll', {
+      room, playerId: me.playerId,
+      dice: ['d6', 'd6', 'd6'], mods: { bag: [{ count: 6, set: 'symbols.nope' }] },
+    });
+    assert.equal(viaSpec.status, 400, JSON.stringify(viaSpec.data));
+    assert.equal(viaSpec.data.code, 'unknown_set');
+  });
+
+  await t('a bag TURN never re-draws: the dice on the felt are the dice drawn', async () => {
+    // The ruling M6 is built on, pinned so it cannot erode silently. A
+    // re-throw throws dice that are already out of the cup and never reaches
+    // back into it — which is also why entry.dice and entry.sets can stay
+    // aliased rather than cloned in the projection.
+    const room = 'bag-turn';
+    const me = await joinRoom(room, 'Alice');
+    const res = await post('/api/roll', { room, playerId: me.playerId, notation: `3d6 ${BAG} t3` });
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+    const before = res.data.roll.sets.slice();
+    for (let i = 0; i < 2; i++) {
+      const again = await post('/api/rethrow', {
+        room, playerId: me.playerId, rollId: res.data.roll.rollId, keep: [0],
+      });
+      assert.equal(again.status, 200, JSON.stringify(again.data));
+      assert.deepEqual(again.data.roll.sets, before,
+        'the draw is unchanged by a re-throw');
+    }
+  });
+
+  await t('a bag without tN is not a turn', async () => {
+    const room = 'bag-not-turn';
+    const me = await joinRoom(room, 'Alice');
+    const res = await post('/api/roll', { room, playerId: me.playerId, notation: `3d6 ${BAG}` });
+    const again = await post('/api/rethrow', {
+      room, playerId: me.playerId, rollId: res.data.roll.rollId, keep: [0],
+    });
+    assert.equal(again.status, 400);
+    assert.equal(again.data.code, 'not_a_turn');
+  });
+
+  await t('a bag OFFER is drawn when it is claimed, not when it is written', async () => {
+    // The single most likely wrong placement is drawing in parseRollSpec,
+    // which would hand out a cup emptied at authoring time.
+    const room = 'bag-offer';
+    const alice = await joinRoom(room, 'Alice');
+    const bob = await joinRoom(room, 'Bob');
+    const offered = await post('/api/offer', {
+      room, playerId: alice.playerId, label: 'Draw', notation: `3d6 ${BAG}`,
+    });
+    assert.equal(offered.status, 200, JSON.stringify(offered.data));
+    const offerId = offered.data.offer.offerId;
+    assert.equal(offered.data.offer.sets, undefined, 'an offer carries no draw');
+    const claimed = await post('/api/claim', { room, playerId: bob.playerId, offerId });
+    assert.equal(claimed.status, 200, JSON.stringify(claimed.data));
+    assert.equal(claimed.data.roll.sets.length, 3, 'the claim is what draws');
+  });
+
 } finally {
   await stopServer(proc);
 }

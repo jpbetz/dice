@@ -653,6 +653,34 @@ export const THEMES = {
         faces: ['minus', 'minus', 'blank', 'blank', 'plus', 'plus'],
         geo: { bevel: 0.03 },
       },
+      // A WEIGHTED FAMILY (MECHANICS M6). Same three symbols as `fate`, dealt
+      // in different proportions — which is what makes a BAG of them mean
+      // something. A cup of dice that all share one face table is a skin
+      // lottery: statistically identical to rolling the pool straight, and a
+      // bag mechanic whose only demonstrable effect is cosmetic is a mechanism
+      // pretending to be a feature.
+      //
+      // Named for the WEIGHTING, not for a game, under the same rule the
+      // monster set follows. Three colours of cup is the shape every
+      // draw-from-a-bag dice game uses; which game you are playing is yours.
+      kind: {
+        label: 'Kind',
+        line: 'the generous cup — three plus, two blank, one minus',
+        body: '#28402f', text: '#eef7f0', accent: '#8fc4a0',
+        feel: { rough: 0.4, metal: 0 },
+        glyph: 'faces',
+        faces: ['minus', 'blank', 'blank', 'plus', 'plus', 'plus'],
+        geo: { bevel: 0.03 },
+      },
+      cruel: {
+        label: 'Cruel',
+        line: 'the mean cup — one plus, two blank, three minus',
+        body: '#3a2530', text: '#f7eef2', accent: '#c48fa6',
+        feel: { rough: 0.4, metal: 0 },
+        glyph: 'faces',
+        faces: ['minus', 'minus', 'minus', 'blank', 'blank', 'plus'],
+        geo: { bevel: 0.03 },
+      },
     },
   },
 

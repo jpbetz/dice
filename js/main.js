@@ -25,7 +25,7 @@ import { connect, forgetSeat, peekTable, prejoinSeat, LS_WHO } from './net.js';
 import { recentTables, rememberTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
-  scoringIndices, pushTally, faceScores, MAX_PUSH_THROWS } from './rollspec.js';
+  scoringIndices, pushTally, faceScores, drawBag, MAX_PUSH_THROWS } from './rollspec.js';
 import { previewOf, countingPmfs, sumForecast, sumAtLeast, sumBins, sumPeak } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealStartingRack, dealRack, dealName } from './seed.js';
@@ -6056,7 +6056,14 @@ function rollDice(types, label, opts = {}) {
     revealed: !opts.faceDown,
     rerollOfId,
     set: rollSetOf(opts) || null, // solo throws wear your set — or the pool's own (§9)
-    sets: Array.isArray(opts.sets) && opts.sets.some(Boolean) ? opts.sets.map((s) => s || null) : null,
+    // MECHANICS M6: a bag draws its own dice, and the draw REPLACES whatever
+    // per-die sets the caller had in mind — exactly as the server refuses a
+    // `sets` sent beside a bag. One key, in its original slot: a duplicate key
+    // in an object literal is legal JS that silently keeps the last one.
+    sets: spec.mods && spec.mods.bag
+      ? drawBag(spec.mods.bag, spec.dice.length, Math.random)
+      : (Array.isArray(opts.sets) && opts.sets.some(Boolean)
+        ? opts.sets.map((s2) => s2 || null) : null),
     seed: randomSeed(),
     label: label || formula(types),
     // MECHANICS M2: solo authors its own budget, exactly as executeRoll does
@@ -11330,6 +11337,22 @@ window.__diceDebug = {
     };
   },
   pickClear() { clearDiePicks(); },
+  // THE BAG (MECHANICS M6). `record` is what the roll says was drawn and
+  // `felt` is the skin each die on the table is actually WEARING — the two
+  // must agree, and a payload agreeing with itself proves nothing about what
+  // is on screen. This is the assertion that catches any payload whitelist
+  // dropping `sets` between the server and the dice.
+  bagState(rollId) {
+    const payload = liveTurns.get(rollId) || null;
+    const entry = log.find((e) => e.rollId === rollId) || null;
+    const dice = tableDice.filter((d) => d.rollId === rollId)
+      .sort((a, b) => a.dieIndex - b.dieIndex);
+    return {
+      record: (payload && payload.sets) || (entry && entry.sets) || null,
+      felt: dice.map((d) => d.variant || 'std'),
+      count: dice.length,
+    };
+  },
   // A PUSH TURN (MECHANICS M4). `bankTurn` goes through the same path the
   // player's verb will, so a scenario proves the mechanic and not a shortcut.
   bankTurn(rollId, keep) { return requestBank(rollId, keep); },
@@ -27303,6 +27326,15 @@ function requestRoll(types, label, opts = {}) {
   // means the spec passed the same validation rollDice applies.
   if (netOnline && net) {
     const wireOpts = { ...opts, set: rollSetOf(opts) };
+    // A BAG DRAWS ITS OWN DICE (MECHANICS M6), so nothing here may send a
+    // per-die list beside one. This is the ONE place that matters, and it
+    // matters most for ⟳: rerollOpts carries the previous roll's `sets`
+    // forward into every reroll, so re-rolling a bag would post the LAST
+    // DRAW alongside a fresh bag. The server refuses that (bag_owns_sets),
+    // and without this guard the visible symptom would be a reroll that
+    // 400s where nobody expects one. Dropped rather than refused here,
+    // because "roll that again" on a cup means draw again.
+    if (opts.mods && opts.mods.bag) delete wireOpts.sets;
     // secret/whisper have no explicit wire field BY DESIGN: visibility rides
     // the notation string and the server re-parses it. Paths that arrive here
     // with no string of their own (popover, reroll-last) get the canonical.

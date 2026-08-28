@@ -43,7 +43,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { composeRoll, composeThrow, validateMods, validateSpec, DIE_MAX,
-  scoringIndices, pushTally, MAX_PUSH_THROWS } from './js/rollspec.js';
+  scoringIndices, pushTally, drawBag, MAX_PUSH_THROWS } from './js/rollspec.js';
 import { parseNotation } from './js/notation.js';
 import { SET_IDS } from './js/themes.js';
 // C22: the stamp's SHAPE only. The server carries `ver` on a table setup and
@@ -2124,6 +2124,15 @@ function collectEntries(room, entries) {
 // Compose, log, and broadcast a roll for a player from a validated spec.
 // Shared by /api/roll and /api/claim so both take the exact same path.
 function executeRoll(room, player, spec) {
+  // THE DRAW HAPPENS HERE AND NOWHERE ELSE (MECHANICS M6). This is the one
+  // function /api/roll and /api/claim both go through, and it holds the
+  // crypto rng — so a bag OFFER is drawn when it is CLAIMED, which is the
+  // only sensible moment. Drawing in parseRollSpec would fire for
+  // /api/offer too and hand out a cup that was emptied when the card was
+  // written rather than when someone picked it up.
+  const drawn = spec.mods && spec.mods.bag
+    ? drawBag(spec.mods.bag, spec.dice.length, rng)
+    : null;
   const composed = composeRoll(spec.dice, spec.mods, rng);
 
   const roll = {
@@ -2205,7 +2214,13 @@ function executeRoll(room, player, spec) {
   if (spec.set) roll.set = spec.set;
   // Per-die sets (§9 mixed pools): the same cosmetic present-or-absent ride,
   // aligned to the base dice — each die keeps the skin of the pool it left.
-  if (spec.sets) roll.sets = spec.sets;
+  // A DRAW OVERRIDES A SENT `sets`, and handleRoll refuses the combination
+  // outright — this is belt and braces on a field that decides the outcome
+  // distribution. It does NOT ride roll.spec: spec is the request reroll-last
+  // replays, and a draw frozen onto it would make every future ⟳ replay the
+  // same draw forever instead of reaching into the cup again.
+  if (drawn) roll.sets = drawn;
+  else if (spec.sets) roll.sets = spec.sets;
 
   // Auto-collect (§7.7): the felt belongs to ONE roll, so everything already on
   // it goes to the shelf as part of the incoming roll's arrival beat. The
@@ -2300,6 +2315,18 @@ async function handleRoll(req, res) {
   const specErr = validateSpec(spec);
   if (specErr) return sendError(res, 400, `invalid roll: ${specErr}`, specErr);
 
+  // THE CATALOGUE, which js/notation.js cannot check: it imports nothing by
+  // design, so the grammar judges a bag entry's SHAPE and this judges whether
+  // the set exists. Same split as MAX_THROWS, and the same 400 an unknown
+  // roll-level set already gets.
+  if (spec.mods && spec.mods.bag) {
+    for (const b of spec.mods.bag) {
+      if (b.set !== 'std' && !SET_IDS.includes(b.set)) {
+        return sendError(res, 400, `unknown dice set: ${b.set}`, 'unknown_set');
+      }
+    }
+  }
+
   // Reroll provenance (rerollOfId) — read HERE and only here: offers/claims
   // are fresh rolls and their parser must never see this key. It is a CLAIM
   // ABOUT HISTORY and the server is the only party that can substantiate one.
@@ -2333,6 +2360,14 @@ async function handleRoll(req, res) {
 
   const sets = readSetsField(body.value, spec.dice.length);
   if (sets.error) return sendError(res, ...sets.error);
+  // A BAG OWNS ITS OWN DRAW (MECHANICS M6). Letting a client send `sets`
+  // beside a bag would let it choose which dice came out of the cup, which is
+  // goal 8 — values are server-authored, no client can forge a roll — applied
+  // to the composition of the pool. The roll-level `set` still rides: it is
+  // cosmetic identity and every drawn die's per-die set shadows it anyway.
+  if (sets.sets && spec.mods && spec.mods.bag) {
+    return sendError(res, 400, 'a bag draws its own dice', 'bag_owns_sets');
+  }
   if (sets.sets) spec.sets = sets.sets;
 
   const roll = executeRoll(room, player, spec);

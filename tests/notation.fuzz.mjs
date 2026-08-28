@@ -64,7 +64,7 @@ const EXP_KINDS = new Set(['check', 'cinematic']);
 // list reject them on the first run — which is the list doing its job, and
 // also the proof that nothing had ever put a procedure flag through here.
 const MOD_KEYS = new Set(['modifier', 'parts', 'adv', 'keep', 'reroll', 'explode',
-  'throws', 'push']);
+  'throws', 'push', 'bag']);
 const TYPES = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20'];
 // eslint-disable-next-line no-control-regex
 const CTL = /[\x00-\x1f\x7f]/;
@@ -485,6 +485,22 @@ function genMods(dice) {
   // They are mutually exclusive with each other and with everything above
   // that selects dice within a throw (validateMods refuses those pairs), so
   // they only generate onto a pool that has none of them.
+  // A BAG (MECHANICS M6): one die type, at least as many dice in the cup as
+  // the pool draws, no advantage. Generated before the procedure flags
+  // because it composes with all of them.
+  if (chance(0.15) && new Set(dice).size === 1 && !mods.adv) {
+    const kinds = between(1, 3);
+    const ids = ['std', 'symbols.fate', 'symbols.kind', 'symbols.cruel', 'symbols.monster'];
+    const picked = new Set();
+    while (picked.size < kinds) picked.add(pick(ids));
+    const bag = [...picked].map((set) => ({ set, count: between(1, 6) }));
+    let size = bag.reduce((n, b) => n + b.count, 0);
+    // Top the cup up rather than discard the case: a bag smaller than the
+    // pool is refused, and a generator that mostly discards tests little.
+    if (size < dice.length) { bag[0].count += dice.length - size; size = dice.length; }
+    if (size <= 40) mods.bag = bag;
+  }
+
   const plain = !mods.adv && !mods.keep && !mods.reroll && !mods.explode;
   if (plain && chance(0.2)) {
     mods.throws = between(2, MAX_THROWS);

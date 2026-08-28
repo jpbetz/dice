@@ -64,6 +64,14 @@ limitations under the License.
 //               typed (roster matching downstream is case-insensitive);
 //               duplicate names (case-insensitive) collapse with a warning.
 //               A name cannot contain '#' — the comment split runs first)
+//   bag      := "bag:" entry ("," entry)*      entry := count "@" setId
+//               (MECHANICS M6: A CUP. `3d6 bag:6@symbols.fair,4@symbols.kind`
+//               puts ten dice in the cup and draws three. The pool size says
+//               how many are DRAWN; the flag says what from. One die type per
+//               bag — the draw has to be knowable at parse time. This file
+//               checks SHAPE only: whether a set id exists is the catalogue's
+//               question and is answered where SET_IDS lives, the same split
+//               MAX_THROWS already makes.)
 //   push     := "push" (">=" int | "=" int ("," int)*)
 //               (MECHANICS M4: PUSH-YOUR-LUCK. Declares which FACES score —
 //               "push>=5" or "push=1,5". Throw, keep whichever scoring dice
@@ -90,7 +98,7 @@ limitations under the License.
 //               convenience, not grammar)
 //
 // Canonical flag order:
-//   [adv|dis] [trailing keep] [trailing reroll] [!] [tN] [push] [check|cinematic]
+//   [bag] [adv|dis] [trailing keep] [trailing reroll] [!] [tN] [push] [check|cinematic]
 //   [held|secret|w:names] [dcN] [# comment [| subtitle]]
 //
 // The term 2d20kh1 collapses to 1d20 + advantage (2d20kl1 → disadvantage)
@@ -120,6 +128,7 @@ const MAX_PARTS = 12;
 // Both are refused by validateMods on the server regardless, so a drift here
 // costs a worse error message, never a bad roll.
 const MAX_THROWS = 5;
+const MAX_BAG_KINDS = 12; // mirrors js/rollspec.js, same reason as MAX_THROWS
 
 // Moment-kind flag words (UX.md §7.6): input aliases → normalized kind.
 const KIND_WORDS = { check: 'check', cinematic: 'cinematic', cine: 'cinematic' };
@@ -176,6 +185,7 @@ function couldExtend(frag) {
     /^(a|ad|adv?|d|di|dis?)$/.test(frag) ||
     /^(d|dc|v|vs)$/.test(frag) ||
     /^(p|pu|pus|push|push>|push>=|push=)(\d{1,2}(,\d{1,2})*,?)?$/.test(frag) || // partial push
+    /^(b|ba|bag|bag:)([0-9]{0,2}(@[a-z0-9.]*)?(,[0-9]{0,2}(@[a-z0-9.]*)?)*,?)?$/.test(frag) || // partial bag
     /^[+-]$/.test(frag) ||
     /^\d{1,3}\[[^\]]{0,40}$/.test(frag)             // open label bracket
   );
@@ -482,6 +492,7 @@ export function parseNotation(input, opts = {}) {
   let flagExplode = false;
   let flagThrows = null;
   let flagPush = null;
+  let flagBag = null;
   let expKind = null;
   let dc = null;
 
@@ -538,6 +549,27 @@ export function parseNotation(input, opts = {}) {
     } else if (tok === '!') {
       if (flagExplode) return invalid('! specified twice');
       flagExplode = true;
+    } else if (tok.startsWith('bag:') || tok === 'bag') {
+      if (flagBag) return invalid('bag specified twice');
+      if (tok === 'bag') return incomplete('bag needs a cup, e.g. bag:6@std,4@symbols.fair');
+      const entries = tok.slice(4).split(',');
+      const out = [];
+      const seen = new Set();
+      for (const e of entries) {
+        const em = /^(\d{1,2})@(std|[a-z][a-z0-9]{0,23}\.[a-z][a-z0-9]{0,23})$/.exec(e);
+        if (!em) {
+          if (last && /^\d{0,2}(@[a-z0-9.]*)?$/.test(e)) return incomplete('unfinished bag entry');
+          return invalid(`bag entry must be count@set: ${e}`, 'e.g. 6@symbols.fair');
+        }
+        const count = parseInt(em[1], 10);
+        if (count < 1) return invalid('a bag entry needs at least one die');
+        // Merging a repeated set id would silently rewrite what was typed.
+        if (seen.has(em[2])) return invalid(`${em[2]} appears twice in the bag`);
+        seen.add(em[2]);
+        out.push({ count, set: em[2] });
+      }
+      if (out.length > MAX_BAG_KINDS) return invalid(`a bag holds at most ${MAX_BAG_KINDS} kinds`);
+      flagBag = out;
     } else if ((m = /^push(>=|=)(\d{1,2}(?:,\d{1,2})*)$/.exec(tok))) {
       if (flagPush) return invalid('push specified twice');
       const nums = m[2].split(',').map((x) => parseInt(x, 10));
@@ -743,6 +775,22 @@ export function parseNotation(input, opts = {}) {
     warnings.push('percentile dice never explode');
   }
 
+  if (flagBag) {
+    const size = flagBag.reduce((n, b) => n + b.count, 0);
+    if (size > MAX_DICE) return invalid(`a bag holds at most ${MAX_DICE} dice`);
+    if (size < dice.length) {
+      return invalid(`this bag holds ${size} dice and the roll draws ${dice.length}`,
+        'draw fewer, or put more in the bag');
+    }
+    if (new Set(dice).size > 1) {
+      return invalid('a bag holds one kind of die', 'the cup varies the FACES, not the solid');
+    }
+    if (flagAdv) {
+      return invalid('a bag cannot also take advantage',
+        'advantage adds a die the bag never drew');
+    }
+  }
+
   // A HELD PUSH IS A CONTRADICTION, and refusing it here is kinder than
   // letting it roll. `held` is face down for EVERYONE INCLUDING THE ROLLER
   // (UX §3.2), and push-your-luck is nothing but a series of choices about
@@ -802,6 +850,7 @@ export function parseNotation(input, opts = {}) {
   if (explode) mods.explode = true;
   if (flagThrows) mods.throws = flagThrows;
   if (flagPush) mods.push = flagPush;
+  if (flagBag) mods.bag = flagBag;
   const spec = { dice, mods: Object.keys(mods).length ? mods : null };
   // Source labels ride present-or-absent: an unlabeled pool has NO sources
   // key, so every pre-Rack payload and canonical stays byte-identical.
@@ -905,6 +954,13 @@ export function canonicalNotation(spec, extras = {}) {
   let out = diceStrs.join('+') + intStrs.join('');
 
   const flags = [];
+  // The bag leads, because the sentence reads in the order the dice travel:
+  // pool, then which of them came out of the cup, then what happens to them
+  // inside a throw, then the procedure across throws. Entries are re-emitted
+  // in the order they were written — a repeated id is an error rather than a
+  // merge, so the canonical is a fixed point without having to sort away the
+  // author's own "six green, four yellow" reading order.
+  if (m.bag) flags.push(`bag:${m.bag.map((b) => `${b.count}@${b.set}`).join(',')}`);
   if (m.adv) flags.push(m.adv);
   // glue rides as trailing flags whenever it is not glued to a single term
   // (mixed pools, the d100 pool, and the collapse-avoiding 2d20-keep-1 case)
@@ -965,6 +1021,14 @@ export function specEquals(a, b) {
       // push entirely. Found by the M6 design pass reading this file, not by
       // anything going red. Anything added to `mods` belongs on this list.
       throws: m.throws || null,
+      // NORMALIZED, not stringified as-is: JSON.stringify preserves key
+      // ORDER, so `{set, count}` and `{count, set}` — the same bag, written
+      // by two different callers — compared unequal. The fuzzer found it on
+      // the first run after it learned to generate bags. Every structured mod
+      // on this list has to be rebuilt field by field for the same reason;
+      // `keep` and `parts` get away with it only because one producer builds
+      // them.
+      bag: m.bag ? m.bag.map((b) => ({ count: b.count, set: b.set })) : null,
       push: m.push ? { min: m.push.min ?? null, faces: m.push.faces || null } : null,
     });
   };

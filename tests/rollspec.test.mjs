@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import assert from 'node:assert/strict';
-import { composeRoll, validateMods, countingBaseTypes, previewSpec } from '../js/rollspec.js';
+import { composeRoll, validateMods, countingBaseTypes, previewSpec, drawBag } from '../js/rollspec.js';
 
 let n = 0;
 const t = (name, fn) => {
@@ -118,6 +118,45 @@ t('validate parts non-array', () =>
 t('preview 1d20+3 bounds', () => {
   const p = previewSpec(['d20'], { modifier: 3 }, 3000);
   assert.ok(p.min >= 4 && p.max <= 23 && p.avg > 12 && p.avg < 15.5);
+});
+
+
+// ---- drawBag (MECHANICS M6) ------------------------------------------------
+t('a draw is WITHOUT replacement — a cup of one each yields a permutation', () => {
+  // The assertion that separates a real draw from sampling with replacement.
+  // "Every id came from the bag" passes for both; only exhausting the cup
+  // distinguishes them.
+  const bag = [{ count: 1, set: 'a' }, { count: 1, set: 'b' }, { count: 1, set: 'c' }];
+  for (let i = 0; i < 500; i++) {
+    const got = drawBag(bag, 3, Math.random);
+    assert.equal(got.length, 3);
+    assert.deepEqual([...got].sort(), ['a', 'b', 'c'],
+      `a cup of three distinct dice, drawn empty, is a permutation (${got})`);
+  }
+});
+
+t('a draw is uniform over the cup', () => {
+  // 2 of one, 1 of another: `a` should come up about twice as often. A
+  // fixed-order implementation scores 1.0 or 0.0, which is what this refuses.
+  const bag = [{ count: 2, set: 'a' }, { count: 1, set: 'b' }];
+  let a = 0;
+  const N = 6000;
+  for (let i = 0; i < N; i++) if (drawBag(bag, 1, Math.random)[0] === 'a') a++;
+  const share = a / N;
+  assert.ok(share > 0.6 && share < 0.73,
+    `a is drawn about two thirds of the time (${share.toFixed(3)})`);
+});
+
+t('a draw is a pure function of rng', () => {
+  const bag = [{ count: 3, set: 'a' }, { count: 3, set: 'b' }];
+  const seq = () => { let i = 0; const xs = [0.9, 0.1, 0.5, 0.3]; return () => xs[i++ % xs.length]; };
+  assert.deepEqual(drawBag(bag, 4, seq()), drawBag(bag, 4, seq()),
+    'same rng, same draw — no Math.random hiding inside');
+});
+
+t('a draw never returns more than the cup holds', () => {
+  assert.equal(drawBag([{ count: 2, set: 'a' }], 5, Math.random).length, 2,
+    'validateMods refuses this spec, but the function still may not invent dice');
 });
 
 console.log(process.exitCode ? `${n} tests, FAILURES above` : `all ${n} rollspec tests pass`);
