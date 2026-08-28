@@ -21206,4 +21206,242 @@ export const scenarios = [
       assert.match(stuck.title, /unpick/i, 'and says how to get out of it');
     },
   },
+  {
+    name: 'turn-keep-keyboard',
+    tags: ['mechanics', 'm2c', 'input', 'a11y', 'smoke'],
+    // MECHANICS M2c — the keyboard path to the dice (docs/MECHANICS.md).
+    //
+    // M2b's gesture was pointer-only, which left GOALS' *Always interruptible*
+    // ("keyboard paths exist for the common actions") owing a binding for the
+    // one action a turn is made of. This walks it with REAL key events —
+    // KeyboardEvent dispatched at document.body, the way the browser delivers
+    // one when nothing is focused — rather than by calling the mover, because
+    // half of what can go wrong here is about which handler gets the key.
+    //
+    // THE TWO CLAIMS COUNTING CANNOT MAKE, and both are asserted through
+    // `pickFocusProbe`:
+    //
+    //   * that the arrows are BORROWED, not taken. Outside an open turn this
+    //     handler must leave the event untouched for the radiogroup walker and
+    //     for whatever the browser wanted to do with it, so the scenario reads
+    //     `defaultPrevented` on both sides of the arming line — a marker count
+    //     is identical either way.
+    //   * that a FOCUSED die and a KEPT die are told apart. One die wearing
+    //     both markers, with the two markers' ink and world radius reported
+    //     side by side: recolouring the cursor gold or shrinking it onto the
+    //     ring turns this red while every count stays green.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      // A real key event, and the answer is whether anything CONSUMED it.
+      // document.body is the honest target: it is what `document.activeElement`
+      // falls back to, which is where a player's keystrokes land while they are
+      // looking at the felt.
+      const press = (k) => a.eval(`(() => {
+        const ev = new KeyboardEvent('keydown',
+          { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true });
+        document.body.dispatchEvent(ev);
+        return ev.defaultPrevented;
+      })()`);
+      const focus = () => a.dbg('pickFocusProbe()');
+      const hint = () => a.dbg('pickHint()');
+      const verb = () => a.eval(`(() => {
+        const b = document.querySelector('.throw-again');
+        return b && !b.hidden ? b.textContent.trim() : null;
+      })()`);
+
+      // ① NO TURN, NOT OUR KEYS. A plain roll leaves six perfectly visible
+      // dice that mean nothing to keep, so the whole path stays dark — and
+      // "dark" has to include leaving the EVENT alone, or every arrow press
+      // anywhere in the app has been quietly stolen by a feature that is not
+      // even armed.
+      await a.roll('4d6');
+      const asleep = await hint();
+      assert.equal(asleep.mounted, false,
+        'with no turn the hint element has never been created — no standing chrome');
+      assert.equal(await press('ArrowRight'), false,
+        'and an arrow press is left for whoever else wants it');
+      assert.equal(await press('k'), false, "…as is 'k'");
+      const dark = await focus();
+      assert.equal(dark.key, null, 'nothing is focused');
+      assert.equal(dark.drawn, 0, 'and nothing is drawn');
+      assert.equal((await picked(a)).dice.length, 0, 'and nothing is kept');
+
+      // ② A TURN ARMS THEM, AND SAYS SO. The binding has to be findable
+      // without reading source, and it rides the turn rather than a standing
+      // cheatsheet because it works nowhere else.
+      await a.dbg('clearTable()');
+      await a.dbg('sim(60)');
+      await a.roll('6d6 t3');
+      const rid = await a.rollId();
+      const one = await a.dbg(`turnState(${JSON.stringify(rid)})`);
+      const said = await hint();
+      assert.equal(said.shown, true, 'the hint appears with the turn');
+      assert.match(said.text, /\bK\b/, `and names the keep key (${said.text})`);
+      assert.match(said.text, /[←→]/, `and the keys that move between dice (${said.text})`);
+
+      // ③ THE FIRST PRESS SHOWS; IT DOES NOT ACT. GOALS' *the procedure never
+      // plays for you*, at the scale of one keystroke: with no cursor yet there
+      // is no die the player has been shown, so the press puts one under the
+      // cursor and stops.
+      assert.equal(await press('k'), true, "'k' is consumed while a turn is open");
+      await a.dbg('sim(2)');
+      const shown = await focus();
+      assert.equal(shown.dieIndex, 0, 'the first press lands the cursor on the first die');
+      assert.ok(shown.drawn > 0,
+        `and the cursor is actually drawn (${JSON.stringify(shown)})`);
+      assert.equal((await picked(a)).dice.length, 0,
+        'while keeping nothing — nothing acts on a die you have not been shown');
+
+      // ④ THE SECOND PRESS KEEPS IT, through the same toggle a click uses.
+      await press('k');
+      await a.dbg('sim(2)');
+      const kept = await picked(a);
+      assert.equal(kept.dice.length, 1, `one die kept (${JSON.stringify(kept.dice)})`);
+      assert.equal(kept.dice[0].dieIndex, 0, 'the one under the cursor');
+      assert.equal(kept.marks, 1, 'and the kept ring draws for it');
+
+      // ⑤ FOCUSED AND KEPT ARE TOLD APART, on the one die wearing both. This
+      // is the assertion the marker count cannot make.
+      const both = await focus();
+      assert.equal(both.kept, true, 'the cursor is standing on the die it just kept');
+      assert.ok(both.color && both.keptColor && both.radius && both.keptRadius,
+        `both markers report themselves (${JSON.stringify(both)})`);
+      assert.notEqual(both.color, both.keptColor,
+        `the cursor is not the kept ink (${both.color} vs ${both.keptColor})`);
+      assert.ok(both.radius > both.keptRadius + 0.05,
+        `and stands outside the kept ring rather than on it `
+        + `(${both.radius} vs ${both.keptRadius})`);
+      assert.equal(both.renderOrder, both.ringRenderOrder,
+        'while inheriting the kept marker\'s painting rank — the fog argument is one argument');
+
+      // ⑥ AND A THIRD PRESS RELEASES IT. Keeping is a toggle from either input.
+      await press('k');
+      await a.dbg('sim(2)');
+      assert.equal((await picked(a)).dice.length, 0, 'pressing it again releases the die');
+
+      // ⑦ THE ORDER IS THE DIE INDEX — the order the chips and the log line
+      // already read, and the reason a screen-position order was refused: it
+      // would rename "the third die" under the camera peek.
+      assert.deepEqual((await focus()).order, [0, 1, 2, 3, 4, 5],
+        'the cursor walks the dice in index order');
+      await press('ArrowRight');
+      await press('ArrowRight');
+      assert.equal((await focus()).dieIndex, 2, 'two steps right from die 0 is die 2');
+      await press('ArrowLeft');
+      assert.equal((await focus()).dieIndex, 1, 'and one step back is die 1');
+
+      // ⑧ IT WRAPS, both ways, so no die is unreachable from where you are.
+      await press('ArrowLeft');
+      await press('ArrowLeft');
+      assert.equal((await focus()).dieIndex, 5,
+        'stepping left off the front wraps round to the last die');
+      await press('ArrowRight');
+      assert.equal((await focus()).dieIndex, 0, 'and right off the back comes home');
+
+      // ⑨ A TURN PLAYED WITH THE KEYS ONLY. Keep dice 1 and 3 by cursor, and
+      // the verb must count what the KEYBOARD chose — the selection is one
+      // state and it does not matter which input wrote it.
+      await press('ArrowRight');                 // 0 -> 1
+      await press('k');
+      await press('ArrowRight');
+      await press('ArrowRight');                 // 1 -> 3
+      await press('k');
+      // …and then the cursor is PARKED ON A DIE THAT IS ABOUT TO BE THROWN,
+      // which is the only state that can test the footing of a re-thrown die.
+      // Moving the cursor after the throw re-measures on the way in, so a
+      // scenario that walked to the die would pass with the measurement
+      // deleted — this exact leg was written that way first, and the sabotage
+      // run stayed green.
+      await press('ArrowRight');                 // 3 -> 4, unkept
+      await a.dbg('sim(2)');
+      const two = await picked(a);
+      assert.deepEqual(two.dice.map((d) => d.dieIndex).sort((x, y) => x - y), [1, 3],
+        `the keyboard kept dice 1 and 3 (${JSON.stringify(two.dice)})`);
+      assert.equal(two.marks, 2, 'and both are marked on the felt');
+      assert.match(await verb(), /\b4\b/,
+        'the verb counts the four it would throw, not the six on the table');
+
+      await a.eval(`document.querySelector('.throw-again').click()`);
+      await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        { desc: 'the throw plays out', timeout: 30000 });
+      await a.dbg('sim(240)');
+      const after = await a.dbg(`turnState(${JSON.stringify(rid)})`);
+      assert.deepEqual(after.throws, { max: 3, used: 2 }, 'a throw was spent');
+      for (const k of [1, 3]) {
+        assert.equal(after.values[k], one.values[k],
+          `die ${k} was kept from the keyboard, so it kept its face`);
+        assert.deepEqual(after.positions[k], one.positions[k], `…and did not move`);
+      }
+      // THE SELECTION GOES; THE CURSOR STAYS, and the difference is what each
+      // one IS. A pick is a decision about a throw that is now over, so
+      // carrying it forward would keep dice nobody has looked at. A cursor is
+      // a place to stand, and taking it away would make every throw cost the
+      // player their position on the felt for nothing.
+      assert.equal((await picked(a)).dice.length, 0, 'the picks are dropped after the throw');
+      const rethrown = await focus();
+      assert.equal(rethrown.dieIndex, 4, 'the cursor is still on the die it was left on');
+      assert.ok(rethrown.drawn > 0, 'and still drawn');
+
+      // …AND IT STANDS ON THE GROUND UNDER A DIE THAT WAS THROWN, without
+      // having been moved. This is the leg the whole probe exists for: a
+      // re-throw replaces the thrown dice with NEW objects while the cursor's
+      // key (rollId:dieIndex) survives, so a cursor that trusted a cached
+      // footing comes back drawing at the die's CENTRE — floating half a unit
+      // up inside it, with nothing above it to be buried by, no count wrong,
+      // and `pickRingProbe`'s downward ray reporting it perfectly clear.
+      assert.equal(rethrown.footed, true, 'its footing was measured where it stands');
+      assert.ok(rethrown.y < rethrown.anchorY,
+        `and the marker is under the die, not inside it `
+        + `(marker y ${rethrown.y}, die centre ${rethrown.anchorY})`);
+      // Sized off THIS die's own footprint, checked as the RATIO the two
+      // markers must always stand in. An absolute radius cannot be compared
+      // between two dice: the footprint is a world-axis box, so a d6 resting
+      // at 30° of yaw measures wider than one resting square (1.58 against
+      // 1.64 here, and up to 41% apart in principle). The ratio is exact
+      // whatever the yaw, because both markers scale the same measurement —
+      // and it is null-vs-number, not a near miss, if the footing is missing.
+      assert.ok(rethrown.keptRadius
+        && Math.abs(rethrown.radius / rethrown.keptRadius - 1.9 / 1.35) < 0.01,
+      `sized off its own footprint, not a fallback `
+      + `(cursor ${rethrown.radius}, kept ring ${rethrown.keptRadius})`);
+
+      // ⑩ THE MARKER IS NOT UNDER THE FLOOR — asserted in a FAE VENUE with a
+      // die that is FOCUSED and NOT kept, which is the case a loop over the
+      // selection cannot see. The glade's ground is an opaque disc at y 0.02
+      // and dice settle with their undersides at ~0.001, so a cursor that took
+      // its height from the die instead of from the surface is buried while
+      // every count reads green. That is W3 round 9 and M1's second bug; this
+      // is the third marker and it is measured, not assumed.
+      await a.dbg('clearTable()');
+      await a.dbg('sim(60)');
+      await a.dbg("setVenue('moonrise')");
+      await a.dbg('sim(120)');
+      await a.roll('6d6 t3');
+      await press('ArrowRight');
+      await a.dbg('sim(2)');
+      const glade = await focus();
+      assert.ok(glade.drawn > 0, 'the cursor is drawn in the glade');
+      assert.equal((await picked(a)).dice.length, 0,
+        'on a die nobody has kept — the case the selection loop cannot reach');
+      const probe = await a.dbg('pickRingProbe()');
+      assert.deepEqual(probe.over, [],
+        `nothing that paints over the felt outranks the markers `
+        + `(${JSON.stringify(probe.over)})`);
+      assert.deepEqual(probe.buried, [],
+        `and the cursor stands on the surface, not under it (${JSON.stringify(probe.buried)})`);
+      await a.dbg("setVenue('table')");
+      await a.dbg('sim(120)');
+
+      // ⑪ IT ALL GOES AWAY WITH THE TURN. Sweep the felt: the hint hides, the
+      // cursor goes dark, and the arrows go back to belonging to nobody.
+      await a.dbg('clearTable()');
+      await a.dbg('sim(60)');
+      const gone = await hint();
+      assert.equal(gone.shown, false, 'the hint retires with the turn');
+      assert.equal((await focus()).drawn, 0, 'the cursor stops drawing');
+      assert.equal(await press('ArrowRight'), false,
+        'and the arrows are handed back');
+      assert.equal(await press('k'), false, "as is 'k'");
+    },
+  },
 ];

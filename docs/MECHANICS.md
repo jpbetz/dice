@@ -24,9 +24,11 @@ belongs to the turn) and Q3 is still open, blocking nothing. What was settled:
 - **Scope: M1 through M3, and M4 waits.** Build the substrate, the turn and
   symbol faces. Decide whether the app should detect a bust and keep a tally
   once there is a turn on the felt to play with. **All three shipped
-  2026-08-28**, and they turned up one more item that was not on the list:
-  M2b, the player-facing gesture — M2 works from the API and the debug seam,
-  and M1's pick path is still dark, so nothing yet joins them up.
+  2026-08-28**, and they turned up two more items that were not on the list:
+  M2b, the player-facing gesture (M2 worked from the API and the debug seam
+  while M1's pick path stayed dark, so nothing joined them up), and then M2c,
+  the keyboard path M2b's own record says it still owed. Both shipped the same
+  day.
 - **Sequencing: mechanics before T15.** The three classic skins wait.
 - **Goal 16 is adopted** — the coverage table now lives in
   [GOALS.md](GOALS.md) and this file cites it rather than holding a copy.
@@ -227,6 +229,7 @@ to be answered.
 | ~~**M1**~~ | ~~**Touch a die.**~~ **SHIPPED 2026-08-28** — see "M1, and the two bugs only a screenshot could find" below. | med | no | everything below; also V5's felt echo and §7.1 physical pool building, both stalled on exactly this |
 | ~~**M2**~~ | ~~**The throw becomes a turn.**~~ **SHIPPED 2026-08-28**, minus the player gesture — see the record below. | large | no | Yahtzee, King of Tokyo, Farkle, Can't Stop, Pig — with the human judging the bust |
 | ~~**M2b**~~ | ~~**Pick becomes keep.**~~ **SHIPPED 2026-08-28** — a turn is playable by a person; see the record below. | small–med | no | any of Track C being usable without the API |
+| ~~**M2c**~~ | ~~**The keyboard path to the dice.**~~ **SHIPPED 2026-08-28** — `← →` and `k`, with a cursor; see the record below. | small | no | the *Always interruptible* debt M1 deferred and M2b named |
 | ~~**M3**~~ | ~~**Faces that are not numbers.**~~ **SHIPPED 2026-08-28** — `symbols.monster` and `symbols.fate`; see "M3, and the game we are not naming" below. | med | no | King of Tokyo's actual dice, Fudge, and ROADMAP §8's first half |
 | **M4** | **Procedures as a registry.** `PROCEDURES` beside `SYSTEMS`: throws, keep rule, bust rule, tally, bank verb. Farkle and Zombie Dice become assisted rather than merely possible. | med–large | **yes — this is the goal 6 decision** | automatic bust, running tally, the bank verb |
 | **M5** | **The decision as a beat.** Ceremony at the choice point: the tally at stake, the live bust odds, the moment. `js/odds.js` already forecasts; UX §2.1's `showOdds` exists and is deliberately unbuilt, and push-your-luck is the case that makes odds obviously worth showing rather than a crutch. | med | no (rides ⑤) | the reason to use this instead of physical dice |
@@ -403,12 +406,86 @@ walks the same `mountedActionHolders` registry `repaintAwayVerbs` uses, and
 one function decides what the verb says — so the mount, the repaint and a
 selection change cannot drift.
 
-**Still owed: the keyboard path.** M1 deliberately did not invent a binding
-for an action that did nothing; the action exists now, so the binding is real
-work with a real name to choose. `toggleDiePick` is input-agnostic and the
-verb is a real `<button>` that already takes Enter, so what is missing is a
-way to reach the DICE without a pointer. That is the next small thing, and it
-is an *Always interruptible* obligation, not a nice-to-have.
+~~**Still owed: the keyboard path.**~~ **SHIPPED as M2c** — see the record
+below. M1 deliberately did not invent a binding for an action that did
+nothing; the action existed, so the binding was real work with a real name to
+choose. `toggleDiePick` was already input-agnostic and the verb is a real
+`<button>` that already takes Enter, so what was missing was a way to reach
+the DICE without a pointer. It is an *Always interruptible* obligation, not a
+nice-to-have.
+
+## M2c, the keyboard path to the dice — SHIPPED 2026-08-28
+
+**Two keys and a cursor.** `←` `→` move between the turn's dice, `k` keeps or
+releases the one you are on. A quiet line at the top of the felt says so while
+the turn is open. `↑` `↓` are accepted as synonyms for `←` `→` — one row of
+dice, and nobody should have to guess which axis it is.
+
+**The keys are BORROWED, and that is what made claiming the arrows safe.**
+They are inert unless `pickableDice()` is non-empty — the same one place the
+pointer gesture asks, so the arming rule still lives in exactly one function.
+Outside an open turn of yours the handler returns before it touches the event,
+so the radiogroup's roving-focus walker and a panel scrolled with the keyboard
+are untouched; inside one, the cursor on screen is the explanation for where
+the arrows went. That the event is left alone is ASSERTED
+(`ev.defaultPrevented` on both sides of the arming line), because a marker
+count reads identical either way.
+
+**The keydown audit, because "do not fight existing bindings" needs evidence.**
+The table shortcuts are `/ ? r c m n b g l i s`, `Enter`, `Esc`, `Space` and
+`1`–`9`, plus `Ctrl/Cmd+K`; **`k` was free**, and a modifier returns above the
+gesture so the palette keeps its chord. Every other keydown listener in the
+file is element-scoped, and the ones that own arrows of their own — the rail
+menu, the dice-set menu, the ± popover's fields — already `stopPropagation`,
+which is this file's existing rule for "no table shortcuts underneath". The
+one document-level arrow consumer that does not is the radiogroup walker, so
+a `[role="radio"]` target is skipped explicitly.
+
+**A FOCUSED die and a KEPT die differ on three axes at once**, because a die
+can be both and one axis is not enough at the size a die occupies on screen.
+Shape: the kept marker is a closed ring, the cursor is two opposed arcs. Size:
+1.9 of the die's footprint against the ring's 1.35, so a die wearing both reads
+as a ring inside a bracket. Hue: cool white against gold — which is the house
+rule rather than a taste (HUE = ACT; a pick is ivory or steel and never gold,
+and gold here means kept). The e2e reports both markers' ink and world radius
+side by side, so recolouring the cursor gold or shrinking it onto the ring
+turns a test red where a count of drawn instances would stay green.
+
+**Nothing acts blind.** With no cursor yet, `k` shows you the die it would act
+on and stops; the second press keeps it. That is *the procedure never plays for
+you* at the scale of one keystroke.
+
+**The selection goes with the throw; the cursor stays.** A pick described a
+throw that is over. A cursor is a place to stand, and taking it away would cost
+the player their position on the felt for nothing.
+
+**And that turned up the one real bug in the slice.** A cursor's key is
+`rollId:dieIndex`, which is exactly what a re-throw preserves — so a cursor
+resting on a die that then gets THROWN comes back pointing at a brand-new die
+object (`playRoll` swaps the thrown dice and keeps the rest). The footing was
+cached by `toggleDiePick`, so the new object had none, and the marker fell back
+to the die's CENTRE height: floating half a unit up inside the die, where
+nothing is buried, no count is wrong, and `pickRingProbe`'s downward ray sees
+nothing above it. The fix is a lazy measure in the cursor's own step; the
+assertion is that the marker's `y` is BELOW the die's centre, which is the only
+form the claim can take that a probe looking down cannot answer.
+
+**Where the hint went, and the two homes that were refused.** The `Throw N
+again` button's `title` only reaches a pointer already hovering it. The
+cheatsheet is a standing list of shortcuts that work everywhere, which these
+two deliberately do not. So the hint rides the TURN on the same arming rule as
+the dice: with no turn open the element is not merely hidden, it has never been
+created, and `pickHint().mounted` is the assertion that says so.
+
+**What a screen reader gets** is `announce()` on every cursor move and every
+keep — "die 3 of 6", "kept — die 3 of 6" — and the hint is `aria-hidden`, since
+a decorative line re-read on every table update would be noise over the top of
+it. **The announcement deliberately does not name the FACE.** A symbol die's
+face is a drawn shape (M3) and the number under it is meaningless — "showing 5"
+for a claw is *results readable* broken in the confusing direction — and saying
+it properly needs the symbol-aware wording the chips already own. One copy of
+that wording is the whole reason M3 keeps its shapes in a single place, so this
+is left as a known gap rather than a second copy.
 
 ## M3, and the game we are not naming — SHIPPED 2026-08-28
 
