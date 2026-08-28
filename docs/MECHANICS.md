@@ -252,6 +252,7 @@ to be answered.
 | ~~**M4**~~ | ~~**Procedures as a registry.**~~ **SHIPPED 2026-08-28 — and NOT as a registry;** see the record below. Was: `PROCEDURES` beside `SYSTEMS`: throws, keep rule, bust rule, tally, bank verb. | med–large | **yes — this is the goal 6 decision** | automatic bust, running tally, the bank verb |
 | ~~**M5**~~ | ~~**The decision as a beat.**~~ **SHIPPED 2026-08-28** — the readout forecasts in the shape the table READS, and refuses in writing where it cannot. See the record below. | med | no (rides ⑤) | the reason to use this instead of physical dice |
 | ~~**M6**~~ | ~~**The bag.**~~ **SHIPPED 2026-08-28** — a cup you draw from; see the record below. | small–med | no | the honest primitive behind any "draw 3 of these" |
+| **M7** | **Dice drafting** — roll a shared pool, take turns taking from it (Sagrada, Dice Forge). Queued 2026-08-28. The first mechanic that BREAKS an assumption rather than adding to one: every roll here belongs to one player. | large, design-first | probably — goal 10 has always steered around turn order | the last multi-player-dice family |
 
 **M1 first, and it is worth doing even if Joe stops the campaign there** — it
 is the substrate for M2, and it independently unblocks two design-first items
@@ -767,6 +768,64 @@ worse. The consequence is for TESTS: `document.querySelector` finds the verdict
 card first, so any DOM read of these surfaces must be scoped to the roll it
 means. `turnOdds()` reports each card's `rollId` for exactly that reason, and
 the scenario's ⑧ pins it.
+
+
+## The reading layer, and the four copies — 2026-08-28
+
+Joe, after trying to play with what Track C shipped: *"why didn't we
+introduce a rolling system"*. He was right, and the answer is that the
+campaign covered two of goal 6's layers and forgot the first one.
+
+M3 gave a d6 faces that are not numbers. M2 gave it a turn. Between them a
+monster-brawl dice game became playable — and the TABLE still read a claw as
+"5 — Success", because nothing had been taught what the face means. M3's own
+record deferred that with *"the real answer is M4"*, and M4 turned out to be
+push-your-luck declared in notation, not a reading layer at all. **A deferral
+that pointed at something which then changed shape underneath it, and nothing
+re-checked the pointer.** The visible symptom was the workaround in the
+answer I gave him: "set the system to Numbers only", which is not a setting,
+it is an apology.
+
+**`monster` is now a rolling system**, `aggregate: 'per-die'`,
+`usesTotal: false`, mapping 4/5/6 to Energy/Claw/Heart. The number faces stay
+QUIET on purpose — a number needs no interpretation, and "3 — Three" beside a
+die showing 3 is the app talking to hear itself.
+
+**One tier for all three faces, and that is a decision.** Every tier in this
+app is a DEGREE of success or failure, painted in that hue family. A claw is
+neither; it is a kind. Painting it in the failure hue would say something
+false, and a hue each would make three neutral facts read as three verdicts.
+The word carries the meaning and M3's drawn glyph carries the recognition, so
+the colour has nothing left to do.
+
+**It is a lens, not a skin.** Picking this system reads every d6 this way
+whether or not the dice wear the monster faces — the same rule Soul Deal
+follows. The set makes them look right, the system makes them read right,
+`t3` makes them behave right: three independent choices that happen to pair.
+
+### What a second per-die system actually cost
+
+**The id list lived in FOUR places** — `js/meanings.js`, `server.js:299`,
+`js/portable.js:183`, `js/profiles.js:117` — and CUJS.md's ruling that adding
+a system is "addable by a developer, in a commit" was only ever true of the
+first. Adding `monster` to meanings.js put it in the picker, made the client
+report the change applied, and had the **server silently refuse it**: the
+table went on reading Soul Deal words and nothing threw.
+
+`js/profiles.js` had a drift guard and it caught its own copy on the next test
+run — which is the guard working, and simultaneously the proof that the other
+two copies had none. The mirrors' stated reason ("meanings.js drags the chart
+in behind it") was never true: meanings.js imports nothing, deliberately, so
+that its forecast maths can be injected. All four now read one list, and the
+guard is an IDENTITY check — equality could not tell an import from a fresh
+copy that happens to match today.
+
+**`collapseBars` spoke one system's vocabulary as its own knowledge**,
+iterating Soul Deal's ladder and tier map, so any word a second per-die
+profile produced was silently dropped and the collapsed forecast came back
+empty. The ladder and tiers are parameters now. That is the real price of a
+second per-die system, and it had been sitting there uncollected since the
+first one.
 
 ## The questions, and the answers — 2026-08-27
 

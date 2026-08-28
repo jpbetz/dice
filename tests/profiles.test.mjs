@@ -49,7 +49,7 @@ import {
   addProfile, renameProfile, deleteProfile, setActive, writeActivePools,
   setActiveSystem, setProfileSet, migrateLegacy, rebuildStore, toWire, fromWire,
 } from '../js/profiles.js';
-import { SYSTEMS, DEFAULT_SYSTEM } from '../js/meanings.js';
+import { SYSTEMS, DEFAULT_SYSTEM, SYSTEM_IDS as MEANINGS_SYSTEM_IDS } from '../js/meanings.js';
 
 let n = 0;
 const t = (name, fn) => {
@@ -80,9 +80,19 @@ function threeSystems() {
 
 // ---- the mirror -------------------------------------------------------------
 
-t('the mirrored system list is exactly meanings.js SYSTEMS', () => {
-  assert.deepEqual(SYSTEM_IDS, Object.keys(SYSTEMS),
-    'js/profiles.js mirrors the system ids by hand — this is the drift guard');
+t('the system list has ONE owner — identity, not equality', () => {
+  // This guard used to compare CONTENTS, because the list was copied by hand
+  // here. It caught its own copy the day a fourth system was added — and by
+  // catching it, showed that the copies in server.js and js/portable.js had
+  // no guard at all and had already gone stale.
+  //
+  // Now the list is imported, so the check is IDENTITY: the same array object,
+  // which equality could never tell apart from a fresh copy that happens to
+  // match today. Re-introducing a literal here turns this red immediately
+  // rather than on the next system.
+  assert.strictEqual(SYSTEM_IDS, MEANINGS_SYSTEM_IDS,
+    'js/profiles.js must re-export meanings.js SYSTEM_IDS, never re-state it');
+  assert.deepEqual(SYSTEM_IDS, Object.keys(SYSTEMS), '…and it is the profile registry');
   assert.equal(DEFAULT_SYSTEM_ID, DEFAULT_SYSTEM);
 });
 

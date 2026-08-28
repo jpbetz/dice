@@ -45,12 +45,24 @@ limitations under the License.
 // pointing that one writer at the store costs one line and buys a model with
 // no second copy to fall out of step.
 //
-// SYSTEMS ARE MIRRORED, NOT IMPORTED. Same reason js/portable.js mirrors
-// them: this file must keep running under plain Node for the unit suite, and
-// js/meanings.js drags the chart, the tiers and the forecast in behind it.
-// The list is three ids long and it changes about once a year; the unit suite
-// pins the mirror against meanings.js so a drift is a test failure, not a
-// discovery.
+// SYSTEMS ARE IMPORTED, NOT MIRRORED — corrected 2026-08-28, and the old
+// reasoning is kept here because it was wrong in an instructive way.
+//
+// It said the mirror existed because "this file must keep running under plain
+// Node for the unit suite, and js/meanings.js drags the chart, the tiers and
+// the forecast in behind it". Behind it there is NOTHING: meanings.js imports
+// no modules at all — the odds maths is injected into forecastFor precisely
+// so it stays free-standing — and tests/meanings.test.mjs has been importing
+// it under plain Node the whole time. The cost was module size, never
+// compatibility, and the same was true of the copies in server.js and
+// js/portable.js.
+//
+// What the copies actually cost was found the day a FOURTH system was added:
+// `monster` appeared in the picker, the client reported the change applied,
+// and the server refused it silently, so the table went on reading the old
+// system's words. This file's drift guard caught its own copy on the next
+// test run — which is the guard doing exactly its job, and also the proof
+// that the other two had no guard at all.
 //
 // A PROFILE NAME IS A DISPLAY NAME, so `#` is banned here as it is at every
 // other name door (GOALS notation-totality; server.js cleanName). Picking a
@@ -69,6 +81,8 @@ limitations under the License.
 // reads the same under every lens — so the profile survives.
 
 import { cutText } from './notation.js';
+import { SYSTEM_IDS as MEANINGS_SYSTEM_IDS,
+  DEFAULT_SYSTEM as MEANINGS_DEFAULT_SYSTEM } from './meanings.js'; // imports nothing itself
 import { STAMP as SCHEMA_STAMP, judgeStamp } from './schema.js';
 
 export const STORE_KEY = 'dice.profiles.v1';
@@ -113,9 +127,10 @@ export const MAX_PROFILES = 32;
 export const MAX_POOLS = 40;
 export const MAX_NAME = 24;
 
-// Mirrored from js/meanings.js SYSTEMS + DEFAULT_SYSTEM (see the header).
-export const SYSTEM_IDS = ['soul-deal', 'dnd', 'none'];
-export const DEFAULT_SYSTEM_ID = 'soul-deal';
+// Re-exported from js/meanings.js, which owns them (see the header). Kept as
+// this module's own names so every caller's import is unchanged.
+export const SYSTEM_IDS = MEANINGS_SYSTEM_IDS;
+export const DEFAULT_SYSTEM_ID = MEANINGS_DEFAULT_SYSTEM;
 
 export const knownSystem = (id) => (SYSTEM_IDS.includes(id) ? id : null);
 

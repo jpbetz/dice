@@ -21,7 +21,7 @@ limitations under the License.
 // gate wholesale.
 
 import assert from 'node:assert/strict';
-import { outcomeForDie, SYSTEMS, OUTCOME_LADDER } from '../js/meanings.js';
+import { outcomeForDie, SYSTEMS, OUTCOME_LADDER, OUTCOME_SLUGS } from '../js/meanings.js';
 import { countingPmfs, sumForecast } from '../js/odds.js';
 import { composeRoll } from '../js/rollspec.js';
 
@@ -417,6 +417,99 @@ t('end to end: forecast segments match outcomesFor word frequencies (seeded MC)'
       const sigma = Math.sqrt(s.p * (1 - s.p) / outcomes);
       assert.ok(Math.abs(observed - s.p) < 5 * sigma + 1e-12,
         `${dice} ${JSON.stringify(mods)} ${s.word}: observed ${observed.toFixed(4)} vs ${s.p.toFixed(4)}`);
+    }
+  }
+});
+
+// ---- Monster dice, the second per-die system ------------------------------
+const MON = SYSTEMS.monster;
+const monEntry = (vals, counts = null) => ({
+  parts: vals.map((v, i) => ({
+    type: 'd6', value: v, counts: counts ? counts[i] : true,
+    reason: counts && !counts[i] ? 'drop' : null,
+  })),
+});
+
+t('it reads the three symbol faces and leaves the numbers quiet', () => {
+  const out = MON.outcomesFor(monEntry([1, 2, 3, 4, 5, 6]));
+  assert.deepEqual(out.map((o) => o.word), [null, null, null, 'Energy', 'Claw', 'Heart']);
+  // A number needs no interpretation, and "3 — Three" beside a die showing 3
+  // is the app talking to hear itself. Quiet is the claim, so it is pinned.
+  assert.deepEqual(out.slice(0, 3).map((o) => o.tier), [null, null, null]);
+  assert.deepEqual(out.slice(3).map((o) => o.tier), ['kind', 'kind', 'kind']);
+});
+
+t('every die the player threw gets a row, struck ones included and wordless', () => {
+  const out = MON.outcomesFor(monEntry([6, 5], [true, false]));
+  assert.equal(out.length, 2, 'a dropped die is a ROW, never a missing one');
+  assert.equal(out[1].struck, 'drop');
+  assert.equal(out[1].word, null, 'and a die that was set aside never spoke');
+});
+
+t('a die with no monster face reads quiet rather than being forced onto one', () => {
+  const out = MON.outcomesFor({ parts: [{ type: 'd20', value: 5, counts: true }] });
+  assert.equal(out[0].word, null, 'a d20 has no claw');
+});
+
+t('nothing on these dice is a crit', () => {
+  assert.equal(MON.critFor(monEntry([6, 6, 6])), null);
+  assert.equal(MON.usesTotal, false, 'and the faces do not sum');
+  assert.equal(MON.aggregate, 'per-die');
+});
+
+t('the forecast is exact, and a quiet half is half', () => {
+  const fc = MON.forecastFor({ dice: ['d6'] }, { countingPmfs, sumForecast });
+  assert.equal(fc.kind, 'per-die');
+  const seg = new Map(fc.bars[0].segments.map((x) => [x.word, x.p]));
+  for (const w of ['Energy', 'Claw', 'Heart']) {
+    assert.ok(Math.abs(seg.get(w) - 1 / 6) < 1e-9, `${w} is one face in six`);
+  }
+  assert.ok(Math.abs(seg.get(null) - 0.5) < 1e-9, 'the three number faces are half the die');
+  const total = fc.bars[0].segments.reduce((a, x) => a + x.p, 0);
+  assert.ok(Math.abs(total - 1) < 1e-9, `a die's segments sum to 1 (${total})`);
+});
+
+t('the collapsed view carries the new vocabulary', () => {
+  // THE ASSERTION THIS SECTION EXISTS FOR. collapseBars used to iterate Soul
+  // Deal's ladder and tier map as its own knowledge, so any word a second
+  // per-die profile produced was dropped here — the collapsed view came back
+  // EMPTY and nothing said why. That is the real cost of a second per-die
+  // system, and this is what proves it was paid.
+  const fc = MON.forecastFor({ dice: ['d6', 'd6', 'd20'] }, { countingPmfs, sumForecast });
+  const seg = new Map(fc.collapsed.segments.map((x) => [x.word, x.p]));
+  assert.ok(seg.size > 1, `the collapse is not empty (${JSON.stringify([...seg])})`);
+  for (const w of ['Energy', 'Claw', 'Heart']) {
+    assert.ok(Math.abs(seg.get(w) - 2 / 18) < 1e-9,
+      `${w}: two d6 of three dice, one face in six`);
+  }
+  assert.equal(fc.bars.find((b) => b.type === 'd20').allQuiet, true);
+});
+
+t('Soul Deal is untouched by the generalisation', () => {
+  // collapseBars grew two parameters with defaults; the existing caller must
+  // be byte-identical, and this is the cheapest way to say so.
+  const fc = SYSTEMS['soul-deal'].forecastFor({ dice: ['d6', 'd6'] }, { countingPmfs, sumForecast });
+  assert.equal(fc.kind, 'per-die');
+  assert.ok(fc.collapsed.segments.length > 0, 'and it still collapses to something');
+  for (const s2 of fc.collapsed.segments) {
+    assert.ok(s2.word === null || OUTCOME_LADDER.includes(s2.word),
+      `${s2.word} is still a Soul Deal word`);
+  }
+});
+
+t('every per-die word a system can produce has a CSS slug', () => {
+  // A word with no slug paints `fc-w-undefined` — a class with no rule, so a
+  // segment with no fill and nothing to say it is missing.
+  for (const sys of Object.values(SYSTEMS)) {
+    if (sys.aggregate !== 'per-die') continue;
+    const fc = sys.forecastFor({ dice: ['d6', 'd6'] }, { countingPmfs, sumForecast });
+    if (!fc || fc.kind !== 'per-die') continue;
+    for (const b of fc.bars) {
+      for (const seg of b.segments) {
+        if (seg.word === null) continue;
+        assert.ok(OUTCOME_SLUGS[seg.word],
+          `${sys.id}: "${seg.word}" has no OUTCOME_SLUGS entry`);
+      }
     }
   }
 });

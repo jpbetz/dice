@@ -25,6 +25,12 @@ limitations under the License.
 // a warning while garbage INSIDE a known section still refuses.
 
 import assert from 'node:assert/strict';
+// DERIVED, NOT FROZEN. This expectation used to spell the system list out,
+// which made it a sixth copy: adding a system turned it red for the wrong
+// reason — the message was correct and the test was stale. What is worth
+// asserting is that the refusal NAMES the legal systems, not which ones
+// they happen to be today.
+import { SYSTEM_IDS } from '../js/meanings.js';
 import { exportYaml, parsePortable, planImport, profileToImport } from '../js/portable.js';
 import { STAMP as SCHEMA_STAMP, EPOCH, MAJOR } from '../js/schema.js';
 
@@ -379,7 +385,7 @@ t('a `profile:` section alone is a usable document', () => {
   assert.deepEqual(parsed.profile, { name: 'Nessa' });
 });
 
-refuses("profile:\n  system: 'pathfinder'\n", 'is not one of soul-deal, dnd, none',
+refuses("profile:\n  system: 'pathfinder'\n", `is not one of ${SYSTEM_IDS.join(', ')}`,
   'an unknown system in profile: refuses, as it does in a player block');
 refuses("profile:\n  name: 'Bo#b'\n", "carries '#'",
   "'#' in the profile: name refuses — it is a display name too");
@@ -420,7 +426,7 @@ t('a profile with no system parses — a seat prepared before systems existed st
 });
 
 refuses("players:\n  'A':\n    system: 'pathfinder'\n    pools:\n",
-  'is not one of soul-deal, dnd, none', 'an unknown system REFUSES at its line');
+  `is not one of ${SYSTEM_IDS.join(', ')}`, 'an unknown system REFUSES at its line');
 
 refuses("players:\n  'A':\n    system: 'dnd'\n    system: 'none'\n    pools:\n",
   'names a system twice', 'a doubled system key refuses');

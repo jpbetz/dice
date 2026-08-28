@@ -46,6 +46,7 @@ import { composeRoll, composeThrow, validateMods, validateSpec, DIE_MAX,
   scoringIndices, pushTally, drawBag, MAX_PUSH_THROWS } from './js/rollspec.js';
 import { parseNotation } from './js/notation.js';
 import { SET_IDS } from './js/themes.js';
+import { SYSTEM_IDS } from './js/meanings.js';
 // C22: the stamp's SHAPE only. The server carries `ver` on a table setup and
 // never judges it — see handleTable — so it imports the parser and nothing
 // else, which is also what keeps the regex in one file.
@@ -296,7 +297,9 @@ const FELT_THEMES = ['emerald', 'crimson', 'midnight', 'slate', 'walnut',
 // 'dnd' (natural-20/1 crits, no chart), 'none' (numbers only). The server
 // stores the id and nothing else: meaning words and crit rules are a
 // render-time lens, so switching systems re-reads the log a room already has.
-const SYSTEMS = ['soul-deal', 'dnd', 'none'];
+// The interpretation systems this build knows, from the module that defines
+// them — never a hand-kept copy (js/meanings.js SYSTEM_IDS says why).
+const SYSTEMS = SYSTEM_IDS;
 
 // A custom experience template, per the record shape in docs/UX.md §2.1. The
 // three launch experiences (Plain/Check/Cinematic) are built into the client

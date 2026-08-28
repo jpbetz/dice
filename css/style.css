@@ -6840,3 +6840,13 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
     flex: 0 0 auto;
   }
 }
+
+/* MONSTER DICE — the `kind` tier (js/meanings.js). Every other tier in this
+   app is a DEGREE of success or failure and is painted in that hue family. A
+   claw is neither; it is a kind. So this tier is deliberately neutral: it
+   marks the chip as having spoken without claiming the face was good or bad,
+   and the word plus M3's drawn glyph do the rest. */
+.oc-chip.oc-b-kind { border-color: rgba(216, 201, 163, 0.42); }
+.fc-seg.fc-w-energy { background: rgba(255, 212, 121, 0.62); }
+.fc-seg.fc-w-claw   { background: rgba(196, 143, 166, 0.62); }
+.fc-seg.fc-w-heart  { background: rgba(143, 196, 160, 0.62); }

@@ -146,6 +146,7 @@
 import { parseNotation, cutText } from './notation.js';
 import { STAMP as SCHEMA_STAMP, judgeStamp } from './schema.js';
 import { SETS } from './themes.js'; // import-free data — still runs under Node
+import { SYSTEM_IDS } from './meanings.js'; // likewise: no imports of its own
 
 const TRIO = ['attributes', 'skills', 'motivations'];
 const TRIO_LABELS = { attributes: 'Attributes', skills: 'Skills', motivations: 'Motivations' };
@@ -180,7 +181,9 @@ const MAX_TABLE_NAME = 28; // SETTING_SPECS.tableName's cap
 // header: no import). Adding a felt or a system there means adding it here.
 const FELT_THEMES = ['emerald', 'crimson', 'midnight', 'slate', 'walnut',
   'obsidian', 'ocean', 'plum', 'sand'];
-const SYSTEMS = ['soul-deal', 'dnd', 'none'];
+// From the module that defines them, not a hand-kept copy — see
+// js/meanings.js SYSTEM_IDS for what the copies cost.
+const SYSTEMS = SYSTEM_IDS;
 const ZOOMS = ['wide', 'medium', 'close'];
 // A TOWER ID, SHAPE-CHECKED AND NOT ENUMERATED (see the header). Deliberately
 // wider than today's ids (`heartwood`, `blackanvil`, …): dice-set ids in this

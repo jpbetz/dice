@@ -21947,4 +21947,76 @@ export const scenarios = [
       await a.dbg("setSystem('soul-deal')");
     },
   },
+  {
+    name: 'monster-system',
+    tags: ['mechanics', 'systems', 'smoke'],
+    // The MONSTER DICE rolling system — the layer Track C forgot.
+    //
+    // M3 gave a d6 faces that are not numbers; nothing taught the TABLE what
+    // they mean, so a claw read as "5 — Success" under whatever numeric system
+    // the room was on. This is that reading.
+    //
+    // THE ASSERTION THIS SCENARIO EXISTS FOR is ①: that the SERVER accepts the
+    // system at all. The id list was mirrored by hand in three files, so
+    // adding a fourth system made it appear in the picker, made the client
+    // report the change applied, and had the server silently refuse it — the
+    // table went on reading Soul Deal words and nothing threw. Checking the
+    // words alone would not have found it either; only asking whether the
+    // change SURVIVED the round trip does.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+
+      // ① IT SURVIVES THE ROUND TRIP TO THE SERVER AND BACK.
+      assert.equal(await a.dbg("setSystem('monster')"), true, 'the client accepts it');
+      await a.waitFor(`(window.__diceDebug.sim(30), [...document.querySelectorAll('.system-chip')]
+          .some((c) => c.textContent.trim() === 'Monster dice'
+            && c.getAttribute('aria-pressed') === 'true'))`,
+      { desc: 'the TABLE adopts it — the server did not refuse it', timeout: 15000 });
+
+      // ② IT READS THE FACES, and leaves the numbers alone.
+      await a.dbg("setDiceSet('symbols.monster')");
+      await a.eval(`window.__diceDebug.throwSeeded(
+        ["d6","d6","d6","d6","d6","d6"], 4242, [1,2,3,4,5,6])`);
+      await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        { desc: 'the dice settle', timeout: 30000 });
+      await a.dbg('sim(240)');
+      const words = await a.eval(`JSON.stringify(
+        [...document.querySelectorAll('.oc-chip')].map((c) => c.textContent.replace(/\\s+/g, ' ').trim()))`)
+        .then(JSON.parse);
+      assert.equal(words.length, 6, `six dice are read out (${JSON.stringify(words)})`);
+      assert.match(words[3], /Energy/, 'the fourth face is Energy');
+      assert.match(words[4], /Claw/, 'the fifth is Claw');
+      assert.match(words[5], /Heart/, 'the sixth is Heart');
+      // A number needs no interpretation; the app must not talk to hear itself.
+      for (const w of words.slice(0, 3)) {
+        assert.doesNotMatch(w, /Energy|Claw|Heart|Success|Fail/,
+          `a number face stays quiet (${w})`);
+      }
+      // …and no Soul Deal verdict survives anywhere on the card.
+      assert.doesNotMatch(words.join(' '), /Success|Fail|Bonus/,
+        'nothing is read as a success or a failure — these faces are kinds');
+
+      // ③ NO CRIT WASH. Three hearts is not a critical anything.
+      await a.eval(`window.__diceDebug.throwSeeded(["d6","d6","d6"], 77, [6,6,6])`);
+      await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        { desc: 'three hearts settle', timeout: 30000 });
+      await a.dbg('sim(240)');
+      assert.equal(await a.eval(
+        `document.getElementById('result-banner').classList.contains('crit-success')`), false,
+      'no crit wash — the six faces are kinds, not degrees');
+
+      // ④ SWITCHING BACK RE-READS THE SAME LOG. The system is a lens, and the
+      // history does not change when the lens does.
+      await a.dbg("setSystem('none')");
+      await a.waitFor(`(window.__diceDebug.sim(30), [...document.querySelectorAll('.system-chip')]
+          .some((c) => c.textContent.trim() === 'Numbers only'
+            && c.getAttribute('aria-pressed') === 'true'))`,
+      { desc: 'the table goes back to numbers', timeout: 15000 });
+      const after = await a.eval(`JSON.stringify(
+        [...document.querySelectorAll('.oc-chip')].map((c) => c.textContent.replace(/\\s+/g, ' ').trim()))`)
+        .then(JSON.parse);
+      assert.doesNotMatch(after.join(' '), /Energy|Claw|Heart/,
+        `the words are gone with the lens (${JSON.stringify(after)})`);
+    },
+  },
 ];

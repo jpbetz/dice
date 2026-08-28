@@ -199,14 +199,16 @@ note).
 | push-your-luck | Pig, Farkle-shaped games | **shipped 2026-08-28** — `1d6 push>=2`, bust and bank; MECHANICS M4 |
 | dice drawn from a bag | a cup of mixed dice | **shipped 2026-08-28** — `3d6 bag:6@a,4@b`; MECHANICS M6. It does NOT do a cup that DEPLETES across a turn — that is stateful and the bag has no memory by design |
 | opposed rolls | two players, one comparison | **open** — every roll is read alone; nothing on any surface compares two |
+| dice drafting | Sagrada, Dice Forge — roll a shared pool, take turns picking from it | **open** — MECHANICS M7. The one family that breaks an assumption rather than adding to it: every roll here belongs to ONE player |
 | initiative order | one shared action, sorted | **open** — ROADMAP §7 |
 
     **Five rows closed on 2026-08-28** (MECHANICS M1–M6, one day's Track C
-    campaign). Two remain open and neither is a dice mechanic in the same
-    sense: initiative order is a table's shared act, and opposed rolls is a
-    comparison between two rolls that nothing on any surface makes. Both are
-    still worth having; neither was found by playing, which is why the table
-    exists.
+    campaign) and symbol faces gained their READING the same week (the
+    `monster` system). **Three remain open, and the pattern in them is worth
+    seeing:** initiative order, opposed rolls and dice drafting all involve
+    MORE THAN ONE PLAYER'S dice at once, which is the assumption every mechanic
+    shipped so far leaves untouched. None of the three was found by playing —
+    each was found by writing this table down, which is what it is for.
 
     **A family may be deliberately refused**, and a refused row says so with
     its reason — coverage is a goal, not a mandate, and this project kills

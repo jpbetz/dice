@@ -89,16 +89,24 @@ export const OUTCOME_LADDER = ['Critical Fail', 'Fail', 'Mishap', 'Blemish', nul
 // (Joe 2026-08-06, amending the display default only): one line answering
 // 'a die from this pool, on average', with the per-die rows one tap away.
 // Results still never fold and no printed number counts across dice.
-function collapseBars(bars) {
+// THE LADDER AND THE TIERS ARE ARGUMENTS, not this function's own knowledge.
+// It was written when there was one per-die system and quietly spoke its
+// vocabulary: iterating OUTCOME_LADDER and looking up TIERS meant any word a
+// SECOND per-die profile produced was silently dropped here — the collapsed
+// view would come back empty and nothing would say why. That is the real
+// price of a second per-die system, and paying it is what makes the machinery
+// multi-system rather than Soul-Deal-shaped. Defaults keep every existing
+// caller byte-identical.
+function collapseBars(bars, ladder = OUTCOME_LADDER, tiers = TIERS) {
   const total = bars.reduce((s, b) => s + b.count, 0);
   const acc = new Map();
   for (const b of bars) {
     for (const seg of b.segments) acc.set(seg.word, (acc.get(seg.word) || 0) + seg.p * b.count);
   }
   const segments = [];
-  for (const word of OUTCOME_LADDER) {
+  for (const word of ladder) {
     if (!acc.has(word)) continue;
-    segments.push({ word, tier: word ? TIERS[word] : null, p: acc.get(word) / total });
+    segments.push({ word, tier: word ? tiers[word] : null, p: acc.get(word) / total });
   }
   return { mixed: true, count: total, allQuiet: bars.every((b) => b.allQuiet), segments };
 }
@@ -111,6 +119,11 @@ export const OUTCOME_SLUGS = {
   'Minimal Success': 'minimal', 'Minor Success': 'minor', 'Partial Success': 'partial',
   'Success': 'success', 'Success & Bonus': 'bonus', 'Advantage': 'adv',
   'Success & Perm Bonus': 'perm', 'Critical Success': 'crit',
+  // Monster dice (below). Every per-die word needs a slug or the forecast
+  // paints `fc-w-undefined` — a class with no rule, which is a segment with
+  // no fill and nothing to say it is missing. This map is where a new
+  // system's vocabulary joins the renderer.
+  Energy: 'energy', Claw: 'claw', Heart: 'heart',
 };
 
 // THE SOUL DEAL READ (corrected 2026-07-31, from the system's author):
@@ -233,6 +246,30 @@ function sumForecastFor(spec, tools) {
   if (!spec || !Array.isArray(spec.dice) || !spec.dice.length) return null;
   if (!tools || typeof tools.sumForecast !== 'function') return null;
   return tools.sumForecast(spec.dice, spec.mods || null);
+}
+
+// The monster chart. d6 only — these faces exist on a six-sided die and
+// nowhere else, so every other type reads quiet rather than being forced onto
+// a mapping it has no faces for.
+const MONSTER_TYPES = new Set(['d6']);
+const MONSTER_FACES = { 4: 'Energy', 5: 'Claw', 6: 'Heart' };
+// ONE TIER FOR ALL THREE, and that is a decision rather than laziness. In this
+// app a tier is the hue family an outcome is painted in, and every existing
+// one means a DEGREE of success or failure. A claw is neither: it is a kind.
+// Painting it in the failure hue would say something false about it, and
+// giving each face its own hue would make three neutral facts read as three
+// verdicts. The WORD carries the meaning, and the drawn glyph on the chip
+// (MECHANICS M3) carries the recognition, so the colour has nothing left to do.
+const MONSTER_TIERS = { Energy: 'kind', Claw: 'kind', Heart: 'kind' };
+// Display order for the forecast's segments, quiet last — the ladder's job in
+// a per-die system, and this one is not a ladder at all: nothing here outranks
+// anything.
+const MONSTER_LADDER = ['Energy', 'Claw', 'Heart', null];
+
+function monsterRead(type, value) {
+  if (!MONSTER_TYPES.has(type) || typeof value !== 'number') return { word: null, tier: null };
+  const word = MONSTER_FACES[value] || null;
+  return { word, tier: word ? MONSTER_TIERS[word] : null };
 }
 
 export const SYSTEMS = {
@@ -459,6 +496,112 @@ export const SYSTEMS = {
     // the two profiles is `targetWord`, and the renderer owns that.
     forecastFor: sumForecastFor,
   },
+  // MONSTER DICE — the second per-die system, and the layer Track C forgot.
+  //
+  // MECHANICS M3 gave a d6 faces that are not numbers and M2 gave it a turn,
+  // and between them a monster-brawl dice game became playable — but the
+  // TABLE still read a claw as "5", because nothing had been taught what the
+  // face means. M3's own record deferred that with "the real answer is M4",
+  // and M4 went somewhere else entirely (push-your-luck, declared in
+  // notation), so the pointer was never followed. Joe found it by trying to
+  // play: "why didn't we introduce a rolling system". This is that system.
+  //
+  // GOAL 6 PUTS THIS EXACTLY HERE. A chart from a rulebook mapping a face to
+  // a word is the FIRST of the goal's two layers — how a roll is READ — and
+  // it has been pluggable since the beginning. `Your Soul Deal` is the same
+  // class of thing. Nothing about this knows what a claw DOES.
+  //
+  // THE NUMBER FACES STAY QUIET, on purpose. 1, 2 and 3 are numbers and a
+  // number needs no interpretation; printing "3 — Three" beside a die
+  // showing 3 is the app talking to hear itself. The system speaks exactly
+  // where the face stops being a number, which is also where a player
+  // actually needs it.
+  //
+  // IT IS A LENS, NOT A SKIN, and the two are chosen separately. Picking this
+  // system reads every d6 this way whether or not the dice WEAR the monster
+  // faces — the same rule Soul Deal follows, which reads every die by its
+  // chart regardless of what set it is dressed in. The dice set makes them
+  // look right; this makes them read right; `t3` makes them behave right.
+  // Three independent choices that happen to pair, like felt and venue.
+  //
+  // NAMED FOR THE FACES, NOT FOR A GAME — the same rule js/themes.js follows
+  // for the dice set. The obvious published example is somebody's trademark.
+  monster: {
+    id: 'monster',
+    label: 'Monster dice',
+    aggregate: 'per-die',
+    usesTotal: false,
+    targetWord: 'Target',
+    outcomesFor(entry) {
+      if (!entry || !Array.isArray(entry.parts)) return null;
+      return entry.parts.map((p, i) => {
+        const read = monsterRead(p.type, p.value);
+        return {
+          dieIndex: i,
+          type: p.type,
+          value: p.value,
+          word: read.word,
+          tier: read.tier,
+          // Same rule as soul-deal: a die a mechanic set aside is a ROW that
+          // says which mechanic, never a missing row, and it never gets a
+          // word — a discarded die did not speak.
+          struck: p.counts ? null : (p.reason || 'drop'),
+          children: [],
+        };
+      }).map((o) => (o.struck ? { ...o, word: null, tier: null } : o));
+    },
+    // NO CRIT FACE. Nothing on these dice is a critical anything — the six
+    // faces are kinds, not degrees — so there is no crit to announce and the
+    // table-stopping wash never fires. Stated rather than left to a default,
+    // because the contrast with the other three profiles belongs on the
+    // record beside them.
+    critFor: () => null,
+    forecastFor(spec, tools) {
+      if (!spec || !Array.isArray(spec.dice) || !spec.dice.length) return null;
+      if (!tools || typeof tools.countingPmfs !== 'function') return null;
+      const mods = spec.mods || null;
+      if (mods && mods.keep) {
+        return { kind: 'refusal', reason: 'keep/drop picks which dice count after they land — no per-die read before the roll' };
+      }
+      const built = tools.countingPmfs(spec.dice, mods);
+      if (!built.exact) {
+        return { kind: 'refusal', reason: 'more rerolls than the 40-die cap can hold — which dice reroll depends on the landing' };
+      }
+      const bars = new Map();
+      spec.dice.forEach((t, i) => {
+        const source = spec.sources ? (spec.sources[i] || null) : null;
+        const { q, variant } = built.pmfs[i];
+        const key = `${source ?? ''}#${t}#${variant ?? ''}`;
+        const seen = bars.get(key);
+        if (seen) { seen.count++; return; }
+        // `q` is a MAP of face -> probability, not an array indexed by face.
+        // Walking it as an array produced no segments at all and threw
+        // nothing: an empty forecast renders as an empty bar, which looks
+        // like a die with nothing to say rather than like a bug.
+        const acc = new Map();
+        for (const [v, p] of q) {
+          if (!p) continue;
+          const w = monsterRead(t, v).word;
+          acc.set(w, (acc.get(w) || 0) + p);
+        }
+        const segments = [];
+        for (const w of MONSTER_LADDER) {
+          if (!acc.has(w)) continue;
+          segments.push({ word: w, tier: w ? MONSTER_TIERS[w] : null, p: acc.get(w) });
+        }
+        bars.set(key, {
+          source, type: t, rank: null, count: 1, variant,
+          // A die with no monster face at all — a d20 has no claw — says
+          // nothing under this system, exactly as an off-chart die does
+          // under Soul Deal.
+          allQuiet: !MONSTER_TYPES.has(t),
+          segments,
+        });
+      });
+      const list = [...bars.values()];
+      return { kind: 'per-die', bars: list, collapsed: collapseBars(list, MONSTER_LADDER, MONSTER_TIERS) };
+    },
+  },
   none: {
     id: 'none',
     label: 'Numbers only',
@@ -472,3 +615,16 @@ export const SYSTEMS = {
 };
 
 export const DEFAULT_SYSTEM = 'soul-deal';
+
+// THE ID LIST, PUBLISHED ONCE. It was mirrored by hand in server.js and in
+// js/portable.js — three copies of one fact — and the consequence was
+// discovered the day a fourth system was added: `monster` appeared in the
+// picker, the client reported the change as applied, and the SERVER silently
+// refused it, so the table went on reading claws as Soul Deal words. Nothing
+// threw. CUJS.md's ruling that a new interpretation system is "addable by a
+// developer, in a commit" was only true of THIS file.
+//
+// Both other readers are import-free-data consumers already (portable.js
+// takes SETS from themes.js on the same footing, and this module imports
+// nothing at all), so there was never a reason for the copies.
+export const SYSTEM_IDS = Object.keys(SYSTEMS);
