@@ -21218,8 +21218,7 @@ export const scenarios = [
     // one when nothing is focused — rather than by calling the mover, because
     // half of what can go wrong here is about which handler gets the key.
     //
-    // THE TWO CLAIMS COUNTING CANNOT MAKE, and both are asserted through
-    // `pickFocusProbe`:
+    // THE TWO CLAIMS COUNTING CANNOT MAKE:
     //
     //   * that the arrows are BORROWED, not taken. Outside an open turn this
     //     handler must leave the event untouched for the radiogroup walker and
@@ -21227,9 +21226,10 @@ export const scenarios = [
     //     `defaultPrevented` on both sides of the arming line — a marker count
     //     is identical either way.
     //   * that a FOCUSED die and a KEPT die are told apart. One die wearing
-    //     both markers, with the two markers' ink and world radius reported
-    //     side by side: recolouring the cursor gold or shrinking it onto the
-    //     ring turns this red while every count stays green.
+    //     both markers, with `pickFocusProbe` reporting the two markers' ink
+    //     and world radius side by side: recolouring the cursor gold or
+    //     shrinking it onto the ring turns this red while every count stays
+    //     green.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
       // A real key event, and the answer is whether anything CONSUMED it.
@@ -21249,7 +21249,7 @@ export const scenarios = [
         return b && !b.hidden ? b.textContent.trim() : null;
       })()`);
 
-      // ① NO TURN, NOT OUR KEYS. A plain roll leaves six perfectly visible
+      // ① NO TURN, NOT OUR KEYS. A plain roll leaves four perfectly visible
       // dice that mean nothing to keep, so the whole path stays dark — and
       // "dark" has to include leaving the EVENT alone, or every arrow press
       // anywhere in the app has been quietly stolen by a feature that is not
