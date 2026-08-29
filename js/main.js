@@ -1895,6 +1895,16 @@ const FELT_THEMES = {
   // The one light table: it needs the LEAST, and a full-strength beat here
   // takes it somewhere the other eight never go.
   sand:     { name: 'Sand',     feltBase: '#7c6a4d', sceneBg: '#211a11', breath: 0.8 },
+  // THE FIRST MAT THAT IS NOT FELT (Joe's own seed). `cloth` names its
+  // painter; every row above omits it and gets DEFAULT_CLOTH, so the nine
+  // that shipped are untouched by construction. Stage one is look only —
+  // the physics that makes sand DEADEN a throw is a separate, priced piece.
+  //
+  // `mottle` 0.45: the felt's nap catches light unevenly across the whole
+  // table, but a raked bed is smoothed flat on purpose, so the same field at
+  // full strength reads as damp patches rather than as nap.
+  silt:     { name: 'Silt',     feltBase: '#a2977f', sceneBg: '#1a1712',
+              breath: 0.85, cloth: 'silt', mottle: 0.45 },
 };
 const DEFAULT_FELT = 'obsidian';
 let currentFeltId = DEFAULT_FELT;
@@ -1990,9 +2000,28 @@ const FELT_TILE_PX = 1024;   // authored size of one tile
 const FELT_TILE_U = 5;       // world units it covers -> 204.8 px per world unit
 const FELT_REPEAT = 160 / FELT_TILE_U;   // tiles across the plane
 
+// A CLOTH IS A PAINTER, not a colour (2026-08-29). Nine themes shared one
+// painter and differed by a hex, which is exactly the "one mat in nine
+// colours" Joe named. A theme row now names the cloth it is made of, and this
+// is the seam every later mat rides — a new surface is a painter and a row,
+// not a change to the floor.
+//
+// The picker gets the new cloth for free: renderFeltSwatches already draws the
+// chip from `feltTileCanvas(...).toDataURL()`, so a swatch has always shown the
+// real tile rather than a paint chip. It only needed the cloth threaded
+// through with the colour.
+const FELT_CLOTHS = {
+  felt: paintFeltCloth,
+  silt: paintSiltCloth,
+};
+const DEFAULT_CLOTH = 'felt';
+
+// Keyed by cloth AND colour: two cloths at one hex are two different tiles,
+// and before the key grew they would have silently traded canvases.
 const feltTileCache = new Map();
-function feltTileCanvas(base) {
-  let c = feltTileCache.get(base);
+function feltTileCanvas(base, cloth = DEFAULT_CLOTH) {
+  const key = `${cloth}|${base}`;
+  let c = feltTileCache.get(key);
   if (c) return c;
   c = document.createElement('canvas');
   c.width = c.height = FELT_TILE_PX;
@@ -2000,6 +2029,26 @@ function feltTileCanvas(base) {
   const rnd = mulberry32(feltSeed(base));
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, FELT_TILE_PX, FELT_TILE_PX);
+  (FELT_CLOTHS[cloth] || paintFeltCloth)(ctx, rnd, base);
+  feltTileCache.set(key, c);
+  return c;
+}
+
+// WRAPPED DRAWING, shared by every cloth. A mark within reach of an edge is
+// redrawn across the seam so the tile's border carries the same density as its
+// middle. `reach` is the mark's own extent — anything larger wraps needlessly
+// and anything smaller leaves a visible bald line at 32x32 tiles.
+function feltWrapped(x, y, reach, draw) {
+  const near = (v) => (v < reach ? 1 : v > FELT_TILE_PX - reach ? -1 : 0);
+  const wx = near(x);
+  const wy = near(y);
+  draw(x, y);
+  if (wx) draw(x + wx * FELT_TILE_PX, y);
+  if (wy) draw(x, y + wy * FELT_TILE_PX);
+  if (wx && wy) draw(x + wx * FELT_TILE_PX, y + wy * FELT_TILE_PX);
+}
+
+function paintFeltCloth(ctx, rnd) {
 
   // THE TILE CARRIES ONLY WHAT IS STATISTICALLY SEAMLESS. Anything
   // low-frequency must NOT live here: a blotch clipped by the tile border
@@ -2036,24 +2085,121 @@ function feltTileCanvas(base) {
     const a = light ? 0.006 + rnd() * 0.010 : 0.008 + rnd() * 0.014;
     const w = 1 + rnd() * 1.6;
     ctx.lineWidth = w;
-    // WRAPPED ONLY WHERE IT MATTERS. A stroke is redrawn across the seam so
-    // the tile's edges carry the same density as its middle — but only when it
-    // can actually reach an edge. The first version tested `|x + dx| > PX*1.2`,
-    // which is true for almost nothing, so every stroke was drawn nine times
-    // and eight of them were clipped away off-canvas. Harmless to look at and
-    // pure waste to compute: at 12,000 strokes that is 108,000 stroke calls per
-    // tile instead of ~12,600, on the path a theme swap runs synchronously.
-    const reach = len + w;
-    const near = (v) => (v < reach ? 1 : v > FELT_TILE_PX - reach ? -1 : 0);
-    const wx = near(x);
-    const wy = near(y);
-    stroke(x, y, len, ang, light, a);
-    if (wx) stroke(x + wx * FELT_TILE_PX, y, len, ang, light, a);
-    if (wy) stroke(x, y + wy * FELT_TILE_PX, len, ang, light, a);
-    if (wx && wy) stroke(x + wx * FELT_TILE_PX, y + wy * FELT_TILE_PX, len, ang, light, a);
+    // Wrapped only where it matters (see feltWrapped). The first version
+    // tested `|x + dx| > PX*1.2`, true for almost nothing, so every stroke was
+    // drawn nine times and eight were clipped away off-canvas — harmless to
+    // look at and pure waste on the path a theme swap runs synchronously.
+    feltWrapped(x, y, len + w, (px, py) => stroke(px, py, len, ang, light, a));
   }
-  feltTileCache.set(base, c);
-  return c;
+}
+
+// SILT — fine dry riverbed sand, raked flat before play (ROADMAP: Joe's own
+// seed, "one that functions more like actual sand"). STAGE ONE IS LOOK ONLY:
+// no physics, no bake change, nothing on the wire. The brainstorm's staging,
+// and the reason for it, is that the projector can retime a hop but cannot
+// delete one — so the sand that DEADENS a throw costs the whole physics bill
+// and is priced separately. What a look can buy on its own is most of the
+// percept, and it can be judged before any of that is spent.
+//
+// THE GRAIN IS BIMODAL, and that is the whole trick: thousands of sub-pixel
+// grains ALONE read as television static, not as sand. It is the smaller
+// population of larger, darker, angular fragments sitting in the fine stuff
+// that says "this is a material made of pieces". Ratio matters more than
+// either count on its own.
+function paintSiltCloth(ctx, rnd) {
+  // 1. THE FINE BED. Dense, tiny, low-contrast — the ground everything else
+  // sits in. At 205 px/unit a 1-2 px grain is well under a millimetre at the
+  // scale a d6 sets, which is what keeps it sand rather than gravel.
+  // fillRect, NOT arc. A grain here is 0.6-1.7 px: at that size a circle and a
+  // square are the same handful of pixels, but `beginPath` + `arc` + `fill`
+  // costs several times a `fillRect`, and this runs 26,000 times per tile —
+  // for TEN tiles at boot, because renderFeltSwatches paints every theme's
+  // cloth to build its swatch. The arc version wedged the tab on load, which
+  // is a startup cost paid by every player for a picker most never open.
+  //
+  // No wrapping either, and that is a size argument rather than laziness: a
+  // sub-2 px mark can only be clipped within 2 px of the seam, which is 0.4%
+  // of a 1024 px tile and invisible against 26,000 neighbours. The fragments
+  // and the rake below are large enough to need it, and take it.
+  for (let i = 0; i < 26000; i++) {
+    const x = rnd() * FELT_TILE_PX;
+    const y = rnd() * FELT_TILE_PX;
+    const light = rnd() > 0.45;
+    const a = light ? 0.026 + rnd() * 0.044 : 0.020 + rnd() * 0.036;
+    const r = 0.7 + rnd() * 1.4;
+    ctx.fillStyle = light ? `rgba(255,250,236,${a})` : `rgba(48,38,24,${a})`;
+    ctx.fillRect(x, y, r, r);
+  }
+  // 2. THE FRAGMENTS. Few, darker, ANGULAR — three-point shards rather than
+  // dots, because a bigger round dot is just a bigger grain and reads as
+  // blur. ~600 of them against 34,000 grains is the ratio that makes a bed
+  // of sand instead of noise.
+  //
+  // SIZED FROM THE SCREEN, not from the texture. At `medium` the mat spans
+  // about 135 screen px per world unit against the tile's 205, so a texture
+  // pixel is roughly two thirds of a screen pixel: the first cut's 1.6-4.8 px
+  // shards were one to three screen pixels and vanished into the fine bed,
+  // which is why silt read as pale PAPER rather than as sand. A fragment has
+  // to be four to eight screen pixels to register as a piece, so 3-9 here.
+  for (let i = 0; i < 1100; i++) {
+    const x = rnd() * FELT_TILE_PX;
+    const y = rnd() * FELT_TILE_PX;
+    const r = 3 + rnd() * 6;
+    const rot = rnd() * Math.PI * 2;
+    const a = 0.10 + rnd() * 0.20;
+    ctx.fillStyle = `rgba(41,32,20,${a})`;
+    feltWrapped(x, y, r + 2, (px, py) => {
+      ctx.beginPath();
+      for (let k = 0; k < 3; k++) {
+        const ang = rot + k * (Math.PI * 2 / 3) + (rnd() - 0.5) * 0.7;
+        const rr = r * (0.65 + rnd() * 0.5);
+        const vx = px + Math.cos(ang) * rr;
+        const vy = py + Math.sin(ang) * rr;
+        if (k === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
+      }
+      ctx.closePath();
+      ctx.fill();
+      // A CATCHLIGHT, so a fragment reads as a solid rather than as a hole.
+      // Without it the shards are flat dark blobs and the bed reads as pepper
+      // scattered on paper. The key light sits at (8, 30, 10) — up and to the
+      // +x/+z side — and canvas +x/+y map to world +x/+z, so the lit face of
+      // every grain is its lower-right. One offset dot each; they are 3-9 px,
+      // so anything more elaborate is invented detail nobody can resolve.
+      ctx.fillStyle = `rgba(255,250,238,${a * 0.55})`;
+      ctx.fillRect(px + r * 0.28, py + r * 0.28, r * 0.5, r * 0.5);
+      ctx.fillStyle = `rgba(41,32,20,${a})`;
+    });
+  }
+  // 3. THE RAKE. A sand tray is SMOOTHED BEFORE PLAY and that is most of why
+  // it reads as tended rather than spilled. The lines are periodic by nature,
+  // so unlike the felt's mottle they belong in the tile and repeating every
+  // five units is a feature — a raked bed is meant to be regular.
+  //
+  // They wrap by construction: the displacement is a sine with an INTEGER
+  // number of periods across the tile, so y(0) = y(TILE); and the lines are
+  // evenly spaced by TILE/RAKE_LINES, so the pattern is continuous in y too.
+  // Nothing here needs feltWrapped, which is why the arcs can be long.
+  const RAKE_LINES = 13;
+  for (let k = 0; k < RAKE_LINES; k++) {
+    const y0 = (k + 0.5) * (FELT_TILE_PX / RAKE_LINES);
+    const periods = 1 + Math.floor(rnd() * 2);      // integer => wraps in x
+    const amp = 5 + rnd() * 9;
+    const phase = rnd() * Math.PI * 2;
+    const yAt = (x) => y0 + Math.sin((x / FELT_TILE_PX) * Math.PI * 2 * periods + phase) * amp;
+    // A ridge is TWO strokes, not one: a lit crest and the shadow just behind
+    // it. One stroke alone is a drawn line; the pair is a shape under a lamp.
+    for (const [dy, col, w] of [[0, `rgba(255,250,238,${0.07 + rnd() * 0.04})`, 2.4],
+                                [2.8, `rgba(44,34,21,${0.08 + rnd() * 0.05})`, 2.8]]) {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      for (let x = 0; x <= FELT_TILE_PX; x += 8) {
+        const y = yAt(x) + dy;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  }
 }
 
 // THE MOTTLE MOVED TO THE GEOMETRY. It is the one thing that cannot tile —
@@ -2067,7 +2213,7 @@ function feltTileCanvas(base) {
 // one cloth — the claim `felt-grain-is-seeded` makes.
 const FELT_SEGMENTS = 48;          // 49x49 verts over 160 units: ~3.3 units apart
 const FELT_MOTTLE_STRENGTH = 0.14; // peak deviation from flat, either way
-function feltMottle(geo, base) {
+function feltMottle(geo, base, scale = 1) {
   const rnd = mulberry32(feltSeed(base) ^ 0x9e3779b9);
   // A handful of wide soft lobes, exactly the shape the painted mottle had —
   // 18 blotches 260-680 px across a 2048 atlas, i.e. 20-53 world units.
@@ -2094,7 +2240,7 @@ function feltMottle(geo, base) {
       const d = Math.hypot(x - L.x, z - L.z) / L.r;
       if (d < 1) { const f = 1 - d * d; v += L.a * f * f; }
     }
-    const m = 1 + Math.max(-1, Math.min(1, v)) * FELT_MOTTLE_STRENGTH;
+    const m = 1 + Math.max(-1, Math.min(1, v)) * FELT_MOTTLE_STRENGTH * scale;
     col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = m;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -2110,7 +2256,8 @@ function feltMottle(geo, base) {
 // the low-frequency field a texture would otherwise have to carry at a
 // resolution the tile cannot provide.
 const floorGeo = new THREE.PlaneGeometry(160, 160, FELT_SEGMENTS, FELT_SEGMENTS);
-const floorTexture = new THREE.CanvasTexture(feltTileCanvas(FELT_THEMES[DEFAULT_FELT].feltBase));
+const floorTexture = new THREE.CanvasTexture(
+  feltTileCanvas(FELT_THEMES[DEFAULT_FELT].feltBase, FELT_THEMES[DEFAULT_FELT].cloth));
 floorTexture.colorSpace = THREE.SRGBColorSpace;
 floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
 floorTexture.repeat.set(FELT_REPEAT, FELT_REPEAT);
@@ -2122,7 +2269,7 @@ floorTexture.repeat.set(FELT_REPEAT, FELT_REPEAT);
 // that there is real structure in the tile for it to keep.
 floorTexture.anisotropy = 4;
 
-feltMottle(floorGeo, FELT_THEMES[DEFAULT_FELT].feltBase);
+feltMottle(floorGeo, FELT_THEMES[DEFAULT_FELT].feltBase, FELT_THEMES[DEFAULT_FELT].mottle);
 
 const floor = new THREE.Mesh(
   floorGeo,
@@ -2143,10 +2290,10 @@ scene.add(floor);
 // disposed. Both caches are keyed by the base colour, so a theme returned to
 // is byte-identical to the first time it was worn.
 function recompositeFelt() {
-  const base = FELT_THEMES[currentFeltId].feltBase;
-  floorTexture.image = feltTileCanvas(base);
+  const theme = FELT_THEMES[currentFeltId];
+  floorTexture.image = feltTileCanvas(theme.feltBase, theme.cloth);
   floorTexture.needsUpdate = true;
-  feltMottle(floorGeo, base);
+  feltMottle(floorGeo, theme.feltBase, theme.mottle);
   floorGeo.attributes.color.needsUpdate = true;
 }
 
@@ -23631,7 +23778,7 @@ function renderFeltSwatches() {
       // The swatch shows the CLOTH, not a paint chip: the same grain tile
       // the table itself wears (the felt exploration deserves to be seen
       // in the picker, not guessed from a flat dot).
-      dot.style.backgroundImage = `url(${feltTileCanvas(theme.feltBase).toDataURL()})`;
+      dot.style.backgroundImage = `url(${feltTileCanvas(theme.feltBase, theme.cloth).toDataURL()})`;
       dot.style.backgroundSize = '64px 64px';
       const nm = document.createElement('span');
       nm.textContent = theme.name;

@@ -180,7 +180,7 @@ const MAX_TABLE_NAME = 28; // SETTING_SPECS.tableName's cap
 // The `table:` values, mirrored by hand from server.js SETTING_SPECS (see the
 // header: no import). Adding a felt or a system there means adding it here.
 const FELT_THEMES = ['emerald', 'crimson', 'midnight', 'slate', 'walnut',
-  'obsidian', 'ocean', 'plum', 'sand'];
+  'obsidian', 'ocean', 'plum', 'sand', 'silt'];
 // From the module that defines them, not a hand-kept copy — see
 // js/meanings.js SYSTEM_IDS for what the copies cost.
 const SYSTEMS = SYSTEM_IDS;

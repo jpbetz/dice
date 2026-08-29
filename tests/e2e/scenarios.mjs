@@ -1533,6 +1533,75 @@ export const scenarios = [
     },
   },
   {
+    name: 'silt-is-its-own-cloth',
+    tags: ['mat', 'net'],
+    // SILT — Joe's sand seed, stage one. The claim under test is not "it looks
+    // like sand", which no assertion can make; it is that a felt row can now
+    // name a CLOTH and get a different painter, and that the new id is legal
+    // everywhere it has to be.
+    //
+    // The last part is the one worth a scenario. A felt id exists in three
+    // hand-mirrored places (tests/felt-ids.test.mjs guards the lists as text),
+    // and the way that fails is asymmetric and quiet: a felt missing from the
+    // SERVER's allowlist works perfectly in solo and silently refuses to stick
+    // at a shared table, because the settings patch is 400'd and the client
+    // just never sees the echo. So this drives it through the real wire.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.settle();
+
+      const spread = (t) => t.eval(`JSON.stringify((() => {
+        const d = window.__diceDebug, pts = [];
+        for (let i = 0; i < 24; i++) for (let j = 0; j < 24; j++) {
+          pts.push([-2.5 + (i + 0.37) * 5 / 24, -2.5 + (j + 0.53) * 5 / 24]);
+        }
+        const lum = pts.map(([x, z]) => { const p = d.feltPixel(x, z); return p[0] + p[1] + p[2]; });
+        return { spread: Math.max(...lum) - Math.min(...lum) };
+      })())`).then((r) => JSON.parse(r).spread);
+
+      await a.dbg(`setFelt('walnut')`);
+      await a.waitFor(`window.__diceDebug.breathProbe().felt === 'walnut'`, { desc: 'walnut lands' });
+      const feltSpread = await spread(a);
+
+      await a.dbg(`setFelt('silt')`);
+      await a.waitFor(`window.__diceDebug.breathProbe().felt === 'silt'`, { desc: 'silt lands' });
+      const siltSpread = await spread(a);
+
+      // A DIFFERENT PAINTER RAN, stated as the thing that distinguishes them:
+      // felt is fine slubs and measured 13-24 across all nine cloths, while
+      // silt is a bimodal bed — thousands of sub-pixel grains under a smaller
+      // population of much darker angular fragments — so its contrast is far
+      // wider. If `cloth` were ignored and silt were merely a new colour, this
+      // would land in the felt band.
+      assert.ok(feltSpread < 40, `felt is fine-grained (spread ${feltSpread})`);
+      assert.ok(siltSpread > 60,
+        `silt is a coarser, bimodal bed, not felt in a new colour `
+        + `(spread ${siltSpread} against felt's ${feltSpread})`);
+
+      // THE SWATCH SHOWS THE CLOTH. renderFeltSwatches paints the chip from
+      // the real tile, so a cloth that never reached the painter would show
+      // the wrong surface in the picker while the table showed the right one.
+      const chips = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const els = [...document.querySelectorAll('.felt-swatch')];
+        const one = els.find((e) => e.dataset.felt === 'silt');
+        const other = els.find((e) => e.dataset.felt === 'walnut');
+        const img = (e) => (e && e.querySelector('.swatch-dot')||{}).style?.backgroundImage || '';
+        return { n: els.length, silt: img(one).length, walnut: img(other).length,
+                 same: img(one) === img(other) };
+      })())`));
+      assert.ok(chips.n >= 10, `the picker offers every cloth (${chips.n} chips)`);
+      assert.ok(chips.silt > 100, 'the silt chip is painted from a real tile');
+      assert.ok(!chips.same, '…and it is not the felt tile wearing a new name');
+
+      // AND IT SURVIVES THE WIRE. This is the check that catches a felt the
+      // server would refuse: Bob is a second client in the same room, so he
+      // only ever sees silt if the patch was accepted and echoed.
+      await b.waitFor(`window.__diceDebug.breathProbe().felt === 'silt'`,
+        { desc: 'the other seat sees silt too, so the server accepted it' });
+    },
+  },
+  {
     name: 'no-die-sits-in-fog',
     tags: ['mat', 'chrome'],
     // THE MAT WAS INSIDE ITS OWN FOG. fogNear was dialled by eye at 15 against

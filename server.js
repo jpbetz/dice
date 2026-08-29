@@ -290,7 +290,7 @@ const DIE_TYPES = Object.keys(DIE_MAX);
 // needs the same capping and control-char stripping a roll label gets, and a
 // boolean checker has no way to hand the cleaned value back.
 const FELT_THEMES = ['emerald', 'crimson', 'midnight', 'slate', 'walnut',
-  'obsidian', 'ocean', 'plum', 'sand'];
+  'obsidian', 'ocean', 'plum', 'sand', 'silt'];
 
 // Interpretation systems (GOALS.md goal 6, docs/ROADMAP.md §2): which profile
 // in js/meanings.js reads a roll's numbers — 'soul-deal' (the meaning chart),
