@@ -625,6 +625,8 @@ export function bedAirHz(sampleRate, hz) {
 //   length  envelope trim, in the same direction and for the same reason.
 //   gain    plain absorption. The 0.35 impact ceiling is applied OUTSIDE this
 //           multiplier, so a cloth may only ever take away from §5's mix plan.
+//           IT IS THE ONE DIAL THAT IS CAPPED AT 1, and the cap is about the
+//           mix rather than about materials — see the note below.
 //   tail    multiplies the settle cluster's geometric ratio, and therefore
 //           decides HOW MANY TAPS THERE ARE — `settleTail` below stops at 1%
 //           of the first one. Felt gives a die three or four bounces back;
@@ -639,6 +641,20 @@ export function bedAirHz(sampleRate, hz) {
 //           The rolling voice is one AM parameter away from being a hiss (the
 //           depth is what makes the clacks discrete, §3.3), so this is the
 //           whole "grind → hiss" move and it costs one multiply.
+//
+// A CLOTH MAY GO UP, AND ONLY LEVEL MAY NOT (changed 2026-08-29 for Taproom
+// Oak). The first cut of this table copied the venue rule — "the ground only
+// ever subtracts" — and that rule is right for a VENUE, whose reference is
+// the room you are already in, and wrong for a CLOTH, whose reference is a
+// wool weave over a hard table. A plank table is not a quieter felt: it is
+// brighter, it rings longer and it hands the die back more times, and every
+// one of those is a multiplier above 1. So `centre`, `length`, `tail` and
+// `grind` are free in both directions and only `gain` keeps its cap, for the
+// one reason that has nothing to do with materials: §5's mix plan is a
+// CEILING, the 0.35 clamp is applied before this multiply, and a row with
+// `gain: 1.4` would lift a landing straight through it. A hard surface sells
+// itself on DURATION at an unchanged peak, which is the tap-tail finding
+// exactly.
 //
 // THE FELT ROW IS ALL IDENTITY, so every table that has ever been played
 // sounds byte-identical after this change BY CONSTRUCTION rather than by
@@ -663,6 +679,28 @@ export const CLOTH_VOICES = {
   silt: {
     label: 'a hand of dry grain over stone',
     centre: 0.58, length: 0.6, gain: 0.85, tail: 0.45, grind: 1.7, fizz: 0.75,
+  },
+  // THE OTHER END OF THE REGISTER. Everything above swallows a die; this
+  // hands it back. `tail: 1.6` takes the geometric ratio from 0.42 to 0.672,
+  // which is TWELVE taps over ~257 ms against the felt's six over ~145 — and
+  // the count is what a hard surface actually sounds like, because the peak
+  // cannot move: the 0.35 clamp sits outside `gain`, so a plank table sells
+  // itself on how long it goes on.
+  //
+  // WHY NOT THE ~410 ms THE TAP-TAIL FINDING NAMED. The gaps are geometric,
+  // so the tail's length is T0/(1−e) and 410 ms needs e ≈ 0.8, which is 21
+  // taps — 420 scheduled one-shots on a twenty-die throw, each of them three
+  // nodes. The cost is what stopped it, not the taste; `tail` is the dial if
+  // Joe wants the longer one and is willing to pay for it.
+  //
+  // `fizz: 0` and not a negative number: wood should be MORE clacky than
+  // wool, but the AM depth is already clamped at 0.95 and pushing the
+  // modulation past the 0.35 DC term inverts the voice on every trough, which
+  // is distortion rather than brightness. Oak's clack comes from `centre` and
+  // from the tail instead.
+  oak: {
+    label: 'a waxed plank table',
+    centre: 1.3, length: 1.35, gain: 1, tail: 1.6, grind: 1.35, fizz: 0,
   },
 };
 
@@ -689,7 +727,12 @@ export function clothVoiceFor(venueId, cloth) {
 export const TAP_E = 0.42;         // the geometric ratio, gaps and amplitudes alike
 export const TAP_T0 = 0.085;       // seconds — the first gap
 export const TAP_A0_FRAC = 0.5;    // of the landing impact's computed gain
-export const TAP_MAX = 8;
+// A BOUND ON COST, NOT A SHAPER OF ANY TAIL. It was 8 while the felt's six
+// were the longest thing here; oak's twelve would have been silently
+// truncated by it, which is the shape of bug that ships sounding "fine". 16
+// keeps every shipped cloth ending at the 1% floor instead of at the cap, and
+// `tests/voices.test.mjs` asserts exactly that.
+export const TAP_MAX = 16;
 export const TAP_FLOOR_FRAC = 0.01; // stop when a tap is under 1% of A0
 
 // `[{ decay, gap }]`, jitter-free and cloth-aware. Ends at the floor, so its

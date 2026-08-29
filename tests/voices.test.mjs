@@ -81,7 +81,7 @@ import {
   BED_PINK, BED_BROWN, BED_CRACKLE, BED_TICK_SHAPE, BED_SWELL,
   PINK_BUFFER_RMS, BROWN_BUFFER_RMS, MATERIAL_BOUNDARY_HZ,
   impactSpectrum, bedProfile, bedDistance, biquadMag,
-  CLOTH_VOICES, CLOTH_DEFAULT, clothVoiceFor, settleTail, TAP_E, TAP_T0,
+  CLOTH_VOICES, CLOTH_DEFAULT, clothVoiceFor, settleTail, TAP_E, TAP_T0, TAP_MAX,
 } from '../js/voices.js';
 // THE SET REGISTRY ITSELF, because the kill is the ABSENCE of a field on one
 // row and nothing in js/voices.js can see that. `SETS` and not `THEMES`: it is
@@ -798,22 +798,65 @@ t('a venue lays its floor OVER the mat, so the cloth says nothing there', () => 
   assert.equal(clothVoiceFor('table', undefined), CLOTH_VOICES.felt);
 });
 
-t('a cloth only ever subtracts from the mix plan', () => {
-  // Same rule as the venue rows: §5's mix plan is a ceiling and every tier
-  // under it may take away. `grind` is exempt and only `grind` — it is a
-  // FILTER FREQUENCY, not a level, and the fizz beside it removes energy from
-  // the same voice it brightens.
+t('only LEVEL is capped — a cloth may go up in every other dimension', () => {
+  // THE RULE CHANGED FOR OAK (2026-08-29) and this is the assertion that
+  // records why. The first cut copied the venue rule — "the ground only ever
+  // subtracts" — which is right for a venue, whose reference is the room you
+  // are in, and wrong for a cloth, whose reference is wool over a hard table.
+  // A plank table is not a quieter felt.
   for (const [id, c] of Object.entries(CLOTH_VOICES)) {
-    assert.ok(c.gain <= 1 && c.centre <= 1 && c.length <= 1,
-      `${id}: the cloth only ever subtracts`);
-    assert.ok(c.tail > 0 && c.tail <= 1, `${id}: and never adds a bounce`);
-    assert.ok(c.fizz >= 0 && c.fizz < 1, `${id}: fizz is a fraction of the depth`);
+    // §5's mix plan is a CEILING: the 0.35 clamp is applied before this
+    // multiply, so a row with gain 1.4 would lift a landing through it.
+    assert.ok(c.gain > 0 && c.gain <= 1,
+      `${id}: level is the one capped dial (${c.gain})`);
+    assert.ok(c.centre > 0 && c.length > 0 && c.tail > 0 && c.grind > 0,
+      `${id}: every multiplier is a multiplier`);
+    assert.ok(c.fizz >= 0 && c.fizz < 1,
+      `${id}: fizz is a fraction of the depth — a negative one would push the `
+      + 'modulation past the DC term and invert the voice on every trough');
     assert.ok(typeof c.label === 'string' && c.label.length > 0,
       `${id}: says what it is`);
     // A cloth with no taps at all would be a die landing in silence, which is
     // a bug rather than a material.
     assert.ok(settleTail(c).length >= 2, `${id}: a landing is still an event`);
+    // AND NO SHIPPED TAIL IS TRUNCATED BY THE CAP. TAP_MAX is a bound on
+    // cost; a cloth whose tail ends because it ran out of budget sounds
+    // arbitrarily cut, and oak's twelve taps would have hit the old cap of 8
+    // in exactly that way. Every tail must end at the 1% floor instead.
+    assert.ok(settleTail(c).length < TAP_MAX,
+      `${id}: its tail ends at the floor, not at TAP_MAX (${TAP_MAX})`);
   }
+});
+
+t('oak HANDS THE DIE BACK — the register\'s other end', () => {
+  const oak = CLOTH_VOICES.oak;
+  const felt = CLOTH_VOICES.felt;
+  const silt = CLOTH_VOICES.silt;
+  // The three cloths are three answers to one question, and the ORDER is the
+  // design: grain catches, wool absorbs, wood returns.
+  const taps = (c) => settleTail(c).length;
+  assert.ok(taps(silt) < taps(felt) && taps(felt) < taps(oak),
+    `silt ${taps(silt)} < felt ${taps(felt)} < oak ${taps(oak)}`);
+  const len = (c) => settleTail(c).reduce((a, x) => a + x.gap, 0);
+  assert.ok(len(oak) > len(felt) * 1.5,
+    `and oak goes on ${Math.round(len(oak) * 1000)} ms against the felt's `
+    + `${Math.round(len(felt) * 1000)}`);
+  // AT AN UNCHANGED PEAK, which is the tap-tail finding and the reason a hard
+  // surface can be sold at all under a ceiling: gain is clamped at 0.35 before
+  // the cloth multiplies, duration is not.
+  assert.equal(oak.gain, 1, 'oak takes nothing away and cannot add');
+  // Brighter, both on the knock and on the scrape — and unlike silt these two
+  // point the SAME way, because a hard surface is hard to a landing and to a
+  // drag alike. That silt and oak differ in this shape is the whole argument
+  // for two numbers instead of one.
+  const bare = spectrumOf({}, 1);
+  const wood = spectrumOf({}, oak.centre);
+  assert.ok(wood.centroidHz > bare.centroidHz,
+    `a landing on wood is brighter than on felt `
+    + `(${bare.centroidHz} → ${wood.centroidHz} Hz)`);
+  assert.ok(oak.grind > 1 && oak.centre > 1, 'and so is the scrape');
+  assert.ok(silt.centre < 1 && silt.grind > 1,
+    'while grain still disagrees with itself, which is what makes it grain');
 });
 
 console.log(`voices: ${n} assertions run`);

@@ -1906,6 +1906,11 @@ const FELT_THEMES = {
   // full strength reads as damp patches rather than as nap.
   silt:     { name: 'Silt',     feltBase: '#a2977f', sceneBg: '#1a1712',
               breath: 0.85, cloth: 'silt', mottle: 0.45 },
+  // THE HARD SURFACE, and the register's other end: every row above swallows
+  // a die and this one hands it back. `mottle` 0.6 because a waxed board
+  // catches light unevenly along its length, but far less than a nap does.
+  taproom:  { name: 'Taproom',  feltBase: '#544530', sceneBg: '#191310',
+              breath: 1.1, cloth: 'oak', mottle: 0.6 },
 };
 const DEFAULT_FELT = 'obsidian';
 let currentFeltId = DEFAULT_FELT;
@@ -2014,6 +2019,7 @@ const FELT_REPEAT = 160 / FELT_TILE_U;   // tiles across the plane
 const FELT_CLOTHS = {
   felt: paintFeltCloth,
   silt: paintSiltCloth,
+  oak: paintOakCloth,
 };
 const DEFAULT_CLOTH = 'felt';
 
@@ -2199,6 +2205,154 @@ function paintSiltCloth(ctx, rnd) {
         if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.stroke();
+    }
+  }
+}
+
+// TAPROOM OAK — the register's hard surface, and the first cloth that is not
+// soft (ROADMAP: Joe's "one of each, deliberately"). The roster had drifted to
+// near-black wool: nine felts and a bed of grain, all of which SWALLOW a die.
+// A waxed plank table is the opposite argument in every dimension the tier
+// has — brighter, longer, more bounce — which is why it was taken before the
+// prettier candidates. It is the one that decides whether a cloth row can go
+// UP (js/voices.js §4b; before this the whole table could only subtract).
+//
+// THE TILE CARRIES ONLY WHAT IS STATISTICALLY SEAMLESS — the rule the felt's
+// header states and the rule wood is hardest on, because wood is the material
+// people read landmarks in. Three things a taproom table obviously has were
+// refused for exactly that reason, and refusing them is most of why this reads
+// as boards rather than as wallpaper:
+//
+//   · KNOTS. A knot is a landmark. One per tile is 1,024 identical knots on a
+//     32x32 grid across the plane, and the eye finds that grid instantly —
+//     the same failure the painted mottle had before it moved to the geometry.
+//   · BUTT JOINTS. Plank ends would repeat every five units in a lattice. A
+//     taproom table's boards run its whole length anyway, so the honest
+//     surface has none in the play area.
+//   · RING STAINS from tankards. The most tavern-ish mark available and the
+//     worst offender: a low-frequency blot, clipped by the tile, repeating.
+//
+// What is left is what a plank floor is actually MADE of at this density:
+// board tone, the groove between boards, ring-porous grain running the length,
+// and the pore flecks that say oak rather than pine. All four are periodic or
+// tiny, which is what lets them tile.
+const OAK_PLANKS = 4;   // per tile: 1.25 world units a board, ~10 cm at a d6's scale
+
+function paintOakCloth(ctx, rnd) {
+  const H = FELT_TILE_PX / OAK_PLANKS;
+  const TAU = Math.PI * 2;
+  // A grain line runs the full width and must arrive where it left: the
+  // displacement is a sine with an INTEGER number of periods across the tile,
+  // the same construction the silt rake uses, so y(0) === y(TILE) exactly.
+  const wave = (periods, amp, phase) => (x) =>
+    Math.sin((x / FELT_TILE_PX) * TAU * periods + phase) * amp;
+
+  for (let p = 0; p < OAK_PLANKS; p++) {
+    const top = p * H;
+    // 1. BOARD TONE. Boards are cut from different parts of a log and no two
+    // take the wax the same way; a floor of identical boards reads as a
+    // printed pattern. Flat within the board, so it cannot break the seam.
+    // KEPT DELIBERATELY LOW-CONTRAST, and this is the correction the first
+    // look forced. Boards ARE periodic — like the silt rake, a plank floor is
+    // meant to be regular, and repeating the SEAMS every five units is
+    // honest. What must not repeat is a board's CHARACTER: at the first
+    // strength (±0.10 alpha, plus wide dark figure bands) the eye read the
+    // four-board tone sequence as a pattern and the floor became wallpaper.
+    // So the boards differ just enough to be separate boards, and the grain —
+    // which is high-frequency and busy — carries the interest.
+    const tone = (rnd() - 0.5) * 2;
+    ctx.fillStyle = tone > 0
+      ? `rgba(255,232,198,${0.012 + tone * 0.032})`
+      : `rgba(26,14,5,${0.012 - tone * 0.042})`;
+    ctx.fillRect(0, top, FELT_TILE_PX, H);
+    // …and the FIGURE under it: two or three wide soft bands running the
+    // length of the board. Without them a board is a flat field with lines on
+    // it, which is what makes cheap wood textures read as laminate — the
+    // low-frequency variation is the difference between a board and a decal.
+    // Integer periods, so they meet at the seam like everything else here.
+    for (let f = 0; f < 1 + Math.floor(rnd() * 3); f++) {
+      const fy = top + rnd() * H;
+      const fh = H * (0.08 + rnd() * 0.16);
+      const dark = rnd() < 0.65;
+      const fw = wave(1 + Math.floor(rnd() * 2), 4 + rnd() * 10, rnd() * TAU);
+      ctx.fillStyle = dark
+        ? `rgba(24,13,4,${0.025 + rnd() * 0.035})`
+        : `rgba(255,228,190,${0.012 + rnd() * 0.022})`;
+      for (let x = 0; x <= FELT_TILE_PX; x += 8) {
+        ctx.fillRect(x, fy + fw(x), 8.5, fh);
+      }
+    }
+
+    // 2. THE GRAIN. Ring-porous hardwood is not evenly striped: it is bands of
+    // dense late wood (dark, narrow) separated by open early wood (pale,
+    // wide), and the tell is that the dark lines come in tight groups. So the
+    // lines are drawn in CLUSTERS around a drifting centre rather than at
+    // uniform random — uniform random reads as brushed metal.
+    const RINGS = 34;
+    for (let r = 0; r < RINGS; r++) {
+      const centre = top + ((r + 0.5) / RINGS) * H + (rnd() - 0.5) * (H / RINGS);
+      const periods = 1 + Math.floor(rnd() * 3);
+      const amp = 2 + rnd() * 7;
+      const phase = rnd() * TAU;
+      const w = wave(periods, amp, phase);
+      const lines = 2 + Math.floor(rnd() * 4);
+      for (let i = 0; i < lines; i++) {
+        const off = (i - lines / 2) * (1.2 + rnd() * 2.2);
+        const dark = rnd() < 0.78;
+        const a0 = dark ? 0.07 + rnd() * 0.17 : 0.015 + rnd() * 0.035;
+        const rgb = dark ? '28,15,4' : '255,228,190';
+        ctx.lineWidth = 0.6 + rnd() * 1.7;
+        // A GRAIN LINE FADES IN AND OUT ALONG ITS LENGTH, and this is what
+        // separates wood from BRUSHED METAL. A line of constant alpha running
+        // the full width is a machined scratch; a real ring surfaces, dives
+        // under the plane and comes back. So the line is drawn in segments
+        // whose alpha rides its own slow wave — INTEGER periods again, so the
+        // strength on the left edge is the strength on the right and the
+        // fade does not become a visible break repeated 32 times.
+        const fade = wave(1 + Math.floor(rnd() * 2), 1, rnd() * TAU);
+        const STEP = 32;
+        for (let x = 0; x < FELT_TILE_PX; x += STEP) {
+          const m = 0.25 + 0.75 * Math.abs(fade(x + STEP / 2));
+          ctx.strokeStyle = `rgba(${rgb},${a0 * m})`;
+          ctx.beginPath();
+          ctx.moveTo(x, centre + off + w(x));
+          ctx.lineTo(x + STEP / 2, centre + off + w(x + STEP / 2));
+          ctx.lineTo(x + STEP, centre + off + w(x + STEP));
+          ctx.stroke();
+        }
+      }
+    }
+
+    // 3. THE PORES. Oak's vessels are open and they are what separates it from
+    // pine at reading distance: short dark dashes lying ALONG the grain, never
+    // across it. Small enough not to need wrapping in y, wrapped in x because
+    // a 3-9 px dash at the seam is a visible dotted line at 32 tiles.
+    for (let i = 0; i < 2600; i++) {
+      const x = rnd() * FELT_TILE_PX;
+      const y = top + 3 + rnd() * (H - 6);
+      const len = 3 + rnd() * 6;
+      const a = 0.07 + rnd() * 0.16;
+      ctx.fillStyle = `rgba(24,12,3,${a})`;
+      feltWrapped(x, y, len + 2, (px, py) => ctx.fillRect(px, py, len, 1 + rnd() * 0.9));
+    }
+  }
+
+  // 4. THE GROOVE BETWEEN BOARDS. A dark line with a lit lip BELOW it: the key
+  // sits at (8, 30, 10), canvas +y is world +z, so the near edge of a chamfer
+  // is the one that catches the lamp — the same reasoning the silt fragments'
+  // catchlight uses, and the pair is what makes a seam read as two boards
+  // meeting rather than as a drawn line.
+  //
+  // Drawn at 0 AND at the tile height, because the seam at y=0 is the wrap
+  // seam and half of it lives at the other edge.
+  for (let p = 0; p < OAK_PLANKS; p++) {
+    for (const yy of [p * H, p * H + FELT_TILE_PX]) {
+      ctx.fillStyle = 'rgba(16,8,2,0.55)';
+      ctx.fillRect(0, yy - 1.3, FELT_TILE_PX, 2.6);
+      ctx.fillStyle = 'rgba(255,240,214,0.14)';
+      ctx.fillRect(0, yy + 1.5, FELT_TILE_PX, 1.8);
+      ctx.fillStyle = 'rgba(22,12,4,0.16)';
+      ctx.fillRect(0, yy - 5, FELT_TILE_PX, 3.7);
     }
   }
 }

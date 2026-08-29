@@ -1828,6 +1828,140 @@ export const scenarios = [
     },
   },
   {
+    name: 'oak-is-a-hard-surface',
+    tags: ['mat', 'audio', 'net'],
+    timeout: 300000,
+    // TAPROOM OAK — the register's other end (Joe's "one of each,
+    // deliberately"). Ten mats swallow a die; this one hands it back, and it
+    // is the first row that made the cloth tier go UP: before it, every dial
+    // in CLOTH_VOICES could only subtract, which is the venue's rule copied
+    // onto a table whose reference is wool rather than a room.
+    //
+    // WHAT THIS CAN CLAIM. Not that it looks like oak — that is Joe's. That
+    // the surface is BANDED where a weave is not, that the voice reaches the
+    // landing and the tail with the row's own factors, that the peak does NOT
+    // move (a hard surface sells on duration, because §5's ceiling is applied
+    // before the cloth multiplies), and that the id is legal on the wire.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.settle();
+      const S = 50;
+      const voicing = () => a.dbg(`impactVoicingFor(${S}, 'std', {})`);
+      const near = (got, want, msg) => assert.ok(
+        Math.abs(got - want) <= Math.max(2e-9, Math.abs(want) * 1e-5),
+        `${msg} — got ${got}, expected ${want}`);
+      const wear = async (id) => {
+        await a.dbg(`setFelt(${JSON.stringify(id)})`);
+        await a.waitFor(`window.__diceDebug.breathProbe().felt === ${JSON.stringify(id)}`,
+          { desc: `${id} is the table's mat` });
+      };
+
+      // ---- ① A PLANK TABLE IS BANDED, AND A WEAVE IS NOT ------------------
+      // Measured as how much whole ROWS of the tile differ from one another,
+      // which is the one number that separates boards from everything else
+      // here: a weave is isotropic at this scale and a bed of grain is nearly
+      // so, but a plank floor is long bands with grooves between them.
+      // Measured 2026-08-29: felt 0.5, silt 3.1, oak 8.4.
+      const bandedness = (t) => t.eval(`JSON.stringify((() => {
+        const d = window.__diceDebug;
+        const lum = (x, z) => { const p = d.feltPixel(x, z); return p[0] + p[1] + p[2]; };
+        const rows = [];
+        for (let i = 0; i < 64; i++) {
+          const z = -2.5 + (i + 0.5) * 5 / 64;
+          let s = 0;
+          for (let j = 0; j < 24; j++) s += lum(-2.5 + (j + 0.17) * 5 / 24, z);
+          rows.push(s / 24);
+        }
+        const mean = rows.reduce((p, c) => p + c, 0) / rows.length;
+        const sd = Math.sqrt(rows.reduce((p, c) => p + (c - mean) ** 2, 0) / rows.length);
+        return { sd, mean, n: rows.length };
+      })())`).then((r) => JSON.parse(r));
+
+      await wear('walnut');
+      const weave = await bandedness(a);
+      // Guard the guard: a sampler reading zeroes agrees with everything.
+      assert.ok(weave.mean > 40 && weave.n === 64,
+        `the sampler read real cloth (mean luminance ${Math.round(weave.mean)})`);
+      await wear('taproom');
+      const boards = await bandedness(a);
+      assert.ok(weave.sd < 1.5,
+        `a weave has no bands to speak of (row sd ${weave.sd.toFixed(2)})`);
+      assert.ok(boards.sd > 6,
+        `and a plank table is made of them (row sd ${boards.sd.toFixed(2)} `
+        + `against the felt's ${weave.sd.toFixed(2)})`);
+
+      // ---- ② THE VOICE GOES UP, AND THE PEAK DOES NOT ---------------------
+      const c = await a.dbg('clothAudioInfo()');
+      assert.equal(c.id, 'oak', 'the taproom row names its own cloth');
+      const d = c.declared;
+      assert.ok(d.centre > 1 && d.length > 1 && d.tail > 1,
+        `wood is brighter, longer and bouncier than wool (${JSON.stringify(d)})`);
+      await wear('walnut');
+      const impFelt = await voicing();
+      await wear('taproom');
+      const impOak = await voicing();
+      near(impOak.centre, impFelt.centre * d.centre,
+        'the landing brightens by the cloth’s own factor');
+      near(impOak.durSec, impFelt.durSec * d.length,
+        'and rings longer by the cloth’s own factor');
+      // THE CEILING IS THE POINT. `gain: 1` is not laziness: the 0.35 clamp is
+      // applied BEFORE the cloth multiplies, so a louder row would lift a
+      // landing straight through §5's mix plan. A hard surface is sold on how
+      // long it goes on, at an unchanged peak — the tap-tail finding, made an
+      // assertion.
+      assert.equal(d.gain, 1, 'oak takes nothing away and cannot add');
+      assert.equal(impOak.gain, impFelt.gain,
+        `so the peak does not move (${impOak.gain})`);
+
+      // ---- ③ TWELVE TAPS, AND NONE OF THEM CUT BY THE BUDGET --------------
+      // TAP_MAX was 8 while the felt's six were the longest thing in the app.
+      // Oak's twelve would have been silently truncated by it — a tail that
+      // ends because it ran out of budget rather than because it ran out of
+      // energy, which is the shape of bug that ships sounding "fine".
+      assert.equal(c.tail.length, 12, `oak hands the die back twelve times`);
+      await wear('walnut');
+      assert.equal((await a.dbg('clothAudioInfo()')).tail.length, 6,
+        'and the felt still six, exactly as it always has');
+
+      // …AND THE DECLARED SCHEDULE IS THE RENDERED ONE. The row is a claim
+      // about a projection until a bake wears it.
+      await wear('taproom');
+      await a.dbg('audioForce(true)');
+      await a.dbg('holdClock(true)');
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+      // Three dice and a seed known to land all three: a die whose recorded
+      // landing strength is zero schedules no cluster at all, which is a
+      // legitimate film and a useless subject.
+      await a.dbg(`throwSeeded(['d6','d6','d6'], 7314)`);
+      await a.eval('(() => { const D = window.__diceDebug;'
+        + ' for (let w = 0; w < 1800 && !D.busy; w++) D.sim(1);'
+        + ' return 1; })()');
+      await a.eval('(() => { const D = window.__diceDebug;'
+        + ' for (let f = 0; f < 9000 && D.busy; f++) D.sim(1); return 1; })()');
+      const settle = await a.dbg('audioSettleInfo()');
+      assert.ok(settle.plans.length === settle.dice && settle.dice === 3,
+        `every die scheduled a tail (${settle.plans.length} for ${settle.dice})`);
+      for (const p of settle.plans) {
+        assert.equal(p.gaps.length, 12,
+          `die ${p.di}: the rendered cluster is the declared one (${p.gaps.length} taps)`);
+        const total = p.gaps.reduce((s, x) => s + x, 0);
+        assert.ok(total > 0.2 && total < 0.4,
+          `die ${p.di}: and it goes on for ${Math.round(total * 1000)} ms`);
+      }
+      await a.dbg('holdClock(false)');
+      await a.dbg('audioForce(false)');
+
+      // ---- ④ AND IT IS LEGAL ON THE WIRE ----------------------------------
+      // The asymmetric failure tests/felt-ids.test.mjs guards as text: a mat
+      // the server does not know works perfectly in solo and silently refuses
+      // to stick at a shared table.
+      await b.waitFor(`window.__diceDebug.breathProbe().felt === 'taproom'`,
+        { desc: 'the other seat sees the taproom too, so the server accepted it' });
+    },
+  },
+  {
     name: 'no-die-sits-in-fog',
     tags: ['mat', 'chrome'],
     // THE MAT WAS INSIDE ITS OWN FOG. fogNear was dialled by eye at 15 against
