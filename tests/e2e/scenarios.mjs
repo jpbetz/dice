@@ -1456,6 +1456,112 @@ export const scenarios = [
     },
   },
   {
+    name: 'felt-grain-is-seeded',
+    tags: ['mat', 'net'],
+    // TWO PLAYERS AT ONE TABLE SAW TWO DIFFERENT CLOTHS. js/decals.js states
+    // the rule in its own header — "the atlas must draw identically every boot
+    // (screenshots, and two tabs of one table should agree about what frost
+    // looks like)" — and the felt was the one atlas in the app that never
+    // followed it: 14 000 specks and 18 mottles laid down with bare
+    // Math.random, re-rolled on every load, per client.
+    //
+    // This was never a goal-15 correctness bug and the claim is not that it
+    // was: the bake never reads a canvas, so the FILM always agreed. It is the
+    // weaker and still real claim that one table should look like one table.
+    //
+    // Nothing could have caught it by looking at one client — there is no
+    // wrong pixel, only a pixel that disagrees with the one next door's. So
+    // the check needs two clients, which is what makes it worth a scenario
+    // rather than a unit test.
+    async fn(ctx) {
+      const SIG = `JSON.stringify((() => {
+        const d = window.__diceDebug, pts = [];
+        for (let x = -6; x <= 6; x += 1.5) for (let z = -3; z <= 3; z += 1.5) pts.push([x, z]);
+        return { n: pts.length, sig: pts.map(([x, z]) => (d.feltPixel(x, z) || []).join(',')).join('|') };
+      })())`;
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.settle();
+      await b.settle();
+      const A = JSON.parse(await a.eval(SIG));
+      const B = JSON.parse(await b.eval(SIG));
+      // Guard the guard: a sampler that reads nothing agrees with everything.
+      assert.ok(A.n >= 40 && A.sig.length > 200,
+        `the sampler actually read the cloth (${A.n} points, ${A.sig.length} bytes)`);
+      assert.ok(/[1-9]/.test(A.sig), '…and read real pixel values, not a blank atlas');
+      assert.equal(A.sig, B.sig, 'two clients at one table see the same cloth');
+    },
+  },
+  {
+    name: 'mat-text-fits-the-mat',
+    tags: ['mat', 'chrome', 'roll'],
+    // THE DECLARATION RAN OFF EVERY ZOOM FOR THE LIFE OF THE FEATURE, and no
+    // check could have caught it: the line was painted into the 2048² floor
+    // atlas, and nothing samples glyphs. It was found by looking at the frame
+    // (2026-08-29) — at `medium`, the default, "THE GATE OF STORMS" rendered
+    // as "ATE OF ST", off both edges and blurred to mush.
+    //
+    // The two constants that did it — fit to 26 world units, seat at z +3.4 —
+    // were survivors of the 30-unit mat, exactly like the shelf pitch C25
+    // caught. Against today's 8.6–14.1 ladder they let the line run up to 3×
+    // the mat's width and sat it ACROSS the front wall at all three zooms.
+    //
+    // So this asserts the claim in WORLD units, which is the only frame the
+    // bug was ever visible in: the band lies inside the walls, at every zoom,
+    // for a line long enough to have overflowed the old one. Asserting "some
+    // canvas got painted" is what the old code would also have passed.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+      const LINE = 'The Gate Of Storms'; // 18 chars — ~2.4× the old fit budget
+      for (const zoom of ['wide', 'medium', 'close']) {
+        await a.dbg('clearTable()');
+        // The zoom must land BEFORE the declaration: queueZoom defers while a
+        // roll is live (tableIsBusyForZoom), so setting it mid-ceremony leaves
+        // `pendingZoom` set and the mat untouched — which is correct behaviour
+        // and also the shape that made a hand-check of this silently vacuous.
+        await a.dbg(`setZoom(${JSON.stringify(zoom)})`);
+        await a.settle();
+        await a.dbg(`commandRoll(${JSON.stringify(`2d6 cinematic # ${LINE}`)})`);
+        // WAIT ON THE STATE, NOT A STEP COUNT. `sim()` drives the FILM clock,
+        // and the declare beat is deliberately not on it (a held declaration
+        // is reading time, not dice) — so no number of sim frames raises the
+        // line, and a scenario that guessed one would fail for the wrong
+        // reason today and pass vacuously the day the beat is retimed.
+        await a.waitFor('window.__diceDebug.matTextProbe().standing === true',
+          { desc: `${zoom}: the declare beat raises the mat text` });
+        const p = JSON.parse(await a.eval('JSON.stringify(window.__diceDebug.matTextProbe())'));
+        assert.ok(p.standing && p.visible, `${zoom}: the declaration is on the felt`);
+        assert.equal(p.text, LINE, `${zoom}: …and it is the line that was asked for`);
+        assert.ok(p.fits,
+          `${zoom}: the declaration lies inside the walls — band x [${p.box.x0}, ${p.box.x1}] `
+          + `z [${p.box.z0}, ${p.box.z1}] against walls ±${p.wall.x} / ±${p.wall.z}`);
+        // The other half of the bug: it must also be legible. The floor atlas
+        // gives 12.8 px per world unit, which is why no font size could fit a
+        // line inside the mat and why the old code stopped trying.
+        assert.ok(p.pxPerUnit > 100,
+          `${zoom}: the line is set at ${p.pxPerUnit.toFixed(0)} px/unit, not the atlas's 12.8`);
+        // A quad that wrote depth would lift every die that landed over the
+        // line — `surfaceUnder` seats a die on the highest depth-writing hit.
+        assert.equal(p.depthWrite, false,
+          `${zoom}: the band never writes depth, so it cannot seat a die`);
+
+        // GUARD THE GUARD. Everything above passes trivially if `fits` is a
+        // predicate that cannot say no, which is this repo's dominant failure
+        // shape. So run the SAME predicate over the geometry the bug actually
+        // had at this zoom — fitted to 26 world units, seated centred at
+        // z +3.4, ~2.34 units of cap height — and require it to reject.
+        const old = { x0: -13, x1: 13, z0: 3.4 - 1.17, z1: 3.4 + 1.17 };
+        const fitsOld = old.x0 >= -p.wall.x && old.x1 <= p.wall.x
+          && old.z0 >= -p.wall.z && old.z1 <= p.wall.z;
+        assert.equal(fitsOld, false,
+          `${zoom}: …and the check can still fail — the pre-2026-08-29 band `
+          + `(x ±13, z ${old.z0.toFixed(2)}–${old.z1.toFixed(2)}) is rejected `
+          + `against walls ±${p.wall.x} / ±${p.wall.z}`);
+      }
+    },
+  },
+  {
     name: 'debug-surface-answers',
     tags: ['quality'],
     // A DEBUG HOOK THAT THROWS IS INVISIBLE TO THIS SUITE unless something

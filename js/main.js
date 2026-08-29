@@ -1734,6 +1734,24 @@ const collected = new Map();
 // cleared. Solo enforces it locally (soloCollectEntries) so both modes agree.
 const COLLECT_CAP = 5;
 
+// THE FELT'S GRAIN IS SEEDED, like every other atlas in the app.
+//
+// js/decals.js learned this first and says why in one line — "the atlas must
+// draw identically every boot (screenshots, and two tabs of one table should
+// agree about what frost looks like)". The felt was the one surface still
+// drawn with bare Math.random, so until 2026-08-29 the cloth was a different
+// cloth on every reload and a DIFFERENT cloth for every player in the room:
+// same theme, same hex, 14 000 specks and 18 mottles laid down somewhere else.
+// Nothing caught it because nothing could — there is no wrong pixel to assert,
+// only a pixel that disagrees with the one next door's.
+//
+// This is NOT the film, so it was never a goal 15 correctness bug: the bake is
+// a function of the seed and never reads a canvas. It is the weaker claim that
+// one table should look like one table. The seed is the base color itself,
+// which is also the cache key, so a theme's grain is stable for the life of
+// the deployment and two themes cannot trade grain without trading hex.
+const feltSeed = (base) => (parseInt(base.slice(1), 16) ^ 0x5eed_f317) >>> 0;
+
 // One 512px felt tile per base color (cached — the decal composite redraws it
 // 36 times per ceremony and regenerating the noise each time would visibly
 // "reseed" the grain under the text).
@@ -1744,6 +1762,7 @@ function feltTileCanvas(base) {
   c = document.createElement('canvas');
   c.width = c.height = 512;
   const ctx = c.getContext('2d');
+  const rnd = mulberry32(feltSeed(base));
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, 512, 512);
   // The tile carries ONLY the fine uniform speckle: statistically seamless
@@ -1751,11 +1770,11 @@ function feltTileCanvas(base) {
   // blotch clipped by the tile border repeats as an obvious 6×6 seam grid
   // (baseFeltCanvas paints the whole-plane mottle exactly once instead).
   for (let i = 0; i < 14000; i++) {
-    const shade = Math.random();
+    const shade = rnd();
     ctx.fillStyle = shade > 0.5
-      ? `rgba(255,255,240,${0.012 + Math.random() * 0.02})`
-      : `rgba(0,0,0,${0.018 + Math.random() * 0.03})`;
-    ctx.fillRect(Math.random() * 512, Math.random() * 512, 1, 1);
+      ? `rgba(255,255,240,${0.012 + rnd() * 0.02})`
+      : `rgba(0,0,0,${0.018 + rnd() * 0.03})`;
+    ctx.fillRect(rnd() * 512, rnd() * 512, 1, 1);
   }
   feltTileCache.set(base, c);
   return c;
@@ -1794,6 +1813,9 @@ function baseFeltCanvas(base) {
   c = document.createElement('canvas');
   c.width = c.height = DECAL_SIZE;
   const ctx = c.getContext('2d');
+  // A SECOND stream off the same theme seed (the tile consumed the first), so
+  // the mottle field is stable per theme without repeating the tile's numbers.
+  const rnd = mulberry32(feltSeed(base) ^ 0x9e3779b9);
   const tile = feltTileCanvas(base);
   const tileSize = DECAL_SIZE / 6; // the same 6×6 rhythm the old plain repeat had
   for (let x = 0; x < 6; x++) {
@@ -1803,12 +1825,12 @@ function baseFeltCanvas(base) {
   // tile: any blotch the tile border clips repeats as a 6×6 seam grid).
   // Very soft and very wide — the nap catching light unevenly, not stains.
   for (let i = 0; i < 18; i++) {
-    const light = Math.random() > 0.5;
-    const r = 260 + Math.random() * 420;
-    const x = Math.random() * DECAL_SIZE;
-    const y = Math.random() * DECAL_SIZE;
+    const light = rnd() > 0.5;
+    const r = 260 + rnd() * 420;
+    const x = rnd() * DECAL_SIZE;
+    const y = rnd() * DECAL_SIZE;
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    const a = 0.006 + Math.random() * 0.01;
+    const a = 0.006 + rnd() * 0.01;
     g.addColorStop(0, light ? `rgba(255,250,235,${a})` : `rgba(0,0,0,${a * 1.3})`);
     g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g;
@@ -1831,58 +1853,151 @@ floorCanvas.width = floorCanvas.height = DECAL_SIZE;
 const floorCtx = floorCanvas.getContext('2d');
 const floorTexture = new THREE.CanvasTexture(floorCanvas);
 floorTexture.colorSpace = THREE.SRGBColorSpace;
+// The floor was the ONE texture in the app that never asked for anisotropy —
+// dice.js, towerskin.js, towerdress.js and toweranvil.js all set 4 (eleven call
+// sites). It matters most here and was missing only here: the felt is the one
+// surface the camera sees almost edge-on, so its far half is exactly the
+// grazing-angle case anisotropic filtering exists for.
+floorTexture.anisotropy = 4;
 
-// The mat-text branch, extracted verbatim from the old feltCanvas() — the
-// letterSpacing try/catch, the 30→13 px shrink loop bounds, and the +3.4
-// unit y-offset must not drift (no scenario asserts glyph position).
-function drawMatText(ctx, text) {
-  const line = text.toUpperCase();
+// Repaint the persistent floor canvas in place. base is a felt-tile cache
+// entry. MUST be called at least once before the first render() — otherwise
+// the first frame samples a blank atlas. Boot does this at end-of-file just
+// below the floor construction.
+//
+// The mat DECLARATION no longer lives in here; it is its own quad, below.
+function paintFloor(base) {
+  floorCtx.clearRect(0, 0, DECAL_SIZE, DECAL_SIZE);
+  floorCtx.drawImage(baseFeltCanvas(base), 0, 0);
+  floorTexture.needsUpdate = true;
+}
+
+// ---------------------------------------------------------------------------
+// THE MAT DECLARATION (UX §5.4 — "in the felt, not the DOM")
+//
+// WHY IT IS NO LONGER PAINTED INTO THE FELT. The floor atlas is 2048 px across
+// a 160-unit plane: 12.8 px per world unit. The MAT is 8.6–14.1 units wide, so
+// the playing surface owns 110×67 to 180×110 pixels of that atlas — a postage
+// stamp, and 99.7% of the texture is spent on plane outside the walls. There
+// is no font size at which a legible line fits inside 141 px, so the old code
+// did the only thing it could: it fitted the line to **26 world units** and
+// seated it at z +3.4. Both numbers are survivors of the 30-unit mat that C25
+// also caught out (see `collected`), and against today's ladder they mean:
+//
+//   zoom     mat w    front wall   the line was allowed to run   the line sat
+//   wide     14.1     z +4.30      1.8× the mat's width          across the wall
+//   medium   11.0     z +3.35      2.4× the mat's width          across the wall
+//   close     8.6     z +2.60      3.0× the mat's width          across the wall
+//
+// Measured in the app on 2026-08-29 at `medium`, the default: "THE GATE OF
+// STORMS" rendered as "ATE OF ST" — off both edges of the frame, and blurred
+// to mush by the 12.8 px/unit atlas. It was broken at ALL THREE zooms, not the
+// two the arithmetic alone suggested, and it had never been asserted.
+//
+// So the line gets its own surface. A band quad, sized from the LIVE mat
+// extents, carrying a 2048×288 canvas of its own — 186 px per world unit at
+// `medium`, 14.5× the floor atlas. That is enough to set type in.
+//
+// IT IS STILL "IN THE FELT" AND THAT IS THE POINT: MeshStandardMaterial at the
+// floor's own roughness, so the lamp lights the letters and the cloth as one
+// surface. A MeshBasicMaterial would have been cheaper and would have read as
+// a sticker. It is NOT in the pick markers' burn-through class (renderOrder 10,
+// fog off) — a declaration is table dressing, not a result, so it sits under a
+// venue's fog sheets and dims with the room, exactly as painted-in text did.
+const MATTEXT_W = 2048;                 // canvas px across the band
+const MATTEXT_H = 288;                  // canvas px down the band
+const MATTEXT_ASPECT = MATTEXT_H / MATTEXT_W;
+const MATTEXT_Y = DECAL_Y - 0.002;      // under contact marks: a mark lands ON the print
+const MATTEXT_MARGIN_U = 0.55;          // world units of clear felt inside each side wall
+const MATTEXT_FRONT_GAP_U = 0.35;       // world units between the band and the front wall
+const MATTEXT_ALPHA = 0.28;             // unchanged from the painted-in era
+let MATTEXT = null;                     // { canvas, ctx, texture, mesh } once a line has stood
+
+// Built on FIRST declaration, never at boot — a table that never runs a
+// ceremony pays nothing, which is `ensurePickRing`'s bargain and the same
+// reason (`scene-draw-budget` asserts calls ≤ 220 and this is a draw call
+// whenever it is visible).
+function ensureMatText() {
+  if (MATTEXT) return MATTEXT;
+  const canvas = document.createElement('canvas');
+  canvas.width = MATTEXT_W;
+  canvas.height = MATTEXT_H;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;               // the same grazing-angle case as the floor
+  const geo = new THREE.PlaneGeometry(1, 1);
+  geo.rotateX(-Math.PI / 2);            // lie flat on the cloth
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    map: texture, transparent: true, roughness: 0.95, metalness: 0,
+    // Never writes depth, for the reason the pick ring gives and for one more:
+    // `surfaceUnder` seats a die on the highest surface that WRITES depth, so
+    // a writing quad here would lift every die that landed over the line.
+    depthWrite: false,
+  }));
+  mesh.visible = false;
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+  MATTEXT = { canvas, ctx: canvas.getContext('2d'), texture, mesh };
+  return MATTEXT;
+}
+
+// Size and seat the band from the LIVE mat, then set the line inside it.
+// Called on every apply AND from both writers of the mat's extents — applyZoom
+// (which moves TABLE_W and the base depth) and towerMatDepth (which deepens
+// the mat when a tower sockets). A declaration outlives both.
+function layoutMatText() {
+  if (!MATTEXT || matDecalText === null) return;
+  const { ctx, texture, mesh } = MATTEXT;
+  const bandW = TABLE_W;
+  const bandD = bandW * MATTEXT_ASPECT;  // glyphs stay square: one scale, not two
+  mesh.scale.set(bandW, 1, bandD);
+  // Seated INSIDE the front wall by construction rather than at a constant.
+  mesh.position.set(0, MATTEXT_Y, TABLE_D / 2 - bandD / 2 - MATTEXT_FRONT_GAP_U);
+
+  ctx.clearRect(0, 0, MATTEXT_W, MATTEXT_H);
+  const line = matDecalText.toUpperCase();
   ctx.save();
-  ctx.globalAlpha = 0.28;
+  ctx.globalAlpha = MATTEXT_ALPHA;
   ctx.fillStyle = '#ffd766';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  try { ctx.letterSpacing = '9px'; } catch { /* older engines: no letterspacing */ }
-  // fit within ~26 table units; shrink for long declarations
-  let px = 30;
-  const maxW = 26 * DECAL_PX_PER_UNIT;
-  for (; px > 13; px--) {
+  // The fit target is the MAT, converted to this canvas's pixels — so the
+  // guarantee is "inside the walls at every zoom", not a number that was true
+  // for a mat we no longer have.
+  const pxPerUnit = MATTEXT_W / bandW;
+  const maxW = Math.max(1, (bandW - MATTEXT_MARGIN_U * 2) * pxPerUnit);
+  let px = 150;
+  for (; px > 40; px -= 2) {
+    // Letterspacing rides the size; at a fixed 9px it swamped a shrunk line.
+    try { ctx.letterSpacing = `${Math.round(px * 0.26)}px`; } catch { /* older engines */ }
     ctx.font = `${px}px Georgia, 'Times New Roman', serif`;
     if (ctx.measureText(line).width <= maxW) break;
   }
-  ctx.fillText(line, DECAL_SIZE / 2, DECAL_SIZE / 2 + 3.4 * DECAL_PX_PER_UNIT);
+  ctx.fillText(line, MATTEXT_W / 2, MATTEXT_H / 2);
   ctx.restore();
-}
-
-// Repaint the persistent floor canvas in place. base is a felt-tile cache
-// entry; text is the optional mat declaration line. MUST be called at least
-// once before the first render() — otherwise the first frame samples a blank
-// atlas. Boot does this at end-of-file just below the floor construction.
-function paintFloor(base, text) {
-  floorCtx.clearRect(0, 0, DECAL_SIZE, DECAL_SIZE);
-  floorCtx.drawImage(baseFeltCanvas(base), 0, 0);
-  if (text) drawMatText(floorCtx, text);
-  floorTexture.needsUpdate = true;
+  texture.needsUpdate = true;
+  mesh.visible = true;
 }
 
 function applyMatDecal(text) {
   if (typeof text !== 'string' || !text.trim()) return;
   matDecalText = text.trim();
-  paintFloor(FELT_THEMES[currentFeltId].feltBase, matDecalText);
+  ensureMatText();
+  layoutMatText();
 }
 
 function clearMatDecal() {
   if (matDecalText === null) return;
   matDecalText = null;
-  paintFloor(FELT_THEMES[currentFeltId].feltBase, null);
+  if (MATTEXT) MATTEXT.mesh.visible = false;
 }
 
-// Repaint the live floor: same base, same mat text. Since C25 took the shelf
-// off the felt this composites nothing occupancy-dependent, so the callers
-// left are the theme swap and the ceremony's mat text — the felt no longer
-// changes because a roll was collected.
+// Repaint the live floor. Since C25 took the shelf off the felt this
+// composites nothing occupancy-dependent, and since the declaration moved to
+// its own quad it composites no text either — so the one caller left is the
+// theme swap. The mat text no longer rides a felt repaint at all.
 function recompositeFelt() {
-  paintFloor(FELT_THEMES[currentFeltId].feltBase, matDecalText);
+  paintFloor(FELT_THEMES[currentFeltId].feltBase);
 }
 
 const floor = new THREE.Mesh(
@@ -1898,7 +2013,7 @@ floor.receiveShadow = true;
 scene.add(floor);
 // MUST paint at least once before the first render — the persistent canvas
 // starts blank, and the material.map reference is now permanent.
-paintFloor(FELT_THEMES[DEFAULT_FELT].feltBase, null);
+paintFloor(FELT_THEMES[DEFAULT_FELT].feltBase);
 
 // Swap the felt + scene background live. Returns false for unknown ids — the
 // id can arrive off the wire or from localStorage, never trust it blindly.
@@ -1906,8 +2021,9 @@ function applyFeltTheme(id) {
   const theme = FELT_THEMES[id];
   if (!theme) return false;
   currentFeltId = id;
-  // A theme change mid-ceremony keeps the mat text (and any shelf glow):
-  // recomposite on the new base.
+  // A theme change mid-ceremony keeps the mat text — and since 2026-08-29 it
+  // keeps it for FREE: the declaration is its own quad, so there is no longer
+  // any text to re-composite onto the new base. This repaints the cloth only.
   recompositeFelt();
   scene.background = new THREE.Color(theme.sceneBg);
   if (MOOD.on) applyMood(); // the fog wears the new background's colour
@@ -11357,6 +11473,8 @@ function towerMatDepth(layer, extra) {
   towerPlaceBackWall();
   walls.front.position.set(0, 0, TABLE_D / 2);
   updateShadowFrustum();
+  // A standing declaration is seated off the FRONT wall, which just moved.
+  layoutMatText();
   refitView();
 }
 
@@ -16306,6 +16424,28 @@ window.__diceDebug = {
   // refactor reintroduces swapFloorMap-style dispose+new churn on shelf
   // changes, theme swaps, or mat-decal open/close.
   floorTextureId() { return (floor.material.map || {}).uuid || null; },
+  // THE DECLARATION'S FOOTPRINT AGAINST THE WALLS. The old painted-in mat text
+  // ran off every zoom for the life of the feature because nothing could see
+  // it: it was pixels in a 2048² atlas, and no assertion samples glyphs. This
+  // reports the band as WORLD extents beside the mat's own, so a scenario can
+  // state the thing that was false — the line is inside the walls — instead of
+  // stating that some canvas was painted. `fits` is the whole check.
+  matTextProbe() {
+    if (!MATTEXT || matDecalText === null) return { standing: false };
+    const m = MATTEXT.mesh;
+    const halfW = m.scale.x / 2, halfD = m.scale.z / 2;
+    const box = { x0: -halfW, x1: halfW, z0: m.position.z - halfD, z1: m.position.z + halfD };
+    const wall = { x: TABLE_W / 2, z: TABLE_D / 2 };
+    return {
+      standing: true, visible: m.visible, text: matDecalText,
+      box, wall, y: m.position.y,
+      depthWrite: m.material.depthWrite,
+      fits: box.x0 >= -wall.x && box.x1 <= wall.x && box.z0 >= -wall.z && box.z1 <= wall.z,
+      // px per world unit the line is actually set at — the number that made
+      // the old one illegible (the floor atlas gives 12.8).
+      pxPerUnit: MATTEXT_W / m.scale.x,
+    };
+  },
   // sim(n) is the FILM stepper and rides no tempo — n frames of baked
   // keyframes, always. sim(n, true) is the wall-clock stepper: it asks for
   // the same 1/60 s of REAL time animate() would deliver, so at k=2 the
@@ -23162,6 +23302,10 @@ function applyZoom(level) {
   walls.left.position.set(-TABLE_W / 2, 0, 0);
   walls.right.position.set( TABLE_W / 2, 0, 0);
   updateShadowFrustum();
+  // The declaration is sized from TABLE_W and seated off the front wall, and
+  // both just moved. (A zoom mid-ceremony is rare but entirely reachable —
+  // the picker is live and the mat text stands for the whole declare beat.)
+  layoutMatText();
   CAM_EYE = { full: [...p.eyeFull], mini: [...p.eyeMini] };
   currentZoom = level;
   // Nothing on the felt survives a zoom but the live roll's dice, and those
