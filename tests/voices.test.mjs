@@ -81,6 +81,7 @@ import {
   BED_PINK, BED_BROWN, BED_CRACKLE, BED_TICK_SHAPE, BED_SWELL,
   PINK_BUFFER_RMS, BROWN_BUFFER_RMS, MATERIAL_BOUNDARY_HZ,
   impactSpectrum, bedProfile, bedDistance, biquadMag,
+  CLOTH_VOICES, CLOTH_DEFAULT, clothVoiceFor, settleTail, TAP_E, TAP_T0,
 } from '../js/voices.js';
 // THE SET REGISTRY ITSELF, because the kill is the ABSENCE of a field on one
 // row and nothing in js/voices.js can see that. `SETS` and not `THEMES`: it is
@@ -699,6 +700,119 @@ t('a venue may re-balance the room and may never turn it up', () => {
       `${id}: and the bed's make-up gain stays inside the plan`);
     assert.ok(v.bed.swell === null || v.bed.swell.rate > 0,
       `${id}: a declared swell has a clock`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// THE CLOTH TIER (the mats arc, 2026-08-29). NOT A VERDICT — A DESIGN.
+// ---------------------------------------------------------------------------
+// Every other block in this file is a fence around something Joe HEARD. This
+// one is not, and saying so is the point: silt's voice is an argument from the
+// material, and it has been judged by nobody. What is asserted here is that
+// the argument is internally consistent and that the felt is untouched by it,
+// which is all arithmetic can settle before he listens.
+
+const ms = (x) => Math.round(x * 1e5) / 100;
+
+t('the felt is inert BY CONSTRUCTION, and its tail is the shipped one', () => {
+  // The same discipline as `groundedInert` one tier up. If this goes red, a
+  // change of cloth has changed the sound of every table ever played on.
+  const f = CLOTH_VOICES[CLOTH_DEFAULT];
+  assert.equal(CLOTH_DEFAULT, 'felt');
+  assert.equal(f.centre, 1); assert.equal(f.length, 1); assert.equal(f.gain, 1);
+  assert.equal(f.tail, 1); assert.equal(f.grind, 1); assert.equal(f.fizz, 0);
+  // …and the schedule the constants produce is the one docs/AUDIO.md §3.4
+  // quotes and js/main.js's own comment quotes: 85, 36, 15, 6.3, 2.6 ms. The
+  // walk moved out of js/main.js in this change; this is what says it moved
+  // without moving.
+  const felt = settleTail(f).map((x) => ms(x.gap));
+  assert.deepEqual(felt, [85, 35.7, 14.99, 6.3, 2.64, 1.11],
+    'the felt hands the die back six times, exactly as it always has');
+  assert.equal(ms(TAP_T0), 85);
+  assert.equal(TAP_E, 0.42);
+});
+
+t('silt CATCHES the die — three taps, and two of them inside 20 ms', () => {
+  // The handoff's line was that a sand table is the one you identify by the
+  // chatter that is not there, and this is that sentence as arithmetic.
+  const silt = settleTail(CLOTH_VOICES.silt);
+  const felt = settleTail(CLOTH_VOICES.felt);
+  assert.equal(felt.length, 6);
+  assert.equal(silt.length, 3, 'grain gives a die half as many bounces back');
+  // The first gap is the drop, and no surface changes it — it is when the die
+  // stops moving, not what it stopped on. Everything after it is the surface.
+  assert.equal(ms(silt[0].gap), ms(felt[0].gap));
+  const after = silt.slice(1).reduce((a, x) => a + x.gap, 0);
+  const feltAfter = felt.slice(1).reduce((a, x) => a + x.gap, 0);
+  assert.ok(ms(after) < 20,
+    `the whole tail after the drop is ${ms(after)} ms (felt: ${ms(feltAfter)})`);
+  assert.ok(after < feltAfter * 0.4, 'and less than half as long as the felt\'s');
+  // The third tap is 3.6% of the first and 3 ms behind the second: it is not
+  // a third event, it is the second one's edge. That is what "two taps" means.
+  assert.ok(silt[2].decay < 0.05 && ms(silt[2].gap) < 4);
+});
+
+t('down for the knock, UP for the scrape — the pair is the material', () => {
+  // The one assertion in this file that would catch a tidying pass. `centre`
+  // and `grind` disagreeing looks like an oversight and is the whole design:
+  // loose grain has nothing in it that can resonate (so the landing is the
+  // deadest in the app) and yet a die dragging through it makes broadband
+  // noise a wool weave never makes.
+  const silt = CLOTH_VOICES.silt;
+  assert.ok(silt.centre < 1 && silt.grind > 1,
+    'if these ever point the same way, someone has "fixed" the design');
+  // The deadest landing in the app, and by a clear margin — deeper than the
+  // damp hollow, which was the previous floor.
+  const felt = spectrumOf({}, 1);
+  const hollow = spectrumOf({}, VENUE_AUDIO.foxfire.ground.centre);
+  const grain = spectrumOf({}, silt.centre);
+  assert.ok(grain.centroidHz < hollow.centroidHz,
+    `a grain bed swallows more than standing water does `
+    + `(${grain.centroidHz} vs ${hollow.centroidHz} Hz)`);
+  assert.ok(pct(grain.centroidHz, felt.centroidHz) <= -30,
+    `and ${pct(grain.centroidHz, felt.centroidHz)}% under the felt`);
+  assert.equal(grain.partialHz, null, 'nothing rings in sand');
+  // And the sustained layer goes the other way by at least half an octave.
+  assert.ok(silt.grind >= 1.5,
+    'the scrape rises far enough to be heard as a different surface');
+  // The fizz is the "grind → hiss" move: the AM depth is what makes the
+  // face-clacks discrete, so smothering it is what leaves only the scrape.
+  assert.ok(silt.fizz >= 0.5 && silt.fizz < 1,
+    'smothered, not silenced — a die on grain still has a rate');
+});
+
+t('a venue lays its floor OVER the mat, so the cloth says nothing there', () => {
+  // The two surface tiers do not stack, and the reason is geometry rather than
+  // taste: js/fae-lab.js covers the felt and the 160-unit floor with one disc,
+  // so in a glade the dice are not on the cloth at all. Composing them would
+  // voice a die landing in moss as if the moss were full of sand.
+  assert.equal(clothVoiceFor('table', 'silt'), CLOTH_VOICES.silt);
+  for (const venue of ['moonrise', 'foxfire']) {
+    assert.equal(clothVoiceFor(venue, 'silt'), CLOTH_VOICES.felt,
+      `${venue}: covered`);
+  }
+  // An unknown cloth is silent about sound rather than wrong about it — the
+  // same fallback the venue table has, and what makes adding a mat a
+  // visual-only job until somebody writes its voice down.
+  assert.equal(clothVoiceFor('table', 'nosuch'), CLOTH_VOICES.felt);
+  assert.equal(clothVoiceFor('table', undefined), CLOTH_VOICES.felt);
+});
+
+t('a cloth only ever subtracts from the mix plan', () => {
+  // Same rule as the venue rows: §5's mix plan is a ceiling and every tier
+  // under it may take away. `grind` is exempt and only `grind` — it is a
+  // FILTER FREQUENCY, not a level, and the fizz beside it removes energy from
+  // the same voice it brightens.
+  for (const [id, c] of Object.entries(CLOTH_VOICES)) {
+    assert.ok(c.gain <= 1 && c.centre <= 1 && c.length <= 1,
+      `${id}: the cloth only ever subtracts`);
+    assert.ok(c.tail > 0 && c.tail <= 1, `${id}: and never adds a bounce`);
+    assert.ok(c.fizz >= 0 && c.fizz < 1, `${id}: fizz is a fraction of the depth`);
+    assert.ok(typeof c.label === 'string' && c.label.length > 0,
+      `${id}: says what it is`);
+    // A cloth with no taps at all would be a die landing in silence, which is
+    // a bug rather than a material.
+    assert.ok(settleTail(c).length >= 2, `${id}: a landing is still an event`);
   }
 });
 

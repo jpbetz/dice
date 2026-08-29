@@ -44,6 +44,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// THE CLOTH TABLE, IMPORTED rather than scraped — js/voices.js is pure data
+// and loads in Node, which is why every voice number lives there.
+import { CLOTH_VOICES } from '../js/voices.js';
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 
@@ -124,6 +128,38 @@ t('neither mirror carries a felt the client cannot render', () => {
   const extraP = portable.filter((id) => !client.includes(id));
   assert.deepEqual(extraS, [], `server accepts felts the client has no row for: ${extraS.join(', ')}`);
   assert.deepEqual(extraP, [], `portable carries felts the client has no row for: ${extraP.join(', ')}`);
+});
+
+// A FOURTH MIRROR, ADDED WITH SILT'S VOICE (2026-08-29). A cloth id now names
+// three things that are written down separately: a PAINTER (js/main.js
+// FELT_CLOTHS — what the tile looks like), a VOICE (js/voices.js CLOTH_VOICES
+// — what a die sounds like landing on it), and the rows that cite it. Silt
+// shipped for one day with a painter and no voice, which is this project's
+// signature failure exactly: it looked right, so nothing said it was wrong.
+const src = read('js/main.js');
+const clothOfRows = [...src.matchAll(/\bcloth:\s*'([a-z][a-z0-9]*)'/g)].map((m) => m[1]);
+const painters = (() => {
+  const m = src.match(/const FELT_CLOTHS = \{([\s\S]*?)\};/);
+  assert.ok(m, 'js/main.js: no FELT_CLOTHS registry found — did it move?');
+  return [...m[1].matchAll(/([a-z][a-zA-Z0-9]*)\s*:/g)].map((x) => x[1]);
+})();
+
+t('every cloth that is painted is also voiced', () => {
+  assert.ok(painters.includes('felt'), `the painter registry looks wrong: ${painters.join(', ')}`);
+  const unvoiced = painters.filter((id) => !CLOTH_VOICES[id]);
+  assert.deepEqual(unvoiced, [],
+    `these cloths have a look and no voice, so a die lands on them sounding `
+    + `like wool over wood: ${unvoiced.join(', ')}`);
+  const unpainted = Object.keys(CLOTH_VOICES).filter((id) => !painters.includes(id));
+  assert.deepEqual(unpainted, [],
+    `these cloths are voiced but nothing paints them: ${unpainted.join(', ')}`);
+});
+
+t('every cloth a felt row cites exists in both registries', () => {
+  for (const id of clothOfRows) {
+    assert.ok(painters.includes(id), `a felt row cites cloth "${id}" with no painter`);
+    assert.ok(CLOTH_VOICES[id], `a felt row cites cloth "${id}" with no voice`);
+  }
 });
 
 t("the server's default felt is one it accepts and the client can render", () => {

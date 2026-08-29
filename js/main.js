@@ -67,6 +67,7 @@ import {
   IMPACT_VOICES, IMPACT_DEFAULT_BODY,
   IMPACT_SOFT_STRENGTH, IMPACT_SOFT_CENTRE, IMPACT_SOFT_LENGTH,
   CLUNK_VOICES, VENUE_AUDIO, bedAirHz,
+  CLOTH_VOICES, CLOTH_DEFAULT, clothVoiceFor, settleTail, TAP_A0_FRAC,
   BED_PINK, BED_BROWN, BED_CRACKLE, BED_TICK_SHAPE, BED_SWELL,
   BED_FADE_S, BED_VOICE_S, DUCK_DB, DUCK_ATTACK_S, DUCK_RECOVER_TAU,
   MASTER_GAIN,
@@ -3103,7 +3104,37 @@ function venueAudio() {
 // knock inside a hollow trunk as if it happened in the moss outside. Every
 // caller that can see a clunk passes it, and this is what it gets.
 const GROUND_NEUTRAL = { centre: 1, length: 1, gain: 1 };
-function groundFor(isClunk) { return isClunk ? GROUND_NEUTRAL : venueAudio().ground; }
+
+// WHAT THE CLOTH DOES TO A CONTACT (the mats arc; the table is js/voices.js
+// §4b). The venue answers "what place is this", the cloth answers "what am I
+// standing on inside it", and they do not stack: a venue lays one huge floor
+// disc OVER the mat, so in a glade the dice are not on the cloth at all.
+// `clothVoiceFor` owns that rule; this file just asks it.
+function clothId() {
+  const t = FELT_THEMES[currentFeltId];
+  return (t && t.cloth) || CLOTH_DEFAULT;
+}
+function clothVoice() { return clothVoiceFor(venueAudioId(), clothId()); }
+
+// The two tiers composed, memoized on the pair that decides them — the
+// rolling layer asks per die per frame, and neither id changes inside a frame.
+// Only the three fields a ground row has: `tail`, `grind` and `fizz` are the
+// cloth's alone and are read at their own two call sites, which keeps the
+// shape `impactVoicingFor` publishes exactly what it published before.
+let surfaceGroundCache = { key: null, row: GROUND_NEUTRAL };
+function surfaceGround() {
+  const key = venueAudioId() + '|' + clothId();
+  if (surfaceGroundCache.key !== key) {
+    const g = venueAudio().ground;
+    const c = clothVoice();
+    surfaceGroundCache = {
+      key,
+      row: { centre: g.centre * c.centre, length: g.length * c.length, gain: g.gain * c.gain },
+    };
+  }
+  return surfaceGroundCache.row;
+}
+function groundFor(isClunk) { return isClunk ? GROUND_NEUTRAL : surfaceGround(); }
 
 function pinkBuffer(ctx, seconds) {
   const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate);
@@ -3703,11 +3734,12 @@ function noiseOneShot({ preset, freq, gain, durSec, bus, punch = 1, at = 0, tran
 // clients; timing may not.
 // ---------------------------------------------------------------------------
 
-const TAP_E = 0.42;         // the geometric ratio, gaps and amplitudes alike
-const TAP_T0 = 0.085;       // seconds — the first gap
-const TAP_A0_FRAC = 0.5;    // of the landing impact's computed gain
-const TAP_MAX = 8;
-const TAP_FLOOR_FRAC = 0.01; // stop when a tap is under 1% of A0
+// The five constants and the walk over them live in js/voices.js now, with
+// every other voice number: the cloth decides HOW MANY taps there are (a
+// surface that catches a die gives fewer back), and that made the schedule a
+// designed quantity rather than an implementation detail. `settleTail(cloth)`
+// returns `[{decay, gap}]`; the jitter, the amplitude and the voicing are
+// still this file's, below.
 
 // Deterministic jitter. A finalizer hash of (seed, die, tap index) — no state,
 // no stream position, so client A and client B agree without having to have
@@ -3764,6 +3796,7 @@ function scheduleSettleCluster(roll, di) {
   // `isClunk` is false by construction here. `vo.gain` already carries the
   // ground's absorption, which is why A0 is read off it rather than recomputed.
   const vo = impactVoicingOf(strength, voice, false);
+  const cloth = clothVoice();
   const { preset } = vo;
   const weight = vo.weight;
   const sustainMs = vo.sustainMs;
@@ -3775,10 +3808,16 @@ function scheduleSettleCluster(roll, di) {
   const plan = { di, gaps: [], amps: [] };
   let t = ctx.currentTime;
   const bus = busFor(0) || AUDIO.master;
-  for (let k = 0; k < TAP_MAX; k++) {
-    const decay = Math.pow(TAP_E, k);
-    if (decay < TAP_FLOOR_FRAC) break;
-    const gap = TAP_T0 * decay * (0.88 + 0.24 * tapHash(roll.seed, di, k));
+  // HOW MANY TIMES THIS SURFACE HANDS THE DIE BACK. Felt gives six taps, silt
+  // three, and the third one lands 3 ms after the second — so what a grain bed
+  // sounds like is a thud, a pat, and then the thing that identifies it, which
+  // is nothing. The schedule is jitter-free in js/voices.js so a test can
+  // count it; the jitter below is still what keeps two people in one room
+  // hearing the same tail (§4: timbre may differ, timing may not).
+  const tail = settleTail(cloth);
+  for (let k = 0; k < tail.length; k++) {
+    const decay = tail[k].decay;
+    const gap = tail[k].gap * (0.88 + 0.24 * tapHash(roll.seed, di, k));
     const amp = A0 * decay;
     t += gap;
     plan.gaps.push(Math.round(gap * 1e6) / 1e6);
@@ -4208,6 +4247,9 @@ function stepRollingAudio(roll, i0, realtime) {
   if (!(realtime || audioForced)) return;
   const ctx = ensureAudio();
   if (!ctx) return;
+  // One read per frame, not per die: neither the venue nor the cloth can
+  // change inside a frame, and the sustained layer is the hottest caller.
+  const cloth = clothVoice();
   // MUTE SILENCES THE SUSTAINED LAYER TOO (verifier catch): the master gain
   // already zeroes the audible output, but a muted table must not keep a
   // live rolling pool running under its own switch — levels go to 0 and
@@ -4235,7 +4277,15 @@ function stepRollingAudio(roll, i0, realtime) {
       // under another sky still derives the same levels. §4 already licenses
       // exactly this asymmetry — timbre may differ between clients, rhythm and
       // level may not — and a venue is one more thing on the timbre side.
-      const gcen = venueAudio().ground.centre;
+      // …and THE CLOTH, ON THE GRIND, which is the one place a cloth's
+      // spectral factor goes the OTHER WAY from the venue's. A venue's floor
+      // absorbs, full stop. A bed of loose grain absorbs the knock (nothing in
+      // it can resonate) and yet BRIGHTENS the scrape, because a die dragging
+      // through grain generates broadband noise a wool weave never makes.
+      // `grind` is that number and it is 1.7 on silt against 0.58 for the same
+      // cloth's landing — down for the knock, up for the scrape, and the pair
+      // is what the material IS.
+      const gcen = venueAudio().ground.centre * cloth.grind;
       const bandF = ROLL_BAND_BASE * gcen
         * Math.min(1.3, Math.max(0.9, Math.pow(ROLL_REF_RADIUS / R, 0.4)));
       if (Math.abs(bandF - v.setBand) > 1) { v.band.frequency.value = bandF; v.setBand = bandF; }
@@ -4248,8 +4298,13 @@ function stepRollingAudio(roll, i0, realtime) {
       if (Math.abs(tiltF - v.setTilt) > 10) { v.tilt.frequency.value = tiltF; v.setTilt = tiltF; }
       // Fast clacks physically overlap, so the modulation gets shallower as
       // the rate climbs — which is exactly what turns clacks into a grind.
+      // AND THE FIZZ, WHICH IS THE WHOLE "GRIND → HISS" MOVE. The AM depth is
+      // what makes the face-clacks discrete; the DC term (0.35) carries the
+      // level, so smothering the modulation costs no loudness — it costs the
+      // clack. Grain gets between the die and the surface it would otherwise
+      // knock against, so at fizz 0.75 what is left is the scrape alone.
       v.depth.gain.value = Math.min(0.95, Math.max(0.25, 1 - s.fFace / 45))
-        * (0.5 + 0.35 * s.rough);
+        * (0.5 + 0.35 * s.rough) * (1 - cloth.fizz);
       v.setFreq = paramTo(v.osc.frequency, v.setFreq,
         Math.min(400, Math.max(0.5, s.fFace)), ctx, 0.03);
       if (Math.abs(s.pan - v.setPan) > 0.01) { v.pan.pan.value = s.pan || 0; v.setPan = s.pan; }
@@ -15438,6 +15493,48 @@ window.__diceDebug = {
         swellRate: bed.swell ? bed.swell.rate : 0,
         sources: bed.nodes.length,
         told: { ...bed.told },
+      } : null,
+    };
+  },
+  // THE CLOTH'S VOICE (the mats arc; js/voices.js §4b). Same two halves as the
+  // venue's, and for the same reason — `declared` is the row, `live` is read
+  // off the standing rolling voice, so "the grind became a hiss" is a claim
+  // about an AudioParam rather than about a flag. `live` is null unless dice
+  // are actually moving, which is itself the honest answer.
+  //
+  // `feltInert` is the load-bearing one: the reference row is all identity, so
+  // every table that has ever been played sounds the same after this change BY
+  // CONSTRUCTION. `covered` is the other rule made watchable — a venue lays
+  // its own floor over the mat, and a cloth under a glade must say nothing.
+  clothAudioInfo() {
+    const id = clothId();
+    const c = clothVoice();
+    const f = CLOTH_VOICES.felt;
+    const g = surfaceGround();
+    const live = rollVoices.find((v) => v && v.target > 0) || null;
+    return {
+      id, venue: venueAudioId(), label: c.label,
+      covered: venueAudioId() !== 'table' && id !== 'felt',
+      declared: { ...c },
+      // The composed surface tier — venue × cloth — as the impacts and the
+      // tail wear it.
+      ground: {
+        centre: Math.round(g.centre * 1e6) / 1e6,
+        length: Math.round(g.length * 1e6) / 1e6,
+        gain: Math.round(g.gain * 1e6) / 1e6,
+      },
+      // How many times this surface hands the die back, and when.
+      tail: settleTail(c).map((x) => Math.round(x.gap * 1e5) / 1e5),
+      // What the sustained layer is ASKED for, before any die is rolling.
+      grindBandHz: Math.round(ROLL_BAND_BASE * venueAudio().ground.centre * c.grind),
+      depthScale: Math.round((1 - c.fizz) * 1e6) / 1e6,
+      feltInert: f.centre === 1 && f.length === 1 && f.gain === 1
+        && f.tail === 1 && f.grind === 1 && f.fizz === 0,
+      live: live ? {
+        bandHz: Math.round(live.band.frequency.value),
+        tiltHz: Math.round(live.tilt.frequency.value),
+        depth: Math.round(live.depth.gain.value * 1e4) / 1e4,
+        level: Math.round(live.level.gain.value * 1e6) / 1e6,
       } : null,
     };
   },

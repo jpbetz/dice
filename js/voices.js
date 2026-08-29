@@ -597,6 +597,116 @@ export function bedAirHz(sampleRate, hz) {
 }
 
 // ---------------------------------------------------------------------------
+// 4b. WHAT THE CLOTH DOES TO A CONTACT (the mats arc, docs/UX.md §5.4b)
+// ---------------------------------------------------------------------------
+// Silt shipped 2026-08-29 as a picture of a granular bed and nothing else: the
+// felt's voice came out of it unchanged, so a die landed in loose grain and
+// clicked like a die landing on wool over wood. The handoff's line was that
+// this is the half most likely to sell the material — you identify a sand
+// table by the chatter that is NOT there.
+//
+// SO A CLOTH IS A SURFACE TIER, in the same shape and for the same reason as
+// the venue's ground (§2.5) and `IMPACT_SOFT_*` before it: it MULTIPLIES the
+// die's own material rather than replacing it. A steel die still rings; the
+// silt says what that ring does when it lands in a hand's depth of grain.
+//
+// THE TWO TIERS DO NOT STACK, and that is a rule about geometry rather than
+// taste: a venue's floor is one huge disc laid OVER the mat (js/fae-lab.js
+// covers the felt and the 160-unit floor alike), so in a glade the dice are
+// not on the cloth at all. The cloth speaks only when it is the surface you
+// can see — `clothVoiceFor(venueId, cloth)` below is that one line, and it is
+// what keeps this table out of the eight voices Joe approved on 2026-08-18.
+//
+// SIX DIALS, AND THE FOURTH THROUGH SIXTH ARE THE ONES THAT ARE ABOUT SILT
+// RATHER THAN ABOUT VOLUME:
+//
+//   centre  spectral trim on the landing and its tail — how much of the
+//           contact the surface swallows before it can resonate.
+//   length  envelope trim, in the same direction and for the same reason.
+//   gain    plain absorption. The 0.35 impact ceiling is applied OUTSIDE this
+//           multiplier, so a cloth may only ever take away from §5's mix plan.
+//   tail    multiplies the settle cluster's geometric ratio, and therefore
+//           decides HOW MANY TAPS THERE ARE — `settleTail` below stops at 1%
+//           of the first one. Felt gives a die three or four bounces back;
+//           grain catches it. This is the dial the whole idea rests on.
+//   grind   the SUSTAINED layer's spectral factor, and the one number here
+//           that goes UP. It is not a contradiction with `centre`: a mass of
+//           loose grain absorbs an impact (no cavity, no plate, nothing to
+//           resonate) and yet a die DRAGGING through it generates broadband
+//           noise a felt weave never makes. Down for the knock, up for the
+//           scrape, and the pair is the material.
+//   fizz    0..1 — how much of the face-clack modulation the surface smothers.
+//           The rolling voice is one AM parameter away from being a hiss (the
+//           depth is what makes the clacks discrete, §3.3), so this is the
+//           whole "grind → hiss" move and it costs one multiply.
+//
+// THE FELT ROW IS ALL IDENTITY, so every table that has ever been played
+// sounds byte-identical after this change BY CONSTRUCTION rather than by
+// care — `clothVoiceInfo().feltInert` is that claim, watchable, and it is the
+// same discipline as `groundedInert` one tier up.
+export const CLOTH_VOICES = {
+  // THE CLOTH YOU KNOW — the reference row. Do not turn these dials to voice
+  // a new cloth; add a row.
+  felt: {
+    label: 'wool weave over a hard table',
+    centre: 1, length: 1, gain: 1, tail: 1, grind: 1, fizz: 0,
+  },
+  // A HAND'S DEPTH OF DRY GRAIN. Every number is at or past the deepest the
+  // app has gone (foxfire's standing-water hollow, 0.66/0.78/0.85) because a
+  // bed of grain is not a damp floor: it has no surface to speak from.
+  //
+  // `tail: 0.45` is the load-bearing one. It takes the geometric ratio from
+  // 0.42 to 0.189, which stops the cluster at three taps instead of six, and
+  // the third arrives 3 ms after the second and 3.6% as loud — so what you
+  // hear is a thud and a single pat, then nothing. That "then nothing" is the
+  // sound of a die being caught rather than bouncing.
+  silt: {
+    label: 'a hand of dry grain over stone',
+    centre: 0.58, length: 0.6, gain: 0.85, tail: 0.45, grind: 1.7, fizz: 0.75,
+  },
+};
+
+export const CLOTH_DEFAULT = 'felt';
+
+// THE ONE READER, and the covering rule with it. Anything that is not a known
+// cloth, and any venue that lays its own floor over the mat, resolves to the
+// reference row — so an unvoiced cloth is silent about sound rather than
+// wrong about it, exactly as an unvoiced venue is.
+export function clothVoiceFor(venueId, cloth) {
+  if (venueId && venueId !== 'table') return CLOTH_VOICES[CLOTH_DEFAULT];
+  return CLOTH_VOICES[cloth] || CLOTH_VOICES[CLOTH_DEFAULT];
+}
+
+// ---------------------------------------------------------------------------
+// THE SETTLE CLUSTER'S SKELETON (docs/AUDIO.md §3.4)
+// ---------------------------------------------------------------------------
+// These five constants and the walk over them moved out of js/main.js with the
+// cloth tier, for the reason every table in this file moved: the number of
+// taps a surface gives back is now a DESIGNED quantity, and a designed
+// quantity that can only be observed by driving a browser is one nobody
+// checks. js/main.js walks this exact array — it adds the per-tap jitter, the
+// amplitude and the voicing, and it does not recompute the schedule.
+export const TAP_E = 0.42;         // the geometric ratio, gaps and amplitudes alike
+export const TAP_T0 = 0.085;       // seconds — the first gap
+export const TAP_A0_FRAC = 0.5;    // of the landing impact's computed gain
+export const TAP_MAX = 8;
+export const TAP_FLOOR_FRAC = 0.01; // stop when a tap is under 1% of A0
+
+// `[{ decay, gap }]`, jitter-free and cloth-aware. Ends at the floor, so its
+// LENGTH is the answer to "how many times does this surface hand the die
+// back".
+export function settleTail(cloth) {
+  const ratio = TAP_E * ((cloth && cloth.tail) || 1);
+  const out = [];
+  for (let k = 0; k < TAP_MAX; k++) {
+    const decay = Math.pow(ratio, k);
+    if (decay < TAP_FLOOR_FRAC) break;
+    out.push({ decay, gap: TAP_T0 * decay });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // 5. WHAT A ROOM MEASURES (the answer to "white noise, super faint")
 // ---------------------------------------------------------------------------
 

@@ -1602,6 +1602,232 @@ export const scenarios = [
     },
   },
   {
+    name: 'silt-has-a-voice',
+    tags: ['mat', 'audio', 'roll', 'net'],
+    timeout: 300000,
+    // SILT SHIPPED LOOKING LIKE A GRANULAR BED AND SOUNDING LIKE WOOL OVER
+    // WOOD. Stage one gave a felt row its own painter; the contact machine
+    // never learned that the surface had changed, so a die landing in a hand's
+    // depth of dry grain clicked and bounced six times exactly as it does on
+    // the felt. That is this project's signature failure — it looked right, so
+    // nothing said it was wrong — and it is why the CLOTH TIER exists
+    // (js/voices.js §4b) and why the mirror between painters and voices is now
+    // a unit test (tests/felt-ids.test.mjs).
+    //
+    // WHAT AN ASSERTION CAN AND CANNOT SAY HERE. It cannot say silt sounds
+    // like sand; only Joe can. It can say that the surface is WIRED — that the
+    // declared row reaches the landing, the tail and the grind — and that the
+    // felt is untouched, which is the claim that protects nine shipped mats
+    // and eight voices he approved on 2026-08-18.
+    //
+    // THE ONE DESIGN CLAIM WORTH READING BEFORE THE CODE: `centre` and `grind`
+    // point in OPPOSITE directions, deliberately. A bed of loose grain
+    // swallows a landing (nothing in it can resonate) and yet brightens a
+    // scrape (a die dragging through grain makes broadband noise a wool weave
+    // never makes). Down for the knock, up for the scrape.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.settle();
+      const ci = () => a.dbg('clothAudioInfo()');
+      const S = 50;   // above IMPACT_SOFT_STRENGTH and clamping for every body
+      const voicing = (ev) => a.dbg(`impactVoicingFor(${S}, 'std', ${JSON.stringify(ev)})`);
+      const near = (got, want, msg) => assert.ok(
+        Math.abs(got - want) <= Math.max(2e-9, Math.abs(want) * 1e-5),
+        `${msg} — got ${got}, expected ${want}`);
+      const wearFelt = async (id) => {
+        await a.dbg(`setFelt(${JSON.stringify(id)})`);
+        await a.waitFor(`window.__diceDebug.breathProbe().felt === ${JSON.stringify(id)}`,
+          { desc: `${id} is the table's cloth` });
+      };
+
+      // ---- ① THE FELT IS INERT, BY CONSTRUCTION AND IN EFFECT -------------
+      // Nine of the ten mats are felt, so this is the assertion that says the
+      // cloth tier changed nothing for anybody who does not choose silt. The
+      // flag is the app's own statement of it; the voicing beside it is the
+      // same claim where it is actually audible.
+      await wearFelt('walnut');
+      let c = await ci();
+      assert.equal(c.id, 'felt', 'a felt row wears the reference cloth');
+      assert.equal(c.feltInert, true,
+        `the reference row is all identity (${JSON.stringify(c.declared)})`);
+      assert.deepEqual(c.ground, { centre: 1, length: 1, gain: 1 },
+        'so the surface tier is neutral in the grounded room');
+      const impFelt = await voicing({});
+      assert.equal(c.tail.length, 6, 'the felt hands a die back six times, as it always has');
+
+      // ---- ② SILT TRIMS THE LANDING, BY ITS OWN DECLARED FACTORS ----------
+      await wearFelt('silt');
+      c = await ci();
+      assert.equal(c.id, 'silt', 'the silt row names its own cloth');
+      const d = c.declared;
+      assert.ok(d.centre < 1 && d.length < 1 && d.gain <= 1,
+        `grain is duller, shorter and quieter than wool (${JSON.stringify(d)})`);
+      const impSilt = await voicing({});
+      // THE PRODUCT, NOT THE DIAL (TESTING.md P10). Each is the felt's own
+      // measured answer times the factor the cloth declares, so an unwired
+      // tier fails here and re-deriving the formula cannot make it pass.
+      near(impSilt.centre, impFelt.centre * d.centre,
+        'the landing’s centre frequency comes down by the cloth’s own factor');
+      near(impSilt.durSec, impFelt.durSec * d.length,
+        'its envelope shortens by the cloth’s own factor');
+      near(impSilt.gain, impFelt.gain * d.gain,
+        'and it quietens by the cloth’s own factor');
+      assert.ok(impSilt.gain < 0.35,
+        `a cloth only ever subtracts from §5's ceiling (${impSilt.gain})`);
+      // A BAFFLE KNOCK IS NOT ON THE CLOTH. A die inside the tower is inside
+      // the tower; the same rule, and the same one line, as the venue tier.
+      const knock = await voicing({ clunk: 'baffle' });
+      assert.deepEqual(knock.ground, { centre: 1, length: 1, gain: 1 },
+        `the knock takes the neutral ground over silt (${JSON.stringify(knock.ground)})`);
+
+      // ---- ③ THE TAIL: WHAT A SURFACE THAT CATCHES A DIE SOUNDS LIKE ------
+      // The cluster is where the cloth stops being a filter and becomes a
+      // RHYTHM. Felt gives six taps, silt three, and the third arrives 3 ms
+      // behind the second — so what you hear is a thud, a pat, and then the
+      // thing that identifies a grain bed, which is nothing.
+      await a.dbg('audioForce(true)');
+      await a.dbg('holdClock(true)');
+      const bake = async (seed, why) => {
+        await a.dbg('clearTable()');
+        await a.dbg('sim(400)');
+        await a.dbg(`throwSeeded(['d6','d6','d6'], ${seed})`);
+        await a.eval('(() => { const D = window.__diceDebug;'
+          + ' for (let w = 0; w < 1800 && !D.busy; w++) D.sim(1);'
+          + ' return 1; })()');
+        // STEP TO THE FIRST FRAME THAT IS ACTUALLY MAKING THE SOUND, rather
+        // than to a fixed count. `sim(150)` was tried first and it is exactly
+        // the green check this project keeps catching: this seed settles by
+        // frame 65, so both bakes sampled a dead table, every level was 0, and
+        // "the cloth moves no rolling LEVEL" passed by comparing two rows of
+        // zeroes. The film is identical under both cloths, so this loop stops
+        // on the SAME frame in both — which the assertion below states.
+        const at = Number(await a.eval('(() => { const D = window.__diceDebug;'
+          + ' for (let f = 0; f < 900; f++) {'
+          + '   const r = D.rollingState();'
+          + '   if (r && r.dice.some((x) => x.targetLevel > 0)) return f;'
+          + '   D.sim(1); } return -1; })()'));
+        assert.ok(at >= 0, `${why}: the throw was audible on some frame`);
+        const rolling = await a.dbg('rollingState()');
+        const live = (await ci()).live;
+        assert.ok(rolling.dice.some((x) => x.targetLevel > 0),
+          `${why}: and the sample is taken on it (frame ${rolling.frame})`);
+        await a.eval('(() => { const D = window.__diceDebug;'
+          + ' for (let f = 0; f < 9000 && D.busy; f++) D.sim(1); return 1; })()');
+        const settle = await a.dbg('audioSettleInfo()');
+        const film = await a.dbg('audioFilmScan()');
+        assert.ok(settle.plans.length === settle.dice && settle.dice === 3,
+          `${why}: the pour finished and every die scheduled a tail `
+          + `(${settle.plans.length} plans for ${settle.dice} dice)`);
+        return { settle, film, rolling, live };
+      };
+      const grain = await bake(7314, 'silt');
+      await wearFelt('walnut');
+      const wool = await bake(7314, 'walnut');
+
+      // THE PRECONDITION, asserted rather than assumed: a cloth is a SOUND,
+      // not a physics change. Same seed, same film — if this ever fails, every
+      // comparison below is measuring the wrong difference, and a mat that
+      // moved the dice would be a goal-15 bug rather than a voicing one.
+      assert.deepEqual(grain.film, wool.film,
+        'the two cloths bake the SAME film — a surface may be heard, not felt');
+      assert.equal(grain.rolling.frame, wool.rolling.frame,
+        'the two samples are taken at the same film frame');
+      assert.deepEqual(grain.rolling.dice.map((x) => x.targetLevel),
+        wool.rolling.dice.map((x) => x.targetLevel),
+        'and the cloth moves no rolling LEVEL — §4 stays literally true');
+
+      const byDi = (info) => [...info.plans].sort((x, y) => x.di - y.di);
+      const gp = byDi(grain.settle);
+      const wp = byDi(wool.settle);
+      for (let i = 0; i < gp.length; i++) {
+        assert.equal(wp[i].gaps.length, 6, `die ${i}: the felt bounces it six times`);
+        assert.equal(gp[i].gaps.length, 3, `die ${i}: grain catches it in three`);
+        // THE DROP IS NOT THE SURFACE. The first gap is when the die stops
+        // moving; everything after it is what it stopped ON. Equal firsts and
+        // unequal remainders is the shape that says the cloth changed the
+        // tail rather than the landing.
+        assert.equal(gp[i].gaps[0], wp[i].gaps[0],
+          `die ${i}: both cloths take the same time to catch the die`);
+        const after = (p) => p.gaps.slice(1).reduce((s, x) => s + x, 0);
+        assert.ok(after(gp[i]) < after(wp[i]) * 0.4,
+          `die ${i}: and the tail after it is under 40% as long `
+          + `(${Math.round(after(gp[i]) * 1000)} ms against ${Math.round(after(wp[i]) * 1000)} ms)`);
+        // Quieter as well as shorter: A0 rides the landing's trimmed gain.
+        assert.ok(gp[i].amps[0] < wp[i].amps[0],
+          `die ${i}: the first tap is quieter on grain too`);
+      }
+
+      // ---- ④ THE GRIND, READ OFF THE NODES ---------------------------------
+      // `audio-venue` ⑤ names this exact gap and says it out loud: there was
+      // no hook publishing a rolling voice's band or tilt, so a grind that
+      // stopped consulting the surface would still have passed. `live` is read
+      // off the standing AudioParams, so this is a claim about the graph.
+      assert.ok(grain.live && wool.live,
+        'both bakes had a rolling voice up when the sample was taken');
+      // Both are published as whole Hz, so the product is asserted to within a
+      // hertz rather than exactly — the trim itself is a float multiply.
+      assert.ok(Math.abs(grain.live.bandHz - wool.live.bandHz * d.grind) <= 1.5,
+        `the scrape rises by the cloth's own factor `
+        + `(${wool.live.bandHz} → ${grain.live.bandHz} Hz, expected `
+        + `${Math.round(wool.live.bandHz * d.grind)})`);
+      assert.ok(grain.live.bandHz > wool.live.bandHz,
+        'up, not down — the one number in the row that goes the other way');
+      assert.ok(Math.abs(grain.live.depth - wool.live.depth * (1 - d.fizz)) <= 2e-4,
+        `and the face-clacks are smothered by the fizz `
+        + `(depth ${wool.live.depth} → ${grain.live.depth}, expected `
+        + `${Math.round(wool.live.depth * (1 - d.fizz) * 1e4) / 1e4})`);
+      assert.ok(grain.live.depth < wool.live.depth * 0.5,
+        'so what is left is the scrape rather than a rate of clacks');
+      // The level under it is untouched: the AM's DC term carries the loudness
+      // and the depth carries the character, which is why "grind → hiss" costs
+      // no volume.
+      assert.equal(grain.live.level, wool.live.level,
+        'the hiss is exactly as loud as the grind it replaced');
+      await a.dbg('holdClock(false)');
+      await a.dbg('audioForce(false)');
+
+      // ---- ⑤ ONE TABLE, ONE TAIL ------------------------------------------
+      // The tail's RHYTHM now depends on the cloth, and §4 forbids timing that
+      // differs between clients. That is safe for exactly one reason: the felt
+      // id is room state, so both seats resolve the same row. This is that
+      // reason, checked through the real wire rather than assumed.
+      await wearFelt('silt');
+      await b.waitFor(`window.__diceDebug.clothAudioInfo().id === 'silt'`,
+        { desc: 'the other seat wears the same cloth' });
+      const cB = await b.dbg('clothAudioInfo()');
+      const cA = await ci();
+      assert.deepEqual(cB.declared, cA.declared,
+        'so both seats voice it the same way — the tail is a function of this row');
+      assert.deepEqual(cB.tail, cA.tail, 'and schedule the same taps');
+
+      // ---- ⑥ A VENUE LAYS ITS FLOOR OVER THE MAT ---------------------------
+      // The two surface tiers do not stack, and the reason is geometry rather
+      // than taste: js/fae-lab.js covers the felt and the 160-unit floor with
+      // one mossed disc, so in a glade the dice are not on the cloth at all.
+      // Composing them would voice a die landing in moss as if the moss were
+      // full of sand.
+      await a.dbg(`setVenue('moonrise')`);
+      await a.waitFor(`(window.__diceDebug.sim(2), window.__diceDebug.venue === 'moonrise')`,
+        { desc: 'the glade is the room' });
+      c = await ci();
+      assert.equal(c.covered, true, 'the cloth is under the glade’s floor');
+      assert.equal(c.declared.tail, 1, '…so it says nothing about the tail');
+      const moss = (await a.dbg('venueAudioInfo()')).declared.ground;
+      assert.deepEqual(c.ground, moss,
+        `and the surface tier is the venue's row alone (${JSON.stringify(c.ground)})`);
+      const impMoss = await voicing({});
+      near(impMoss.centre, impFelt.centre * moss.centre,
+        'a die in the glade lands on moss, not on sand under moss');
+      await a.dbg(`setVenue('table')`);
+      await a.waitFor(`(window.__diceDebug.sim(2), window.__diceDebug.venue === 'table')`,
+        { desc: 'home again' });
+      c = await ci();
+      assert.equal(c.covered, false, 'and back on the table the cloth speaks again');
+      assert.ok(c.ground.centre < 1, `with silt still under the dice (${c.ground.centre})`);
+    },
+  },
+  {
     name: 'no-die-sits-in-fog',
     tags: ['mat', 'chrome'],
     // THE MAT WAS INSIDE ITS OWN FOG. fogNear was dialled by eye at 15 against
