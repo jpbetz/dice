@@ -1961,154 +1961,194 @@ const COLLECT_CAP = 5;
 // the deployment and two themes cannot trade grain without trading hex.
 const feltSeed = (base) => (parseInt(base.slice(1), 16) ^ 0x5eed_f317) >>> 0;
 
-// One 512px felt tile per base color (cached — the decal composite redraws it
-// 36 times per ceremony and regenerating the noise each time would visibly
-// "reseed" the grain under the text).
+// ONE CLOTH, TILED — the atlas points at the mat now (Joe, 2026-08-29).
+//
+// WHAT WAS WRONG. The floor texture was a single 2048-px composite stretched
+// once over the whole 160-unit plane: 12.8 px per world unit. The MAT is
+// 8.6-14.1 units wide, so the surface everyone actually looks at owned
+// 110x67 to 180x110 pixels of it and 99.7% of the texture was spent on plane
+// outside the walls. Worse, the tile was authored at 19.2 px/unit and
+// DOWNSAMPLED 1.5x into the composite, so a 1-pixel speck landed at 0.67
+// texels and averaged straight back into flat colour. That is the whole
+// reason the felt read as "a colour with some noise on it" and the ceiling
+// every surface-detail idea kept hitting without naming.
+//
+// THE FIX IS NOT A BIGGER ATLAS. With a REPEATING texture, resolution is a
+// property of the tile, not of the plane: one tile authored at FELT_TILE_PX
+// over FELT_TILE_U world units gives that density everywhere the plane goes,
+// for a quarter of the memory the old composite used. So there is no
+// mat-sized texture, no second mesh, and no boundary to hide — the mat and
+// the ground around it are the same cloth at the same world scale, and the
+// only thing that changes with distance is how much of it you can resolve,
+// which is what a real surface does.
+//
+// THE GRAIN IS RE-AUTHORED, not merely enlarged. At 205 px/unit a speck of
+// the old world size would be an 11-pixel blob. Cloth at this density is
+// SLUBS — short soft strokes along the weave — not pixel dust, and the count
+// falls accordingly while the ink stays about the same.
+const FELT_TILE_PX = 1024;   // authored size of one tile
+const FELT_TILE_U = 5;       // world units it covers -> 204.8 px per world unit
+const FELT_REPEAT = 160 / FELT_TILE_U;   // tiles across the plane
+
 const feltTileCache = new Map();
 function feltTileCanvas(base) {
   let c = feltTileCache.get(base);
   if (c) return c;
   c = document.createElement('canvas');
-  c.width = c.height = 512;
+  c.width = c.height = FELT_TILE_PX;
   const ctx = c.getContext('2d');
   const rnd = mulberry32(feltSeed(base));
   ctx.fillStyle = base;
-  ctx.fillRect(0, 0, 512, 512);
-  // The tile carries ONLY the fine uniform speckle: statistically seamless
-  // under the 6×6 repeat. Anything low-frequency must NOT live here — a
-  // blotch clipped by the tile border repeats as an obvious 6×6 seam grid
-  // (baseFeltCanvas paints the whole-plane mottle exactly once instead).
-  for (let i = 0; i < 14000; i++) {
-    const shade = rnd();
-    ctx.fillStyle = shade > 0.5
-      ? `rgba(255,255,240,${0.012 + rnd() * 0.02})`
-      : `rgba(0,0,0,${0.018 + rnd() * 0.03})`;
-    ctx.fillRect(rnd() * 512, rnd() * 512, 1, 1);
+  ctx.fillRect(0, 0, FELT_TILE_PX, FELT_TILE_PX);
+
+  // THE TILE CARRIES ONLY WHAT IS STATISTICALLY SEAMLESS. Anything
+  // low-frequency must NOT live here: a blotch clipped by the tile border
+  // repeats as a grid, and at 32x32 tiles that grid is unmissable. The
+  // whole-plane mottle lives on the geometry instead (see feltMottle).
+  //
+  // Slubs, drawn wrapped: every stroke is drawn a second time shifted by a
+  // full tile whenever it crosses an edge, so the seam carries the same
+  // density as the middle rather than a bald line.
+  // DENSE AND QUIET, not sparse and loud (Joe, 2026-08-29). The first cut ran
+  // 4,200 strokes at alpha 0.018-0.066 and read as FLECKED — the eye picked
+  // out individual fibres, so it looked like lint scattered on a smooth ground
+  // rather than a woven surface. Tripling the count and cutting the alpha by
+  // the same factor holds the total ink constant, so the cloth is neither
+  // lighter nor darker than the tuned original — only finer than the eye can
+  // resolve, which is what makes it read as a surface instead of as marks.
+  const N = 12000;
+  const stroke = (x, y, len, ang, light, a) => {
+    ctx.strokeStyle = light ? `rgba(255,252,242,${a})` : `rgba(0,0,0,${a})`;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
+    ctx.stroke();
+  };
+  ctx.lineCap = 'round';
+  for (let i = 0; i < N; i++) {
+    const x = rnd() * FELT_TILE_PX;
+    const y = rnd() * FELT_TILE_PX;
+    // Two crossed families at right angles: a weave has a direction, and one
+    // family alone reads as brushed suede rather than cloth.
+    const ang = (rnd() < 0.5 ? 0 : Math.PI / 2) + (rnd() - 0.5) * 0.55;
+    const len = 5 + rnd() * 13;
+    const light = rnd() > 0.5;
+    const a = light ? 0.006 + rnd() * 0.010 : 0.008 + rnd() * 0.014;
+    const w = 1 + rnd() * 1.6;
+    ctx.lineWidth = w;
+    // WRAPPED ONLY WHERE IT MATTERS. A stroke is redrawn across the seam so
+    // the tile's edges carry the same density as its middle — but only when it
+    // can actually reach an edge. The first version tested `|x + dx| > PX*1.2`,
+    // which is true for almost nothing, so every stroke was drawn nine times
+    // and eight of them were clipped away off-canvas. Harmless to look at and
+    // pure waste to compute: at 12,000 strokes that is 108,000 stroke calls per
+    // tile instead of ~12,600, on the path a theme swap runs synchronously.
+    const reach = len + w;
+    const near = (v) => (v < reach ? 1 : v > FELT_TILE_PX - reach ? -1 : 0);
+    const wx = near(x);
+    const wy = near(y);
+    stroke(x, y, len, ang, light, a);
+    if (wx) stroke(x + wx * FELT_TILE_PX, y, len, ang, light, a);
+    if (wy) stroke(x, y + wy * FELT_TILE_PX, len, ang, light, a);
+    if (wx && wy) stroke(x + wx * FELT_TILE_PX, y + wy * FELT_TILE_PX, len, ang, light, a);
   }
   feltTileCache.set(base, c);
   return c;
 }
 
-// Felt composite: the floor texture is a single 2048-px composite covering the
-// whole 160-unit plane once (repeat 1,1) — the 6×6 felt tile pattern and the
-// whole-plane mottle, and nothing else.
+// THE MOTTLE MOVED TO THE GEOMETRY. It is the one thing that cannot tile —
+// it is the nap catching light unevenly ACROSS the whole table, and any
+// version of it inside the tile repeats as a grid. It needs no texture: it is
+// very low frequency by definition, so a vertex-colour field on a subdivided
+// plane carries it exactly, at zero extra draw calls and zero extra memory.
+// (`vertexColors: true` is the same idiom towerskin.js and faelife.js use.)
 //
-// THIS COMMENT DESCRIBED TWO DEAD THINGS UNTIL 2026-08-29. It still promised a
-// soft under-glow ring beneath each occupied shelf position (C25 took the
-// shelf off the felt) and the mat-text declaration line in letterspaced gold
-// caps (replaced by the room closing in — see BREATH). Both had been gone for
-// a while and the paragraph still explained how they worked, which is how the
-// next reader learns something false. The composite is now genuinely just
-// cloth, and `recompositeFelt`'s only caller is the theme swap.
-//
-// The 12.8 px per world unit this density implies is the ceiling on every
-// surface detail the felt can carry; it is why the declaration needed its own
-// surface and, in the end, why it left the felt entirely.
-const DECAL_SIZE = 2048;                    // px across the 160-unit plane
-const DECAL_PX_PER_UNIT = DECAL_SIZE / 160;
-
-// canvas x/y from world x/z: the camera looks from +z, so canvas center is the
-// table center and +z (the lower felt, where the shelf lives) is +y.
-const decalPx = (v) => (v + 80) * DECAL_PX_PER_UNIT;
-
-// (The shelf's under-glow rings went with the felt shelf — C25. They were the
-// joiner's at-a-glance attribution: one warm ring per occupied slot, tinted
-// with its roller's colour. With nothing standing on the felt but the live
-// roll there is no occupancy to draw, and §7.7.1's "no casino markings" now
-// describes the whole felt rather than only its empty slots. The attribution
-// they carried is the roll log's, which names its roller in their colour.)
-
-// The text-free TILE layer is cached per base color: theme swaps, decal
-// clears, and every shelf recomposite reuse the same canvas instead of
-// re-noising 36 tiles each time. Glow and text are painted over a copy.
-const feltCompositeCache = new Map();
-function baseFeltCanvas(base) {
-  let c = feltCompositeCache.get(base);
-  if (c) return c;
-  c = document.createElement('canvas');
-  c.width = c.height = DECAL_SIZE;
-  const ctx = c.getContext('2d');
-  // A SECOND stream off the same theme seed (the tile consumed the first), so
-  // the mottle field is stable per theme without repeating the tile's numbers.
+// Seeded off the theme like the tile, so two clients at one table still see
+// one cloth — the claim `felt-grain-is-seeded` makes.
+const FELT_SEGMENTS = 48;          // 49x49 verts over 160 units: ~3.3 units apart
+const FELT_MOTTLE_STRENGTH = 0.14; // peak deviation from flat, either way
+function feltMottle(geo, base) {
   const rnd = mulberry32(feltSeed(base) ^ 0x9e3779b9);
-  const tile = feltTileCanvas(base);
-  const tileSize = DECAL_SIZE / 6; // the same 6×6 rhythm the old plain repeat had
-  for (let x = 0; x < 6; x++) {
-    for (let y = 0; y < 6; y++) ctx.drawImage(tile, x * tileSize, y * tileSize, tileSize, tileSize);
-  }
-  // Cloth mottle, painted ONCE across the whole plane (it can't live in the
-  // tile: any blotch the tile border clips repeats as a 6×6 seam grid).
-  // Very soft and very wide — the nap catching light unevenly, not stains.
+  // A handful of wide soft lobes, exactly the shape the painted mottle had —
+  // 18 blotches 260-680 px across a 2048 atlas, i.e. 20-53 world units.
+  const lobes = [];
   for (let i = 0; i < 18; i++) {
-    const light = rnd() > 0.5;
-    const r = 260 + rnd() * 420;
-    const x = rnd() * DECAL_SIZE;
-    const y = rnd() * DECAL_SIZE;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    const a = 0.006 + rnd() * 0.01;
-    g.addColorStop(0, light ? `rgba(255,250,235,${a})` : `rgba(0,0,0,${a * 1.3})`);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, DECAL_SIZE, DECAL_SIZE);
+    lobes.push({
+      x: (rnd() - 0.5) * 160, z: (rnd() - 0.5) * 160,
+      r: 20 + rnd() * 33,
+      a: (rnd() > 0.5 ? 1 : -1.3) * (0.35 + rnd() * 0.65),
+    });
   }
-  feltCompositeCache.set(base, c);
-  return c;
+  const pos = geo.attributes.position;
+  const col = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    // The plane is authored in XY and rotated −90° about X, so local +y ends
+    // up as world −z: this `z` is the world one MIRRORED. That is deliberate
+    // and not worth correcting — the field is isotropic noise, so mirroring it
+    // produces a different-but-equally-valid cloth, and every client mirrors
+    // it identically. Said plainly here because "y here is z there" is the
+    // kind of almost-true comment the next reader would build on.
+    const x = pos.getX(i), z = pos.getY(i);
+    let v = 0;
+    for (const L of lobes) {
+      const d = Math.hypot(x - L.x, z - L.z) / L.r;
+      if (d < 1) { const f = 1 - d * d; v += L.a * f * f; }
+    }
+    const m = 1 + Math.max(-1, Math.min(1, v)) * FELT_MOTTLE_STRENGTH;
+    col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = m;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
 }
 
-// Tier 0 §0 (hot-paths): ONE persistent DECAL_SIZE canvas + ONE CanvasTexture
-// serve the floor for the life of the process. paintFloor clears + redraws in
-// place and flips needsUpdate; the floor material's `map` reference never
-// changes after boot, so there is no dispose/allocate churn on shelf change,
-// theme swap, or mat-decal open/close. The GPU still re-uploads the 2048²
-// atlas on each needsUpdate (that cost is unchanged), but the CPU allocation
-// (a fresh backing canvas + a new WebGLTexture handle per recomposite) and
-// the GC pressure that came with it are gone — the primary win.
-const floorCanvas = document.createElement('canvas');
-floorCanvas.width = floorCanvas.height = DECAL_SIZE;
-const floorCtx = floorCanvas.getContext('2d');
-const floorTexture = new THREE.CanvasTexture(floorCanvas);
+// ONE texture and ONE geometry for the life of the process, both swapped in
+// place on a theme change — the same no-churn discipline the old persistent
+// composite had (Tier 0 §0), for the same reason: a felt swap must not
+// allocate a WebGLTexture or a BufferGeometry.
+//
+// The plane is SUBDIVIDED now (48x48) so the mottle has vertices to live on.
+// 4,608 triangles for the whole table is nothing next to one die, and it buys
+// the low-frequency field a texture would otherwise have to carry at a
+// resolution the tile cannot provide.
+const floorGeo = new THREE.PlaneGeometry(160, 160, FELT_SEGMENTS, FELT_SEGMENTS);
+const floorTexture = new THREE.CanvasTexture(feltTileCanvas(FELT_THEMES[DEFAULT_FELT].feltBase));
 floorTexture.colorSpace = THREE.SRGBColorSpace;
+floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+floorTexture.repeat.set(FELT_REPEAT, FELT_REPEAT);
 // The floor was the ONE texture in the app that never asked for anisotropy —
-// dice.js, towerskin.js, towerdress.js and toweranvil.js all set 4 (eleven call
-// sites). It matters most here and was missing only here: the felt is the one
-// surface the camera sees almost edge-on, so its far half is exactly the
-// grazing-angle case anisotropic filtering exists for.
+// dice.js, towerskin.js, towerdress.js and toweranvil.js all set 4 (eleven
+// call sites). It matters most here and was missing only here: the felt is the
+// one surface the camera sees almost edge-on, so its far half is exactly the
+// grazing-angle case anisotropic filtering exists for. It matters MORE now
+// that there is real structure in the tile for it to keep.
 floorTexture.anisotropy = 4;
 
-// Repaint the persistent floor canvas in place. base is a felt-tile cache
-// entry. MUST be called at least once before the first render() — otherwise
-// the first frame samples a blank atlas. Boot does this at end-of-file just
-// below the floor construction.
-//
-// The mat DECLARATION no longer lives in here; it is its own quad, below.
-function paintFloor(base) {
-  floorCtx.clearRect(0, 0, DECAL_SIZE, DECAL_SIZE);
-  floorCtx.drawImage(baseFeltCanvas(base), 0, 0);
-  floorTexture.needsUpdate = true;
-}
-
-// Repaint the live floor. Since C25 took the shelf off the felt this
-// composites nothing occupancy-dependent, and since the declaration moved to
-// its own quad it composites no text either — so the one caller left is the
-// theme swap. The mat text no longer rides a felt repaint at all.
-function recompositeFelt() {
-  paintFloor(FELT_THEMES[currentFeltId].feltBase);
-}
+feltMottle(floorGeo, FELT_THEMES[DEFAULT_FELT].feltBase);
 
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(160, 160),
+  floorGeo,
   new THREE.MeshStandardMaterial({
     map: floorTexture,
     roughness: 0.95,
     metalness: 0,
+    vertexColors: true,   // the mottle; see feltMottle
   })
 );
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
-// MUST paint at least once before the first render — the persistent canvas
-// starts blank, and the material.map reference is now permanent.
-paintFloor(FELT_THEMES[DEFAULT_FELT].feltBase);
+
+// Repaint the cloth for a new base colour. Swaps the tile image and the
+// mottle field in place — the texture object and the geometry both outlive
+// every theme change, so nothing is allocated on the GPU and nothing is
+// disposed. Both caches are keyed by the base colour, so a theme returned to
+// is byte-identical to the first time it was worn.
+function recompositeFelt() {
+  const base = FELT_THEMES[currentFeltId].feltBase;
+  floorTexture.image = feltTileCanvas(base);
+  floorTexture.needsUpdate = true;
+  feltMottle(floorGeo, base);
+  floorGeo.attributes.color.needsUpdate = true;
+}
 
 // Swap the felt + scene background live. Returns false for unknown ids — the
 // id can arrive off the wire or from localStorage, never trust it blindly.
@@ -16531,14 +16571,43 @@ window.__diceDebug = {
       y: (-v.y * 0.5 + 0.5) * view.height,
     };
   },
-  // felt composite sampling (tests): RGBA of the floor texture at world (x, z)
-  // — how a headless check proves the slot decals survive theme/decal swaps.
+  // The cloth at world (x, z), as RGBA off the TILE.
+  //
+  // The mapping changed with the atlas re-point (2026-08-29) and the old one
+  // would now be quietly wrong rather than loudly broken: the texture used to
+  // be one composite stretched over the whole 160-unit plane, so world→pixel
+  // was an offset and a scale. It is a REPEATING tile now, so the world
+  // position has to be wrapped into the tile first. Sampling with the old
+  // formula still returned bytes — just always from the same corner of the
+  // tile, which is exactly the shape of check that passes while proving
+  // nothing.
+  //
+  // The `% 1 + 1) % 1` is not superstition: JS `%` keeps the sign, so a
+  // negative world coordinate — half the table — lands outside [0,1) without
+  // it, and Math.round then clamps every one of them to pixel 0.
   feltPixel(x, z) {
     const img = floor.material.map && floor.material.map.image;
     if (!img || !img.getContext) return null;
-    const px = Math.max(0, Math.min(DECAL_SIZE - 1, Math.round((x + 80) * DECAL_PX_PER_UNIT)));
-    const py = Math.max(0, Math.min(DECAL_SIZE - 1, Math.round((z + 80) * DECAL_PX_PER_UNIT)));
+    const wrap = (v) => (((v / FELT_TILE_U) % 1) + 1) % 1;
+    const px = Math.min(FELT_TILE_PX - 1, Math.floor(wrap(x) * FELT_TILE_PX));
+    const py = Math.min(FELT_TILE_PX - 1, Math.floor(wrap(z) * FELT_TILE_PX));
     return [...img.getContext('2d').getImageData(px, py, 1, 1).data];
+  },
+  // The MOTTLE is no longer in any texture — it is a vertex-colour field on
+  // the floor geometry — so proving two clients see one cloth needs both
+  // halves. This is the second half: a digest of the whole colour attribute.
+  // Returned as a number rather than the 7,203 floats it summarises, because
+  // the scenario's question is only ever "the same or not".
+  feltMottleDigest() {
+    const a = floorGeo.attributes.color;
+    if (!a) return null;
+    let h = 0;
+    for (let i = 0; i < a.count; i++) {
+      // Quantised before hashing: the claim is that two clients agree about
+      // the cloth, not that two floating-point pipelines agree bit for bit.
+      h = (Math.imul(h, 31) + Math.round(a.getX(i) * 100000)) | 0;
+    }
+    return { verts: a.count, digest: h };
   },
   // Tier 0 §0 (hot-paths): the floor's texture identity is now permanent —
   // this hook is the regression fence a scenario uses to prove no future

@@ -1474,10 +1474,26 @@ export const scenarios = [
     // the check needs two clients, which is what makes it worth a scenario
     // rather than a unit test.
     async fn(ctx) {
+      // SAMPLED DENSELY ACROSS ONE TILE, not sparsely across the table. The
+      // cloth is a 5-unit repeating tile carrying ~12,000 fine strokes, so a
+      // coarse grid mostly lands on bare ground between fibres: a 45-point
+      // sweep returned five distinct colours and could not tell a seeded tile
+      // from a blank one. A 16x16 grid over a single tile puts roughly a
+      // quarter of its samples on a stroke, which is what makes the comparison
+      // mean something. Points are offset off the exact tile origin so the
+      // grid cannot alias onto one row of pixels.
       const SIG = `JSON.stringify((() => {
         const d = window.__diceDebug, pts = [];
-        for (let x = -6; x <= 6; x += 1.5) for (let z = -3; z <= 3; z += 1.5) pts.push([x, z]);
-        return { n: pts.length, sig: pts.map(([x, z]) => (d.feltPixel(x, z) || []).join(',')).join('|') };
+        for (let i = 0; i < 16; i++) {
+          for (let j = 0; j < 16; j++) pts.push([-2.5 + (i + 0.37) * 5 / 16, -2.5 + (j + 0.53) * 5 / 16]);
+        }
+        const px = pts.map(([x, z]) => d.feltPixel(x, z) || [0, 0, 0, 0]);
+        const lum = px.map((p) => p[0] + p[1] + p[2]);
+        return {
+          n: pts.length,
+          sig: px.map((p) => p.join(',')).join('|'),
+          spread: Math.max(...lum) - Math.min(...lum),
+        };
       })())`;
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
@@ -1489,7 +1505,31 @@ export const scenarios = [
       assert.ok(A.n >= 40 && A.sig.length > 200,
         `the sampler actually read the cloth (${A.n} points, ${A.sig.length} bytes)`);
       assert.ok(/[1-9]/.test(A.sig), '…and read real pixel values, not a blank atlas');
+      // …and that it read more than ONE place. The atlas re-point made the
+      // floor a REPEATING tile, so a world→pixel mapping that forgot to wrap
+      // would return bytes from the same corner for every sample and this
+      // whole check would agree with itself about nothing.
+      // THE CLOTH HAS STRUCTURE, measured as luminance SPREAD rather than as a
+      // count of distinct pixel tuples. The count was tried first and is a bad
+      // proxy: the grain is deliberately fine and quiet, so it moves a channel
+      // by a handful of levels and hundreds of samples legitimately share an
+      // exact value — 256 samples returned six distinct tuples on a texture
+      // that was working correctly. Spread asks the question directly, and it
+      // holds across the whole palette: measured 13-24 on all nine themes
+      // (obsidian 18, the darkest), against 0 for a blank atlas.
+      assert.ok(A.spread >= 8,
+        `the cloth has real structure, not flat colour (luminance spread ${A.spread} across ${A.n} samples)`);
       assert.equal(A.sig, B.sig, 'two clients at one table see the same cloth');
+
+      // BOTH HALVES OF THE CLOTH. Since the re-point the mottle is not in any
+      // texture — it is a vertex-colour field on the floor geometry — so the
+      // pixel sweep above proves only the tile. A seeded tile under an
+      // unseeded mottle would still be two different tables.
+      const MOT = 'JSON.stringify(window.__diceDebug.feltMottleDigest())';
+      const mA = JSON.parse(await a.eval(MOT));
+      const mB = JSON.parse(await b.eval(MOT));
+      assert.ok(mA && mA.verts > 100, `the mottle field exists (${mA && mA.verts} verts)`);
+      assert.equal(mA.digest, mB.digest, '…and both clients see the same mottle');
     },
   },
   {
@@ -1515,11 +1555,20 @@ export const scenarios = [
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.settle();
       const probe = 'JSON.stringify(window.__diceDebug.breathProbe())';
+      const floors = [];
       for (const zoom of ['wide', 'medium', 'close']) {
         await a.dbg(`setZoom(${JSON.stringify(zoom)})`);
-        await a.settle();
+        // WAIT FOR THE ZOOM, don't settle and hope. queueZoom defers to the
+        // roll boundary and flushes from tick, so `settle()` can return with
+        // the change still pending — which is exactly what happened when this
+        // read the floors in a SECOND pass: it collected medium's number twice
+        // and failed a guard that was right to fail. One pass, and the read
+        // happens only once the probe agrees the zoom landed.
+        await a.waitFor(`window.__diceDebug.breathProbe().zoom === ${JSON.stringify(zoom)}`,
+          { desc: `${zoom}: the zoom applies` });
         const p = JSON.parse(await a.eval(probe));
         assert.equal(p.zoom, zoom, `${zoom}: the zoom actually applied`);
+        floors.push(p.matFogFloor);
         // The floor is recomputed from the mat that is standing NOW. Re-derive
         // it here from the reported extents rather than trusting the number,
         // so a stale floor from another zoom cannot pass.
@@ -1531,13 +1580,8 @@ export const scenarios = [
       }
       // Guard the guard: the three zooms must not all report the same floor,
       // or the sweep proves nothing about staleness — which is the exact bug
-      // it exists to catch.
-      const floors = [];
-      for (const zoom of ['wide', 'medium', 'close']) {
-        await a.dbg(`setZoom(${JSON.stringify(zoom)})`);
-        await a.settle();
-        floors.push(JSON.parse(await a.eval(probe)).matFogFloor);
-      }
+      // it exists to catch. Collected in the loop above, from the same reads
+      // the per-zoom assertions used.
       assert.equal(new Set(floors.map((f) => f.toFixed(3))).size, 3,
         `each zoom derives its own floor (${floors.map((f) => f.toFixed(2)).join(', ')})`);
     },
