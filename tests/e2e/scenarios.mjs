@@ -1493,72 +1493,79 @@ export const scenarios = [
     },
   },
   {
-    name: 'mat-text-fits-the-mat',
+    name: 'held-breath-declare-beat',
     tags: ['mat', 'chrome', 'roll'],
-    // THE DECLARATION RAN OFF EVERY ZOOM FOR THE LIFE OF THE FEATURE, and no
-    // check could have caught it: the line was painted into the 2048² floor
-    // atlas, and nothing samples glyphs. It was found by looking at the frame
-    // (2026-08-29) — at `medium`, the default, "THE GATE OF STORMS" rendered
-    // as "ATE OF ST", off both edges and blurred to mush.
+    // THE DECLARE BEAT IS TOLD IN LIGHT NOW (Joe, 2026-08-29). It used to be a
+    // gold line printed into the felt, and that line was broken at every zoom
+    // for the life of the feature — fitted to 26 world units and seated at a
+    // constant z +3.4, both survivors of the 30-unit mat, against a mat that
+    // is 8.6-14.1 wide. It could not be fixed in place either: the floor atlas
+    // gives 12.8 px per world unit, so no font size sets a legible line inside
+    // the walls. The room closing in needs no texture at all, which is why it
+    // works on all nine cloths and on every mat that ever ships.
     //
-    // The two constants that did it — fit to 26 world units, seat at z +3.4 —
-    // were survivors of the 30-unit mat, exactly like the shelf pitch C25
-    // caught. Against today's 8.6–14.1 ladder they let the line run up to 3×
-    // the mat's width and sat it ACROSS the front wall at all three zooms.
-    //
-    // So this asserts the claim in WORLD units, which is the only frame the
-    // bug was ever visible in: the band lies inside the walls, at every zoom,
-    // for a line long enough to have overflowed the old one. Asserting "some
-    // canvas got painted" is what the old code would also have passed.
+    // NOTHING IS DRAWN, so there is no pixel to assert. The beat IS the light,
+    // and the two things that can actually go wrong are: it never closes, or —
+    // far worse — it never opens, and the table is left dark for the session.
+    // Both are stated here.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.settle();
-      const LINE = 'The Gate Of Storms'; // 18 chars — ~2.4× the old fit budget
-      for (const zoom of ['wide', 'medium', 'close']) {
-        await a.dbg('clearTable()');
-        // The zoom must land BEFORE the declaration: queueZoom defers while a
-        // roll is live (tableIsBusyForZoom), so setting it mid-ceremony leaves
-        // `pendingZoom` set and the mat untouched — which is correct behaviour
-        // and also the shape that made a hand-check of this silently vacuous.
-        await a.dbg(`setZoom(${JSON.stringify(zoom)})`);
-        await a.settle();
-        await a.dbg(`commandRoll(${JSON.stringify(`2d6 cinematic # ${LINE}`)})`);
-        // WAIT ON THE STATE, NOT A STEP COUNT. `sim()` drives the FILM clock,
-        // and the declare beat is deliberately not on it (a held declaration
-        // is reading time, not dice) — so no number of sim frames raises the
-        // line, and a scenario that guessed one would fail for the wrong
-        // reason today and pass vacuously the day the beat is retimed.
-        await a.waitFor('window.__diceDebug.matTextProbe().standing === true',
-          { desc: `${zoom}: the declare beat raises the mat text` });
-        const p = JSON.parse(await a.eval('JSON.stringify(window.__diceDebug.matTextProbe())'));
-        assert.ok(p.standing && p.visible, `${zoom}: the declaration is on the felt`);
-        assert.equal(p.text, LINE, `${zoom}: …and it is the line that was asked for`);
-        assert.ok(p.fits,
-          `${zoom}: the declaration lies inside the walls — band x [${p.box.x0}, ${p.box.x1}] `
-          + `z [${p.box.z0}, ${p.box.z1}] against walls ±${p.wall.x} / ±${p.wall.z}`);
-        // The other half of the bug: it must also be legible. The floor atlas
-        // gives 12.8 px per world unit, which is why no font size could fit a
-        // line inside the mat and why the old code stopped trying.
-        assert.ok(p.pxPerUnit > 100,
-          `${zoom}: the line is set at ${p.pxPerUnit.toFixed(0)} px/unit, not the atlas's 12.8`);
-        // A quad that wrote depth would lift every die that landed over the
-        // line — `surfaceUnder` seats a die on the highest depth-writing hit.
-        assert.equal(p.depthWrite, false,
-          `${zoom}: the band never writes depth, so it cannot seat a die`);
+      const probe = 'JSON.stringify(window.__diceDebug.breathProbe())';
 
-        // GUARD THE GUARD. Everything above passes trivially if `fits` is a
-        // predicate that cannot say no, which is this repo's dominant failure
-        // shape. So run the SAME predicate over the geometry the bug actually
-        // had at this zoom — fitted to 26 world units, seated centred at
-        // z +3.4, ~2.34 units of cap height — and require it to reject.
-        const old = { x0: -13, x1: 13, z0: 3.4 - 1.17, z1: 3.4 + 1.17 };
-        const fitsOld = old.x0 >= -p.wall.x && old.x1 <= p.wall.x
-          && old.z0 >= -p.wall.z && old.z1 <= p.wall.z;
-        assert.equal(fitsOld, false,
-          `${zoom}: …and the check can still fail — the pre-2026-08-29 band `
-          + `(x ±13, z ${old.z0.toFixed(2)}–${old.z1.toFixed(2)}) is rejected `
-          + `against walls ±${p.wall.x} / ±${p.wall.z}`);
+      const open = JSON.parse(await a.eval(probe));
+      assert.equal(open.t, 0, 'the room rests open');
+      for (const dial of ['hemi', 'key', 'rim', 'lamp', 'angle']) {
+        assert.ok(Math.abs(open[dial] - 1) < 1e-9,
+          `…at exactly the shipped ${dial} (ratio ${open[dial]}), so t=0 is the room that shipped`);
       }
+
+      await a.dbg('commandRoll("2d6 cinematic # The Gate Of Storms")');
+      await a.waitFor('window.__diceDebug.breathProbe().t > 0.9',
+        { desc: 'the declare beat closes the room' });
+      const shut = JSON.parse(await a.eval(probe));
+      // Direction, not just movement: ambient falls, the pool comes UP. A beat
+      // that dimmed everything would read as the power going out.
+      assert.ok(shut.hemi < 0.5, `the room's ambient falls away (${shut.hemi.toFixed(2)} of shipped)`);
+      assert.ok(shut.rim < 0.4, `the cool counter goes with it (${shut.rim.toFixed(2)})`);
+      assert.ok(shut.angle < 0.8, `the lamp cone tightens (${shut.angle.toFixed(2)})`);
+      assert.ok(shut.lamp > 1, `…and the pool brightens (${shut.lamp.toFixed(2)}), so it reads as focus`);
+      // Dice must stay readable through the beat: the key is halved, not cut.
+      assert.ok(shut.key > 0.4, `the key light survives the beat (${shut.key.toFixed(2)}) so dice stay readable`);
+      // The fog is deliberately not in the beat — the mat's far corners are
+      // already inside it at two of three zooms, so pulling it in would put
+      // more fog on dice a player is trying to read.
+      assert.equal(shut.fogNear, open.fogNear, 'the beat does not touch fogNear');
+      assert.equal(shut.fogFar, open.fogFar, '…nor fogFar');
+
+      // AND IT OPENS AGAIN. This is the assertion that matters most: a beat
+      // stuck closed leaves the table dark for the rest of the session, and it
+      // would read as a mood bug rather than a ceremony one.
+      //
+      // BOTH RELEASE PATHS ARE COVERED, because they are different code and
+      // the second one is the safety net. The natural release is at
+      // ceremonyEnterTumble — the frame the declaration stops holding the
+      // stage and the dice come back. Releasing at dismissCeremonyUI alone was
+      // measured (2026-08-29) to hold the room shut through the tumble, the
+      // settle and the whole verdict dwell.
+      await a.waitFor('window.__diceDebug.breathProbe().t === 0',
+        { desc: 'the room opens as the dice come back, not at dismiss' });
+      const after = JSON.parse(await a.eval(probe));
+      for (const dial of ['hemi', 'key', 'rim', 'lamp', 'angle']) {
+        assert.ok(Math.abs(after[dial] - 1) < 1e-9,
+          `…all the way back to shipped ${dial} (ratio ${after[dial]}), not merely close`);
+      }
+
+      // The safety net: a ceremony SKIPPED before it ever reaches a tumble
+      // must still reopen the room, via dismissCeremonyUI's sweep.
+      await a.dbg('clearTable()');
+      await a.settle();
+      await a.dbg('commandRoll("2d6 cinematic # Skipped Outright")');
+      await a.waitFor('window.__diceDebug.breathProbe().t > 0.9',
+        { desc: 'the skipped ceremony closes the room first' });
+      await a.dbg('skipCeremony()');
+      await a.waitFor('window.__diceDebug.breathProbe().t === 0',
+        { desc: '…and a skip reopens it too, so no path leaves the table dark' });
     },
   },
   {

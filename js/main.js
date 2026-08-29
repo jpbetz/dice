@@ -1567,7 +1567,88 @@ function moodMotesDown() {
   MOOD.motes = null;
 }
 
-function applyMood() {
+// HELD BREATH — the declare beat, told in light.
+//
+// A ceremony announces itself and then holds for CEREMONY_DECLARE_S while the
+// dice wait mid-air. That hold used to be carried by a gold line printed on
+// the felt. It is carried now by the ROOM: over ~600 ms the lamp narrows and
+// lifts, the hemisphere and rim fall away, and the table is left standing in a
+// smaller pool of light. It opens again when the number is read.
+//
+// NOTHING IS DRAWN. That is the entire point, and it is why this survives
+// where the printed line could not: it needs no texture, so it cannot fight
+// the floor atlas's 12.8 px per unit; it works on all nine shipped cloths and
+// on every mat that ever ships; it costs nothing on the wire because it is
+// pure presentation; and it cannot disagree between clients in any way that
+// matters, because it reads no state but "is a declaration standing".
+//
+// IT DOES NOT TOUCH FOG, and that is a measurement, not a preference. The
+// original sketch pulled the fog in too. But the mat's far corners already sit
+// at 15.03 units from the camera at `medium` and 19.25 at `wide`, against a
+// shipped fogNear of 15 — so the back of the table is ALREADY inside the fog
+// before any beat, and both pulling fogNear in and pulling fogFar in put more
+// fog on dice a player is trying to read. There is no headroom at two of the
+// three zooms. Light has plenty. (That the shipped room already fogs its own
+// back corners is a real finding and a separate question for Joe; this beat
+// deliberately does not answer it by making it worse.)
+//
+// EVERY DIAL IS A FRACTION OF THE SHIPPED VALUE, never an absolute, so a mood
+// re-tune moves the beat with it and `t = 0` is exactly the room that shipped.
+const BREATH = {
+  on: true,          // device-local; __diceDebug.breath(false) and the reduced-motion path
+  t: 0,              // 0 open, 1 closed — the eased value the lights read
+  target: 0,         // where it is heading
+  dur: 0.6,          // seconds, each way
+  hemiDrop: 0.65,    // the room's ambient falls furthest — it is what "closing in" is
+  rimDrop: 0.75,     // the cool counter goes almost entirely
+  keyDrop: 0.45,     // the key stays halfway: dice must not go unreadable
+  lampLift: 0.12,    // …and the pool comes UP, so it reads as focus not failure
+  angleNarrow: 0.30, // the cone tightens onto the table
+};
+
+// A player who has asked the OS for less motion gets the state change without
+// the traverse — the room still closes, it simply arrives. Read once: this is
+// a preference, not something to poll every frame.
+const BREATH_INSTANT = typeof matchMedia === 'function'
+  && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Raise or release the beat. Idempotent, so the ceremony's own re-entrancy
+// (a skip, a re-declare, a dismiss that arrives twice) cannot double it.
+function holdBreath(closed) {
+  const want = closed ? 1 : 0;
+  if (BREATH.target === want) return;
+  BREATH.target = want;
+  if (BREATH_INSTANT || !BREATH.on) { BREATH.t = want; applyMoodLights(); }
+}
+
+// Eased once a frame from tick. Linear in TIME with a smoothstep in VALUE —
+// the ease has to be in the value, because a linear ramp on light intensity
+// reads as a switch being turned rather than a room settling.
+function stepBreath(dt) {
+  if (!BREATH.on || BREATH.t === BREATH.target) return;
+  const step = dt / Math.max(0.0001, BREATH.dur);
+  BREATH.t = BREATH.target > BREATH.t
+    ? Math.min(BREATH.target, BREATH.t + step)
+    : Math.max(BREATH.target, BREATH.t - step);
+  applyMoodLights();
+}
+
+// smoothstep on the way into the dials, so the endpoints are flat and the
+// middle moves — see stepBreath's note.
+const breathEase = (x) => x * x * (3 - 2 * x);
+
+// THE LIGHTS HALF OF applyMood, SPLIT OUT so the declare beat can breathe.
+//
+// HELD BREATH (the ceremony's declare beat) eases the room closed and open
+// again, which means writing these dials ~36 times over 600 ms. applyMood
+// REBUILDS the mote field on every call by design ("the field is a pure
+// function of (seed, dials)"), and rebuilding 200 points per frame to move a
+// light is the wrong trade — worse, it would restart the air's drift on every
+// frame of the beat, so the dust would visibly freeze while the room closed.
+//
+// So: lights, fog and lamp here; motes stay in applyMood. Every existing
+// caller still calls applyMood and is unchanged.
+function applyMoodLights() {
   const t = MOOD.tune;
   if (!MOOD.on) {
     hemiLight.intensity = MOOD.base.hemi;
@@ -1575,12 +1656,15 @@ function applyMood() {
     rimLight.intensity = MOOD.base.rim;
     scene.fog = null;
     if (MOOD.lamp) { scene.remove(MOOD.lamp, MOOD.lampTarget); MOOD.lamp = MOOD.lampTarget = null; }
-    moodMotesDown();
     return;
   }
-  hemiLight.intensity = t.hemi;
-  keyLight.intensity = t.key;
-  rimLight.intensity = t.rim;
+  // b is 0 with the room open and 1 with it fully closed; every dial below is
+  // the shipped value scaled by it, so b = 0 is byte-identical to the room
+  // that shipped before the beat existed.
+  const b = BREATH.on ? breathEase(BREATH.t) : 0;
+  hemiLight.intensity = t.hemi * (1 - BREATH.hemiDrop * b);
+  keyLight.intensity = t.key * (1 - BREATH.keyDrop * b);
+  rimLight.intensity = t.rim * (1 - BREATH.rimDrop * b);
   // Fog in the BACKGROUND's colour, refreshed by applyFeltTheme on swap, so
   // the floor fades into exactly the void it would otherwise edge against.
   scene.fog = new THREE.Fog(scene.background.clone(), t.fogNear, t.fogFar);
@@ -1591,14 +1675,24 @@ function applyMood() {
     MOOD.lamp.target = MOOD.lampTarget;
   }
   MOOD.lamp.color.set(t.lampColor);
-  MOOD.lamp.intensity = t.lampIntensity;
-  MOOD.lamp.angle = t.lampAngle;
+  // The pool BRIGHTENS a little as the room falls away, which is the whole
+  // trick: a lamp that dimmed with everything else would read as the power
+  // going out. This one reads as the rest of the room stepping back from it.
+  MOOD.lamp.intensity = t.lampIntensity * (1 + BREATH.lampLift * b);
+  MOOD.lamp.angle = t.lampAngle * (1 - BREATH.angleNarrow * b);
   MOOD.lamp.penumbra = t.lampPenumbra;
   MOOD.lamp.position.set(0, t.lampY, t.lampZ);
   MOOD.lampTarget.position.set(0, 0, 0);
+}
+
+function applyMood() {
+  applyMoodLights();
+  const t = MOOD.tune;
+  if (!MOOD.on) { moodMotesDown(); return; }
   // The motes are rebuilt, not patched: the field is a pure function of
   // (seed, dials), and a rebuild of 160 points costs nothing. Their cone
-  // follows the lamp's, always.
+  // follows the lamp's, always. (The BREATH does NOT rebuild them — see
+  // applyMoodLights — so the air keeps drifting through the beat.)
   moodMotesDown();
   if (MOOD.moteTune.on && MOOD.moteHost) {
     MOOD.motes = buildMotes(MOTE_SEED, {
@@ -1780,17 +1874,23 @@ function feltTileCanvas(base) {
   return c;
 }
 
-// Felt composite (UX §5.4, §7.7, §7.7.1): the floor texture is ALWAYS a
-// single 2048-px composite covering the whole 160-unit plane once (repeat
-// 1,1) — the 6×6 felt tile pattern, a soft under-glow ring beneath each
-// OCCUPIED shelf position, and, during a ceremony, the mat-text declaration
-// line in letterspaced gold caps. applyFeltTheme mid-ceremony recomposites
-// onto the new base; clearMatDecal drops only the text; recompositeFelt
-// repaints on every shelf occupancy change so the rings arrive and leave with
-// their clusters. Old textures are always disposed by whoever replaces them.
+// Felt composite: the floor texture is a single 2048-px composite covering the
+// whole 160-unit plane once (repeat 1,1) — the 6×6 felt tile pattern and the
+// whole-plane mottle, and nothing else.
+//
+// THIS COMMENT DESCRIBED TWO DEAD THINGS UNTIL 2026-08-29. It still promised a
+// soft under-glow ring beneath each occupied shelf position (C25 took the
+// shelf off the felt) and the mat-text declaration line in letterspaced gold
+// caps (replaced by the room closing in — see BREATH). Both had been gone for
+// a while and the paragraph still explained how they worked, which is how the
+// next reader learns something false. The composite is now genuinely just
+// cloth, and `recompositeFelt`'s only caller is the theme swap.
+//
+// The 12.8 px per world unit this density implies is the ceiling on every
+// surface detail the felt can carry; it is why the declaration needed its own
+// surface and, in the end, why it left the felt entirely.
 const DECAL_SIZE = 2048;                    // px across the 160-unit plane
 const DECAL_PX_PER_UNIT = DECAL_SIZE / 160;
-let matDecalText = null;                    // non-null while a decal is applied
 
 // canvas x/y from world x/z: the camera looks from +z, so canvas center is the
 // table center and +z (the lower felt, where the shelf lives) is +y.
@@ -1870,126 +1970,6 @@ function paintFloor(base) {
   floorCtx.clearRect(0, 0, DECAL_SIZE, DECAL_SIZE);
   floorCtx.drawImage(baseFeltCanvas(base), 0, 0);
   floorTexture.needsUpdate = true;
-}
-
-// ---------------------------------------------------------------------------
-// THE MAT DECLARATION (UX §5.4 — "in the felt, not the DOM")
-//
-// WHY IT IS NO LONGER PAINTED INTO THE FELT. The floor atlas is 2048 px across
-// a 160-unit plane: 12.8 px per world unit. The MAT is 8.6–14.1 units wide, so
-// the playing surface owns 110×67 to 180×110 pixels of that atlas — a postage
-// stamp, and 99.7% of the texture is spent on plane outside the walls. There
-// is no font size at which a legible line fits inside 141 px, so the old code
-// did the only thing it could: it fitted the line to **26 world units** and
-// seated it at z +3.4. Both numbers are survivors of the 30-unit mat that C25
-// also caught out (see `collected`), and against today's ladder they mean:
-//
-//   zoom     mat w    front wall   the line was allowed to run   the line sat
-//   wide     14.1     z +4.30      1.8× the mat's width          across the wall
-//   medium   11.0     z +3.35      2.4× the mat's width          across the wall
-//   close     8.6     z +2.60      3.0× the mat's width          across the wall
-//
-// Measured in the app on 2026-08-29 at `medium`, the default: "THE GATE OF
-// STORMS" rendered as "ATE OF ST" — off both edges of the frame, and blurred
-// to mush by the 12.8 px/unit atlas. It was broken at ALL THREE zooms, not the
-// two the arithmetic alone suggested, and it had never been asserted.
-//
-// So the line gets its own surface. A band quad, sized from the LIVE mat
-// extents, carrying a 2048×288 canvas of its own — 186 px per world unit at
-// `medium`, 14.5× the floor atlas. That is enough to set type in.
-//
-// IT IS STILL "IN THE FELT" AND THAT IS THE POINT: MeshStandardMaterial at the
-// floor's own roughness, so the lamp lights the letters and the cloth as one
-// surface. A MeshBasicMaterial would have been cheaper and would have read as
-// a sticker. It is NOT in the pick markers' burn-through class (renderOrder 10,
-// fog off) — a declaration is table dressing, not a result, so it sits under a
-// venue's fog sheets and dims with the room, exactly as painted-in text did.
-const MATTEXT_W = 2048;                 // canvas px across the band
-const MATTEXT_H = 288;                  // canvas px down the band
-const MATTEXT_ASPECT = MATTEXT_H / MATTEXT_W;
-const MATTEXT_Y = DECAL_Y - 0.002;      // under contact marks: a mark lands ON the print
-const MATTEXT_MARGIN_U = 0.55;          // world units of clear felt inside each side wall
-const MATTEXT_FRONT_GAP_U = 0.35;       // world units between the band and the front wall
-const MATTEXT_ALPHA = 0.28;             // unchanged from the painted-in era
-let MATTEXT = null;                     // { canvas, ctx, texture, mesh } once a line has stood
-
-// Built on FIRST declaration, never at boot — a table that never runs a
-// ceremony pays nothing, which is `ensurePickRing`'s bargain and the same
-// reason (`scene-draw-budget` asserts calls ≤ 220 and this is a draw call
-// whenever it is visible).
-function ensureMatText() {
-  if (MATTEXT) return MATTEXT;
-  const canvas = document.createElement('canvas');
-  canvas.width = MATTEXT_W;
-  canvas.height = MATTEXT_H;
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;               // the same grazing-angle case as the floor
-  const geo = new THREE.PlaneGeometry(1, 1);
-  geo.rotateX(-Math.PI / 2);            // lie flat on the cloth
-  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    map: texture, transparent: true, roughness: 0.95, metalness: 0,
-    // Never writes depth, for the reason the pick ring gives and for one more:
-    // `surfaceUnder` seats a die on the highest surface that WRITES depth, so
-    // a writing quad here would lift every die that landed over the line.
-    depthWrite: false,
-  }));
-  mesh.visible = false;
-  mesh.frustumCulled = false;
-  scene.add(mesh);
-  MATTEXT = { canvas, ctx: canvas.getContext('2d'), texture, mesh };
-  return MATTEXT;
-}
-
-// Size and seat the band from the LIVE mat, then set the line inside it.
-// Called on every apply AND from both writers of the mat's extents — applyZoom
-// (which moves TABLE_W and the base depth) and towerMatDepth (which deepens
-// the mat when a tower sockets). A declaration outlives both.
-function layoutMatText() {
-  if (!MATTEXT || matDecalText === null) return;
-  const { ctx, texture, mesh } = MATTEXT;
-  const bandW = TABLE_W;
-  const bandD = bandW * MATTEXT_ASPECT;  // glyphs stay square: one scale, not two
-  mesh.scale.set(bandW, 1, bandD);
-  // Seated INSIDE the front wall by construction rather than at a constant.
-  mesh.position.set(0, MATTEXT_Y, TABLE_D / 2 - bandD / 2 - MATTEXT_FRONT_GAP_U);
-
-  ctx.clearRect(0, 0, MATTEXT_W, MATTEXT_H);
-  const line = matDecalText.toUpperCase();
-  ctx.save();
-  ctx.globalAlpha = MATTEXT_ALPHA;
-  ctx.fillStyle = '#ffd766';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  // The fit target is the MAT, converted to this canvas's pixels — so the
-  // guarantee is "inside the walls at every zoom", not a number that was true
-  // for a mat we no longer have.
-  const pxPerUnit = MATTEXT_W / bandW;
-  const maxW = Math.max(1, (bandW - MATTEXT_MARGIN_U * 2) * pxPerUnit);
-  let px = 150;
-  for (; px > 40; px -= 2) {
-    // Letterspacing rides the size; at a fixed 9px it swamped a shrunk line.
-    try { ctx.letterSpacing = `${Math.round(px * 0.26)}px`; } catch { /* older engines */ }
-    ctx.font = `${px}px Georgia, 'Times New Roman', serif`;
-    if (ctx.measureText(line).width <= maxW) break;
-  }
-  ctx.fillText(line, MATTEXT_W / 2, MATTEXT_H / 2);
-  ctx.restore();
-  texture.needsUpdate = true;
-  mesh.visible = true;
-}
-
-function applyMatDecal(text) {
-  if (typeof text !== 'string' || !text.trim()) return;
-  matDecalText = text.trim();
-  ensureMatText();
-  layoutMatText();
-}
-
-function clearMatDecal() {
-  if (matDecalText === null) return;
-  matDecalText = null;
-  if (MATTEXT) MATTEXT.mesh.visible = false;
 }
 
 // Repaint the live floor. Since C25 took the shelf off the felt this
@@ -8905,8 +8885,13 @@ function beginCeremony(roll) {
   // out of sight while the declaration holds the stage.
   for (const d of roll.dice) d.mesh.visible = false;
   renderIntentCard(roll);
-  const title = momentTitle(roll); // '' for an untitled check: the felt stays bare
-  if (title) applyMatDecal(title);
+  // THE ROOM CLOSES IN, and it is the declaration now (Joe, 2026-08-29 — the
+  // gold line on the felt was retired in the same change). It raises for EVERY
+  // ceremony, titled or not: an untitled check still holds the stage for
+  // CEREMONY_DECLARE_S, and the beat is about the hold, not about a string.
+  // The words themselves have never been the felt's job — the intent card
+  // above names the moment, and it still does.
+  holdBreath(true);
   setCeremonyPhaseClass(roll, 'c-declare');
 }
 
@@ -8922,6 +8907,16 @@ function ceremonyEnterTumble(roll) {
   const cer = roll.ceremony;
   cer.phase = 'tumble';
   cer.clock = 0;
+  // THE ROOM OPENS HERE, not at dismiss. This is the frame the declaration
+  // stops holding the stage and the dice come back — "it reopens when the
+  // number is read". Releasing at dismissCeremonyUI instead was measured
+  // (2026-08-29) to leave the room shut through the tumble, the settle and
+  // the whole verdict dwell: the dice were readable, but the table sat dark
+  // for seconds rather than for the beat. dismissCeremonyUI still releases
+  // too, and must — it is the sweep that catches a ceremony which is skipped,
+  // cleared or abandoned before it ever reaches a tumble. holdBreath is
+  // idempotent, so the two never fight.
+  holdBreath(false);
   // A POUR's dice are not all in the room when the tumble starts — most are
   // still waiting above the mouth, and showing them for the one frame before
   // stepPlayback's next pass would flash the whole pool stacked over the
@@ -9135,7 +9130,11 @@ function dismissCeremonyUI() {
   ceremonyDismissTimer = null;
   ceremonyLayer.className = 'hidden';
   stagedVerdict = null; // nothing on screen left for a lens change to repaint
-  clearMatDecal();
+  // The room opens again. This is the ONLY release, and it is on the sweep
+  // that already exists for exactly this reason — "safe to call at any time"
+  // — so a skipped, cleared, replaced or abandoned ceremony all reopen by the
+  // same path. A beat that could be left closed would leave the table dark.
+  holdBreath(false);
 }
 
 // ---- card rendering (user-supplied strings via textContent only) ----------
@@ -10251,6 +10250,7 @@ function tick(dt, render = true, realtime = false) {
   stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
   stepPickMarks();   // MECHANICS M1: the picked-die marker follows finalPos
   stepRevealing(dt); // reveal correction flips (goal 11)
+  stepBreath(dt);    // the declare beat's room, easing closed and open
   // A DEFERRED ROOM CHANGE RIDES THE PREDICATE, NOT THE CALL SITE (C28 ②).
   // `tableIsBusyForZoom()` names three things that hold a zoom or a tower back
   // — an in-flight roll, a queued roll, a reveal flip — and every one of them
@@ -11473,8 +11473,6 @@ function towerMatDepth(layer, extra) {
   towerPlaceBackWall();
   walls.front.position.set(0, 0, TABLE_D / 2);
   updateShadowFrustum();
-  // A standing declaration is seated off the FRONT wall, which just moved.
-  layoutMatText();
   refitView();
 }
 
@@ -14813,7 +14811,10 @@ window.__diceDebug = {
       phase: r.ceremony.phase,
       kind: r.ceremony.exp.kind,
       clock: r.ceremony.clock,
-      decal: matDecalText,
+      // Was `decal: matDecalText` until 2026-08-29, when the gold line on the
+      // felt was replaced by the room closing in. `breath` is what carries the
+      // declare beat now, so it is what this reports.
+      breath: BREATH.t,
     };
   },
   skipCeremony() { return skipCeremony(); },
@@ -16424,28 +16425,30 @@ window.__diceDebug = {
   // refactor reintroduces swapFloorMap-style dispose+new churn on shelf
   // changes, theme swaps, or mat-decal open/close.
   floorTextureId() { return (floor.material.map || {}).uuid || null; },
-  // THE DECLARATION'S FOOTPRINT AGAINST THE WALLS. The old painted-in mat text
-  // ran off every zoom for the life of the feature because nothing could see
-  // it: it was pixels in a 2048² atlas, and no assertion samples glyphs. This
-  // reports the band as WORLD extents beside the mat's own, so a scenario can
-  // state the thing that was false — the line is inside the walls — instead of
-  // stating that some canvas was painted. `fits` is the whole check.
-  matTextProbe() {
-    if (!MATTEXT || matDecalText === null) return { standing: false };
-    const m = MATTEXT.mesh;
-    const halfW = m.scale.x / 2, halfD = m.scale.z / 2;
-    const box = { x0: -halfW, x1: halfW, z0: m.position.z - halfD, z1: m.position.z + halfD };
-    const wall = { x: TABLE_W / 2, z: TABLE_D / 2 };
+  // THE DECLARE BEAT, IN THE ONLY TERMS IT HAS. Held Breath draws nothing, so
+  // there is no pixel and no object to assert on — the whole effect is four
+  // light intensities and a cone angle. This reports them beside the room's
+  // own shipped values, so a scenario can state that the room actually closed
+  // (and, just as important, that it opened again) rather than that a flag
+  // flipped. `open` is the resting room: every ratio 1, the beat at 0.
+  breathProbe() {
+    const t = MOOD.tune;
     return {
-      standing: true, visible: m.visible, text: matDecalText,
-      box, wall, y: m.position.y,
-      depthWrite: m.material.depthWrite,
-      fits: box.x0 >= -wall.x && box.x1 <= wall.x && box.z0 >= -wall.z && box.z1 <= wall.z,
-      // px per world unit the line is actually set at — the number that made
-      // the old one illegible (the floor atlas gives 12.8).
-      pxPerUnit: MATTEXT_W / m.scale.x,
+      on: BREATH.on, t: BREATH.t, target: BREATH.target, instant: BREATH_INSTANT,
+      // Ratios against the shipped dials, so this stays true through a re-tune.
+      hemi: hemiLight.intensity / t.hemi,
+      key: keyLight.intensity / t.key,
+      rim: rimLight.intensity / t.rim,
+      lamp: MOOD.lamp ? MOOD.lamp.intensity / t.lampIntensity : null,
+      angle: MOOD.lamp ? MOOD.lamp.angle / t.lampAngle : null,
+      // The fog is deliberately NOT part of the beat (the mat's far corners
+      // already sit inside it) — asserted so a future "improvement" that pulls
+      // fog in has to argue with this instead of quietly shipping.
+      fogNear: scene.fog ? scene.fog.near : null,
+      fogFar: scene.fog ? scene.fog.far : null,
     };
   },
+  breath(on) { BREATH.on = !!on; applyMoodLights(); return BREATH.on; },
   // sim(n) is the FILM stepper and rides no tempo — n frames of baked
   // keyframes, always. sim(n, true) is the wall-clock stepper: it asks for
   // the same 1/60 s of REAL time animate() would deliver, so at k=2 the
@@ -23302,10 +23305,6 @@ function applyZoom(level) {
   walls.left.position.set(-TABLE_W / 2, 0, 0);
   walls.right.position.set( TABLE_W / 2, 0, 0);
   updateShadowFrustum();
-  // The declaration is sized from TABLE_W and seated off the front wall, and
-  // both just moved. (A zoom mid-ceremony is rare but entirely reachable —
-  // the picker is live and the mat text stands for the whole declare beat.)
-  layoutMatText();
   CAM_EYE = { full: [...p.eyeFull], mini: [...p.eyeMini] };
   currentZoom = level;
   // Nothing on the felt survives a zoom but the live roll's dice, and those
