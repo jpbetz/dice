@@ -22,7 +22,12 @@ note).
 2. **Fantasy-forward.** Effects beyond what a physical table can do — the
    roll-moment ceremony, mat inscriptions, crit fanfare, themed dice — are
    core to the experience, not decoration. (They are, however, sequenced
-   after core mechanics; see Priorities.)
+   after core mechanics; see Priorities.) *(Amended 2026-08-29: **mat
+   inscriptions are retired as a mechanism, not as a goal.** The declare
+   beat is told in LIGHT now — the room closes in and reopens as the dice
+   return (UX §5.4, "Held Breath"). The effect this goal asks for is
+   stronger for it, and it is no longer bounded by what a floor texture
+   can hold. See Superseded decisions.)*
 3. **Excitement outranks physicality.** Rolls are planned experiences: stakes
    declared, anticipation built, reveals accentuated and connected back to
    the stakes. Where drama and realism conflict, drama wins. *(Rider, added
@@ -326,6 +331,22 @@ are authoritative, and nothing here needs to be consulted to build.*
   audit rows written against it (IMMERSION-AUDIT.md §6, §9) remain correct
   *for that register*. Joe: "go full fantasy... nothing needs to be real
   dice on a real table."
+- **The declaration left the felt (2026-08-29)**: UX §5.4 promised the
+  declaration as a canvas-texture decal on the table plane, "diegetic and
+  looks like nothing else on the web". It shipped that way and was broken
+  at every zoom for the life of the feature — fitted to 26 world units and
+  seated at a constant `z +3.4`, both survivors of the 30-unit mat that C25
+  also caught out at the shelf. At `medium`, the default, "THE GATE OF
+  STORMS" rendered as `ATE OF ST`.
+  It could not be fixed in place. The floor atlas gave **12.8 px per world
+  unit**, so no font size sets a legible line inside a mat 8.6–14.1 units
+  wide; the old code's oversizing was the only way to make it readable at
+  all. Joe's call: **Held Breath instead** — on the declare beat the lamp
+  narrows and lifts, the hemisphere and rim fall away, and the table is
+  left in a smaller pool of light; it reopens as the dice come back.
+  Nothing is drawn, which is why it works on all nine cloths and on every
+  mat that ever ships, and costs nothing on the wire. The words were never
+  the felt's job: the intent card names the moment and still does.
 - **The felt keeps no marks (2026-08-03)**: Level 4's impact decals
   (frost / drying ring / scorch / smudge) shipped and were switched off
   the same evening — the ladder stayed, the residue went. The machinery is

@@ -28,6 +28,20 @@ those mechanics are TURNS** — so it is a campaign, not a feature. His rulings:
 a stated goal ([GOALS.md](GOALS.md) goal 16) with a family table that has six
 open rows.
 
+**THE MATS ARC LANDED 2026-08-29, and its remainder is Track B.** The atlas re-point,
+Held Breath, the fog floor and Silt (stage one) shipped 2026-08-29 — the
+record is in [SHIPPED.md](SHIPPED.md), the beat and the fog in
+[UX.md](UX.md) §5.4 / §5.4a, and the retirement of mat inscriptions in
+[GOALS.md](GOALS.md). **What is still open is listed in
+[docs/handoff/2026-08-29-mats.md](handoff/2026-08-29-mats.md)** rather than
+here, because the ordering of it is Joe's to make: Silt's VOICE (stage one
+is silent, and the brainstorm's read was that Silt is the mat you identify
+by the chatter that is not there), a hard surface for the one-of-each
+register Joe chose (Taproom Oak decides more than Wet Slate), and the Nap —
+a normal map from the same stroke field, the biggest remaining step toward
+cloth. The brainstorm those came from is not in the repo; it is the artifact
+linked from the session.
+
 **Track C's rows in THE ORDER are keyed `M1`/`M2`, not integers.** The
 integers 1–11 are taken, several by struck rows that keep their numbers as
 history (C4: one owner per numbering namespace, and a reused number is how

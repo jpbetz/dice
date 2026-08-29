@@ -1018,15 +1018,73 @@ between "modern app with a dramatic moment" and "fantasy skin".
   BG3's painted canvas.
 - Gold stays a border/accent color: **< ~3% of card pixels**, never a fill.
 
-### 5.4 Mat text — in the felt, not the DOM
+### 5.4 The declare beat — Held Breath (supersedes "mat text in the felt")
 
-The declaration ("The lie leaves your lips…") renders as a **canvas-texture
-decal on the table plane under the dice**: letterspaced uppercase Georgia,
+**RETIRED 2026-08-29, and the reason matters more than the replacement.**
+
+~~The declaration ("The lie leaves your lips…") renders as a canvas-texture
+decal on the table plane under the dice: letterspaced uppercase Georgia,
 additive gold at ~20% opacity, 600 ms fade-in on intent, slow fade after
 verdict. Dice land *on top of* the words. An HTML div with the same text is
-a heading; this is diegetic and looks like nothing else on the web — the
-one place to spend real effort, and the app's differentiator over BG3,
-which has no table.
+a heading; this is diegetic and looks like nothing else on the web — the one
+place to spend real effort, and the app's differentiator over BG3, which has
+no table.~~
+
+It shipped exactly as written and **it was broken at all three zooms for the
+life of the feature.** The line was fitted to 26 world units and seated at a
+constant `z +3.4`; both numbers are survivors of the 30-unit mat that C25
+caught out at the shelf (§7.27). Against today's 8.6–14.1 ladder that let a
+declaration run up to 3× the mat's width and sat it across the front wall at
+every zoom. Measured in the app at `medium`, the default: "THE GATE OF
+STORMS" rendered as **`ATE OF ST`**, off both edges of the frame and blurred
+to mush. Nothing caught it because nothing could — it was pixels in an
+atlas, and no assertion samples glyphs.
+
+**It could not be fixed in place.** The floor texture gave 12.8 px per world
+unit, so the mat itself owned 110×67 to 180×110 pixels of it. There is no
+font size at which a legible line fits inside 141 px; the old code's
+oversizing was not a bug on top of the design, it was the only way the
+design could be made readable at all.
+
+**What carries the beat now.** On the declare beat the room closes in over
+~600 ms: the lamp narrows and lifts, the hemisphere and rim fall away, and
+the table is left standing in a smaller pool of light. It reopens as the
+dice come back (`ceremonyEnterTumble`, not at dismiss — hooked to dismiss it
+held the room shut through the tumble, the settle and the whole verdict
+dwell). **Nothing is drawn**, and that is the whole argument: it needs no
+texture, so it works on all nine cloths and on every mat that ever ships, it
+costs nothing on the wire, and it cannot disagree between clients.
+
+The diegetic claim survives the change. The room is the table's own light,
+not a heading — and the words were never the felt's job in the first place:
+the intent card names the moment and still does.
+
+**Rules it ships under.** Every dial is a fraction of the shipped mood value,
+so `t = 0` is exactly the room that shipped. The KEY light does not take the
+theme's depth — the app's job is a number read off a die, so the key bottoms
+out at 0.55 on every cloth while the ambient scales. Each cloth carries its
+own `breath` depth, because one setting was measured wrong across the range
+(dramatic on `sand`, ~14 levels of RGB on `obsidian`, the default). Reduced
+motion gets the state change without the traverse. It does **not** touch fog
+— see §5.4a.
+
+### 5.4a No die sits in fog (2026-08-29)
+
+`fogNear` was dialled by eye at 15 against the mat of the day and the zoom
+ladder moved under it. The mat's far CORNERS sit **15.03** units from the eye
+at `medium` and **19.25** at `wide`, so the back of the table was inside its
+own fog before any beat existed — measured, not guessed. Held Breath's first
+sketch pulled the fog in as part of the beat; that was refused on the
+measurement, because both pulling `fogNear` in and pulling `fogFar` in put
+more fog on dice a player is trying to read, and there is no headroom at two
+of the three zooms.
+
+`fogNear` is now a FLOOR derived from the mat's far corner plus a margin,
+`Math.max`'d with the tune — so `close` (11.72 + margin, under 15) keeps the
+shipped number and only the zooms that actually overrun move. The horizon
+dissolve is the point of the fog and stays; it starts past the last place a
+die can land. It rides `updateShadowFrustum`, the one hook every writer of
+the mat's extents already calls.
 
 ### 5.5 Motion principles
 

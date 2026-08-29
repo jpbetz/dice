@@ -11,6 +11,93 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## The mats arc — the atlas points at the mat, and the first cloth that is not felt (2026-08-29)
+
+Started from Joe's ask for roll-mat alternatives and his three seeds (real
+sand, dirt, dice that float into place amid mist). The brainstorm produced
+172 ideas across 11 families; what it actually turned up was a NUMBER.
+
+**The felt was rendering at 12.8 px per world unit.** A 2048² composite was
+stretched once over the 160-unit plane while the mat is 8.6–14.1 units wide,
+so the surface everyone looks at owned 110×67 to 180×110 pixels of it and
+99.7% went on plane outside the walls. Worse, the tile was authored at 19.2
+px/unit and DOWNSAMPLED 1.5× into the composite, so a 1-pixel speck landed
+at **0.67 texels** and averaged back into flat colour. That single fact
+explains the felt reading as "a colour with some noise on it", why the
+ceremony line could not be made legible in place, and why half the
+brainstorm's surface-detail ideas were quietly impossible.
+
+**The fix was not a bigger atlas.** With a REPEATING texture, resolution
+belongs to the tile, not the plane: one tile at 1024 px over 5 world units
+gives 205 px/unit everywhere the plane goes, at a quarter of the memory the
+composite used. So there is no mat-sized texture, no second mesh and no seam
+— the mat and the ground around it are the same cloth at the same world
+scale, and only the resolvable detail changes with distance, which is what a
+real surface does. Re-pointing the surround too turned out CHEAPER than the
+mat-only option it was weighed against, not dearer.
+
+The grain was re-authored rather than enlarged (at 205 px/unit a speck of the
+old world size is an 11-px blob): fine slubs in two crossed families, because
+one family alone reads as brushed suede. First cut read FLECKED — individual
+fibres picking out like lint — so Joe took denser and quieter: 12,000 strokes
+at a third the alpha, total ink held (ratio 1.05), so the cloth is neither
+lighter nor darker, only finer than the eye resolves.
+
+**The mottle moved to the geometry.** It is the one thing that cannot tile —
+any version inside the tile repeats as a 32×32 grid — and it needs no
+texture: a vertex-colour field on a 48×48 plane carries it exactly, at no
+extra draw call and no extra memory (the idiom towerskin.js and faelife.js
+already use).
+
+**A cloth is a painter now, not a colour.** Nine themes shared one painter
+and differed by a hex, which is precisely the "one mat in nine colours" this
+arc started from. A theme row names its cloth, and that registry is the seam
+every later mat rides. The picker came free: `renderFeltSwatches` has always
+painted its chip from the real tile.
+
+**SILT** is the first mat that is not felt — Joe's sand seed, stage one, LOOK
+ONLY (the physics that makes sand deaden a throw is priced separately,
+because the projector can retime a hop but cannot delete one). Its grain is
+bimodal: thousands of sub-pixel grains ALONE read as television static, and
+it is the smaller population of larger, darker, angular fragments that says
+"made of pieces". Two things had to be right before it read as sand at all,
+both found by looking: the fragments were sized in TEXTURE pixels when the
+mat spans ~135 SCREEN px per world unit (so 1.6–4.8 px shards were one to
+three screen pixels and vanished — silt read as pale paper), and they were
+flat dark blobs until each got a catchlight on its lower-right, which is what
+makes a grain read as a solid rather than as pepper.
+
+Also in the arc: **Held Breath** (GOALS Superseded decisions; UX §5.4) and
+**no die sits in fog** (UX §5.4a).
+
+### Six defects, none of which had a check
+
+1. The ceremony declaration ran off the mat at **all three** zooms and
+   rendered as `ATE OF ST`. Constants left over from the 30-unit mat.
+2. Every player at a table saw a **different cloth** — the felt was the one
+   atlas in the app still drawn with bare `Math.random`. Not a goal-15 bug
+   (the bake never reads a canvas), just the weaker claim that one table
+   should look like one table.
+3. A zoom moved the mat and never refreshed the fog; a table at `wide` was
+   fogged to `medium`'s number until something unrelated re-applied lights.
+4. Once that was hooked, `applyZoom` refreshed it BETWEEN writing the new mat
+   and the new eye, deriving a floor from a mat and an eye that never
+   coexisted.
+5. Obsidian's beat depth drove the rim light to **−0.13**. A light that
+   subtracts is not a dark room. It passed because the assertion was
+   `rim < 0.4` with no lower bound — a check that could only fail one way.
+6. The felt id exists in **three** hand-mirrored lists (js/main.js,
+   server.js, js/portable.js) with no guard. The failure is asymmetric and
+   silent: a felt missing from the SERVER's allowlist works perfectly in solo
+   and refuses to stick at a shared table, because the patch is 400'd and the
+   client never sees an echo. `tests/felt-ids.test.mjs` compares all three
+   from source; `silt-is-its-own-cloth` drives it through a real second seat.
+
+Every new check was confirmed RED before being confirmed green.
+Shots: `tools/steps/silt-look.mjs`.
+
+---
+
 ## TOWER_CORE v2 — the portal contract, the GLB tower path, and the rebuilt Hollow Bole (2026-08-13)
 
 The redesign the W3 handoff promised as its item 7, delivered end to end.
