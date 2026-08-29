@@ -4790,7 +4790,18 @@ plank table — so a label naming the material of nine of them is a lie about
 the other two, and the sublabel underneath ("the surface everyone rolls on")
 was already carrying the honest version. The setting's id, its wire key and
 all three mirrored id lists stay `felt`: this is a word a player reads, not a
-rename. The row's height is unchanged, so §7.37's cap is untouched.
+rename. The row's height is unchanged.
+
+**The eleventh mat paid for its own row, in chip weight.** Taproom took the
+picker to a FOURTH row of pills and Staging 28px past the cap — the defect
+this section exists to defend against, re-grown by an addition, exactly as the
+paragraph below predicts. What came out was not a control: labels 12px → 11px,
+the swatch dot 18px → 15px, padding `5/11/5/7` → `4/9/4/6`. Eleven chips now
+sit in three rows where ten took three at the old size (measured: rows of
+4/4/3, `felt-swatches` 138px → 87px), Staging lands exactly at the cap on both
+channels, and the picker reads tidier for it. **It is full again**: a twelfth
+mat needs another ~31px from somewhere, and the next thing to give is the
+Venue sub-line, which wraps to two.
 
 **Felt stays in Staging, and that was a measurement.** Felt is room-wide, so
 blast radius alone (§7.37) argues it belongs in Table once no venue is on
