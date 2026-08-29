@@ -4784,6 +4784,14 @@ venue never hides its own picker — so a beta tester in Moonrise Glade got an
 EMPTY Staging destination: beta tag up, channel intact, no way back out short
 of the console, reported (reasonably) as "my beta opt-in got cleared."
 
+**And "Felt" is now labelled "Mat" (2026-08-29).** Two of the eleven surfaces
+in the picker are not felt at all — Silt is a bed of dry grain, Taproom is a
+plank table — so a label naming the material of nine of them is a lie about
+the other two, and the sublabel underneath ("the surface everyone rolls on")
+was already carrying the honest version. The setting's id, its wire key and
+all three mirrored id lists stay `felt`: this is a word a player reads, not a
+rename. The row's height is unchanged, so §7.37's cap is untouched.
+
 **Felt stays in Staging, and that was a measurement.** Felt is room-wide, so
 blast radius alone (§7.37) argues it belongs in Table once no venue is on
 offer to own it. Moved there it stood **483px against a 459px panel** — 24px

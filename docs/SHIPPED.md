@@ -112,6 +112,51 @@ stopped consulting the surface would have passed.
 for judging it is AUDIO §9 D, and each of the three claims it makes says which
 dial to turn if the ear says otherwise.
 
+### Taproom Oak — the register's other end (2026-08-29)
+
+Joe's "one of each, deliberately", taken before the prettier candidates
+because it decides more: ten mats swallow a die and this one hands it back.
+
+**It is the row that made the tier go UP.** The cloth table shipped that
+morning copying the venue's rule — the ground only ever subtracts — which is
+right for a venue, whose reference is the room you are already in, and wrong
+for a cloth, whose reference is wool over a hard table. A plank table is not a
+quieter felt. `centre`, `length`, `tail` and `grind` are free in both
+directions now; only `gain` keeps its cap, and for a reason that has nothing
+to do with materials: the 0.35 clamp sits outside it, so a louder row would
+lift a landing through the mix plan. **A hard surface is sold on duration at
+an unchanged peak** — twelve taps over ~257 ms against the felt's six over
+~145.
+
+`TAP_MAX` was a trap: 8, while the felt's six were the longest thing in the
+app. Oak's twelve would have been truncated by it silently — a tail that ends
+because it ran out of budget rather than out of energy. It is 16, and no
+shipped cloth may end at the cap.
+
+**What the look refuses is most of why it works.** Wood is the material the
+eye reads landmarks in, and the tile repeats every five units, so a taproom
+table's three most obvious features were all refused: knots (one per tile is
+1,024 identical knots on a 32x32 grid), butt joints (a lattice), and ring
+stains from tankards (a low-frequency blot, clipped by the tile, repeating).
+What is left is what a plank floor is made of at 205 px/unit — board tone, the
+groove between boards, ring-porous grain running the length, and the pore
+flecks that say oak rather than pine.
+
+**Two corrections came from looking, and only from looking.** The first cut
+read as LAMINATE: grain lines of constant alpha running the full width are
+machined scratches, so a line's strength now rides its own slow wave (integer
+periods, so it meets itself at the seam). The second read as WALLPAPER: the
+four-board tone sequence was a signature the eye locked onto every five units,
+so the boards now differ just enough to be separate boards and the grain
+carries the interest.
+
+**"Felt" became "Mat" in the picker.** Two of the eleven surfaces are not felt
+at all, and a label naming the material of nine of them is a lie about the
+other two. The setting id, the wire key and all three mirrors stay `felt`.
+
+Neither Silt's voice nor this one has been heard. AUDIO §9 D is the sitting.
+Shots: `tools/steps/oak-look.mjs`.
+
 ### Seven defects, none of which had a check
 
 1. The ceremony declaration ran off the mat at **all three** zooms and

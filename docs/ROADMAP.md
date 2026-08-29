@@ -34,13 +34,18 @@ record is in [SHIPPED.md](SHIPPED.md), the beat and the fog in
 [UX.md](UX.md) §5.4 / §5.4a, and the retirement of mat inscriptions in
 [GOALS.md](GOALS.md). **What is still open is listed in
 [docs/handoff/2026-08-29-mats.md](handoff/2026-08-29-mats.md)** rather than
-here, because the ordering of it is Joe's to make: Silt's VOICE (stage one
-is silent, and the brainstorm's read was that Silt is the mat you identify
-by the chatter that is not there), a hard surface for the one-of-each
-register Joe chose (Taproom Oak decides more than Wet Slate), and the Nap —
-a normal map from the same stroke field, the biggest remaining step toward
-cloth. The brainstorm those came from is not in the repo; it is the artifact
-linked from the session.
+here, because the ordering of it is Joe's to make. **Two of those three have
+landed since**: Silt's VOICE (2026-08-29 — a cloth is a surface tier now,
+[AUDIO.md](AUDIO.md) §2.6) and **Taproom Oak**, the hard surface for the
+one-of-each register (2026-08-29 — eleven mats, and the first row that made
+the tier go UP). **The Nap is what is left** — a normal map from the same
+stroke field, the biggest remaining step toward cloth — with The Ledger
+optional beside it. The brainstorm those came from is not in the repo; it is
+the artifact linked from the session.
+
+**Neither new mat has been HEARD or judged.** Both rows were reasoned from
+the material, and [AUDIO.md](AUDIO.md) §9 D is the sitting that settles
+them.
 
 **Track C's rows in THE ORDER are keyed `M1`/`M2`, not integers.** The
 integers 1–11 are taken, several by struck rows that keep their numbers as
