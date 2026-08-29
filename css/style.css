@@ -3940,20 +3940,20 @@ html, body {
 .felt-swatch {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 11px 5px 7px;
+  gap: 6px;
+  padding: 4px 9px 4px 6px;
   border-radius: 999px;
   border: 1px solid var(--hair);
   background: rgba(255, 255, 255, 0.04);
   color: var(--ivory);
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .felt-swatch:hover { border-color: var(--panel-border); background: rgba(255, 255, 255, 0.09); }
 .felt-swatch .swatch-dot {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: var(--felt-color, #444); /* under the cloth tile (JS sets it) */
   border: 1px solid rgba(255, 255, 255, 0.16);

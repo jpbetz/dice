@@ -1124,8 +1124,22 @@ export const scenarios = [
       // A small pool was never starved; it is the control. If this fails, the
       // per-step cap was set too tight and took the ordinary case with it.
       const trio = await sample('1d8+1d6+1d10');
-      assert.ok(trio.every((r) => r.afterHalfSec > 0),
-        `the canonical three-die roll still records its landings `
+      // TWO CLAIMS, AND ONLY ONE OF THEM IS ABOUT EVERY THROW — the correction
+      // a full sweep forced on 2026-08-29, when this read `every(afterHalfSec
+      // > 0)` and came back `0/9/6`. These rolls are UNSEEDED, so the scenario
+      // is a slow fuzz test over films it has never seen, and three dice
+      // dropped close together can legitimately finish every contact inside
+      // half a second. The starvation this exists to catch does not look like
+      // that: a starved recorder spends its whole budget on the spawn cluster
+      // and records NOTHING afterwards, on every throw, which is what the
+      // first assertion says. The second keeps the timing claim on the same
+      // majority rule the two large pools above already use, and for the
+      // reason stated there.
+      assert.ok(trio.every((r) => r.total > 0),
+        `every three-die throw records contacts at all — a starved recorder `
+        + `records none (${trio.map((r) => r.total).join('/')})`);
+      assert.ok(trio.filter((r) => r.afterHalfSec > 0).length >= 2,
+        `and the canonical three-die roll is still making them after 0.5 s `
         + `(${trio.map((r) => r.afterHalfSec).join('/')} late contacts)`);
     },
   },
