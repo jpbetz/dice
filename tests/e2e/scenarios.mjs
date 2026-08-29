@@ -1493,6 +1493,56 @@ export const scenarios = [
     },
   },
   {
+    name: 'no-die-sits-in-fog',
+    tags: ['mat', 'chrome'],
+    // THE MAT WAS INSIDE ITS OWN FOG. fogNear was dialled by eye at 15 against
+    // the mat of the day, and the zoom ladder moved under it: the far CORNERS
+    // sit 15.03 units from the eye at `medium` and 19.25 at `wide`, so the back
+    // of the table was being fogged before any of this. Joe's call, 2026-08-29:
+    // push it past the mat. The horizon dissolve is the point of the fog and
+    // stays — it simply starts past the last place a die can land.
+    //
+    // A FLOOR, NOT A VALUE, so `close` (11.72 + margin, under 15) keeps the
+    // shipped number and only the zooms that actually overrun move.
+    //
+    // AND IT MUST NOT GO STALE. Two ordering bugs were caught here while this
+    // was being written: a zoom moved the mat without refreshing the fog at
+    // all, and then applyZoom refreshed it between writing the new mat and the
+    // new eye, so it was derived from a mat and an eye that never coexisted.
+    // Both were silent. Hence the sweep over all three zooms rather than a
+    // single reading at the default.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+      const probe = 'JSON.stringify(window.__diceDebug.breathProbe())';
+      for (const zoom of ['wide', 'medium', 'close']) {
+        await a.dbg(`setZoom(${JSON.stringify(zoom)})`);
+        await a.settle();
+        const p = JSON.parse(await a.eval(probe));
+        assert.equal(p.zoom, zoom, `${zoom}: the zoom actually applied`);
+        // The floor is recomputed from the mat that is standing NOW. Re-derive
+        // it here from the reported extents rather than trusting the number,
+        // so a stale floor from another zoom cannot pass.
+        assert.ok(p.matFogFloor > Math.hypot(p.tableW / 2, 0, p.tableD / 2),
+          `${zoom}: the floor clears the mat it was derived from`);
+        assert.ok(p.fogNear >= p.matFogFloor - 1e-9,
+          `${zoom}: fog starts past the mat's far corner `
+          + `(fogNear ${p.fogNear.toFixed(2)} vs floor ${p.matFogFloor.toFixed(2)})`);
+      }
+      // Guard the guard: the three zooms must not all report the same floor,
+      // or the sweep proves nothing about staleness — which is the exact bug
+      // it exists to catch.
+      const floors = [];
+      for (const zoom of ['wide', 'medium', 'close']) {
+        await a.dbg(`setZoom(${JSON.stringify(zoom)})`);
+        await a.settle();
+        floors.push(JSON.parse(await a.eval(probe)).matFogFloor);
+      }
+      assert.equal(new Set(floors.map((f) => f.toFixed(3))).size, 3,
+        `each zoom derives its own floor (${floors.map((f) => f.toFixed(2)).join(', ')})`);
+    },
+  },
+  {
     name: 'held-breath-declare-beat',
     tags: ['mat', 'chrome', 'roll'],
     // THE DECLARE BEAT IS TOLD IN LIGHT NOW (Joe, 2026-08-29). It used to be a
@@ -1530,6 +1580,17 @@ export const scenarios = [
       assert.ok(shut.rim < 0.4, `the cool counter goes with it (${shut.rim.toFixed(2)})`);
       assert.ok(shut.angle < 0.8, `the lamp cone tightens (${shut.angle.toFixed(2)})`);
       assert.ok(shut.lamp > 1, `…and the pool brightens (${shut.lamp.toFixed(2)}), so it reads as focus`);
+      // BOUNDED AT BOTH ENDS, and this half is not ceremony. The checks above
+      // are all "less than", and a one-sided check can only fail in one
+      // direction: a per-theme depth of 1.5 against the rim's 0.75 drop gives
+      // 1 − 1.125 = −0.125, and `rim < 0.4` waved a NEGATIVE light intensity
+      // straight through. A light that subtracts is not a dark room. Every
+      // dial gets a floor, and the cone gets a strict one because a SpotLight
+      // at angle ≤ 0 lights nothing at all.
+      for (const dial of ['hemi', 'key', 'rim', 'lamp']) {
+        assert.ok(shut[dial] >= 0, `${dial} never goes negative (${shut[dial]})`);
+      }
+      assert.ok(shut.angle > 0, `the cone never closes to nothing (${shut.angle})`);
       // Dice must stay readable through the beat: the key is halved, not cut.
       assert.ok(shut.key > 0.4, `the key light survives the beat (${shut.key.toFixed(2)}) so dice stay readable`);
       // The fog is deliberately not in the beat — the mat's far corners are

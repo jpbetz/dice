@@ -195,6 +195,16 @@ let TABLE_D = 6.7;           // playable depth (z) — DERIVED; see MAT_DEPTH
 // `x + 0.0` is `x`), and unsocketing is `base + 0 + 0`, which is base itself
 // rather than base ± an ulp. towerMatDepth() is the only writer.
 const MAT_DEPTH = { base: TABLE_D, socket: 0, lab: 0 };
+
+// THE EYE, DECLARED HERE FOR THE SAME TDZ REASON AS ZOOM_LEVELS BELOW.
+// LET, not const: zoom rewrites the eye preset so the walker's angle stays
+// fixed (every entry keeps y/z ≈ 1.74). It lived down beside the framing rig
+// until 2026-08-29, which was fine while only the framing read it — but
+// applyMoodLights now derives the fog floor from it, and applyMood runs during
+// MODULE EVALUATION, thousands of lines before that declaration. Reading a
+// `let` from its dead zone throws, so the declaration comes up here to the
+// other mat-extent state rather than the reader going defensive about it.
+let CAM_EYE = { full: [0, 10.4, 6.0], mini: [0, 8.6, 4.8] }; // the DEFAULT ('medium')
 // Zoom picker labels — declared here (not next to renderZoomPicker) because
 // setSound() → syncSettingsUI() → renderZoomPicker() runs during module
 // evaluation, and the picker's early build must not read this in TDZ.
@@ -1494,12 +1504,60 @@ keyLight.shadow.mapSize.set(2048, 2048);
 // Shadow frustum tracks the mat: zoom shrinks TABLE_W/D, and the ortho
 // bounds shrink with it (a bigger frustum than the mat just wastes shadow
 // map). updateShadowFrustum runs at boot and again from applyZoom.
+// NO DIE IS EVER FOGGED (Joe, 2026-08-29). The shipped fogNear of 15 was
+// dialled by eye against the mat of the day, and the ladder has moved under it
+// since: the mat's far CORNERS sit 15.03 units from the eye at `medium` and
+// 19.25 at `wide`, so the back of the table was inside its own fog before any
+// of this — measured, not guessed. The horizon dissolve is the point of the
+// fog and stays; it simply starts past the last place a die can land.
+//
+// A FLOOR, NOT A VALUE: Math.max with the tune, so `close` (11.72 + margin,
+// under 15) keeps the shipped number and only the zooms that actually overrun
+// are pushed out. A tune that moves fogNear further out still wins.
+//
+// Derived from the FULL eye rather than the live camera: the camera eases, and
+// a fog plane that slid every frame while the view settled would be a new kind
+// of wrong. The mini eye is always nearer, so the full eye bounds both.
+// False until the boot applyMood() has run. Declared ABOVE updateShadowFrustum
+// because that function is invoked during module evaluation, and a `let` below
+// its definition would be read from its own dead zone on that first call.
+let moodReady = false;
+const MAT_FOG_MARGIN = 1.5;   // units of clear air past the corner
+let matFogFloor = 0;
+function updateMatFogFloor() {
+  const [, ey, ez] = CAM_EYE.full;
+  let far = 0;
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      far = Math.max(far, Math.hypot(sx * TABLE_W / 2, ey, sz * TABLE_D / 2 - ez));
+    }
+  }
+  matFogFloor = far + MAT_FOG_MARGIN;
+}
+
 function updateShadowFrustum() {
   keyLight.shadow.camera.left = -TABLE_W / 2 - 4;
   keyLight.shadow.camera.right = TABLE_W / 2 + 4;
   keyLight.shadow.camera.top = TABLE_D / 2 + 6;
   keyLight.shadow.camera.bottom = -TABLE_D / 2 - 6;
   keyLight.shadow.camera.updateProjectionMatrix();
+  // THE FOG FLOOR RIDES THIS HOOK, and it has to ride a hook rather than the
+  // call sites: the floor is a function of the mat's extents and the eye, and
+  // EVERY writer of those already calls updateShadowFrustum (boot, applyZoom,
+  // towerMatDepth). Hanging it off the writers individually is precisely how
+  // the zoom-defer bug missed four of them.
+  //
+  // Caught by the scenario, 2026-08-29: without this, a zoom moved the mat and
+  // left scene.fog holding a floor derived from the PREVIOUS mat — a table
+  // sitting at `wide` was fogged to `medium`'s number until some unrelated
+  // thing happened to re-apply the lights. Stale, silent, and only visible as
+  // a fog plane in slightly the wrong place.
+  //
+  // `moodReady` guards boot order alone: this function runs once at module
+  // evaluation, before MOOD is declared, and reading a const from its dead
+  // zone throws. The boot applyMood() a few lines below does the first real
+  // apply, and everything after this flag flips goes through here.
+  if (moodReady) applyMoodLights();
 }
 updateShadowFrustum();
 keyLight.shadow.camera.far = 60;
@@ -1604,6 +1662,12 @@ const BREATH = {
   keyDrop: 0.45,     // the key stays halfway: dice must not go unreadable
   lampLift: 0.12,    // …and the pool comes UP, so it reads as focus not failure
   angleNarrow: 0.30, // the cone tightens onto the table
+  // How far this CLOTH takes the beat, 0..~1.6. PUSHED by applyFeltTheme, not
+  // read from FELT_THEMES, because FELT_THEMES is declared thousands of lines
+  // below and applyMood runs during module evaluation — the same TDZ that
+  // makes MOOD.moteHost pushed state rather than a lookup. 1 is the shipped
+  // beat and the value a theme gets by saying nothing.
+  depth: 1,
 };
 
 // A player who has asked the OS for less motion gets the state change without
@@ -1658,16 +1722,44 @@ function applyMoodLights() {
     if (MOOD.lamp) { scene.remove(MOOD.lamp, MOOD.lampTarget); MOOD.lamp = MOOD.lampTarget = null; }
     return;
   }
+  // Recomputed here rather than hung off the extent writers: this is four
+  // hypots, it is a pure function of (CAM_EYE, TABLE_W, TABLE_D) which are all
+  // declared above, and doing it here means there is no boot-ordering question
+  // to get wrong. updateShadowFrustum runs before MOOD even exists.
+  updateMatFogFloor();
   // b is 0 with the room open and 1 with it fully closed; every dial below is
   // the shipped value scaled by it, so b = 0 is byte-identical to the room
   // that shipped before the beat existed.
-  const b = BREATH.on ? breathEase(BREATH.t) : 0;
-  hemiLight.intensity = t.hemi * (1 - BREATH.hemiDrop * b);
-  keyLight.intensity = t.key * (1 - BREATH.keyDrop * b);
-  rimLight.intensity = t.rim * (1 - BREATH.rimDrop * b);
+  //
+  // THE DEPTH IS THE THEME'S (Joe, 2026-08-29). One depth for every cloth was
+  // measured wrong in the only way that matters — on `sand` the corners fall
+  // away and a warm pool holds the table, and on `obsidian`, the DEFAULT, the
+  // same dials move about 14 levels of RGB, because half of near-black is
+  // still near-black. A dark theme has less light to take away, so it has to
+  // take a larger fraction of it.
+  const eased = BREATH.on ? breathEase(BREATH.t) : 0;
+  const b = eased * BREATH.depth;
+  // CLAMPED AT ZERO, because a depth above 1 can drive a drop past it: at
+  // obsidian's 1.5 the rim's 0.75 gives 1 − 1.125 = −0.125, and a NEGATIVE
+  // light intensity is not a dark room, it is a light that subtracts. It
+  // shipped for exactly one test run and the scenario waved it through,
+  // because the assertion was `rim < 0.4` with no lower bound — a check that
+  // could only fail in one direction, which is this repo's favourite way to
+  // be wrong. The scenario now bounds both ends of every dial.
+  const drop = (amount) => Math.max(0, 1 - amount * b);
+  hemiLight.intensity = t.hemi * drop(BREATH.hemiDrop);
+  rimLight.intensity = t.rim * drop(BREATH.rimDrop);
+  // THE KEY DOES NOT TAKE THE THEME'S DEPTH, and the scenario is why: at
+  // obsidian's 1.5 the key fell to 0.32 of shipped and the dice went with the
+  // room. That is the one thing the beat must never do — the app's whole job
+  // is a number read off a die. So the depth multiplies the AMBIENT, which is
+  // what "the room steps back" means, while the key rides the un-deepened
+  // curve and bottoms out at the shipped 0.55 on every cloth.
+  keyLight.intensity = t.key * (1 - BREATH.keyDrop * eased);
   // Fog in the BACKGROUND's colour, refreshed by applyFeltTheme on swap, so
-  // the floor fades into exactly the void it would otherwise edge against.
-  scene.fog = new THREE.Fog(scene.background.clone(), t.fogNear, t.fogFar);
+  // the floor fades into exactly the void it would otherwise edge against —
+  // but never nearer than the mat's own far corner (Joe, 2026-08-29).
+  scene.fog = new THREE.Fog(scene.background.clone(), Math.max(t.fogNear, matFogFloor), t.fogFar);
   if (!MOOD.lamp) {
     MOOD.lamp = new THREE.SpotLight(t.lampColor, t.lampIntensity, 0, t.lampAngle, t.lampPenumbra, 0);
     MOOD.lampTarget = new THREE.Object3D();
@@ -1679,7 +1771,10 @@ function applyMoodLights() {
   // trick: a lamp that dimmed with everything else would read as the power
   // going out. This one reads as the rest of the room stepping back from it.
   MOOD.lamp.intensity = t.lampIntensity * (1 + BREATH.lampLift * b);
-  MOOD.lamp.angle = t.lampAngle * (1 - BREATH.angleNarrow * b);
+  // Same clamp as the ambient dials, and here it is not merely tidy: a
+  // SpotLight with angle ≤ 0 lights nothing, so an overshoot would put the
+  // table out entirely rather than dimming it.
+  MOOD.lamp.angle = t.lampAngle * drop(BREATH.angleNarrow);
   MOOD.lamp.penumbra = t.lampPenumbra;
   MOOD.lamp.position.set(0, t.lampY, t.lampZ);
   MOOD.lampTarget.position.set(0, 0, 0);
@@ -1704,6 +1799,9 @@ function applyMood() {
   }
 }
 applyMood(); // shipped on — the room boots dark, lamp lit, horizon dissolved
+// From here on every mat-extent change refreshes the fog floor through
+// updateShadowFrustum; before here, MOOD did not exist yet.
+moodReady = true;
 
 // A reflection environment (Tier 6 §9, same technique the lab proved):
 // glossy themed sets — lacquer, ice, resin — need a WORLD to mirror, not
@@ -1774,22 +1872,39 @@ const DECAL_CAP_PER_ROLL = 6;     // drama, not mud
 // fantasy-not-casino). A stored solo choice (emerald included) is respected.
 // The theme id is room state (settings.felt); the 2D gold/ivory UI palette
 // never changes.
+//
+// `breath` is HOW FAR THIS CLOTH TAKES THE DECLARE BEAT (Joe, 2026-08-29), a
+// multiplier on BREATH's dials; absent means 1, the shipped beat. It exists
+// because one setting was measured wrong across the range: the beat drops
+// ambient to ~49%, which on `sand` reads as the room stepping back and on
+// `obsidian` moves about 14 levels of RGB, since half of near-black is still
+// near-black. The rule is simply that a darker cloth has less light to lose,
+// so it must lose a larger fraction of it. Ordered by how dark the base is.
 const FELT_THEMES = {
-  emerald:  { name: 'Emerald',  feltBase: '#1f3128', sceneBg: '#191512' },
-  crimson:  { name: 'Crimson',  feltBase: '#46201e', sceneBg: '#1a1211' },
-  midnight: { name: 'Midnight', feltBase: '#1e2a3f', sceneBg: '#121520' },
-  slate:    { name: 'Slate',    feltBase: '#2c3438', sceneBg: '#161a1c' },
-  walnut:   { name: 'Walnut',   feltBase: '#402e1c', sceneBg: '#1b1410' },
+  emerald:  { name: 'Emerald',  feltBase: '#1f3128', sceneBg: '#191512', breath: 1.35 },
+  crimson:  { name: 'Crimson',  feltBase: '#46201e', sceneBg: '#1a1211', breath: 1.15 },
+  midnight: { name: 'Midnight', feltBase: '#1e2a3f', sceneBg: '#121520', breath: 1.35 },
+  slate:    { name: 'Slate',    feltBase: '#2c3438', sceneBg: '#161a1c', breath: 1.25 },
+  walnut:   { name: 'Walnut',   feltBase: '#402e1c', sceneBg: '#1b1410', breath: 1.15 },
   // The exploration batch (2026-07): more of the palette than green/brown —
   // near-black stone, cold deep teal, wine-dark purple, and one LIGHT table
   // (dice and gold chrome read differently on it by design).
-  obsidian: { name: 'Obsidian', feltBase: '#1c1c24', sceneBg: '#0f0f13' },
-  ocean:    { name: 'Ocean',    feltBase: '#16404a', sceneBg: '#0f181c' },
-  plum:     { name: 'Plum',     feltBase: '#3b2342', sceneBg: '#160f18' },
-  sand:     { name: 'Sand',     feltBase: '#7c6a4d', sceneBg: '#211a11' },
+  obsidian: { name: 'Obsidian', feltBase: '#1c1c24', sceneBg: '#0f0f13', breath: 1.5 },
+  ocean:    { name: 'Ocean',    feltBase: '#16404a', sceneBg: '#0f181c', breath: 1.3 },
+  plum:     { name: 'Plum',     feltBase: '#3b2342', sceneBg: '#160f18', breath: 1.3 },
+  // The one light table: it needs the LEAST, and a full-strength beat here
+  // takes it somewhere the other eight never go.
+  sand:     { name: 'Sand',     feltBase: '#7c6a4d', sceneBg: '#211a11', breath: 0.8 },
 };
 const DEFAULT_FELT = 'obsidian';
 let currentFeltId = DEFAULT_FELT;
+// The DEFAULT cloth never passes through applyFeltTheme — boot assigns the id
+// directly — so its beat depth has to be pushed here or the shipped table is
+// the one theme running the beat at the wrong strength. (Obsidian is the
+// default AND the darkest, so it is exactly the row that needs 1.5.) The
+// lights are re-applied because MOOD is already up by this line.
+BREATH.depth = FELT_THEMES[DEFAULT_FELT].breath ?? 1;
+applyMoodLights();
 
 // Current merged room settings — initialized HERE, not next to
 // applyRoomSettings below, because setSound()'s module-eval call chain
@@ -2001,6 +2116,11 @@ function applyFeltTheme(id) {
   const theme = FELT_THEMES[id];
   if (!theme) return false;
   currentFeltId = id;
+  // PUSH the beat's depth for this cloth (see BREATH.depth for why pushed and
+  // not read). Absent means 1, so a new theme that says nothing about the beat
+  // gets the shipped one rather than no beat at all.
+  BREATH.depth = theme.breath ?? 1;
+  applyMoodLights();
   // A theme change mid-ceremony keeps the mat text — and since 2026-08-29 it
   // keeps it for FREE: the declaration is its own quad, so there is no longer
   // any text to re-composite onto the new base. This repaints the cloth only.
@@ -16435,6 +16555,14 @@ window.__diceDebug = {
     const t = MOOD.tune;
     return {
       on: BREATH.on, t: BREATH.t, target: BREATH.target, instant: BREATH_INSTANT,
+      depth: BREATH.depth, felt: currentFeltId,
+      // The mat the floor was derived FROM, so a reader can tell a fog change
+      // caused by the beat (never) from one caused by the mat moving under it.
+      zoom: currentZoom, tableW: TABLE_W, tableD: TABLE_D,
+      // The floor the fog may never come nearer than — the mat's own far
+      // corner plus a margin. Reported so a scenario can state that no die
+      // sits in fog, which is the claim, rather than that a number is a number.
+      matFogFloor,
       // Ratios against the shipped dials, so this stays true through a re-tune.
       hemi: hemiLight.intensity / t.hemi,
       key: keyLight.intensity / t.key,
@@ -23304,8 +23432,15 @@ function applyZoom(level) {
   walls.front.position.set(0, 0,  TABLE_D / 2);
   walls.left.position.set(-TABLE_W / 2, 0, 0);
   walls.right.position.set( TABLE_W / 2, 0, 0);
-  updateShadowFrustum();
+  // THE EYE MOVES BEFORE THE FRUSTUM CALL, not after. It used to be the other
+  // way round, which was harmless while updateShadowFrustum only read the mat
+  // — but it also refreshes the fog floor now, and that floor is a function of
+  // the mat AND the eye. Called in the old order it computed the new mat's
+  // corners against the PREVIOUS zoom's eye and left the fog a step behind,
+  // every zoom, until something unrelated re-applied the lights. Caught by the
+  // scenario. Nothing between these two lines reads either value.
   CAM_EYE = { full: [...p.eyeFull], mini: [...p.eyeMini] };
+  updateShadowFrustum();
   currentZoom = level;
   // Nothing on the felt survives a zoom but the live roll's dice, and those
   // are physics — the walls moved above and the bodies follow. Since C25 the
@@ -25442,10 +25577,11 @@ function panelDebugState() {
 // below ~1.3 aspect: a 4:3 desktop clipped slots 0 and 4, and an iPad portrait
 // — too big to auto-engage compact view — put two of the five markers, ✕ and
 // all, outside the viewport entirely.
-// LET, not const: zoom rewrites the eye preset so the walker's angle stays
-// fixed (every entry keeps y/z ≈ 1.74). applyCameraFraming's step-back still
-// runs after — it just starts from the closer eye at 'medium'/'close'.
-let CAM_EYE = { full: [0, 10.4, 6.0], mini: [0, 8.6, 4.8] }; // the DEFAULT ('medium')
+// (CAM_EYE itself is declared at the top of the file with TABLE_W — see there
+// for why. Its behaviour is unchanged: zoom rewrites the eye preset so the
+// walker's angle stays fixed, every entry keeping y/z ≈ 1.74, and
+// applyCameraFraming's step-back still runs after, just starting from the
+// closer eye at 'medium'/'close'.)
 
 // What must stay on screen, each with the NDC headroom its own chrome needs.
 //
