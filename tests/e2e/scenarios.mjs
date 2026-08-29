@@ -16053,8 +16053,22 @@ export const scenarios = [
           `d${d.i}: one rough byte per frame, cut with the film `
           + `(${d.roughLen} bytes for ${scan.frames} frames)`);
       }
-      const rolled = scan.dice.filter((d) => d.rollingFrames > 0);
-      assert.ok(rolled.length > 0, 'some die rolled, so there is a window to look in');
+      // A WINDOW HAS TO BE WIDE ENOUGH TO CARRY THE CLAIM, and the first
+      // version of this loop did not say so — which is where the `audio-phases`
+      // flake came from (diagnosed 2026-08-29, one failure per handful of full
+      // sweeps, always green in isolation). It is not a race and not load:
+      // THIS POUR IS NOT SEEDED (`commandRoll('6d6')`, deliberately — the leg
+      // above it is about a real pour through a real tower), so the film is a
+      // new one every run, and every few hundred dice one of them clears the
+      // rolling bar for a SINGLE frame on its way to a stop. The phase is
+      // derived from speed, the rough byte is derived from contact, and a die
+      // in the air for that one frame legitimately has neither. `0 of 1
+      // frames` was the assertion overreaching, not the track failing.
+      const ROUGH_WINDOW = 5;   // frames — a twelfth of a second of rolling
+      const rolled = scan.dice.filter((d) => d.rollingFrames >= ROUGH_WINDOW);
+      assert.ok(rolled.length > 0,
+        `some die rolled for ${ROUGH_WINDOW}+ frames, so there is a window to `
+        + `look in (${scan.dice.map((d) => d.rollingFrames).join(', ')})`);
       for (const d of rolled) {
         assert.ok(d.roughInRollingWindow > 0,
           `d${d.i}: the rough bytes are non-zero somewhere in its rolling `

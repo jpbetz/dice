@@ -70,7 +70,49 @@ makes a grain read as a solid rather than as pepper.
 Also in the arc: **Held Breath** (GOALS Superseded decisions; UX §5.4) and
 **no die sits in fog** (UX §5.4a).
 
-### Six defects, none of which had a check
+### Silt's voice — the cloth becomes a surface tier (2026-08-29, same day)
+
+Stage one shipped a picture of a granular bed and nothing else: the contact
+machine never learned the surface had changed, so a die landing in a hand's
+depth of dry grain clicked and bounced six times exactly as it does on wool
+over wood. **It looked right, so nothing said it was wrong** — this project's
+signature failure, found the same day it shipped and fixed before anyone had
+to hear it twice.
+
+A cloth is a **second surface tier** now (docs/AUDIO.md §2.6), the same shape
+and the same argument as the venue's ground: it multiplies the die's own
+material rather than replacing it. Three of its six dials are the ones that
+are about silt rather than about volume:
+
+- **`tail`** multiplies the settle cluster's geometric ratio and therefore
+  decides HOW MANY TAPS THERE ARE. Felt hands a die back six times; silt
+  three, the last two inside 20 ms. A thud, a pat, and then the thing that
+  identifies a grain bed, which is nothing.
+- **`grind`** is the one number that goes UP, and it is not a contradiction
+  with `centre`: loose grain swallows a landing (nothing in it can resonate)
+  and yet brightens a scrape. Down for the knock, up for the scrape.
+- **`fizz`** smothers the face-clack modulation. The AM depth is what makes
+  clacks discrete and the DC term carries the level, so "grind → hiss" costs
+  one multiply and no loudness.
+
+**The felt row is all identity**, so nine shipped mats and the eight voices
+Joe approved on 2026-08-18 are byte-identical by construction, not by care.
+**The two tiers do not stack**, for a reason that is geometry rather than
+taste: a venue lays one huge floor disc over the mat, so in a glade the dice
+are not on the cloth at all.
+
+The tap schedule moved to `js/voices.js` with every other voice number — how
+many times a surface hands a die back is a designed quantity now, and a
+designed quantity only observable by driving a browser is one nobody checks.
+`clothAudioInfo().live` also **closes a gap docs/AUDIO.md §8.1 had named out
+loud**: nothing published a rolling voice's band or tilt, so a grind that
+stopped consulting the surface would have passed.
+
+**Nobody has heard it.** The row is an argument from the material; the route
+for judging it is AUDIO §9 D, and each of the three claims it makes says which
+dial to turn if the ear says otherwise.
+
+### Seven defects, none of which had a check
 
 1. The ceremony declaration ran off the mat at **all three** zooms and
    rendered as `ATE OF ST`. Constants left over from the 30-unit mat.
@@ -92,6 +134,10 @@ Also in the arc: **Held Breath** (GOALS Superseded decisions; UX §5.4) and
    and refuses to stick at a shared table, because the patch is 400'd and the
    client never sees an echo. `tests/felt-ids.test.mjs` compares all three
    from source; `silt-is-its-own-cloth` drives it through a real second seat.
+7. And the same failure one layer down, found the next morning: a cloth id
+   named a PAINTER and nothing else, so silt shipped looking like grain and
+   sounding like wool. `tests/felt-ids.test.mjs` now guards a fourth mirror —
+   every cloth that is painted is also voiced.
 
 Every new check was confirmed RED before being confirmed green.
 Shots: `tools/steps/silt-look.mjs`.

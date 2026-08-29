@@ -597,7 +597,7 @@ export function bedAirHz(sampleRate, hz) {
 }
 
 // ---------------------------------------------------------------------------
-// 4b. WHAT THE CLOTH DOES TO A CONTACT (the mats arc, docs/UX.md §5.4b)
+// 4b. WHAT THE CLOTH DOES TO A CONTACT (the mats arc, docs/AUDIO.md §2.6)
 // ---------------------------------------------------------------------------
 // Silt shipped 2026-08-29 as a picture of a granular bed and nothing else: the
 // felt's voice came out of it unchanged, so a die landed in loose grain and

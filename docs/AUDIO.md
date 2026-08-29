@@ -51,6 +51,12 @@ Read what is left of "warm", "dead", "bright" and "dull" below as a
 *prediction* still — but §9's ten rows now carry verdicts, and only the rows
 that CHANGED need a second sitting.
 
+**One voice has been added since and is UNHEARD:** the cloth tier (§2.6,
+2026-08-29), which is what a mat does to a die that lands on it. Silt is the
+first cloth that is not felt, its row was reasoned from the material rather
+than tuned to a sentence, and §9 D is its route. The felt row is all identity,
+so nothing in the ten above moved.
+
 ## 1. The sound of this table
 
 Felt over wood in a quiet, warm room — a private corner of a tavern, not a
@@ -354,6 +360,83 @@ does not switch on, and it does not switch **over** either.
 **A venue changes what the bed IS; it never changes whether the bed is ON.**
 That is refusal 14, and it is the same rule as refusal 7.
 
+### 2.6 The cloth's voice (the mats arc, 2026-08-29)
+
+Silt shipped on 2026-08-29 as a picture of a granular bed and nothing else.
+The contact machine never learned the surface had changed, so a die landing in
+a hand's depth of dry grain clicked and bounced six times exactly as it does
+on wool over wood — **it looked right, so nothing said it was wrong.**
+
+A cloth is therefore a **second surface tier**, the same shape and the same
+argument as §2.5's ground and as `IMPACT_SOFT_*` before it: it *multiplies*
+the die's own material rather than replacing it. A steel die still rings; the
+silt says what that ring does when it lands in loose grain.
+
+The rows live in `CLOTH_VOICES` (`js/voices.js` §4b), read through **one**
+function, `clothVoiceFor(venueId, cloth)`:
+
+| | `felt` (reference) | `silt` |
+|---|---|---|
+| what it is | wool weave over a hard table | a hand of dry grain over stone |
+| `centre` × | 1 | 0.58 |
+| `length` × | 1 | 0.6 |
+| `gain` × | 1 | 0.85 |
+| `tail` × | 1 | 0.45 |
+| `grind` × | 1 | 1.7 |
+| `fizz` | 0 | 0.75 |
+| taps it hands back | 6 | 3 |
+
+The first three are §2.5's dials and behave identically. The other three are
+the ones that are about silt rather than about volume:
+
+- **`tail`** multiplies the settle cluster's geometric ratio (§3.4), and
+  therefore decides **how many taps there are** — the walk stops at 1 % of the
+  first one. 0.42 → 0.189 takes the cluster from six taps to three, and the
+  third arrives 3 ms behind the second at 3.6 % of its amplitude. What you
+  hear is a thud, a pat, and then the thing that identifies a grain bed, which
+  is *nothing*. This is the dial the whole idea rests on.
+- **`grind`** is the sustained layer's spectral factor and the one number in
+  the table that goes **up**. It is not a contradiction with `centre`: a mass
+  of loose grain absorbs an impact (no cavity, no plate, nothing to resonate)
+  and yet a die *dragging* through it generates broadband noise a wool weave
+  never makes. **Down for the knock, up for the scrape**, and the pair is the
+  material.
+- **`fizz`** is how much of the face-clack modulation the surface smothers.
+  §3.3's AM depth is what makes the clacks discrete and the 0.35 DC term
+  carries the level, so "grind → hiss" costs one multiply and no loudness.
+
+**Four properties, and the first two are the load-bearing ones:**
+
+1. **The felt row is all identity**, so every table that has ever been played
+   sounds byte-identical after this change *by construction* rather than by
+   care. `clothAudioInfo().feltInert` is that claim, and it is the same
+   discipline as `groundedInert` one tier up.
+2. **The two tiers do not stack.** A venue lays one huge floor disc *over* the
+   mat (`js/fae-lab.js` covers the felt and the 160-unit floor alike), so in a
+   glade the dice are not on the cloth at all — composing them would voice a
+   die landing in moss as if the moss were full of sand. `clothVoiceFor` owns
+   that rule in one line; `clothAudioInfo().covered` publishes it.
+3. **A baffle knock is never trimmed**, for the reason §2.5 gives: a die
+   inside the tower is inside the tower. Same `groundFor(isClunk)`.
+4. **The mix ceiling only falls**, and no rolling `targetLevel` moves. §4
+   stays literally true.
+
+**The tail's rhythm now depends on the cloth, which §4 would otherwise
+forbid.** It is safe for exactly one reason: the felt id is *room state*, so
+both seats at a table resolve the same row and schedule the same taps. That
+reason is checked through the real wire (`silt-has-a-voice` ⑤) rather than
+assumed.
+
+**An unvoiced cloth is silent about sound rather than wrong about it** — it
+falls back to the reference row, the same way an unvoiced venue does, so
+adding a mat stays a visual-only job until somebody writes its voice down.
+`tests/felt-ids.test.mjs` is what makes that a decision rather than an
+oversight: every cloth that is *painted* must also be *voiced*.
+
+**Nobody has heard any of this.** Every other number in this document is a
+fence around something Joe listened to; §2.6's row is an argument from the
+material and the verdict is still his. §9 D is the route.
+
 ## 3. The three-phase contact machine
 
 Per-die state, derived at playback from film data every client already
@@ -460,9 +543,16 @@ amp_k = A0·e^k
 voice = the landing's body, freq ×0.85^k, sustain ×0.5
 ```
 
-`e = 0.42`, `T0 = 85 ms`, `A0 = 0.5 ×` the landing impact's computed gain,
-max 8 taps, stopping at 1 % of A0 — about five audible taps over ~145 ms,
-the last of them near-pure thump.
+`e = 0.42 × cloth.tail`, `T0 = 85 ms`, `A0 = 0.5 ×` the landing impact's
+computed gain, max 8 taps, stopping at 1 % of A0 — on the felt, six taps over
+~145 ms, the last of them near-pure thump.
+
+**The constants and the walk over them live in `js/voices.js`** (`TAP_*` and
+`settleTail(cloth)`) since the cloth tier landed, with every other voice
+number and for the same reason: how many times a surface hands a die back is a
+*designed* quantity now (§2.6), and a designed quantity only observable by
+driving a browser is one nobody checks. `js/main.js` walks that array and adds
+the jitter, the amplitude and the voicing; it does not recompute the schedule.
 
 The cluster uses the **tap** gate class. It must bypass the impact cursor
 entirely or the 18 ms floor eats taps 3–7 — the tail is *supposed* to be
@@ -476,10 +566,11 @@ produces that crossing for the last die like every other. The design expected
 to need the special case; the measurement said otherwise, and the code says so
 in a comment this file contradicted.*
 
-The tail wears the venue's ground (§2.5) too — a die settles on the floor of
-the place it is in — through `vo.ground`, and deliberately through
-`ground.centre` rather than the full `centre`: the cluster does not apply the
-soft-strength tier (its own `0.85^k` walk down is the dulling), and folding it
+The tail wears the venue's ground (§2.5) and the cloth (§2.6) too — a die
+settles on the floor of the place it is in — through `vo.ground`, and the
+cloth's `tail` on top of that, which is the one thing a surface may change
+about the *rhythm*. Deliberately through `ground.centre` rather than the full
+`centre`: the cluster does not apply the soft-strength tier (its own `0.85^k` walk down is the dulling), and folding it
 in here would move a shipped schedule.
 
 ## 4. Determinism contract
@@ -750,6 +841,7 @@ Tag `audio` (with `fx` and `roll`), in `tests/e2e/scenarios.mjs`:
 | `audio-settle` | one scheduled cluster per die, geometric intervals within jitter tolerance, byte-identical schedules for the same seed, and the impact cursor unmoved by taps |
 | `audio-shaft` | the shaft bus exists only under a socketed tower, and `impactVoiceFor` — not `towerClunkVoice` — is what says a towerless roll has no shaft |
 | `audio-ambience` | the toggle defaults off, no bed sources when off, and `soundOn === false` forces zero bed sources regardless |
+| `silt-has-a-voice` | **Shipped 2026-08-29** (tags `mat audio roll net`). The felt is inert in effect and `feltInert` agrees; silt trims a landing by the exact product of the felt's own measured answer and its declared row, outside the 0.35 clamp; a baffle knock over silt keeps the neutral ground; the two cloths bake the SAME film (a surface may be heard, not felt) and move no rolling `targetLevel`; the tail is six taps on felt and three on silt with the same first gap and under 40 % of the remainder; the grind's band rises by `grind` and its AM depth falls by `1 − fizz`, both read off the live AudioParams; both seats at one table wear the same cloth; and a venue's floor covers the mat, after which the cloth says nothing |
 | `audio-venue` | **Shipped 2026-08-17.** The grounded row is inert *in effect* (a landing and a baffle knock are byte-identical there); a fantasy venue trims a landing by the exact product of the grounded answer and its own declared row, outside the 0.35 clamp; a baffle knock under the same venue keeps the neutral ground and the full ceiling; the settle tail carries the trim on its LEVELS and not on its GAPS (moonrise vs foxfire — same tower, same staged set, same seed, so only the ground row differs) and no rolling `targetLevel` moves; the standing bed re-voices in place (`told` instantly, live AudioParams over real seconds, `bedSources` AND `perHitBufferAllocs` unmoved); and a venue never switches the bed on |
 
 Hooks it stands on, added by W6:
@@ -762,6 +854,12 @@ publishes a rolling voice's band or tilt frequency (`audioGraphInfo` reports
 pool sizes and levels, never filters), so the GRIND's trim is asserted on the
 shared `ground.centre` that `stepRollingVoices` reads and not on the band it
 produces. A grind that stopped multiplying by that number would still pass.
+
+*Closed 2026-08-29.* `clothAudioInfo().live` reads the standing rolling
+voice's band, tilt, depth and level off the AudioParams, and
+`silt-has-a-voice` ④ asserts the product on them. `audio-venue` still makes
+the weaker claim; the instrument now exists for anyone who wants to strengthen
+it.
 
 **A known flake, measured 2026-08-16 and it is NOT W6's:** `audio-graph`'s
 `gateCursors.tap === 0` ("nothing has scheduled a settle cluster") fails about
@@ -1004,6 +1102,38 @@ about a third of an octave against the grounded felt. **Set both to all-1s and
 a fae landing becomes byte-identical to a grounded one** — one edit, and it
 should be his call. `ground.centre` moves the impacts, the whole settle tail,
 the rolling surface band and the tilt curve *together*, by design.
+
+#### D. The cloth under the dice — two mats, one throw (2026-08-29, UNHEARD)
+
+Come home first: **The Table** as the venue, sound on. This section is not
+like A, B or C — every voice in those was heard and then tuned to a sentence
+Joe said. §2.6's row was reasoned from the material and has never been played
+to anybody, so what follows is a route rather than a defence.
+
+**Roll the same handful twice, switching only the mat.** The film is identical
+under both cloths (`silt-has-a-voice` asserts it), so anything you hear
+change is the surface and nothing else.
+
+| # | Mat | The two clicks | Listen for | asked |
+|---|---|---|---|---|
+| D1 | **Walnut** (or any felt) | *(a row of ×8)* → **Roll** | the reference. The tail is the part to fix in memory: six taps over ~145 ms, and the pile's grind as it rolls out | — |
+| D2 | **Silt** | settings → **Silt** → **Roll** | **the tail, first and hardest.** Three taps, the last two inside 20 ms — a thud, a pat, then nothing. Then the grind: it should have gone from a rate of clacks to a *hiss*, at the same loudness and about two-thirds of an octave brighter | does this sound like dice landing in dry grain? |
+
+**What is being claimed, so it can be rejected precisely:**
+
+1. **The catch.** A grain bed does not hand a die back. If D2 still sounds
+   like a bounce, `tail` is not low enough (0.45 today; 0.21 would leave two
+   taps, and below that a landing stops being an event).
+2. **The hiss.** If the grind reads as *brighter felt* rather than as grain,
+   `fizz` is the dial — it is 0.75, and it is the difference between clacks at
+   a rate and a continuous scrape.
+3. **The deadness.** If the landing itself sounds *muffled* rather than
+   *absorbed*, `centre`/`length` (0.58 / 0.6) went too far; they are already
+   past the deepest floor in the app, which is Foxfire's standing water.
+
+**And the one thing that is not a dial:** if silt sounds right but the whole
+table now sounds quieter, that is `gain` at 0.85 doing what a bed of grain
+does, and it is the only number here that touches level.
 
 **The single control that answers most of section A** is `BED_SWELL`, then the
 two bed levels — but note that section A is **approved** and needs no sitting.
