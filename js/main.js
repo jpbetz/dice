@@ -2120,7 +2120,7 @@ function paintSiltCloth(ctx, rnd) {
   // fillRect, NOT arc. A grain here is 0.6-1.7 px: at that size a circle and a
   // square are the same handful of pixels, but `beginPath` + `arc` + `fill`
   // costs several times a `fillRect`, and this runs 26,000 times per tile —
-  // for TEN tiles at boot, because renderFeltSwatches paints every theme's
+  // for ELEVEN tiles at boot, because renderFeltSwatches paints every theme's
   // cloth to build its swatch. The arc version wedged the tab on load, which
   // is a startup cost paid by every player for a picker most never open.
   //
@@ -2442,8 +2442,10 @@ scene.add(floor);
 // Repaint the cloth for a new base colour. Swaps the tile image and the
 // mottle field in place — the texture object and the geometry both outlive
 // every theme change, so nothing is allocated on the GPU and nothing is
-// disposed. Both caches are keyed by the base colour, so a theme returned to
-// is byte-identical to the first time it was worn.
+// disposed. There is ONE cache and it is keyed by CLOTH AND colour
+// (`feltTileCache`, `${cloth}|${base}`), so a theme returned to is
+// byte-identical to the first time it was worn; the mottle is not cached at
+// all — it is recomputed from the same seed, which comes to the same thing.
 function recompositeFelt() {
   const theme = FELT_THEMES[currentFeltId];
   floorTexture.image = feltTileCanvas(theme.feltBase, theme.cloth);

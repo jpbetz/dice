@@ -275,11 +275,33 @@ export function bakeWood({ size, stops, planks, seed, cathedral }) {
   return { ...mapsFromCanvases(cCan, hCan, seed), colorCanvas: cCan, heightCanvas: hCan };
 }
 
-// Sobel a height sketch into a tangent-space normal map (OpenGL +Y). LINEAR
-// data — no colorSpace tag, that would bend the vectors. Sampling wraps
-// modulo W so the result is as seamless as its input.
+// Turn a height sketch into a tangent-space normal map. LINEAR data — no
+// colorSpace tag, that would bend the vectors. Sampling wraps modulo W so the
+// result is as seamless as its input.
 // (js/dice.js has the same routine but does not export it; duplicating ~20
 // lines beats widening that module's surface for a lab-only skin.)
+//
+// IT IS NOT A SOBEL — it is a 4-tap central difference, no 3x3 kernel and no
+// diagonals. The word was in both copies of this comment and it travelled: the
+// mats handoff cites "js/themes.js does height-sketch→Sobel", which is wrong
+// about the file AND about the kernel. Corrected 2026-08-29.
+//
+// AND THE TWO FORKS DISAGREE ON THE SIGN OF Y, which nobody had noticed. Both
+// write G = +dy; this one computes dy = h(y-1) - h(y+1), js/dice.js computes
+// dy = h(y+1) - h(y-1). They emit opposite green channels from one sketch, so
+// a ridge lit from the north reads as a groove in one of them.
+//
+// WHICH IS RIGHT DEPENDS ON THE SURFACE, and that is why this is a note rather
+// than a fix. For an OpenGL-convention tangent-space map, G encodes -dH/dv. A
+// CanvasTexture has flipY = true, so v = 1 - y/s and dv = -dy/s, which makes
+// -dH/dv = +s·dh/dy — i.e. js/dice.js's sign is the correct one for the
+// built-in three.js geometries it is used on (PlaneGeometry, the dice solids).
+// THIS fork feeds GLB models whose UVs come from glTF, where v runs the other
+// way, so its inversion may be exactly right in its own context — but the
+// stated reason ("canvas y is down") is not that reason. Nobody has put a
+// known ridge under a known lamp and looked, which is the only thing that
+// would settle it. Anything NEW deriving a normal map for a built-in geometry
+// should use the js/dice.js sign.
 export function heightToNormal(heightCanvas, strength) {
   const s = heightCanvas.width;
   const src = heightCanvas.getContext('2d').getImageData(0, 0, s, s).data;

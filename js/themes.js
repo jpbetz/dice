@@ -54,7 +54,11 @@
 // · `maps` (Level 1, texture-space authoring):
 //     digitGlow {color, intensity}  emissiveMap of the DIGITS alone
 //     relief {pattern, strength, digitDepth}
-//                                 height sketch → Sobel normal map:
+//                                 height sketch → normal map (the code is
+//                                 `heightToNormal` in js/dice.js, NOT here,
+//                                 and it is a 4-tap CENTRAL DIFFERENCE, not
+//                                 a Sobel — this line said "Sobel" and the
+//                                 mats handoff cited THIS FILE for it):
 //                                 'hammer' · 'grain' · 'ferns' ·
 //                                 'scrimshaw'; digits engrave at depth
 //     roughPattern                  roughnessMap: pattern = ROUGH over the

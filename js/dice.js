@@ -528,8 +528,15 @@ const PATTERNS = {
 // nothing in the app enumerates painters at runtime).
 export const PATTERN_IDS = Object.keys(PATTERNS);
 
-// Sobel a height sketch into a tangent-space normal map. LINEAR data — no
+// Turn a height sketch into a tangent-space normal map. LINEAR data — no
 // sRGB tag (that would bend the vectors).
+//
+// NOT A SOBEL (4-tap central difference), and the sign of dy here is the
+// OPPOSITE of js/towerskin.js's exported twin. See the long note above that
+// one for the derivation: with flipY = true this file's sign is the correct
+// OpenGL-convention one for a built-in three.js geometry, and towerskin's
+// serves GLB models whose UVs may run the other way. Neither has been put
+// under a lamp and checked.
 function heightToNormal(heightCanvas, strength) {
   const s = heightCanvas.width;
   const src = heightCanvas.getContext('2d').getImageData(0, 0, s, s).data;

@@ -4148,10 +4148,19 @@ export const scenarios = [
     name: 'floor-texture-persistent',
     tags: ['smoke', 'perf', 'themes', 'cuj12'],
     // Tier 0 §0 (hot-paths): the floor's texture identity is permanent —
-    // recompositeFelt, applyFeltTheme, applyZoom, applyMatDecal, and the
-    // corner sweep all repaint the same CanvasTexture in place and flip
+    // `recompositeFelt` repaints the same CanvasTexture in place and flips
     // needsUpdate. A collect→theme→zoom→clear sweep must NOT allocate a
     // fresh texture (that was the old swapFloorMap dispose+new churn).
+    //
+    // THE CALL LIST ABOVE USED TO NAME FOUR PATHS — applyZoom, applyMatDecal
+    // and "the corner sweep" among them — and none of those exist any more
+    // (the mat decals went with C25 and the atlas re-point left
+    // `applyFeltTheme` as recompositeFelt's ONE caller). Corrected 2026-08-29:
+    // the sweep below is still worth walking, but three of its four legs now
+    // pass because nothing repaints at all, not because a repaint reused the
+    // texture. AND IT ONLY WATCHES `material.map`: `floorTextureId()` returns
+    // that one uuid, so a SECOND texture on the floor (a normal map, say)
+    // could churn on every swap and this fence would stay green.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const uuid0 = await a.dbg('floorTextureId()');

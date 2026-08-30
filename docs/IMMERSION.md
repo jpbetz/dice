@@ -894,6 +894,13 @@ drift. `glowTint` (js/main.js:386) returns ash for members; repaint through
 runs on every shelf change. Measured cost: one `paintFloor`, ≤0.1 ms on hardware
 GL.
 
+> **Stale as of the mats arc (2026-08-29).** This route no longer exists as
+> written. `paintFloor` was deleted with the atlas re-point, `recompositeFelt`
+> has moved and has exactly ONE caller (`applyFeltTheme`) — it does not fire on
+> shelf changes — and the floor is a repeating 5-unit tile, so nothing can be
+> painted at a table position in it any more. Anything wanting to mark the mat
+> now needs the decal layer (js/decals.js), not the floor texture.
+
 > **Breaks: the felt keeps no marks — arguably.** Buys: the cost of a reroll is
 > visible on the table rather than only in the log. Read carefully: this is not
 > new residue. It re-tints an under-glow that is *already* painted for that
@@ -1879,6 +1886,8 @@ contact equations, roughly doubling the impulse at exactly the stress case;
 essentially at the mat centre pinballing at a target one unit away, and its
 `spread = min(arenaW - 4.4, …)` goes **negative** below 4.4; and the arena's felt
 rect is dropped by every `recompositeFelt`, which fires on every shelf change.
+(That last clause is stale — see the correction above: `recompositeFelt` fires
+only on a theme change now, and there is no felt rect to drop.)
 **The route back**, if it is wanted: make the six shelf points conditional on
 `shelfClusters` occupancy, so an empty shelf frames the arena alone. That is the
 change that actually moves the camera, and it front-loads the win where it is
