@@ -3167,6 +3167,29 @@ before either invite door hands out its link (§7.20's Settings → Table row,
 key `i`, and the identity menu). Intent first, question second — never the
 reverse, which is what the old front door did.
 
+**THE GATE IS SPENT BY THE BOOT, and this is the sharp edge.** "A minted
+table asks you nothing" is true of ARRIVING. It must not be true of the
+surfaces whose whole job is to re-enter the join flow and ask — the presence
+row's `Take a seat` ghost and `ensureTableLive`. The first spelling made the
+gate unconditional and handed both of them back the door they were trying to
+open: at a minted table the ghost rendered and did nothing, and so did the
+invite key, which left the one thing this change exists for unreachable from
+the state it puts you in. `bootArrival` is spent by the first `initNet`;
+every later entry is a person deliberately asking, and a deliberate ask
+always gets the prompt. **Pinned by `the-door-opens`, which presses both
+doors and asserts the PICKER — the scenario that missed it asserted the ghost
+EXISTS, and it did.**
+
+**And the chip says `You`, not `…`.** That glyph is the JOIN's placeholder —
+"a name is coming, the prompt is resolving" — and at the door none is. The
+lobby already said the honest word; `updateIdentityChip` reads
+`IN_LOBBY || seatDeclined` now. Found by looking at the rendered page while
+every field on the debug surface was already correct. Its `seatDeclined` read
+had to be hoisted beside `ROOM`: the chip runs during module evaluation, so
+the declaration down with the seat state was in TDZ and killed main.js at
+eval — with a canvas still on screen, which is why the tell was a later `let`
+throwing from a debug getter rather than a blank page.
+
 **A table earns its recents slot.** The list holds eight and every front door
 visit mints a room, so remembering on the join would push out every table
 anybody actually played at within a week — silently, with nothing failing.
