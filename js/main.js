@@ -77,22 +77,68 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-// THE URL ADDRESSES A TABLE, AND NOW IT IS ALLOWED NOT TO (§3b L0, UX §7.20).
-// `?room=` absent used to fall back to the key 'table', which meant the bare
-// deployed URL sat every stranger who opened it on ONE shared felt — nobody
-// joined that table, it was just the only front door. ROOM is now nullable and
-// null IS the lobby: no join, no name prompt, no server call at all. Every
-// consumer that interpolates ROOM into a key, a URL or a wire field has to ask
-// IN_LOBBY first — the audit's rule is that a surface speaking about YOU keeps
-// working and a surface speaking about THE TABLE must be absent, and this pair
-// is where that question gets asked.
+// THE URL ADDRESSES A TABLE, AND NOW EVERY PAGE HAS ONE (2026-08-30, the
+// link-sharing pass). Two dead designs are buried in this line. `?room=`
+// absent first fell back to the key 'table', which sat every stranger who
+// opened the deployed URL on ONE shared felt; §3b L0 answered that by making
+// ROOM nullable, and null WAS the lobby — no join, no name prompt, no server
+// call at all. That fixed CUJ1 ("I just need to do a dice roll NOW") and it
+// broke CUJ2 in a way nothing in this repo could see, because every test and
+// every proof step opens the URL it already means to be at.
+//
+// REAL PLAY FOUND IT (Joe, 2026-08-30, after several remote RPG sessions):
+// "it might have been cool if the link put the players into the same session
+// more easily". The link a host naturally shares is the app's own front door,
+// and the front door was a lobby — so it handed every one of four remote
+// players their own private table. Playing together needed a SECOND, nearly
+// identical link that does not exist until you have found "+ New table"
+// first. Two links, one of which silently does the wrong thing.
+//
+// SO A PAGE WITH NO ROOM MINTS ONE and writes it into the address bar. The
+// key is unguessable by construction (js/tables.js — the key IS the door,
+// goal 10), costs one crypto.getRandomValues and no server call at all, and
+// from the first frame the address bar is a working invite. There is exactly
+// one link now, and it is the one every person already knows how to copy.
+//
+// MINTING IS NOT JOINING, and that distinction is what keeps CUJ1 whole:
+// whether this page goes live is initNet's call, and it turns on whether we
+// already know your name. IN_LOBBY therefore keeps its exact old meaning
+// (ROOM === null) and every consumer of it is untouched — what changed is
+// only how you GET there. The lobby is now a place you go on purpose
+// (`?lobby`, which is leaveToLobby's destination and where the recents list
+// lives), never the place you land by default.
 //
 // DECLARED HERE, at the top, for exactly the reason ZOOM_LEVELS below is:
 // setSound() → syncSettingsUI() → the felt/system pickers run during MODULE
 // EVALUATION, and those pickers now word their tooltips differently in the
 // lobby. Left down beside LS_NAME (where the rest of the net constants live)
 // this pair is in TDZ when they read it, and the whole module dies at eval.
-const ROOM = new URLSearchParams(window.location.search).get('room') || null;
+const LOBBY_PARAM = 'lobby';
+// ONE IIFE for both, because the mint can fail and the failure has to be able
+// to choose the lobby: mintRoomKey throws rather than fall back to Math.random
+// (a guessable key is worse than no key — js/tables.js), and a browser with no
+// crypto.getRandomValues must still boot. It lands in the lobby, which is the
+// honest answer: no table, and no pretend link to one.
+const { room: ROOM, arrivedByLink: ARRIVED_BY_LINK } = (() => {
+  const p = new URLSearchParams(window.location.search);
+  const key = p.get('room');
+  // SOMEBODY SENT US HERE. The only flag initNet needs at arrival: are you
+  // joining people (ask who you are) or are you the first one at a table this
+  // boot just minted (do not ask — nobody is here to address you yet).
+  if (key) return { room: key, arrivedByLink: true };
+  if (p.get(LOBBY_PARAM) !== null) return { room: null, arrivedByLink: false };
+  let minted = null;
+  try { minted = mintRoomKey(''); } catch { return { room: null, arrivedByLink: false }; }
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('room', minted);
+    // replaceState, not push: the roomless URL is not a place in this tab's
+    // history worth going back to, and a Back button that walked you off your
+    // own table would be this fix undoing itself one keystroke later.
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+  } catch { /* no replaceState: the table works, the bar just does not show it */ }
+  return { room: minted, arrivedByLink: false };
+})();
 const IN_LOBBY = ROOM === null;
 
 // THE STABILITY CHANNEL (js/stability.js — read its header for the law).
@@ -28250,7 +28296,9 @@ function gotoTable(room) {
   if (net && netOnline) net.leave();
   window.location.href = room
     ? `${window.location.pathname}?room=${encodeURIComponent(room)}`
-    : window.location.pathname;
+    // NOT the bare pathname any more: that mints a table now, so "leave to the
+    // lobby" would deposit you on a brand-new felt instead of the recents list.
+    : `${window.location.pathname}?${LOBBY_PARAM}=1`;
 }
 
 // Compact human summary of a mods spec: "+3 · adv · drop low 1 · reroll ≤2 · explode"
@@ -28709,9 +28757,32 @@ window.addEventListener('pagehide', (e) => {
 // there — so the key REFUSES with the exit named, rather than copying
 // nothing or fabricating a link to the shared room called 'table' (the
 // single most misleading affordance L0 was built to kill).
+// OPEN THE TABLE BEFORE YOU HAND OUT ITS ADDRESS (2026-08-30, the
+// link-sharing pass). A page that minted its own room key sits AT THE DOOR
+// until it has a name — deliberately, so a first-time visitor can roll
+// without meeting a modal — and its invite link is real but has nobody
+// behind it. Wanting to invite someone is the exact moment a name starts to
+// matter, so this is where the prompt belongs and the only place it now
+// appears unbidden: intent first, question second, never the reverse.
+//
+// Returns whether the table is live. FALSE is not always a failure — a
+// dismissed picker is a person deciding not to have company yet — so callers
+// hand over the link either way rather than swallowing the gesture. The link
+// is correct in both cases; it just does not have a host behind it until the
+// door is answered, and the first guest to arrive opens the room themselves.
+async function ensureTableLive() {
+  if (IN_LOBBY || netOnline) return netOnline;
+  if (!seatDeclined) return false; // a real connection failure, not the door
+  seatDeclined = false;
+  netReady = initNet();
+  const conn = await netReady;
+  return !!(conn && conn.online);
+}
+
 async function copyInviteLink(btn, restoreLabel) {
   const url = inviteUrl();
   if (!url) { showSettingsNote('No table to invite anyone to — start one first'); return; }
+  await ensureTableLive();
   await shareInvite(url, btn, restoreLabel);
   // shareInvite's own feedback is the button's label swap, which a keyboard
   // press has no button for and a screen reader never sees either way.
@@ -28724,6 +28795,7 @@ document.getElementById('set-invite').addEventListener('click', (e) =>
 
 document.getElementById('idm-invite').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
+  await ensureTableLive();
   await shareInvite(inviteUrl(), btn, 'Copy invite link');
   setTimeout(closeIdentityMenu, 900);
 });
@@ -30187,6 +30259,40 @@ async function initNet() {
   let name = '';
   try { name = (localStorage.getItem(LS_NAME) || '').trim(); } catch { /* ignore */ }
 
+  // AT THE DOOR, LOOKING, NOT SEATED — the fourth presence state (C12), and
+  // now the resting state of two different arrivals rather than one. It is
+  // your own felt with the table's chrome present and a 'Take a seat' ghost
+  // standing open in the presence row; nothing is stored, nothing is joined,
+  // and the room is never told anyone came to the door.
+  const atTheDoor = () => {
+    seatDeclined = true;
+    netOnline = false;
+    roomSetup = null;
+    applyRoomSettings(ownSettingsForChannel(load(LS_ROOMSETTINGS, null)));
+    renderPlayers();       // draws 'Take a seat' — the door, standing open
+    ensureProfileForTable();
+    updateIdentityChip();
+    updateTrayButtons();   // no table, so no Offer verb on the draft
+    return { online: false };
+  };
+
+  // NOBODY IS HERE TO ADDRESS YOU YET (2026-08-30, the link-sharing pass).
+  // Minting a room key gave every page a table address, which is what makes
+  // one link enough — but it must not also give every first-time visitor the
+  // modal the lobby was built to remove. The question that separates the two
+  // cases is not "is there a room key", it is ARRIVED_BY_LINK: somebody sent
+  // you here, so you are joining PEOPLE and a name is what they address you
+  // by. At a table this boot minted there is no one to address you, so the
+  // honest answer is no prompt at all — take the door state, roll instantly,
+  // and name yourself if and when you want company. CUJ1 is preserved by the
+  // same mechanism that now serves CUJ2, rather than at its expense.
+  //
+  // A STORED NAME SKIPS ALL OF IT and joins below, which is the case that
+  // makes a blind copy of the address bar work: a returning host is live at
+  // their own address from the first frame, so the link they paste already
+  // has somebody behind it.
+  if (!name && !ARRIVED_BY_LINK) return atTheDoor();
+
   // A PER-SEAT LINK OUTRANKS A STORED NAME (U3, 2026-08-08). `dice.name.v1`
   // is origin-GLOBAL, so this gate skipped the picker for anyone who had ever
   // opened the app on this origin — and `&as=Bo` then did nothing at all.
@@ -30229,17 +30335,7 @@ async function initNet() {
     // for good), nothing is joined, and the room is never told anyone came to
     // the door. The felt is your own — the same state a `?room=` with no
     // server already lands in — and the presence row offers the way back.
-    if (name === null) {
-      seatDeclined = true;
-      netOnline = false;
-      roomSetup = null;
-      applyRoomSettings(ownSettingsForChannel(load(LS_ROOMSETTINGS, null)));
-      renderPlayers();       // draws 'Take a seat' — the door, standing open
-      ensureProfileForTable();
-      updateIdentityChip();
-      updateTrayButtons();   // no table, so no Offer verb on the draft
-      return { online: false };
-    }
+    if (name === null) return atTheDoor();
     try { localStorage.setItem(LS_NAME, name); } catch { /* ignore */ }
   }
 

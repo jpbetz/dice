@@ -209,11 +209,15 @@ async function bootTab(ctx, {
   }
 }
 
-// A tab in the LOBBY: the bare url, ready when the app itself says lobby.
+// A tab in the LOBBY — `?lobby`, NOT the bare url any more (2026-08-30, the
+// link-sharing pass). The bare url mints a table now, so `/` is the one path
+// that can no longer reach this surface. Every scenario below that says
+// "lobby" means the deliberate destination: leaveToLobby's landing place and
+// where the recents list lives.
 const lobbyTab = (ctx, opts = {}) => bootTab(ctx, {
   recordApi: true,
   ...opts,
-  path: '/',
+  path: `/?lobby=1`,
   readyExpr: `!!window.__diceDebug && (window.__diceDebug.identity || {}).lobby === true`,
   readyDesc: `lobby up (${opts.origin || 'localhost'})`,
 });
@@ -286,11 +290,13 @@ const landedAtTable = (t, from = null) => settleNavigation(
     : `the navigation to land at a table other than ${from}`,
 );
 
-// Landed in the lobby: the bare url, and the app says lobby.
+// Landed in the lobby: `?lobby`, and the app says lobby. The bare url was the
+// spelling until 2026-08-30 — it mints a table now, so the lobby has a real
+// address of its own and leaveToLobby navigates to it.
 const landedInLobby = (t) => settleNavigation(
   t,
   `!!window.__diceDebug && (window.__diceDebug.identity || {}).lobby === true`
-  + ` && window.location.search === ''`,
+  + ` && window.location.search === '?lobby=1'`,
   'the navigation to land in the lobby',
 );
 
