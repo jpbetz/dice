@@ -172,6 +172,44 @@ returns byte-identical); a fifth mirror in `tests/felt-ids.test.mjs`;
 `floor-texture-persistent` extended to pin both textures. Each confirmed RED
 first. Shots and numbers: `tools/steps/felt-light-look.mjs`.
 
+### Every tower was lit from below (2026-08-30)
+
+`heightToNormal` turns a height sketch into a normal map, and the repo has two
+near-identical copies of it — one exported from `js/towerskin.js` that every
+tower surface goes through, one private to `js/dice.js` for the five relief
+dice sets. **They emitted opposite green channels from the same sketch**, and
+had since they were written. Nobody had noticed, because an inverted normal map
+is not a broken one: it renders, it filters, it reads as a surface, and it is
+wrong only in a way you have to know to look for.
+
+**The towers were the wrong one.** Every bevel, plank edge, block arris and pore
+had its shading inside-out, under a key that stands 67 degrees above the table.
+
+**Settled by derivation, then checked.** G encodes −dH/dv; a CanvasTexture has
+`flipY = true`, so image row 0 is v = 1 and dv = −dy/s; and `planarUV` sets
+`v = y` on every vertical face, which makes +v world-up and the flip visible
+rather than academic. Therefore G is the canvas-DOWN derivative — dice.js's
+sign. The derivation is mesh-independent (it turns on the texture's own flipY
+and the tangent frame the shader derives from uv gradients), so it holds for the
+GLB tower as well as the procedural ones. `__diceDebug.normalConvention()` runs
+a synthetic ridge through the real function and reports 158 on the upper flank,
+128 at the crest, 97 on the lower — exactly what the derivation predicts, and
+the inverse of what the old sign gave.
+
+Measured on a rendered tower rather than argued: mean luma across the body moved
+**−0.17** while 23% of pixels moved by 2 or more, p95 17.8 — the signature of
+highlights migrating to the other side of every feature with no net brightness
+change, which is what flipping a green channel does and nothing else does.
+
+The colour canvas was checked for a baked light direction that the fix might
+fight, and has none: `bakeStone`'s arris highlight keys on distance to the
+nearest joint, so it brightens every edge equally.
+
+`tower-normal-convention` fences the convention, confirmed RED against the old
+sign. The two copies now agree, and js/dice.js's fork survives for one stated
+reason: it deliberately does not set RepeatWrapping, because a die's face atlas
+is clamped and repeating it would wrap a face's relief onto its neighbour.
+
 ### Taproom Oak — the register's other end (2026-08-29)
 
 Joe's "one of each, deliberately", taken before the prettier candidates

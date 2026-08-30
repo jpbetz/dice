@@ -2131,6 +2131,45 @@ export const scenarios = [
     },
   },
   {
+    name: 'tower-normal-convention',
+    tags: ['tower', 'fx'],
+    // WHICH WAY IS UP IN A NORMAL MAP. Every tower surface and five relief
+    // dice sets are shaded through a height sketch turned into a tangent-space
+    // normal map, and js/towerskin.js's copy had the green channel INVERTED
+    // for as long as towers have existed — so every bevel, plank edge and
+    // block seam was lit from below, under a key that stands 67 degrees above
+    // the table. Found 2026-08-29 by noticing that the two copies of the same
+    // twenty lines disagreed, not by looking at a tower: an inverted normal
+    // map is not a broken one. It renders, it filters, it reads as a surface,
+    // and it is wrong only in a way you have to know to look for.
+    //
+    // THE DERIVATION THIS FENCES. G encodes -dH/dv; a CanvasTexture has
+    // flipY = true so v = 1 - y/s; and `planarUV` sets v = y on every vertical
+    // face, which makes +v world-up. Therefore G is the canvas-DOWN
+    // derivative, and a ridge's upper flank must come back above 128.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      const n = await a.dbg('normalConvention()');
+      // Guard the guard: a probe that derived nothing agrees with everything.
+      assert.ok(n.px >= 32 && n.crest > 0, `the probe ran (${JSON.stringify(n)})`);
+      assert.ok(Math.abs(n.atCrest - 128) <= 2,
+        `the crest itself is flat in v (${n.atCrest}) — a ridge's peak has no `
+        + 'vertical slope, so anything else means the derivative is not centred');
+      assert.ok(n.upper > 140,
+        `the upper flank tilts UP (green ${n.upper}, needs > 140) — this is the `
+        + 'assertion that was red for the life of the towers');
+      assert.ok(n.lower < 116,
+        `and the lower flank tilts DOWN (green ${n.lower}, needs < 116)`);
+      assert.ok(n.upper - n.lower > 40,
+        `with real contrast between them (${n.upper - n.lower})`);
+      // …and the two properties the tower path depends on beyond the sign.
+      assert.equal(n.colorSpace, '',
+        'the map is LINEAR data: an sRGB tag would bend every vector in it');
+      assert.deepEqual(n.wrap, [1000, 1000],
+        'and it repeats, because a tower skin tiles its faces');
+    },
+  },
+  {
     name: 'no-die-sits-in-fog',
     tags: ['mat', 'chrome'],
     // THE MAT WAS INSIDE ITS OWN FOG. fogNear was dialled by eye at 15 against

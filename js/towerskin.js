@@ -286,22 +286,30 @@ export function bakeWood({ size, stops, planks, seed, cathedral }) {
 // mats handoff cites "js/themes.js does height-sketch→Sobel", which is wrong
 // about the file AND about the kernel. Corrected 2026-08-29.
 //
-// AND THE TWO FORKS DISAGREE ON THE SIGN OF Y, which nobody had noticed. Both
-// write G = +dy; this one computes dy = h(y-1) - h(y+1), js/dice.js computes
-// dy = h(y+1) - h(y-1). They emit opposite green channels from one sketch, so
-// a ridge lit from the north reads as a groove in one of them.
+// THE SIGN OF Y WAS INVERTED HERE UNTIL 2026-08-29, and it had been since this
+// function was written. Both forks write G = +dy; this one computed
+// dy = h(y-1) - h(y+1) and js/dice.js computes dy = h(y+1) - h(y-1), so they
+// emitted opposite green channels from one sketch. EVERY TOWER SURFACE WAS
+// THEREFORE LIT FROM BELOW: bevels, plank edges, block seams and pores all had
+// their shading inside-out under a key that stands 67 degrees above the table.
 //
-// WHICH IS RIGHT DEPENDS ON THE SURFACE, and that is why this is a note rather
-// than a fix. For an OpenGL-convention tangent-space map, G encodes -dH/dv. A
-// CanvasTexture has flipY = true, so v = 1 - y/s and dv = -dy/s, which makes
-// -dH/dv = +s·dh/dy — i.e. js/dice.js's sign is the correct one for the
-// built-in three.js geometries it is used on (PlaneGeometry, the dice solids).
-// THIS fork feeds GLB models whose UVs come from glTF, where v runs the other
-// way, so its inversion may be exactly right in its own context — but the
-// stated reason ("canvas y is down") is not that reason. Nobody has put a
-// known ridge under a known lamp and looked, which is the only thing that
-// would settle it. Anything NEW deriving a normal map for a built-in geometry
-// should use the js/dice.js sign.
+// THE DERIVATION, so nobody has to re-run it. For an OpenGL-convention
+// tangent-space map G encodes -dH/dv. Two facts fix dv:
+//
+//   · a CanvasTexture has flipY = true, so image row 0 is v = 1 and
+//     v = 1 - y/s, giving dv = -dy/s;
+//   · `planarUV` below sets v = y for every vertical face (cheeks and faces),
+//     so +v is world UP — which is what makes the flip visible rather than
+//     academic.
+//
+// Therefore -dH/dv = +s·dh/dy: G is the CANVAS-DOWN derivative, which is what
+// js/dice.js always had. The old comment here ("canvas y is down") named a
+// true fact and drew the opposite conclusion from it.
+//
+// Checked, not just derived: `__diceDebug.normalConvention()` runs this
+// function over a synthetic ridge and reports the green channel on each flank,
+// and `tower-normal-convention` asserts the crest's upper flank comes back
+// brighter than its lower one. Confirmed RED against the old sign.
 export function heightToNormal(heightCanvas, strength) {
   const s = heightCanvas.width;
   const src = heightCanvas.getContext('2d').getImageData(0, 0, s, s).data;
@@ -313,7 +321,7 @@ export function heightToNormal(heightCanvas, strength) {
   for (let y = 0; y < s; y++) {
     for (let x = 0; x < s; x++) {
       const dx = (h(x + 1, y) - h(x - 1, y)) * strength * 2;
-      const dy = (h(x, y - 1) - h(x, y + 1)) * strength * 2; // canvas y is down
+      const dy = (h(x, y + 1) - h(x, y - 1)) * strength * 2; // see the note above
       const inv = 1 / Math.hypot(dx, dy, 1);
       const i = (y * s + x) * 4;
       img.data[i] = (-dx * inv * 0.5 + 0.5) * 255;

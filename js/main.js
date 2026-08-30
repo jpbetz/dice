@@ -45,7 +45,7 @@ import { ParticleField } from './particles.js';
 import { DecalField } from './decals.js';
 import { DieLightRig } from './dielights.js';
 import { PostStack, MAX_SHIMMER, BLOOM_THRESHOLD } from './post.js';
-import { buildTowerSkin } from './towerskin.js';
+import { buildTowerSkin, heightToNormal } from './towerskin.js';
 import { buildBastionSkin } from './towerbastion.js';
 import { buildAnvilSkin } from './toweranvil.js';
 import { buildHollowBoleSkin, HOLLOW_EMBER } from './towerhollow.js';
@@ -14336,6 +14336,48 @@ window.__diceDebug = {
   floorOverride(ov) {
     applyFloorOverride(ov && Object.keys(ov).length ? ov : null);
     return { swingScale: GLOSS.swingScale, roughness: floor.material.roughness };
+  },
+  // WHICH WAY IS UP IN A NORMAL MAP — the convention every tower surface and
+  // every relief die share, made checkable.
+  //
+  // It was WRONG on the towers for as long as they have existed: both forks of
+  // `heightToNormal` write G = +dy and js/towerskin.js computed dy with the
+  // opposite sign, so every bevel, plank edge and block seam was lit from
+  // below. Nothing caught it because an inverted normal map is not a broken
+  // one — it renders, it filters, it looks like a surface, and it is only
+  // wrong in a way you have to know to look for.
+  //
+  // The probe paints a ridge across a small height canvas, derives the map,
+  // and reports the green channel on each flank. With the correct sign the
+  // UPPER flank (smaller canvas y, and `planarUV` makes that world-up on every
+  // vertical face) comes back ABOVE 128 and the lower flank below it.
+  normalConvention(px = 64) {
+    const c = document.createElement('canvas');
+    c.width = c.height = px;
+    const g = c.getContext('2d');
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, px, px);
+    // A ridge: a smooth rise to a crest at the middle row and back down.
+    const crest = px / 2;
+    for (let y = 0; y < px; y++) {
+      const t = Math.max(0, 1 - Math.abs(y - crest) / (px / 4));
+      const v = Math.round(t * 255);
+      g.fillStyle = `rgb(${v},${v},${v})`;
+      g.fillRect(0, y, px, 1);
+    }
+    const tex = heightToNormal(c, 1.0);
+    const out = tex.image.getContext('2d').getImageData(0, 0, px, px).data;
+    const at = (y) => out[((y * px) + (px >> 1)) * 4 + 1];
+    return {
+      px,
+      crest,
+      // Above the crest in the canvas — world-up on a vertical face.
+      upper: at(crest - Math.round(px / 8)),
+      lower: at(crest + Math.round(px / 8)),
+      atCrest: at(crest),
+      wrap: [tex.wrapS, tex.wrapT],
+      colorSpace: tex.colorSpace,
+    };
   },
   // THE GLOSS FIELD AS DATA — min, max, mean and a digest, read off the canvas
   // that is actually bound. A flat field is the roughness analogue of a Sobel

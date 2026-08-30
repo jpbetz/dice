@@ -531,12 +531,15 @@ export const PATTERN_IDS = Object.keys(PATTERNS);
 // Turn a height sketch into a tangent-space normal map. LINEAR data — no
 // sRGB tag (that would bend the vectors).
 //
-// NOT A SOBEL (4-tap central difference), and the sign of dy here is the
-// OPPOSITE of js/towerskin.js's exported twin. See the long note above that
-// one for the derivation: with flipY = true this file's sign is the correct
-// OpenGL-convention one for a built-in three.js geometry, and towerskin's
-// serves GLB models whose UVs may run the other way. Neither has been put
-// under a lamp and checked.
+// NOT A SOBEL — a 4-tap central difference. This file's sign was always the
+// correct one; js/towerskin.js's exported twin had it inverted until
+// 2026-08-29 and the derivation now sits above that copy. The two agree, and
+// `tower-normal-convention` fences the shared convention.
+//
+// WHY THIS FORK STILL EXISTS after the sign was reconciled: it deliberately
+// does NOT set RepeatWrapping. A die's face atlas is sampled inside 0..1 and
+// clamped at the edge, and switching it to repeat would wrap a face's relief
+// onto its neighbour at exactly the seam a bevel sits on.
 function heightToNormal(heightCanvas, strength) {
   const s = heightCanvas.width;
   const src = heightCanvas.getContext('2d').getImageData(0, 0, s, s).data;
