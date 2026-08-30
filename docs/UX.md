@@ -3213,6 +3213,23 @@ the table on the first ROLL would prompt for a name in the middle of a
 throw. The invite gesture is the honest trigger because it is the only
 moment the app can know you want company.
 
+**ONE CONSEQUENCE, NAMED RATHER THAN PAPERED OVER: the recents list moved
+one step further away.** `Tables ▾` renders only in the lobby
+(`renderPresenceExits`), and the lobby used to be where you landed — so a
+returning player saw their recents on arrival and now reaches them through
+the identity menu's `Leave table`. Two steps where there were none.
+
+**Left as it is, on purpose, and the reason is GOALS goal 7.** Rooms live and
+die in memory. A table from last week does not exist to go back to; its key
+resolves to a fresh empty room, which is the case `cameBackEmpty` was written
+to explain. So the recents list is a within-the-day tool, and the arrival it
+was sitting on is now the arrival of somebody starting a game or following a
+link. Putting `Tables ▾` at a table as well would be standing chrome that
+this row's own rule (§7.20 — every affordance retired by its own success)
+resists. **If it turns out to be missed, the cheap fix is a row in the
+identity menu, not a pill in the presence row** — the menu is already open
+for `Leave table` and costs no pixels until it is.
+
 **What is pinned.** `front-door-is-a-table` (the mint, the bar, the invite
 url, and CUJ1's absence of a modal *and* of a single API call beside it) and
 `the-link-in-the-bar-is-the-invite` (a host's address bar, pasted verbatim,
