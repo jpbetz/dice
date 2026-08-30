@@ -2446,6 +2446,27 @@ scene.add(floor);
 // (`feltTileCache`, `${cloth}|${base}`), so a theme returned to is
 // byte-identical to the first time it was worn; the mottle is not cached at
 // all — it is recomputed from the same seed, which comes to the same thing.
+// A CONTROLLED, REVERSIBLE POKE AT THE FLOOR'S LIGHT RESPONSE — the other half
+// of `floorLook` below, and the reason that instrument can make an A/B claim at
+// all. The vocabulary is small and explicit ON PURPOSE: nothing here may cross
+// a program-variant predicate (binding or unbinding a map slot, or flipping
+// `sheen` through zero), because a recompile between two grabs measures the
+// compiler rather than the surface.
+//
+// `null` restores the shipped state, and the shipped state is READ ONCE at
+// module eval rather than hardcoded, so a future dial change cannot leave this
+// restoring a number nobody ships any more.
+const FLOOR_SHIPPED = {};
+function applyFloorOverride(ov) {
+  const m = floor.material;
+  if (FLOOR_SHIPPED.roughness === undefined) FLOOR_SHIPPED.roughness = m.roughness;
+  if (!ov) {
+    m.roughness = FLOOR_SHIPPED.roughness;
+    return;
+  }
+  if (typeof ov.roughness === 'number') m.roughness = ov.roughness;
+}
+
 function recompositeFelt() {
   const theme = FELT_THEMES[currentFeltId];
   floorTexture.image = feltTileCanvas(theme.feltBase, theme.cloth);
@@ -14006,6 +14027,121 @@ window.__diceDebug = {
     camera.lookAt(0, 5.2 * v.S, v.z0 - 1.4);
     camera.updateMatrixWorld();
     return [camera.position.x, camera.position.y, camera.position.z];
+  },
+  // A CONTROLLED A/B ON THE FLOOR'S LIGHT RESPONSE, RENDERED THROUGH THE REAL
+  // POST STACK. Two frames, one difference, measured in three bands of bare
+  // felt at increasing distance — because the whole question about this
+  // surface is not "does it change" but "does it change by more than a player
+  // can see", and this project has no other way to ask that.
+  //
+  // THE CLOCK IS HELD FOR THE WHOLE CALL, and that is not tidiness: animate()
+  // runs on rAF between any two awaits, and ~200 mood motes drift through the
+  // lamp cone over exactly the region these bands sample. Without the freeze a
+  // build where NOTHING changed still reports a non-zero delta — which is how
+  // a dead feature graduates. `floorLook({a:{},b:{}})` is the null control
+  // that makes every other number here honest, and it must read ~0.
+  //
+  // The two grabs are ONE SYNCHRONOUS BURST with no await between them: the
+  // renderer has no preserveDrawingBuffer, so a WebGL canvas may be composited
+  // away between tasks. Same idiom as lookSheet below.
+  //
+  // Bands are [label, x0, x1, y0, y1] in normalised frame coordinates. World z
+  // grows DOWN the frame, so `near` is the low band. They were verified to
+  // land on bare felt at zoom medium with an empty mat — a band that drifts
+  // onto a die or the background measures the wrong thing quietly, which is
+  // what the aMean sanity range in the scenario is for.
+  async floorLook(opts = {}) {
+    const bands = opts.bands || [
+      ['near', 0.35, 0.65, 0.72, 0.82],
+      ['mid', 0.35, 0.65, 0.55, 0.65],
+      ['far', 0.35, 0.65, 0.35, 0.45],
+    ];
+    const el = renderer.domElement;
+    const held = clockHeld;
+    this.holdClock(true);
+    const grab = (ov) => {
+      applyFloorOverride(ov);
+      this.tick(0, true, false);
+      return el.toDataURL('image/png');
+    };
+    const aURL = grab(opts.a || null);
+    const bURL = grab(opts.b || null);
+    applyFloorOverride(null);
+    this.tick(0, true, false);   // and LEAVE the canvas on the shipped state
+    this.holdClock(held);
+    const load = (u) => new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = rej;
+      im.src = u;
+    });
+    const [ia, ib] = [await load(aURL), await load(bURL)];
+    const w = ia.width, h = ia.height;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    const dataOf = (img) => {
+      g.clearRect(0, 0, w, h);
+      g.drawImage(img, 0, 0);
+      return g.getImageData(0, 0, w, h).data;
+    };
+    const A = dataOf(ia), B = dataOf(ib);
+    const luma = (d, i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    const out = [];
+    for (const [label, x0, x1, y0, y1] of bands) {
+      const px0 = Math.round(x0 * w), px1 = Math.round(x1 * w);
+      const py0 = Math.round(y0 * h), py1 = Math.round(y1 * h);
+      let sa = 0, sb = 0, n = 0, changed = 0;
+      const diffs = [];
+      for (let y = py0; y < py1; y++) {
+        for (let x = px0; x < px1; x++) {
+          const i = (y * w + x) * 4;
+          const la = luma(A, i), lb = luma(B, i);
+          sa += la; sb += lb; n++;
+          const d = Math.abs(lb - la);
+          diffs.push(d);
+          if (d >= 0.5) changed++;
+        }
+      }
+      diffs.sort((p, q) => p - q);
+      const r3 = (v) => Math.round(v * 1000) / 1000;
+      out.push({
+        label,
+        aMean: r3(sa / n), bMean: r3(sb / n),
+        delta: r3(sb / n - sa / n),
+        absMeanDelta: r3(Math.abs(sb / n - sa / n)),
+        p95AbsDelta: r3(diffs[Math.floor(diffs.length * 0.95)] || 0),
+        changedFrac: r3(changed / n),
+        n,
+      });
+    }
+    return { w, h, bands: out };
+  },
+  // WHAT THE FLOOR'S MATERIAL ACTUALLY IS, read off the MATERIAL and never off
+  // a module variable — the difference matters, because "the right texture was
+  // built" and "the right texture is bound" are different claims and only the
+  // second one renders.
+  floorMaterialProbe() {
+    const m = floor.material;
+    const t = (x) => (x ? {
+      uuid: x.uuid,
+      repeat: [x.repeat.x, x.repeat.y],
+      wrap: [x.wrapS, x.wrapT],
+      colorSpace: x.colorSpace,
+      anisotropy: x.anisotropy,
+      size: x.image ? [x.image.width, x.image.height] : null,
+    } : null);
+    return {
+      type: m.type,
+      roughness: m.roughness,
+      metalness: m.metalness,
+      vertexColors: m.vertexColors,
+      hasNormalMap: !!m.normalMap,
+      hasBumpMap: !!m.bumpMap,
+      hasRoughnessMap: !!m.roughnessMap,
+      map: t(m.map),
+      roughnessMap: t(m.roughnessMap),
+    };
   },
   // ONE SHEET, NOT SIX FRAMES — and rendered by the SHIPPED path, in the
   // room's own light.
