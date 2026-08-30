@@ -12562,6 +12562,142 @@ export const scenarios = [
     },
   },
   {
+    name: 'front-door-is-a-table',
+    tags: ['smoke', 'journey', 'lobby', 'cuj1', 'cuj2'],
+    // THE BARE URL MINTS A TABLE (2026-08-30). It used to be the lobby, which
+    // fixed CUJ1 by removing the seat modal and broke CUJ2 by making the link
+    // a host naturally shares a link to NOTHING — four remote players each got
+    // their own private felt. This scenario holds both halves at once, because
+    // the two have been traded for each other twice now and the trade is what
+    // has to stop.
+    //
+    // WHAT IT CATCHES: the front door is the ONE path no other scenario can
+    // exercise. Every other tab in this file opens the url it already means to
+    // be at — `?room=` from ctx.room, or `?lobby` — so a front door that
+    // silently went back to being roomless would leave all 237 of them green.
+    async fn(ctx) {
+      const a = await bootTab(ctx, {
+        recordApi: true,
+        origin: '127.0.0.21',
+        clean: ['dice.name.v1', 'dice.tables.v1', 'dice.roomsettings.v1'],
+        path: '/',
+        readyExpr: `!!window.__diceDebug && !!(window.__diceDebug.identity || {}).room`,
+        readyDesc: 'the front door mints a table',
+      });
+
+      // ① THE ADDRESS BAR IS THE INVITE. Minted shape, not a chosen name: 16
+      // base36 chars is the door itself (js/tables.js), and `?room=table`
+      // would be a door anyone holding the deployment's URL could walk.
+      const search = await a.eval('location.search');
+      assert.match(search, /^\?room=[a-z0-9]{16}$/,
+        `the bare url writes a minted key into the bar (got: ${search})`);
+      const id = await a.dbg('identity');
+      assert.equal(id.lobby, false, 'the front door is not the lobby any more');
+      assert.equal(`?room=${encodeURIComponent(id.room)}`, search,
+        'the bar and the app name the same table');
+      assert.equal(id.inviteUrl, await a.eval('location.href'),
+        'the invite link IS the address bar — that is the whole fix');
+
+      // ② AND CUJ1 IS UNTOUCHED. A minted table has nobody to address you, so
+      // there is no prompt and — the sharper claim — not one API call. The
+      // key cost a crypto.getRandomValues and nothing else.
+      assert.equal(await a.eval(`document.getElementById('name-modal').classList.contains('hidden')`),
+        true, 'no "Take a seat" modal at a table this boot minted');
+      assert.equal((await a.dbg('seatPicker')).open, false, 'the seat picker agrees');
+      assert.equal((await a.dbg('seatPicker')).declined, true,
+        'it rests at the door — the shipped fourth presence state, not a new one');
+      assert.deepEqual(await a.eval('window.__apiCalls'), [],
+        'minting is not joining: no /api/join, no /api/table peek, no stream');
+
+      // ③ The dice are live right now, which is what CUJ1 actually asks for.
+      await a.roll('2d6');
+      assert.equal(await a.diceCount(), 2, 'two dice on the felt');
+      const st = await a.entryState();
+      assert.ok(st && typeof st.total === 'number' && st.total >= 2 && st.total <= 12,
+        `the roll resolved locally (got ${JSON.stringify(st && st.total)})`);
+      assert.deepEqual(await a.eval('window.__apiCalls'), [],
+        'and it stayed a solo roll — rolling is not joining either');
+
+      // ④ The door is standing open, and answering it is what opens the table.
+      await a.waitFor(`[...document.querySelectorAll('#rail-roster .rail-ghost')]`
+        + `.some((b) => b.textContent.includes('Take a seat'))`,
+        { desc: "the 'Take a seat' ghost offers the way in" });
+    },
+  },
+  {
+    name: 'the-link-in-the-bar-is-the-invite',
+    tags: ['lobby', 'seat', 'cuj2', 'cuj3'],
+    // THE JOURNEY THAT WAS BROKEN IN THE FIELD, end to end: a host opens the
+    // app, copies what is in the address bar, and a player who pastes it lands
+    // at the SAME table. Nothing is pressed, nothing is found first — the
+    // whole point is that the naive gesture works, because the naive gesture
+    // is what four remote players actually performed.
+    //
+    // The host here is a RETURNING one (a stored name), which is the
+    // population that makes a blind copy work: they are live at their own
+    // address from the first frame, so the link they paste already has
+    // somebody behind it.
+    async fn(ctx) {
+      const host = await bootTab(ctx, {
+        origin: '127.0.0.22',
+        clean: ['dice.tables.v1'],
+        seed: { 'dice.name.v1': 'Alice' },
+        path: '/',
+        readyExpr: `!!window.__diceDebug && window.__diceDebug.netReady`,
+        readyDesc: 'the host lands at their own table',
+      });
+      await host.waitOnline();
+
+      // What a person copies: the address bar, verbatim. Not a button, not a
+      // menu — the thing every human already knows how to copy.
+      const search = await host.eval('location.search');
+      assert.match(search, /^\?room=[a-z0-9]{16}$/, `the host has a real address (got: ${search})`);
+
+      // AND IT HAS NOT TAKEN A RECENTS SLOT YET. The list holds eight; every
+      // front door visit mints a room; so a week of idle opens would push out
+      // every table anybody played at, and nothing anywhere would fail. An
+      // unnamed table this boot minted, alone, has not earned a slot.
+      const recentsOf = (t) => t.eval(`localStorage.getItem('dice.tables.v1')`)
+        .then((raw) => (raw ? JSON.parse(raw) : []));
+      assert.deepEqual(await recentsOf(host), [],
+        'a minted table nobody has rolled at or joined is not yet "a table you have been to"');
+
+      const guest = await bootTab(ctx, {
+        origin: '127.0.0.23',
+        clean: ['dice.tables.v1'],
+        seed: { 'dice.name.v1': 'Bob' },
+        path: search,               // ← pasted, exactly as copied
+        readyExpr: `!!window.__diceDebug && window.__diceDebug.netReady`,
+        readyDesc: 'the guest lands at the pasted link',
+      });
+      await guest.waitOnline();
+
+      // The SEARCH, not the href: the harness gives each player its own
+      // 127.0.0.x origin so they get separate localStorage buckets, so the
+      // hosts differ by construction here and only here. What a person pastes
+      // is the whole url; what makes it the same table is this half of it.
+      assert.equal(await guest.eval('location.search'), search,
+        'the guest is at the very address the host copied');
+      assert.equal((await guest.dbg('identity')).room, (await host.dbg('identity')).room,
+        'and it is the same table, not a same-looking one');
+
+      // THE ASSERTION THE FIELD WOULD HAVE MADE: they can see each other.
+      const bothSee = `[...document.querySelectorAll('#rail-roster .roster-name')]`
+        + `.map((n) => n.textContent.trim()).sort().join(',')`;
+      await host.waitFor(`${bothSee}.includes('Bob')`, { desc: 'the host sees the guest arrive' });
+      await guest.waitFor(`${bothSee}.includes('Alice')`, { desc: 'the guest sees the host' });
+
+      // …and NOW it has earned its slot, on both ends: somebody came, which is
+      // the other half of the rule (the first is rolling there).
+      const key = decodeURIComponent(search.replace('?room=', ''));
+      await host.waitFor(`(JSON.parse(localStorage.getItem('dice.tables.v1') || '[]')`
+        + `.some((e) => e.room === ${JSON.stringify(key)}))`,
+        { desc: 'company makes the table worth finding again' });
+      assert.equal((await recentsOf(guest))[0].room, key,
+        'and the guest, who arrived by link, remembers it from the join');
+    },
+  },
+  {
     name: 'new-table',
     tags: ['lobby', 'cuj2'],
     // §3b L1: name it, land in it. The key is MINTED, never the typed name —

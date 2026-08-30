@@ -29071,6 +29071,10 @@ function handleNetEvent(type, data) {
         players.push(data.player);
         renderPlayers();
         refreshPoolsPresence(); // the owner switcher gains a chip
+        // Somebody came. A minted table that nobody had rolled at yet has
+        // just become one worth finding again — the second of the two things
+        // that earn a recents slot (see initNet).
+        rememberThisTable();
       }
       break;
     case 'player-left': {
@@ -29302,8 +29306,21 @@ function handleNetRefusal(info) {
 // bug: rebuilding the list every add re-bound N buttons every arrival).
 let lastRequestedRoll = null;
 
+// Set at a join that did not earn a recents slot (see initNet), spent by the
+// first thing that earns one. Idempotent and cheap enough to sit in a hot
+// path: the boolean is the whole guard.
+let tableUnremembered = false;
+function rememberThisTable() {
+  if (!tableUnremembered || IN_LOBBY) return;
+  tableUnremembered = false;
+  rememberTable(ROOM, roomSettings.tableName || '');
+}
+
 function requestRoll(types, label, opts = {}) {
   if (!types.length) return;
+  // THIS is the roll that makes a minted table worth listing — one entry
+  // point for every roll this client originates, solo and online both.
+  rememberThisTable();
   lastRequestedRoll = {
     dice: [...types],
     label: label || null,
@@ -30439,7 +30456,23 @@ async function initNet() {
     );
     const wanted = takePendingTableName() || (remembered && remembered.name) || '';
     if (wanted && !roomSettings.tableName && net) net.setSettings({ tableName: wanted });
-    rememberTable(ROOM, roomSettings.tableName || wanted || '');
+    // A TABLE YOU MINTED THREE SECONDS AGO IS NOT A TABLE YOU HAVE BEEN TO
+    // (2026-08-30, the link-sharing pass). Every front door visit mints a room
+    // now, and this list holds EIGHT — so remembering on the join would let a
+    // week of idle visits push out every table anybody actually played at, and
+    // the recents list is the other half of how you get back to one. Nothing
+    // would have failed: the list would just quietly stop being useful.
+    //
+    // A table earns its slot by being a table. Named, arrived at through
+    // somebody's link, or already holding company — those are true at the
+    // join. The fourth is not, and it is the common one: a solo host at a
+    // table they minted, who earns it by ROLLING there (rememberThisTable,
+    // spent by requestRoll and by the roster growing).
+    if (ARRIVED_BY_LINK || roomSettings.tableName || wanted || players.length > 1) {
+      rememberTable(ROOM, roomSettings.tableName || wanted || '');
+    } else {
+      tableUnremembered = true;
+    }
     // THE CHILD END OF A SPLIT (§3b L4). Whoever walked in through a breakout
     // link — the splitter, or a follower who beat them here — tells the room
     // what it is a breakout of, and hands it the felt and system to inherit.
