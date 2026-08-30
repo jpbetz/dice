@@ -68,11 +68,24 @@ not put a stranger on someone else's felt.
 *Actor:* the person who called the game.
 **Done when:** a table exists at an unguessable key, and its link reaches
 five other people in one gesture.
-*Surfaces:* New table, the nameplate, the invite chair, per-seat chairs.
-*Proof:* `new-table`, `invite-chair`, `table-name-survives-round-trip`,
+*Surfaces:* the front door itself (§7.20a), New table, the nameplate, the
+invite chair, per-seat chairs.
+*Proof:* `front-door-is-a-table`, `the-link-in-the-bar-is-the-invite`,
+`new-table`, `invite-chair`, `table-name-survives-round-trip`,
 `table-setup-wire`, `setup-repush`.
-**SHIPPED** (ROADMAP `L1`, `94f3069`). *Open rung:* QR for in-person night
-(zero-dep means hand-rolling an encoder — its own decision).
+**SHIPPED** (ROADMAP `L1`, `94f3069`) — **and it was still broken in the
+field until 2026-08-30, which is the most useful thing on this page.** "Its
+link reaches five other people in one gesture" was true of a link you had to
+know to go and get. The link a host actually shares is the app's own url, and
+that was the LOBBY: four remote players opened it and each landed on their
+own private felt (Joe, after several real RPG sessions — "it might have been
+cool if the link put the players into the same session more easily"). Playing
+together needed a second, nearly identical link. Fixed by making every page a
+table at its own address (UX §7.20a); the two new proofs above are the ones
+that could see it, and they exist because **no scenario written before them
+could** — every tab in the suite opens the url it already means to be at.
+*Open rung:* QR for in-person night (zero-dep means hand-rolling an
+encoder — its own decision).
 
 ### CUJ3 — "My friend invited me. I want to join up with them."
 

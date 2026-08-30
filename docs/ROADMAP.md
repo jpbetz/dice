@@ -12,6 +12,54 @@ none of them mints one.
 
 ---
 
+## THE TABLE HAS BEEN PLAYED ON (2026-08-30) — read this first
+
+**Several real remote RPG sessions have now happened on the deployed table,
+and they went smoothly.** Nothing in this repo knew that: GOALS, CUJS and this
+file were all written as if the thing had never been used, and a strategic
+read on 2026-08-30 named "nobody has ever played a game on this" as the
+biggest open question. It was already answered, and better than a guess.
+
+**Joe's qualifier is the load-bearing half: "the usage was on the most stable
+aspects of the system."** So what is PROVEN is the old core — compose a roll,
+throw it, read it, share a table. What has never been touched by a player who
+was not building it is everything from the preceding fortnight: all of Track
+C (turns, keeping dice, push-your-luck, the bag, symbol faces), the eleven
+mats, the venues, the towers. **The surface has grown much faster than the
+proven area**, which is a different situation from the one the tiers below
+were sequenced in.
+
+**Three things came out of it, in order of how much they should move work:**
+
+1. **One link — SHIPPED the same day** ([the record](SHIPPED.md), UX §7.20a).
+   The link a host naturally shares was the app's front door, and the front
+   door was the lobby, so four remote players each landed on their own private
+   felt. 237 green scenarios could not see it: every tab in the suite opens
+   the url it already means to be at. This is the pattern to look for again —
+   **not a wrong assertion, an unreachable population.**
+2. **The value is in the READ, not the network.** What players cared about was
+   their rolls coming back in *Your Soul Deal*'s result format. They did not
+   care to connect to rooms and mostly did not know they could. `js/meanings.js`
+   is 637 lines and four systems, one of which is "numbers only"; the shared
+   table is the server, seats, presence, whispers, offers, split-the-party,
+   prepared seats and half of GOALS. **That ratio is a finding, not a
+   complaint** — it says the next depth belongs in interpretation, and it says
+   the social machinery is finished enough to stop investing in.
+3. **The two open coverage rows that an RPG table hits every night are
+   initiative order and opposed rolls** (GOALS goal 16). The three families
+   that shipped most recently — push-your-luck, roll-and-lock, the bag — serve
+   board games, an audience that has not yet brought a game to this table.
+   Coverage built ahead of demand is not wrong; it is not the same as coverage
+   somebody is waiting for. **Both rows were found by writing the table down,
+   never by playing**, and now there is play to check them against.
+
+**What has NOT been harvested:** Joe was in those rooms. What players fumbled,
+what he had to explain twice, and what the table tracked on paper or in a chat
+window instead of here — that is the richest unread source in the project, and
+it costs nothing but asking.
+
+---
+
 ## How this file is sequenced — read this before THE ORDER
 
 **Two tracks run in parallel.** Track A is the debt — correctness, capture,

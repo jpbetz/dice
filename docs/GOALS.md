@@ -98,6 +98,17 @@ note).
    links are gone. The URL addresses a TABLE — `?room=` — and carries no
    user state at all. Persistent identity and saves are a later pass.)*
 
+   *(Amended 2026-08-30: **every page now HAS a table address.** A page
+   opened with no `?room=` mints a key and writes it into the address bar,
+   so the bare url is a table and the lobby is a place you go on purpose
+   (`?lobby`). The rule above is unchanged and is why this is allowed: a
+   minted room key is the TABLE's address, not user state — nothing durable
+   rides the URL, and the key is the door (goal 10), which is why it is 82
+   bits of crypto random rather than anything guessable. The change is
+   CUJ2's, not the architecture's: the link a host naturally shares was the
+   front door, the front door was a lobby, and four remote players each
+   landed on their own private felt. UX §7.20a.)*
+
    *(Amended 2026-08-14: `?stability=beta|stable` is the ONE other parameter
    the app reads, and it is a KEY rather than a setting — redeemed once into
    localStorage and then **stripped from the address bar** (`js/stability.js`,

@@ -11,6 +11,69 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## One link — the front door became a table (2026-08-30)
+
+**The only item in this file found by somebody playing the game.** Joe ran
+several remote RPG sessions on the deployed table. They went smoothly, and
+his read afterwards was two sentences long: the usage was on the most stable
+parts of the system, and *"it might have been cool if the link put the
+players into the same session more easily — maybe have the current player's
+link update so if they copy paste that other players join"*.
+
+**The two-link problem.** The app's front door was a working solo table with
+no address (§3b L0's lobby). That was the right answer to CUJ1 — *I just need
+to do a dice roll NOW* — and it made the link a host naturally shares, the
+app's own url, hand every recipient their own private felt. Playing together
+needed a SECOND, nearly identical link that does not exist until you have
+found "+ New table" first. Four remote players, one link in a chat window,
+and only one of the two links does what everybody assumes.
+
+**Nothing in this repo could have caught it, and the reason generalises.**
+237 scenarios, thirteen CUJs, an invite gesture with three doors and its own
+a11y proof — all green, because *every tab in the suite opens the url it
+already means to be at* (`?room=` from `ctx.room`, or the lobby's own path).
+The front door is the one path a test has to go out of its way to exercise,
+and none did. **Add it to the list of ways a green check masks a broken
+thing**: not a wrong assertion, an unreachable population.
+
+**The fix.** A page with no `?room=` mints a key and writes it into the
+address bar with `replaceState`. One crypto.getRandomValues, no server call,
+and from the first frame the address bar is a working invite — the one link
+everybody already knows how to copy. The lobby keeps its whole spec and moves
+to `?lobby`, where `leaveToLobby` now goes and where the recents list lives.
+`IN_LOBBY` keeps its exact meaning (`ROOM === null`) so all twelve consumers
+are untouched; what changed is only how you get there. A browser with no
+`crypto.getRandomValues` lands in the lobby too, which is the honest answer —
+no table, and no pretend link to one.
+
+**MINTING IS NOT JOINING, which is what kept CUJ1 whole.** The question at
+arrival is not "is there a room key" (there always is now) but
+`ARRIVED_BY_LINK`. Somebody sent you → you are joining PEOPLE, and today's
+prompt is right. A table this boot minted → nobody is here to address you, so
+there is no prompt and **not one API call**; you rest in C12's shipped
+seat-declined state and can roll instantly. A stored name skips both and
+joins silently, which is what makes a blind copy work: a returning host is
+live at their own address before they touch anything. The prompt moved to
+`ensureTableLive()`, fired by the invite doors — wanting company is the exact
+moment a name starts to matter. Intent first, question second.
+
+**The regression the first commit would have shipped.** Recents holds EIGHT
+and every front door visit now mints a room, so remembering on the join would
+have pushed out every table anybody actually played at within a week —
+silently, nothing failing. A table earns its slot by being one: named,
+arrived at by link, or holding company at the join; otherwise at the first
+roll or the first guest (`rememberThisTable`). Caught by asking what the
+change costs the *other* half of getting back to a table, not by a test.
+
+**Pinned by** `front-door-is-a-table` and `the-link-in-the-bar-is-the-invite`,
+both sabotage-checked — and the first sabotage check was INVALID and said so:
+restoring the file raced a run still in flight, and the scenario went green
+against un-sabotaged code. Re-run against one scenario at a time, both fail
+with the mint reverted. Specs: UX §7.20a (and §7.20's amendment), GOALS
+goal 7, CUJS CUJ2.
+
+---
+
 ## The mats arc — the atlas points at the mat, and the first cloth that is not felt (2026-08-29)
 
 Started from Joe's ask for roll-mat alternatives and his three seeds (real

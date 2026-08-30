@@ -2837,6 +2837,31 @@ link for everyone stays the primary form — `inviteUrl()` is unchanged.
 ### 7.20 The lobby, the empty seat, and the way to a table
 (2026-08-07, design — ROADMAP §3b)
 
+> **AMENDED 2026-08-30 — THE LOBBY IS NO LONGER THE FRONT DOOR.** Everything
+> below is still the spec for the lobby *surface*; what changed is how you
+> reach it. A page with no `?room=` MINTS a room key and writes it into the
+> address bar (`js/main.js`, the ROOM/ARRIVED_BY_LINK pair), so the bare url
+> is a table and the lobby is a place you go on purpose — `?lobby`, which is
+> `leaveToLobby`'s destination and where the recents list lives.
+>
+> **Why, and it is not a preference.** This section's own CUJ2 — *get my
+> friends in here* — was broken in the field for exactly as long as the lobby
+> was the landing place. Joe ran several remote RPG sessions (2026-08-30);
+> they went well, and his one ask was that "the link put the players into the
+> same session more easily". The link a host naturally shares is the app's own
+> front door, and a front door that is a lobby hands every recipient their own
+> private felt. Playing together needed a SECOND, nearly identical link that
+> does not exist until you have found "+ New table" first. **Nothing in this
+> repo could have caught it**: every scenario and every proof step opens the
+> url it already means to be at.
+>
+> **State L is now reached deliberately, and state A is what you land in.**
+> The three presence states below are unchanged in every other respect —
+> including the fourth (C12's *at the door*), which is now the resting state
+> of two arrivals rather than one, because a table you minted has nobody to
+> address you and therefore asks you nothing. See §7.20a for the rule that
+> keeps CUJ1 and CUJ2 from being traded for each other a third time.
+
 Roadmap authority is [ROADMAP.md](ROADMAP.md) §3b, which holds the CUJs
 and the three rulings; this section specifies the surfaces. The
 governing sentence: **the rail's first row already asks "who is here" —
@@ -2870,7 +2895,8 @@ and `renderPlayers()` becomes the renderer of all three — today it runs
 only in `initNet()`'s online branch (main.js:11289), so the lobby branch
 must call it too:
 
-- **L — the lobby.** No `?room=`. You are not at a table.
+- **L — the lobby.** `?lobby` (it was "no `?room=`" until 2026-08-30 —
+  see the amendment above). You are not at a table.
 - **A — the empty table.** A room with nobody else in it. CUJ2's waiting
   room, and the most important moment in the whole flow.
 - **T — the table.** Roster pills, exactly as they ship today. **No new
@@ -3105,6 +3131,56 @@ transition here NAVIGATES rather than swapping in place (§3b L3) ·
 fix while the pill is being simplified · `.solo` never had a CSS rule at
 all (css:1810-1835 defines only base, `.offline`, `.refused`), which is
 its own small evidence that the state was never designed.
+
+### 7.20a One link — the front door is a table (2026-08-30)
+
+**The rule.** A page opened with no `?room=` mints a room key, writes it into
+the address bar with `replaceState`, and is a table from the first frame.
+There is exactly one link, and it is the one every person already knows how
+to copy.
+
+**Where this came from.** Not an audit. Joe ran several remote RPG sessions
+on the deployed table and they went smoothly; the one thing he asked for
+afterwards was that "the link put the players into the same session more
+easily". Four remote players, one link in a chat window, and the link a host
+naturally shares — the app's own url — was a lobby, so each of them landed on
+their own private felt. §7.20's CUJ2 was broken for the whole life of the
+lobby and every test stayed green, because a test opens the url it already
+means to be at. **This is the second time CUJ1 and CUJ2 have been traded for
+each other**; the rule below exists so there is not a third.
+
+**MINTING IS NOT JOINING.** The lobby was built to answer CUJ1 — *I just need
+to do a dice roll NOW* — by removing the "Take a seat" modal a first-timer
+used to meet before touching a die, and that fix has to survive intact. So
+the question at arrival is **not** "is there a room key" (there always is
+now). It is `ARRIVED_BY_LINK`:
+
+| you arrived | what it means | what happens |
+| --- | --- | --- |
+| with a `?room=` | somebody sent you; you are joining PEOPLE | today's flow, prompt included — a name is what they address you by |
+| with none (minted) | you are the first one here | **no prompt, no API call at all** — the seat-declined state (C12), your own felt, a `Take a seat` ghost standing open |
+| minted, stored name | a returning host | joins silently — this is what makes a blind copy of the address bar work, because the link already has somebody behind it |
+
+**The prompt moved to where intent is.** Wanting to invite someone is the
+exact moment a name starts to matter, so `ensureTableLive()` opens the table
+before either invite door hands out its link (§7.20's Settings → Table row,
+key `i`, and the identity menu). Intent first, question second — never the
+reverse, which is what the old front door did.
+
+**A table earns its recents slot.** The list holds eight and every front door
+visit mints a room, so remembering on the join would push out every table
+anybody actually played at within a week — silently, with nothing failing.
+A table is remembered when it is named, arrived at through somebody's link,
+or already holding company at the join; otherwise at the first roll
+(`requestRoll`) or the first guest (`player-joined`), via
+`rememberThisTable()`. A room you minted three seconds ago and did nothing at
+is not "a table you have been to".
+
+**What is pinned.** `front-door-is-a-table` (the mint, the bar, the invite
+url, and CUJ1's absence of a modal *and* of a single API call beside it) and
+`the-link-in-the-bar-is-the-invite` (a host's address bar, pasted verbatim,
+puts a second player on the same roster). Both were sabotage-checked. The
+front door is the one path no other scenario can reach.
 
 ### 7.21 The named verb — a card's main act says its name (2026-08-07)
 
