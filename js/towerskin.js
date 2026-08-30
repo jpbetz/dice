@@ -1450,9 +1450,32 @@ export function buildTowerSkin(v) {
     base.rotation.x = -Math.PI / 2;
     base.position.set(0, 0.006, (zFO + zBO) / 2);
     group.add(base);
-    const trayShadow = new THREE.Mesh(new THREE.PlaneGeometry(v.lip.s[0] + 1.6, 2.0), shMat());
+    // A CONTACT SHADOW BELONGS TO A FOOTPRINT, NOT TO A PATCH OF FELT.
+    //
+    // This quad used to be `(lip.s[0] + 1.6) x 2.0` centred at
+    // `lip.c[2] + lip.s[2]/2 + 0.35` — that is, 0.35 units BEYOND the tray's
+    // front edge, so the darkest point of a "contact" shadow sat on open felt
+    // with nothing above it to occlude the sky, and the board covered the near
+    // half of the gradient. What you saw was the far half: it emerged from
+    // behind the board already near peak (28 code values in FOUR pixels,
+    // measured on sand) and faded over the next hundred and thirty. A smudge
+    // on bare ground with a hard edge where the board clipped it.
+    //
+    // The `base` quad three lines up always had the right construction — the
+    // tower's own footprint plus a margin, centred on it — and this one is now
+    // built the same way: the TRAY's footprint plus a margin, centred on the
+    // TRAY. The peak is under the board where it belongs and cannot be seen;
+    // what shows past the silhouette is the outer half of the fade, which is
+    // what a contact halo is. Nothing dark lands on felt the tray is not
+    // touching.
+    //
+    // Joe found it on a phone, on the taproom's oak. It was invisible for as
+    // long as every mat was dark and arrived with the pale ones.
+    const SH_MARGIN = 1.4;
+    const trayShadow = new THREE.Mesh(new THREE.PlaneGeometry(
+      v.lip.s[0] + SH_MARGIN, v.lip.s[2] + SH_MARGIN), shMat());
     trayShadow.rotation.x = -Math.PI / 2;
-    trayShadow.position.set(0, 0.005, v.lip.c[2] + v.lip.s[2] / 2 + 0.35);
+    trayShadow.position.set(0, 0.005, v.lip.c[2]);
     group.add(trayShadow);
   }
 

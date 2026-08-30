@@ -172,6 +172,54 @@ returns byte-identical); a fifth mirror in `tests/felt-ids.test.mjs`;
 `floor-texture-persistent` extended to pin both textures. Each confirmed RED
 first. Shots and numbers: `tools/steps/felt-light-look.mjs`.
 
+### The contact shadow that was not on the contact (2026-08-30)
+
+Joe, from a phone: *"What's the line near the bottom of the ramp and on the
+ground in front of the tower?"* Two things, and only one was a defect.
+
+**The line ON the ramp is a join, and it is correct.** The ramp is two boards —
+a sloped chute out of the doorway, then a separate tray of a paler species,
+chosen deliberately because "the light species is what makes the dice on it
+read". Two woods at two angles meet in a straight line.
+
+**The line on the GROUND was the tray's fake contact shadow, and the fault was
+WHERE IT WAS.** The quad was `(lip.s[0] + 1.6) x 2.0` centred at
+`lip.c[2] + lip.s[2]/2 + 0.35` — 0.35 units BEYOND the tray's front edge. So the
+darkest point of a *contact* shadow sat on open felt with nothing above it to
+occlude the sky, while the board covered the near half of its gradient. What a
+player saw was the far half: emerging from behind the board already near peak
+(28 code values in FOUR pixels, measured on sand) and fading over the next
+hundred and thirty. Hard on one side, smooth on the other — the signature of a
+clipped pool, not of a bad fade.
+
+**The fix is the construction the `base` quad three lines above always used:**
+the object's own footprint plus a margin, centred on the object. The tray's
+shadow is now `(lip.s[0] + 1.4) x (lip.s[2] + 1.4)` centred on `lip.c[2]`. The
+peak sits under the board where it belongs and cannot be seen; what shows past
+the silhouette is the outer half of the fade, which is what a contact halo is.
+Nothing dark lands on felt the tray is not touching.
+
+**Three wrong answers died first**, each on a measurement rather than an
+argument: not the shadow map (turned it off, the line stayed), not the fog
+(turned it off, it stayed), not the mat's texture (hid the quad, clean sand).
+Then two wrong FIXES: making the quad deeper made the step worse (more of the
+dark centre arrived at the board's edge), and disabling mipmaps changed nothing.
+A first pass shipped as a dimming — 0.5 to 0.30 — and Joe rejected it as a
+bandaid, correctly: it made a misplaced shadow fainter instead of putting it
+where the object is. That commit is reverted in the history above this one.
+
+**And the renderer cannot do this for us**, which is worth writing down: with
+the painted quad hidden the tray sits on clean sand with NO shadow at all. The
+board is 0.08 proud and lies flat, so its real cast shadow is sub-pixel under a
+key 67 degrees up, and there is no ambient-occlusion pass. The painted halo is a
+stand-in for AO, and the standard for it is that it must sit on the footprint.
+
+**Why now.** 0.5 of near-black over `#1c1c24` obsidian is a small relative
+change; over sand, silt or the taproom's oak it is a fifth of the ground's
+value. It was tuned when every mat was dark and two of eleven are not any more —
+both shipped this week. Fixed in all three towers that carry the same three
+lines.
+
 ### Every tower was lit from below (2026-08-30)
 
 `heightToNormal` turns a height sketch into a normal map, and the repo has two
