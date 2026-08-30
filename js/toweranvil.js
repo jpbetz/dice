@@ -964,31 +964,15 @@ export function buildAnvilSkin(v) {
 
   // --- AO layer (d): contact shadows, flat on the felt ---------------------
   {
-    const shMat = (opacity = 0.5) => new THREE.MeshBasicMaterial({
-      map: M.shadow, transparent: true, opacity, depthWrite: false,
+    const shMat = () => new THREE.MeshBasicMaterial({
+      map: M.shadow, transparent: true, opacity: 0.5, depthWrite: false,
     });
     const base = new THREE.Mesh(
       new THREE.PlaneGeometry(2 * xPl1 + 2.6, (zFO - zPl1) + 2.6), shMat());
     base.rotation.x = -Math.PI / 2;
     base.position.set(0, 0.006, (zFO + zPl1) / 2);
     group.add(base);
-    // THE TRAY'S POOL IS HALF-OCCLUDED, and that is what makes it read as a
-    // line rather than as shade (measured 2026-08-30, on sand, through the
-    // shipped post stack). The quad is flat on the felt and the tray board
-    // sits over its darkest half, so the visible part BEGINS at the board's
-    // silhouette already at full strength: across that boundary the felt
-    // darkens by 28 code values in FOUR pixels, while the open side fades out
-    // over a hundred and thirty. An occlusion edge cannot be softened by
-    // moving the texture — only by not being so dark when it arrives.
-    //
-    // IT ONLY BECAME VISIBLE THIS WEEK. 0.5 of near-black over `#1c1c24`
-    // obsidian is a small relative change; over sand, silt or the taproom's
-    // oak it is about a fifth of the ground's value. The patch was tuned when
-    // every mat was dark, and two of the eleven are not any more.
-    //
-    // So: 0.30 rather than 0.50, over three units rather than two — the same
-    // ink, half the step at the board's edge, and a longer tail on the felt.
-    const trayShadow = new THREE.Mesh(new THREE.PlaneGeometry(v.lip.s[0] + 1.6, 3.0), shMat(0.30));
+    const trayShadow = new THREE.Mesh(new THREE.PlaneGeometry(v.lip.s[0] + 1.6, 2.0), shMat());
     trayShadow.rotation.x = -Math.PI / 2;
     trayShadow.position.set(0, 0.005, v.lip.c[2] + v.lip.s[2] / 2 + 0.35);
     group.add(trayShadow);

@@ -172,43 +172,6 @@ returns byte-identical); a fifth mirror in `tests/felt-ids.test.mjs`;
 `floor-texture-persistent` extended to pin both textures. Each confirmed RED
 first. Shots and numbers: `tools/steps/felt-light-look.mjs`.
 
-### The line in front of the tower (2026-08-30)
-
-Joe, from a phone: *"What's the line near the bottom of the ramp and on the
-ground in front of the tower?"* Two different things, and finding out which took
-ruling out three plausible wrong answers first.
-
-**The line ON the ramp is a join, and it is correct.** The ramp is two boards —
-a sloped chute out of the doorway, then a separate tray of a paler species,
-chosen deliberately because "the light species is what makes the dice on it
-read". Two woods at two angles meet in a straight line.
-
-**The line on the GROUND is the tray's fake contact shadow, and it was a
-defect.** It is an unlit quad lying on the felt with a radial veil. Not the
-shadow map (turned it off — the line stayed), not the fog (turned it off — it
-stayed), not the mat's own texture (hiding the quad left clean sand).
-
-**The root cause is OCCLUSION, not the fade.** The quad lies flat and the tray
-board covers its darkest half, so the visible part begins at the board's
-silhouette *already at full strength*. Measured on sand through the shipped post
-stack: across that boundary the felt darkens by **28 code values in four
-pixels**, while the open side fades out over **a hundred and thirty**. Hard on
-one side, smooth on the other — which is the signature of a clipped pool rather
-than a texture whose gradient is wrong. Two earlier hypotheses died on that
-measurement: making the quad deeper made the step WORSE (more of the dark centre
-arrived at the board's edge), and disabling mipmaps changed nothing.
-
-**Why now.** 0.5 of near-black over `#1c1c24` obsidian is a small relative
-change; over sand, silt or the taproom's oak it is about a fifth of the ground's
-value. The patch was tuned when every mat was dark, and two of the eleven are
-not any more — both shipped this week.
-
-An occlusion edge cannot be softened by moving the texture, only by being less
-dark when it arrives: `0.30` over three units instead of `0.50` over two. The
-step at the board's edge falls from 28 code values to 16.5 and the peak from 31
-to 18, with a longer tail on the felt. Fixed in all three towers that carry a
-copy of the same three lines.
-
 ### Every tower was lit from below (2026-08-30)
 
 `heightToNormal` turns a height sketch into a normal map, and the repo has two
