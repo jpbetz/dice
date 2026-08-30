@@ -152,6 +152,11 @@ const IN_LOBBY = ROOM === null;
 // a LATER `let` throwing "cannot access before initialization" from a debug
 // getter. Same trap the ROOM/IN_LOBBY pair above carries its own note about.
 let seatDeclined = false;
+// Spent by the FIRST initNet (see its gate). Everything after the boot — the
+// presence row's 'Take a seat', ensureTableLive behind the invite doors — is a
+// person deliberately asking to join, and a deliberate ask always gets the
+// prompt.
+let bootArrival = true;
 
 // THE STABILITY CHANNEL (js/stability.js — read its header for the law).
 // Towers and venues are in closed beta; this decides whether this browser is
@@ -30321,7 +30326,16 @@ async function initNet() {
   // makes a blind copy of the address bar work: a returning host is live at
   // their own address from the first frame, so the link they paste already
   // has somebody behind it.
-  if (!name && !ARRIVED_BY_LINK) return atTheDoor();
+  //
+  // THE BOOT ONLY, and getting this wrong shut the door it was holding open.
+  // `Take a seat` and ensureTableLive re-enter this function precisely to ask
+  // the question — an unconditional gate answered them with the door they were
+  // trying to open, so at a minted table BOTH the ghost and the invite key did
+  // nothing at all. The suite could not see it: the scenario asserted the ghost
+  // EXISTS, which it did. Found by pressing it.
+  const firstBoot = bootArrival;
+  bootArrival = false;
+  if (!name && firstBoot && !ARRIVED_BY_LINK) return atTheDoor();
 
   // A PER-SEAT LINK OUTRANKS A STORED NAME (U3, 2026-08-08). `dice.name.v1`
   // is origin-GLOBAL, so this gate skipped the picker for anyone who had ever

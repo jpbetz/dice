@@ -12631,6 +12631,64 @@ export const scenarios = [
     },
   },
   {
+    name: 'the-door-opens',
+    tags: ['lobby', 'seat', 'cuj1', 'cuj2'],
+    // THE GATE THAT KEEPS THE BOOT QUIET MUST NOT ANSWER A DELIBERATE ASK
+    // WITH THE SAME SILENCE. A table this boot minted asks an unnamed visitor
+    // nothing (§7.20a) — and the first spelling of that gate was
+    // unconditional, so the two surfaces whose entire job is to re-enter the
+    // join flow and ASK were handed back the door they were trying to open.
+    // Both the 'Take a seat' ghost and the invite key did nothing at all.
+    //
+    // WHAT MADE IT INVISIBLE: `front-door-is-a-table` asserted the ghost
+    // EXISTS, and it did. Found by pressing it. So this scenario presses both
+    // doors, and asserts the PICKER, not the button.
+    async fn(ctx) {
+      const doorTab = (origin) => bootTab(ctx, {
+        origin,
+        clean: ['dice.name.v1', 'dice.tables.v1'],
+        path: '/',
+        readyExpr: `!!window.__diceDebug && window.__diceDebug.seatPicker.declined === true`,
+        readyDesc: `at the door (${origin})`,
+      });
+
+      // ① The presence row's ghost — the standing door, always on screen.
+      const a = await doorTab('127.0.0.24');
+      await a.eval(`[...document.querySelectorAll('#rail-roster .rail-ghost')]`
+        + `.find((b) => b.textContent.includes('Take a seat')).click()`);
+      await a.waitFor(`window.__diceDebug.seatPicker.open === true`,
+        { desc: 'the ghost opens the picker' });
+
+      // ② And key `i` — the invite door, which goes through ensureTableLive
+      // because you cannot hand out a link to a table you are not at. Wanting
+      // company is where the name question belongs, so the picker is the
+      // correct answer to this keystroke, not a copied link to an empty room.
+      //
+      // The clipboard is stubbed for the same reason invite-has-a-primary-
+      // gesture stubs it: headless Chrome has no grant, the real writeText
+      // rejects, and shareInvite's fallback is window.prompt — a JS dialog
+      // with nobody to answer it, which hangs the page. (Measured: it froze a
+      // live browser during this very pass.) Nothing should reach shareInvite
+      // here anyway — ensureTableLive is still awaiting the picker — so the
+      // stub doubles as the assertion that no link was handed out early.
+      const b = await doorTab('127.0.0.25');
+      await b.eval(`(() => {
+        window.__copied = [];
+        Object.defineProperty(navigator, 'clipboard', {
+          configurable: true,
+          value: { writeText: (s) => { window.__copied.push(String(s)); return Promise.resolve(); } },
+        });
+        window.prompt = (msg, val) => { window.__copied.push('PROMPT:' + String(val)); return null; };
+      })()`);
+      await b.eval(`document.body.dispatchEvent(`
+        + `new KeyboardEvent('keydown', { key: 'i', bubbles: true }))`);
+      await b.waitFor(`window.__diceDebug.seatPicker.open === true`,
+        { desc: 'the invite key opens the table before it hands out its link' });
+      assert.deepEqual(await b.eval('window.__copied'), [],
+        'and no link is copied while the question is still on screen');
+    },
+  },
+  {
     name: 'the-link-in-the-bar-is-the-invite',
     tags: ['lobby', 'seat', 'cuj2', 'cuj3'],
     // THE JOURNEY THAT WAS BROKEN IN THE FIELD, end to end: a host opens the
