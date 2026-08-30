@@ -67,10 +67,14 @@ function arrayList(src, file) {
   return m[1].split(',').map((s) => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
 }
 
-// `const FELT_THEMES = { id: { ... }, ... };` — the client's object of rows.
-function objectKeys(src, file) {
-  const at = src.indexOf('const FELT_THEMES = {');
-  assert.ok(at >= 0, `${file}: no FELT_THEMES object found`);
+// `const NAME = { id: { ... }, ... };` — an object of rows, top-level keys only.
+// Generalised from FELT_THEMES 2026-08-29 for FELT_GLOSS: the brace walk is the
+// only extractor here that survives nested values, and the flat `([a-z]+):`
+// regex used for the painter registry would return `felt, mid, swing, silt,
+// mid, swing, ...` on it.
+function objectKeys(src, file, name = 'FELT_THEMES') {
+  const at = src.indexOf(`const ${name} = {`);
+  assert.ok(at >= 0, `${file}: no ${name} object found`);
   // Walk to the matching brace so a nested row cannot end the scan early.
   let i = src.indexOf('{', at);
   let depth = 0;
@@ -143,6 +147,25 @@ const painters = (() => {
   assert.ok(m, 'js/main.js: no FELT_CLOTHS registry found — did it move?');
   return [...m[1].matchAll(/([a-z][a-zA-Z0-9]*)\s*:/g)].map((x) => x[1]);
 })();
+
+const gloss = objectKeys(src, 'js/main.js', 'FELT_GLOSS');
+
+t('every cloth that is painted also answers the lamp', () => {
+  // THE FIFTH MIRROR. A cloth id now names four things written down
+  // separately: a painter (FELT_CLOTHS), a voice (CLOTH_VOICES), a gloss row
+  // (FELT_GLOSS) and the theme rows that cite it. The failure this catches is
+  // the same shape as the silt-without-a-voice bug that made this file grow its
+  // fourth mirror: `FELT_GLOSS[cloth] || FELT_GLOSS[DEFAULT_CLOTH]` does its job
+  // quietly, so a cloth with no row of its own silently wears wool's gloss and
+  // looks almost right.
+  assert.ok(gloss.length >= 3, `the gloss registry looks wrong: ${gloss.join(', ')}`);
+  const unlit = painters.filter((id) => !gloss.includes(id));
+  assert.deepEqual(unlit, [],
+    `these cloths have a look and no gloss row, so they wear wool's: ${unlit.join(', ')}`);
+  const extra = gloss.filter((id) => !painters.includes(id));
+  assert.deepEqual(extra, [],
+    `these gloss rows describe a cloth nothing paints: ${extra.join(', ')}`);
+});
 
 t('every cloth that is painted is also voiced', () => {
   assert.ok(painters.includes('felt'), `the painter registry looks wrong: ${painters.join(', ')}`);

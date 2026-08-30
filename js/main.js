@@ -2023,6 +2023,62 @@ const FELT_CLOTHS = {
 };
 const DEFAULT_CLOTH = 'felt';
 
+// HOW THE CLOTH ANSWERS THE LAMP (2026-08-29). A SEPARATE registry from
+// FELT_CLOTHS on purpose: tests/felt-ids.test.mjs regex-scrapes that object
+// non-greedily and would stop at the first `};` if its values grew.
+//
+// THIS IS THE MEASUREMENT THAT CHOSE IT, and it is why there is no normal map
+// here. `floorLook` was built to ask one question — does a change to this
+// surface move more pixels than a player can see — and it answered, in sRGB
+// code values on obsidian at zoom medium, through the shipped post stack:
+//
+//     tilting THE WHOLE PLANE by 8 degrees      0.05 - 0.62
+//     ...by 20 degrees                          1.7  - 2.7
+//     roughness 1.00 -> 0.88                    7.6  - 9.1
+//
+// The first row is the CEILING on any normal map this floor could ever wear:
+// a constant tilt moves every texel at once, where a real relief map alternates
+// and its neighbours cancel. The key stands 67 degrees above a horizontal floor
+// and the mood lamp is within about 5 degrees of vertical over the mat centre,
+// so N.L barely moves for a shallow perturbation — the nap the roadmap asked
+// for cannot be seen at any strength that is not a corrugated roof. Gloss can:
+// the same change spent on roughness is worth fifteen times as much, at a
+// 128px texture instead of a 1024px one. docs/UX.md has the full record.
+//
+// `mid` SHIPS ONE NOTCH OFF today's scalar 0.95 so the +swing tail does not
+// clip against the 1.0 ceiling. No cloth's MEAN gloss moves: this is a swing
+// around the look Joe already approved, not a new look.
+// MEASURED, NOT GUESSED — obsidian at zoom medium, empty mat, sRGB code values
+// near/mid/far, against the shipped vertex mottle beside it:
+//
+//     swing 0.03   1.4 / 1.0 / 0.7   (mottle: 1.4 / 1.1 / 0.8) — invisible
+//     swing 0.10   5.6 / 3.7 / 1.8   with mid 0.88 — clearly visible, but the
+//                                    mid moves the whole floor's gloss with it
+//     swing 0.06   SHIPPED           twice the mottle, mean unmoved
+//
+// The near/far ramp is the tell that this is not another mottle: 3.1x against
+// the mottle's 1.8x, because a specular term falls off with the view angle and
+// an albedo term does not. That ramp toward the receding felt is the one
+// percept in this problem no existing mechanism produces.
+//
+// WHY A DARK CLOTH NEEDS THIS MOST, which was the surprise. Albedo structure is
+// capped by the albedo: obsidian is #1c1c24, so the mottle's ±14% has almost
+// nothing to modulate and measures 1.4 there against 9.8 on sand. A specular
+// term does not scale with albedo, so gloss is the ONE lever that can give a
+// near-black cloth visible surface variation. Six of the eleven mats are dark.
+const FELT_GLOSS = {
+  felt: { mid: 0.94, swing: 0.060 },
+  // A raked bed is smoothed flat before play and its grains are matte; it gets
+  // the smallest swing of the three.
+  silt: { mid: 0.94, swing: 0.035 },
+  // Wax pools on a board and never in a groove, so a plank table is the one
+  // surface here that genuinely has glossy and dull regions.
+  oak: { mid: 0.93, swing: 0.090 },
+};
+// 1.25 world units a texel, against lobes 40-106 units across — the field is
+// low-frequency by nature, so this is oversampling it about thirtyfold.
+const FELT_GLOSS_PX = 128;
+
 // Keyed by cloth AND colour: two cloths at one hex are two different tiles,
 // and before the key grew they would have silently traded canvases.
 const feltTileCache = new Map();
@@ -2368,10 +2424,15 @@ function paintOakCloth(ctx, rnd) {
 // one cloth — the claim `felt-grain-is-seeded` makes.
 const FELT_SEGMENTS = 48;          // 49x49 verts over 160 units: ~3.3 units apart
 const FELT_MOTTLE_STRENGTH = 0.14; // peak deviation from flat, either way
-function feltMottle(geo, base, scale = 1) {
+// THE LOBES ARE SHARED DATA NOW, because two fields ride them: the mottle,
+// which is how much light the cloth RETURNS, and the gloss field below, which
+// is how it returns it. Seeded off the theme like everything else on this
+// surface, so two clients at one table still see one cloth.
+//
+// A handful of wide soft lobes, exactly the shape the painted mottle had —
+// 18 blotches 260-680 px across a 2048 atlas, i.e. 20-53 world units.
+function mottleLobes(base) {
   const rnd = mulberry32(feltSeed(base) ^ 0x9e3779b9);
-  // A handful of wide soft lobes, exactly the shape the painted mottle had —
-  // 18 blotches 260-680 px across a 2048 atlas, i.e. 20-53 world units.
   const lobes = [];
   for (let i = 0; i < 18; i++) {
     lobes.push({
@@ -2380,6 +2441,21 @@ function feltMottle(geo, base, scale = 1) {
       a: (rnd() > 0.5 ? 1 : -1.3) * (0.35 + rnd() * 0.65),
     });
   }
+  return lobes;
+}
+
+// The field itself, evaluated anywhere: -1..1 before any strength is applied.
+function lobeFieldAt(lobes, x, z) {
+  let v = 0;
+  for (const L of lobes) {
+    const d = Math.hypot(x - L.x, z - L.z) / L.r;
+    if (d < 1) { const f = 1 - d * d; v += L.a * f * f; }
+  }
+  return Math.max(-1, Math.min(1, v));
+}
+
+function feltMottle(geo, base, scale = 1) {
+  const lobes = mottleLobes(base);
   const pos = geo.attributes.position;
   const col = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {
@@ -2390,12 +2466,7 @@ function feltMottle(geo, base, scale = 1) {
     // it identically. Said plainly here because "y here is z there" is the
     // kind of almost-true comment the next reader would build on.
     const x = pos.getX(i), z = pos.getY(i);
-    let v = 0;
-    for (const L of lobes) {
-      const d = Math.hypot(x - L.x, z - L.z) / L.r;
-      if (d < 1) { const f = 1 - d * d; v += L.a * f * f; }
-    }
-    const m = 1 + Math.max(-1, Math.min(1, v)) * FELT_MOTTLE_STRENGTH * scale;
+    const m = 1 + lobeFieldAt(lobes, x, z) * FELT_MOTTLE_STRENGTH * scale;
     col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = m;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -2410,6 +2481,60 @@ function feltMottle(geo, base, scale = 1) {
 // 4,608 triangles for the whole table is nothing next to one die, and it buys
 // the low-frequency field a texture would otherwise have to carry at a
 // resolution the tile cannot provide.
+// THE GLOSS FIELD — where the cloth is worn smooth and where it is not.
+//
+// IT IS NOT A TILE, and that is the whole reason it is allowed to exist. The
+// tile law ("only what is statistically seamless") binds the colour map because
+// it repeats 32x32; r160 gives roughnessMap its OWN uv transform, so this one
+// covers the 160-unit plane exactly once at repeat(1,1) and may therefore carry
+// the low-frequency structure the tile is forbidden. It is the same field the
+// mottle rides, one lobe set, so the mat gains no second geography.
+//
+// NO colorSpace TAG. This is a linear scalar, not a colour; an sRGB tag would
+// read 0.94 as about 0.87 and make the whole floor glossier than any dial says.
+// The three channels are equal but only .g is read (r160 samples
+// roughnessMap.g), which is also why the green-channel handedness question that
+// haunts normal maps is structurally absent here.
+const glossCanvas = document.createElement('canvas');
+glossCanvas.width = glossCanvas.height = FELT_GLOSS_PX;
+const glossTexture = new THREE.CanvasTexture(glossCanvas);
+glossTexture.anisotropy = 4;
+
+// Painted in the SAME frame as the mottle, which is the mirrored one: the plane
+// is authored in XY and rotated -90 degrees about X, so the geometry's local +y
+// is world -z, and feltMottle evaluates its lobes in those local coordinates.
+// A CanvasTexture flips Y again on upload, so canvas row 0 is local +y. Follow
+// that chain and canvas +y is world +z (verified by stamping a known row and
+// looking) while the LOBES want local y — hence the negation below. Get this
+// wrong and the two fields are mirror images of each other: still plausible
+// cloth, and never the same cloth twice.
+// Instrument state, and the ONE dial `applyFloorOverride` may move. Declared
+// ABOVE its reader: this file has paid for that ordering twice.
+const GLOSS = { paints: 0, swingScale: 1 };
+
+function paintGloss(base, cloth = DEFAULT_CLOTH) {
+  const g = FELT_GLOSS[cloth] || FELT_GLOSS[DEFAULT_CLOTH];
+  const lobes = mottleLobes(base);
+  const ctx = glossCanvas.getContext('2d');
+  const im = ctx.createImageData(FELT_GLOSS_PX, FELT_GLOSS_PX);
+  for (let py = 0; py < FELT_GLOSS_PX; py++) {
+    const lz = 80 - ((py + 0.5) / FELT_GLOSS_PX) * 160;
+    for (let px = 0; px < FELT_GLOSS_PX; px++) {
+      const lx = ((px + 0.5) / FELT_GLOSS_PX) * 160 - 80;
+      const v = lobeFieldAt(lobes, lx, lz);
+      const r = Math.max(0, Math.min(1, g.mid + v * g.swing * GLOSS.swingScale));
+      const b = Math.round(r * 255);
+      const i = (py * FELT_GLOSS_PX + px) * 4;
+      im.data[i] = im.data[i + 1] = im.data[i + 2] = b;
+      im.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(im, 0, 0);
+  glossTexture.needsUpdate = true;
+  GLOSS.paints++;
+  return g;
+}
+
 const floorGeo = new THREE.PlaneGeometry(160, 160, FELT_SEGMENTS, FELT_SEGMENTS);
 const floorTexture = new THREE.CanvasTexture(
   feltTileCanvas(FELT_THEMES[DEFAULT_FELT].feltBase, FELT_THEMES[DEFAULT_FELT].cloth));
@@ -2425,12 +2550,18 @@ floorTexture.repeat.set(FELT_REPEAT, FELT_REPEAT);
 floorTexture.anisotropy = 4;
 
 feltMottle(floorGeo, FELT_THEMES[DEFAULT_FELT].feltBase, FELT_THEMES[DEFAULT_FELT].mottle);
+paintGloss(FELT_THEMES[DEFAULT_FELT].feltBase, FELT_THEMES[DEFAULT_FELT].cloth);
 
 const floor = new THREE.Mesh(
   floorGeo,
   new THREE.MeshStandardMaterial({
     map: floorTexture,
-    roughness: 0.95,
+    // THE MAP CARRIES THE VALUE, so the scalar is pinned at 1 — r160 computes
+    // `roughnessFactor *= texelRoughness.g`, and the app's own convention
+    // wherever a roughnessMap is used is to leave the multiplier alone. The
+    // 0.95 that used to sit here now lives in FELT_GLOSS as `mid`.
+    roughnessMap: glossTexture,
+    roughness: 1,
     metalness: 0,
     vertexColors: true,   // the mottle; see feltMottle
   })
@@ -2462,15 +2593,40 @@ function applyFloorOverride(ov) {
   if (FLOOR_SHIPPED.roughness === undefined) FLOOR_SHIPPED.roughness = m.roughness;
   if (!ov) {
     m.roughness = FLOOR_SHIPPED.roughness;
+    const t = FELT_THEMES[currentFeltId];
+    if (GLOSS.swingScale !== 1) { GLOSS.swingScale = 1; paintGloss(t.feltBase, t.cloth); }
+    feltMottle(floorGeo, t.feltBase, t.mottle);
+    floorGeo.attributes.color.needsUpdate = true;
     return;
   }
   if (typeof ov.roughness === 'number') m.roughness = ov.roughness;
+  // `glossSwing: 0` is numerically a flat field at `mid` — the perfect
+  // off-state, and it needs no rebind and no recompile, which is exactly what
+  // an A/B between two frames requires.
+  if (typeof ov.glossSwing === 'number') {
+    GLOSS.swingScale = ov.glossSwing;
+    const t = FELT_THEMES[currentFeltId];
+    paintGloss(t.feltBase, t.cloth);
+  }
+  // The mottle is the field the gloss sits beside, so being able to turn it
+  // off is what makes "the gloss is a companion, not the new dominant
+  // structure" a measured statement instead of a hope.
+  if (typeof ov.mottle === 'number') {
+    const t = FELT_THEMES[currentFeltId];
+    feltMottle(floorGeo, t.feltBase, ov.mottle);
+    floorGeo.attributes.color.needsUpdate = true;
+  }
 }
 
 function recompositeFelt() {
   const theme = FELT_THEMES[currentFeltId];
   floorTexture.image = feltTileCanvas(theme.feltBase, theme.cloth);
   floorTexture.needsUpdate = true;
+  // THE THIRD MUTATION. A cloth swapped without this leaves the whole table
+  // repainted and still wearing the previous cloth's gloss — invisible in any
+  // single frame, which is why `felt-gloss` sweeps four themes and back and
+  // asserts the digest returns to where it started.
+  paintGloss(theme.feltBase, theme.cloth);
   feltMottle(floorGeo, theme.feltBase, theme.mottle);
   floorGeo.attributes.color.needsUpdate = true;
 }
@@ -14059,8 +14215,15 @@ window.__diceDebug = {
     const el = renderer.domElement;
     const held = clockHeld;
     this.holdClock(true);
+    // EVERY GRAB STARTS FROM THE SHIPPED STATE. The first cut applied the
+    // override and rendered, which made `{a:{glossSwing:0}, b:{}}` measure
+    // nothing: `{}` is truthy, so side B applied no override and inherited
+    // side A's, and the two frames were identical. Every gloss number read
+    // 0.000 and the feature looked dead. The null control could not catch it —
+    // it is the one case where inheriting the other side is correct.
     const grab = (ov) => {
-      applyFloorOverride(ov);
+      applyFloorOverride(null);
+      if (ov && Object.keys(ov).length) applyFloorOverride(ov);
       this.tick(0, true, false);
       return el.toDataURL('image/png');
     };
@@ -14116,6 +14279,40 @@ window.__diceDebug = {
       });
     }
     return { w, h, bands: out };
+  },
+  // The override, left standing — for LOOKING. `floorLook` restores the
+  // shipped state before it returns, which is right for a measurement and
+  // useless for a screenshot pair. Debug-only, and it says what it applied.
+  floorOverride(ov) {
+    applyFloorOverride(ov && Object.keys(ov).length ? ov : null);
+    return { swingScale: GLOSS.swingScale, roughness: floor.material.roughness };
+  },
+  // THE GLOSS FIELD AS DATA — min, max, mean and a digest, read off the canvas
+  // that is actually bound. A flat field is the roughness analogue of a Sobel
+  // over constant height: it binds, it filters, it renders, and it proves
+  // nothing, so `max - min` is the assertion that has to carry this.
+  //
+  // The digest deliberately does NOT include the cloth id: a digest keyed on
+  // what it is supposed to be detecting cannot detect it, which is how a swap
+  // fence goes vacuous.
+  feltGlossStats() {
+    const g = glossCanvas.getContext('2d', { willReadFrequently: true });
+    const d = g.getImageData(0, 0, FELT_GLOSS_PX, FELT_GLOSS_PX).data;
+    let min = 255, max = 0, sum = 0, h = 2166136261, n = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = d[i + 1];   // .g, the channel r160 actually samples
+      if (v < min) min = v;
+      if (v > max) max = v;
+      sum += v; n++;
+      h = Math.imul(h ^ v, 16777619);
+    }
+    return {
+      px: FELT_GLOSS_PX,
+      min: min / 255, max: max / 255, mean: sum / n / 255,
+      spread: (max - min) / 255,
+      paints: GLOSS.paints,
+      digest: h >>> 0,
+    };
   },
   // WHAT THE FLOOR'S MATERIAL ACTUALLY IS, read off the MATERIAL and never off
   // a module variable — the difference matters, because "the right texture was

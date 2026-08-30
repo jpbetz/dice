@@ -1976,6 +1976,161 @@ export const scenarios = [
     },
   },
   {
+    name: 'felt-gloss',
+    tags: ['mat', 'themes'],
+    timeout: 300000,
+    // THE FELT ANSWERS THE LAMP — and the reason it is gloss and not a nap.
+    //
+    // The mats handoff's last item asked for a NORMAL MAP: "the weave catches
+    // the lamp rather than being painted". It was refused with a measurement
+    // rather than an argument, and this scenario is where that measurement
+    // lives. `floorLook` renders two frames through the real post stack with
+    // one controlled difference and reports mean luma in three bands of bare
+    // felt; on obsidian, tilting THE WHOLE PLANE by 8 degrees — a ceiling no
+    // relief map could reach, since a real one alternates and its neighbours
+    // cancel — moved 0.62 code values at best. The key stands 67 degrees above
+    // a horizontal floor and the mood lamp is within 5 degrees of vertical, so
+    // N·L barely moves. The same change spent on ROUGHNESS moved 9.1.
+    //
+    // So the floor gained a low-frequency gloss field on the same eighteen
+    // lobes the mottle already rides — one geography, two properties: how much
+    // light the cloth returns, and how it returns it.
+    //
+    // WHAT THIS CANNOT SAY: whether it looks good. Every number here is about
+    // whether a player could see it at all, which is the question this project
+    // had no way to ask before.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      await a.settle();
+      await a.dbg(`setFelt('obsidian')`);
+      await a.waitFor(`window.__diceDebug.breathProbe().felt === 'obsidian'`,
+        { desc: 'the darkest cloth, which is also the default' });
+      const look = (o) => a.dbg(`floorLook(${JSON.stringify(o)})`);
+      const band = (r, l) => r.bands.find((b) => b.label === l);
+
+      // ---- G0 THE NULL CONTROL, FIRST -------------------------------------
+      // Every other rendered number below is void if this fails. Two identical
+      // frames must differ by nothing: `floorLook` holds the clock for exactly
+      // this reason, because ~200 mood motes drift through the lamp cone over
+      // these bands and would give a dead build a non-zero delta.
+      const nul = await look({});
+      for (const b of nul.bands) {
+        assert.ok(b.absMeanDelta < 0.15 && b.p95AbsDelta < 0.5,
+          `null control: ${b.label} must read zero, got ${b.absMeanDelta} / p95 ${b.p95AbsDelta}`);
+      }
+      // ---- G1 FRAME SANITY -------------------------------------------------
+      // Without this, G0 passes trivially on two identical BLACK frames, and a
+      // band that has drifted off the felt onto a die or the background is
+      // measuring something else entirely.
+      for (const b of nul.bands) {
+        assert.ok(b.aMean > 4 && b.aMean < 80,
+          `${b.label}: the band is on lit felt (mean luma ${b.aMean})`);
+        assert.ok(b.n > 5000, `${b.label}: and it is a real sample (${b.n} px)`);
+      }
+
+      // ---- G2 IT MOVES PIXELS ----------------------------------------------
+      // The one failure nothing else could detect: the whole feature
+      // contributing something no player can see. Measured 2.8 / 2.0 / 1.3 on
+      // obsidian at swing 0.06; the ceiling matters as much as the floor,
+      // because past about 8 the gloss stops being the mottle's companion and
+      // becomes the mat's dominant structure.
+      const g = await look({ a: { glossSwing: 0 }, b: {} });
+      const gn = band(g, 'near'), gf = band(g, 'far');
+      assert.ok(gn.absMeanDelta >= 1.2 && gn.absMeanDelta <= 8,
+        `the gloss field is visible near the camera (${gn.absMeanDelta} code)`);
+      assert.ok(gn.changedFrac >= 0.3,
+        `and it moves a real share of the band (${gn.changedFrac})`);
+      // ---- G3 …AND IT IS SPECULAR, WHICH THE MOTTLE CANNOT BE --------------
+      // The near/far ramp is the half a second albedo field could not fake: a
+      // specular term falls off with the view angle, an albedo term does not.
+      // Measured 2.1x for the gloss against 1.8x for the mottle — close enough
+      // that only the DIRECTION is asserted, plus the ratio against a flat one.
+      const m = await look({ a: { mottle: 0 }, b: {} });
+      const mn = band(m, 'near'), mf = band(m, 'far');
+      assert.ok(gn.absMeanDelta > gf.absMeanDelta,
+        `the gloss falls off toward the receding felt (${gn.absMeanDelta} -> ${gf.absMeanDelta})`);
+      assert.ok(mn.absMeanDelta > 0.3,
+        `the mottle is still doing its own work (${mn.absMeanDelta} code)`);
+      assert.ok(gn.absMeanDelta > mn.absMeanDelta,
+        `and on the DARKEST cloth the gloss carries more than the mottle can `
+        + `(${gn.absMeanDelta} vs ${mn.absMeanDelta}) — albedo structure is capped `
+        + `by the albedo, specular structure is not`);
+      // The same claim's other half, on the brightest cloth: there the mottle
+      // has plenty to modulate and dominates. If this ever inverts, the gloss
+      // has become the mat's main structure everywhere.
+      await a.dbg(`setFelt('sand')`);
+      await a.waitFor(`window.__diceDebug.breathProbe().felt === 'sand'`, { desc: 'the light cloth' });
+      const sg = band(await look({ a: { glossSwing: 0 }, b: {} }), 'near');
+      const sm = band(await look({ a: { mottle: 0 }, b: {} }), 'near');
+      assert.ok(sm.absMeanDelta > sg.absMeanDelta * 2,
+        `on a pale cloth the mottle still owns the surface `
+        + `(${sm.absMeanDelta} vs ${sg.absMeanDelta})`);
+
+      // ---- G4 NOT A FLAT FIELD ---------------------------------------------
+      // The roughness analogue of a Sobel over constant height: it binds, it
+      // filters, it renders, and it proves nothing.
+      await a.dbg(`setFelt('obsidian')`);
+      await a.waitFor(`window.__diceDebug.breathProbe().felt === 'obsidian'`, { desc: 'back to obsidian' });
+      const st = await a.dbg('feltGlossStats()');
+      assert.ok(st.spread >= 0.04,
+        `the field has real structure (spread ${st.spread})`);
+      assert.ok(st.mean > 0.90 && st.mean < 0.98,
+        `and sits where the shipped scalar did (mean ${st.mean}) — a mean near 0 `
+        + `would be a 160-unit mirror, which is what an unpainted canvas gives`);
+      assert.ok(st.min >= 0.80, `nothing on this floor is polished stone (min ${st.min})`);
+
+      // ---- G5 BOUND, AND BOUND CORRECTLY -----------------------------------
+      // Read off the MATERIAL, never off the module variable that built it.
+      const p = await a.dbg('floorMaterialProbe()');
+      assert.equal(p.hasRoughnessMap, true, 'the field is bound');
+      assert.equal(p.roughness, 1,
+        'and the scalar is pinned at 1 so the map carries the value');
+      assert.deepEqual(p.roughnessMap.repeat, [1, 1],
+        `the field covers the plane ONCE (${JSON.stringify(p.roughnessMap.repeat)}) — `
+        + `inheriting the colour tile's 32x32 would turn a 20-53 unit field into `
+        + `exactly the grid the tile law forbids`);
+      assert.equal(p.roughnessMap.colorSpace, '',
+        'and carries no colour space: an sRGB tag would read 0.94 as ~0.87');
+      assert.deepEqual(p.roughnessMap.size, [128, 128], 'at the size it was authored');
+      assert.notEqual(p.roughnessMap.uuid, p.map.uuid, 'and it is not the colour tile');
+      // THE NAP, REFUSED IN CODE. A future pass that reaches for a normal map
+      // without a measurement trips this, and the comment above tells it why.
+      assert.equal(p.hasNormalMap, false,
+        'no normal map on this floor: measured at 0.62 code for an 8-degree '
+        + 'tilt of the WHOLE plane, against 9.1 for the roughness lever');
+      assert.equal(p.hasBumpMap, false, 'and no bump map, which would crawl at 32x minification');
+
+      // ---- G6 THE SWAP REMEMBERS IT ----------------------------------------
+      // recompositeFelt mutates three things now. Forget the third and the
+      // whole table repaints to a new cloth still wearing the previous one's
+      // gloss — invisible in any single frame.
+      const seen = [];
+      const uuid0 = (await a.dbg('floorMaterialProbe()')).roughnessMap.uuid;
+      for (const felt of ['sand', 'silt', 'taproom', 'obsidian']) {
+        await a.dbg(`setFelt('${felt}')`);
+        await a.waitFor(`window.__diceDebug.breathProbe().felt === '${felt}'`, { desc: `${felt} lands` });
+        const s = await a.dbg('feltGlossStats()');
+        seen.push([felt, s.digest, s.spread]);
+        assert.equal((await a.dbg('floorMaterialProbe()')).roughnessMap.uuid, uuid0,
+          `${felt}: the texture object outlives the swap — no dispose-and-new churn`);
+      }
+      const digests = seen.map((x) => x[1]);
+      assert.equal(new Set(digests).size, digests.length,
+        `every cloth paints its own field (${JSON.stringify(seen)})`);
+      // THE RETURN LEG IS THE FENCE. `st` was read on the first wearing of
+      // obsidian, before the sweep; coming back to it must be byte-identical,
+      // which is what says the field is seeded off the theme and not off the
+      // clock — and, with the digests above, that the swap actually repaints.
+      assert.equal(digests[3], st.digest,
+        'and obsidian returns to exactly the field it wore before the sweep');
+      // Two cloths that differ only in their gloss ROW must differ in spread:
+      // silt is the flattest of the three, taproom the most varied.
+      const spreadOf = (id) => seen.find((x) => x[0] === id)[2];
+      assert.ok(spreadOf('taproom') > spreadOf('silt'),
+        `wax pools and a raked bed does not (${spreadOf('taproom')} vs ${spreadOf('silt')})`);
+    },
+  },
+  {
     name: 'no-die-sits-in-fog',
     tags: ['mat', 'chrome'],
     // THE MAT WAS INSIDE ITS OWN FOG. fogNear was dialled by eye at 15 against
