@@ -12606,6 +12606,12 @@ export const scenarios = [
       assert.equal((await a.dbg('seatPicker')).open, false, 'the seat picker agrees');
       assert.equal((await a.dbg('seatPicker')).declined, true,
         'it rests at the door — the shipped fourth presence state, not a new one');
+      // '…' is the JOIN's placeholder and means "a name is coming". At the
+      // front door none is. Found by LOOKING: every debug field above was
+      // already correct while the chip sat there promising a name that was
+      // never going to arrive.
+      assert.equal(await a.eval(`document.getElementById('identity-name').textContent`), 'You',
+        'the chip says the honest word, not the join placeholder');
       assert.deepEqual(await a.eval('window.__apiCalls'), [],
         'minting is not joining: no /api/join, no /api/table peek, no stream');
 

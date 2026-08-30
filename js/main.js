@@ -141,6 +141,18 @@ const { room: ROOM, arrivedByLink: ARRIVED_BY_LINK } = (() => {
 })();
 const IN_LOBBY = ROOM === null;
 
+// AT THE DOOR — dismissed the picker, or (since 2026-08-30) landed at a table
+// this boot minted with no stored name: looking rather than sitting (C12).
+// Read by renderPresenceExits, which offers the way back in, and by
+// updateIdentityChip, which is what dragged it up here from beside the other
+// seat state: setSound() → syncSettingsUI() → updateIdentityChip runs during
+// MODULE EVALUATION, so a declaration left down at line ~29479 is in TDZ when
+// the chip reads it and the whole module dies at eval. Measured, not guessed:
+// the page still rendered a canvas and a 329-key __diceDebug, and the tell was
+// a LATER `let` throwing "cannot access before initialization" from a debug
+// getter. Same trap the ROOM/IN_LOBBY pair above carries its own note about.
+let seatDeclined = false;
+
 // THE STABILITY CHANNEL (js/stability.js — read its header for the law).
 // Towers and venues are in closed beta; this decides whether this browser is
 // OFFERED them. It never decides whether they WORK: a stable client in a beta
@@ -28493,9 +28505,14 @@ function updateIdentityChip() {
   // '' falls back to the stylesheet's solo dot color
   document.getElementById('identity-dot').style.background = info.color || '';
   // '…' is the JOIN's placeholder — it means "a name is coming, the prompt is
-  // resolving". The lobby never joins and never prompts, so there is nothing
-  // coming: it says the honest word instead, until you choose one.
-  document.getElementById('identity-name').textContent = info.name || (IN_LOBBY ? 'You' : '…');
+  // resolving". It is only honest while one actually is. The lobby never joins
+  // and never prompts; neither does a page resting AT THE DOOR, which since
+  // 2026-08-30 is where an unnamed visitor to the front door lands (§7.20a) —
+  // found by looking at it, because the state is correct in every debug field
+  // and the chip still sat there promising a name that was never coming. Both
+  // say the honest word instead, until you choose one.
+  document.getElementById('identity-name').textContent = info.name
+    || (IN_LOBBY || seatDeclined ? 'You' : '…');
   // ONE grammar for whose-rack (Joe 2026-08-04): teammate consolidation
   // grew the rail into a "whose pools" segmented control — pill click
   // browses, press-again falls home. The identity chip joins that
@@ -29469,10 +29486,6 @@ let seatProfilePicked = null; // §11: the profile picked at THIS prompt, or nul
 // peek lands after the first render: without the latch the default would be
 // re-applied over a row the player had already tapped in the meantime.
 let seatDefaulted = false;
-// The player dismissed the door and is LOOKING rather than sitting (C12). Read
-// by renderPresenceExits, which is what offers the way back in.
-let seatDeclined = false;
-
 // Which rulebook this table reads, BEFORE the join. The room's settings do not
 // reach this client until the join answers, so `currentSystemId` is still this
 // browser's own until then — the peek is the only source, and it is why the

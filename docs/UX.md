@@ -3176,6 +3176,20 @@ or already holding company at the join; otherwise at the first roll
 `rememberThisTable()`. A room you minted three seconds ago and did nothing at
 is not "a table you have been to".
 
+**THE ONE HOLE, RECORDED RATHER THAN ENGINEERED AROUND.** A first-time
+visitor — never named on this origin — rests at the door and is not
+connected. If they copy the address bar *blind*, without pressing invite, a
+guest who opens it creates the room and sits in it alone while the host is
+still offline. It is narrow (a browser that has never named itself, sharing
+before naming) and it self-heals: the host's next invite press or seat
+answer joins the same key, and the guest meanwhile sees state A — the empty
+table, which is a designed surface and not an error. The alternatives are
+worse and were weighed: connecting every visitor at boot puts CUJ1's modal
+back and mints a server room per drive-by (`MAX_ROOMS` is 500), and opening
+the table on the first ROLL would prompt for a name in the middle of a
+throw. The invite gesture is the honest trigger because it is the only
+moment the app can know you want company.
+
 **What is pinned.** `front-door-is-a-table` (the mint, the bar, the invite
 url, and CUJ1's absence of a modal *and* of a single API call beside it) and
 `the-link-in-the-bar-is-the-invite` (a host's address bar, pasted verbatim,
