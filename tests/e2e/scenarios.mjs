@@ -12712,6 +12712,13 @@ export const scenarios = [
       });
       await host.waitOnline();
 
+      // §7.20 STATE A IS NOW THE DEFAULT ARRIVAL, which is worth an assertion
+      // of its own: "the empty table — CUJ2's waiting room, and the most
+      // important moment in the whole flow" used to be somewhere you got to
+      // by making a table, and is where every returning player now lands.
+      assert.deepEqual((await host.dbg('presenceRow')).ghosts.map((g) => g.label),
+        ['Invite'], 'the waiting room offers its chair at the front door');
+
       // What a person copies: the address bar, verbatim. Not a button, not a
       // menu — the thing every human already knows how to copy.
       const search = await host.eval('location.search');
