@@ -2066,14 +2066,32 @@ const DEFAULT_CLOTH = 'felt';
 // nothing to modulate and measures 1.4 there against 9.8 on sand. A specular
 // term does not scale with albedo, so gloss is the ONE lever that can give a
 // near-black cloth visible surface variation. Six of the eleven mats are dark.
+// JOE'S CALL, TAKEN ON HIS BEHALF: he was on mobile and asked for the BOLD
+// option, so these are dialled past what the arithmetic would have chosen. The
+// ladder that got here, measured on obsidian in sRGB code values near the
+// camera: swing 0.03 read 1.4 and two frames were hard to tell apart; 0.06
+// read 2.8, twice the mottle and still quiet; 0.11 reads about 5.5 and the
+// polished patches are plainly there when you look at the table.
+//
+// `mid` comes DOWN with the swing, which is the half that is not just volume:
+// it keeps the bright lobes off the 1.0 ceiling (a clipped lobe is a flat
+// lobe), and it leaves every mat a little glossier overall than the 0.95
+// scalar it replaced. That second part is a real change to nine surfaces Joe
+// dialled by eye, and it is the first thing to walk back if the table reads
+// wet rather than worn: raise `mid` toward 0.94 and leave `swing` alone.
+//
+// The ceiling that matters is about 8 code — past that the gloss stops being
+// the mottle's companion and becomes the mat's dominant structure.
+// `felt-gloss` fences both ends.
 const FELT_GLOSS = {
-  felt: { mid: 0.94, swing: 0.060 },
-  // A raked bed is smoothed flat before play and its grains are matte; it gets
-  // the smallest swing of the three.
-  silt: { mid: 0.94, swing: 0.035 },
+  felt: { mid: 0.91, swing: 0.110 },
+  // A raked bed is smoothed flat before play and its grains are matte; it
+  // keeps the smallest swing of the three even at this strength.
+  silt: { mid: 0.93, swing: 0.070 },
   // Wax pools on a board and never in a groove, so a plank table is the one
-  // surface here that genuinely has glossy and dull regions.
-  oak: { mid: 0.93, swing: 0.090 },
+  // surface here that genuinely has glossy and dull regions — and the one that
+  // can carry the lowest `mid` without reading wet.
+  oak: { mid: 0.89, swing: 0.110 },
 };
 // 1.25 world units a texel, against lobes 40-106 units across — the field is
 // low-frequency by nature, so this is oversampling it about thirtyfold.
