@@ -2097,6 +2097,31 @@ function feltTileCanvas(base, cloth = DEFAULT_CLOTH) {
   return c;
 }
 
+// WHICH FLANK THE LAMP IS ON — the rule both painters below get their relief
+// from, and two shipped features had it backwards until 2026-08-29.
+//
+// THE CHAIN, and it has three inversions in it, which is why nobody had it
+// right by accident: the plane is authored in XY and rotated -90 degrees about
+// X, so geometry-local +y is world -z; uv.v runs with local +y; and a
+// CanvasTexture flips Y on upload. Follow all three and CANVAS +y IS WORLD +z.
+// Measured rather than reasoned: a red band stamped at canvas row 0 and a green
+// one at row 512 render in the order green, red, green, red DOWN the frame,
+// 2.5 world units apart, and down-frame is +z.
+//
+// The key sits at (8, 30, 10) aimed at the origin, so the vector toward it has
+// a +z component. Therefore:
+//
+//   · a CONVEX feature (a ridge, a grain, a raised crest) is LIT on its
+//     LARGER-canvas-y flank and shadowed on its smaller-y one;
+//   · a CONCAVE one (a groove, a channel, a seam) is the other way round —
+//     LIT on the SMALLER-canvas-y flank.
+//
+// The silt fragments' catchlight has always been right (a shard is convex, and
+// it lights at py + r*0.28). The silt rake and the oak groove were both
+// backwards: each was reasoned from "the key is on the +z side" without
+// carrying the convex/concave distinction through, so each lit the flank that
+// faces away from the lamp.
+
 // WRAPPED DRAWING, shared by every cloth. A mark within reach of an edge is
 // redrawn across the seam so the tile's border carries the same density as its
 // middle. `reach` is the mark's own extent — anything larger wraps needlessly
@@ -2251,8 +2276,13 @@ function paintSiltCloth(ctx, rnd) {
     const yAt = (x) => y0 + Math.sin((x / FELT_TILE_PX) * Math.PI * 2 * periods + phase) * amp;
     // A ridge is TWO strokes, not one: a lit crest and the shadow just behind
     // it. One stroke alone is a drawn line; the pair is a shape under a lamp.
+    // -2.8, not +2.8 (corrected 2026-08-29): a rake ridge is CONVEX, so the
+    // lamp is on its larger-y flank and the shadow falls on the smaller-y one.
+    // The sign is the only thing that moved — the rnd() calls stay in the same
+    // order inside the alpha templates, so every other byte of the tile is
+    // unchanged and the seeded-cloth claim still holds.
     for (const [dy, col, w] of [[0, `rgba(255,250,238,${0.07 + rnd() * 0.04})`, 2.4],
-                                [2.8, `rgba(44,34,21,${0.08 + rnd() * 0.05})`, 2.8]]) {
+                                [-2.8, `rgba(44,34,21,${0.08 + rnd() * 0.05})`, 2.8]]) {
       ctx.strokeStyle = col;
       ctx.lineWidth = w;
       ctx.beginPath();
@@ -2393,11 +2423,13 @@ function paintOakCloth(ctx, rnd) {
     }
   }
 
-  // 4. THE GROOVE BETWEEN BOARDS. A dark line with a lit lip BELOW it: the key
-  // sits at (8, 30, 10), canvas +y is world +z, so the near edge of a chamfer
-  // is the one that catches the lamp — the same reasoning the silt fragments'
-  // catchlight uses, and the pair is what makes a seam read as two boards
-  // meeting rather than as a drawn line.
+  // 4. THE GROOVE BETWEEN BOARDS: a dark line, a lit lip ABOVE it and a soft
+  // shadow below. A groove is CONCAVE, so by the rule at the top of this
+  // section its lit flank is the SMALLER-canvas-y one — the chamfer on the far
+  // board's edge, which tips back toward the lamp. This shipped inverted
+  // (2026-08-29) with a comment that cited the right light and the wrong rule:
+  // it applied the convex case to a concave feature, so every seam on the
+  // taproom table was lit from underneath.
   //
   // Drawn at 0 AND at the tile height, because the seam at y=0 is the wrap
   // seam and half of it lives at the other edge.
@@ -2406,9 +2438,9 @@ function paintOakCloth(ctx, rnd) {
       ctx.fillStyle = 'rgba(16,8,2,0.55)';
       ctx.fillRect(0, yy - 1.3, FELT_TILE_PX, 2.6);
       ctx.fillStyle = 'rgba(255,240,214,0.14)';
-      ctx.fillRect(0, yy + 1.5, FELT_TILE_PX, 1.8);
+      ctx.fillRect(0, yy - 3.3, FELT_TILE_PX, 1.8);
       ctx.fillStyle = 'rgba(22,12,4,0.16)';
-      ctx.fillRect(0, yy - 5, FELT_TILE_PX, 3.7);
+      ctx.fillRect(0, yy + 1.3, FELT_TILE_PX, 3.7);
     }
   }
 }

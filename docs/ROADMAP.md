@@ -38,9 +38,10 @@ here, because the ordering of it is Joe's to make. **Two of those three have
 landed since**: Silt's VOICE (2026-08-29 — a cloth is a surface tier now,
 [AUDIO.md](AUDIO.md) §2.6) and **Taproom Oak**, the hard surface for the
 one-of-each register (2026-08-29 — eleven mats, and the first row that made
-the tier go UP). **The Nap is what is left** — a normal map from the same
-stroke field, the biggest remaining step toward cloth — with The Ledger
-optional beside it. The brainstorm those came from is not in the repo; it is
+the tier go UP). **The Nap was refused with a measurement** on the same day (UX §5.4b): a
+normal map cannot be seen on a horizontal floor under a 67-degree key, and the
+floor carries a gloss field instead. **What is left of the mats arc is The
+Ledger, and it was always optional.** The brainstorm those came from is not in the repo; it is
 the artifact linked from the session.
 
 **Neither new mat has been HEARD or judged.** Both rows were reasoned from

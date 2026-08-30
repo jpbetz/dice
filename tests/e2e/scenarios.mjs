@@ -4313,14 +4313,26 @@ export const scenarios = [
     // `applyFeltTheme` as recompositeFelt's ONE caller). Corrected 2026-08-29:
     // the sweep below is still worth walking, but three of its four legs now
     // pass because nothing repaints at all, not because a repaint reused the
-    // texture. AND IT ONLY WATCHES `material.map`: `floorTextureId()` returns
-    // that one uuid, so a SECOND texture on the floor (a normal map, say)
-    // could churn on every swap and this fence would stay green.
+    // texture.
+    //
+    // AND IT WATCHES BOTH TEXTURES NOW. The floor gained a gloss field the same
+    // day (a roughnessMap, docs/UX.md), and `floorTextureId()` returns the
+    // COLOUR map's uuid alone — so the warning that used to end this comment,
+    // that a second texture could churn on every swap unseen, was true for
+    // about four hours. Both uuids are pinned below.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const uuid0 = await a.dbg('floorTextureId()');
       assert.ok(typeof uuid0 === 'string' && uuid0.length > 0,
         'boot paints the persistent texture and it has a uuid');
+      const gloss0 = (await a.dbg('floorMaterialProbe()')).roughnessMap.uuid;
+      assert.ok(typeof gloss0 === 'string' && gloss0.length > 0,
+        'and the gloss field beside it');
+      const both = async (why) => {
+        assert.equal(await a.dbg('floorTextureId()'), uuid0, why);
+        assert.equal((await a.dbg('floorMaterialProbe()')).roughnessMap.uuid, gloss0,
+          `${why} — and so does the gloss field`);
+      };
       // A roll + collect triggers the whisk-landing recomposite (glow rings
       // paint in place); the uuid must not change.
       await a.roll('d20');
@@ -4334,8 +4346,7 @@ export const scenarios = [
         'the persistent texture survives whisk-landing recomposite');
       // applyFeltTheme repaints on the new base — same texture.
       assert.equal(await a.dbg(`setFelt('emerald')`), true, 'theme swap accepted');
-      assert.equal(await a.dbg('floorTextureId()'), uuid0,
-        'the persistent texture survives an applyFeltTheme repaint');
+      await both('the persistent texture survives an applyFeltTheme repaint');
       // applyZoom re-places the shelf and recomposites — same texture.
       await a.dbg(`setZoom('close')`);
       await a.waitFor(`window.__diceDebug.zoom === 'close'`, { desc: 'zoom took' });

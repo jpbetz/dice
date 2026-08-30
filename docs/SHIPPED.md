@@ -112,6 +112,66 @@ stopped consulting the surface would have passed.
 for judging it is AUDIO §9 D, and each of the three claims it makes says which
 dial to turn if the ear says otherwise.
 
+### The felt answers the lamp — the gloss field, and the nap refused (2026-08-29)
+
+The mats arc's last open item asked for a NAP: a normal map so "the weave
+catches the lamp rather than being painted". It is the first item in this
+project killed by a number rather than by taste, and the number came from an
+instrument built to get it.
+
+**`floorLook({a, b})`** renders two frames through the real post stack with one
+controlled difference and reports mean luma in three bands of bare felt. It
+holds the clock for the whole call, because ~200 mood motes drift through the
+lamp cone over those bands and a build where nothing changed would otherwise
+report a delta. Its null control reads 0.000.
+
+**What it said**, obsidian, sRGB code values: tilting *the whole plane* by 8°
+moves **0.62** at best — a ceiling no relief map can reach, since a real one
+alternates and its neighbours cancel. Roughness 1.00 → 0.88 moves **9.1**. The
+key stands 67° above a horizontal floor and the mood lamp within 5° of
+vertical, so N·L barely moves; the same rig that makes `heightToNormal` earn
+its keep on a tower's vertical flank is what makes it worthless here.
+
+**So the floor carries a gloss field**: a 128px `roughnessMap` at `repeat(1,1)`
+painted from the same eighteen lobes the mottle already rides. One geography,
+two properties — how much light the cloth returns, and how it returns it. It is
+legal where a nap was not because r160 gives that slot its own uv transform, so
+at repeat(1,1) the tile-seamlessness law does not bind it and it can carry
+exactly the low-frequency structure the tile forbids.
+
+**The surprise.** Albedo structure is capped by the albedo: on `#1c1c24`
+obsidian the mottle's ±14% measures 1.3 code against 9.7 on sand. A specular
+term does not scale with albedo — so gloss is the ONE lever that gives a
+near-black cloth visible surface variation, and six of the eleven mats are
+dark. Shipped at about twice the mottle, with a 2.1× near/far ramp the mottle's
+1.8× cannot fake.
+
+**And the lamp was on the wrong side of two shipped features.** Canvas +y is
+world +z on this floor — three inversions deep (the plane's −90° X rotation,
+uv.v, and CanvasTexture's flipY), so it was measured rather than reasoned: a
+red band stamped at canvas row 0 and a green one at row 512 render green, red,
+green, red *down* the frame. With the key at (8,30,10) a convex feature is lit
+on its larger-canvas-y flank and a concave one on its smaller. The silt
+fragments' catchlight was right; **the silt rake and the oak groove were both
+backwards** — each reasoned from "the key is on the +z side" without carrying
+the convex/concave distinction through, so every plank seam on the taproom
+table was lit from underneath.
+
+**The instrument's own hole, found while using it.** `floorLook` applied the
+override and rendered, so `{a:{glossSwing:0}, b:{}}` never restored between
+grabs — `{}` is truthy — and both frames were identical. Every gloss number
+read 0.000 and the feature looked dead. No null control could have caught it:
+inheriting the other side is exactly what a null control wants. Every grab
+starts from the shipped state now.
+
+Checks: `felt-gloss` (null control first, frame sanity, it moves pixels with a
+ceiling as well as a floor, it falls off toward the receding felt, it beats the
+mottle on the darkest cloth and loses on the palest, not flat, bound at
+repeat(1,1) with no colour space, **no normal map**, and a four-cloth swap that
+returns byte-identical); a fifth mirror in `tests/felt-ids.test.mjs`;
+`floor-texture-persistent` extended to pin both textures. Each confirmed RED
+first. Shots and numbers: `tools/steps/felt-light-look.mjs`.
+
 ### Taproom Oak — the register's other end (2026-08-29)
 
 Joe's "one of each, deliberately", taken before the prettier candidates

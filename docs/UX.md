@@ -1086,6 +1086,83 @@ dissolve is the point of the fog and stays; it starts past the last place a
 die can land. It rides `updateShadowFrustum`, the one hook every writer of
 the mat's extents already calls.
 
+### 5.4b The felt answers the lamp — and why there is no nap (2026-08-29)
+
+**The mats handoff's last item asked for a normal map**: "the weave catches the
+lamp rather than being painted". It is refused, and this section is the
+measurement that refuses it, so that nobody has to argue it again from taste.
+
+**The instrument.** `__diceDebug.floorLook({a, b})` renders two frames through
+the real post stack with exactly one controlled difference between them, and
+reports mean luma in three bands of bare felt at increasing distance. It holds
+the clock for the whole call, because ~200 mood motes drift through the lamp
+cone over those bands and without the freeze a build where nothing changed
+still reports a delta. `floorLook({})` is the null control and it reads
+**0.000**.
+
+**The numbers**, obsidian (the default and the darkest of eleven), zoom
+`medium`, empty mat, sRGB code values near/mid/far:
+
+| change | measured |
+|---|---|
+| tilt **the whole plane** by 8° | 0.05 / 0.01 / 0.12 (0.62 peak on the z axis) |
+| …by 20° | 2.7 / 2.2 / 1.7 |
+| …by 45° | 10.4 / 9.7 / 8.4 |
+| `roughness` 1.00 → 0.88 | **9.1 / 8.8 / 7.6** |
+| the shipped vertex mottle | 1.3 / 1.0 / 0.7 |
+| the shipped gloss field | 2.8 / 2.0 / 1.3 |
+
+**The first row is a ceiling, not a sample.** A constant tilt moves every texel
+at once; a real relief map alternates, so adjacent texels cancel and the
+visible contrast is *less* than this. The strongest feature any proposed nap
+would have carried was about 13° of facet — call it a third of the 20° row,
+spread over millimetres.
+
+**The geometry is why.** Relief contrast scales with the tangent of the angle
+between the surface normal and the light. This floor is horizontal, the key
+sits at (8, 30, 10) — **67° above the horizon** — and the mood spotlight, which
+is the brightest thing on the felt at intensity 2.8, stands within about 5° of
+vertical over the mat centre. Both lights strike the floor nearly head-on, so
+N·L barely moves for a shallow perturbation. The same rig is *ideal* for a
+tower's vertical flank, which is why `heightToNormal` earns its keep there and
+cannot here.
+
+**So the lever is the light response, not the surface.** The floor carries a
+**gloss field**: a 128px `roughnessMap` at `repeat(1, 1)` painted from the same
+eighteen lobes `feltMottle` already rides. One geography, two properties — how
+much light the cloth returns, and how it returns it.
+
+Three things make it legal where a nap was not:
+
+- **It is not a tile.** r160 gives `roughnessMap` its own uv transform, so at
+  `repeat(1,1)` it covers the 160-unit plane exactly once and the
+  tile-seamlessness law does not bind it. It may therefore carry precisely the
+  low-frequency structure the tile forbids.
+- **It costs a 128px canvas**, against the 1024² a nap needed, and it is
+  painted once per theme swap rather than eleven times at boot.
+- **Only `.g` is sampled**, so the tangent-space handedness question that
+  haunts normal maps — and on which this repo's two `heightToNormal` forks
+  still disagree — is structurally absent rather than merely tested.
+
+**The surprise, and the reason this is worth having at all.** Albedo structure
+is capped by the albedo. Obsidian is `#1c1c24`, so the mottle's ±14% has almost
+nothing to modulate: it measures 1.3 there against 9.7 on sand. A specular term
+does not scale with albedo. **Gloss is the one lever that can give a near-black
+cloth visible surface variation, and six of the eleven mats are dark.** The
+near/far ramp is its signature — 2.1× against the mottle's 1.8×, because a
+specular term falls off with the view angle and an albedo term does not.
+
+**Dials.** `FELT_GLOSS.<cloth>.mid` is the mean roughness (0.94, one notch off
+the 0.95 scalar it replaced, so no cloth's mean gloss moves) and `.swing` is
+how loud the field is (felt 0.06, silt 0.035, oak 0.09). Shipped at roughly
+twice the mottle. `floorOverride({glossSwing: n})` scales it live for looking;
+`0` is a perfect off-state and needs no recompile.
+
+**If a future pass wants a nap anyway**, the bar is this section: bring a
+`floorLook` measurement showing the relief moving more than the gloss field it
+would sit beside. `felt-gloss` asserts `hasNormalMap === false` so that the
+question has to be re-asked out loud rather than assumed.
+
 ### 5.5 Motion principles
 
 - Anticipation (small counter-move before commit), overshoot-and-settle on
