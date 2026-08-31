@@ -11,6 +11,75 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## The roll is framed before it moves (2026-08-31)
+
+**The second item in this file found by somebody playing the game**, and the
+second one 240-odd green scenarios could not see. Joe, from a phone: *"It looks
+super zoomed out and the dice almost disappear into the fog in the initial
+throw."* Two symptoms, one root, plus a third defect found while measuring them.
+Full spec: **UX §7.62**; §5.4a is amended in the same commit.
+
+**Why nothing caught it.** Every framing measurement in the repo grades the
+SETTLED frame, because that is the frame the ladder was written to choose. Ruling
+① forbids the camera to move during the tumble, so the reframe sat at the END of
+playback — which means **the frame a player watches the roll IN was the one frame
+nothing asserted on**. On a desktop the two are identical and it went unnoticed
+for months. On a phone they were nothing alike. Same shape as the two-link
+problem above: not a wrong assertion, an unmeasured moment.
+
+**What was actually happening.** The mat has never fit a phone. `fitCameraTo`
+walks out to its `3.671×` ceiling, fails, and returns *having left the eye at the
+ceiling* — so the resting frame, and the whole flight of every throw, was the fit
+scan's give-up position. Nobody chose it. `restFrameProbe()` prices what that
+bought: at `1.0×` the mat's worst corner is at ndc 5.22 horizontally and **0.80
+vertically**; at `3.671×` it is 1.28 and 0.24. The entire retreat is spent on an
+axis that never reaches 1 anyway, while three quarters of the screen's height
+goes unused — and it costs 72% of the die size (223 px → 62 px) to fail.
+
+The fog rode the same defect from the other side. `matFogFloor` measured the
+mat's far corner from the eye **the zoom asks for**, and the framing then
+retreated from that eye without telling the fog: dice at eye-depth 34–35 against
+`fogNear` 16.5, i.e. **59% dissolved into the background while still in the
+air**, with `no-die-sits-in-fog` green throughout.
+
+**Three changes.** (1) `playRoll` bakes every final pose before frame one and
+freezes the bodies at `finalPos`, so the roll's own frame is knowable at frame
+zero — it is claimed there now, as a CUT, which *strengthens* ruling ① (the
+camera moves before anything is moving, then holds perfectly still through the
+whole tumble). It must sit after `currentRoll` is assigned or every roll falls
+into the ungated rung-2 branch. (2) `fitCameraTo` gains `refundOnFail`, which the
+mat rung alone passes: an unsatisfiable fit costs nothing, and the mat is
+re-fitted **cropped square** instead — a fit that can succeed, and therefore a
+retreat worth paying for. (3) The fog floor rides the camera's pose, and `fogFar`
+moves with `fogNear` keeping the tune's span.
+
+**What it bought,** `tools/steps/phone-boot-frame.mjs`, 3d6 seed 7002, mid-flight:
+
+| viewport | before | after |
+|---|---|---|
+| phone 390 | 62 px, 59% fogged | **94 px, no fog** |
+| ipad-p 834 | 119 px, 19% fogged | **279 px, no fog** |
+| desktop 1600 | 200 px, clear | 266 px, clear |
+
+The flight frame now equals the settled frame on every viewport, so the zoom-pop
+at settle disappeared as a side effect rather than as a second fix.
+
+**Both endpoints of the resting frame were looked at, not argued.** The ceiling
+is the 62 px frame; no retreat at all is 223 px of uniform brown cloth, corner to
+corner, because the mat has no visible edge to lose (the floor is a 160-unit
+plane wearing the same felt) and what makes the shot read as a table is the lamp
+pool falling off into the fog. `tools/steps/phone-look.mjs` is the picture that
+settled it.
+
+**Proof:** `the-flight-is-framed-like-the-landing` (mat, chrome, roll) — grades
+the flight with the clock held, on the one viewport where the mat cannot fit.
+Each of the three fixes was reverted in turn and it fails on each.
+`held-breath-declare-beat`'s fog pair was rewritten in the same commit: it
+compared an empty-table reading against a mid-roll one, which stopped being fair
+the moment a roll frames itself.
+
+---
+
 ## One link — the front door became a table (2026-08-30)
 
 **The only item in this file found by somebody playing the game.** Joe ran

@@ -53,10 +53,27 @@ were sequenced in.
    somebody is waiting for. **Both rows were found by writing the table down,
    never by playing**, and now there is play to check them against.
 
+**And a fourth, found the next day from the same source (2026-08-31, SHIPPED,
+UX §7.62).** Joe, from a phone: *"it looks super zoomed out and the dice almost
+disappear into the fog in the initial throw."* **The pattern from item 1 repeated
+exactly, on a different surface.** Every framing measurement in the repo grades
+the SETTLED frame; ruling ① kept the camera still during the tumble, so the
+reframe sat at the END of playback — and the frame a player watches the roll IN
+was the one frame nothing asserted on. Identical on a desktop, nothing alike on a
+phone, where the camera sat at the fit scan's give-up position for the whole
+flight and the dice were 59% dissolved into the fog in mid-air. Not a wrong
+assertion; an unmeasured moment.
+
+**Both findings say the same thing about this repo's tests: they grade the states
+the code was written to produce, and the gaps are at the seams — the arrival
+nobody's tab performs, the moment no probe reads.** Worth a deliberate pass for
+more of them rather than waiting for Joe to hit the next one from a phone.
+
 **What has NOT been harvested:** Joe was in those rooms. What players fumbled,
 what he had to explain twice, and what the table tracked on paper or in a chat
 window instead of here — that is the richest unread source in the project, and
-it costs nothing but asking.
+it costs nothing but asking. **Mobile is now a named part of that ask**: the
+report above came from one sentence about a phone, and it cost three defects.
 
 ---
 

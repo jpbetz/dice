@@ -1086,6 +1086,17 @@ dissolve is the point of the fog and stays; it starts past the last place a
 die can land. It rides `updateShadowFrustum`, the one hook every writer of
 the mat's extents already calls.
 
+**AMENDED 2026-08-31 — this was half the invariant, and the half that is never
+wrong.** The floor above is measured from the eye **the zoom asks for**, and
+`applyCameraFraming` then retreats from that eye without telling the fog. On a
+390px phone, where the mat has never fit, the camera sat at `3.671×` the preset
+distance and the dice were at eye-depth 34–35 against a `fogNear` of 16.5 —
+**59% dissolved into the background while still in the air**, with this section's
+own scenario green throughout, because it asserts about the mat and the preset,
+which is exactly the pair that was never wrong. The floor now rides the camera's
+actual pose and `fogFar` moves with `fogNear` keeping the tune's span. See
+**§7.62**; the assertion that catches it is about dice, not about the mat.
+
 ### 5.4b The felt answers the lamp — and why there is no nap (2026-08-29)
 
 **The mats handoff's last item asked for a normal map**: "the weave catches the
@@ -1302,6 +1313,7 @@ a stale row is worse than no table.
 | Identity chip · roster · nameplate | **§7.43** — a MINTED `?room=` key is not a chosen name (`isMintedKey`, so an unnamed table wears no plate and no tab title), the roster's 76px pill floor and its two differently-worded folds, and the invite link's four doors · §7.17 — the rail pill is the one per-player surface, left-click toggles the rack, right-click / long-press opens the menu, and the quiet nameplate · §7.9's ORDER IS THE CONTRACT · §7.22 for the collapsed dress | §7.9's "Identity is on the table" paragraph, where left-click opened the menu |
 | Settings | No single section. **§7.43** for the Table destination's `Copy invite link` row and the pool-broadcast disclosure over *At this table* · §7.9 for the *Just you* scope (chips off by default, the dice-set select) · §7.13 for *Your data* · §7.17 for the table name; the room-wide keys are `SETTING_SPECS` in `server.js` | §2.1 / §2.3's experience record and its editor — never built, and `/api/table` refuses the key |
 | **Any control's ON / OFF / UNAVAILABLE dress** (not a surface — the rule that governs all of them) | **§7.41** — the token layer. THE KIND OF CHOICE PICKS THE DRESS: switch / pick / dial, three degrees of not-active, and the override rule that makes a disagreement one greppable line. The values of record are the `:root` block in `css/style.css` | Copying the nearest neighbour's numbers, which is what produced nine `[aria-pressed="true"]` dresses across four hue families (audit C3) · any reading in which `#left-panel` scoping is what makes a dress right — 2i-C and U6 both had to un-scope a law twice for the same reason |
+| Camera / framing | **§7.62** — the roll frames itself BEFORE it moves, so the flight frame and the settled frame are one; an unsatisfiable mat fit is refunded and the mat is fitted cropped square instead; the fog floor rides the camera's pose · §7.55 for the dice-first rung and its two gate conditions · §5.4a for the fog invariant, as amended there | §7.55's "where the eye ends up once the dice have STOPPED" — the reframe moved to frame zero on 2026-08-31, and a settle-time reframe is now a no-op · §5.4a's floor measured from the zoom's preset eye · any reading in which `mat-overflow` is a frame somebody chose (it was the fit scan's give-up position) |
 
 ### 7.1 Physical pool building (supersedes the button grid as the primary path)
 
@@ -7775,3 +7787,159 @@ canary** — it sets what the app already holds, and every cell of every table
 reads **+0.0%**. And `replay-drift.mjs shipped 8 900 20d6`, one pool per
 invocation as the campaign rule requires, is **8/8 byte-identical** after 900
 unrelated throws.
+
+
+### §7.62 — The roll is framed before it moves (2026-08-31)
+
+*Joe, from a phone: "It looks super zoomed out and the dice almost disappear
+into the fog in the initial throw." Two symptoms, one root, plus a third defect
+found while measuring the first two. §7.55 is the parent section — this is the
+same camera, asked the question at a different moment.*
+
+#### ① What a player saw, and why nothing caught it
+
+Every framing measurement in this repo grades the **settled** frame, because
+that is the frame the ladder was written to choose. Ruling ① forbids the camera
+to move during the tumble, so the reframe sat at the **end** of playback — which
+means the frame a player watches the roll *in* was the one frame nothing ever
+asserted on. On a desktop the two are the same and nobody noticed for months. On
+a phone they were nothing alike.
+
+`restFrameProbe()` prices the resting frame scale by scale. A 390px phone,
+`medium` zoom, mat 11 × 6.7, felt 278 × 844:
+
+| scale | ndcX | ndcY | die span |
+|-------|------|------|----------|
+| 1.000 | 5.22 | 0.80 | 223 px |
+| 2.400 | 2.00 | 0.36 | 94 px |
+| 3.671 | 1.28 | 0.24 | **62 px** ← what shipped |
+
+The mat has never fit a phone. `fitCameraTo` walks out to its `3.671×` ceiling,
+fails, and **returns having left the eye at the ceiling** — so the resting frame,
+and therefore the whole flight of every throw, was the fit scan's give-up
+position. Nobody chose it. Read the table across: the entire retreat is spent on
+`ndcX`, which never reaches 1 anyway, while `ndcY` was *already* inside the frame
+at 0.80 and ends at 0.24. **Three quarters of the screen's height, bought with
+72% of the die size, for a fit that still fails.**
+
+Portrait is no escape and the numbers say so: it fits at `3.671×` (ndc 0.93) and
+the dice come out *smaller still*, at 56 px. Fitting the mat is simply the wrong
+goal on a phone.
+
+#### ② The fog was riding the wrong eye
+
+§5.4a's invariant is "no die sits in fog", and `matFogFloor` enforced it by
+measuring the mat's far corner **from the eye the zoom asks for**. The framing
+then retreats from that eye without telling the fog. Measured before the fix, on
+a phone mid-flight: dice at eye-depth **34–35** against `fogNear` 16.5 /
+`fogFar` 46 — **59% dissolved into the background while still in the air** — with
+`no-die-sits-in-fog` green throughout, because that scenario asserts about the
+mat and the preset, which is exactly the pair that was never wrong.
+
+A desktop never sees it. A desktop never retreats.
+
+#### ③ The three changes
+
+**The roll frames itself before it moves.** `playRoll` bakes every final pose
+before frame one and freezes the bodies at `finalPos`, so `diceFramingPoints`
+already returns the *settled* cluster and `lastLanding` already names the
+deciding die. The frame the roll ends in is fully knowable at frame zero, and
+`playRoll` now asks for it there instead of a second and a half later.
+
+This **strengthens ruling ① rather than bending it**. The ruling's reason is that
+a player must never track motion with a moving frame. Before, the camera moved
+once per roll with dice on screen; now it moves once per roll *before anything is
+moving* and is then perfectly still from the first tumbling frame to the last. It
+**cuts** rather than eases for the same reason — an ease would still be
+travelling 0.42 s into the tumble, which is the one thing the ruling names. A cut
+at the instant dice appear is a shot change, not a camera move.
+
+It must come **after** `currentRoll` is assigned, and that is not a tidiness
+point: the ladder asks `decidingOnScreen()`, which reads `currentRoll.lastLanding`,
+and with `currentRoll` still null every roll falls into the **ungated** rung-2
+branch — no `gain` test, no "loses no die" test — which is precisely what a 40d6
+desktop pile needs refusing (its ungated fit is `0.92×`, a shrink). Placed
+correctly, the pose computed is bit-for-bit the pose the settle used to compute.
+
+**A retreat is only paid for if it achieves the fit.** `fitCameraTo` takes
+`refundOnFail`, and the **mat rung alone** passes it: an unsatisfiable mat fit now
+costs nothing and the eye returns to where the scan started. The dice and hero
+rungs are untouched, including their failure behaviour — their scans fail on big
+piles where the ceiling *is* a meaningful answer, and this file has been bitten
+before by a rule that looked general and was not.
+
+**Where the whole mat will not fit, the mat is fitted cropped square**
+(`matSquarePoints`), which is a fit that can actually succeed and therefore a
+retreat worth paying for. Both endpoints were looked at and both are wrong: the
+ceiling is the 62 px frame above, and no retreat at all is 223 px of **uniform
+brown cloth, corner to corner**. The mat has no visible edge to lose — the floor
+is a 160-unit plane wearing the same felt — so what makes the shot read as a
+table is the lamp pool falling off into the fog, and inside the pool there is
+nothing to read. That one was decided by looking, not by arguing:
+`tools/steps/phone-look.mjs`.
+
+The square takes the mat's own **depth** as its width. A square because the crop
+must not prefer an axis it was not asked to prefer; that size because it is the
+one number already on the table rather than a constant tuned against a viewport
+that will change.
+
+**And the fog floor rides the retreat.** `camFogEye` is written once per
+**pose**, from the pose's own destination, so the plane moves when the framing
+decides and then holds through the ease. While the eye is still travelling out to
+a further pose it is *nearer* than the floor assumed — less fog than earned,
+never more, which is the safe direction to be wrong in. `fogFar` moves with
+`fogNear` keeping the tune's span, because a phone's near can pass the shipped
+far of 46 outright and a `THREE.Fog` with near > far is not "no fog", it is a
+sign flip that fogs the foreground.
+
+#### ④ What it measures out at
+
+`node tools/drive.mjs tools/steps/phone-boot-frame.mjs`, `medium`, 3d6 seed 7002.
+"eye→die" is view depth, the quantity three.js actually fogs on:
+
+| viewport | moment | rung | span | eye→die | fogNear | fogged? |
+|---|---|---|---|---|---|---|
+| phone 390 | flight, **before** | mat-overflow | 62 px | 34–35 | 16.5 | **59%** |
+| phone 390 | flight, after | dice | **94 px** | 23–25 | 28.7 | none |
+| phone 390 | settled, after | dice | 94 px | 23–25 | 28.7 | none |
+| ipad-p 834 | flight, before | mat-overflow | 119 px | 22–24 | 16.5 | 19% |
+| ipad-p 834 | flight, after | dice | **279 px** | 11–13 | 16.7 | none |
+| desktop 1600 | flight, after | dice | 266 px | 11–12 | 16.2 | none |
+
+The flight frame now **equals** the settled frame on every viewport, so the
+zoom-pop at settle is gone as a side effect rather than as a second fix. The
+resting phone frame moves from 62 px to 77 px — deliberately a little closer than
+a roll's own frame, which is the direction that flatters the cut when a throw
+begins.
+
+#### ⑤ What is NOT claimed
+
+- **The tablet's cut is bigger than the phone's** (119 → 279 px). That move
+  existed before and was Joe's approved §7.55 crop; only its *timing* changed,
+  from an ease at settle to a cut at throw. If it reads badly in play, the ease
+  is one argument to `applyCameraFraming` away — but it cannot come back without
+  re-opening ruling ①, which is why it is written down here rather than dialled.
+- **Pours are untouched.** A tower roll's camera is two approved acts of its own
+  (`towerCamTo`, docs/TOWER.md) and its dice are deliberately not all visible at
+  frame zero, so framing them at frame zero would frame whichever one had been
+  dropped.
+- **The square fallback is reached by phones only.** A tablet and a desktop fit
+  the whole mat and never see it.
+
+#### ⑥ The scenario
+
+`the-flight-is-framed-like-the-landing` (`mat`, `chrome`, `roll`) grades the
+**flight**, on the one viewport where the mat cannot fit, holding the clock so
+"mid-flight" is a fact rather than a race. It asserts the three things the
+settled frame cannot speak for: the resting eye is not the scan's ceiling (priced
+against `restFrameProbe`'s own reading of that ceiling, so the comparison carries
+no constant), the roll is framed as the roll before it moves, and **no die is in
+fog while tumbling**. Each of the three fixes was reverted in turn and the
+scenario fails on each.
+
+`held-breath-declare-beat`'s fog pair was rewritten in the same commit. It
+compared an **empty-table** reading against a **mid-roll** one, which stopped
+being a fair comparison the moment a roll frames itself — the two straddled a
+deliberate camera move. The claim was always about the beat and never about the
+camera, so both reads now sit on the same side of the frame and either side of
+the beat. Verified still to bite by making the beat touch `fogNear`.

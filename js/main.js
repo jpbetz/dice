@@ -1582,6 +1582,28 @@ keyLight.shadow.mapSize.set(2048, 2048);
 // Derived from the FULL eye rather than the live camera: the camera eases, and
 // a fog plane that slid every frame while the view settled would be a new kind
 // of wrong. The mini eye is always nearer, so the full eye bounds both.
+//
+// AND THE PRESET EYE IS NOT WHERE THE CAMERA IS (Joe, 2026-08-31: "the dice
+// almost disappear into the fog in the initial throw"). The paragraph above
+// bounds the floor by the eye the ZOOM asks for, and applyCameraFraming then
+// retreats from it — on a 390px phone all the way to the fit scan's 3.671x
+// ceiling. Measured before the fix: a phone's dice sat at eye-depth 34-35
+// against fogNear 16.5 / fogFar 46, i.e. **59% dissolved into the background
+// while they were still in the air**, and the invariant one line above this
+// one was simply false everywhere the mat does not fit. A desktop never saw it
+// because a desktop never retreats (depth 11-13, inside fogNear).
+//
+// So the floor rides the RETREAT, not the preset — but it is still not the
+// live camera, and the distinction is the whole reason this works: `camFogEye`
+// is written once per POSE, from the pose's own destination, so the plane moves
+// when the framing decides and then holds through the ease. While the eye is
+// still travelling out to a further pose it is NEARER than the floor assumed,
+// which is the safe direction to be wrong in — less fog than earned, never more.
+//
+// Null until the first pose is applied, and the preset stands in — which is
+// also the boot value, because updateShadowFrustum calls this during module
+// evaluation, long before a camera has been framed.
+let camFogEye = null;
 // False until the boot applyMood() has run. Declared ABOVE updateShadowFrustum
 // because that function is invoked during module evaluation, and a `let` below
 // its definition would be read from its own dead zone on that first call.
@@ -1589,11 +1611,16 @@ let moodReady = false;
 const MAT_FOG_MARGIN = 1.5;   // units of clear air past the corner
 let matFogFloor = 0;
 function updateMatFogFloor() {
-  const [, ey, ez] = CAM_EYE.full;
+  // Measured from the EYE THE FRAMING PARKED AT to the furthest mat corner.
+  // Straight-line distance, while three.js fogs on view DEPTH (-mvPosition.z),
+  // and that inequality is deliberate: depth is never more than distance, so
+  // every die on the mat is inside this floor by construction rather than by a
+  // number that happens to work at the zooms someone checked.
+  const [px, py, pz] = camFogEye || CAM_EYE.full;
   let far = 0;
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
-      far = Math.max(far, Math.hypot(sx * TABLE_W / 2, ey, sz * TABLE_D / 2 - ez));
+      far = Math.max(far, Math.hypot(sx * TABLE_W / 2 - px, py, sz * TABLE_D / 2 - pz));
     }
   }
   matFogFloor = far + MAT_FOG_MARGIN;
@@ -1823,7 +1850,16 @@ function applyMoodLights() {
   // Fog in the BACKGROUND's colour, refreshed by applyFeltTheme on swap, so
   // the floor fades into exactly the void it would otherwise edge against —
   // but never nearer than the mat's own far corner (Joe, 2026-08-29).
-  scene.fog = new THREE.Fog(scene.background.clone(), Math.max(t.fogNear, matFogFloor), t.fogFar);
+  //
+  // FAR MOVES WITH NEAR, KEEPING THE TUNE'S SPAN. Once the floor rides the
+  // retreat (see updateMatFogFloor) a phone's near can pass the shipped far of
+  // 46 outright, and a Fog with near > far is not "no fog" — it is a sign flip
+  // that fogs the FOREGROUND. The dissolve is a depth, not a pair of numbers:
+  // hold `fogFar - fogNear` and both ends slide together, so a retreat buys
+  // clear air over the mat without ever losing the horizon the mood is for.
+  const fogNear = Math.max(t.fogNear, matFogFloor);
+  const fogFar = Math.max(t.fogFar, fogNear + (t.fogFar - t.fogNear));
+  scene.fog = new THREE.Fog(scene.background.clone(), fogNear, fogFar);
   if (!MOOD.lamp) {
     MOOD.lamp = new THREE.SpotLight(t.lampColor, t.lampIntensity, 0, t.lampAngle, t.lampPenumbra, 0);
     MOOD.lampTarget = new THREE.Object3D();
@@ -7242,7 +7278,41 @@ function playRoll(roll, rethrow = null) {
 
   // Act one of the pour's camera: look at the thing the dice are about to
   // vanish into. Act two is cued off the film's first exit, in stepPlayback.
+  //
+  // AND FOR A THROW, THE ONLY CAMERA ACT THERE IS (Joe, 2026-08-31: "the dice
+  // almost disappear into the fog in the initial throw").
+  //
+  // The reframe used to sit at the END of playback, because ruling (1) lets the
+  // camera move only once the picture is quiet. On a desktop that is a no-op and
+  // nobody noticed; on a phone, where the resting frame was the mat fit's
+  // give-up position, it meant the entire tumble played at 62px a die, 59%
+  // dissolved into the fog, and then POPPED to 94px and clear air the instant it
+  // stopped. The interesting part of a roll was the part framed worst.
+  //
+  // It needs no new machinery, because the bodies were frozen at `finalPos`
+  // above: `diceFramingPoints` reads body positions, so it already returns the
+  // SETTLED cluster, and `lastLanding` already names the deciding die. The frame
+  // this roll ends in is fully knowable before frame one — this line just asks
+  // for it now instead of a second and a half later.
+  //
+  // IT MUST COME AFTER `currentRoll`, and that is not a tidiness point. The
+  // ladder asks `decidingOnScreen()`, which reads currentRoll.lastLanding; with
+  // currentRoll still null the question answers false and every roll falls into
+  // the UNGATED rung-2 branch — the one with no `gain` test and no
+  // "loses no die" test, which is exactly what a 40d6 desktop pile needs
+  // refusing (its ungated fit is 0.92x, a shrink). Placed here, the pose this
+  // computes is bit-for-bit the pose the settle used to compute.
+  //
+  // THIS STRENGTHENS RULING (1) RATHER THAN BENDING IT. The ruling's reason is
+  // that a player must never track motion with a moving frame. Before, the
+  // camera moved once per roll with dice on screen; now it moves once per roll
+  // BEFORE anything is moving and is then perfectly still from the first
+  // tumbling frame to the last. It CUTS rather than eases for the same reason:
+  // an ease would still be travelling 0.42 s into the tumble, which is the one
+  // thing the ruling actually names. A cut at the instant dice appear is a shot
+  // change, not a camera move.
   if (pourFilm) towerCamTo('tower');
+  else applyCameraFraming(false);
 
   // Roll moments (UX §2): a Check/Cinematic attachment stages the playback.
   // Held rolls keep their FULL ceremony (goal 11): the stakes — declaration,
@@ -14879,6 +14949,69 @@ window.__diceDebug = {
       table: `${TABLE_W}x${TABLE_D}`,
     };
   },
+  // WHAT THE RETREAT ACTUALLY BUYS, SCALE BY SCALE, IN BOTH ORIENTATIONS.
+  //
+  // Every other framing probe here grades ONE camera — the one a fit chose.
+  // This one grades the CHOICE, because on a phone the fit does not make one:
+  // `fitCameraTo` walks to its 3.671x ceiling, fails, and leaves the eye
+  // there, so the resting frame — and, since ruling (1) freezes the camera
+  // through the tumble, the whole FLIGHT of every throw — is the scan's
+  // give-up position rather than anything anybody picked.
+  //
+  // Two columns decide whether that retreat is worth its price:
+  //   ndc    the worst mat corner (<= 1 is on screen). How much mat the
+  //          retreat bought.
+  //   span   the die span in px. What it cost to buy it.
+  // Run at both orientations, because the mat's aspect against a portrait
+  // window is the phone's actual problem (see camOrbit) and the resting frame
+  // has no dice to tell the two candidates apart with.
+  //
+  // Restores the shipped framing before returning — never leave the player
+  // looking at a probe.
+  restFrameProbe(scales = [1, 1.3, 1.6, 2, 2.4, 2.8, 3.2, 3.671]) {
+    const savedOrbit = camOrbit;
+    const savedPos = camera.position.clone();
+    const savedTgt = camTarget.clone();
+    const home = CAM_TARGET_HOME;
+    const eye = new THREE.Vector3(
+      ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
+    );
+    const span = () => {
+      const a = new THREE.Vector3(0, 0, 0).project(camera);
+      const b = new THREE.Vector3(1, 0, 0).project(camera);
+      return Math.round(Math.hypot((b.x - a.x) * view.width, (b.y - a.y) * view.height));
+    };
+    const rows = [];
+    for (const orbit of [0, Math.PI / 2]) {
+      camOrbit = orbit;
+      const ray = eye.clone().sub(home);
+      if (orbit) ray.applyAxisAngle(Y_AXIS, orbit);
+      for (const s of scales) {
+        camera.position.copy(home).addScaledVector(ray, s);
+        aimCamera(home);
+        const w = matWorstNdc();
+        rows.push({
+          orbit: orbit ? 'portrait' : 'landscape',
+          scale: s,
+          ndcX: Math.round(w.x * 100) / 100,
+          ndcY: Math.round(w.y * 100) / 100,
+          worst: Math.round(Math.max(w.x, w.y) * 100) / 100,
+          fits: w.x <= 1 && w.y <= 1,
+          span: span(),
+        });
+      }
+    }
+    camOrbit = savedOrbit;
+    camera.position.copy(savedPos);
+    camTarget.copy(savedTgt);
+    aimCamera(camTarget);
+    applyCameraFraming();
+    return {
+      rows,
+      view: `${Math.round(view.width)}x${Math.round(view.height)}`,
+      table: `${TABLE_W}x${TABLE_D}`,
+    };
+  },
   // WHAT THE FRAMING SPENDS (C25). applyCameraFraming pulls the eye back until
   // every framing point fits, so the hungriest point sets the view. This was
   // written to price the SHELF's share of that and answered 1.08–1.18× on a
@@ -17531,6 +17664,24 @@ window.__diceDebug = {
       // fog in has to argue with this instead of quietly shipping.
       fogNear: scene.fog ? scene.fog.near : null,
       fogFar: scene.fog ? scene.fog.far : null,
+    };
+  },
+  // WHERE EVERY DIE ACTUALLY SITS IN THE FOG. `breathProbe` reports the floor
+  // and the mat it was derived from, which is the claim about the MAT; this is
+  // the claim about the DICE, and the two came apart the moment the camera
+  // started retreating from the preset the floor was measured at (a 390px
+  // phone's dice were 59% dissolved in mid-air while breathProbe read green).
+  //
+  // `depth` is -mvPosition.z off the last render — the same quantity three.js
+  // mixes fog on, not a distance that stands in for it — so a scenario can
+  // assert the invariant in the fog's own units and at any moment of a roll,
+  // including the flight, which is where it was broken.
+  fogDepths() {
+    const dice = tableDice.filter((d) => d.mesh && d.mesh.visible !== false);
+    return {
+      near: scene.fog ? scene.fog.near : null,
+      far: scene.fog ? scene.fog.far : null,
+      depths: dice.map((d) => Math.round(-d.mesh.modelViewMatrix.elements[14] * 100) / 100),
     };
   },
   breath(on) { BREATH.on = !!on; applyMoodLights(); return BREATH.on; },
@@ -26563,6 +26714,41 @@ function framingPoints() {
   return pts;
 }
 
+// THE MAT, CROPPED SQUARE — what an empty felt is framed on where the whole mat
+// will never fit. A phone is the only device that reaches it.
+//
+// WHY A SQUARE, AND WHY THIS SQUARE. The mat is 11 x 6.7 and a phone's felt is
+// 278 x 844; the mismatch is entirely on the WIDTH, so something has to be
+// given up, and the question is only how much. The two endpoints were both
+// looked at and both are wrong:
+//
+//   · the whole mat, which is what shipped. The fit never succeeds, so the eye
+//     parks at the scan's 3.671x ceiling having bought nothing: dice at 62px,
+//     and three quarters of the screen height unused (restFrameProbe).
+//   · no retreat at all, the eye at the zoom preset. Dice at 223px — and the
+//     picture is uniform brown cloth, corner to corner. The mat has no visible
+//     EDGE to lose (the floor is a 160-unit plane wearing the same felt), so
+//     what makes the shot read as a table is the lamp pool falling off into the
+//     fog, and inside the pool there is nothing to read. Looked at, not reasoned
+//     about: tools/steps/phone-look.mjs.
+//
+// So the crop takes the mat's own DEPTH as its width and nothing else. It is a
+// square because the crop must not prefer an axis it was not asked to prefer,
+// and its size is the one number already on the table rather than a constant
+// tuned against a viewport that will change. It lands the resting eye a little
+// closer than a roll's own frame, which is the direction that flatters the cut
+// when a throw begins.
+function matSquarePoints() {
+  const h = Math.min(TABLE_W, TABLE_D) / 2;
+  const pts = [];
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      pts.push({ p: new THREE.Vector3(sx * h, 0, sz * h), mx: 0.02, my: 0.02, of: 'felt' });
+    }
+  }
+  return pts;
+}
+
 // Pull the eye STRAIGHT BACK along its own ray until every point in `pts`
 // fits. Split out of applyCameraFraming so the same fit can be run against a
 // subset without touching the shipped framing (see framingCost).
@@ -26582,12 +26768,24 @@ function framingPoints() {
 // downwards: see framingFor's APPROACH block for why that is payable there and
 // nowhere else. The ceiling stays 3.67× whatever the floor is, so no caller can
 // buy a longer retreat by asking to start closer.
-function fitCameraTo(pts, target = camTarget, from = 1) {
+//
+// `refundOnFail` IS THE ONE PLACE THE CEILING IS NOT AN ANSWER. Off, the eye
+// stays where the scan gave up — which is what the dice and hero rungs want,
+// because a pile they cannot contain is genuinely better seen from further
+// back. On, a failed scan costs nothing and the eye returns to `from`. Only the
+// MAT rung passes it; see the block in framingFor for the measurement that says
+// why the mat is different from every other subject on the felt.
+function fitCameraTo(pts, target = camTarget, from = 1, refundOnFail = false) {
   const eye = new THREE.Vector3(
     ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
   );
   const ray = eye.clone().sub(target);
   if (camOrbit) ray.applyAxisAngle(Y_AXIS, camOrbit);
+  const refund = () => {
+    camera.position.copy(target).addScaledVector(ray, from);
+    aimCamera(target);
+    return false;
+  };
   const v = new THREE.Vector3();
   // Pull back in small steps and stop at the first distance that fits — a
   // closed form would have to invert the projection for eight points at once,
@@ -26595,7 +26793,8 @@ function fitCameraTo(pts, target = camTarget, from = 1) {
   // settle.
   for (let i = 0; ; i++) {
     const s = from + i * 0.03;
-    if (s > 3.671) return false; // == the old `i < 90` when from is 1
+    // == the old `i < 90` when from is 1
+    if (s > 3.671) return refundOnFail ? refund() : false;
     camera.position.copy(target).addScaledVector(ray, s);
     aimCamera(target);
     const fits = pts.every(({ p, mx, my }) => {
@@ -26786,7 +26985,34 @@ function framingFor(orbit) {
   // IS OFF SCREEN. Rung 1 therefore has to clear the same bar as the rest of
   // the ladder, or the guarantee this whole ladder exists for has a hole in it
   // on the one device that never reaches rung 2.
-  const matOk = fitCameraTo(framingPoints(), home);
+  // A RETREAT IS ONLY PAID FOR IF IT ACHIEVES THE FIT (Joe, 2026-08-31: "it
+  // looks super zoomed out"). fitCameraTo walks out to its 3.671x ceiling and,
+  // when nothing fits, returns false having left the eye AT the ceiling — so on
+  // every viewport where the mat has never fit, the frame is the scan's
+  // give-up position. Nobody chose it. `restFrameProbe` prices what it buys and
+  // what it costs, and on a 390px phone the answer is damning:
+  //
+  //   scale  ndcX  ndcY  spanPx
+  //   1.000  5.22  0.80     223
+  //   3.671  1.28  0.24      62      <- the shipped resting frame
+  //
+  // The whole retreat is spent on ndcX, which never reaches 1 anyway; ndcY was
+  // ALREADY inside the frame at 0.80 and ends up at 0.24, so three quarters of
+  // the screen's height is bought with 72% of the die size and the mat still
+  // does not fit. Portrait is no escape — it fits at 3.671 (ndc 0.93) and the
+  // dice come out SMALLER still, at 56px, which is why the orbit tie-break
+  // refusing it was accidentally right and why "fit the mat" is simply the
+  // wrong goal on a phone.
+  //
+  // So an unsatisfiable mat fit costs nothing: the eye is refunded to the scan's
+  // start and the mat is re-fitted CROPPED SQUARE instead (matSquarePoints),
+  // which is a fit that can actually succeed and therefore a retreat worth
+  // paying for. This is the mat rung only. The dice and hero rungs keep their
+  // exact shipped behaviour, including their failure behaviour — their scans
+  // fail on big piles where the ceiling is a meaningful answer, and this file
+  // has been bitten before by a rule that looked general and was not.
+  const matOk = fitCameraTo(framingPoints(), home, 1, true);
+  if (!matOk) fitCameraTo(matSquarePoints(), home, 1, true);
   if (framingLadder && (!matOk || !decidingOnScreen())) {
     const dice = diceFramingPoints();
     if (dice && fitCameraTo(dice, dice.centre)) {
@@ -26943,6 +27169,22 @@ function applyFramingPose(pose, animate) {
   // mid-quarter-turn is a somersault, not a camera move. It cuts, and the
   // position ease carries the rest.
   camOrbit = pose.orbit !== undefined ? pose.orbit : camOrbit;
+  // THE FOG LEARNS WHERE THE EYE IS GOING, here and nowhere else — once per
+  // pose, from the pose's DESTINATION, which is what keeps the plane from
+  // sliding through the ease (see updateMatFogFloor). Guarded on a real move,
+  // because applyMoodLights rebuilds the Fog, the lamp and the mote field, and
+  // this runs on every reframe including the many that change nothing.
+  const eyeMoved = !camFogEye
+    || Math.hypot(camFogEye[0] - pose.pos.x, camFogEye[1] - pose.pos.y, camFogEye[2] - pose.pos.z) > 0.1;
+  if (eyeMoved) {
+    // A PLAIN TRIPLE, NOT A Vector3 — updateMatFogFloor destructures it beside
+    // CAM_EYE.full, which is a triple, and the two have to be the same shape or
+    // the boot path and the framed path read different things.
+    camFogEye = [pose.pos.x, pose.pos.y, pose.pos.z];
+    const before = matFogFloor;
+    updateMatFogFloor();
+    if (moodReady && Math.abs(before - matFogFloor) > 0.01) applyMoodLights();
+  }
   if (!animate || prefersReducedMotion()) {
     camEase = null;
     camera.position.copy(pose.pos);

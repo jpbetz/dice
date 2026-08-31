@@ -2230,6 +2230,111 @@ export const scenarios = [
     },
   },
   {
+    name: 'the-flight-is-framed-like-the-landing',
+    tags: ['mat', 'chrome', 'roll'],
+    // WHAT THIS CATCHES, and why 237 green scenarios did not (Joe, 2026-08-31:
+    // "it looks super zoomed out and the dice almost disappear into the fog in
+    // the initial throw").
+    //
+    // Every framing scenario in this file grades the SETTLED frame, because
+    // that is the one the ladder was written to choose. But ruling (1) forbade
+    // the camera to move during the tumble, so the reframe sat at the END of
+    // playback — which means the frame a player watches the roll IN was never
+    // the frame anything asserted on. On a phone the two were nothing alike:
+    // the mat has never fit there, `fitCameraTo` walked to its 3.671x ceiling
+    // and parked at the give-up position, and the whole flight played at 62px
+    // a die before popping to 94px the instant it stopped.
+    //
+    // The fog rode the same defect. `no-die-sits-in-fog` asserts the floor
+    // clears the MAT, measured from the eye the ZOOM asks for — and then the
+    // framing retreats from that eye without telling the fog. Measured before
+    // the fix: dice at eye-depth 34-35 against fogNear 16.5 / fogFar 46, i.e.
+    // **59% dissolved into the background while they were still in the air**,
+    // with that scenario green throughout. A desktop never sees it because a
+    // desktop never retreats.
+    //
+    // So this grades the flight, on the one viewport where the mat cannot fit,
+    // and it asserts the two things the settled frame cannot speak for: the
+    // roll is framed as the roll before it moves, and no die is in fog WHILE
+    // TUMBLING. The clock is held so "mid-flight" is a fact, not a race.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.63', name: 'Phone' });
+      await a.page.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 390, height: 844, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
+      try {
+        await a.dbg('setPanelState({pools: false, log: false})');
+        await a.eval('window.dispatchEvent(new Event("resize"))');
+        await a.settle();
+
+        // THE PRECONDITION IS THE POINT. If the mat ever fits here this
+        // scenario is grading a desktop by another name and proves nothing.
+        const rest = await a.dbg('framingInfo()');
+        assert.equal(rest.matFits, false,
+          `the mat does not fit a 390px phone — that is what makes this the interesting viewport (${rest.view})`);
+
+        // AND THE RESTING EYE IS NOT THE GIVE-UP POSITION EITHER. When the mat
+        // cannot fit, `fitCameraTo` used to walk to its 3.671x ceiling, fail,
+        // and leave the eye there — spending the entire retreat on a fit it
+        // never achieved. `restFrameProbe` prices that exact frame, so the
+        // comparison carries no constant of its own: the resting frame must
+        // show BIGGER dice than the ceiling it used to sit at.
+        const priced = await a.dbg('restFrameProbe()');
+        const ceiling = priced.rows.find((r) => r.orbit === 'landscape' && r.scale === 3.671);
+        assert.ok(ceiling && !ceiling.fits,
+          'the scan ceiling really is a failed fit here — otherwise there was nothing to refund');
+        assert.ok(rest.camScale < 3.671,
+          `the resting eye is not parked at the scan's ceiling (camScale ${rest.camScale})`);
+        assert.ok(rest.spanPx > ceiling.span,
+          `the resting frame beats the give-up position it used to be `
+          + `(${rest.spanPx}px vs ${ceiling.span}px at the 3.671x ceiling)`);
+
+        await a.dbg('holdClock(true)');
+        await a.dbg('throwSeeded(["d6","d6","d6"], 7002)');
+        await a.dbg('sim(20)');
+
+        const fly = await a.dbg('framingInfo()');
+        const fog = await a.dbg('fogDepths()');
+        assert.equal(fly.dice, 3, 'three dice are on the felt');
+        assert.equal(fog.depths.length, 3, 'and all three are being drawn');
+
+        // 1. THE ROLL IS FRAMED AS THE ROLL, before it has moved. `mat-overflow`
+        //    is the give-up position by another name.
+        assert.notEqual(fly.mode, 'mat-overflow',
+          `the flight is framed on the roll, not on a mat that never fit (mode ${fly.mode})`);
+        assert.equal(fly.diceOnScreen, 3,
+          `every die is on screen during the flight (${fly.diceOnScreen}/3)`);
+
+        // 2. NO DIE IS IN FOG WHILE IT IS STILL IN THE AIR. The invariant
+        //    `no-die-sits-in-fog` states about the mat, stated about the dice,
+        //    in the fog's own units, at the moment it used to be false.
+        const deepest = Math.max(...fog.depths);
+        assert.ok(deepest < fog.near,
+          `no die is in fog mid-flight (deepest ${deepest} vs fogNear ${fog.near.toFixed(2)})`);
+
+        // 3. AND THE FRAME DOES NOT MOVE WHEN THE ROLL STOPS. The pop was the
+        //    visible half of the defect: same rung, same eye, same die size
+        //    from the first tumbling frame to the last.
+        await a.dbg('holdClock(false)');
+        await a.settle();
+        await a.dbg('sim(600)');
+        const done = await a.dbg('framingInfo()');
+        assert.equal(done.mode, fly.mode, 'the settle does not change the rung');
+        assert.equal(done.camScale, fly.camScale,
+          `the settle does not move the eye (${fly.camScale} -> ${done.camScale})`);
+        assert.equal(done.spanPx, fly.spanPx,
+          `the dice are the same size when they stop as when they were thrown (${fly.spanPx} -> ${done.spanPx})`);
+
+        const settledFog = await a.dbg('fogDepths()');
+        assert.ok(Math.max(...settledFog.depths) < settledFog.near,
+          'and no die is in fog once it lands either');
+      } finally {
+        await a.dbg('holdClock(false)').catch(() => {});
+        await a.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, a.page.sessionId)
+          .catch(() => {});
+      }
+    },
+  },
+  {
     name: 'held-breath-declare-beat',
     tags: ['mat', 'chrome', 'roll'],
     // THE DECLARE BEAT IS TOLD IN LIGHT NOW (Joe, 2026-08-29). It used to be a
@@ -2283,8 +2388,17 @@ export const scenarios = [
       // The fog is deliberately not in the beat — the mat's far corners are
       // already inside it at two of three zooms, so pulling it in would put
       // more fog on dice a player is trying to read.
-      assert.equal(shut.fogNear, open.fogNear, 'the beat does not touch fogNear');
-      assert.equal(shut.fogFar, open.fogFar, '…nor fogFar');
+      //
+      // READ EITHER SIDE OF THE BEAT, NOT EITHER SIDE OF A ROLL. This used to
+      // compare `shut` against `open`, and that stopped being a fair comparison
+      // on 2026-08-31, when the fog floor started riding the camera's RETREAT
+      // instead of the zoom preset it had always been measured at (see
+      // updateMatFogFloor, and `the-flight-is-framed-like-the-landing` for what
+      // that fixed). `open` is read on an EMPTY table and `shut` mid-roll, and a
+      // roll now frames itself before it moves — so the two readings straddled a
+      // deliberate camera move and the fog honestly differed across it. The
+      // claim was always about the BEAT and never about the camera, so the
+      // second read is now `after`, below: same frame, other side of the beat.
 
       // AND IT OPENS AGAIN. This is the assertion that matters most: a beat
       // stuck closed leaves the table dark for the rest of the session, and it
@@ -2303,6 +2417,8 @@ export const scenarios = [
         assert.ok(Math.abs(after[dial] - 1) < 1e-9,
           `…all the way back to shipped ${dial} (ratio ${after[dial]}), not merely close`);
       }
+      assert.equal(shut.fogNear, after.fogNear, 'the beat does not touch fogNear');
+      assert.equal(shut.fogFar, after.fogFar, '…nor fogFar');
 
       // The safety net: a ceremony SKIPPED before it ever reaches a tumble
       // must still reopen the room, via dismissCeremonyUI's sweep.
