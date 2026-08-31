@@ -131,4 +131,36 @@ consistent footage.)
 
 ---
 
+## Fun ranking (started 2026-08-31)
+
+Prioritizing purely on fun factor — Joe's call. Fun = the grin during actual
+play; effort and strategic value deliberately ignored. One column per
+ranker; argue by adding a column, not by editing someone else's.
+
+**Claude's ranking**, in tiers:
+
+1. **Grin on every roll** — §7 gesture throws, §2 dice exits. These two are
+   the top tier because they attach fun to the single most frequent act.
+   §7 edges §2 for me: doing beats watching — flinging the dice yourself is
+   toy-grade fun, the kind you do three extra times for no reason. §2 is the
+   best *spectacle* on the page and you get it free on every roll's ending.
+2. **The table feels alive** — §1 seats, §8 presence shadows. Social fun:
+   the moment someone's roll tumbles in from *their* edge, or a hand-shadow
+   crosses the felt and everyone goes quiet. Less frequent than tier 1's
+   grin but deeper — it's fun *between* people, which is what the table is
+   for.
+3. **Quiet charm** — §6 chalk on the felt, §9 the table keeps time. Real
+   delight, but of the noticed-later kind; nobody laughs out loud at fading
+   chalk.
+4. **Satisfying, not fun** — §5 radial menu, §4 chrome dissolves. These
+   make the table *better* and would be a joy to use, but the pleasure is
+   smoothness, not play. (If §4 shipped, tier 1–2 ideas would land harder
+   on it — it's a fun *multiplier*, not fun itself.)
+5. **Fun for one chair** — §3 lenses. The DM lens is genuinely fun *for the
+   DM* — offering a roll to a seat is a game-master flourish — and the
+   spectator lens is fun for the room watching the TV. But for a player
+   mid-session it's plumbing.
+
+**Joe's ranking:** *(add here)*
+
 *Add below or riff above. — opened by Joe & Claude, 2026-08-31*
