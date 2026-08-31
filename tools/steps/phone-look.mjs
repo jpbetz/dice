@@ -50,6 +50,17 @@ export default async function run(stage) {
       { desc: `${vp.name} settle`, timeout: 40000 });
     await a.dbg('sim(400)');
     await stage.shot(a, `p-${vp.name}-settled.png`);
+
+    // THE CHROME, NOT THE FELT. The camera work is judged above; these two are
+    // the surfaces a phone is most likely to overflow, and they are cheap to
+    // look at while the stage is already up.
+    await a.dbg('setPanelState({log: true})');
+    await new Promise((r) => setTimeout(r, 250));
+    await stage.shot(a, `p-${vp.name}-log.png`);
+    await a.dbg('setPanelState({log: false})');
+    await a.eval("document.getElementById('toggle-settings').click()");
+    await new Promise((r) => setTimeout(r, 350));
+    await stage.shot(a, `p-${vp.name}-settings.png`);
   }
   await a.dbg('setPanelState({pools: true, log: true})');
   console.log('  shots/p-*.png written');
