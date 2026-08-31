@@ -17672,16 +17672,34 @@ window.__diceDebug = {
   // started retreating from the preset the floor was measured at (a 390px
   // phone's dice were 59% dissolved in mid-air while breathProbe read green).
   //
-  // `depth` is -mvPosition.z off the last render — the same quantity three.js
-  // mixes fog on, not a distance that stands in for it — so a scenario can
-  // assert the invariant in the fog's own units and at any moment of a roll,
-  // including the flight, which is where it was broken.
+  // `depth` is the die's view-space -z — the same quantity three.js mixes fog
+  // on, not a distance that stands in for it — so a scenario can assert the
+  // invariant in the fog's own units and at any moment of a roll, including
+  // the flight, which is where it was broken.
+  //
+  // DERIVED HERE, NOT READ OFF `modelViewMatrix`, and the difference is a
+  // vacuous green. That matrix is written by `renderer.render`, and `sim()`
+  // steps the film WITHOUT rendering (tick's `render` gate) — so a caller that
+  // sims and reads in one synchronous pass gets **zeroes for every die**, and
+  // `deepest < fogNear` then passes because nothing was measured. Caught on the
+  // deployed build by reading it from a browser console, where no frame can
+  // render mid-script; the e2e scenario had been getting real numbers only
+  // because each CDP round-trip happens to let a frame through. Computing the
+  // transform here makes the reading true whether or not anything has painted.
   fogDepths() {
     const dice = tableDice.filter((d) => d.mesh && d.mesh.visible !== false);
+    const inv = new THREE.Matrix4();
+    camera.updateMatrixWorld(true);
+    inv.copy(camera.matrixWorld).invert();
+    const v = new THREE.Vector3();
     return {
       near: scene.fog ? scene.fog.near : null,
       far: scene.fog ? scene.fog.far : null,
-      depths: dice.map((d) => Math.round(-d.mesh.modelViewMatrix.elements[14] * 100) / 100),
+      depths: dice.map((d) => {
+        d.mesh.updateWorldMatrix(true, false);
+        v.setFromMatrixPosition(d.mesh.matrixWorld).applyMatrix4(inv);
+        return Math.round(-v.z * 100) / 100;
+      }),
     };
   },
   breath(on) { BREATH.on = !!on; applyMoodLights(); return BREATH.on; },

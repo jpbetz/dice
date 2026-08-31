@@ -7980,6 +7980,17 @@ no constant), the roll is framed as the roll before it moves, and **no die is in
 fog while tumbling**. Each of the three fixes was reverted in turn and the
 scenario fails on each.
 
+**`fogDepths()` derives the view transform rather than reading
+`modelViewMatrix`, and that is not a tidy-up.** That matrix is written by
+`renderer.render`, and `sim()` steps the film WITHOUT rendering — so a caller
+that sims and reads in one synchronous pass gets **zero for every die**, and
+`deepest < fogNear` passes because nothing was measured. Found by reading the
+hook from a browser console against the deployed build, where no frame can
+render mid-script; the scenario had been getting real numbers only because each
+CDP round-trip happens to let a frame through. The stale-matrix reading was also
+answering a *different moment* than it claimed: under the same sabotage it said
+22.39, and the derived one says 30.17.
+
 `held-breath-declare-beat`'s fog pair was rewritten in the same commit. It
 compared an **empty-table** reading against a **mid-roll** one, which stopped
 being a fair comparison the moment a roll frames itself — the two straddled a
