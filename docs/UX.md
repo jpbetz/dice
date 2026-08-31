@@ -7912,7 +7912,50 @@ resting phone frame moves from 62 px to 77 px — deliberately a little closer t
 a roll's own frame, which is the direction that flatters the cut when a throw
 begins.
 
-#### ⑤ What is NOT claimed
+#### ⑤ The cost, measured: dice fall in from off screen
+
+A frame fitted to where dice will LAND cannot contain them while they are in the
+air — they are thrown from **y ≈ 24** and drop in. So a tighter flight frame buys
+its die size with a longer entry, and that had to be measured rather than
+assumed, because it is the one thing this change could make worse.
+
+Frames during which ANY die is off screen (`sim` walk of the whole flight, worst
+seed per pool; the scratch probe is in the commit message, not the repo — it
+duplicates the projection and does not belong in `tools/steps`):
+
+| pool | phone 390 | ipad-p 834 | desktop 1600 |
+|---|---|---|---|
+| 1d20 | 0.13 s | 0.07 s | 0.13 s |
+| 3d6 | 0.20 s | 0.07 s | 0.20 s |
+| 6d6 | 0.00 s | 0.20 s | 0.13 s |
+| 20d6 | **1.47 s** | 0.33 s | 0.47 s |
+| 40d6 | 0.13 s | 0.13 s | **never all in** |
+
+**Read the desktop column first.** It is the control: the desktop's flight frame
+barely moves under this change (scale 1.09 → 1.00), and it shows the same
+0.13–0.20 s entry. Dice falling in from above the frame is how every throw on
+every device has always looked, before this change and after it. Desktop 40d6
+never gets all forty on screen at once, and that too is pre-existing and already
+written down — at forty dice a few are always piled above the mat plane and
+project out of frame whichever way round the table sits.
+
+**The one cell this change makes materially worse is 20d6 on a phone**: 1.47 s
+with some of the pool out of frame, against a shipped frame that showed all
+twenty. It is **not** paid to gain die size — that pool measures 61 px either way,
+because at twenty dice the cluster is nearly as wide as the mat — so it is a
+straight loss on the one pool where the frame has nothing to offer. Recorded
+rather than fixed, for the reason the whole section exists: containing airborne
+dice means retreating, and retreating is what made them unreadable. The rung the
+ladder picks there is already named `dice-cropped`, so the settled frame was a
+declared crop before any of this.
+
+**If this ever needs fixing**, the lever is a vertical-only margin on
+`diceFramingPoints` for the pre-frame — a phone has `ndcY` headroom to spare
+(0.36 at the frame it lands on) while `ndcX` is what binds. It is not taken here
+because it trades a certain win on 1d20/3d6 — the pools Joe actually rolls —
+against an edge case, on a guess about how it looks.
+
+#### ⑥ What is NOT claimed
 
 - **The tablet's cut is bigger than the phone's** (119 → 279 px). That move
   existed before and was Joe's approved §7.55 crop; only its *timing* changed,
@@ -7926,7 +7969,7 @@ begins.
 - **The square fallback is reached by phones only.** A tablet and a desktop fit
   the whole mat and never see it.
 
-#### ⑥ The scenario
+#### ⑦ The scenario
 
 `the-flight-is-framed-like-the-landing` (`mat`, `chrome`, `roll`) grades the
 **flight**, on the one viewport where the mat cannot fit, holding the clock so

@@ -71,6 +71,17 @@ plane wearing the same felt) and what makes the shot read as a table is the lamp
 pool falling off into the fog. `tools/steps/phone-look.mjs` is the picture that
 settled it.
 
+**The cost, measured and recorded rather than fixed.** A frame fitted to where
+dice will LAND cannot contain them mid-air — they are thrown from y ≈ 24 and fall
+in. Frames with any die off screen: **0.07–0.20 s on every device for 1d20, 3d6
+and 6d6**, which is the entry and is how every throw has always looked (the
+desktop is the control: its flight frame barely moves under this change and shows
+the same 0.13–0.20 s). **The one cell made materially worse is 20d6 on a phone**
+— 1.47 s with part of the pool out of frame — and it buys nothing there, because
+that pool measures 61 px either way. Left alone: containing airborne dice means
+retreating, which is what made them unreadable. UX §7.62 ⑤ carries the table and
+the lever if it ever needs one.
+
 **Proof:** `the-flight-is-framed-like-the-landing` (mat, chrome, roll) — grades
 the flight with the clock held, on the one viewport where the mat cannot fit.
 Each of the three fixes was reverted in turn and it fails on each.
