@@ -69,12 +69,18 @@ export default async function run(stage) {
     rows.push({ view: vp.name, at: 'resting (empty felt)', ...flat(rest) });
 
     // THE FLIGHT. Throw, step a handful of frames so the dice are in the air,
-    // and read the camera the player is actually looking through.
+    // and read the camera the player is actually looking through. Two reads
+    // since the arrival became an ease (2026-08-31 pm): one mid-arrival, one
+    // after it lands (CAM_ARRIVE_S 0.9 s = 54 frames) with dice still aloft.
     await a.dbg(`throwSeeded(["d6","d6","d6"], 7002)`);
     await a.dbg('sim(20)');
     const fly = await a.eval(READ);
     const dist = await a.eval(FOGDEPTH);
-    rows.push({ view: vp.name, at: 'flight (frame 20)', ...flat(fly), dist: fmtDist(dist) });
+    rows.push({ view: vp.name, at: 'flight (frame 20, mid-arrival)', ...flat(fly), dist: fmtDist(dist) });
+    await a.dbg('sim(40)');
+    const fly2 = await a.eval(READ);
+    const distB = await a.eval(FOGDEPTH);
+    rows.push({ view: vp.name, at: 'flight (frame 60, arrived)', ...flat(fly2), dist: fmtDist(distB) });
 
     await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
       { desc: `${vp.name} settle`, timeout: 40000 });

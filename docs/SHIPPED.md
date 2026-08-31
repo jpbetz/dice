@@ -89,6 +89,17 @@ Each of the three fixes was reverted in turn and it fails on each.
 compared an empty-table reading against a mid-roll one, which stopped being fair
 the moment a roll frames itself.
 
+**Amended in play the same afternoon** (Joe: *"the camera movements when rolling
+dice are super fast... It's almost jarring"*). The cut was the jar — measured, a
+desktop 3d6 jumps 156 → 208 px die span in one frame, on every throw. UX §7.62 ⑥
+had priced this exact lever, and it was taken: the frame-zero claim stays but is
+applied as an **arrival ease** (`CAM_ARRIVE_S` 0.9 s) that lands while the dice
+are still airborne, re-opening ruling ① on Joe's word — a throw now holds the
+same arrival concession as the pour acts. Every roll camera clock slowed with
+it: `CAM_EASE_S` 0.42 → 0.8, the pour's look-down act 0.7 → 1.3. The scenario
+now also grades the arrival itself (ease not cut, nothing past `fogFar`
+mid-ease, lands before the film runs out). Full story: UX §7.62 ③, amendment.
+
 ---
 
 ## One link — the front door became a table (2026-08-30)

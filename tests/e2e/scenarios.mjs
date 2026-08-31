@@ -2257,6 +2257,16 @@ export const scenarios = [
     // and it asserts the two things the settled frame cannot speak for: the
     // roll is framed as the roll before it moves, and no die is in fog WHILE
     // TUMBLING. The clock is held so "mid-flight" is a fact, not a race.
+    //
+    // AMENDED THE DAY IT SHIPPED: the frame's claim was a CUT at first, and it
+    // read in play as a snap zoom (Joe, same day: "the camera movements when
+    // rolling dice are super fast... It's almost jarring"). The arrival is now
+    // an EASE on CAM_ARRIVE_S — the lever §7.62 ⑥ priced — so "the flight is
+    // framed like the landing" is true from the moment the arrival lands,
+    // which must itself be while the dice are still in the air. The grading
+    // walks to the ease's end and asserts exactly that; mid-ease the weaker
+    // fog claim holds (no die DISSOLVES — past fogFar — while the camera is
+    // still travelling).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.63', name: 'Phone' });
       await a.page.browser.send('Emulation.setDeviceMetricsOverride',
@@ -2290,15 +2300,40 @@ export const scenarios = [
 
         await a.dbg('holdClock(true)');
         await a.dbg('throwSeeded(["d6","d6","d6"], 7002)');
-        await a.dbg('sim(20)');
+        await a.dbg('sim(6)');
 
+        // The arrival is an ease, not a cut — and while it travels, no die is
+        // ever DISSOLVED (past fogFar): the fog floor already rides the
+        // pose's destination, so mid-ease can only under-fog, never lose one.
+        const early = await a.dbg('framingInfo()');
+        assert.equal(early.easing, true, 'the arrival eases instead of cutting');
+        const earlyFog = await a.dbg('fogDepths()');
+        assert.ok(Math.max(...earlyFog.depths) < earlyFog.far,
+          `no die dissolves while the arrival travels (deepest ${Math.max(...earlyFog.depths).toFixed(1)} vs fogFar ${earlyFog.far.toFixed(1)})`);
+
+        // Walk to the ease's end. CAM_ARRIVE_S is 0.9 s (54 frames); the cap
+        // exists so a broken never-ending ease fails here, not by timeout.
+        let simmed = 6;
+        while (simmed < 90 && (await a.dbg('framingInfo()')).easing) {
+          await a.dbg('sim(6)');
+          simmed += 6;
+        }
         const fly = await a.dbg('framingInfo()');
+        assert.equal(fly.easing, false, `the arrival lands within 90 held frames (took > ${simmed})`);
+
+        // ...and it lands while the dice are still IN THE AIR — the whole
+        // point of moving early. Read off the roll itself, not a guess.
+        const prog = JSON.parse(await a.eval(
+          'JSON.stringify({t: window.__diceDebug.currentRoll.time, dur: window.__diceDebug.currentRoll.duration})'));
+        assert.ok(prog.t < prog.dur,
+          `the camera lands before the dice do (film at ${prog.t.toFixed(2)}s of ${prog.dur.toFixed(2)}s)`);
+
         const fog = await a.dbg('fogDepths()');
         assert.equal(fly.dice, 3, 'three dice are on the felt');
         assert.equal(fog.depths.length, 3, 'and all three are being drawn');
 
-        // 1. THE ROLL IS FRAMED AS THE ROLL, before it has moved. `mat-overflow`
-        //    is the give-up position by another name.
+        // 1. THE ROLL IS FRAMED AS THE ROLL, from the arrival's landing to the
+        //    dice's own. `mat-overflow` is the give-up position by another name.
         assert.notEqual(fly.mode, 'mat-overflow',
           `the flight is framed on the roll, not on a mat that never fit (mode ${fly.mode})`);
         assert.equal(fly.diceOnScreen, 3,

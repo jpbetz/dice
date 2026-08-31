@@ -7303,16 +7303,22 @@ function playRoll(roll, rethrow = null) {
   // refusing (its ungated fit is 0.92x, a shrink). Placed here, the pose this
   // computes is bit-for-bit the pose the settle used to compute.
   //
-  // THIS STRENGTHENS RULING (1) RATHER THAN BENDING IT. The ruling's reason is
-  // that a player must never track motion with a moving frame. Before, the
-  // camera moved once per roll with dice on screen; now it moves once per roll
-  // BEFORE anything is moving and is then perfectly still from the first
-  // tumbling frame to the last. It CUTS rather than eases for the same reason:
-  // an ease would still be travelling 0.42 s into the tumble, which is the one
-  // thing the ruling actually names. A cut at the instant dice appear is a shot
-  // change, not a camera move.
+  // IT EASES, ON THE ARRIVAL CLOCK — and this is ruling (1) re-opened, not
+  // strengthened. It shipped as a CUT first (2026-08-31 am, "a shot change,
+  // not a camera move") and read in play as a snap zoom the same afternoon
+  // (Joe: "the camera movements when rolling dice are super fast... It's
+  // almost jarring" — measured, a desktop 3d6 jumps 156 → 208 px die span in
+  // one frame). §7.62 ⑥ named this exact lever when the cut shipped: the ease
+  // is one argument to applyCameraFraming away, at the price of re-opening
+  // the ruling. Paid, and the amendment's edges are written next to the
+  // ruling itself (CAM_ARRIVE_S, beside CAM_EASE_S): the camera glides onto
+  // the landing frame while the dice are still falling in, lands well before
+  // they do, and is then perfectly still through the tumble and the settle.
   if (pourFilm) towerCamTo('tower');
-  else applyCameraFraming(false);
+  else {
+    applyCameraFraming(true);
+    if (camEase) camEase.dur = CAM_ARRIVE_S;
+  }
 
   // Roll moments (UX §2): a Check/Cinematic attachment stages the playback.
   // Held rolls keep their FULL ceremony (goal 11): the stakes — declaration,
@@ -12827,10 +12833,10 @@ function towerCamTo(phase) {
     // The look-down pan rides a SLOWER clock than every other ease (Joe,
     // 2026-08-12: "when the camera looks down, it needs to pan more
     // slowly"): from the raised tower eye the act-two drop covers the most
-    // ground of any move in the app, and at the shared 0.42 s it read as a
-    // lurch. Only this ease takes the long clock; reframes and the resting
-    // eye keep CAM_EASE_S.
-    if (camEase) camEase.dur = 0.7;
+    // ground of any move in the app, and at the then-shared 0.42 s it read
+    // as a lurch. Scaled with the 2026-08-31 slowdown of every roll clock
+    // (0.7 against the old 0.42), keeping its ~1.6x ratio to CAM_EASE_S.
+    if (camEase) camEase.dur = 1.3;
   }
 }
 
@@ -27180,7 +27186,30 @@ function computeFraming() {
 // are the ONLY camera moves a tower roll makes, both ease over CAM_EASE_S,
 // both are refused under prefers-reduced-motion, and a thrown roll is
 // untouched. See towerCamTo.
-const CAM_EASE_S = 0.42;
+//
+// AMENDED AGAIN FOR THE THROW'S OWN ARRIVAL (Joe, 2026-08-31: "the camera
+// movements when rolling dice are super fast... It's almost jarring"). §7.62
+// moved the reframe to frame zero as a CUT — the one form the ruling had no
+// clause about — and the same day it read in play as a snap zoom (measured:
+// a desktop 3d6 jumps 156 → 208 px die span with a 4-unit target pan, in one
+// frame). §7.62 ⑥ had already named the lever and its price: the ease comes
+// back, and it re-opens this ruling on purpose. So a throw's start now EASES
+// onto the landing frame while the dice fall in — the same arrival concession
+// the pour acts hold — on the slower CAM_ARRIVE_S clock, landing well before
+// the dice do. The rest of the ruling stands: once the arrival lands the
+// frame is perfectly still to the last tumbling frame, and the settle reframe
+// is a no-op because the arrival's destination WAS the settled pose.
+//
+// 0.42 was the shared clock through 2026-08-31 and it is the number the
+// complaint priced: over these distances (the zooms grew, 2026-08-2x) it
+// reads as a lurch, not as a move.
+const CAM_EASE_S = 0.8;
+// The arrival's own clock (a throw's act one — see playRoll). Slower than the
+// shared clock because it runs UNDER flying dice, the busiest picture the app
+// draws, and calm is the point. The ease-out cubic covers ~70% of the travel
+// in its first third, so the frame is essentially placed while the dice are
+// still dropping in from y ≈ 24 (§7.62 ⑤ prices that entry at 0.07–0.20 s).
+const CAM_ARRIVE_S = 0.9;
 
 function applyFramingPose(pose, animate) {
   // The orientation is part of the pose, and it is NOT eased — a table

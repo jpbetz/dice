@@ -7854,6 +7854,21 @@ moving* and is then perfectly still from the first tumbling frame to the last. I
 travelling 0.42 s into the tumble, which is the one thing the ruling names. A cut
 at the instant dice appear is a shot change, not a camera move.
 
+*Amended in play the same afternoon.* Joe: *"the camera movements when rolling
+dice are super fast... It's almost jarring."* The cut IS the jar — measured, a
+desktop 3d6 throw jumps 156 → 208 px of die span with a 4-unit target pan in a
+single frame, and it does so on **every** throw, not just the phone case that
+motivated this section. ⑥'s first bullet had already named the lever and its
+price, and both are paid: the claim at frame zero stays (the pose is still
+computed and committed there, fog floor included), but it is applied as an
+**arrival ease** — `CAM_ARRIVE_S`, 0.9 s, deliberately slower than the shared
+`CAM_EASE_S` (itself raised 0.42 → 0.8 in the same change, with the pour's
+look-down act scaled 0.7 → 1.3 to keep its ratio) — that lands while the dice
+are still in the air and is then still through the rest of the tumble and the
+settle. Ruling ① is thereby **re-opened, on Joe's word**: a throw now holds the
+same narrow arrival concession the pour acts have held since 2026-08-12. The
+amendment's edges live next to the ruling itself, at `CAM_EASE_S` in `js/main.js`.
+
 It must come **after** `currentRoll` is assigned, and that is not a tidiness
 point: the ladder asks `decidingOnScreen()`, which reads `currentRoll.lastLanding`,
 and with `currentRoll` still null every roll falls into the **ungated** rung-2
@@ -7962,6 +7977,8 @@ against an edge case, on a guess about how it looks.
   from an ease at settle to a cut at throw. If it reads badly in play, the ease
   is one argument to `applyCameraFraming` away — but it cannot come back without
   re-opening ruling ①, which is why it is written down here rather than dialled.
+  *(It read badly in play the same day, on every viewport, and the lever was
+  taken exactly as priced — see the amendment under ③.)*
 - **Pours are untouched.** A tower roll's camera is two approved acts of its own
   (`towerCamTo`, docs/TOWER.md) and its dice are deliberately not all visible at
   frame zero, so framing them at frame zero would frame whichever one had been
@@ -7978,7 +7995,10 @@ settled frame cannot speak for: the resting eye is not the scan's ceiling (price
 against `restFrameProbe`'s own reading of that ceiling, so the comparison carries
 no constant), the roll is framed as the roll before it moves, and **no die is in
 fog while tumbling**. Each of the three fixes was reverted in turn and the
-scenario fails on each.
+scenario fails on each. Since the ③ amendment it also grades the **arrival**:
+the frame-zero move is an ease (not a cut), no die passes `fogFar` while the
+ease travels, and the ease lands while the film still has flight left — read off
+`currentRoll.time` against `duration`, not off a frame count.
 
 **`fogDepths()` derives the view transform rather than reading
 `modelViewMatrix`, and that is not a tidy-up.** That matrix is written by
