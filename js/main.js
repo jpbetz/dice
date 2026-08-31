@@ -27172,8 +27172,15 @@ function applyFramingPose(pose, animate) {
   // THE FOG LEARNS WHERE THE EYE IS GOING, here and nowhere else — once per
   // pose, from the pose's DESTINATION, which is what keeps the plane from
   // sliding through the ease (see updateMatFogFloor). Guarded on a real move,
-  // because applyMoodLights rebuilds the Fog, the lamp and the mote field, and
+  // because applyMoodLights rebuilds the Fog and re-derives every light, and
   // this runs on every reframe including the many that change nothing.
+  //
+  // THE GUARD IS ON THE EYE AND NOWHERE ELSE, so `matFogFloor` and the live
+  // `scene.fog` can never disagree. An inner tolerance on the FLOOR was written
+  // here first and it was a latent flake: a sub-threshold move would advance the
+  // floor and skip the rebuild, leaving `no-die-sits-in-fog`'s
+  // `fogNear >= matFogFloor - 1e-9` short by the difference. Skipping both, or
+  // doing both, keeps the pair consistent by construction.
   const eyeMoved = !camFogEye
     || Math.hypot(camFogEye[0] - pose.pos.x, camFogEye[1] - pose.pos.y, camFogEye[2] - pose.pos.z) > 0.1;
   if (eyeMoved) {
@@ -27183,7 +27190,7 @@ function applyFramingPose(pose, animate) {
     camFogEye = [pose.pos.x, pose.pos.y, pose.pos.z];
     const before = matFogFloor;
     updateMatFogFloor();
-    if (moodReady && Math.abs(before - matFogFloor) > 0.01) applyMoodLights();
+    if (moodReady && before !== matFogFloor) applyMoodLights();
   }
   if (!animate || prefersReducedMotion()) {
     camEase = null;
