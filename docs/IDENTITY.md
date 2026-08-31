@@ -1,4 +1,4 @@
-# IDENTITY.md — what a "who" is at this table (2026-08-17, §8 added 2026-08-18)
+# IDENTITY.md — what a "who" is at this table (2026-08-17, §8 added 2026-08-18, decision 7 added 2026-08-31)
 
 *THE ORDER #9. The structural-bet entry said "schedule the later pass before
 the next feature that needs a stable who; B1 is that feature and it has
@@ -195,6 +195,57 @@ live clients · never persisted server-side beyond the room's own life
    nothing out.
 6. **Google sign-in stays deferred**; PROFILES §6 is unamended by this
    pass.
+7. **A body at the table needs its own two words, because `seat` and
+   `chair` are already spoken for.** *(2026-08-31, with the design behind
+   [ROADMAP](ROADMAP.md) THE ORDER #14, "A place at the table". Recorded
+   here rather than in the feature's own doc because §1's whole point is
+   that three objects already wear the word "who" and a fourth arriving
+   quietly is how they got confused in the first place.)*
+
+   - **`place`** — the STATION at the table: an integer 0–7, assigned by
+     the server, sticky for as long as the player is there and for the
+     60 s of the vacated stub after they go. Code: `place`, `PLACE_MAX`,
+     `freePlace`, `keepPlace`, `placeOrbit`, `placeAnchor(id)`.
+   - **`placard`** — the OBJECT standing there, the folded name card that
+     the station is read from. Code: `js/placard.js`, `PLACARD_*`.
+   - **`seat` is untouched** — it is still the `playerId`, still the sole
+     credential, decision 3 above. **`chair` is untouched** — it is still
+     the dashed unclaimed-seat pill in the presence row (UX §7.20). A
+     place is not a seat you take; it is where the seat you already hold
+     is standing.
+
+   **What `place` may and may not do.** It is display state and it is
+   allowed to be wrong for a frame: nothing downstream of a pixel reads
+   it. So — **it is never read off a request body** (the server assigns
+   it and only the server assigns it), it is **never in
+   `GET /api/table`** (the one unauthenticated read keeps its written-out
+   budget), it is **not in the portable YAML** and **not in the URL**
+   (goal 7: the URL addresses a table and carries no user state). It
+   authorizes nothing, gates nothing, and owns no felt (goal 10; the risk
+   clause at [IMMERSION](IMMERSION.md) item 16 is re-affirmed there,
+   unamended).
+
+   **§5's five must-nots govern `who`, not this.** `place` is displayed
+   and it does ride broadcasts — that is the entire point of it. What it
+   shares with `who` is only the last must-not: it is never persisted
+   beyond the room's own life, because rooms die whole.
+
+   **The two clocks of §8, one each.** The **placard** answers the
+   ROSTER clock (`DISCONNECT_GRACE_MS`, 5 s): it vanishes when the player
+   does, because presence is asserted, never inferred. Their dice and
+   their log rows keep their names on the HISTORY clock and do not
+   vanish. The **place** answers the MEMORY clock (`RESUME_TTL_MS`,
+   60 s): the vacated stub holds the station, so a reload lands you back
+   where you were sitting rather than at the next free station.
+
+   **What is NOT identity, and must never be filed here.** The film's
+   inputs — `roll.entry` (which edge a throw comes in over) and
+   `roll.lane` — are stamped onto the ROLL by the server and ride the
+   roll payload in the seed's determinism class. They are not roster
+   state, they are not a "who", and the film never reads the roster to
+   get them. If a later pass finds itself adding a position field beside
+   `playerId` to make the dice come from the right side, it has taken the
+   wrong turn: the turn was taken here, on purpose.
 
 ## 7. The question, and Joe's answer: **rung 2 is CLOSED**
 

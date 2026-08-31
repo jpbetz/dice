@@ -248,7 +248,7 @@ each unblock a group in Wave 2.
 | 13 | The Felt Answers Each Die | 3 | noticeable | medium | **yes ×3** |
 | 14 | The Edge of the World | 3 | noticeable | medium | **yes ×2** |
 | 15 | The Cup (online half) | 4 | transformative | large | **yes ×3** |
-| 16 | The Table Has Sides | 4 | noticeable | medium | **yes ×2** |
+| 16 | The Table Has Sides — **SUPERSEDED 2026-08-31, read the item** | 4 | noticeable | medium | **yes ×2** |
 | 17 | The Pour | 4 | noticeable | large | **yes ×3** |
 | 18 | The Plinth | 4 | transformative | large | **yes ×4** |
 | 19 | The Tower | 4 | transformative | large | **yes ×5** |
@@ -1357,6 +1357,49 @@ cannot vibrate.
 
 ### 16. The Table Has Sides
 
+> **SUPERSEDED 2026-08-31 — the successor is "A place at the table"**
+> ([ROADMAP](ROADMAP.md) THE ORDER #14), designed *against* this item rather
+> than around it. **The record for what actually ships is UX §7.63**, written
+> in the ship commit; until that section exists, THE ORDER's row is the
+> authority and this pointer is the only route to it. Six things a reader of
+> this item needs to know before quoting it:
+>
+> 1. **Both of this item's kills are honoured.** No `DecalField`, and no seat
+>    angle derived from the client's `players` index. The crescent is gone with
+>    them: the marker is a **placard** — a folded tent card in a low holder,
+>    real geometry standing *outboard of the physics wall*, casting a real
+>    shadow, at 256 px per world unit of its own atlas. It is not a mark on the
+>    felt at all, which is why it never touches the residue ruling.
+> 2. **The correction in "How it is built" was taken, then taken further.** The
+>    station is server-authored (`place`, on the roster, through one extracted
+>    `publicPlayer(p)` projection so the `set`-class bug cannot recur), and the
+>    THROW's input is stamped separately onto the roll as `roll.entry` /
+>    `roll.lane`. **The film never reads the roster.** The roster-index hazard
+>    named at :1367-1382 — the visual claim being false while the readout says
+>    Ravi — is therefore closed by construction, not by discipline.
+> 3. **The risk clause below is re-affirmed unamended and the successor is
+>    bound by it**, so it is quoted here rather than pointed at: *"A seat is a
+>    POSITION and a COLOUR, nothing else. It confers no capability, gates no
+>    action, owns no region of felt, cannot be claimed or refused. If a seat
+>    ever becomes a thing you can take or a place only your dice may land, the
+>    proposal has failed."* Read `place` for `seat` and it stands unchanged.
+>    The one thing that presses on it is the
+>    landing bias, and it is priced: the aim box is **translated, never shrunk**
+>    — at most 0.99 units on an 11-unit mat, straddling the centre in every
+>    case, auto-collect untouched, one roll on the felt. **No felt is owned**,
+>    and the sentence above is the test any later pass is measured against.
+> 4. **The geometry collision at the foot of this item is void, not fixed.**
+>    Every placard stands outboard of a wall plane, so it cannot meet a shelf
+>    slot, a die, or the ground-plane traps that go with them.
+> 5. **Solo gets nothing, as this item intended** — empty roster, no place, no
+>    placard, and `Math.floor(rng()*4)` still drawn, so the film is
+>    bit-identical to today's.
+> 6. **What this item could not reach, the successor can.** "Your dice come
+>    from your edge" is unreachable while a tower is socketed (a pour never
+>    touches `spawnDie`). The back stations relocate to the tower's flanks and
+>    the WASH — a transient arc of the roller's hue under their own placard —
+>    keeps naming the roller through the doorway.
+
 **What the player feels.** Four of you. Around the mat's edge, four faint
 crescents of colour — yours amber at the near edge, Ana's teal on the left. The
 table has SIDES now, and each side is somebody. Ravi rolls: his crescent
@@ -2120,6 +2163,39 @@ effects by name — several for exactly the sin an always-present mark commits. 
 strongest case for is that a six-person room and a solo room currently look
 **identical** on the felt.
 
+> **Q5 AND Q6, AS THEY STAND AFTER 2026-08-31.** Item 16's successor —
+> [ROADMAP](ROADMAP.md) THE ORDER #14, "A place at the table" — is the first
+> thing built that these two questions gate, so the state of both is worth
+> writing down where they are asked rather than leaving it to be re-derived.
+>
+> **Q5 was already ruled, and the ruling is ④ above** (2026-08-09: *a mark may
+> persist as long as the thing it represents is present*). The "Not yet ruled"
+> list beside ④ already leaves Q5 out and keeps only Q6; anyone who reads this
+> question as still open has read the question and not the ruling, and it has
+> happened at least once. **The successor does not spend it.** Its placard is not a mark on
+> the felt — it is an object standing outboard of the physics wall, in the
+> category the tower and the stump are in — and its only felt-side cue, the
+> **wash**, is a transient arc under the roller's placard that lives exactly as
+> long as their film. So the design sits inside the *original* 2026-08-03
+> residue ruling as this question phrased it — **transient and caused, yes;
+> accumulating, no** — and ④'s wider licence, along with the propagation debt
+> ④ names above, is neither drawn on nor deepened by it. The placard's category
+> is **presence**, not residue: it answers the 5 s roster clock and vanishes
+> when the person does ([IDENTITY](IDENTITY.md) §6 decision 7, §8).
+>
+> **Q6 is still not ruled in the abstract, and it is answered in the concrete
+> by the build order.** §1 is Joe's own entry in [BRAINSTORM](BRAINSTORM.md)
+> and the first of that doc's ideas to earn a ROADMAP line, which is the only
+> way anything in there is ever scheduled — so THE ORDER's row IS the ruling,
+> for this one table's worth of it. The strongest case for, quoted from this question, is the thing
+> that changes: a six-person room and a solo room stop looking identical on the
+> felt, **exactly when there is somebody to read**. What is bought with it is
+> bounded and stated: one merged mesh, one material, ≤ 4 draw calls, no light
+> added, nothing standing on the felt, and nothing at all on a solo table.
+> **This does not generalise** — it is one answer for one surface, not the
+> line's new position; the other five items this question affects still need it
+> drawn.
+
 **7. Does `fx.html` ship to production?** One line in `.gcloudignore`. Shipping
 it is what makes items 4, 7, 15, 19 and 21 judgeable at all, because they cannot
 be judged on a desktop. No roles, no secrets, and the flag cannot reach another
@@ -2187,6 +2263,22 @@ reads "The collect shelf — *supersedes landing zones*." Item 16 reaches the sa
 goal ("mat color per-player, visible to all") through server-authored seat
 numbers and scene geometry, needing no zones at all. §12 should be rewritten
 against that, or closed and re-minted.
+
+> **CLOSED 2026-08-31, per this paragraph's own instruction.** Neither
+> rewritten nor re-minted: §12's goal is reached whole by item 16's successor,
+> [ROADMAP](ROADMAP.md) THE ORDER #14, "A place at the table", which needs no
+> zones and takes a new number rather than reusing 12 (C4: one owner per
+> numbering namespace). **What §12 asked for and what #14 gives it:** "mat
+> colour per-player, visible to all" becomes a **placard** — the player's hue
+> on a real object standing at their station, visible to everyone, turned
+> toward each reader — plus a **wash**, a transient arc of that same hue on the
+> ground under it while their roll is in the air. **What §12 asked for and does
+> not get, deliberately:** a per-player REGION of mat. That is the sentence
+> item 16's risk clause forbids (`:1399-1403`, re-affirmed unamended at the
+> head of the item), and the felt is still the one place a roll lands, on one
+> server-authored auto-collect clock. ROADMAP §12 keeps its number as history
+> (C4, and that file's own convention at its §13) and now carries the pointer
+> back to here and on to #14, so the section cannot be read as open.
 
 **Tier 6 §9 (Dice sets — art direction continues)** — item 12 is the sharpest §9
 item available, because it ships an effect that is already compiled into every
