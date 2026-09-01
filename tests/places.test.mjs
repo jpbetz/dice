@@ -26,7 +26,7 @@ limitations under the License.
 import assert from 'node:assert/strict';
 import {
   PLACE_MAX, PLACE_LANE, PITCH_MIN, PLACARD_STANDOFF, PLACARD_W, PLACARD_D,
-  STATIONS, PLACE_AIM, AIM_ZERO,
+  STATIONS, PLACE_AIM, PLACE_AIM_AUTHORED, AIM_ZERO,
   entryFor, placeAnchor, placardFootprint, placardGap, laneSpread, aimFor,
 } from '../js/places.js';
 
@@ -329,7 +329,40 @@ t('an unstamped roll gets the one shared zero, by reference', () => {
   assert.throws(() => { AIM_ZERO.x = 5; }, 'the shared zero cannot be poisoned');
 });
 
-t('the worked aims at medium', () => {
+// THE DIALS SHIP AT ZERO (the gate's pre-declared fallback, taken 2026-08-31 —
+// see PLACE_AIM in js/places.js for the numbers). The MECHANISM is still
+// pinned, against the authored dials it was designed and measured with, so
+// re-enabling it is one assignment and not a re-derivation: the two worked
+// tests below run under PLACE_AIM_AUTHORED and put the shipped dial back.
+const underAuthoredAim = (fn) => {
+  const shipped = { ...PLACE_AIM };
+  Object.assign(PLACE_AIM, PLACE_AIM_AUTHORED);
+  try { fn(); } finally {
+    for (const k of Object.keys(PLACE_AIM)) delete PLACE_AIM[k];
+    Object.assign(PLACE_AIM, shipped);
+  }
+};
+
+t('the shipped dial is zero, and a zero dial aims every stamped throw at the centre', () => {
+  assert.deepEqual(PLACE_AIM, { lateral: 0, entry: 0, minTravel: 0 },
+    'the pre-declared fallback ships: the edge alone carries');
+  assert.deepEqual(PLACE_AIM_AUTHORED, { lateral: 0.34, entry: 0.18, minTravel: 1.6 },
+    'and the authored dials are kept on record, frozen');
+  assert.throws(() => { PLACE_AIM_AUTHORED.entry = 1; }, 'the record cannot be edited in place');
+  for (const [, z] of Object.entries(ZOOMS)) {
+    for (let entry = 0; entry < 4; entry++) {
+      for (const lane of [-PLACE_LANE, -0.98, 0, 0.98, PLACE_LANE]) {
+        const aim = aimFor(entry, lane, z.w, z.d, THROW_TARGET);
+        // Numerically zero on both axes — `0 + v` and `-0 + v` are both `v`,
+        // so a stamped throw lands through the box an unstamped one does.
+        assert.equal(aim.x + 1, 1, `w${z.w}/${entry}/${lane}: no lateral bias`);
+        assert.equal(aim.z + 1, 1, `w${z.w}/${entry}/${lane}: no entry bias`);
+      }
+    }
+  }
+});
+
+t('the worked aims at medium (under the authored dials)', () => underAuthoredAim(() => {
   const { w, d } = ZOOMS.medium;
   const near = (got, want, why) => assert.ok(Math.abs(got - want) < 1e-9, `${why}: ${got}`);
   const front = aimFor(0, 0, w, d, THROW_TARGET);
@@ -344,9 +377,9 @@ t('the worked aims at medium', () => {
   near(right.x, 0.99, 'the right head aims off its own edge');
   near(right.z, 0, 'and takes no lateral bias — heads are single-station');
   near(aimFor(2, 0, w, d, THROW_TARGET).x, -0.99, 'the left head mirrors it');
-});
+}));
 
-t('the wall cap binds at close and not at medium (the negative control)', () => {
+t('the wall cap binds at close and not at medium (the negative control, authored dials)', () => underAuthoredAim(() => {
   const capOf = (extent) => ZOOMS.close[extent === 'z' ? 'd' : 'w'];
   const closeFront = aimFor(0, 0, ZOOMS.close.w, ZOOMS.close.d, THROW_TARGET);
   const cap = capOf('z') / 2 - capOf('z') * THROW_TARGET / 2 - 1.25;
@@ -356,9 +389,14 @@ t('the wall cap binds at close and not at medium (the negative control)', () => 
   const medCap = ZOOMS.medium.d / 2 - ZOOMS.medium.d * THROW_TARGET / 2 - 1.25;
   assert.ok(Math.abs(medFront.z) < medCap - 1e-9,
     'at medium the travel floor decides, not the wall');
+}));
+
+t('the dial is restored after the authored-dial pins', () => {
+  assert.deepEqual(PLACE_AIM, { lateral: 0, entry: 0, minTravel: 0 },
+    'a pin that ran under the authored dials put the shipped zero back');
 });
 
-t('the box is translated, never shrunk — and it always straddles the centre', () => {
+t('the box is translated, never shrunk — and it always straddles the centre (authored dials)', () => underAuthoredAim(() => {
   for (const [id, z] of Object.entries(ZOOMS)) {
     for (let entry = 0; entry < 4; entry++) {
       const alongZ = entry <= 1;
@@ -379,12 +417,13 @@ t('the box is translated, never shrunk — and it always straddles the centre', 
         `${id}/${entry}: the lateral bias never exceeds one lane's worth`);
     }
   }
-});
+}));
 
-t('every bias is a nudge — nothing owns felt', () => {
+t('every bias is a nudge — nothing owns felt (authored dials)', () => underAuthoredAim(() => {
   // IMMERSION:1399-1403, re-affirmed unamended. A lane only exists on the long
   // edges (heads are single-station), so those are the only combinations a
-  // table can actually produce.
+  // table can actually produce. Pinned under the AUTHORED dials — the shipped
+  // zero satisfies every line here trivially, and a vacuous pin is no pin.
   let worst = 0;
   for (const [id, z] of Object.entries(ZOOMS)) {
     for (let entry = 0; entry < 4; entry++) {
@@ -398,6 +437,7 @@ t('every bias is a nudge — nothing owns felt', () => {
   }
   assert.ok(worst <= 0.99 + 1e-9,
     `the largest bias on the default mat is ${worst.toFixed(3)} — on a mat 11 wide`);
-});
+  assert.ok(worst > 0.9, `and the pin is not vacuous: the authored dials really bias (${worst.toFixed(3)})`);
+}));
 
 console.log(process.exitCode ? `${n} tests, FAILURES above` : `all ${n} places tests pass`);

@@ -261,12 +261,34 @@ export function laneSpread(laneSlot, room, spread, count) {
 
 // THE NEGOTIABLE HALF, NAMED BEFORE THE MEASUREMENT RAN. The entry edge is the
 // read; this is the nudge that makes the read felt in where the dice come to
-// rest. It ships only if settle-matrix says Δ pile-refusal ≤ +2.0 points AND
-// Δ median duration ≤ +0.25 s AND no cell regresses > +4.0 points — else these
-// two dials ship at 0 and the edge alone carries. `__diceDebug.setPlaceAim`
-// writes this object in place (the setThrowTarget pattern), so it is a mutable
-// const on purpose.
-export const PLACE_AIM = { lateral: 0.34, entry: 0.18, minTravel: 1.6 };
+// rest. The rule, made before the numbers existed: it ships only if the gate
+// (tools/steps/place-settle.mjs) says Δ pile ≤ +2.0 points AND Δ median
+// duration ≤ +0.25 s AND no cell regresses > +4.0 points against the
+// placeless baseline — else the dials ship at 0 and the edge alone carries.
+//
+// THE GATE RAN 2026-08-31 AND THE DIALS SHIP AT ZERO. Measured over {close,
+// medium} × {6d6, 12d6, 3d20} × stations {0, 2, 4}, 24 seeds a cell: mean
+// Δpile +1.0pp (pass), mean Δmedian +0.02 s (pass), worst cell +8.3pp at
+// close/3d20 from the right head (FAIL, bar +4.0). The pre-declared fallback
+// is taken as declared. What the attribution run beside it found — recorded
+// so the dial is never re-decided from the headline alone: every cell over
+// the bar was the HEAD station, and the fallback itself (aim zero, entry
+// kept) reads +9.0pp worst against the same baseline — a short-edge throw
+// piles more than the four-side average whether or not the box moves, and
+// the entry is the read, not the negotiable half. The aim's OWN cost, same
+// stamps and seeds, aim on minus aim off: mean +0.2pp, +0.04 s, worst cell
+// +6.9pp (5 dice of 72, one 3d20 cell). The authored dials are kept below as
+// PLACE_AIM_AUTHORED, the values the mechanism is unit-pinned against and
+// the value the gate's `ab` mode measures; re-enabling is one assignment.
+//
+// The measurement's dial is this object, written in place (the setThrowTarget
+// pattern — tools/steps/place-settle.mjs reaches it through the page's own
+// module instance), so it is a mutable const on purpose. With every dial at 0
+// aimFor returns a numerically zero aim: `0 + v` is `v` on the same double,
+// so a stamped throw aims exactly where an unstamped one does and differs
+// from it only by its edge and its lane.
+export const PLACE_AIM = { lateral: 0, entry: 0, minTravel: 0 };
+export const PLACE_AIM_AUTHORED = Object.freeze({ lateral: 0.34, entry: 0.18, minTravel: 1.6 });
 
 // The widest die's rest ceiling, kept off the mat's rim by the cap below.
 const AIM_HULL = 1.25;

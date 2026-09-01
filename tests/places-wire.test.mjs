@@ -50,10 +50,12 @@ limitations under the License.
 //      through. publicPlayer is now the only projection there is, and this file
 //      asserts the payloads key for key rather than trusting that.
 //
-// The redaction legs at the bottom are the stamp slice's landing pad: `entry`
-// and `lane` join the redacted branch there, and the assertion that matters —
-// that a redacted roll still omits every value-bearing key — is pinned HERE, so
-// the slice that widens that branch cannot widen it by accident.
+// The redaction legs at the bottom were the stamp slice's landing pad, and the
+// stamp has now landed: `entry` and `lane` ride the redacted branch beside
+// `seed`. The assertion that matters — that a redacted roll still omits every
+// value-bearing key — was pinned BEFORE that branch widened, so widening it
+// could not widen it by accident; section 6 proves the stamp itself, end to
+// end, through a real roll and a real stream.
 //
 // A real server.js child on an ephemeral port — never 8123 (Joe's live table).
 
@@ -64,7 +66,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { projectEntryFor } from '../server.js';
-import { PLACE_MAX } from '../js/places.js';
+import { PLACE_MAX, entryFor } from '../js/places.js';
 
 // server.js installs a swallow-and-continue uncaughtException handler for its
 // own resilience; a test run must crash loudly instead.
@@ -419,13 +421,14 @@ await t('a stub that expires gives its station up', async () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. Redaction — the landing pad for the stamp (S5 widens this branch)
+// 5. Redaction — the stamp rides it, the values never do
 // ---------------------------------------------------------------------------
 
-// The stamp slice adds `entry` and `lane` to the redacted branch beside `seed`:
-// pose inputs, disclosing strictly less than the `playerId` that branch already
-// ships. What must stay true either way is asserted here, so widening the
-// branch cannot widen it by accident.
+// The stamp slice added `entry` and `lane` to the redacted branch beside
+// `seed`: pose inputs, disclosing strictly less than the `playerId` that
+// branch already ships. What had to stay true across that widening is asserted
+// here — and the stamp is present-or-absent, so a stampless entry's redaction
+// is still byte-for-byte the pre-places projection.
 const heldEntry = () => ({
   rollId: 'r1',
   playerId: 'ann',
@@ -450,10 +453,21 @@ await t('a redacted roll still omits every value-bearing key', () => {
   }
   assert.equal(out.seed, 1234, 'the seed rides — poses only');
   assert.equal(out.redacted, true);
-  // Pre-wired for the stamp: today there is nothing to carry, so the branch
-  // must not be inventing one either.
-  assert.equal('entry' in out, false, 'no entry until the stamp slice');
-  assert.equal('lane' in out, false, 'no lane until the stamp slice');
+  // A stampless entry carries no stamp: present-or-absent, never invented, so
+  // this projection is byte-for-byte what it was before places existed.
+  assert.equal('entry' in out, false, 'no entry key on a stampless entry');
+  assert.equal('lane' in out, false, 'no lane key on a stampless entry');
+});
+
+await t('a redacted roll carries the stamp, and still no values', () => {
+  const stamped = { ...heldEntry(), entry: 1, lane: -1 };
+  const out = projectEntryFor(stamped, 'bystander');
+  assert.equal(out.entry, 1, 'the entry edge survives redaction — a pose input');
+  assert.equal(out.lane, -1, 'and the lane with it');
+  assert.equal(out.redacted, true);
+  for (const key of ['values', 'perDie', 'modifier', 'total', 'spec']) {
+    assert.equal(key in out, false, `${key} still omitted beside the stamp`);
+  }
 });
 
 await t('a secret roll is projected as nothing at all', () => {
@@ -461,6 +475,69 @@ await t('a secret roll is projected as nothing at all', () => {
   assert.equal(projectEntryFor(secret, 'bystander'), null,
     'no payload, no film, no cue — there is structurally nothing to suppress');
   assert.ok(projectEntryFor(secret, 'ann'), 'the roller still sees their own');
+});
+
+// ---------------------------------------------------------------------------
+// 6. The stamp itself — server-set, from the roster, onto the payload
+// ---------------------------------------------------------------------------
+
+await t('a roll is stamped with its roller\'s own entry and lane, and everyone gets the same integers', async () => {
+  const room = 'wire-stamp';
+  const ann = await seat(base, room, 'Ann');    // place 0 — front, lane 0
+  const bram = await seat(base, room, 'Bram');  // place 1 — back, lane 0
+  const r = await postTo(base, '/api/roll', { room, playerId: ann.playerId, notation: '2d6' });
+  assert.equal(r.status, 200, r.text.slice(0, 200));
+  const want = entryFor(0, false);
+  assert.equal(r.data.roll.entry, want.entry, 'the response carries the front station\'s edge');
+  assert.equal(r.data.roll.lane, want.lane, 'and its lane');
+  // The same integers reach the OTHER side of the table on the broadcast —
+  // the whole point: one payload, one film, no client-side re-derivation.
+  const heard = await waitForEvent(bram.stream, 'roll', (d) => d.rollId === r.data.roll.rollId);
+  assert.equal(heard.data.entry, r.data.roll.entry, 'the broadcast carries the same edge');
+  assert.equal(heard.data.lane, r.data.roll.lane, 'and the same lane');
+  // And the stamp is the ROLLER's, not the room's: Bram's own roll comes in
+  // from Bram's station.
+  const r2 = await postTo(base, '/api/roll', { room, playerId: bram.playerId, notation: '1d20' });
+  assert.equal(r2.data.roll.entry, entryFor(1, false).entry, 'Bram\'s roll wears Bram\'s edge');
+});
+
+await t('a placeless roller\'s payload carries no stamp at all', async () => {
+  const room = 'wire-stamp-overflow';
+  const ids = [];
+  for (let i = 0; i <= PLACE_MAX; i++) {
+    const r = await joinRoom(room, `P${i}`);
+    assert.equal(r.status, 200, r.text.slice(0, 200));
+    ids.push(r.data.playerId);
+  }
+  // The ninth chair does not exist: no place, so no entry, no lane — the key
+  // is ABSENT, and the film falls back to the seeded draw it always had.
+  const r = await postTo(base, '/api/roll', { room, playerId: ids[PLACE_MAX], notation: '2d6' });
+  assert.equal(r.status, 200, r.text.slice(0, 200));
+  assert.equal('entry' in r.data.roll, false, 'no entry key on a placeless roll');
+  assert.equal('lane' in r.data.roll, false, 'no lane key either');
+});
+
+await t('a re-throw is re-stamped from the live place — the tower remap included', async () => {
+  const room = 'wire-stamp-rethrow';
+  const ann = await seat(base, room, 'Ann');    // place 0
+  const bram = await seat(base, room, 'Bram');  // place 1 — BACK, remapped by a tower
+  const first = await postTo(base, '/api/roll', { room, playerId: bram.playerId, notation: '2d6 t2' });
+  assert.equal(first.status, 200, first.text.slice(0, 200));
+  assert.equal(first.data.roll.entry, entryFor(1, false).entry, 'throw one enters from the back');
+  // The tower socketed between throws: the back stations move to its flanks,
+  // and Bram's SECOND throw must enter beside where his placard stands now —
+  // entryFor's towerUp remap, read off the room's own live setting.
+  const set = await postTo(base, '/api/settings',
+    { room, playerId: ann.playerId, settings: { tower: 'blackanvil' } });
+  assert.equal(set.status, 200, set.text.slice(0, 200));
+  const again = await postTo(base, '/api/rethrow',
+    { room, playerId: bram.playerId, rollId: first.data.roll.rollId, keep: [0] });
+  assert.equal(again.status, 200, again.text.slice(0, 200));
+  const flank = entryFor(1, true);
+  assert.notEqual(flank.entry, entryFor(1, false).entry,
+    'the remap is a real remap, or this leg proves nothing');
+  assert.equal(again.data.roll.entry, flank.entry, 'the re-throw enters from the flank');
+  assert.equal(again.data.roll.lane, flank.lane, 'flanks are single-station: lane 0');
 });
 
 await stopServer(proc);

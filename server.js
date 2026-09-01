@@ -49,10 +49,13 @@ import { SET_IDS } from './js/themes.js';
 import { SYSTEM_IDS } from './js/meanings.js';
 // A place at the table (docs/UX.md §7.63). The station arithmetic is written
 // ONCE, in js/places.js, and this process and every browser import the same
-// file — the js/rollspec.js precedent. Here it is the ladder's own ceiling:
+// file — the js/rollspec.js precedent. PLACE_MAX is the ladder's own ceiling:
 // how many stations there are to hand out is a fact about the LAYOUT, not a
-// number the server gets to hold a second copy of.
-import { PLACE_MAX } from './js/places.js';
+// number the server gets to hold a second copy of. entryFor is the film half:
+// which edge, and which lane of it, a station's throws come in from —
+// executeRoll stamps its answer onto the roll payload, and every client bakes
+// the film from the stamp, never from a roster of its own.
+import { PLACE_MAX, entryFor } from './js/places.js';
 // C22: the stamp's SHAPE only. The server carries `ver` on a table setup and
 // never judges it — see handleTable — so it imports the parser and nothing
 // else, which is also what keeps the regex in one file.
@@ -2180,6 +2183,19 @@ function projectEntryFor(entry, viewerId) {
     // value. The audience list itself is not repeated here.
     revealAuthority: vis.revealAuthority,
   };
+  // The place stamp survives redaction (UX §7.63): `entry`/`lane` are POSE
+  // inputs of exactly the seed's class — the shrouded film visibly tumbles in
+  // over the roller's edge, and this branch already ships the `playerId` and
+  // name standing at that edge, so the stamp discloses strictly less than
+  // what rides beside it. Present-or-absent like the stamp itself, so a
+  // stampless entry's redaction is byte-for-byte what it always was. (A
+  // SECRET roll never reaches this line for anyone but its roller: the
+  // projection above is null — no payload, no film, no cue, structurally
+  // nothing to suppress.)
+  if (Number.isInteger(entry.entry)) {
+    out.entry = entry.entry;
+    out.lane = entry.lane;
+  }
   if (entry.exp) out.exp = entry.exp;
   // A TURN'S BUDGET IS A STAKE, not a value (MECHANICS M2). How many throws
   // a turn has and how many are spent is exactly as public as which dice are
@@ -2313,6 +2329,25 @@ function executeRoll(room, player, spec) {
     seed: crypto.randomInt(0, 2 ** 32),
     t: Date.now(),
   };
+  // WHICH EDGE, AND WHICH LANE OF IT, THIS THROW COMES IN FROM (UX §7.63).
+  // Stamped here, from this server's own roster, at the moment the dice are
+  // drawn — never computed by a client, never re-derived later. Film inputs of
+  // exactly the seed's class: every client bakes the same tumble because the
+  // same integers reached all of them on the same payload (goal 8/15). They
+  // ride the ENTRY, not the roster — the roster is live state, the log is
+  // history (GOALS:297-306) — so a replay after the roller left still enters
+  // from the edge it entered from. Present-or-absent like every field above:
+  // a placeless roller's payload (the 9th chair, solo, PLACES_ON off) stays
+  // byte-for-byte what it always was, and their dice keep the seeded draw.
+  // No CLIENT's tower view is consulted — entryFor reads this room's own
+  // setting, so a pour (which ignores the stamp) and a re-throw (which
+  // honours it) both carry one shared answer, and a client whose tower
+  // change is still deferred to the next roll boundary cannot desync anyone.
+  if (PLACES_ON && Number.isInteger(player.place)) {
+    const towerUp = !!(room.settings.tower && room.settings.tower !== 'none');
+    const e = entryFor(player.place, towerUp);   // {entry, lane} | null
+    if (e) { roll.entry = e.entry; roll.lane = e.lane; }
+  }
   // Only a dressed-up roll carries the field at all, so a Plain roll's payload
   // — broadcast, response and log entry alike — stays byte-for-byte what it
   // was before experiences existed. It also rides on `spec`, because spec IS
@@ -2647,6 +2682,20 @@ async function handleRethrow(req, res) {
   // nothing to replay. Parking them on the entry would broadcast a stale
   // "which dice moved" with every future projection of it.
   const seed = crypto.randomInt(0, 2 ** 32);
+
+  // The re-throw enters from the acting player's LIVE place at rethrow time
+  // (UX §7.63). A re-throw is always thrown, even under a tower — and the
+  // tower may have socketed or gone since the first throw, which remaps the
+  // back stations to its flanks (js/places.js entryFor carries the remap). So
+  // the stamp is refreshed with the same guard executeRoll uses: the payload
+  // every client re-bakes from says where the roller's chair stands NOW. A
+  // roller who holds no place refreshes nothing — a birth stamp, had there
+  // been one, stays, because the entry is history and history keeps its edge.
+  if (PLACES_ON && Number.isInteger(player.place)) {
+    const towerUp = !!(room.settings.tower && room.settings.tower !== 'none');
+    const e = entryFor(player.place, towerUp);
+    if (e) { roll.entry = e.entry; roll.lane = e.lane; }
+  }
 
   logDebug(() => `rethrow ${logField('room', room.name)} ${logField('name', player.name)} `
     + `rollId=${rollId} throw=${roll.throws.used}/${roll.throws.max} thrown=${thrown.join(',')}`

@@ -18630,20 +18630,62 @@ export const scenarios = [
     //
     // The hover-hold half of U26 is deliberately NOT asserted here yet: it is
     // U25/U26's own build step and its scenario folds in beside this one.
+    //
+    // THE FELT JOINED THE WALK with a place at the table (UX §7.63): each roll
+    // now comes in over its roller's own edge, so the first read — WHOSE — is
+    // made from the motion, with the log closed, before any log row is
+    // consulted. The placard that labels the edge and the wash that lights
+    // under it land in later slices and will join the same leg; the edge is
+    // the half that ships first because it is the half that cannot be cut.
     async fn(ctx) {
       const ada = await ctx.newTable({ origin: '127.0.0.31', name: 'Ada' });
       const bram = await ctx.newTable({ origin: '127.0.0.32', name: 'Bram' });
       const cass = await ctx.newTable({ origin: '127.0.0.33', name: 'Cass' });
       await cass.waitFor(`window.__diceDebug.players.length === 3`, { desc: 'three at the table' });
 
+      // (0) WHOSE ROLL IT IS, FROM THE FELT ALONE. Cass keeps the log shut and
+      // watches the dice arrive. The film's own record of where a throw came
+      // in from, bound to the roster's record of who sits at that edge, has to
+      // name the roller — and name a DIFFERENT roller for Bram than for Ada,
+      // or the read is a coin. Nothing here opens a popover, reads a log row,
+      // or touches the banner.
+      await cass.dbg('setLogFlyout(false)');
+      const rollerByEdge = (t) => t.eval(`(() => {
+        const D = window.__diceDebug;
+        const org = D.throwOrigin();
+        if (!org || org.from !== 'place') return { who: null, org };
+        const SIDE = { front: 0, back: 1, left: 2, right: 3 };
+        const st = D.places().stations.find((s) => SIDE[s.station] === org.entry && s.lane === org.lane);
+        return { who: st ? st.name : null, entry: org.entry };
+      })()`);
+      const landsFor = (t, rid, count) => t.waitFor(
+        `(window.__diceDebug.sim(120), !window.__diceDebug.busy`
+        + ` && window.__diceDebug.tableDice.length === ${count}`
+        + ` && !!window.__diceDebug.entryState(${JSON.stringify(rid)}))`,
+        { desc: `roll ${rid} lands for the spectator`, timeout: 60000 });
+
       // Two people play. Cass does not.
       await ada.roll('2d8[Wisdom] # Read the room');
       const first = await ada.rollId();
+      await landsFor(cass, first, 2);
+      const readFirst = await rollerByEdge(cass);
+      assert.equal(readFirst.who, 'Ada',
+        `the dice came in over Ada's edge, and the felt says so (${JSON.stringify(readFirst)})`);
       await bram.roll('1d10[Sword] # Cut the rope');
       const second = await bram.rollId();
+      await landsFor(cass, second, 1);
+      const readSecond = await rollerByEdge(cass);
+      assert.equal(readSecond.who, 'Bram',
+        `and Bram's over Bram's (${JSON.stringify(readSecond)})`);
+      assert.notEqual(readFirst.entry, readSecond.entry,
+        'two rollers, two edges — the spectator can tell them apart by where the dice came from');
       await ada.roll('d20 held # Something behind the screen');
       const hidden = await ada.rollId();
       await cass.waitFor(shroudSettled(hidden), { desc: 'the shrouded roll settles for the spectator' });
+      // Face down, and STILL from Ada's edge: the stamp survives redaction,
+      // because which chair a throw came from is a stake, never a value.
+      assert.equal((await rollerByEdge(cass)).who, 'Ada',
+        'the held roll is unreadable, and its edge still says whose it is');
 
       // (1) WHOSE ROLL IT WAS — attribution, from the chair.
       for (const [id, who] of [[first, 'Ada'], [second, 'Bram']]) {
@@ -19968,42 +20010,64 @@ export const scenarios = [
     // being recorded at all — would pass this scenario forever while measuring
     // nothing. `axis: 'width'` is the pre-2026-08-14 formula, still reachable
     // through setSpawn precisely so the instrument can be shown to work.
+    //
+    // SINCE A PLACE AT THE TABLE (UX §7.63) A ROLLER'S THROWS COME IN OVER
+    // THEIR OWN EDGE. This probe used to lean on the seeded draw scattering a
+    // lone roller's throws over all four sides; a placed roller's no longer
+    // scatter (Ada, first in, is the front chair — side 0 every time), and
+    // the negative control measured 0 of 60 through a wall the day the stamp
+    // landed. So the sides are now chosen on purpose: Ada throws from the
+    // front, and Eluned — seated at the right HEAD by three raw players
+    // ahead of her — throws from side 3, one of the two sides that spread
+    // along Z, which is exactly where the bug lived.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.60', name: 'Ada' });
+      await a.waitFor('window.__diceDebug.places().mine === 0', { desc: 'Ada takes the front chair' });
+      for (const nm of ['Bram', 'Cass', 'Dev']) await ctx.rawPlayer(nm);      // stations 1-3
+      const eluned = await ctx.rawPlayer('Eluned');                           // station 4: the right head
+      await a.waitFor(`window.__diceDebug.places().stations.some((s) => s.name === 'Eluned' && s.station === 'right')`,
+        { desc: 'Eluned sits at the right head' });
       // The tightest mat, which is where the room to spread is smallest.
       await a.dbg(`setZoom('close')`);
       await a.waitFor(`window.__diceDebug.zoom === 'close'`, { desc: 'the close mat' });
 
-      const sweep = async (seeds) => {
+      const sweep = async (seeds, playerId, who) => {
         const out = [];
         for (let i = 0; i < seeds; i++) {
-          await a.roll('3d20');
+          const before = await a.logCount();
+          const r = await ctx.api('/api/roll', { playerId, notation: '3d20' });
+          assert.equal(r.status, 200, `${who}'s throw ${i}: ${JSON.stringify(r.data)}`);
+          await a.waitFor(`(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${before}`
+            + ' && !window.__diceDebug.busy)', { desc: `${who}'s throw ${i} lands`, timeout: 60000 });
           const line = await a.dbg('spawnLine()');
-          assert.equal(line.length, 3, `every die of throw ${i} is on the line`);
+          assert.equal(line.length, 3, `every die of ${who}'s throw ${i} is on the line`);
           out.push(...line);
           await a.dbg('clearTable()');
           await a.dbg('sim(240)');
         }
         return out;
       };
+      const ada = await a.playerId();
 
       // THE SHIPPED THROW. d20s, because a big die's hull is what eats the
-      // clearance, and the clamp works per die off that die's own hull.
-      const shipped = await sweep(12);
+      // clearance, and the clamp works per die off that die's own hull. Six
+      // from the front, six from the head.
+      const shipped = [...await sweep(6, ada, 'Ada'), ...await sweep(6, eluned.playerId, 'Eluned')];
       const worst = Math.min(...shipped.map((d) => d.clear));
       assert.ok(shipped.length === 36, `36 dice measured (got ${shipped.length})`);
       assert.ok(worst >= 0,
         `no die is born inside a wall over 12 seeds (worst clearance ${worst}, `
         + `offenders ${JSON.stringify(shipped.filter((d) => d.clear < 0))})`);
-      assert.ok(shipped.some((d) => d.side === 0 || d.side === 1),
-        'and the sweep reached the sides that spread along Z, which is where the bug was');
+      assert.ok(shipped.some((d) => d.side >= 2),
+        'and the sweep reached the sides that spread along Z (2/3, the heads), which is where the bug was');
 
       // THE NEGATIVE CONTROL. The old formula, on the same mat, with the same
-      // dice: if this does not produce a die through a wall, the measurement
-      // above is not measuring anything.
+      // dice, from the head: if this does not produce a die through a wall,
+      // the measurement above is not measuring anything.
       await a.dbg(`setSpawn({axis: 'width'})`);
       try {
-        const old = await sweep(20);
+        const old = await sweep(20, eluned.playerId, 'Eluned');
+        assert.ok(old.every((d) => d.side === 3), 'every control throw came in over the right head');
         const bad = old.filter((d) => d.clear < 0);
         assert.ok(bad.length > 0,
           `the pre-fix formula still puts dice through walls, so the probe works `
@@ -20284,6 +20348,271 @@ export const scenarios = [
           'a stampless film is bit-identical to the pre-places build — the golden replays');
       } finally {
         await a.dbg('holdClock(false)');
+      }
+    },
+  },
+  {
+    name: 'place-throws-from-your-edge',
+    tags: ['place', 'roll', 'physics', 'cuj8'],
+    timeout: 150000,
+    // THE READ ITSELF (UX §7.63, CUJ8). A roll comes in over its ROLLER'S edge:
+    // the server stamps `entry`/`lane` onto the payload from the roller's own
+    // station at the moment the dice are drawn, and every client's film lines
+    // the throw up on the stamp. Nothing reads the roster to do it — the
+    // stamp rides the roll, in the seed's determinism class — so what is
+    // asserted here is read off ONE watching tab's throwOrigin() for rolls
+    // made by four different people through the bare API.
+    //
+    // P9 — three DIFFERENT sides. A reader that ignored the stamp and took the
+    // seeded draw would still pass a one-roll check one time in four; three
+    // rolls from three stations on three distinct edges cannot pass by luck
+    // (1 in 64 per run is not zero, but the entry/side/lane triple is asserted
+    // on every roll, and the placeless negative control below has to read
+    // 'seed' at the same time).
+    //
+    // THE F1 PROOF rides the laned roll: the front-left station's 6d6 must not
+    // collapse onto one x. The design's absolute bar — min pairwise |Δx| >= 0.7
+    // after jitter — is unreachable at close/6d6 in the pristine build (pitch
+    // 0.84 minus ±0.6 jitter; tools/steps/place-spawn.mjs carries the delta
+    // gate there), but a fresh room opens WIDE, where the pitch is 1.94 and
+    // 0.74 is the arithmetic floor. So the bar is asserted exactly where it is
+    // sound, and the wall check re-runs on every laned row beside it.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.65', name: 'Ann' });
+      await a.waitFor('window.__diceDebug.places().mine === 0', { desc: 'Ann takes station 0' });
+      const names = ['Bram', 'Cass', 'Dev', 'Eluned', 'Fionn', 'Gus', 'Hana'];
+      const raws = {};
+      for (const nm of names) raws[nm] = await ctx.rawPlayer(nm);
+      const iris = await ctx.rawPlayer('Iris');            // the ninth: placeless
+      await a.waitFor('window.__diceDebug.players.length === 9', { desc: 'nine at the table' });
+      const seating = await a.dbg('places()');
+      const stationOf = (nm) => (seating.stations.find((s) => s.name === nm) || {}).place;
+      assert.equal(stationOf('Bram'), 1, 'Bram sits opposite');
+      assert.equal(stationOf('Cass'), 2, 'Cass on the front-left lane');
+      assert.equal(stationOf('Eluned'), 4, 'Eluned at the right head');
+      assert.equal(stationOf('Iris'), undefined, 'Iris holds no station');
+      assert.equal(seating.stations.find((s) => s.name === 'Cass').lane, -1,
+        'the front-left chair is a laned station');
+
+      await a.dbg('holdClock(true)');
+      try {
+        const rollAs = async (playerId, notation, count) => {
+          const r = await ctx.api('/api/roll', { playerId, notation });
+          assert.equal(r.status, 200, `roll "${notation}": ${JSON.stringify(r.data)}`);
+          const rid = r.data.roll.rollId;
+          await a.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy`
+            + ` && window.__diceDebug.tableDice.length === ${count}`
+            + ` && !!window.__diceDebug.entryState(${JSON.stringify(rid)}))`,
+          { desc: `"${notation}" lands on Ann's felt`, timeout: 60000 });
+          return { wire: r.data.roll, org: await a.dbg('throwOrigin()'), line: await a.dbg('spawnLine()') };
+        };
+
+        // Ann's own d20 comes from HER spot — front, lane 0.
+        const mine = await rollAs(await a.playerId(), '1d20 # From my chair', 1);
+        assert.equal(mine.wire.entry, 0, 'the payload carries the front edge');
+        assert.equal(mine.wire.lane, 0, 'and the centre lane');
+        assert.equal(mine.org.from, 'place', 'the film took the stamp, not the draw');
+        assert.equal(mine.org.side, 0, 'and came in over the front');
+        assert.equal(mine.org.laneWorld, 0, 'a centre station shifts nothing');
+
+        // Bram's from across the table; Eluned's from the right head.
+        const opposite = await rollAs(raws.Bram.playerId, '2d6 # From across', 2);
+        assert.equal(opposite.org.from, 'place');
+        assert.equal(opposite.org.side, 1, "Bram's dice come in over the back edge");
+        const head = await rollAs(raws.Eluned.playerId, '2d8 # From the head', 2);
+        assert.equal(head.org.from, 'place');
+        assert.equal(head.org.side, 3, "Eluned's dice come in over the right head");
+        assert.equal(head.org.lane, 0, 'heads are single-station: no lane');
+        assert.equal(new Set([mine.org.side, opposite.org.side, head.org.side]).size, 3,
+          'three stations, three DIFFERENT edges — the read is not a coin the draw could flip');
+
+        // Cass's handful from the front-LEFT lane: laned, and the lane yields
+        // to the pool rather than collapsing it.
+        const laned = await rollAs(raws.Cass.playerId, '6d6 # A handful from the left', 6);
+        assert.equal(laned.wire.lane, -1, 'the payload carries the lane');
+        assert.equal(laned.org.side, 0, 'front edge');
+        assert.equal(laned.org.lane, -1, 'left lane, as stamped');
+        assert.ok(laned.org.laneWorld < 0, `the line shifted left (laneWorld ${laned.org.laneWorld})`);
+        assert.ok(Math.abs(laned.org.laneWorld) < 2.55,
+          `and the lane YIELDED to a six-die pool (${laned.org.laneWorld} of the 2.55 a single die gets)`);
+        assert.equal(laned.line.length, 6, 'six spawn rows');
+        assert.ok(laned.line.every((s) => s.from === 'place' && s.lane < 0 && s.clear >= 0),
+          `every row laned, every row clear of the wall (${JSON.stringify(laned.line.map((s) => [s.lane, s.clear]))})`);
+        const xs = laned.line.map((s) => s.x).sort((p, q) => p - q);
+        let pair = Infinity;
+        for (let i = 1; i < xs.length; i++) pair = Math.min(pair, xs[i] - xs[i - 1]);
+        assert.ok(pair >= 0.7,
+          `no two dice are born on one x — min pairwise |Δx| ${pair.toFixed(3)} >= 0.7 (the F1 collapse read 0.0)`);
+
+        // THE NEGATIVE CONTROL. Iris holds no place: her payload carries no
+        // stamp, and her dice take the seeded draw — the same path the
+        // pre-places table baked, byte for byte (place-seeds-unchanged).
+        const loose = await rollAs(iris.playerId, '2d6 # From the fold', 2);
+        assert.equal('entry' in loose.wire, false, 'a placeless roll carries no entry');
+        assert.equal('lane' in loose.wire, false, 'and no lane');
+        assert.equal(loose.org.from, 'seed', 'the seeded draw decided her edge');
+        assert.equal(loose.org.entry, null, 'no stamp reached the film');
+        assert.deepEqual(loose.org.aim, { x: 0, z: 0 }, 'and the aim box sits on the centre');
+      } finally {
+        await a.dbg('holdClock(false)');
+      }
+    },
+  },
+  {
+    name: 'place-film-is-one-film',
+    tags: ['place', 'roll', 'resync', 'perf'],
+    timeout: 150000,
+    // one-seed-one-film, WITH THE STAMP (UX §7.63, goal 8). That scenario
+    // rules the viewport out as a film input; this one rules the PLACE out.
+    // Two tabs at two different stations — a phone at 0 and a desktop at 1 —
+    // watch one stamped roll, and the felt must agree to the byte. The trap
+    // it guards: a client that lined the throw up from ITS OWN roster (the
+    // roller's place as this tab happens to know it) instead of from the
+    // payload would bake two films the moment two rosters disagreed for a
+    // frame. The stamp is the payload, so there is nothing to disagree about.
+    //
+    // The content discriminator: both tabs must have CONSUMED the stamp
+    // (throwOrigin 'place', entry 1), or the equality below is two tabs both
+    // falling back to the seeded draw. The orbit-differs leg — the two views
+    // framed from their own chairs — lands with per-viewer orientation.
+    async fn(ctx) {
+      const phone = await ctx.newTable({ origin: '127.0.0.66', name: 'Phone' });
+      const desk = await ctx.newTable({ origin: '127.0.0.67', name: 'Desk' });
+      await phone.page.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 390, height: 844, deviceScaleFactor: 1, mobile: false }, phone.page.sessionId);
+      await desk.page.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false }, desk.page.sessionId);
+      try {
+        await desk.waitFor('window.__diceDebug.places().stations.length === 2', { desc: 'both seated' });
+        assert.equal(await phone.dbg('places().mine'), 0, 'the phone sits at the front');
+        assert.equal(await desk.dbg('places().mine'), 1, 'the desktop sits opposite');
+        const fp = await phone.dbg('framingInfo()');
+        const fd = await desk.dbg('framingInfo()');
+        assert.notEqual(fp.view, fd.view, `the two tabs are different sizes (${fp.view} / ${fd.view})`);
+
+        await desk.roll('4d6 # One film, from my chair');
+        const rid = await desk.rollId();
+        await phone.waitFor(shroudSettled(rid, 4).replace('shroudedCount', 'tableDice.length'),
+          { desc: 'the roll plays out on the phone too' });
+        await phone.settle();
+        await desk.settle();
+
+        const od = await desk.dbg('throwOrigin()');
+        const op = await phone.dbg('throwOrigin()');
+        assert.equal(od.from, 'place', 'the roller\'s own tab took the stamp');
+        assert.equal(od.entry, 1, 'and it is the back edge — the desktop\'s station');
+        assert.deepEqual(op, od,
+          'the phone, at a different station, lined the throw up on the SAME stamp — not on its own chair');
+
+        const a = await phone.dbg('feltPoses()');
+        const b = await desk.dbg('feltPoses()');
+        assert.equal(a.length, 4, 'four dice on the phone\'s felt');
+        assert.deepEqual(a, b,
+          'the same dice at the same poses — neither the viewport nor the place is an input to the film');
+        assert.equal(JSON.stringify(a), JSON.stringify(b),
+          'byte-identical as strings, which is the form two clients can actually compare');
+      } finally {
+        for (const t of [phone, desk]) {
+          await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId)
+            .catch(() => {});
+        }
+      }
+    },
+  },
+  {
+    name: 'place-wash',
+    tags: ['place', 'visibility'],
+    timeout: 150000,
+    // THE ATTRIBUTION RULE, TRUTH HALF (UX §7.63 — "attribution is edge +
+    // wash"). The wash itself — the soft arc of the roller's hue under their
+    // placard while the film plays — arrives with the placard; what is pinned
+    // HERE, the moment films change, is what the wash will be allowed to
+    // answer to, because the cue is only as honest as the stamp under it:
+    //
+    //   placed roller    → the payload is stamped; the film enters from their
+    //                      edge; (the wash will light under THEIR card)
+    //   placeless roller → no stamp; seeded edge; nothing to anchor a cue to
+    //                      — so a placeless roll can never wear the name of
+    //                      whoever's card its random edge happens to cross
+    //   secret roll      → for everyone but the roller there is NO EVENT AT
+    //                      ALL: no payload, no film, no cue. Nothing to
+    //                      suppress, because nothing arrived.
+    //
+    // `washAt` is asserted null on purpose: the field exists so the cue has a
+    // named anchor to fill, and today it is honest about having none.
+    async fn(ctx) {
+      const ann = await ctx.newTable({ origin: '127.0.0.68', name: 'Ann' });
+      const bob = await ctx.newTable({ origin: '127.0.0.69', name: 'Bob' });
+      await bob.waitFor('window.__diceDebug.places().stations.length === 2', { desc: 'both seated' });
+      for (const nm of ['Cass', 'Dev', 'Eluned', 'Fionn', 'Gus', 'Hana']) await ctx.rawPlayer(nm);
+      const iris = await ctx.rawPlayer('Iris');            // ninth: placeless, and a raw witness
+      await bob.waitFor('window.__diceDebug.players.length === 9', { desc: 'nine at the table' });
+      assert.equal((await bob.dbg('places()')).stations.some((s) => s.name === 'Iris'), false,
+        'Iris holds no station');
+      const annId = await ann.playerId();
+
+      await ann.dbg('holdClock(true)');
+      await bob.dbg('holdClock(true)');
+      try {
+        const landsOn = (t, rid, count, desc) => t.waitFor(
+          `(window.__diceDebug.sim(120), !window.__diceDebug.busy`
+          + ` && window.__diceDebug.tableDice.length === ${count}`
+          + ` && !!window.__diceDebug.entryState(${JSON.stringify(rid)}))`,
+          { desc, timeout: 60000 });
+
+        // (a) A PLACED ROLLER'S ROLL IS STAMPED. Bob's film of Ann's roll comes
+        // in from Ann's edge, and so does Ann's own.
+        const r1 = await ctx.api('/api/roll', { playerId: annId, notation: '3d6 # Mine' });
+        assert.equal(r1.status, 200, JSON.stringify(r1.data));
+        await landsOn(bob, r1.data.roll.rollId, 3, 'Ann\'s roll lands on Bob\'s felt');
+        const heard = await bob.dbg('throwOrigin()');
+        assert.equal(heard.from, 'place', 'Bob\'s film took the stamp');
+        assert.equal(heard.entry, 0, 'and it names Ann\'s edge — the front');
+        assert.equal(heard.washAt, null, 'no anchor yet: the wash lands with the placard');
+        await landsOn(ann, r1.data.roll.rollId, 3, 'and on Ann\'s');
+        assert.equal((await ann.dbg('throwOrigin()')).entry, 0, 'Ann\'s own film agrees');
+
+        // (b) A PLACELESS ROLLER'S ROLL IS NOT. Seeded edge, no stamp, no anchor
+        // — the rule that keeps a ninth player's dice from wearing an eighth's name.
+        const r2 = await ctx.api('/api/roll', { playerId: iris.playerId, notation: '2d6 # From the fold' });
+        assert.equal(r2.status, 200, JSON.stringify(r2.data));
+        assert.equal('entry' in r2.data.roll, false, 'no stamp on the placeless payload');
+        await landsOn(bob, r2.data.roll.rollId, 2, 'Iris\'s roll lands on Bob\'s felt');
+        const loose = await bob.dbg('throwOrigin()');
+        assert.equal(loose.from, 'seed', 'the seeded draw decided');
+        assert.equal(loose.entry, null, 'nothing to anchor a cue to');
+        assert.equal(loose.washAt, null);
+
+        // (c) A SECRET ROLL IS NOTHING AT ALL TO EVERYONE ELSE. Ann rolls behind
+        // the screen: her own film still enters from her edge (the stamp rides
+        // her copy), and Bob's table does not move — no log row, no dice, no
+        // change to his last throw origin — because no event reached him.
+        const bobLog = await bob.logCount();
+        const r3 = await ctx.api('/api/roll', { playerId: annId, notation: 'd20 secret # Behind the screen' });
+        assert.equal(r3.status, 200, JSON.stringify(r3.data));
+        const secretId = r3.data.roll.rollId;
+        assert.equal(r3.data.roll.entry, 0, 'the roller\'s own copy is stamped');
+        await landsOn(ann, secretId, 1, 'the secret roll lands on Ann\'s own felt');
+        assert.equal((await ann.dbg('throwOrigin()')).from, 'place', 'and entered from her edge');
+        await bob.dbg('sim(240)');
+        assert.equal(await bob.logCount(), bobLog, 'Bob\'s log did not grow');
+        assert.equal(await bob.dbg(`entryState(${JSON.stringify(secretId)})`), null,
+          'Bob has never heard of the roll');
+        assert.deepEqual(await bob.dbg('throwOrigin()'), loose,
+          'no film played for him — his last throw origin is still Iris\'s roll, from the edge it came in on');
+        // (What Bob DOES see is Iris's dice being put away: the felt belongs to
+        // one roll, and the secret roll's arrival beat auto-collects hers — an
+        // event addressed to HER roll, which exists for everyone (§7.7). That
+        // is the shipped tell that somebody rolled, and no byte of the secret
+        // roll rides it.) The bytes agree: a raw stream in the same room never
+        // carried the id, in any event of any type.
+        const leaked = iris.events().filter((e) => JSON.stringify(e.data).includes(secretId));
+        assert.deepEqual(leaked, [], 'the secret roll\'s id never crossed the wire to a bystander');
+        assert.equal(iris.events().filter((e) => e.type === 'roll').length, 2,
+          'the bystander\'s stream carried exactly the two open rolls, never a third');
+      } finally {
+        await ann.dbg('holdClock(false)');
+        await bob.dbg('holdClock(false)');
       }
     },
   },
