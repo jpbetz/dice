@@ -18812,9 +18812,13 @@ export const scenarios = [
     // THE FELT JOINED THE WALK with a place at the table (UX §7.63): each roll
     // now comes in over its roller's own edge, so the first read — WHOSE — is
     // made from the motion, with the log closed, before any log row is
-    // consulted. The placard that labels the edge and the wash that lights
-    // under it land in later slices and will join the same leg; the edge is
-    // the half that ships first because it is the half that cannot be cut.
+    // consulted. The edge shipped first because it is the half that cannot be
+    // cut; the placard that labels the edge and the wash that lights under it
+    // followed, and this leg reads all three — the CUJ's done-when is "you
+    // know it was Priya because Priya is on the left", which is a card with
+    // her name on it and her hue on the ground under it, not a test-side join
+    // of two instruments. (Found in review: with only the join asserted, this
+    // walk stayed green with no card standing and the wash dead.)
     async fn(ctx) {
       const ada = await ctx.newTable({ origin: '127.0.0.31', name: 'Ada' });
       const bram = await ctx.newTable({ origin: '127.0.0.32', name: 'Bram' });
@@ -18827,7 +18831,28 @@ export const scenarios = [
       // name the roller — and name a DIFFERENT roller for Bram than for Ada,
       // or the read is a coin. Nothing here opens a popover, reads a log row,
       // or touches the banner.
+      //
+      // Cass's clock is HELD for the two open rolls: the wash lasts exactly
+      // as long as the film, so it has to be read MID-FLIGHT, and a held clock
+      // is what makes "mid-flight" a frame this scenario chooses rather than
+      // one it races. `landsFor` drives her film forward itself.
       await cass.dbg('setLogFlyout(false)');
+      await cass.dbg('holdClock(true)');
+      // The two reads a person at the table actually makes while the dice are
+      // in the air: an arc of somebody's hue on the ground, under a card.
+      const cueUnderCard = async (t, count, who) => {
+        await t.waitFor(`(window.__diceDebug.sim(1), window.__diceDebug.tableDice.length === ${count})`,
+          { desc: `${who}'s dice arrive for the spectator`, timeout: 30000 });
+        await t.dbg('sim(20)');
+        const lit = await t.dbg('washInfo()');
+        const card = (await t.dbg('places()')).stations.find((s) => s.name === who);
+        assert.ok(card, `${who} has a card standing`);
+        assert.equal(lit.active, true, `a wash is lit while ${who}'s dice are in the air`);
+        assert.equal(lit.station, card.place, `and it is under ${who}'s card, not somebody else's`);
+        assert.equal(await t.dbg(`placardText(${card.place})`), who,
+          `and the card it is under has ${who}'s name painted on it`);
+        return card.place;
+      };
       const rollerByEdge = (t) => t.eval(`(() => {
         const D = window.__diceDebug;
         const org = D.throwOrigin();
@@ -18845,18 +18870,23 @@ export const scenarios = [
       // Two people play. Cass does not.
       await ada.roll('2d8[Wisdom] # Read the room');
       const first = await ada.rollId();
+      const adaCard = await cueUnderCard(cass, 2, 'Ada');
       await landsFor(cass, first, 2);
       const readFirst = await rollerByEdge(cass);
       assert.equal(readFirst.who, 'Ada',
         `the dice came in over Ada's edge, and the felt says so (${JSON.stringify(readFirst)})`);
       await bram.roll('1d10[Sword] # Cut the rope');
       const second = await bram.rollId();
+      const bramCard = await cueUnderCard(cass, 1, 'Bram');
       await landsFor(cass, second, 1);
       const readSecond = await rollerByEdge(cass);
       assert.equal(readSecond.who, 'Bram',
         `and Bram's over Bram's (${JSON.stringify(readSecond)})`);
       assert.notEqual(readFirst.entry, readSecond.entry,
         'two rollers, two edges — the spectator can tell them apart by where the dice came from');
+      assert.notEqual(adaCard, bramCard,
+        'and two cards lit — the wash is a difference claim, not a light that is always on');
+      await cass.dbg('holdClock(false)');
       await ada.roll('d20 held # Something behind the screen');
       const hidden = await ada.rollId();
       await cass.waitFor(shroudSettled(hidden), { desc: 'the shrouded roll settles for the spectator' });
