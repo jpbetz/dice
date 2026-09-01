@@ -29623,6 +29623,15 @@ function leaveTable() {
   forgetSeat(ROOM);
   try { localStorage.removeItem(LS_NAME); } catch { /* ignore */ }
   players = [];
+  // §7.63: THE CARDS COME DOWN WITH THE TABLE. This is the one roster door
+  // that is not an event — it empties the roster by hand and re-enters
+  // initNet, whose lobby / at-the-door / offline branches never ring the
+  // placards — so without this line the cards of the table you just left
+  // kept standing, lit and drawing (2 draws, 384 tris) behind the 'Take a
+  // seat' modal until some unrelated roster event happened by, while
+  // places() reported on:false. placeRows() reads netOnline (false now), so
+  // the rebuild stands nothing and hides the rig.
+  placardQueue();
   offers = [];
   poolsOwner = null;
   renderPlayers(); // empties the rail roster (players = [])

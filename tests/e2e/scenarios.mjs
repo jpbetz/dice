@@ -20427,6 +20427,21 @@ export const scenarios = [
         'one chair changed hands; the other seven did not move');
       assert.ok(after.queued > full.queued,
         'every roster door asks the placards to be restood (the rebuild itself lands next slice)');
+
+      // LEAVING TAKES THE CARDS DOWN. leaveTable() is the one roster door
+      // that is not an event — it empties the roster by hand and re-enters
+      // initNet — and it has to ring the placards like every other door, or
+      // the cards of the table you just left keep standing (and drawing)
+      // behind the 'Take a seat' modal while places() says there is no table.
+      // (Found in review: queued/built sat at 5/5 across the leave, the rig
+      // visible with occupied 4 — the instrument and the picture disagreeing
+      // in exactly the way this repo keeps catching.)
+      assert.equal((await a.dbg('placardBudget()')).occupied, 8, 'eight cards stand before the leave');
+      assert.equal(await a.dbg('leaveTable()'), true, 'Ann leaves the table');
+      assert.equal((await a.dbg('places()')).on, false, 'no table, no places…');
+      const down = await a.dbg('placardBudget()');
+      assert.equal(down.occupied, 0, '…and no card left standing');
+      assert.equal(down.draws, 0, 'nor drawing');
     },
   },
   {
