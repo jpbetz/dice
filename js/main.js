@@ -6492,8 +6492,11 @@ function playRoll(roll, rethrow = null) {
   // is never `stamped` (the doorway erases the entry read entirely), and the
   // pour is exactly when the wash is the only thing left saying whose dice
   // these are. The anchor is the roller's PLACARD, not their entry edge,
-  // because under a tower two flank stations share one edge (§7.1) and only
-  // the card tells them apart. A placeless roll carries no stamp, so it
+  // because under a tower stations SHARE edges — three stamp side 3 (1, 3
+  // and the un-relocated right head 4), two stamp side 2 (7 and the left
+  // head 5), js/places.js TOWER_FLANKS — and an edge read there would not
+  // merely go ambiguous, it would name a specific other player; only the
+  // card tells them apart. A placeless roll carries no stamp, so it
   // lights nothing — which is what stops a ninth player's dice ever wearing
   // an eighth player's name.
   const washPlan = placeWashFor(roll);
@@ -16485,7 +16488,7 @@ window.__diceDebug = {
   },
   // THE ATTRIBUTION ARC (§6.3). `active` while it is lit, `station` whose card
   // it is under, `world` where, `color` the roller's hue, `opacity` where the
-  // 0 -> 0.5 -> 0 envelope has got to.
+  // 0 -> 0.62 -> 0 envelope (WASH_PEAK in js/placard.js) has got to.
   washInfo() {
     return placardRig ? placardRig.washInfo()
       : { active: false, station: null, world: null, color: null, opacity: 0 };
@@ -25111,7 +25114,8 @@ function placeWashClear() {
 }
 
 // THE WASH KEEPS THE FILM'S CLOCK, NOT ITS OWN (§7.63 §6.3: "0 → 0.5 → 0 over
-// the film"). Called once per tick AFTER stepPlayback, and from the plain
+// the film" — the SHAPE; the peak shipped at WASH_PEAK 0.62 in js/placard.js,
+// S6's look). Called once per tick AFTER stepPlayback, and from the plain
 // skip, it places the arc on its envelope by `roll.time` and nothing else, so
 // every way a film can be held, jumped or dropped is already handled:
 //   · the ceremony's declaration beat pins roll.time at 0 with the dice
@@ -29655,6 +29659,16 @@ function leaveTable() {
   // seat' modal until some unrelated roster event happened by, while
   // places() reported on:false. placeRows() reads netOnline (false now), so
   // the rebuild stands nothing and hides the rig.
+  //
+  // And it cannot WAIT for the rebuild: placardQueue() is a deferred ask that
+  // tryFlushPlaces refuses while dice are in the air, so a leave taken
+  // mid-film (measured: four lit cards and a stranger's hue climbing to its
+  // peak for up to WASH_MAX_S behind the modal) needs the wash put out and
+  // the rig rebuilt HERE, ungated. Both are render-only — the gate exists
+  // for the orbit (ruling ①), and the orbit's own reset to the front still
+  // rides the queued flush at the next roll boundary.
+  placeWashClear();
+  placardRebuild();
   placardQueue();
   offers = [];
   poolsOwner = null;

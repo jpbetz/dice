@@ -173,7 +173,9 @@ const WASH_SEG = 32;
 const WASH_SPAN = Math.PI * 0.9;
 const WASH_PEAK = 0.62;
 const WASH_Y = 0.012;
-const WASH_MIN_S = 0.6;
+// No floor: the arc ends with the film (placeWashSync clears it on done), so
+// a minimum could only ever be a promise the clock cannot keep. The shortest
+// shipped films (3d6 0.95 s) are all longer than the old 0.6 s floor anyway.
 const WASH_MAX_S = 6;
 
 function hexColor(hex) {
@@ -716,7 +718,9 @@ export class PlacardRig {
     this.washMesh.visible = true;
     this.wash = {
       active: true, t: 0,
-      dur: Math.max(WASH_MIN_S, Math.min(WASH_MAX_S, dur || 0)),
+      // A film without a length (none ships one) gets the cap: the film's
+      // clock ends the arc regardless, and 0 would divide washAt to NaN.
+      dur: Math.min(WASH_MAX_S, dur > 0 ? dur : WASH_MAX_S),
       place: at.place, x: at.x, y, z: at.z, color: at.color || null,
     };
     return this.wash;
