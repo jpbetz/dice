@@ -31,7 +31,13 @@ import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
 // file reads the stamps back (the rollspec.js precedent). The film half only:
 // laneSpread (the lane yields to the pool), aimFor (a translated aim box),
 // and AIM_ZERO (the shared frozen zero every unstamped roll aims through).
-import { laneSpread, aimFor, regionFor, AIM_ZERO, placeAnchor, STATIONS } from './places.js';
+import { laneSpread, aimFor, regionFor, AIM_ZERO, placeAnchor, STATIONS,
+  entryFor } from './places.js';
+// THE DEMO DOOR (js/demo.js — read its header for the law): a dev instrument
+// for looking at a full table in ONE TAB. Solo-only, param-only, and every
+// line of it in this file is behind `DEMO`.
+import { resolveDemo, dealDemo, demoArrivalSweep, DEMO_PARAM, DEMO_MAX, DEMO_REFUSAL }
+  from './demo.js';
 // …and the OBJECT standing at a place: the merged eight-station placard rig
 // (one mesh, one material, three textures) plus the roller's wash, which is
 // the other half of "attribution is edge + wash". Render-only, top to bottom:
@@ -125,6 +131,25 @@ import {
 // lobby. Left down beside LS_NAME (where the rest of the net constants live)
 // this pair is in TDZ when they read it, and the whole module dies at eval.
 const LOBBY_PARAM = 'lobby';
+
+// THE DEMO DOOR (js/demo.js — its header holds the law). Read HERE, above the
+// room iife, because the door has to be able to stop the MINT: every front
+// door visit mints a room key and writes it into the address bar, and a demo
+// tab that landed online at a table of one would (a) not be solo, which is
+// the one condition that makes a local stamp lawful, and (b) reload into a
+// `?room=` that refuses the very door it was opened with.
+//
+// A boolean and nothing else. There is no store, no mirror and no strip: a
+// demo is a MODE that lasts as long as the tab, where a stability channel is
+// an ENROLMENT that has to outlive one. The refusal is spoken once, on the
+// console, because a dev door that silently does nothing gets filed as a bug.
+const DEMO = (() => {
+  const p = new URLSearchParams(window.location.search);
+  const d = resolveDemo({ param: p.get(DEMO_PARAM), room: p.get('room') });
+  if (d.refusedByRoom) console.warn(`[dice] ${DEMO_REFUSAL}`);
+  return d.on;
+})();
+
 // ONE IIFE for both, because the mint can fail and the failure has to be able
 // to choose the lobby: mintRoomKey throws rather than fall back to Math.random
 // (a guessable key is worse than no key — js/tables.js), and a browser with no
@@ -138,6 +163,10 @@ const { room: ROOM, arrivedByLink: ARRIVED_BY_LINK } = (() => {
   // boot just minted (do not ask — nobody is here to address you yet).
   if (key) return { room: key, arrivedByLink: true };
   if (p.get(LOBBY_PARAM) !== null) return { room: null, arrivedByLink: false };
+  // A DEMO TAB MINTS NO ROOM — the door is solo-only and this is what makes
+  // it so. Same landing as `?lobby`: no table, no join, your own felt, and
+  // an address that means the same thing on the next reload.
+  if (DEMO) return { room: null, arrivedByLink: false };
   let minted = null;
   try { minted = mintRoomKey(''); } catch { return { room: null, arrivedByLink: false }; }
   try {
@@ -3167,6 +3196,33 @@ let placardRig = null;   // built lazily: a solo table never allocates one
 // eye, so it can be handed back exactly — and so a places flush that lands
 // mid-simulation updates the value to restore rather than the picture.
 let simulatedPlaceView = null;
+
+// THE DEMO TABLE (js/demo.js). All three are inert and unread while the door
+// is shut — `demoRows` empty means `placeRoster()` answers exactly what it
+// answered before this feature existed.
+//
+//   demoRows  — the dealt cast, [{id, name, color, place, demo}] in station
+//               order. THE ROSTER THE PLACARDS READ, injected at the one seam
+//               every reader already goes through (placeRoster below) rather
+//               than into `players`: `players` is the ROOM's roster and half
+//               the chrome in this file reads it behind `netOnline && net`,
+//               so filling it with rows no server ever sent would put demo
+//               names in the presence rail, the whisper picker and the pools
+//               owner switcher, none of which is what was asked for.
+//   demoSeat  — the chair the viewer is sitting in. THE STICKY HALF of the
+//               seat switcher: myPlaceRow() reads it, so the shipped
+//               placeOrbitSync path derives the eye from it and a places
+//               flush RESTORES the view instead of yanking it back to 0 —
+//               which is the one thing simulatePlaceView (an instrument that
+//               parks the real orbit and hands it back) could not do.
+//   demoStamps— rollId -> {playerId, entry, lane} for the rolls this tab has
+//               thrown, so the arrival sweep can be per-PLACE. It is the
+//               server's `room.log` for a table with no server; the client's
+//               own log entries do not carry the stamp (entryFromRoll drops
+//               it — the wire's log does, this file's does not).
+let demoRows = [];
+let demoSeat = 0;
+const demoStamps = new Map();
 
 // cannon's native sleep, made tunable. world.allowSleep is already true, so
 // bodies sleep at these thresholds today; the question is whether a coarser
@@ -16655,6 +16711,33 @@ window.__diceDebug = {
     return placardRig ? placardRig.washInfo()
       : { active: false, station: null, world: null, color: null, opacity: 0 };
   },
+  // THE DEMO DOOR (js/demo.js), as this boot resolved it. A REPORT, and the
+  // FIRST thing every `demo`-tagged scenario reads — because the claim that
+  // matters most about this feature is the negative one, and `on: false` on a
+  // tab that carries no param is half of proving it.
+  //
+  // `n` is how many fake players are standing and `seat` which chair the dial
+  // is sitting in (null when none is — an empty table is a legal setting).
+  // `players` is the dealt cast: station, name, hue, and the marked demo id
+  // that says out loud no server sent this row. Zero-arg, so P7's
+  // `debug-surface-answers` sweep calls it on every ordinary tab too, which
+  // is exactly where it must not throw.
+  demoInfo() {
+    return demoInfoValue();
+  },
+  // STAND N FAKE PLAYERS — the dial, reachable from a script. Returns the
+  // same report as demoInfo(), or null with the door shut (a hook that
+  // pretended to work on a production tab would be the one lie this
+  // instrument cannot afford).
+  demoDeal(n) {
+    return demoDealPlayers(n);
+  },
+  // SIT AT CHAIR k. Sticky, unlike simulatePlaceView below: it writes the
+  // dial, so a places flush restores this chair rather than handing the eye
+  // back to station 0. null for a station nobody is standing at.
+  demoSit(k) {
+    return demoSitAt(k);
+  },
   // LOOK AT THE TABLE FROM SOMEBODY ELSE'S CHAIR, without being them. Render
   // only, and STRICTLY an instrument: it sets THIS tab's `placeOrbit` to
   // station n's azimuth and runs the SHIPPED framing ladder, the lamp and the
@@ -25119,12 +25202,34 @@ function placardQueue() {
 // and nothing downstream of a pixel touches it. The FILM's half of a place —
 // which edge a throw comes in over — rides its own roll payload and never
 // looks here (js/places.js's header, the split the feature rests on).
-function placeRows() {
+// THE ONE SEAM THE DEMO DOOR GOES THROUGH. Every reader of "who sits where"
+// — the rig, the orbit, the wash, the instrument — comes through here, so the
+// door is one branch rather than four, and with it shut this returns the
+// identical array the same expression returned before it existed (the
+// `netOnline` gate is kept verbatim, not re-derived, because it is load-
+// bearing in its own right: a torn-down connection can leave `players`
+// standing for a beat, and a placard rebuilt off that is a card for somebody
+// who is not at the table).
+function placeRoster() {
+  if (DEMO) return demoRows;
   if (!netOnline) return [];
+  return players;
+}
+
+// …and whose card is MINE. Online that is the seat credential; in demo it is
+// the chair the dial is sitting in, which is what makes the seat switcher
+// sticky through a flush rather than an instrument that has to be handed back.
+function placeMineId() {
+  if (DEMO) { const r = demoRows.find((d) => d.place === demoSeat); return r ? r.id : null; }
+  return net ? net.playerId : null;
+}
+
+function placeRows() {
+  const roster = placeRoster();
   const towerUp = towerOn();
-  const mineId = net ? net.playerId : null;
+  const mineId = placeMineId();
   const rows = [];
-  for (const p of players) {
+  for (const p of roster) {
     if (!p || !Number.isInteger(p.place)) continue;      // the +N fold sits nowhere
     const anchor = placeAnchor(p.place, TABLE_W, TABLE_D, towerUp);
     if (!anchor) continue;
@@ -25144,9 +25249,13 @@ function placeRows() {
 // This viewer's own row of the above, or null: solo, offline, a spectator who
 // declined a seat, a placeless ninth. One lookup, shared by the orbit sync
 // and the framingInfo readout so they cannot name two different chairs.
+// (In demo it is the chair the dial is sitting in — see placeMineId; the eye
+// then follows through the SHIPPED placeOrbitSync, so the seat switcher is
+// the real per-viewer orientation path and not a camera of its own.)
 function myPlaceRow() {
-  if (!netOnline || !net || !net.playerId) return null;
-  const me = players.find((p) => p && p.id === net.playerId);
+  const mineId = placeMineId();
+  if (!mineId) return null;
+  const me = placeRoster().find((p) => p && p.id === mineId);
   if (!me || !Number.isInteger(me.place)) return null;
   const anchor = placeAnchor(me.place, TABLE_W, TABLE_D, towerOn());
   return anchor ? { place: me.place, anchor } : null;
@@ -25253,9 +25362,12 @@ function placeOrbitApply() {
 // A secret roll needs no rule at all: for everybody else the projection is
 // null, so there is no event to react to and no leak channel to close.
 function placeWashFor(roll) {
-  if (!roll || !netOnline || !roll.playerId) return null;
+  if (!roll || !roll.playerId) return null;
   if (!Number.isInteger(roll.entry) || roll.entry < 0 || roll.entry > 3) return null;
-  const p = players.find((q) => q && q.id === roll.playerId);
+  // The roster, through the one seam (placeRoster): empty offline, so the
+  // `netOnline` half of the old gate is kept by construction, and the demo
+  // door's cast lights its own cards without a second branch here.
+  const p = placeRoster().find((q) => q && q.id === roll.playerId);
   if (!p || !Number.isInteger(p.place)) return null;
   const a = placeAnchor(p.place, TABLE_W, TABLE_D, towerOn());
   if (!a) return null;
@@ -25299,6 +25411,168 @@ function placeWashSync() {
   if (!roll || roll.done || (cer && cer.phase === 'settle')) { placardRig.washClear(); return; }
   if (cer && cer.phase === 'declare') return;   // held with the film: the dice are not out yet
   placardRig.washAt(roll.time);
+}
+
+// ---------------------------------------------------------------------------
+// THE DEMO DOOR — the dev instrument (js/demo.js holds the law)
+// ---------------------------------------------------------------------------
+//
+// Everything from here to `demoBoot` is dead code with the door shut: no DOM,
+// no scene object, no listener, no timer, and `demoRows` empty means
+// `placeRoster()` answers exactly what it answered before any of this existed.
+// The one scenario that matters most in this whole feature is the one that
+// proves that sentence (`demo-door-shut`), and it proves it by COMPARING a
+// tab booted with `?demo=0` against a tab booted with no param at all —
+// framing, places, draw budget, the lot.
+//
+// WHY IT EXISTS. Judging a placed table used to cost three real tabs at three
+// origins joined to one room (tools/steps/place-view.mjs), and the harness
+// ceiling is three — so the six- and eight-place pictures, the ones where the
+// centre slots and the head tax actually show, could only ever be reached
+// through `simulatePlaceView`, an instrument that borrows the eye and hands it
+// back. Joe: "we need a better way to test this out quickly." One tab, a
+// dial, and the same rig.
+
+// The dial's opening position: four people at one table — ROADMAP row 14's
+// own first sentence, and the arrangement where both long edges are full and
+// nobody has yet paid the head tax. 0 and 8 are both a keystroke away.
+const DEMO_DEAL_AT_BOOT = 4;
+
+let demoPanel = null;      // the fixed dev panel, built once, only in demo
+
+// THE DEAL. N fake players through the REAL assignment: js/demo.js hands out
+// the lowest free station exactly as server.js freePlace does, the hue is
+// PALETTE's for that station, and the row then goes into the roster the
+// placard rig already reads — so the cards that stand are the cards a real
+// table of N would stand, fitted by the real fitter, turned by the real
+// reader turn. Nothing here is on the wire; there is no wire.
+function demoDealPlayers(n) {
+  if (!DEMO) return null;
+  demoRows = dealDemo(n, Math.random);
+  // The dial can shrink out from under the chair you are sitting in. Fall to
+  // the last chair that still exists rather than to 0, so counting DOWN from
+  // eight walks you along the table instead of teleporting you home each step.
+  if (!demoRows.some((r) => r.place === demoSeat)) {
+    demoSeat = demoRows.length ? demoRows[demoRows.length - 1].place : 0;
+  }
+  // A roster door, spelled the way every other roster door is spelled: ask,
+  // and let the roll-boundary flush restand the cards (IMMERSION ruling ① —
+  // cards do not move while dice are in the air, demo or not). The overlay
+  // rides the same flush.
+  placardQueue();
+  demoPanelSync();
+  return demoInfoValue();
+}
+
+// THE SEAT SWITCHER. Sticky, and that is the whole difference from
+// `simulatePlaceView`: this writes the DIAL (`demoSeat`), which `myPlaceRow`
+// derives from — so the eye is set by the shipped `placeOrbitSync` on the
+// shipped roll-boundary flush, and a places flush RESTORES the chair instead
+// of handing the borrowed eye back to station 0. Walking six chairs in one
+// tab is then the same code path a real viewer's own chair takes.
+function demoSitAt(k) {
+  if (!DEMO) return null;
+  const row = demoRows.find((r) => r.place === k);
+  if (!row) return null;
+  demoSeat = row.place;
+  placardQueue();
+  demoPanelSync();
+  return demoInfoValue();
+}
+
+// The instrument's own answer — see the `demoInfo` hook for the shape.
+function demoInfoValue() {
+  return {
+    on: DEMO,
+    param: DEMO_PARAM,
+    n: demoRows.length,
+    seat: demoRows.some((r) => r.place === demoSeat) ? demoSeat : null,
+    players: demoRows.map((r) => ({ place: r.place, name: r.name, color: r.color, id: r.id })),
+  };
+}
+
+// ---- the panel ------------------------------------------------------------
+//
+// A DEV REGISTER, DELIBERATELY. Plain, unthemed, fixed top-right, built from
+// inline styles rather than from css/style.css — which is not laziness, it is
+// the zero-cost proof: a stylesheet rule would ship to every player whether
+// or not the door was ever opened, and a rule that is never matched is still
+// a rule somebody has to read. It never touches the real settings panel and
+// it never appears in the stability channel's offers (js/stability.js): those
+// decide what a PLAYER is shown, and no player is ever shown this.
+function demoPanelBuild() {
+  if (!DEMO || demoPanel) return;
+  const box = document.createElement('div');
+  box.id = 'demo-panel';
+  box.style.cssText = 'position:fixed;top:8px;right:8px;z-index:9999;'
+    + 'font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;'
+    + 'background:rgba(16,16,18,0.88);color:#e8e8ea;border:1px solid #4a4a52;'
+    + 'border-radius:4px;padding:8px 10px;min-width:196px;'
+    + 'user-select:none;pointer-events:auto';
+  const line = (html) => {
+    const d = document.createElement('div');
+    d.style.cssText = 'display:flex;align-items:center;gap:6px;margin:3px 0';
+    d.innerHTML = html;
+    return d;
+  };
+  const head = line('<b style="letter-spacing:.08em">DEMO</b>'
+    + '<span style="opacity:.55;margin-left:auto">?demo=1 · solo</span>');
+  const dial = line('<span style="width:52px">players</span>'
+    + '<input id="demo-n" type="range" min="0" max="' + DEMO_MAX + '" step="1" style="flex:1;accent-color:#8d6ae0">'
+    + '<b id="demo-n-out" style="width:12px;text-align:right"></b>');
+  const cast = line('<button id="demo-shuffle" style="flex:1">reshuffle names</button>');
+  const seat = line('<span style="width:52px">seat</span>'
+    + '<button id="demo-seat-prev">◀</button>'
+    + '<b id="demo-seat-out" style="flex:1;text-align:center"></b>'
+    + '<button id="demo-seat-next">▶</button>');
+  for (const el of [head, dial, cast, seat]) box.append(el);
+  for (const b of box.querySelectorAll('button')) {
+    b.style.cssText = 'font:inherit;background:#2a2a30;color:#e8e8ea;'
+      + 'border:1px solid #4a4a52;border-radius:3px;padding:2px 6px;cursor:pointer';
+  }
+  document.body.append(box);
+  demoPanel = box;
+
+  box.querySelector('#demo-n').addEventListener('input', (e) => {
+    demoDealPlayers(Number(e.target.value));
+  });
+  box.querySelector('#demo-shuffle').addEventListener('click', () => {
+    demoDealPlayers(demoRows.length);
+  });
+  box.querySelector('#demo-seat-prev').addEventListener('click', () => demoSeatStep(-1));
+  box.querySelector('#demo-seat-next').addEventListener('click', () => demoSeatStep(+1));
+}
+
+// Walk to the next OCCUPIED chair, wrapping. Occupied rather than numbered,
+// so at N = 3 the ▶ button visits 0, 1, 2 and comes back rather than stepping
+// into empty stations nobody can see.
+function demoSeatStep(d) {
+  if (!demoRows.length) return null;
+  const at = demoRows.findIndex((r) => r.place === demoSeat);
+  const next = demoRows[(((at < 0 ? 0 : at) + d) % demoRows.length + demoRows.length) % demoRows.length];
+  return demoSitAt(next.place);
+}
+
+function demoPanelSync() {
+  if (!demoPanel) return;
+  const n = demoRows.length;
+  demoPanel.querySelector('#demo-n').value = String(n);
+  demoPanel.querySelector('#demo-n-out').textContent = String(n);
+  const me = demoRows.find((r) => r.place === demoSeat) || null;
+  demoPanel.querySelector('#demo-seat-out').textContent = me ? `${me.place} · ${me.name}` : '—';
+  for (const id of ['#demo-seat-prev', '#demo-seat-next']) {
+    demoPanel.querySelector(id).disabled = !me;
+  }
+}
+
+// The door, opened. Called once at boot, after the scene and the roll surface
+// exist, and a complete no-op with the door shut.
+function demoBoot() {
+  if (!DEMO) return;
+  demoPanelBuild();
+  demoDealPlayers(DEMO_DEAL_AT_BOOT);
+  console.info(`[dice] demo mode: ${DEMO_MAX}-station dev table, solo, `
+    + 'nothing here is on the wire. __diceDebug.demoInfo() / demoDeal(n) / demoRoll(k).');
 }
 
 // ONE roll boundary, every deferred room change. Zoom first: applyZoom
@@ -31799,3 +32073,9 @@ async function initNet() {
 // module). Splitting the two costs nothing and closes the window.
 let netReady;
 netReady = initNet();
+
+// …and the DEV DOOR, after it (js/demo.js). After, because initNet decides
+// whether this tab is online and the demo roster is only ever stood at a solo
+// one — the door already refused a `?room=`, and this ordering means the
+// refusal and the deal can never race. A complete no-op with the door shut.
+demoBoot();
