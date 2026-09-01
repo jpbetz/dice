@@ -182,6 +182,47 @@ node tests/e2e/run.mjs --list         # scenarios and their tags
 errors *and* on any uncaught page exception; `console.error` output is
 reported but not fatal.
 
+### Demo mode — the one-tab look pass
+
+`?demo=1` opens a **dev door** ([js/demo.js](../js/demo.js)): a solo tab with
+a small unthemed panel top-right that stands 0–8 fake players through the
+real place assignment, lets you sit in any of their chairs, draws the felt
+regions the film actually uses, and throws from any chair with the stamp the
+server would have written. Dev tooling, not player chrome — every line of it
+is behind the door, and `demo-door-shut` is what makes that a fact rather than
+an intention: it boots `?demo=0` beside a tab carrying no param at all and
+compares their framing, places, placard budget, world bodies and **draw
+count**. "I looked and there was no panel" is exactly the check that stays
+green while a listener leaks in behind it.
+
+**It is SOLO-ONLY, and that is a law.** The door stands roster rows no server
+sent and stamps its own `roll.entry` / `roll.lane`, which are film inputs of
+the seed's determinism class. Both are lawful in exactly one situation: no
+second viewer to fork a film away from. So a `?room=` refuses the door
+(`demo-room-wins`), and a demo tab mints no room of its own — without that
+suppression it would land online at a table of one and reload into the
+`?room=` that refuses it.
+
+**What it is FOR is the look pass.** Judging a placed table used to cost one
+real tab per player at one loopback origin each, and the harness ceiling is
+three — so the six- and eight-place pictures could only ever be reached
+through `simulatePlaceView`, an instrument that borrows the eye and hands it
+back. `tools/steps/place-card.mjs` and `place-view.mjs` ride the door now.
+`tools/steps/place-two-rolls.mjs` deliberately does **not**, and stays two
+real tabs in one real room: that a stamp crosses the WIRE and two clients bake
+one film is the one thing a single tab cannot say.
+
+```bash
+node tools/drive.mjs tools/steps/place-view.mjs    # every chair, one tab
+node tests/e2e/run.mjs --only demo                 # the door's own scenarios
+```
+
+Hooks: `demoInfo()` (zero-arg, so P7's sweep calls it on every ordinary tab
+too), `demoDeal(n)`, `demoSit(k)`, `demoRoll(k, notation)`, `demoRollAll()` —
+each of the last four returning `null` rather than pretending on a tab without
+the door. The harness opens one with `ctx.demoTab({ players })`, never
+`newTable`, whose url is `?room=` by construction.
+
 ### How much machine a run may use
 
 A full sweep opens ~147 tables, and every one constructs a
@@ -333,6 +374,7 @@ gates that apply to every journey rather than walking one — `a11y-modals`,
 | `look`     | The COSMETIC lane (rule above; no dice, enforced). `tower-dressing` walks every skinned registry row and asserts the dress groups each one DECLARES, that the skin is visible as an aggregate over the `towerSkin*` subtree, the dressing TRIANGLE budget (≤4k, art restraint) and the WHOLE TOWER's draw budget (≤20 — frame cost is total draws, not dress draws; the three code-built classics carry named, valued, self-cleaning overruns at 49/61/88, ROADMAP T14 and T15), and the family traits: an ember on the row with its lamps readable by value, zero lights in the skin |
 | `audio`    | V1 sound ([AUDIO.md](AUDIO.md)): the graph built once at unlock and suspended until a real gesture (`audio-graph`), the three-phase contact machine derived off the film (`audio-phases`), the rolling voice pool and its teardown (`audio-rolling`), the settle cluster's seeded schedule and its own gate cursor (`audio-settle`), the tower shaft send and the FIRST LAW asked of `impactVoiceFor` (`audio-shaft`), the room bed's two switches (`audio-ambience`), and the venue's palette — the grounded row inert in effect, a fantasy venue's trim as an exact product, the baffle knock that keeps the neutral ground, the tail that changes level and not rhythm, and a bed that re-voices in place and is never switched ON by a venue (`audio-venue`). Every scenario also carries `fx` and `roll`. What makes it testable headless: Chrome runs `--mute-audio` WITHOUT `--autoplay-policy=no-user-gesture-required`, so the graph is fully observable while the hardware stays silent and the suspended-until-gesture state reproduces exactly |
 | `stability` | The closed-beta channel (UX §7.38, `js/stability.js`): what the settings panel OFFERS a production browser, and — the leg that costs dice — that the offer is ALL it gates. `stability-gate` puts a stable client and a beta client in one room, pours, and compares both films: refusing the room's tower on the stable client passes every visibility assertion in the file and puts different dice in front of the two players. **Every harness tab is a beta tab** (towers and venues are unreleased and the suite's job includes them), so the population that matters is reached deliberately — `clean: ['dice.stability.v1']` for a browser that has never heard of the beta, `query: '&stability=stable'` for the revoke link. A default that only ever booted one channel is `prepared-seat`'s failure with a new subject |
+| `demo`     | The DEV DOOR (`js/demo.js`, BRIEF-V4) — a dial for player count, a sticky seat switcher, the felt's regions drawn, and a throw from any chair, all in one tab. The scenario that matters most is the NEGATIVE one: `demo-door-shut` compares a `?demo=0` tab against a tab with no param at all, down to the draw count, because the load-bearing claim about a dev instrument is that nobody who did not ask for it ever meets it. Then `demo-dial` (the ladder a demo table deals is the ladder a real table deals, and the seat switcher survives a places flush where `simulatePlaceView` could not), `demo-room-wins` (a `?room=` shuts the door, with a second real browser standing there to say why), `demo-regions` (every rectangle the overlay reports compared against `regionFor`/`aimFor` called HERE — an overlay that redrew the arithmetic would be a confident picture of a mechanism that had since moved), and `demo-roll-from-seat` (the local stamp going down the production `playRoll`, and the per-place sweep leaving three of four pools standing) |
 | `lab`      | The dice lab as a raw page (not in smoke — it bakes ~2000 canvas textures): the GEO BENCH sweep's geometry claims via `geoStats`, the SET BUILDER's live rebuild via `builderSet` + `faceDump`, lab-only ids staying out of `SET_IDS` |
 
 New areas add a tag here and scenarios in `scenarios.mjs` (step 5 adds

@@ -16798,6 +16798,12 @@ window.__diceDebug = {
   demoRollAll(notation) {
     return demoRollEveryone(notation);
   },
+  // FOLD THE DEV PANEL to its header (or unfold it) — so a look step can take
+  // a frame of the TABLE without the instrument standing in front of it. It
+  // folds itself below 520 px for the same reason.
+  demoPanelFold(want) {
+    return demoPanelFold(want);
+  },
   // SIT AT CHAIR k. Sticky, unlike simulatePlaceView below: it writes the
   // dial, so a places flush restores this chair rather than handing the eye
   // back to station 0. null for a station nobody is standing at.
@@ -25514,6 +25520,9 @@ function placeWashSync() {
 const DEMO_DEAL_AT_BOOT = 4;
 
 let demoPanel = null;      // the fixed dev panel, built once, only in demo
+// Below this the panel folds to its header on its own: a dev register that
+// covers the felt cannot be used to judge the felt.
+const DEMO_PANEL_NARROW = 520;
 
 // THE DEAL. N fake players through the REAL assignment: js/demo.js hands out
 // the lowest free station exactly as server.js freePlace does, the hue is
@@ -25592,7 +25601,13 @@ function demoPanelBuild() {
     d.innerHTML = html;
     return d;
   };
-  const head = line('<b style="letter-spacing:.08em">DEMO</b>'
+  // The header is also the COLLAPSE, and that was found by looking rather
+  // than designed: at 390 px the panel covered a third of the phone frame,
+  // which makes the one tool built for the look pass unable to take a phone
+  // look. Clicking it folds the panel to this line; a resize below 520 px
+  // folds it for you (and never unfolds it — a deliberate expand must stick).
+  const head = line('<b id="demo-fold" style="letter-spacing:.08em;cursor:pointer" '
+    + 'title="fold the panel">DEMO</b>'
     + '<span style="opacity:.55;margin-left:auto">?demo=1 · solo</span>');
   const dial = line('<span style="width:52px">players</span>'
     + '<input id="demo-n" type="range" min="0" max="' + DEMO_MAX + '" step="1" style="flex:1;accent-color:#8d6ae0">'
@@ -25626,6 +25641,21 @@ function demoPanelBuild() {
   box.querySelector('#demo-regions').addEventListener('change', (e) => demoOverlayApply(e.target.checked));
   box.querySelector('#demo-throw').addEventListener('click', () => demoRollFrom(demoSeat));
   box.querySelector('#demo-throw-all').addEventListener('click', () => demoRollEveryone());
+  box.querySelector('#demo-fold').addEventListener('click', () => demoPanelFold());
+  window.addEventListener('resize', () => {
+    if (window.innerWidth < DEMO_PANEL_NARROW) demoPanelFold(true);
+  });
+  if (window.innerWidth < DEMO_PANEL_NARROW) demoPanelFold(true);
+}
+
+// Fold the panel to its header, or unfold it. `want` forces a state; omitted,
+// it toggles. Returns the state, so a tool step can drive it.
+function demoPanelFold(want) {
+  if (!demoPanel) return null;
+  const rows = [...demoPanel.children].slice(1);
+  const folded = want === undefined ? rows[0].style.display !== 'none' : !!want;
+  for (const el of rows) el.style.display = folded ? 'none' : 'flex';
+  return folded;
 }
 
 // Walk to the next OCCUPIED chair, wrapping. Occupied rather than numbered,
@@ -25892,6 +25922,12 @@ function demoOverlaySync() {
       depthWrite: false, side: THREE.DoubleSide, fog: false,
     }));
     label.rotation.x = -Math.PI / 2;
+    // Turned toward the reader, exactly as the names are and by the same
+    // number: `readerOrbit()` is the azimuth the rig last turned every card
+    // for, already quantised to the quarter. After the −90° about X the
+    // plane's own +Z is world +Y, so one rotateZ spins the digit flat on the
+    // ground; at orbit 0 it is zero and the numerals stand as authored.
+    label.rotateZ(placardRig ? placardRig.readerOrbit() : 0);
     label.position.set(lx, DEMO_OVERLAY_Y + 0.006, lz);
     label.renderOrder = 9;
     group.add(label);
@@ -28776,7 +28812,15 @@ function applyFramingPose(pose, animate) {
   // turned with it. The OBJECTS do not move (a head card yawed toward another
   // edge stands inside its wall); it is a UV rewrite, and a no-op when the
   // quarter has not changed, which is every reframe but the cut itself.
-  if (placardRig) placardRig.setReader(camOrbit);
+  // …AND THE DEMO OVERLAY'S STATION NUMERALS TURN WITH THEM (js/demo.js).
+  // Found by LOOKING at the seat-3 frame: the digits are painted on the
+  // ground in world orientation, so from the opposite chair they stand on
+  // their heads — and an upside-down 6 is a 9, which is the one way a station
+  // index can be actively WRONG rather than merely awkward. Rebuilt on the
+  // quarter CHANGING (setReader's own return, false on every reframe but the
+  // cut), so it costs nothing on an ease and cannot drift a frame behind the
+  // names it is keyed to.
+  if (placardRig && placardRig.setReader(camOrbit) && DEMO) demoOverlaySync();
   // THE FOG LEARNS WHERE THE EYE IS GOING, here and nowhere else — once per
   // pose, from the pose's DESTINATION, which is what keeps the plane from
   // sliding through the ease (see updateMatFogFloor). Guarded on a real move,

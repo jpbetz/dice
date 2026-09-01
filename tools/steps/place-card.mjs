@@ -27,9 +27,26 @@ limitations under the License.
 //
 //   node tools/drive.mjs tools/steps/place-card.mjs [outDir] [width] [height]
 //
-// Two real tabs at stations 0 and 1, because "does it read from BOTH chairs"
-// is the question and simulatePlaceView cannot answer it while a roll is on
-// the felt.
+// ONE TAB, THROUGH THE DEMO DOOR (v4, 2026-09-01 — `?demo=1`, js/demo.js).
+// This used to be two real tabs at two loopback origins joined to one room,
+// because "does it read from BOTH chairs" is the question and the old
+// `simulatePlaceView` could not answer it while a roll was on the felt: it
+// borrows the eye and hands it back, so a frame taken through it is not the
+// frame a viewer seated there gets. The demo door's seat switcher is STICKY —
+// it writes the dial that `myPlaceRow` derives from, so the eye is set by the
+// shipped `placeOrbitSync` on the shipped flush — which is the same code path
+// a real second tab takes, at a tenth of the setup. The measurements below are
+// unchanged; only the way the two chairs are reached is.
+//
+// The SEAT CHANGE rides the roll-boundary flush, which means it lands after
+// the dice come to rest and never mid-tumble. Every measurement here is taken
+// at rest, so that costs nothing; a mid-flight frame from another chair is
+// `place-view.mjs`'s job, and it uses `simulatePlaceView` there for exactly
+// this reason.
+//
+// What one tab CANNOT say — that a stamp crosses the wire and two clients bake
+// one film — is `place-two-rolls.mjs`'s job, and that step is deliberately
+// still two real tabs.
 
 import { mkdirSync } from 'node:fs';
 
@@ -80,18 +97,22 @@ export default async function run(stage, [outDir = 'tools/shots/place-card', w =
     await stage.shot(t, `${outDir}/${name}.png`);
   };
 
-  const front = await stage.tab('127.0.0.91', 'Front');
-  await frame(front, w, h);
-  await front.waitFor('window.__diceDebug.places().mine === 0', { desc: 'front seated' });
-  const back = await stage.tab('127.0.0.92', 'Back');
-  await frame(back, w, h);
-  await back.waitFor('window.__diceDebug.places().mine === 1', { desc: 'back seated' });
-  const tabs = [[front, 'front'], [back, 'back']];
-  for (const [t] of tabs) {
-    await t.waitFor('window.__diceDebug.places().stations.length === 2', { desc: 'two at the table' });
-    await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
+  const tab = await stage.ctx.demoTab({ origin: '127.0.0.91', players: 2 });
+  await frame(tab, w, h);
+  await tab.waitFor('window.__diceDebug.places().stations.length === 2', { desc: 'two at the table' });
+  // Sit down, and WAIT for the flush rather than for a clock: the chair rides
+  // the same roll-boundary defer the cards do.
+  const sit = async (k) => {
+    await tab.dbg(`demoSit(${k})`);
+    await tab.waitFor(`window.__diceDebug.places().mine === ${k}`, { desc: `seated at ${k}` });
+    await tab.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
       { desc: 'cards agree with the roster' });
-  }
+    await new Promise((r) => setTimeout(r, 200));
+  };
+  // The two chairs, as the old two tabs named them. `chairs` is walked in
+  // order everywhere below, and `sit` is what makes the walk a real reframe.
+  const chairs = [[0, 'front'], [1, 'back']];
+  const front = tab;
 
   const b = await front.dbg('placardBudget()');
   console.log(`# the card: face ${b.face.w} x ${b.face.slope} world (printed ${b.face.printed}), `
@@ -149,34 +170,42 @@ export default async function run(stage, [outDir = 'tools/shots/place-card', w =
   console.log('# the three zooms, idle, from both chairs');
   for (const z of ['wide', 'medium', 'close']) {
     await front.dbg(`setZoom('${z}')`);
-    for (const [t] of tabs) await t.waitFor(`window.__diceDebug.zoom === '${z}'`, { desc: `zoom ${z}` });
-    await new Promise((r) => setTimeout(r, 250));
-    for (const [t, who] of tabs) await row(t, `${z}/${who}`);
+    await tab.waitFor(`window.__diceDebug.zoom === '${z}'`, { desc: `zoom ${z}` });
+    for (const [k, who] of chairs) { await sit(k); await row(tab, `${z}/${who}`); }
   }
   await front.dbg(`setZoom('wide')`);
-  for (const [t] of tabs) await t.waitFor(`window.__diceDebug.zoom === 'wide'`, { desc: 'back to wide' });
+  await tab.waitFor(`window.__diceDebug.zoom === 'wide'`, { desc: 'back to wide' });
 
   for (const [ww, hh, tag] of [[w, h, 'desk'], ['390', '844', 'phone']]) {
     console.log(`# ${tag} ${ww}x${hh} — idle`);
-    for (const [t, who] of tabs) await frame(t, ww, hh);
+    await frame(tab, ww, hh);
     // The phone folds its panels away — tools/steps/phone-look.mjs's own
     // `mini` setup. Without it the side panel keeps its desktop width at a
     // 390px viewport and the felt is a 76px strip, which is a picture of the
     // harness rather than of the phone.
-    for (const [t] of tabs) await t.dbg(`setPanelState({pools: ${tag !== 'phone'}, log: ${tag !== 'phone'}})`);
+    await tab.dbg(`setPanelState({pools: ${tag !== 'phone'}, log: ${tag !== 'phone'}})`);
     await new Promise((r) => setTimeout(r, 350));
-    for (const [t, who] of tabs) { await row(t, `${tag}/${who}`); await dieBox(t, `${tag}/${who}`); await shot(t, `${tag}-idle-${who}`); }
-
-    console.log(`# ${tag} ${ww}x${hh} — after a 3d6 from the front`);
-    await front.dbg('commandRoll("3d6 # From the front")');
-    for (const [t] of tabs) {
-      await t.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy && window.__diceDebug.tableDice.length === 3)',
-        { desc: 'the throw is at rest', timeout: 60000 });
+    for (const [k, who] of chairs) {
+      await sit(k);
+      await row(tab, `${tag}/${who}`); await dieBox(tab, `${tag}/${who}`); await shot(tab, `${tag}-idle-${who}`);
     }
-    for (const [t, who] of tabs) { await row(t, `${tag}/${who}`); await dieBox(t, `${tag}/${who}`); await shot(t, `${tag}-rolled-${who}`); }
+
+    // …and the same pair of chairs with a 3d6 from station 0 ON the felt.
+    // Thrown through the demo door's own seat, so the throw carries station
+    // 0's stamp — its edge, its lane, its region — exactly as the front tab's
+    // roll used to when a server stamped it.
+    console.log(`# ${tag} ${ww}x${hh} — after a 3d6 from the front`);
+    await sit(0);
+    await tab.dbg('demoRoll(0, "3d6 # From the front")');
+    await tab.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy && window.__diceDebug.tableDice.length === 3)',
+      { desc: 'the throw is at rest', timeout: 60000 });
+    for (const [k, who] of chairs) {
+      await sit(k);
+      await row(tab, `${tag}/${who}`); await dieBox(tab, `${tag}/${who}`); await shot(tab, `${tag}-rolled-${who}`);
+    }
     await front.dbg('clearTable()');
     await front.settle();
-    for (const [t] of tabs) await t.dbg('sim(240)');
+    await tab.dbg('sim(240)');
     await new Promise((r) => setTimeout(r, 400));
   }
   console.log(`# shots in ${outDir}`);

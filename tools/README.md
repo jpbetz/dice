@@ -96,7 +96,9 @@ merged, and two look passes:
   card's projected face box, from both chairs, at three zooms, idle and after a
   3d6) and `#result-banner` (the card's printed panels and the NAME inside them
   against the panel's live DOM rect, and against the widest that rect can grow).
-  Desktop and phone. Looks + simulates (one throw per frame size).
+  Desktop and phone. **One tab through the demo door** since v4 — the sticky
+  seat switcher walks both chairs on the shipped orbit path, where the two real
+  tabs used to. Looks + simulates (one throw per frame size).
 - `place-region.mjs [zoom] [seeds] [variants-json] [stations] [pools]` — where a
   stamped throw comes to rest (v2): per cell, the share of dice and of pool
   centroids inside the roller's region, pile and median settle against the
@@ -113,15 +115,21 @@ merged, and two look passes:
   re-taken: two seated tabs, 3d6 each, both pools on the felt in their own
   regions from both chairs, desktop and phone; prints the die's px edge, every
   card's px box, each pool's centroid and region membership, and whether the
-  two chairs' feltPoses are byte-equal. Looks + simulates (two throws per
-  frame size).
-- `place-view.mjs [outDir] [w] [h]` — the view from every chair: three real
-  tabs at the front, the back and the right head on 1600×900. Prints each
-  chair's place base, the orbit the ladder rested on, the die span (the
-  short-edge tax), the fog floor and the lamp's nudge; saves every chair idle
-  at three zooms, one throw from the front mid-flight and at rest from all
-  three, and the empty chairs through `simulatePlaceView`. Looks + simulates
-  (one throw).
+  two chairs' feltPoses are byte-equal. **Deliberately still two real tabs**
+  while its siblings moved to the demo door: a stamp crossing the WIRE, and two
+  clients baking one film, is what a single tab cannot say. Keep at least one
+  step in this shape. Looks + simulates (two throws per frame size).
+- `place-view.mjs [outDir] [w] [h] [players]` — the view from every chair, in
+  **one tab through the demo door** (`?demo=1`): up to EIGHT chairs, which
+  three loopback origins never could reach (the harness ceiling is three tabs,
+  so the six- and eight-place pictures used to exist only as borrowed eyes).
+  Prints each chair's place base, the orbit the ladder rested on, the die span
+  (the short-edge tax), the fog floor and the lamp's nudge; saves every chair
+  idle at three zooms, one throw from station 0 mid-flight (through
+  `simulatePlaceView` — a seat change rides the roll-boundary flush and will
+  not move mid-tumble) and at rest from the sticky seat, and the crowd frame
+  where every chair has thrown and every pool is still standing. Looks +
+  simulates.
 
 Add new step files here (Apache header, like everything first-party) rather
 than writing one-off inline scripts — repeatable work belongs in the repo.

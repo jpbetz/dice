@@ -27,6 +27,15 @@ limitations under the License.
 //   the frame     — the camera mode/scale the dice-first ladder rested on
 //                   with two pools to frame
 //
+// THIS ONE STAYS TWO REAL TABS, ON PURPOSE (v4, 2026-09-01). Its siblings —
+// place-card.mjs and place-view.mjs — moved to one tab through the demo door
+// (`?demo=1`, js/demo.js) and got a tenth of their setup cost back. This step
+// did not, because what it proves is the thing a single tab cannot say: that
+// the stamp crosses the WIRE, that a server-stamped roll enters over its
+// roller's edge on somebody ELSE's client, and that the two clients' feltPoses
+// are byte-equal. A demo tab bakes its own film; two tabs at one room bake the
+// same one. Keep at least one step in this shape.
+//
 //   node tools/drive.mjs tools/steps/place-two-rolls.mjs [outDir] [width] [height] [zoom]
 //
 // Shots: <tag>-idle-front, <tag>-flight-back (the back's throw mid-air, seen
