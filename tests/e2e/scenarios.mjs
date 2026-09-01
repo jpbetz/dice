@@ -1420,12 +1420,17 @@ export const scenarios = [
           // 1 in 12, and it measured the same rate before the C30 tuning.
           //
           // It prints instead of asserting, so it cannot go quietly green: a
-          // shrink still shows up in the run log with the numbers on it. The
-          // fix is to read `framingInfo().spanPx`, which is roll-aware and
-          // already exists — that is the circle-back, and it is a few lines.
+          // shrink still shows up in the run log with the numbers on it.
+          //
+          // §7.63 (per-viewer orientation) repointed `zoomProbe().dieSpanPx`
+          // at the same roll-aware 2-D span framingInfo() takes, so the
+          // numbers printed here are now TRUE under a turn — the instrument
+          // no longer lies. The assertion itself stays disabled: re-arming it
+          // is the owner's circle-back, to be re-measured before it is asked
+          // to hold, not flipped on the day the probe was fixed.
           if (!(n > o * 1.5)) {
             console.log(`    [disabled assertion] phone ${pool}: ${o}px → ${n}px `
-              + '— expected a 1.5x gain; probe reads x only, see the comment above');
+              + '— expected a 1.5x gain; disabled by the owner, see the comment above');
           }
           const f = JSON.parse(await a.eval('JSON.stringify(window.__diceDebug.framingInfo())'));
           assert.equal(f.diceOnScreen, f.dice,
@@ -1441,8 +1446,12 @@ export const scenarios = [
         // and out of frame whichever way the table sits, so that tie-break was
         // noise. These three assertions are the ones that would have caught it.
         const big = await throwIt('40d6');
-        assert.notEqual(big.orbit, 0,
-          `phone 40d6: the table turns (orbit ${big.orbit}, ${big.diceOnScreen}/${big.dice})`);
+        // Measured against the viewer's own PLACE azimuth, not against world
+        // +z (§7.63): a one-tab table sits at place 0, so this is the pin it
+        // always was, and it stays the same claim for a viewer at any chair.
+        assert.notEqual(big.orbit, big.placeOrbit,
+          `phone 40d6: the table turns (orbit ${big.orbit} off a place base of ${big.placeOrbit}, `
+          + `${big.diceOnScreen}/${big.dice})`);
         assert.equal(big.diceOnScreen, big.dice,
           `phone 40d6: …and every one of forty dice is on screen (${big.diceOnScreen}/${big.dice})`);
         const lone = await throwIt('1d20');
@@ -1464,7 +1473,9 @@ export const scenarios = [
         await viewport(1440, 900, true);
         for (const pool of ['20d6', '40d6']) {
           const f = await throwIt(pool);
-          assert.equal(f.orbit, 0, `desktop ${pool}: a mat-rung pool stays landscape`);
+          assert.equal(f.orbit, f.placeOrbit,
+            `desktop ${pool}: a mat-rung pool keeps the viewer's own place azimuth `
+            + `(orbit ${f.orbit}, place base ${f.placeOrbit})`);
           assert.ok(f.decidingOnScreen === true,
             `desktop ${pool}: and the deciding die is in frame — the mat fitting `
             + `does NOT imply the dice do, since a die resting on two others `
@@ -2215,8 +2226,19 @@ export const scenarios = [
     // new eye, so it was derived from a mat and an eye that never coexisted.
     // Both were silent. Hence the sweep over all three zooms rather than a
     // single reading at the default.
+    //
+    // AND SINCE §7.63 THE FLOOR IS PER-VIEWER: a place turns the eye about the
+    // mat's axis, and the floor is a max over four corners FROM THE EYE. The
+    // second half below re-derives it at all four azimuths a viewer can rest
+    // at, on the 16:9 frame the design priced, and then puts dice on the felt
+    // and asks the fog's own units whether any of them sits in it from any
+    // chair.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.page.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
+      try {
+      await a.eval('window.dispatchEvent(new Event("resize"))');
       await a.settle();
       const probe = 'JSON.stringify(window.__diceDebug.breathProbe())';
       const floors = [];
@@ -2248,6 +2270,102 @@ export const scenarios = [
       // the per-zoom assertions used.
       assert.equal(new Set(floors.map((f) => f.toFixed(3))).size, 3,
         `each zoom derives its own floor (${floors.map((f) => f.toFixed(2)).join(', ')})`);
+
+      // ---- the four azimuths (§7.63; DESIGN §5.4) ---------------------------
+      // The design's table, medium, eye at the preset (s = 1):
+      //   0 → 16.53   π → 15.93   π/2 → 17.12   3π/2 → 17.12
+      // THERE IS NO 0↔π SYMMETRY — CAM_TARGET_HOME.z is +0.5, which breaks
+      // the reflection — and nothing here assumes one: front and back are
+      // asserted to DIFFER. The heads mirror each other in x and must agree.
+      //
+      // Only the front chair rests at s = 1 on this frame (measured: the back
+      // eye stands a unit nearer its own edge and retreats to 1.03; a head eye
+      // looks down the long axis and retreats to 1.33), so the design's
+      // numbers are pinned exactly where the eye is at the preset and are the
+      // LOWER BOUND everywhere else — a retreat along the eye's own ray can
+      // only move a far corner further. What is exact at every chair is the
+      // derivation itself: the floor re-computed here from the mat's corners
+      // and the eye framingInfo reports, with the margin read off the front
+      // chair rather than copied out of js/main.js.
+      //
+      // simulatePlaceView(n) is the instrument: it sets placeOrbit to station
+      // n's azimuth and runs the SHIPPED ladder, so this is the frame a viewer
+      // seated at n gets, from one tab.
+      await a.dbg(`setZoom('medium')`);
+      await a.waitFor(`window.__diceDebug.breathProbe().zoom === 'medium'`,
+        { desc: 'medium: the zoom applies' });
+      const farCorner = (p, eye) => {
+        let far = 0;
+        for (const sx of [-1, 1]) {
+          for (const sz of [-1, 1]) {
+            far = Math.max(far, Math.hypot(sx * p.tableW / 2 - eye[0], eye[1], sz * p.tableD / 2 - eye[2]));
+          }
+        }
+        return far;
+      };
+      const CHAIRS = [[0, 0, 16.53], [1, Math.PI, 15.93], [4, Math.PI / 2, 17.12], [5, 3 * Math.PI / 2, 17.12]];
+      const seen = {};
+      let margin = null;
+      for (const [place, azim, atPreset] of CHAIRS) {
+        const sim = await a.dbg(`simulatePlaceView(${place})`);
+        assert.equal(sim.orbit, azim, `station ${place}: simulated at azimuth ${azim.toFixed(2)}`);
+        const f = await a.dbg('framingInfo()');
+        const p = JSON.parse(await a.eval(probe));
+        assert.equal(f.placeOrbit, Math.round(azim * 100) / 100,
+          `station ${place}: the ladder's base is the chair's azimuth`);
+        const quarter = Math.round(((azim + Math.PI / 2) % (2 * Math.PI)) * 100) / 100;
+        assert.ok(f.orbit === f.placeOrbit || f.orbit === quarter,
+          `station ${place}: the resting frame is the base or its quarter turn (${f.orbit})`);
+        assert.equal(f.matFits, true, `station ${place}: the whole mat is in the resting frame`);
+        assert.ok(p.fogNear >= p.matFogFloor - 1e-9,
+          `station ${place}: fog starts past the floor (${p.fogNear.toFixed(2)} vs ${p.matFogFloor.toFixed(2)})`);
+        assert.ok(p.matFogFloor >= atPreset - 0.005,
+          `station ${place}: the floor is never under the design's preset-eye number `
+          + `(${p.matFogFloor.toFixed(3)} vs ${atPreset})`);
+        const far = farCorner(p, f.eye);
+        if (margin === null) margin = p.matFogFloor - far;
+        assert.ok(Math.abs((p.matFogFloor - far) - margin) < 2e-3,
+          `station ${place}: the floor is the furthest mat corner from THIS eye plus the same `
+          + `margin every chair gets (${(p.matFogFloor - far).toFixed(3)} vs ${margin.toFixed(3)})`);
+        if (f.camScale === 1) {
+          assert.equal(p.matFogFloor.toFixed(2), atPreset.toFixed(2),
+            `station ${place}: at the preset eye the floor is the design's number exactly`);
+        }
+        seen[place] = { floor: p.matFogFloor, camScale: f.camScale, orbit: f.orbit };
+      }
+      assert.equal(seen[0].camScale, 1,
+        'the front chair rests at the preset eye, so at least one exact pin above was actually made');
+      assert.notEqual(seen[0].floor.toFixed(3), seen[1].floor.toFixed(3),
+        `front and back derive DIFFERENT floors — there is no 0↔π symmetry `
+        + `(${seen[0].floor.toFixed(2)} / ${seen[1].floor.toFixed(2)}; CAM_TARGET_HOME.z is +0.5)`);
+      assert.equal(seen[4].floor.toFixed(3), seen[5].floor.toFixed(3),
+        `the two heads mirror each other in x and agree (${seen[4].floor.toFixed(2)})`);
+      assert.ok(seen[1].floor < seen[0].floor && seen[0].floor < seen[4].floor,
+        `back < front < heads — the order of the design's table `
+        + `(${seen[1].floor.toFixed(2)} < ${seen[0].floor.toFixed(2)} < ${seen[4].floor.toFixed(2)})`);
+      assert.equal((await a.dbg('simulatePlaceView(null)')).orbit, 0, 'the instrument hands the real chair back');
+      assert.equal((await a.dbg('framingInfo()')).placeOrbit, 0, 'and the frame is the front chair again');
+
+      // ---- and no die sits in fog from any chair -----------------------------
+      // Dice on the felt, then the same four chairs, read in the fog's own
+      // units (view depth). With dice down the ladder may pick any rung it
+      // likes at each azimuth; the invariant has to hold whichever it picks.
+      await a.dbg('throwSeeded(["d6","d6","d6","d6"], 7002)');
+      await a.settle();
+      for (const [place] of CHAIRS) {
+        await a.dbg(`simulatePlaceView(${place})`);
+        const d = await a.dbg('fogDepths()');
+        assert.equal(d.depths.length, 4, `station ${place}: four dice measured`);
+        const deepest = Math.max(...d.depths);
+        assert.ok(deepest < d.near,
+          `station ${place}: no die sits in fog from this chair `
+          + `(deepest ${deepest.toFixed(1)} vs fogNear ${d.near.toFixed(1)})`);
+      }
+      await a.dbg('simulatePlaceView(null)');
+      } finally {
+        await a.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, a.page.sessionId)
+          .catch(() => {});
+      }
     },
   },
   {
@@ -20378,6 +20496,16 @@ export const scenarios = [
         + '7,0.269,0.141]},{"rollId":"seeded-808-2-2","i":1,"type":"d20","shrouded":false,"pos":[0.975,'
         + '0.966,2.597],"quat":[0.006,0.008,0.567,0.824]}]';
       const a = await ctx.newTable({ origin: 'localhost', name: 'Golden' });
+      // PIN THE SET TO STD FIRST. `dice.diceset.v1` is per-origin and outlives
+      // a scenario (the trap TESTING.md records), and the golden below was
+      // captured on the standard set. The PHYSICS does not care which set
+      // rolls — positions came back identical to the byte with a themed set
+      // on — but feltPoses() reads the MESH, and a themed set carries its own
+      // rest cadence (SETS[id].rest), which nudges the settled quaternions by
+      // a third decimal. Found when `venue-dice` (which chooses
+      // tidewrack.seaglass on this origin) first ran ahead of this in a sweep:
+      // a red pin over a cadence, with the film itself untouched.
+      await a.dbg("setDiceSet('std')");
       await a.dbg('holdClock(true)');
       try {
         const throwOne = async (types, seed, values, wantSide) => {
@@ -20533,8 +20661,10 @@ export const scenarios = [
     //
     // The content discriminator: both tabs must have CONSUMED the stamp
     // (throwOrigin 'place', entry 1), or the equality below is two tabs both
-    // falling back to the seeded draw. The orbit-differs leg — the two views
-    // framed from their own chairs — lands with per-viewer orientation.
+    // falling back to the seeded draw. And the orbit-differs leg at the end
+    // is the other half of the claim: the two views ARE framed from their own
+    // chairs (0 and π), so the byte-equal felt is not two identical cameras
+    // agreeing with themselves.
     async fn(ctx) {
       const phone = await ctx.newTable({ origin: '127.0.0.66', name: 'Phone' });
       const desk = await ctx.newTable({ origin: '127.0.0.67', name: 'Desk' });
@@ -20571,8 +20701,133 @@ export const scenarios = [
           'the same dice at the same poses — neither the viewport nor the place is an input to the film');
         assert.equal(JSON.stringify(a), JSON.stringify(b),
           'byte-identical as strings, which is the form two clients can actually compare');
+
+        // ---- and the two views differ (§7.63, per-viewer orientation) -------
+        // Same film, two chairs: the phone at the front frames from a base of
+        // 0, the desktop opposite from a base of π, and the ladder's own turn
+        // (0 or a quarter on) sits on top of each. Without this the equality
+        // above could be two identical cameras.
+        const fp2 = await phone.dbg('framingInfo()');
+        const fd2 = await desk.dbg('framingInfo()');
+        assert.equal(fp2.placeOrbit, 0, 'the phone frames from the front chair');
+        assert.equal(fd2.placeOrbit, 3.14, 'the desktop frames from the chair opposite');
+        assert.notEqual(fp2.orbit, fd2.orbit,
+          `the two views are framed from their own chairs (orbits ${fp2.orbit} / ${fd2.orbit})`);
+        for (const [f, who] of [[fp2, 'phone'], [fd2, 'desktop']]) {
+          const quarter = Math.round(((f.placeOrbit + Math.PI / 2) % (2 * Math.PI)) * 100) / 100;
+          assert.ok(f.orbit === f.placeOrbit || f.orbit === quarter,
+            `${who}: the frame rests on its place base or the quarter turn on from it (${f.orbit})`);
+        }
       } finally {
         for (const t of [phone, desk]) {
+          await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId)
+            .catch(() => {});
+        }
+      }
+    },
+  },
+  {
+    name: 'place-two-views',
+    tags: ['place', 'presence'],
+    timeout: 150000,
+    // TWO PEOPLE, ONE TABLE, TWO CHAIRS (UX §7.63 — per-viewer orientation).
+    // The same dice at the same poses, seen from opposite sides: each viewer's
+    // own card is the one at the bottom of THEIR frame, the names are printed
+    // toward whoever is reading them, and the film underneath is byte-equal.
+    //
+    // P9 — the content discriminator is the orbit itself. A build that left
+    // every viewer at world +z would pass the felt-equality half of this
+    // trivially, so the two tabs' bases are asserted to DIFFER (0 and π) and
+    // the own-card-lowest claim is asserted on BOTH tabs, where a shared
+    // camera can satisfy at most one of them.
+    //
+    // The cut is per-viewer and wire-free: nothing here reaches the server,
+    // and `feltPoses()` proves the film never heard about either chair.
+    async fn(ctx) {
+      const front = await ctx.newTable({ origin: '127.0.0.91', name: 'Front' });
+      const back = await ctx.newTable({ origin: '127.0.0.92', name: 'Back' });
+      for (const t of [front, back]) {
+        await t.page.browser.send('Emulation.setDeviceMetricsOverride',
+          { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
+      }
+      try {
+        for (const t of [front, back]) {
+          await t.eval('window.dispatchEvent(new Event("resize"))');
+          await t.waitFor('window.__diceDebug.places().stations.length === 2', { desc: 'both seated' });
+          await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
+            { desc: 'the cards agree with the roster' });
+        }
+        assert.equal(await front.dbg('places().mine'), 0, 'the first arrival takes the front chair');
+        assert.equal(await back.dbg('places().mine'), 1, 'the second sits opposite');
+
+        // ---- the base differs, and the frame rests on it -------------------
+        const ff = await front.dbg('framingInfo()');
+        const fb = await back.dbg('framingInfo()');
+        assert.equal(ff.placeMine, 0, 'framingInfo names the front chair as mine');
+        assert.equal(fb.placeMine, 1, '…and the back chair on the other tab');
+        assert.equal(ff.placeOrbit, 0, 'the front viewer frames from a base of 0');
+        assert.equal(fb.placeOrbit, 3.14, 'the back viewer frames from a base of π');
+        assert.notEqual(ff.orbit, fb.orbit,
+          `the two frames are not the same orbit (${ff.orbit} / ${fb.orbit}) — a shared camera would fail this`);
+        assert.ok(!(ff.orbit === 0 && fb.orbit === 0), 'and they are not both world +z');
+        for (const [f, who] of [[ff, 'front'], [fb, 'back']]) {
+          const quarter = Math.round(((f.placeOrbit + Math.PI / 2) % (2 * Math.PI)) * 100) / 100;
+          assert.ok(f.orbit === f.placeOrbit || f.orbit === quarter,
+            `${who}: the ladder decides on top of the place's base, never off it (${f.orbit})`);
+          assert.equal(f.matFits, true, `${who}: the whole mat is in the resting frame at 1600×900`);
+        }
+        const pl = await back.dbg('places()');
+        assert.equal(pl.orbit, pl.myOrbit, 'the applied orbit is the one the chair asks for (nothing deferred)');
+
+        // ---- your own card is the one at the bottom of YOUR frame ----------
+        // ndc y grows upward, so "lowest in the picture" is the smallest cy.
+        // Asserted on both tabs: one camera can put at most one card lowest.
+        for (const [t, mine, who] of [[front, 0, 'front'], [back, 1, 'back']]) {
+          const own = await t.dbg(`placardFrame(${mine})`);
+          const other = await t.dbg(`placardFrame(${1 - mine})`);
+          assert.ok(own && other, `${who}: both cards project`);
+          assert.equal(own.mine, true, `${who}: placardFrame knows which card is mine`);
+          assert.ok(own.cy < other.cy,
+            `${who}: my own card sits lowest in my frame (cy ${own.cy.toFixed(3)} vs ${other.cy.toFixed(3)})`);
+          assert.ok(other.in, `${who}: the card opposite is inside the frame`);
+          assert.ok(Math.abs(own.cx) <= 0.94, `${who}: my own card is inside the frame laterally (cx ${own.cx.toFixed(3)})`);
+          // The front's own card is in frame on 16:9 (placard-look's -0.98
+          // bar); the back's own card FACE clips below the rim — the eye
+          // orbits about CAM_TARGET_HOME, 0.5 toward the front chair, so the
+          // back eye stands a unit nearer its own edge. Recorded in
+          // placard-look's four-orbit leg with the numbers; the frame outranks
+          // the place, and your own card is the one name you never need.
+          if (mine === 0) assert.ok(own.in, `${who}: the front's own card is inside the frame`);
+          // The printing follows the frame: the rig turned every name for the
+          // orbit this tab is cut to, not for world +z.
+          const p = await t.dbg('places()');
+          const f = await t.dbg('framingInfo()');
+          assert.equal(Math.round(p.readerOrbit * 100) / 100, f.orbit,
+            `${who}: the names are printed for the reader the frame was cut to (${p.readerOrbit.toFixed(2)} vs ${f.orbit})`);
+        }
+
+        // ---- one roll, one film, two frames ---------------------------------
+        await front.roll('3d6 # From the front');
+        const rid = await front.rollId();
+        await back.waitFor(shroudSettled(rid, 3).replace('shroudedCount', 'tableDice.length'),
+          { desc: 'the roll plays out opposite too' });
+        await front.settle();
+        await back.settle();
+        const a = await front.dbg('feltPoses()');
+        const b = await back.dbg('feltPoses()');
+        assert.equal(a.length, 3, 'three dice on the front felt');
+        assert.deepEqual(a, b, 'the same dice at the same poses from both chairs');
+        assert.equal(JSON.stringify(a), JSON.stringify(b), 'byte-identical as strings');
+        const ff2 = await front.dbg('framingInfo()');
+        const fb2 = await back.dbg('framingInfo()');
+        assert.equal(ff2.placeOrbit, 0, 'the roll did not move the front viewer off their chair');
+        assert.equal(fb2.placeOrbit, 3.14, '…nor the back viewer');
+        assert.equal(ff2.decidingOnScreen, true, 'front: the deciding die is in frame');
+        assert.equal(fb2.decidingOnScreen, true, 'back: the deciding die is in frame from the other chair too');
+        assert.deepEqual(await front.dbg('throwOrigin()'), await back.dbg('throwOrigin()'),
+          'and both tabs lined the throw up on the same stamp — the chair is not a film input');
+      } finally {
+        for (const t of [front, back]) {
           await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId)
             .catch(() => {});
         }
@@ -20861,6 +21116,71 @@ export const scenarios = [
             }
           }
         }
+
+        // ---- …and from every other chair (§7.63; DESIGN §4 amendment 1 asks
+        // for the face gates at all four orbits) -------------------------------
+        // simulatePlaceView(n) runs the SHIPPED ladder from station n's chair.
+        // What holds at every chair, every zoom: every card on another edge
+        // sits clear of both rims, and the near row — the viewer's own — is
+        // the LOWEST row in the frame and horizontally inside it.
+        //
+        // WHAT DOES NOT HOLD, AND IS RECORDED HERE RATHER THAN HIDDEN: at the
+        // back and at both heads the viewer's own card FACE clips below the
+        // bottom rim on a 16:9 frame (measured at medium: back −1.155, heads
+        // −1.121, against the front's −0.903). Two causes, both structural.
+        // The eye orbits about CAM_TARGET_HOME, which sits 0.5 toward the
+        // FRONT chair, so the back eye stands a unit nearer its own edge than
+        // the front eye does and the near edge binds the fit; and a head eye
+        // looks down the mat's long axis, retreats 1.33× to fit it vertically,
+        // and once the mat's near edge is fitted to the rim a card OUTBOARD of
+        // that edge is below the rim by construction. The frame outranks the
+        // place (§5.2 — no framing geometry moves for a card) and your own
+        // card is the one name you never need (§7.2), so the allowance below
+        // is exactly the clip and nothing more: the near row may cross the rim
+        // but must stay the nearest row and stay put laterally, and its
+        // printed band's top may not drift further than 0.5 below the rim.
+        // The named follow-up lever is the edge-anchored crop (UX §7.63).
+        const nearRow = [];
+        for (const [place, azim] of [[1, Math.PI], [4, Math.PI / 2], [5, 3 * Math.PI / 2]]) {
+          const sim = await a.dbg(`simulatePlaceView(${place})`);
+          assert.equal(sim.orbit, azim, `station ${place}: simulated at azimuth ${azim.toFixed(2)}`);
+          for (const z of ['wide', 'medium', 'close']) {
+            await a.dbg(`setZoom('${z}')`);
+            await a.waitFor(`window.__diceDebug.zoom === '${z}'`, { desc: `zoom ${z}` });
+            const fi = await a.dbg('framingInfo()');
+            assert.equal(fi.placeOrbit, Math.round(azim * 100) / 100,
+              `${z} from station ${place}: the ladder's base is that chair`);
+            const pl = await a.dbg('places()');
+            assert.equal(Math.round(pl.readerOrbit * 100) / 100, fi.orbit,
+              `${z} from station ${place}: every name is printed for the reader the frame was cut to`);
+            const ownEdge = pl.stations.find((s) => s.place === place).station;
+            const frames = {};
+            for (const s of pl.stations) frames[s.place] = await a.dbg(`placardFrame(${s.place})`);
+            const farthest = Math.min(...pl.stations.filter((s) => s.station !== ownEdge)
+              .map((s) => frames[s.place].cy));
+            for (const s of pl.stations) {
+              const f = frames[s.place];
+              assert.ok(f, `${z} from station ${place}: station ${s.place} has a card face to project`);
+              if (s.station === ownEdge) {
+                assert.ok(f.cy < farthest,
+                  `${z} from station ${place}: the near row is MINE — station ${s.place} is lower in the `
+                  + `frame than every card on another edge (cy ${f.cy.toFixed(3)} vs ${farthest.toFixed(3)})`);
+                assert.ok(Math.abs(f.cx) <= 0.94,
+                  `${z} from station ${place}: and it is inside the frame laterally (cx ${f.cx.toFixed(3)})`);
+                assert.ok(f.ndc.y1 >= -1.5,
+                  `${z} from station ${place}: its printed band has not drifted away from the rim `
+                  + `(top at ndc ${f.ndc.y1.toFixed(3)})`);
+                if (s.place === place) nearRow.push(`${z}/st${place}: y[${f.ndc.y0.toFixed(3)},${f.ndc.y1.toFixed(3)}]`);
+              } else {
+                assert.ok(f.ndc.y0 >= -0.94 && f.ndc.y1 <= 0.94,
+                  `${z} from station ${place}: station ${s.place} sits clear of both rims `
+                  + `(ndc y ${f.ndc.y0.toFixed(3)}..${f.ndc.y1.toFixed(3)}, the bar is ±0.94)`);
+              }
+            }
+          }
+        }
+        console.log(`    [recorded] own card face from the other chairs: ${nearRow.join('  ')}`);
+        assert.equal((await a.dbg('simulatePlaceView(null)')).orbit, 0, 'the instrument hands the chair back');
 
         // ---- rule 15: the rejected frame must FAIL ---------------------------
         // Eight cards on one edge is the arrangement this layout exists

@@ -78,6 +78,26 @@ paired seeds, so a before and an after are the same throw:
   take a negative control, because with the flush backed out leg 1 leaves a
   zoom pending and wedges every later leg's setup.
 
+A place at the table (docs/UX.md §7.63). Two gates that ran before the stamp
+merged, and two look passes:
+
+- `place-settle.mjs [seeds] [gate|ab]` — the PLACE_AIM ship/no-ship gate: the
+  translated landing box against the placeless baseline on identical seeds
+  (Δ pile, Δ median settle, worst cell). Simulates: minutes. Its `gate` mode
+  exits 1 on the shipped tree by design — the dials ship at zero.
+- `place-spawn.mjs [seeds]` — the laned spawn line priced against the laneless
+  one: wall clearance in every laned cell and the F1 separation delta.
+- `place-look.mjs [outDir] [w] [h]` — the placard itself: one card, the full
+  house at three zooms, the numbers `placard-look` gates on, and the wash
+  mid-film. Looks.
+- `place-view.mjs [outDir] [w] [h]` — the view from every chair: three real
+  tabs at the front, the back and the right head on 1600×900. Prints each
+  chair's place base, the orbit the ladder rested on, the die span (the
+  short-edge tax), the fog floor and the lamp's nudge; saves every chair idle
+  at three zooms, one throw from the front mid-flight and at rest from all
+  three, and the empty chairs through `simulatePlaceView`. Looks + simulates
+  (one throw).
+
 Add new step files here (Apache header, like everything first-party) rather
 than writing one-off inline scripts — repeatable work belongs in the repo.
 

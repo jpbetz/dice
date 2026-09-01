@@ -98,17 +98,19 @@ const FACE_S = (RIDGE_Y - FACE_Y0) / TENT_RISE;       // 0.617 of the slope, fro
 const BEAD_W_MINE = BASE_W - 2 * CHAMFER; // YOUR card's bead runs the full base
 const BEAD_W_OTHER = 0.55;                // everybody else's is a centred pip
 
-// WHICH WAY UP THE PRINTING GOES, per station azimuth, for a reader at
-// azimuth 0. Each row is [+z panel, −z panel] and each entry is
-// [mirror across the card's width, flip the row end-over-end] — a quarter turn
-// of the atlas row in texture space, which is all it takes to hand a shallow
-// tent card's name to the person looking at it. See _writePlacard for why the
-// OBJECT must not turn instead.
+// WHICH WAY UP THE PRINTING GOES, per station azimuth RELATIVE TO THE READER
+// (keyed on `(station azim − reader orbit)` in quarter turns; see setReader).
+// Each row is [+z panel, −z panel] and each entry is [mirror across the card's
+// width, flip the row end-over-end] — a quarter turn of the atlas row in
+// texture space, which is all it takes to hand a shallow tent card's name to
+// the person looking at it. See _writePlacard for why the OBJECT must not
+// turn instead.
 //
-// Front (0) and back (π) land exactly on the reader's up-vector. The two heads
-// are a quarter turn off it either way — a head card is read side-on until the
-// viewer's own table can turn, which is the next slice — so their entries pick
-// the pair that reads bottom-to-top rather than top-to-bottom.
+// The chair the reader sits at (relative 0) and the one opposite (π) land
+// exactly on the reader's up-vector. The two to either side are a quarter
+// turn off it either way — a card at your elbow is read side-on, as it is at
+// a real table — so their entries pick the pair that reads bottom-to-top
+// rather than top-to-bottom.
 const READ_TURN = Object.freeze({
   0: [[false, false], [true, true]],    // front      — azim 0
   1: [[false, false], [true, true]],    // right head — azim π/2
@@ -187,6 +189,10 @@ export class PlacardRig {
     this.rows = [];                 // one per station, null when nobody sits there
     this.occupied = 0;
     this.shown = true;              // the placardShow() override
+    // The reader's azimuth in quarter turns (0 front, 1 right head, 2 back,
+    // 3 left head) — the orbit the frame was last cut to. Every name is
+    // printed for it (READ_TURN); main.js sets it where the orbit cuts.
+    this.readerQ = 0;
     this.wash = { active: false, t: 0, dur: 0, place: null, x: 0, y: 0, z: 0, color: null };
   }
 
@@ -431,11 +437,13 @@ export class PlacardRig {
     // azimuth and only the PRINTING turns — a quarter turn of the atlas row,
     // per panel, in texture space, costing nothing and moving nothing.
     //
-    // The reader is at azimuth 0 this slice (the per-viewer orbit is its own).
-    // Front and back cards land on the reader's up-vector exactly; the two
-    // heads are a quarter turn off it whichever way they are printed, which is
-    // the honest state of a head seat until the viewer's own table can turn.
-    const q = ((Math.round(azim / (Math.PI / 2)) % 4) + 4) % 4;
+    // The reader is wherever the frame was last cut to (`readerQ`, set by
+    // main.js's applyFramingPose — the per-viewer orbit of §7.63, or the
+    // ladder's quarter turn on top of it). The card at the reader's own chair
+    // and the one opposite land on their up-vector exactly; the two at their
+    // elbows are a quarter turn off it whichever way they are printed, which
+    // is how a card at your elbow reads at a real table too.
+    const q = ((Math.round(azim / (Math.PI / 2)) - this.readerQ) % 4 + 4) % 4;
     const turn = READ_TURN[q];
 
     let o = slot * VERTS * 3;
@@ -642,6 +650,37 @@ export class PlacardRig {
   text(place) {
     const r = this.rowAt(place);
     return r ? r.shown : null;
+  }
+
+  // THE READER MOVED — turn every name toward them (§7.63). `orbit` is the
+  // camera orbit the frame was just cut to; quantised to the quarter turn,
+  // and a no-op when the quarter has not changed, which is every reframe but
+  // the cut itself. A UV rewrite over the standing rows: no atlas repaint, no
+  // allocation, no object moved — the printing turns, the placards stand.
+  setReader(orbit) {
+    const q = ((Math.round((orbit || 0) / (Math.PI / 2)) % 4) + 4) % 4;
+    if (q === this.readerQ) return false;
+    this.readerQ = q;
+    this._rewrite();
+    return true;
+  }
+
+  readerOrbit() { return this.readerQ * (Math.PI / 2); }
+
+  // Re-emit every station's geometry from the rows already standing — same
+  // anchors, same seating, same names — for a change that touches only how
+  // they are read. Contents, never lengths, like update().
+  _rewrite() {
+    if (!this.built) return;
+    for (let slot = 0; slot < PLACE_MAX; slot++) {
+      const rec = this.rows[slot];
+      if (rec) this._writePlacard(slot, rec);
+      else this._writeEmpty(slot);
+    }
+    this.geometry.attributes.position.needsUpdate = true;
+    this.geometry.attributes.normal.needsUpdate = true;
+    this.geometry.attributes.color.needsUpdate = true;
+    this.geometry.attributes.uv.needsUpdate = true;
   }
 
   // ---- the wash ---------------------------------------------------------
