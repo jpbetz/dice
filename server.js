@@ -2325,6 +2325,41 @@ function collectEntries(room, entries) {
   return collected;
 }
 
+// WHAT AN ARRIVING ROLL SWEEPS OFF THE FELT (UX §7.7, amended by §7.63 v2).
+//
+// Joe, on the deployed two-tab table (2026-09-01): "there is not enough room
+// for two people to roll the dice at the same time." Until then the felt
+// belonged to ONE roll — every arrival collected every prior — which on a
+// table with places meant the second person's throw put the first person's
+// dice away in the same beat. With a place owning its region of the felt for
+// landing (js/places.js regionFor) the felt holds ONE ROLL PER PLACE:
+//
+//   · a STAMPED arrival (the roller holds a place — the stamp is on the roll,
+//     written from that place a few lines up) collects (a) the roller's own
+//     prior rolls, stamped or not, and (b) every UNSTAMPED roll on the table,
+//     because a roll with no region has nowhere of its own to sit while
+//     another lands. Other placed players' open rolls stay where they are.
+//   · an UNSTAMPED arrival — a placeless roller (the ninth chair), a table
+//     with PLACES_ON off — is today's rule, byte for byte: it takes the whole
+//     felt, placed rolls included. The pin (tests/places-wire.test.mjs §7,
+//     scenario place-two-rolls) calls this what it is: a placeless roll is
+//     the old table, and the next placed roll takes it away again.
+//   · UNDER A TOWER the whole felt is swept as before. A pour ignores the
+//     stamp (the doorway is the tower's own ceremony, docs/TOWER.md) and lands
+//     at the exit, so two open pours would be two pools on one spot; regions
+//     for a tower table are ROADMAP row 15's, with the rest of S8.
+//
+// Decided by the ROLL's stamp and the LOG's stamps, never by the roster: a
+// roll whose roller has since left keeps its felt exactly as its entry keeps
+// its edge (GOALS:297-306, history vs live state). A one-player table is
+// identical to the old rule by construction — every prior roll is the
+// roller's own. Rethrows (M2) collect nothing, as before: a turn is one roll.
+function arrivalSweep(room, roll) {
+  const towerUp = !!(room.settings.tower && room.settings.tower !== 'none');
+  if (!Number.isInteger(roll.entry) || towerUp) return room.log;
+  return room.log.filter((r) => r.playerId === roll.playerId || !Number.isInteger(r.entry));
+}
+
 // Compose, log, and broadcast a roll for a player from a validated spec.
 // Shared by /api/roll and /api/claim so both take the exact same path.
 function executeRoll(room, player, spec) {
@@ -2445,17 +2480,38 @@ function executeRoll(room, player, spec) {
   if (drawn) roll.sets = drawn;
   else if (spec.sets) roll.sets = spec.sets;
 
-  // Auto-collect (§7.7): the felt belongs to ONE roll, so everything already on
-  // it goes to the shelf as part of the incoming roll's arrival beat. The
-  // server decides this, not the clients, so there is no race over whose
-  // whisk-away ran first. `room.log` is still all-priors here — the new roll is
-  // pushed below — and nothing of this roll's has been broadcast yet, so the
-  // whole burst reaches the room in the order §7.7 pins: evictions, then
-  // collections, then the roll itself.
-  collectEntries(room, room.log);
+  // Auto-collect (§7.7): THE FELT HOLDS ONE ROLL PER PLACE (v2, 2026-09-01),
+  // and one roll in all where there are no places. What the incoming roll
+  // sweeps to the shelf is decided by arrivalSweep below — the server decides
+  // it, not the clients, so there is no race over whose whisk-away ran first.
+  // `room.log` is still all-priors here — the new roll is pushed below — and
+  // nothing of this roll's has been broadcast yet, so the whole burst reaches
+  // the room in the order §7.7 pins: evictions, then collections, then the
+  // roll itself.
+  collectEntries(room, arrivalSweep(room, roll));
 
   room.log.push(roll);
-  if (room.log.length > LOG_CAP) room.log = room.log.slice(-LOG_CAP);
+  if (room.log.length > LOG_CAP) {
+    // HISTORY THAT FALLS OFF THE LOG FALLS OFF THE TABLE. Until v2 this trim
+    // could never touch a live roll: every arrival collected the whole felt,
+    // so an open roll was always the newest entry and a shelved one at most
+    // six rolls old. A placed player's open roll now outlives every roll the
+    // OTHER chairs make, so a hundred rolls later it is the oldest entry in
+    // the log — and a client that still had its dice up would keep them
+    // forever (nothing would ever collect a roll the server had forgotten),
+    // while a late joiner, rebuilding from the log, would never see it (goal
+    // 8). So a trimmed entry that is still on the table is CLEARED first and
+    // the room told, existence-gated like every roll-cleared. LOG_CAP is
+    // thereby a hard bound on how long any roll lives on the felt or shelf.
+    for (const old of room.log.slice(0, room.log.length - LOG_CAP)) {
+      if (old.cleared) continue;
+      old.cleared = true;
+      logDebug(() => `trim    ${logField('room', room.name)} rollId=${old.rollId} (fell off the log while ${old.collected ? 'shelved' : 'on the felt'})`);
+      const data = { rollId: old.rollId };
+      broadcast(room, 'roll-cleared', data, (viewerId) => (entryExistsFor(old, viewerId) ? data : null));
+    }
+    room.log = room.log.slice(-LOG_CAP);
+  }
 
   // stdout is a disclosure surface too: a non-open roll logs its stakes and
   // mode, never its values (an operator tailing the log must not out-read the

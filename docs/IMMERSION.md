@@ -1377,17 +1377,31 @@ cannot vibrate.
 >    `roll.lane`. **The film never reads the roster.** The roster-index hazard
 >    named at :1367-1382 — the visual claim being false while the readout says
 >    Ravi — is therefore closed by construction, not by discipline.
-> 3. **The risk clause below is re-affirmed unamended and the successor is
->    bound by it**, so it is quoted here rather than pointed at: *"A seat is a
->    POSITION and a COLOUR, nothing else. It confers no capability, gates no
->    action, owns no region of felt, cannot be claimed or refused. If a seat
->    ever becomes a thing you can take or a place only your dice may land, the
->    proposal has failed."* Read `place` for `seat` and it stands unchanged.
->    The one thing that presses on it is the
->    landing bias, and it is priced: the aim box is **translated, never shrunk**
->    — at most 0.99 units on an 11-unit mat, straddling the centre in every
->    case, auto-collect untouched, one roll on the felt. **No felt is owned**,
->    and the sentence above is the test any later pass is measured against.
+> 3. **The risk clause below is AMENDED BY THE OWNER'S WORD (2026-09-01)** on
+>    exactly one of its five clauses, and re-affirmed on the other four. As
+>    written: *"A seat is a POSITION and a COLOUR, nothing else. It confers no
+>    capability, gates no action, owns no region of felt, cannot be claimed or
+>    refused. If a seat ever becomes a thing you can take or a place only your
+>    dice may land, the proposal has failed."* Read `place` for `seat`. The v1
+>    design (2026-08-31) read "owns no region of felt" literally and shipped a
+>    zero landing bias with one roll on the felt. Joe, looking at the deployed
+>    two-tab table the next morning: *"This is cool. But there are some basics
+>    that are super broken. The placards or whatever you call them are smaller
+>    than the dice, and there is not enough room for two people to roll the
+>    dice at the same time... I talked about the latter."* What he had talked
+>    about is [BRAINSTORM §1](BRAINSTORM.md)'s own sentence, *"Their rolls are
+>    in a region near them"* — the requirement, stated twice. **So a place
+>    OWNS ITS REGION OF THE FELT FOR LANDING** (`js/places.js regionFor`: a
+>    long-edge chair its near half, split by lane into quadrants; a head its
+>    end third), a stamped throw is a low toss into it, and **the felt holds
+>    one roll PER PLACE** (`server.js arrivalSweep`: a placed arrival collects
+>    only its roller's own priors and any placeless roll). What stands
+>    unamended: no capability, gates no action, cannot be claimed or refused,
+>    and **"a place only your dice may land"** is still the failure — regions
+>    are a throw, not walls (no new physics bodies; dice roll out of them, and
+>    a placeless roll lands wherever the seeded draw sends it). The line to
+>    measure any later pass against is now: *a place owns where its own dice
+>    are thrown to; it owns nothing about anyone else's.*
 > 4. **The geometry collision at the foot of this item is void, not fixed.**
 >    Every placard stands outboard of a wall plane, so it cannot meet a shelf
 >    slot, a die, or the ground-plane traps that go with them.

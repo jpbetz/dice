@@ -55,7 +55,8 @@ const { minTowerDataUrl, minTowerGlb, MIN_TOWER_PORTALS } =
 // axis-aligned ground box and `placardGap` measures the clear ground between
 // two of them — negative when they overlap, which is the assertion the felt
 // shelf never had.
-const { placardFootprint, placardGap, PLACE_LANE, PLACARD_W, PLACARD_GAP, PLACARD_STANDOFF }
+const { placardFootprint, placardGap, PLACE_LANE, PLACARD_W, PLACARD_GAP, PLACARD_STANDOFF,
+  entryFor, regionFor, inRegion }
   = await import('../../js/places.js');
 
 // DOES A CARD PRINT THROUGH A PANEL? Two renderers draw the frame — WebGL puts
@@ -130,6 +131,19 @@ function firstDiff(live, want, path = '') {
 
 // Wait for a hidden roll's shrouded playback to land on a tab: the log line
 // exists, the dice are on the felt, and nothing is still animating.
+// THE DICE OF ONE ROLL ON THE FELT (UX §7.63 v2). The felt holds one roll PER
+// PLACE since 2026-09-01 — another chair's pool may be standing beside the one
+// a scenario is waiting on — so `tableDice.length` is no longer the arriving
+// roll's count; this is.
+// A raw stream's event, with the scenario's own words on the timeout.
+const waitForRaw = async (raw, type, match, why) => {
+  try { return await raw.waitForEvent(type, match, { timeout: 15000 }); }
+  catch (e) { throw new Error(`${why}: ${e.message}`); }
+};
+
+const diceOf = (rollId, n) =>
+  `window.__diceDebug.tableDice.filter((d) => d.rollId === ${JSON.stringify(rollId)}).length === ${n}`;
+
 const shroudSettled = (rollId, dice = 1) =>
   `(window.__diceDebug.sim(120), !window.__diceDebug.busy`
   + ` && window.__diceDebug.shroudedCount === ${dice}`
@@ -1203,9 +1217,22 @@ export const scenarios = [
       assert.ok(trio.every((r) => r.total > 0),
         `every three-die throw records contacts at all — a starved recorder `
         + `records none (${trio.map((r) => r.total).join('/')})`);
-      assert.ok(trio.filter((r) => r.afterHalfSec > 0).length >= 2,
-        `and the canonical three-die roll is still making them after 0.5 s `
-        + `(${trio.map((r) => r.afterHalfSec).join('/')} late contacts)`);
+      // THE TIMING BAR MOVED WITH THE THROW (2026-09-01, UX §7.63 v2). Alice is
+      // online and alone, so she holds a place, so her throw is the placed
+      // LOW TOSS — spawned at 0.45 of the old height, it meets the felt at
+      // ~0.2 s instead of ~0.33 and three dice can legitimately be down and
+      // quiet before 0.5 s (a full sweep read 0/199/0 late contacts on the
+      // old bar). The starvation this exists to catch still looks nothing
+      // like that: a starved recorder spends its budget on the spawn frame and
+      // records NOTHING after it, so the claim is (a) something is recorded
+      // after frame zero on EVERY throw, and (b) on the same majority rule as
+      // the large pools, the recording outlives the first landing.
+      assert.ok(trio.every((r) => r.firstFrame < r.total),
+        `every three-die throw records something after the spawn frame `
+        + `(${trio.map((r) => `${r.firstFrame}/${r.total}`).join(' ')} on frame zero)`);
+      assert.ok(trio.filter((r) => r.lastTime > 0.3).length >= 2,
+        `and the canonical three-die roll is still making contacts past its landing `
+        + `(last contact at ${trio.map((r) => r.lastTime.toFixed(2)).join('/')} s)`);
     },
   },
   {
@@ -9759,10 +9786,12 @@ export const scenarios = [
           `the roller's set everywhere on ${who} (got: ${info.map((d) => d.variant).join(',')})`);
       }
 
-      // Bob never picked a set: his roll is std on every screen. Alice's
-      // auto-collected dice LEAVE — C25 — so the felt holds exactly the live
-      // roll, and the skin claim is about what is on the table, not about an
-      // archive standing beside it.
+      // Bob never picked a set: his roll is std on every screen. Alice's anvil
+      // dice STAY — the felt holds one roll per place since UX §7.63 v2
+      // (2026-09-01), and Bob's arrival puts away only Bob's own priors — so
+      // the skin claim is now the sharper one: two players' pools on one
+      // felt, each wearing its own roller's set. (Before v2 Alice's dice were
+      // auto-collected here and the claim was about the one live roll.)
       await b.roll('1d20 # plain');
       await b.settle();
       const rid = await b.rollId();
@@ -9771,13 +9800,16 @@ export const scenarios = [
         + ` && window.__diceDebug.tableDiceInfo().some((d) => d.rollId === ${JSON.stringify(rid)}))`,
         { desc: 'the plain roll lands on A' },
       );
-      await a.dbg('sim(120)'); // let the collected roll's departure finish
+      await a.dbg('sim(120)');
       const infoA = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.tableDiceInfo())`));
       const plain = infoA.filter((d) => d.rollId === rid);
       assert.equal(plain.length, 1, 'one plain die on the felt');
       assert.equal(plain[0].variant, 'std', 'no set chosen ⇒ std');
-      assert.equal(infoA.length, 1,
-        `and it is the ONLY die there — the anvil roll was collected (got ${infoA.length})`);
+      const anvil = infoA.filter((d) => d.rollId !== rid);
+      assert.equal(anvil.length, 2,
+        `and Alice's two anvil dice still stand beside it — Bob's roll put away nothing of hers (got ${infoA.length} dice)`);
+      assert.ok(anvil.every((d) => d.variant === 'emberforge.blackanvil'),
+        `still wearing HER set on the same felt as his std die (got: ${anvil.map((d) => d.variant).join(',')})`);
 
       // The choice persists locally, and the wire refuses an invented skin.
       assert.equal(await a.eval(`localStorage.getItem('dice.diceset.v1')`),
@@ -18660,16 +18692,28 @@ export const scenarios = [
         { desc: 'Bob’s roll is in Alice’s log' });
 
       // (1) SEE WHAT IS ON THE FELT. Nine rolls in, the felt is not nine
-      // rolls deep: a new roll retires the previous one (§7.5), which is the
-      // mechanism goal 5 is bought with.
+      // rolls deep: a new roll retires its roller's previous one (§7.5, and
+      // since UX §7.63 v2 PER PLACE — Alice's eight rolls each retired her
+      // last, and Bob's one roll sits in Bob's own region untouched by any of
+      // hers), which is the mechanism goal 5 is bought with. So the felt
+      // holds two live rolls, one a chair: Alice's pair and Bob's d8.
+      assert.equal(await a.diceCount(), 3,
+        `the felt holds one live roll per chair, not the evening (got ${await a.diceCount()} dice)`);
+      assert.equal(await a.eval(diceOf(keeper, 1)), true,
+        "and Bob's die is the one that is not Alice's — eight rolls of hers never put it away");
+      // Bob puts his own away — only the roller may — and the felt is Alice's
+      // live pair alone.
+      await b.dbg(`collectRoll(${JSON.stringify(keeper)})`);
+      await a.waitFor(`(window.__diceDebug.sim(240), ${diceOf(keeper, 0)})`, { desc: "Bob's roll leaves Alice's felt" });
       assert.ok(await a.diceCount() <= 2,
-        `the felt holds the live roll, not the evening (got ${await a.diceCount()} dice)`);
+        `and now the felt holds the live roll alone (got ${await a.diceCount()} dice)`);
 
       // (2) THE PUT-AWAY ROLLS ARE STILL AN INDEX, not a heap. Nine rolls in,
-      // eight have tidied themselves away (a new roll retires the last one) and
-      // the record ranks them OLDEST→NEWEST — which is the single most useful
-      // fact for "find what happened earlier", and the fact the felt shelf used
-      // to carry and nothing rendered after C25 took it away.
+      // eight have been tidied away (a new roll retires its roller's last one;
+      // Bob tidied his own) and the record ranks them OLDEST→NEWEST — which is
+      // the single most useful fact for "find what happened earlier", and the
+      // fact the felt shelf used to carry and nothing rendered after C25 took
+      // it away.
       await a.dbg('setLogFlyout(true)');
       await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.length === 5)`,
         { desc: 'the finished rolls tidied themselves into the record' });
@@ -18910,7 +18954,12 @@ export const scenarios = [
         + ` && !!window.__diceDebug.entryState(${JSON.stringify(rid)}))`,
         { desc: `roll ${rid} lands for the spectator`, timeout: 60000 });
 
-      // Two people play. Cass does not.
+      // Two people play. Cass does not. And since v2 (2026-09-01) the two of
+      // them play AT ONCE: Bram's die arrives while Ada's pair is still on the
+      // felt — the felt holds one roll per place, and each pool sits in its
+      // roller's own region — so what Cass counts after Bram's roll is three
+      // dice, two of them Ada's. That is the picture Joe asked for ("there is
+      // not enough room for two people to roll the dice at the same time").
       await ada.roll('2d8[Wisdom] # Read the room');
       const first = await ada.rollId();
       const adaCard = await cueUnderCard(cass, 2, 'Ada');
@@ -18920,8 +18969,10 @@ export const scenarios = [
         `the dice came in over Ada's edge, and the felt says so (${JSON.stringify(readFirst)})`);
       await bram.roll('1d10[Sword] # Cut the rope');
       const second = await bram.rollId();
-      const bramCard = await cueUnderCard(cass, 1, 'Bram');
-      await landsFor(cass, second, 1);
+      const bramCard = await cueUnderCard(cass, 3, 'Bram');
+      await landsFor(cass, second, 3);
+      assert.equal(await cass.eval(diceOf(first, 2)), true,
+        "Ada's pair is still on the felt beside Bram's die — the second roll did not put the first away");
       const readSecond = await rollerByEdge(cass);
       assert.equal(readSecond.who, 'Bram',
         `and Bram's over Bram's (${JSON.stringify(readSecond)})`);
@@ -18963,11 +19014,17 @@ export const scenarios = [
       assert.equal(s.canReveal, false, 'and that it is not hers to open');
       assert.ok(await cass.diceCount() > 0, 'the dice are on her felt, face down — she is at the table');
 
-      // (4) AT HER OWN PACE. She puts a roll away and the record keeps it,
-      // ranked and attributed IN SOMEBODY ELSE'S COLOUR — the half a
-      // roller-only surface never has to get right.
-      await cass.dbg(`collectRoll(${JSON.stringify(first)})`);
-      await cass.dbg(`collectRoll(${JSON.stringify(second)})`);
+      // (4) AT HER OWN PACE. The rolls are put away — Ada's pair went to the
+      // shelf when her own held roll arrived (a placed arrival sweeps its
+      // roller's priors), and Bram puts his own die away, because only the
+      // roller may (§7.7; a spectator's collect is refused) — and HER record
+      // keeps both, ranked and attributed IN SOMEBODY ELSE'S COLOUR: the half
+      // a roller-only surface never has to get right.
+      assert.equal(await cass.eval(diceOf(first, 0)), true,
+        "Ada's pair left the felt when Ada's next roll came in — her own prior, swept by her own arrival");
+      assert.equal(await cass.eval(diceOf(second, 1)), true,
+        "and Bram's die is still standing — nobody else's roll puts a placed roll away");
+      await bram.dbg(`collectRoll(${JSON.stringify(second)})`);
       await cass.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.length === 2)`,
         { desc: 'the spectator’s own record fills' });
       const ranks = (await cass.dbg('record')).ranks;
@@ -20706,8 +20763,10 @@ export const scenarios = [
           const r = await ctx.api('/api/roll', { playerId, notation });
           assert.equal(r.status, 200, `roll "${notation}": ${JSON.stringify(r.data)}`);
           const rid = r.data.roll.rollId;
+          // The roll's OWN dice: every roller here holds a place, so the
+          // earlier pools stay on the felt beside this one (§7.63 v2).
           await a.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy`
-            + ` && window.__diceDebug.tableDice.length === ${count}`
+            + ` && ${diceOf(rid, count)}`
             + ` && !!window.__diceDebug.entryState(${JSON.stringify(rid)}))`,
           { desc: `"${notation}" lands on Ann's felt`, timeout: 60000 });
           return { wire: r.data.roll, org: await a.dbg('throwOrigin()'), line: await a.dbg('spawnLine()') };
@@ -20851,6 +20910,177 @@ export const scenarios = [
           await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId)
             .catch(() => {});
         }
+      }
+    },
+  },
+  {
+    name: 'place-two-rolls',
+    tags: ['place', 'roll', 'resync', 'physics'],
+    timeout: 150000,
+    // ROOM FOR TWO (UX §7.63 v2). Joe, on the deployed table, two tabs, 3d6
+    // each: "there is not enough room for two people to roll the dice at the
+    // same time... I talked about the latter" — BRAINSTORM §1's "Their rolls
+    // are in a region near them." Two things had to change and this pins
+    // both: THE SWEEP (server.js arrivalSweep — a placed arrival collects only
+    // its roller's own priors and any placeless roll, so the felt holds one
+    // roll PER PLACE) and THE LANDING (js/places.js regionFor/aimFor — a
+    // stamped throw is a low toss into its own region of the mat).
+    //
+    // THE REGION CLAIM IS A CENTROID WITH A DIE OF MARGIN, and that is the
+    // claim the numbers support, not a softening of one they do not: the
+    // dials are a throw, not walls (no new physics bodies), and the measured
+    // containment (tools/steps/place-region.mjs) is a rate — the pool's
+    // centroid in its region 92–100% a cell at medium, individual dice
+    // 81–97% for a 3d6. The region is grown by one d6 edge on its OPEN sides
+    // (the centre lines; the rims are the rims), and the two centroids are
+    // also ordered against each other — Front's nearer the front and further
+    // left than Back's — which is the picture itself: two pools, two corners.
+    //
+    // THE PLACELESS INTERPLAY, decided and pinned: a placeless roll is the OLD
+    // table. It has no region to sit in, so it takes the whole felt (today's
+    // rule, byte for byte — including the placed pools), and the next placed
+    // arrival takes it away again. A ninth player's dice are therefore never
+    // left standing in somebody's region, and nobody's pool is ever swept by
+    // a chair that has one of its own.
+    //
+    // THE LATE JOINER rebuilds BOTH pools from the snapshot, in log order,
+    // byte-equal to the tabs that watched them arrive — resyncTable used to
+    // take one open roll as a scalar, because the server used to make that
+    // true.
+    async fn(ctx) {
+      const DIE = 1.35;                                  // a d6's edge (js/dice.js:40)
+      const front = await ctx.newTable({ origin: '127.0.0.71', name: 'Front' });
+      const back = await ctx.newTable({ origin: '127.0.0.72', name: 'Back' });
+      await back.waitFor('window.__diceDebug.places().stations.length === 2', { desc: 'both seated' });
+      assert.equal(await front.dbg('places().mine'), 0, 'Front holds station 0 (front, left lane)');
+      assert.equal(await back.dbg('places().mine'), 1, 'Back holds station 1 (back, right lane)');
+      const frontId = await front.playerId();
+      const backId = await back.playerId();
+      // Seven more: six fill stations 2–7, and Iris, the ninth, is placeless.
+      // Cass (station 2, never rolls) is also the raw witness whose stream
+      // says which roll-collected events the room was actually sent.
+      const raws = [];
+      for (const nm of ['Cass', 'Dev', 'Eluned', 'Fionn', 'Gus', 'Hana', 'Iris']) raws.push(await ctx.rawPlayer(nm));
+      const witness = raws[0];
+      const iris = raws[6];
+      await back.waitFor('window.__diceDebug.players.length === 9', { desc: 'nine at the table' });
+      assert.equal((await back.dbg('places()')).stations.some((s) => s.name === 'Iris'), false, 'Iris holds no station');
+
+      const tabs = [front, back];
+      for (const t of tabs) await t.dbg('holdClock(true)');
+      try {
+        const ext = await front.dbg('tableExtents()');
+        const regionOf = (place) => { const e = entryFor(place, false); return regionFor(e.entry, e.lane, ext.w, ext.d); };
+        // A die of margin on the open sides only: a side that IS a rim keeps
+        // the rim (a centroid cannot be past a wall anyway).
+        const grown = (R) => ({
+          x0: R.x0 <= -ext.w / 2 ? R.x0 : R.x0 - DIE, x1: R.x1 >= ext.w / 2 ? R.x1 : R.x1 + DIE,
+          z0: R.z0 <= -ext.d / 2 ? R.z0 : R.z0 - DIE, z1: R.z1 >= ext.d / 2 ? R.z1 : R.z1 + DIE,
+        });
+        const rollAs = async (playerId, notation) => {
+          const r = await ctx.api('/api/roll', { playerId, notation });
+          assert.equal(r.status, 200, `roll "${notation}": ${JSON.stringify(r.data)}`);
+          return r.data.roll;
+        };
+        const lands = (t, rid, n, desc) => t.waitFor(
+          `(window.__diceDebug.sim(120), !window.__diceDebug.busy && ${diceOf(rid, n)}`
+          + ` && !!window.__diceDebug.entryState(${JSON.stringify(rid)}))`, { desc, timeout: 60000 });
+        const poses = (t) => t.eval('JSON.stringify(window.__diceDebug.feltPoses())');
+        const centroid = (list, rid) => {
+          const mine = list.filter((p) => p.rollId === rid);
+          assert.ok(mine.length, `roll ${rid} has dice on the felt`);
+          return {
+            x: mine.reduce((a, p) => a + p.pos[0], 0) / mine.length,
+            z: mine.reduce((a, p) => a + p.pos[2], 0) / mine.length,
+          };
+        };
+        const collectedOn = (raw) => raw.events()
+          .filter((e) => e.type === 'roll-collected').map((e) => e.data.rollId);
+        const openOn = async (t) => (await t.dbg('onTable')).filter((r) => !r.collected).map((r) => r.rollId).sort();
+
+        // (1) FRONT ROLLS. Three dice, on both tabs, in the front-left region.
+        const a = await rollAs(frontId, '3d6 # Front');
+        assert.equal(a.entry, 0, 'stamped with the front edge');
+        assert.equal(a.lane, -1, 'and its left lane');
+        for (const t of tabs) await lands(t, a.rollId, 3, "Front's dice land");
+        const orgA = await back.dbg('throwOrigin()');
+        assert.deepEqual(orgA.region, regionOf(0), "the film knows the roll's region — the front-left quadrant");
+        assert.ok(orgA.box.w < ext.w * 0.4 && orgA.box.d < ext.d * 0.4,
+          `the aim box is SHRUNK to the region (${orgA.box.w.toFixed(2)} x ${orgA.box.d.toFixed(2)} of a ${(ext.w * 0.4).toFixed(2)} x ${(ext.d * 0.4).toFixed(2)} shipped box)`);
+        assert.ok(orgA.box.k < 1 && orgA.box.h < 1, `and the throw is the low, eased toss (hurl ${orgA.box.k}, height ${orgA.box.h})`);
+        assert.ok(inRegion(orgA.region, orgA.aim.x, orgA.aim.z), 'aimed inside it');
+
+        // (2) BACK ROLLS, AND FRONT'S DICE STAY. Six dice on both tabs, the
+        // same six poses to the byte, each pool in its roller's region.
+        const b = await rollAs(backId, '3d6 # Back');
+        assert.equal(b.entry, 1, 'stamped with the back edge');
+        assert.equal(b.lane, 1, 'and its right lane');
+        for (const t of tabs) await lands(t, b.rollId, 3, "Back's dice land");
+        for (const t of tabs) {
+          assert.equal(await t.dbg('tableDice.length'), 6, 'six dice: both pools are on the felt');
+          assert.equal(await t.eval(diceOf(a.rollId, 3)), true, "Front's three are still standing");
+          assert.deepEqual(await openOn(t), [a.rollId, b.rollId].sort(), 'and the table shows two open rolls');
+        }
+        assert.equal(collectedOn(witness).includes(a.rollId), false,
+          "the room was never told to put Front's roll away — Back's arrival swept nothing of hers");
+        const pf = await poses(front);
+        const pb = await poses(back);
+        assert.equal(pf, pb, 'the two tabs hold the same six dice at the same poses, byte for byte');
+        const six = JSON.parse(pf);
+        assert.equal(six.length, 6);
+        const ca = centroid(six, a.rollId);
+        const cb = centroid(six, b.rollId);
+        assert.ok(inRegion(grown(regionOf(0)), ca.x, ca.z),
+          `Front's pool sits in the front-left quadrant (centroid ${ca.x.toFixed(2)}, ${ca.z.toFixed(2)} in ${JSON.stringify(regionOf(0))}, a die of margin)`);
+        assert.ok(inRegion(grown(regionOf(1)), cb.x, cb.z),
+          `Back's pool sits in the back-right quadrant (centroid ${cb.x.toFixed(2)}, ${cb.z.toFixed(2)} in ${JSON.stringify(regionOf(1))}, a die of margin)`);
+        assert.ok(ca.z > cb.z && ca.x < cb.x,
+          `and the two pools are on opposite sides of both centre lines (Front ${ca.x.toFixed(2)},${ca.z.toFixed(2)} vs Back ${cb.x.toFixed(2)},${cb.z.toFixed(2)})`);
+        assert.equal(collectedOn(witness).includes(a.rollId), false, "still nothing collected of Front's");
+
+        // (3) FRONT ROLLS AGAIN: her own prior goes to the shelf, Back's stays.
+        const a2 = await rollAs(frontId, '2d6 # Front again');
+        for (const t of tabs) await lands(t, a2.rollId, 2, "Front's second roll lands");
+        await waitForRaw(witness, 'roll-collected', (d) => d.rollId === a.rollId, "Front's first roll is collected by her own arrival");
+        for (const t of tabs) {
+          assert.equal(await t.dbg('tableDice.length'), 5, "five dice: Back's three and Front's new two");
+          assert.equal(await t.eval(diceOf(a.rollId, 0)), true, "Front's first pool has left the felt");
+          assert.equal(await t.eval(diceOf(b.rollId, 3)), true, "Back's is untouched");
+        }
+        assert.equal(collectedOn(witness).includes(b.rollId), false, "Back's roll was never collected");
+
+        // (4) THE PLACELESS ROLL IS THE OLD TABLE: it takes the whole felt.
+        const c = await rollAs(iris.playerId, '2d6 # From the fold');
+        assert.equal('entry' in c, false, 'no stamp on the ninth chair\'s roll');
+        for (const t of tabs) await lands(t, c.rollId, 2, "Iris's dice land");
+        await waitForRaw(witness, 'roll-collected', (d) => d.rollId === b.rollId, "…and Back's pool is put away by it");
+        await waitForRaw(witness, 'roll-collected', (d) => d.rollId === a2.rollId, "…and Front's too");
+        for (const t of tabs) {
+          assert.equal(await t.dbg('tableDice.length'), 2, 'only her two dice are standing');
+          assert.deepEqual(await openOn(t), [c.rollId], 'one open roll — the placeless one');
+        }
+        // (5) …AND THE NEXT PLACED ROLL TAKES IT AWAY AGAIN.
+        const b2 = await rollAs(backId, '1d20 # Back again');
+        for (const t of tabs) await lands(t, b2.rollId, 1, "Back's d20 lands");
+        await waitForRaw(witness, 'roll-collected', (d) => d.rollId === c.rollId, "Iris's roll is swept by a placed arrival");
+        for (const t of tabs) assert.equal(await t.dbg('tableDice.length'), 1, 'the d20 stands alone');
+
+        // (6) BOTH AGAIN, then (7) A LATE JOINER REBUILDS BOTH, in log order,
+        // byte-equal — the resync used to take one open roll as a scalar.
+        const a3 = await rollAs(frontId, '3d6 # Both again');
+        for (const t of tabs) await lands(t, a3.rollId, 3, "Front's third roll lands");
+        for (const t of tabs) assert.equal(await t.dbg('tableDice.length'), 4, "four: Back's d20 and Front's three");
+        const late = await ctx.newTable({ origin: '127.0.0.73', name: 'Late' });
+        await late.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy && window.__diceDebug.tableDice.length === 4)`,
+          { desc: 'the newcomer rebuilds BOTH pools from the snapshot', timeout: 60000 });
+        assert.deepEqual(await openOn(late), [a3.rollId, b2.rollId].sort(), 'and knows both are open');
+        assert.equal(await poses(late), await poses(front),
+          'four dice at the same poses as the tab that watched them arrive — one seed, one film, replayed in log order');
+        assert.equal((await late.dbg('washInfo()')).active, false, 'and no cue lit for moments that have passed');
+        const openFront = await openOn(front);
+        assert.deepEqual(openFront, [a3.rollId, b2.rollId].sort(), 'the tabs agree with the newcomer about what is open');
+      } finally {
+        for (const t of tabs) await t.dbg('holdClock(false)');
       }
     },
   },
@@ -21066,9 +21296,12 @@ export const scenarios = [
       await ann.dbg('holdClock(true)');
       await bob.dbg('holdClock(true)');
       try {
+        // Keyed on the roll's OWN dice: Ann, Cass and Eluned all hold places,
+        // so each pool stays on the felt while the next chair's arrives
+        // (§7.63 v2 — the felt holds one roll per place).
         const landsOn = (t, rid, count, desc) => t.waitFor(
           `(window.__diceDebug.sim(120), !window.__diceDebug.busy`
-          + ` && window.__diceDebug.tableDice.length === ${count}`
+          + ` && ${diceOf(rid, count)}`
           + ` && !!window.__diceDebug.entryState(${JSON.stringify(rid)}))`,
           { desc, timeout: 60000 });
 
@@ -21080,7 +21313,7 @@ export const scenarios = [
         // attributing, so everything about the cue has to be read while the
         // dice are still in the air; `landsOn` below drives the film to its
         // end and would leave nothing to look at.
-        await bob.waitFor('(window.__diceDebug.sim(1), window.__diceDebug.tableDice.length === 3)',
+        await bob.waitFor(`(window.__diceDebug.sim(1), ${diceOf(r1.data.roll.rollId, 3)})`,
           { desc: 'Ann\'s dice arrive on Bob\'s felt', timeout: 30000 });
         await bob.dbg('sim(20)');
         const heard = await bob.dbg('throwOrigin()');
@@ -21123,7 +21356,7 @@ export const scenarios = [
         for (const [who, place, entry] of [['Cass', 2, 0], ['Eluned', 4, 3]]) {
           const r = await ctx.api('/api/roll', { playerId: raws[who].playerId, notation: `2d6 # ${who}` });
           assert.equal(r.status, 200, JSON.stringify(r.data));
-          await bob.waitFor('(window.__diceDebug.sim(1), window.__diceDebug.tableDice.length === 2)',
+          await bob.waitFor(`(window.__diceDebug.sim(1), ${diceOf(r.data.roll.rollId, 2)})`,
             { desc: `${who}'s dice arrive on Bob's felt`, timeout: 30000 });
           await bob.dbg('sim(20)');
           const org = await bob.dbg('throwOrigin()');
@@ -21149,7 +21382,7 @@ export const scenarios = [
         // Sampled MID-FLIGHT, in the same window leg (a) found a wash burning
         // in — an absence checked after the film would be an absence of
         // nothing, which is this repo's signature green-over-nothing failure.
-        await bob.waitFor('(window.__diceDebug.sim(1), window.__diceDebug.tableDice.length === 2)',
+        await bob.waitFor(`(window.__diceDebug.sim(1), ${diceOf(r2.data.roll.rollId, 2)})`,
           { desc: 'Iris\'s dice arrive on Bob\'s felt', timeout: 30000 });
         await bob.dbg('sim(20)');
         const dark = await bob.dbg('washInfo()');
@@ -21179,9 +21412,10 @@ export const scenarios = [
           'Bob has never heard of the roll');
         assert.deepEqual(await bob.dbg('throwOrigin()'), loose,
           'no film played for him — his last throw origin is still Iris\'s roll, from the edge it came in on');
-        // (What Bob DOES see is Iris's dice being put away: the felt belongs to
-        // one roll, and the secret roll's arrival beat auto-collects hers — an
-        // event addressed to HER roll, which exists for everyone (§7.7). That
+        // (What Bob DOES see is Iris's dice being put away: a placeless roll
+        // has no region to sit in, so a placed arrival's beat auto-collects it
+        // (§7.63 v2, server.js arrivalSweep) — an event addressed to HER roll,
+        // which exists for everyone (§7.7). That
         // is the shipped tell that somebody rolled, and no byte of the secret
         // roll rides it.) The bytes agree: a raw stream in the same room never
         // carried the id, in any event of any type.
@@ -21234,7 +21468,7 @@ export const scenarios = [
         // over a settled pile, let alone reach its peak there.
         const r6 = await ctx.api('/api/roll', { playerId: annId, notation: '12d6 # Skipped' });
         assert.equal(r6.status, 200, JSON.stringify(r6.data));
-        await bob.waitFor('(window.__diceDebug.sim(1), window.__diceDebug.tableDice.length === 12)',
+        await bob.waitFor(`(window.__diceDebug.sim(1), ${diceOf(r6.data.roll.rollId, 12)})`,
           { desc: 'the handful arrives on Bob\'s felt', timeout: 30000 });
         await bob.dbg('sim(6)');
         assert.equal((await bob.dbg('washInfo()')).active, true, 'lit while the handful is in the air');
@@ -21250,7 +21484,7 @@ export const scenarios = [
         // bare felt would be attributing nothing to nobody.
         const r7 = await ctx.api('/api/roll', { playerId: annId, notation: '6d6 # Swept' });
         assert.equal(r7.status, 200, JSON.stringify(r7.data));
-        await bob.waitFor('(window.__diceDebug.sim(1), window.__diceDebug.tableDice.length === 6)',
+        await bob.waitFor(`(window.__diceDebug.sim(1), ${diceOf(r7.data.roll.rollId, 6)})`,
           { desc: 'the six arrive on Bob\'s felt', timeout: 30000 });
         await bob.dbg('sim(6)');
         assert.equal((await bob.dbg('washInfo()')).active, true, 'lit mid-throw');

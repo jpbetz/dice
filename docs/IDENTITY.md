@@ -221,9 +221,15 @@ live clients · never persisted server-side beyond the room's own life
    `GET /api/table`** (the one unauthenticated read keeps its written-out
    budget), it is **not in the portable YAML** and **not in the URL**
    (goal 7: the URL addresses a table and carries no user state). It
-   authorizes nothing, gates nothing, and owns no felt (goal 10; the risk
-   clause at [IMMERSION](IMMERSION.md) item 16 is re-affirmed there,
-   unamended).
+   authorizes nothing and gates nothing (goal 10). **It owns its region of
+   the felt for landing, and nothing else** *(amended 2026-09-01 by Joe's
+   word — "there is not enough room for two people to roll the dice at the
+   same time"; the risk clause at [IMMERSION](IMMERSION.md) item 16 carries
+   the quote and the one clause it amends)*: a placed roll is thrown into
+   its chair's region, and the felt holds one roll PER PLACE — a placed
+   arrival puts away only its roller's own priors and any placeless roll,
+   never another chair's. Still not a claim: nothing refuses a die for
+   where it stops.
 
    **§5's five must-nots govern `who`, not this.** `place` is displayed
    and it does ride broadcasts — that is the entire point of it. What it

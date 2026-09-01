@@ -40,6 +40,13 @@ limitations under the License.
 // pixel reads it. `roll.entry` / `roll.lane` are FILM state: stamped
 // server-side, riding the roll payload in the seed's determinism class. The
 // film never reads the roster, not once.
+//
+// A PLACE OWNS ITS REGION OF THE FELT FOR LANDING, AND THE FELT HOLDS ONE ROLL
+// PER PLACE (v2, 2026-09-01, by Joe's word — docs/IMMERSION.md item 16 carries
+// the quote and the one clause of its risk rule this amends). The region is a
+// function of the stamp and the mat (regionFor), the throw into it a low toss
+// (aimFor), and the sweep that lets two pools coexist is server.js
+// arrivalSweep. Still not a claim: nothing refuses a die for where it stops.
 
 // ---------------------------------------------------------------------------
 // The constants

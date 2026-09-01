@@ -17254,10 +17254,12 @@ window.__diceDebug = {
   // broke (a hello landing MID-PLAYBACK) needs the event delivered at an
   // instant a real reconnect only reaches by luck. Same door net.js uses.
   netEvent(type, data) { handleNetEvent(type, data); return true; },
-  // Is a settled replay parked waiting for the stage to clear? {rollId, armed}
-  // — the assertion surface for "held, not dropped".
+  // Are settled replays parked waiting for the stage to clear? {held: the
+  // oldest rollId | null, heldAll: every stashed rollId in order, armed} — the
+  // assertion surface for "held, not dropped".
   get idleReplayInfo() {
-    return { held: idleReplay ? idleReplay.rollId : null, armed: !!idleReplayTimer };
+    const held = [...idleReplay.keys()];
+    return { held: held.length ? held[0] : null, heldAll: held, armed: !!idleReplayTimer };
   },
   // C22's state, as this boot resolved it. `refused` is the whole sentence, so
   // a scenario asserts on what the player is actually told rather than on a
@@ -29899,10 +29901,13 @@ function rollToLogEntry(roll) {
 // Skipped when this client already has the roll (dice on the table, in
 // flight, or queued) — closing the audit's empty-felt-on-reload gap without
 // disturbing a live table.
-// A SETTLED ROLL WAITING OUT A LIVE PLAYBACK (see replaySettledRoll's second
+// SETTLED ROLLS WAITING OUT A LIVE PLAYBACK (see replaySettledRoll's second
 // guard). Same doctrine as the tower's heldReplay above it — a hold, not a
 // drop — for the other reason a replay cannot run at the instant it arrives.
-let idleReplay = null;             // the roll stashed while the stage is busy
+// A Map, in arrival order, since v2 (UX §7.63): a snapshot can carry one
+// open roll PER PLACE, and a single slot would have kept only the last of
+// them — the same silent loss this stash was built to end.
+const idleReplay = new Map();      // rollId -> the roll stashed while the stage is busy
 let idleReplayTimer = null;
 const IDLE_REPLAY_POLL_MS = 250;   // cheap: it only ticks while one is stashed
 const IDLE_REPLAY_MAX_MS = 30000;  // …and gives up rather than poll forever
@@ -29917,11 +29922,14 @@ const replayStageBusy = () => !!(currentRoll && !currentRoll.done) || rollQueue.
 // its own test — a Check would still lose the felt. This asks the same
 // question both paths answer.
 function drainIdleReplay() {
-  if (!idleReplay) { stopIdleReplay(); return; }
+  if (!idleReplay.size) { stopIdleReplay(); return; }
   if (replayStageBusy()) return;
-  const roll = idleReplay;
-  idleReplay = null;
-  stopIdleReplay();
+  // One per drain, oldest first: replaySettledRoll fast-forwards a roll
+  // synchronously, so the next poll finds the stage clear again and takes the
+  // next — the same log order a fresh join rebuilds in.
+  const [rollId, roll] = idleReplay.entries().next().value;
+  idleReplay.delete(rollId);
+  if (!idleReplay.size) stopIdleReplay();
   // FRESHNESS, NOT JUST IDLENESS. While we waited, the room may have moved on:
   // a newer roll auto-collects this one server-side, and hello/'roll-collected'
   // will have written that into the state row. Replaying it then would stand
@@ -29937,11 +29945,11 @@ function stopIdleReplay() {
 }
 
 function deferIdleReplay(r) {
-  idleReplay = r;
+  idleReplay.set(r.rollId, r);
   if (idleReplayTimer) return;
   const until = Date.now() + IDLE_REPLAY_MAX_MS;
   idleReplayTimer = setInterval(() => {
-    if (Date.now() > until) { idleReplay = null; stopIdleReplay(); return; }
+    if (Date.now() > until) { idleReplay.clear(); stopIdleReplay(); return; }
     drainIdleReplay();
   }, IDLE_REPLAY_POLL_MS);
 }
@@ -30072,15 +30080,24 @@ function resyncTable(snapshot) {
   // §7.7: the server's present-or-absent flags are the one truth about where
   // every roll lives. Adopt them, then rebuild what should be standing.
   //
-  // THE ON-FELT ROLL IS A SCALAR, NOT A LIST, AND THE SERVER IS WHY: every
-  // path that throws goes through executeRoll, which auto-collects the whole
-  // log before pushing the new roll (server.js), so at most ONE entry can
-  // carry neither `collected` nor `cleared`. C25 Stage 1 then took the
+  // THE ON-FELT ROLLS ARE A LIST, ONE PER PLACE (UX §7.63 v2). Until 2026-09-01
+  // this was a scalar and the server was why: every arrival collected the
+  // whole log, so at most ONE entry could carry neither `collected` nor
+  // `cleared`. A placed player's arrival now collects only their own priors
+  // and the placeless ones (server.js arrivalSweep), so a late joiner's
+  // snapshot can hold several open rolls from several chairs, and every one
+  // of them is rebuilt — in LOG ORDER, so each later film bakes against the
+  // earlier pools' frozen dice exactly as it did on every client that watched
+  // them arrive (one seed, one film; place-two-rolls pins the late joiner's
+  // felt byte-equal). Each replay fast-forwards synchronously to its last
+  // keyframe before the next begins, so the stage is clear between them;
+  // when it is NOT clear (a hello landing mid-playback) every one of them is
+  // stashed, not just the last — see deferIdleReplay. C25 Stage 1 took the
   // collected dice off the felt entirely, so a collected entry rebuilds
-  // nothing physical at all — it is a row in the record. `.reverse().find()`
-  // rather than an index because the log is projected per viewer and a secret
-  // roll is OMITTED from it: positions are not stable across viewers, the
-  // flags are.
+  // nothing physical at all — it is a row in the record. Filtered on the
+  // flags rather than by index because the log is projected per viewer and a
+  // secret roll is OMITTED from it: positions are not stable across viewers,
+  // the flags are.
   const entries = (snapshot.log || []).filter((r) => r && r.rollId);
   for (const r of entries) {
     const st = rollState(r.rollId);
@@ -30090,8 +30107,9 @@ function resyncTable(snapshot) {
   for (const r of entries) {
     if (!r.cleared && r.collected) applyRollCollected(r.rollId, r.collected, false);
   }
-  const onFelt = [...entries].reverse().find((r) => !r.cleared && !r.collected);
-  if (onFelt) replaySettledRoll(onFelt);
+  for (const r of entries) {
+    if (!r.cleared && !r.collected) replaySettledRoll(r);
+  }
   renderLog(); // the rows pick up their collected dress and their verbs
 }
 

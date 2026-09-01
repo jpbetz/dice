@@ -1471,7 +1471,9 @@ structured metadata in the comment section. Adopted design (two halves):
 > section for the lifecycle and §7.27 for where a collected roll now lives.
 
 Joe's direction (2026-07-30), synthesized: the main felt belongs to ONE roll
-at a time; history lives on a shelf.
+at a time; history lives on a shelf. *(Since 2026-09-01: one roll PER PLACE —
+Joe, "there is not enough room for two people to roll the dice at the same
+time"; see the auto-collect bullet and §7.63.)*
 
 - **Shelf**: 5 recessed slots along the bottom felt edge, rendered in the 3D
   scene (identical in compact view). A collected roll's dice sit in its slot
@@ -1485,9 +1487,15 @@ at a time; history lives on a shelf.
   banner (POST /api/collect-roll, roller-only, idempotent, broadcast
   'roll-collected'). Dice whisk to the slot (~400ms dt-driven slide; full
   chips retire into the marker).
-- **Auto-collect**: when a new roll EXECUTES, the server marks every prior
-  settled-uncollected roll collected (deterministic, no client races) —
+- **Auto-collect**: when a new roll EXECUTES, the server marks prior
+  settled-uncollected rolls collected (deterministic, no client races) —
   the felt is cleared for the incoming roll as part of its arrival beat.
+  *(Amended 2026-09-01, §7.63 v2 — the felt holds ONE ROLL PER PLACE: a
+  roll from a chair with a place puts away only that roller's own priors
+  and any placeless roll, so other chairs' open pools stay on the felt in
+  their own regions; a placeless roll, or any roll under a tower, is the
+  old rule and takes the whole felt. `server.js arrivalSweep`. A late
+  joiner rebuilds every open roll, in log order.)*
 - **Slots are FIFO**: the server assigns slot order by collection order;
   collecting past capacity marks the oldest collected roll cleared (existing
   sink/fade). The 40-dice whole-table wipe is retired.

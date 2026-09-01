@@ -626,6 +626,119 @@ await t('a re-throw is re-stamped from the live place — the tower remap includ
   assert.equal(again.data.roll.lane, flank.lane, 'flanks are single-station: lane 0');
 });
 
+// ---------------------------------------------------------------------------
+// 7. The felt holds one roll per place — what an arrival sweeps (v2)
+// ---------------------------------------------------------------------------
+
+const collectedOn = (stream) => stream.events()
+  .filter((e) => e.type === 'roll-collected').map((e) => e.data.rollId);
+const openIn = (snapshotLog) => snapshotLog.filter((r) => !r.cleared && !r.collected).map((r) => r.rollId).sort();
+
+await t('a placed arrival sweeps its own priors and leaves the other chairs\' rolls on the felt', async () => {
+  const room = 'wire-sweep';
+  const ann = await seat(base, room, 'Ann');    // place 0
+  const bram = await seat(base, room, 'Bram');  // place 1
+  const cass = await seat(base, room, 'Cass');  // place 2 — the witness, never rolls
+  const a1 = (await postTo(base, '/api/roll', { room, playerId: ann.playerId, notation: '3d6' })).data.roll;
+  const b1 = (await postTo(base, '/api/roll', { room, playerId: bram.playerId, notation: '3d6' })).data.roll;
+  await waitForEvent(cass.stream, 'roll', (d) => d.rollId === b1.rollId);
+  assert.deepEqual(collectedOn(cass.stream), [], "Bram's arrival collected nothing — Ann's roll is still on the felt");
+  const a2 = (await postTo(base, '/api/roll', { room, playerId: ann.playerId, notation: '2d6' })).data.roll;
+  await waitForEvent(cass.stream, 'roll', (d) => d.rollId === a2.rollId);
+  assert.deepEqual(collectedOn(cass.stream), [a1.rollId], "Ann's second roll collected her first, and only her first");
+  // The snapshot a late joiner gets says the same: two open rolls, one per chair.
+  const late = await joinRoom(room, 'Late');
+  assert.deepEqual(openIn(late.data.log), [a2.rollId, b1.rollId].sort(), 'the join snapshot carries both open rolls');
+  // The burst order §7.7 pins still holds: collections before the roll.
+  const types = cass.stream.events().map((e) => e.type);
+  assert.ok(types.lastIndexOf('roll-collected') < types.lastIndexOf('roll'), 'the collection reached the room before the roll that caused it');
+});
+
+await t('a placeless arrival is the old table — it takes the whole felt — and the next placed roll takes it away', async () => {
+  const room = 'wire-sweep-placeless';
+  const seats = [];
+  for (let i = 0; i <= PLACE_MAX; i++) seats.push(await seat(base, room, `P${i}`));
+  const ninth = seats[PLACE_MAX];
+  const witness = seats[2];
+  const a = (await postTo(base, '/api/roll', { room, playerId: seats[0].playerId, notation: '3d6' })).data.roll;
+  const b = (await postTo(base, '/api/roll', { room, playerId: seats[1].playerId, notation: '3d6' })).data.roll;
+  const c = (await postTo(base, '/api/roll', { room, playerId: ninth.playerId, notation: '2d6' })).data.roll;
+  assert.equal('entry' in c, false, 'the ninth chair\'s roll is unstamped');
+  await waitForEvent(witness.stream, 'roll', (d) => d.rollId === c.rollId);
+  assert.deepEqual(collectedOn(witness.stream).sort(), [a.rollId, b.rollId].sort(),
+    'the placeless roll swept BOTH placed pools — today\'s rule, byte for byte');
+  const d = (await postTo(base, '/api/roll', { room, playerId: seats[1].playerId, notation: '1d20' })).data.roll;
+  await waitForEvent(witness.stream, 'roll', (d2) => d2.rollId === d.rollId);
+  assert.ok(collectedOn(witness.stream).includes(c.rollId), 'and the next placed arrival swept the placeless roll');
+  const late = await joinRoom(room, 'Late');
+  assert.deepEqual(openIn(late.data.log), [d.rollId], 'leaving the one placed roll open');
+});
+
+await t('a roll whose roller has left keeps its felt — the sweep reads the log, not the roster', async () => {
+  const room = 'wire-sweep-history';
+  const ann = await seat(base, room, 'Ann');
+  const bram = await seat(base, room, 'Bram');
+  const cass = await seat(base, room, 'Cass');
+  const a = (await postTo(base, '/api/roll', { room, playerId: ann.playerId, notation: '2d6' })).data.roll;
+  await leaveForGood(base, room, ann);
+  const b = (await postTo(base, '/api/roll', { room, playerId: bram.playerId, notation: '2d6' })).data.roll;
+  await waitForEvent(cass.stream, 'roll', (d) => d.rollId === b.rollId);
+  assert.deepEqual(collectedOn(cass.stream), [], 'the departed roller\'s stamped roll stays on the felt');
+  const late = await joinRoom(room, 'Late');
+  assert.deepEqual(openIn(late.data.log), [a.rollId, b.rollId].sort(), 'history keeps its felt as it keeps its edge');
+});
+
+await t('under a tower the whole felt is swept, as before (row 15 owns the tower\'s regions)', async () => {
+  const room = 'wire-sweep-tower';
+  const ann = await seat(base, room, 'Ann');
+  const bram = await seat(base, room, 'Bram');
+  const cass = await seat(base, room, 'Cass');
+  const set = await postTo(base, '/api/settings', { room, playerId: ann.playerId, settings: { tower: 'blackanvil' } });
+  assert.equal(set.status, 200, set.text.slice(0, 200));
+  const a = (await postTo(base, '/api/roll', { room, playerId: ann.playerId, notation: '2d6' })).data.roll;
+  const b = (await postTo(base, '/api/roll', { room, playerId: bram.playerId, notation: '2d6' })).data.roll;
+  await waitForEvent(cass.stream, 'roll', (d) => d.rollId === b.rollId);
+  assert.deepEqual(collectedOn(cass.stream), [a.rollId], 'a pour puts the previous pour away — two pools at one doorway would be one pile');
+});
+
+await t('a rethrow collects nothing, and the other chair\'s roll survives a whole turn', async () => {
+  const room = 'wire-sweep-turn';
+  const ann = await seat(base, room, 'Ann');
+  const bram = await seat(base, room, 'Bram');
+  const cass = await seat(base, room, 'Cass');
+  const a = (await postTo(base, '/api/roll', { room, playerId: ann.playerId, notation: '2d6' })).data.roll;
+  const turn = (await postTo(base, '/api/roll', { room, playerId: bram.playerId, notation: '3d6 t3' })).data.roll;
+  const again = await postTo(base, '/api/rethrow', { room, playerId: bram.playerId, rollId: turn.rollId, keep: [0] });
+  assert.equal(again.status, 200, again.text.slice(0, 200));
+  await waitForEvent(cass.stream, 'rethrow', (d) => d.rollId === turn.rollId);
+  assert.deepEqual(collectedOn(cass.stream), [], 'neither the turn\'s first throw nor its second put Ann\'s roll away');
+});
+
+await t('history that falls off the log falls off the table — LOG_CAP is a hard bound on an open roll', async () => {
+  const room = 'wire-sweep-cap';
+  const ann = await seat(base, room, 'Ann');
+  const bram = await seat(base, room, 'Bram');
+  const a = (await postTo(base, '/api/roll', { room, playerId: ann.playerId, notation: '1d6' })).data.roll;
+  // Bram rolls a hundred times; Ann's open roll is the oldest entry when the
+  // hundred-and-first pushes it out. Sequential on purpose — the order of the
+  // log is the order of these responses.
+  let last = null;
+  for (let i = 0; i < 100; i++) {
+    last = (await postTo(base, '/api/roll', { room, playerId: bram.playerId, notation: '1d6' })).data.roll;
+  }
+  await waitForEvent(ann.stream, 'roll', (d) => d.rollId === last.rollId, 15000);
+  const cleared = ann.stream.events().filter((e) => e.type === 'roll-cleared').map((e) => e.data.rollId);
+  assert.ok(cleared.includes(a.rollId), 'the room was told the fallen-off roll is cleared — nobody keeps dice the server has forgotten');
+  const late = await joinRoom(room, 'Late');
+  assert.equal(late.data.log.some((r) => r.rollId === a.rollId), false, 'and the snapshot no longer carries it');
+  assert.deepEqual(openIn(late.data.log), [last.rollId], 'one open roll: Bram\'s newest');
+  // Ordering: the clear reached the stream BEFORE the roll that pushed it out.
+  const types = ann.stream.events();
+  const iClear = types.findIndex((e) => e.type === 'roll-cleared' && e.data.rollId === a.rollId);
+  const iRoll = types.findIndex((e) => e.type === 'roll' && e.data.rollId === last.rollId);
+  assert.ok(iClear >= 0 && iClear < iRoll, 'cleared first, then the roll');
+});
+
 await Promise.all([proc, procFast, procDoor, procSweep].map(stopServer));
 
 console.log(`${n - failed}/${n} places-wire checks passed`);
