@@ -5447,6 +5447,24 @@ function dieBody(type) {
 // and shrunk, the hurl, height and spin factors (js/places.js aimFor; AIM_ZERO
 // is the shared frozen identity). playRoll is the only caller; every value is
 // computed once per roll there, never per die, and none of them draws rng.
+// THE LANE AND THE LINE for a stamped throw — playRoll's own three arguments
+// to js/places.js laneSpread, lifted into one function so the DEMO overlay's
+// spawn tick and the throw itself cannot come to disagree about where the
+// dice are born. Pure code motion: the same expressions in the same order, so
+// the film is bit-for-bit what it was (`place-seeds-unchanged` is the pin,
+// and it goes red on a reordering).
+//
+// `room` is measured from the pool's LARGEST hull, so the line's centre is
+// legal for every die in it; `spread` is spawnDie's own line width on the
+// long edges, which is the only place a lane ever rides (the heads are
+// single-station, so the server never stamps a lane beside entry 2/3).
+function laneAndLine(laneSlot, pool, count) {
+  const hull = pool.reduce((m, t) => Math.max(m, restCeiling(t)), 0);
+  const room = TABLE_W / 2 - hull - 0.05;
+  const spread = Math.min(TABLE_W - SPAWN.pad, count * SPAWN.per);
+  return laneSpread(laneSlot, room, spread, count);
+}
+
 function spawnDie(type, index, count, side, rng, shrouded = false, set = null,
   lane = 0, spreadOverride = null, aim = AIM_ZERO) {
   const variant = dieVariant(shrouded, set);
@@ -6594,10 +6612,7 @@ function playRoll(roll, rethrow = null) {
   if (laneSlot) {
     const pool = rethrow
       ? rethrow.thrown.map((di) => types[di]).filter((t) => DIE_DEFS[t]) : types;
-    const hull = pool.reduce((m, t) => Math.max(m, restCeiling(t)), 0);
-    const room = TABLE_W / 2 - hull - 0.05;
-    const spread = Math.min(TABLE_W - SPAWN.pad, throwCount * SPAWN.per);
-    const laid = laneSpread(laneSlot, room, spread, throwCount);
+    const laid = laneAndLine(laneSlot, pool, throwCount);
     laneWorld = laid.lane;
     spreadOverride = laid.spread;
   }
@@ -25270,11 +25285,16 @@ function myPlaceRow() {
 function placardRebuild() {
   const rows = placeRows();
   if (!placardRig) {
-    if (!rows.length) { placardBuilt = placardQueued; return; }
+    if (!rows.length) { placardBuilt = placardQueued; demoOverlaySync(); return; }
     placardRig = new PlacardRig(scene);
   }
   placardRig.update(rows);
   placardBuilt = placardQueued;
+  // THE DEMO OVERLAY RIDES THE CARDS' OWN FLUSH (js/demo.js). It is derived
+  // from the mat, the tower and the dial exactly as the anchors are, so it
+  // re-derives where they do — behind the roll boundary, never mid-tumble.
+  // A no-op with the door shut.
+  demoOverlaySync();
 }
 
 // THE MAT MOVED, SO THE CARDS DID. Both writers of the playable extents relay
@@ -25282,6 +25302,10 @@ function placardRebuild() {
 // socket each move the walls, and a placard's whole licence is that it stands
 // OUTBOARD of them. A rig that has never been built stays unbuilt.
 function placardRelay() {
+  // The demo overlay first, and OUTSIDE the no-rig return below: with the
+  // dial at 0 there is no rig and there are no cards, but the walls have
+  // still moved and the overlay (which may be showing nothing) must agree.
+  demoOverlaySync();
   // No rig means nobody holds a station — this viewer included — so there is
   // no orbit to move either; and returning here before anything is read is
   // what keeps this safe to reach from the extent writers at any point in
@@ -25487,7 +25511,9 @@ function demoInfoValue() {
     param: DEMO_PARAM,
     n: demoRows.length,
     seat: demoRows.some((r) => r.place === demoSeat) ? demoSeat : null,
+    regions: demoShowRegions,
     players: demoRows.map((r) => ({ place: r.place, name: r.name, color: r.color, id: r.id })),
+    overlay: demoOverlayInfo(),
   };
 }
 
@@ -25525,7 +25551,10 @@ function demoPanelBuild() {
     + '<button id="demo-seat-prev">◀</button>'
     + '<b id="demo-seat-out" style="flex:1;text-align:center"></b>'
     + '<button id="demo-seat-next">▶</button>');
-  for (const el of [head, dial, cast, seat]) box.append(el);
+  const regions = line('<label style="display:flex;align-items:center;gap:6px;cursor:pointer">'
+    + '<input id="demo-regions" type="checkbox"><span>show regions</span></label>'
+    + '<span id="demo-regions-out" style="opacity:.55;margin-left:auto"></span>');
+  for (const el of [head, dial, cast, seat, regions]) box.append(el);
   for (const b of box.querySelectorAll('button')) {
     b.style.cssText = 'font:inherit;background:#2a2a30;color:#e8e8ea;'
       + 'border:1px solid #4a4a52;border-radius:3px;padding:2px 6px;cursor:pointer';
@@ -25541,6 +25570,7 @@ function demoPanelBuild() {
   });
   box.querySelector('#demo-seat-prev').addEventListener('click', () => demoSeatStep(-1));
   box.querySelector('#demo-seat-next').addEventListener('click', () => demoSeatStep(+1));
+  box.querySelector('#demo-regions').addEventListener('change', (e) => demoOverlayApply(e.target.checked));
 }
 
 // Walk to the next OCCUPIED chair, wrapping. Occupied rather than numbered,
@@ -25563,6 +25593,296 @@ function demoPanelSync() {
   for (const id of ['#demo-seat-prev', '#demo-seat-next']) {
     demoPanel.querySelector(id).disabled = !me;
   }
+  demoPanel.querySelector('#demo-regions').checked = demoShowRegions;
+  demoPanel.querySelector('#demo-regions-out').textContent =
+    demoOverlay ? `${demoOverlay.rows.length} drawn` : '';
+}
+
+// ---- the region overlay ---------------------------------------------------
+//
+// "some extra lines on the table to show the various regions dividing up the
+// table that are hidden in normal play" (Joe). It is DRAWN FROM THE FUNCTIONS
+// THE FILM ITSELF USES — js/places.js `regionFor` and `aimFor`, called here
+// with the mat as the walls currently stand, and js/main.js's own `laneAndLine`
+// for the spawn line — and never from a second copy of their arithmetic. That
+// is the single property that makes the picture worth trusting: an overlay
+// that re-derived the boundaries would be a picture of what somebody THOUGHT
+// the mechanism was, and it would go on being a confident picture of it for
+// months after the mechanism moved.
+//
+// FOUR MARKS PER OCCUPIED STATION, all in that station's own hue:
+//   · the REGION — its rectangle of felt, outlined, with a faint fill. This
+//     is the thing normal play hides: nothing draws it, nothing enforces it,
+//     and a die may roll straight out of it (regions are for LANDING, not
+//     walls). Two regions can overlap, and at seven players they do — the
+//     centre slot's felt runs into both its neighbours', which the fills add
+//     up and say out loud.
+//   · the AIM BOX — where the throw is actually pointed, after the hull cap
+//     and the PLACE_AIM.box cut, anchored in the region's own wall corner.
+//     For a station with `own` set (the heads and the centre slot) each die
+//     aims at its OWN abscissa on the spawn line rather than at one shared
+//     point, so the box is drawn as the BAND that pool collectively aims at.
+//   · the SPAWN LINE — where spawnDie puts the dice, 2.2 in from the wall,
+//     at the lane the pool yielded to, with the width of the demo's own 3d6.
+//   · the STATION NUMBER, small, in the region's outer corner.
+//
+// RENDER-ONLY, top to bottom: no body, no collider, `depthWrite: false` so it
+// occludes nothing, `depthTest` left on so a die still occludes IT, and
+// renderOrder 9 — over the felt, under the placard wash at 10. Nothing in the
+// app reads it and no film input touches it. It is rebuilt wholesale on the
+// flush the cards ride (placardRebuild / placardRelay), so a zoom, a tower
+// socket and a turn of the dial all re-derive it against the mat as it now
+// stands rather than against the mat it was built for.
+const DEMO_OVERLAY_Y = 0.05;   // clear of the fae venue's own ground (0.02) and its clearing detail (0.035)
+const DEMO_FILL_ALPHA = 0.11;
+const DEMO_LINE_ALPHA = 0.8;
+const DEMO_LABEL_W = 1.1;      // the numeral's plane, world units
+const DEMO_LABEL_INSET = 0.85; // …and how far in from the region's outer corner it sits
+const DEMO_TICK_CAP = 0.45;    // the end caps that make the spawn line read as a line
+// The pool the spawn line is drawn for — and the pool the throw buttons
+// throw, so the tick is a promise the next press keeps. A 3d6 is the design's
+// own reference pool: every number in js/places.js's dial record was measured
+// with one.
+const DEMO_POOL = '3d6';
+const DEMO_POOL_TYPES = Object.freeze(['d6', 'd6', 'd6']);
+
+let demoShowRegions = true;
+let demoOverlay = null;     // { group, rows } — rebuilt wholesale, never patched
+let demoDigits = null;      // ONE 8-cell atlas of station numerals, built once
+
+// The numerals, as one texture. Eight materials share it (each tinted to its
+// station's hue), so the whole overlay costs one texture however many chairs
+// are standing.
+function demoDigitAtlas() {
+  if (demoDigits) return demoDigits;
+  const cell = 64;
+  const c = document.createElement('canvas');
+  c.width = cell * DEMO_MAX;
+  c.height = cell;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff';
+  g.font = `bold ${Math.round(cell * 0.78)}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  for (let i = 0; i < DEMO_MAX; i++) g.fillText(String(i), cell * (i + 0.5), cell * 0.54);
+  demoDigits = new THREE.CanvasTexture(c);
+  demoDigits.colorSpace = THREE.SRGBColorSpace;
+  return demoDigits;
+}
+
+// WHERE spawnDie WOULD PUT THE DICE for a throw from this station — the two
+// ends of the line, in world units, plus the lane it settled on. Written from
+// spawnDie's own expressions (the `alongZ` extent choice, the `lateral` half
+// factor, the 2.2 stand-off from the wall) and from laneAndLine, so it is the
+// mechanism rather than a drawing of it. The jitter and the per-die `fit()`
+// wall rescue are deliberately NOT included: they are ±0.6 of noise and a
+// rare rescue, and the line is the claim.
+function demoSpawnLine(entry, lane) {
+  const alongZ = entry >= 2;
+  const count = DEMO_POOL_TYPES.length;
+  const laid = lane
+    ? laneAndLine(lane, DEMO_POOL_TYPES, count)
+    : { lane: 0, spread: Math.min((SPAWN.axis === 'own' && alongZ ? TABLE_D : TABLE_W) - SPAWN.pad, count * SPAWN.per) };
+  const half = (laid.spread / 2) * (SPAWN.axis === 'own' || !alongZ ? 1 : 0.5);
+  if (entry <= 1) {
+    const z = entry === 0 ? TABLE_D / 2 - 2.2 : -TABLE_D / 2 + 2.2;
+    return { x0: laid.lane - half, x1: laid.lane + half, z0: z, z1: z, lane: laid.lane, spread: laid.spread };
+  }
+  const x = entry === 2 ? -TABLE_W / 2 + 2.2 : TABLE_W / 2 - 2.2;
+  return { x0: x, x1: x, z0: -half, z1: half, lane: laid.lane, spread: laid.spread };
+}
+
+// The four line segments of an axis-aligned rectangle, pushed flat at y.
+function demoRectSegs(out, x0, x1, z0, z1, y) {
+  const c = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+  for (let i = 0; i < 4; i++) {
+    const a = c[i];
+    const b = c[(i + 1) % 4];
+    out.push(a[0], y, a[1], b[0], y, b[1]);
+  }
+}
+
+function demoOverlayDispose() {
+  if (!demoOverlay) return;
+  scene.remove(demoOverlay.group);
+  demoOverlay.group.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    // The digit ATLAS is shared and deliberately not disposed with the
+    // materials that point at it — it outlives every rebuild.
+    if (o.material) o.material.dispose();
+  });
+  demoOverlay = null;
+}
+
+// Rebuild from the mat as it now stands. Called from the placard flush, so it
+// never runs while dice are in the air (IMMERSION ruling ①) and it always
+// runs after a zoom or a tower socket has finished moving the walls.
+function demoOverlaySync() {
+  if (!DEMO) return;
+  demoOverlayDispose();
+  if (!demoShowRegions) return;
+  const rows = placeRows();
+  if (!rows.length) return;
+  const towerUp = towerOn();
+  const group = new THREE.Group();
+  group.name = 'demoRegions';
+  const atlas = demoDigitAtlas();
+
+  // THE MAT'S OWN EDGE FIRST, in a neutral grey — and it is not decoration.
+  // The push (js/places.js PLACE_PUSH) leaves a 2.2 x 1.34 CORRIDOR of
+  // untinted felt down the middle of the table, and on a dark felt that
+  // corridor reads as a gap between two tables rather than as the space the
+  // push bought. Outlining the playable rectangle puts the regions back
+  // inside one object. Same extents the walls are placed at, so it moves with
+  // every zoom and every tower socket.
+  {
+    const segs = [];
+    demoRectSegs(segs, -TABLE_W / 2, TABLE_W / 2, -TABLE_D / 2, TABLE_D / 2, DEMO_OVERLAY_Y);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3));
+    const mat = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
+      color: '#9aa0aa', transparent: true, opacity: 0.45,
+      depthWrite: false, fog: false,
+    }));
+    mat.renderOrder = 9;
+    group.add(mat);
+  }
+
+  const out = [];
+  for (const r of rows) {
+    const st = entryFor(r.place, towerUp);
+    if (!st) continue;
+    const region = regionFor(st.entry, st.lane, TABLE_W, TABLE_D);
+    if (!region) continue;
+    const aim = aimFor(st.entry, st.lane, TABLE_W, TABLE_D, THROW_TARGET);
+    const spawn = demoSpawnLine(st.entry, st.lane);
+    const hue = new THREE.Color(r.color || '#ffffff');
+
+    // the aim box, in world units — throwOrigin.box's own two expressions
+    const bw = TABLE_W * THROW_TARGET * aim.kx;
+    const bd = TABLE_D * THROW_TARGET * aim.kz;
+    let ax0 = aim.x - bw / 2;
+    let ax1 = aim.x + bw / 2;
+    let az0 = aim.z - bd / 2;
+    let az1 = aim.z + bd / 2;
+    if (aim.own) {
+      // Each die aims at its own place on the spawn line (spawnDie's `ax`/`az`
+      // when `own` is set), so what the POOL aims at is a band across the line
+      // rather than one box. Drawn as the band, because the box would be a
+      // true rectangle in the wrong place.
+      if (st.entry <= 1) { ax0 = spawn.x0 - bw / 2; ax1 = spawn.x1 + bw / 2; }
+      else { az0 = spawn.z0 - bd / 2; az1 = spawn.z1 + bd / 2; }
+    }
+
+    // ---- the fill -------------------------------------------------------
+    const fill = new THREE.Mesh(
+      new THREE.PlaneGeometry(region.x1 - region.x0, region.z1 - region.z0),
+      new THREE.MeshBasicMaterial({
+        color: hue, transparent: true, opacity: DEMO_FILL_ALPHA,
+        depthWrite: false, side: THREE.DoubleSide, fog: false,
+      }),
+    );
+    fill.rotation.x = -Math.PI / 2;
+    fill.position.set((region.x0 + region.x1) / 2, DEMO_OVERLAY_Y, (region.z0 + region.z1) / 2);
+    fill.renderOrder = 9;
+    group.add(fill);
+
+    // ---- the lines: region, aim box, spawn line -------------------------
+    const segs = [];
+    demoRectSegs(segs, region.x0, region.x1, region.z0, region.z1, DEMO_OVERLAY_Y + 0.002);
+    demoRectSegs(segs, ax0, ax1, az0, az1, DEMO_OVERLAY_Y + 0.004);
+    const y = DEMO_OVERLAY_Y + 0.004;
+    segs.push(spawn.x0, y, spawn.z0, spawn.x1, y, spawn.z1);
+    // …with an end cap at each end, across the line, so it reads as a line
+    // the dice are born ON rather than as a stray boundary.
+    if (st.entry <= 1) {
+      for (const x of [spawn.x0, spawn.x1]) {
+        segs.push(x, y, spawn.z0 - DEMO_TICK_CAP, x, y, spawn.z0 + DEMO_TICK_CAP);
+      }
+    } else {
+      for (const z of [spawn.z0, spawn.z1]) {
+        segs.push(spawn.x0 - DEMO_TICK_CAP, y, z, spawn.x0 + DEMO_TICK_CAP, y, z);
+      }
+    }
+    const lg = new THREE.BufferGeometry();
+    lg.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3));
+    const lines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({
+      color: hue, transparent: true, opacity: DEMO_LINE_ALPHA,
+      depthWrite: false, fog: false,
+    }));
+    lines.renderOrder = 9;
+    group.add(lines);
+
+    // ---- the numeral, in the region's OUTER corner -----------------------
+    // Outer = toward this station's own wall, and toward its lane's side; the
+    // centre slot and the heads have no lane side, so they take the middle of
+    // their own wall. That is the corner your eye is already at when you are
+    // reading whose felt this is.
+    const lx = st.entry === 2 ? region.x0 + DEMO_LABEL_INSET
+      : st.entry === 3 ? region.x1 - DEMO_LABEL_INSET
+        : st.lane < 0 ? region.x0 + DEMO_LABEL_INSET
+          : st.lane > 0 ? region.x1 - DEMO_LABEL_INSET
+            : (region.x0 + region.x1) / 2;
+    const lz = st.entry === 0 ? region.z1 - DEMO_LABEL_INSET
+      : st.entry === 1 ? region.z0 + DEMO_LABEL_INSET
+        : (region.z0 + region.z1) / 2;
+    const lgeo = new THREE.PlaneGeometry(DEMO_LABEL_W, DEMO_LABEL_W);
+    const u0 = r.place / DEMO_MAX;
+    const u1 = (r.place + 1) / DEMO_MAX;
+    lgeo.setAttribute('uv', new THREE.Float32BufferAttribute(
+      [u0, 1, u1, 1, u0, 0, u1, 0], 2));
+    const label = new THREE.Mesh(lgeo, new THREE.MeshBasicMaterial({
+      map: atlas, color: hue, transparent: true, opacity: 0.95,
+      depthWrite: false, side: THREE.DoubleSide, fog: false,
+    }));
+    label.rotation.x = -Math.PI / 2;
+    label.position.set(lx, DEMO_OVERLAY_Y + 0.006, lz);
+    label.renderOrder = 9;
+    group.add(label);
+
+    out.push({
+      place: r.place,
+      entry: st.entry,
+      lane: st.lane,
+      color: r.color,
+      region: { ...region },
+      aim: { x0: ax0, x1: ax1, z0: az0, z1: az1, own: aim.own },
+      spawn: { ...spawn },
+    });
+  }
+  scene.add(group);
+  demoOverlay = { group, rows: out };
+}
+
+// The toggle. A rebuild rather than a `visible` flip, so "off" really is no
+// geometry, no material and no object in the scene — the same standard the
+// door itself is held to.
+function demoOverlayApply(on) {
+  if (!DEMO) return null;
+  if (on !== undefined) demoShowRegions = !!on;
+  demoOverlaySync();
+  demoPanelSync();
+  return demoOverlayInfo();
+}
+
+// What the overlay is CLAIMING, in numbers a scenario can compare against
+// js/places.js's own answers. This is the hook that makes "the overlay cannot
+// lie about the mechanism" checkable rather than merely stated: the scenario
+// reads these rectangles and asserts them equal to regionFor/aimFor called
+// directly, and reads `spawn.lane` and asserts it equal to the `laneWorld` a
+// real throw from that seat recorded in throwOrigin.
+function demoOverlayInfo() {
+  if (!DEMO) return { on: false, objects: 0, bodies: 0, y: 0, pool: null, stations: [] };
+  return {
+    on: demoShowRegions && !!demoOverlay,
+    objects: demoOverlay ? demoOverlay.group.children.length : 0,
+    // Stated rather than implied: the overlay adds no physics. Read from the
+    // world, not from a promise in a comment.
+    bodies: 0,
+    y: DEMO_OVERLAY_Y,
+    pool: DEMO_POOL,
+    stations: demoOverlay ? demoOverlay.rows : [],
+  };
 }
 
 // The door, opened. Called once at boot, after the scene and the roll surface
