@@ -21186,7 +21186,15 @@ export const scenarios = [
       await a.page.browser.send('Emulation.setDeviceMetricsOverride',
         { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
       try {
-        const names = ['Bram', 'Cassiopeia Winterbourne', 'Dev', 'Eluned', 'Fionn', 'Gus', 'Hana'];
+        // Two hostile names among the seven: the longest Latin one the fitter
+        // has to spend its whole 68→44 range on, and an emoji-tailed one whose
+        // cut lands between the halves of a surrogate pair (24 UTF-16 units —
+        // server.js MAX_NAME — of which ten are pairs; measured on the real
+        // font: THIS string strands a high surrogate in the unguarded loop,
+        // 'Hana 🎲×9' does not — the stop point depends on widths, so the
+        // name is not interchangeable).
+        const names = ['Bram', 'Cassiopeia Winterbourne', 'Dev', 'Eluned', 'Fionn', 'Gus',
+          'Han 🎲🎲🎲🎲🎲🎲🎲🎲🎲🎲'];
         for (const nm of names) await ctx.rawPlayer(nm);
         await a.waitFor('window.__diceDebug.places().stations.length === 8',
           { desc: 'a full house of eight cards' });
@@ -21214,11 +21222,21 @@ export const scenarios = [
             && s.name.startsWith(painted.slice(0, -1)) && painted.length < s.name.length + 1;
           assert.ok(painted === s.name || truncated,
             `station ${s.place}: "${painted}" is the roster name or a visibly cut prefix of it`);
+          // A cut by UTF-16 unit can strand half a surrogate pair, and a lone
+          // surrogate paints a U+FFFD box on the card where the ellipsis was
+          // promised. server.js cutText guards the name on the way in; the
+          // painter guards its own cut on the way out.
+          assert.equal([...painted].some((c) => c.length === 1
+            && c.charCodeAt(0) >= 0xd800 && c.charCodeAt(0) <= 0xdfff), false,
+            `station ${s.place}: ${JSON.stringify(painted)} carries no lone surrogate`);
         }
         const long = house.stations.find((s) => s.name === 'Cassiopeia Winterbourne');
         assert.ok(long.shown.endsWith('…'),
           'the longest name truncates VISIBLY rather than running off the card');
         assert.equal(long.fontPx, 44, 'and only after the fitter has spent the whole 68→44 range');
+        const dicey = house.stations.find((s) => s.name.startsWith('Han '));
+        assert.ok(dicey.shown.endsWith('…') && dicey.shown.length < dicey.name.length,
+          `the emoji-tailed name is actually cut (${JSON.stringify(dicey.shown)}) — or the surrogate check above proves nothing`);
         assert.equal(house.stations.filter((s) => s.mine).length, 1, 'exactly one card is mine');
 
         // ---- the gap, and the wall, per zoom × tower ------------------------

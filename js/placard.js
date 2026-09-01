@@ -389,6 +389,13 @@ export class PlacardRig {
     }
     let shown = name;
     while (shown.length > 1 && x.measureText(`${shown}…`).width > room) shown = shown.slice(0, -1);
+    // The cut is by UTF-16 unit and can land between the halves of a
+    // surrogate pair; a lone high surrogate renders as U+FFFD on the card —
+    // server.js cutText's guard, verbatim, because the server takes care never
+    // to hand out a name ending in half a pair and this painter must not
+    // re-create one downstream (measured: 90 of 805 emoji-tailed names did).
+    const last = shown.charCodeAt(shown.length - 1);
+    if (last >= 0xd800 && last <= 0xdbff) shown = shown.slice(0, -1); // unpaired high surrogate
     if (shown !== name) shown += '…';
 
     x.fillStyle = k.ink;
