@@ -77,9 +77,14 @@ export const PLACARD_D = 1.24;
 // laneSpread, and the F1 fix it exists for.
 export const PITCH_MIN = 2.0;
 
-// LONG EDGES FILL FIRST. A head seat costs its sitter ~30% of the table at the
-// default zoom (measured: spanPx 98 -> 68 at medium), so nobody pays that tax
-// until the long edges are full: heads are occupied only at N >= 5.
+// LONG EDGES FILL FIRST. A head seat costs its sitter ~23% of the table at
+// every zoom (measured 1600×900 with framingInfo().spanPx along the camera's
+// right axis: medium front 195 px → head 150 px per world unit, −23.1%; wide
+// 153 → 117; close 251 → 193 — the head eye retreats to camScale 1.33 to fit
+// the long axis vertically), so nobody pays that tax until the long edges are
+// full: heads are occupied only at N >= 5. The design's "98 → 68" (−30%) was
+// the same probe reading the fixed world-x segment, which at a head chair is
+// the foreshortened DEPTH axis, not the die; re-priced 2026-09-01.
 //
 // `side` is the spawn edge js/main.js's spawnDie already has four branches for
 // (0 front/+z, 1 back/−z, 2 left/−x, 3 right/+x). `lane` is −1 | 0 | +1, the

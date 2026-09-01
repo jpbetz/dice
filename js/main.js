@@ -15093,17 +15093,16 @@ window.__diceDebug = {
   // decision that fails on a retune.
   zoomPreset(id) { const p = ZOOM_PRESETS[id]; return p ? { w: p.w, d: p.d } : null; },
   zoomProbe() {
-    const p0 = new THREE.Vector3(0, 0, 0).project(camera);
-    const p1 = new THREE.Vector3(1, 0, 0).project(camera);
-    // ROLL-AWARE since §7.63 — the same 2-D span framingScore() and
-    // framingInfo() take. The 1-D |Δx| read was documented as lying under a
-    // quarter turn (world x runs UP a turned screen, so it read ~0), and a
-    // per-viewer orbit makes the turn a resting state rather than a phone's
-    // occasional one. At orbit 0 the two reads are the same double: the
-    // camera's right axis is exactly world +x there, so the projected Δy is
-    // an exact 0 and hypot(a, 0) is |a|.
+    // THE SAME SPAN framingScore() and framingInfo() take (spanPxNow): one
+    // world unit at the mat's centre along the camera's own right axis, so
+    // the number is the die's screen size at ANY orbit. The 1-D |Δx| read
+    // this was until §7.63 lied under a quarter turn (world x runs UP a
+    // turned screen, so it read ~0); the 2-D read of the world-x segment that
+    // replaced it read ~0 no longer but still priced a turned chair by a
+    // foreshortened depth axis (see spanPxNow). At orbit 0 all three reads
+    // are the same number.
     return {
-      dieSpanPx: Math.round(Math.hypot((p1.x - p0.x) * view.width, (p1.y - p0.y) * view.height)),
+      dieSpanPx: Math.round(spanPxNow()),
       view: `${Math.round(view.width)}x${Math.round(view.height)}`,
       table: `${TABLE_W}x${TABLE_D}`,
       camY: Math.round(camera.position.y * 10) / 10,
@@ -15278,15 +15277,11 @@ window.__diceDebug = {
   setHeroMargin(m) { HERO_MARGIN = m; applyCameraFraming(false); return HERO_MARGIN; },
   framingInfo() {
     const v = new THREE.Vector3();
-    // ROLL-AWARE die span. zoomProbe used to measure |x1 - x0| only, so a
-    // 90-degree turn — which maps world X onto the screen's VERTICAL axis —
-    // read it as zero. Same convention (NDC delta x viewport), taken as a 2D
-    // distance; zoomProbe now takes the same read (§7.63).
-    const spanPx = (() => {
-      const a0 = new THREE.Vector3(0, 0, 0).project(camera);
-      const a1 = new THREE.Vector3(1, 0, 0).project(camera);
-      return Math.round(Math.hypot((a1.x - a0.x) * view.width, (a1.y - a0.y) * view.height));
-    })();
+    // The die span: one world unit at the mat's centre along the camera's
+    // right axis, in CSS px (NDC delta × viewport) — spanPxNow, the read the
+    // ladder scores with and zoomProbe reports. Orbit-invariant by
+    // construction, so it is the die's screen size from every chair (§7.63).
+    const spanPx = Math.round(spanPxNow());
     const ndc = (p) => { v.copy(p).project(camera); return Math.max(Math.abs(v.x), Math.abs(v.y)); };
     const live = tableDice.filter((d) => d.body && d.mesh && d.mesh.visible !== false);
     const l = currentRoll && currentRoll.lastLanding;
@@ -27590,18 +27585,39 @@ function decidingOnScreen() {
 const FRAMING = { preferDice: true, floor: 1, gain: 1.15 };
 
 // HOW GOOD IS THE FRAME THE CAMERA IS IN RIGHT NOW — dice kept, and how big a
-// world unit lands in CSS px (roll-aware: a quarter turn maps world x onto the
-// screen's vertical, so this is a 2D length, not |Δx|). Read from the LIVE
-// camera, never from what a fit intended. One function because the ladder now
-// asks the question twice per candidate and two copies of a comparison is how
-// the last three defects in this file got in.
+// world unit lands in CSS px. Read from the LIVE camera, never from what a
+// fit intended. One function because the ladder asks the question twice per
+// candidate and two copies of a comparison is how the last three defects in
+// this file got in; the three instruments that report a span (framingInfo,
+// zoomProbe, and this) all take it from spanPxNow() for the same reason.
 function framingScore() {
   const v = new THREE.Vector3();
   const on = tableDice.filter((d) => d.body && d.mesh && d.mesh.visible !== false)
     .filter((d) => { v.copy(d.body.position).project(camera); return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1; }).length;
-  const a0 = new THREE.Vector3(0, 0, 0).project(camera);
-  const a1 = new THREE.Vector3(1, 0, 0).project(camera);
-  return { on, span: Math.hypot((a1.x - a0.x) * view.width, (a1.y - a0.y) * view.height) };
+  return { on, span: spanPxNow() };
+}
+
+// THE SPAN: how many CSS px one world unit at the mat's centre covers, along
+// a segment that is PERPENDICULAR TO THE VIEW BY CONSTRUCTION — the camera's
+// own right axis (matrixWorld column 0, unit length, horizontal because the
+// camera's up is +y). Not the fixed world segment (0,0,0)→(1,0,0), which is
+// what this read was until 2026-09-01: that segment is screen-horizontal only
+// at orbit 0 and π. At the two head chairs (§7.63 — resting orbits now, not a
+// phone's occasional portrait) it runs ~88% screen-VERTICAL with its ends at
+// different depths, so it priced the die's size wrong and, worse, priced it
+// DIFFERENTLY at two chairs that render exact mirror images: 137 px at the
+// right head against 129 at the left, 1600×900 medium, every other
+// screen-space size matching to six decimals. The ladder's cross-orbit
+// tie-break (port.span > land.span in computeFraming) inherited that bias.
+// Along the right axis the reading is orbit-invariant and mirror-identical;
+// at orbit 0 the right axis IS world +x, so the shipped read is unchanged
+// there to the last bit the matrix carries.
+const _spanA = new THREE.Vector3();
+const _spanB = new THREE.Vector3();
+function spanPxNow() {
+  _spanA.set(0, 0, 0).project(camera);
+  _spanB.setFromMatrixColumn(camera.matrixWorld, 0).normalize().project(camera);
+  return Math.hypot((_spanB.x - _spanA.x) * view.width, (_spanB.y - _spanA.y) * view.height);
 }
 
 function framingFor(orbit) {

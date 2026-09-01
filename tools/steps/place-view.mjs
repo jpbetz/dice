@@ -19,7 +19,8 @@ limitations under the License.
 // (4, behind two bytes-only players), on the 1600×900 frame the design priced.
 // Prints the numbers the orientation slice is judged on — each tab's place
 // base, the orbit the ladder rested on, the die span in px (the short-edge
-// tax, next to the M2 prediction 98 → 68 at medium), the fog floor per chair,
+// tax — measured −23% at every zoom once the span was read along the
+// camera's right axis; M2's 98 → 68 was the world-x segment), the fog floor per chair,
 // the lamp's nudge — and saves the frames a human has to look at: every chair
 // idle at three zooms, one throw from the front seen mid-flight and at rest
 // from all three chairs, and the remaining chairs through simulatePlaceView.
@@ -75,7 +76,7 @@ export default async function run(stage, [outDir = 'tools/shots/place-view', w =
   };
 
   // ---- idle, three zooms — the short-edge tax --------------------------------
-  console.log('# idle frames per chair (the head pays the short-edge tax; M2 predicted 98 -> 68 at medium)');
+  console.log('# idle frames per chair (the head pays the short-edge tax: spanPx 195 -> 150 at medium, -23%)');
   const tax = [];
   for (const z of ['wide', 'medium', 'close']) {
     await front.dbg(`setZoom('${z}')`);

@@ -1423,11 +1423,16 @@ export const scenarios = [
           // shrink still shows up in the run log with the numbers on it.
           //
           // §7.63 (per-viewer orientation) repointed `zoomProbe().dieSpanPx`
-          // at the same roll-aware 2-D span framingInfo() takes, so the
-          // numbers printed here are now TRUE under a turn — the instrument
-          // no longer lies. The assertion itself stays disabled: re-arming it
-          // is the owner's circle-back, to be re-measured before it is asked
-          // to hold, not flipped on the day the probe was fixed.
+          // at the span framingInfo() and the ladder take — first the 2-D
+          // length of the world-x segment, which no longer read ~0 under a
+          // turn but still priced a turned chair by its foreshortened depth
+          // axis (137 px at the right head, 129 at the left, for one mirrored
+          // picture), and since 2026-09-01 one world unit along the CAMERA'S
+          // RIGHT AXIS (spanPxNow), which is the die's screen size at any
+          // orbit. The numbers printed here are now the die's. The assertion
+          // itself stays disabled: re-arming it is the owner's circle-back,
+          // to be re-measured before it is asked to hold, not flipped on the
+          // day the probe was fixed.
           if (!(n > o * 1.5)) {
             console.log(`    [disabled assertion] phone ${pool}: ${o}px → ${n}px `
               + '— expected a 1.5x gain; disabled by the owner, see the comment above');
@@ -20349,8 +20354,9 @@ export const scenarios = [
     //
     // THE LADDER IS THE CLAIM, not merely the numbering: long edges fill first,
     // and the heads stay empty until N >= 5, because a head seat costs its
-    // sitter ~30% of the table at the default zoom (spanPx 98 -> 68) for no
-    // arrangement benefit at four people or fewer.
+    // sitter ~23% of the table at every zoom (spanPx 195 -> 150 at medium on
+    // 1600×900, js/places.js) for no arrangement benefit at four people or
+    // fewer.
     //
     // THE PROMOTION IS THE TRANSITION LEG, and it doubles as the proof for this
     // slice's one silent trap: `place-changed` is a NEW SSE type, and js/net.js
