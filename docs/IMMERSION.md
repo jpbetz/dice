@@ -1460,6 +1460,12 @@ may land, the proposal has failed. Note also: solo tables get nothing by design
 (empty roster, `Math.floor(rng()*4)` retained), so "swing" here means "swing for
 online rooms of 3+."
 
+> **"owns no region of felt" is AMENDED — see clause 3 of the successor block
+> at the head of this item** (2026-09-01, Joe's word, quoted there). A place
+> owns its region of the felt FOR LANDING and the felt holds one roll per
+> place. The other four clauses of this paragraph, *"a place only your dice
+> may land"* included, stand exactly as written.
+
 **Note it lands on broken geometry.** A near-edge arc at z ≈ +2.6 sits inside
 the shelf slot footprint (slots span z −0.4…+3.2 at `medium`). Fix the slot
 pitch first or keep seats off the shelf edge.
@@ -2290,7 +2296,23 @@ against that, or closed and re-minted.
 > not get, deliberately:** a per-player REGION of mat. That is the sentence
 > item 16's risk clause forbids (`:1399-1403`, re-affirmed unamended at the
 > head of the item), and the felt is still the one place a roll lands, on one
-> server-authored auto-collect clock. ROADMAP §12 keeps its number as history
+> server-authored auto-collect clock.
+>
+> > **AMENDED 2026-09-01 (v2, by Joe's word — the quote and the one clause it
+> > touches are at the head of item 16, clause 3).** Half of that last
+> > sentence did not survive contact with two people rolling at once. **A
+> > place now owns its region of the felt FOR LANDING** — a stamped throw is
+> > a low toss into the region its `entry`/`lane` name (`js/places.js
+> > regionFor`/`aimFor`) — and the felt holds **one roll per place**
+> > (`server.js arrivalSweep`), so it is no longer the one place a roll
+> > lands, though it is still one auto-collect clock, server-authored.
+> > **What §12 asked for and still does not get:** a per-player region of
+> > MAT. There is no skin, no zone, no wall and no new body — nothing about
+> > the felt looks different, nothing refuses a die for where it stops, and
+> > dice roll out of their region freely. §12's colour is still answered by
+> > the placard and the wash, exactly as written above.
+>
+> ROADMAP §12 keeps its number as history
 > (C4, and that file's own convention at its §13) and now carries the pointer
 > back to here and on to #14, so the section cannot be read as open.
 
