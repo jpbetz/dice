@@ -81,10 +81,11 @@ paired seeds, so a before and an after are the same throw:
 A place at the table (docs/UX.md §7.63). Two gates that ran before the stamp
 merged, and two look passes:
 
-- `place-settle.mjs [seeds] [gate|ab]` — the PLACE_AIM ship/no-ship gate: the
-  translated landing box against the placeless baseline on identical seeds
-  (Δ pile, Δ median settle, worst cell). Simulates: minutes. Its `gate` mode
-  exits 1 on the shipped tree by design — the dials ship at zero.
+- `place-settle.mjs [seeds] [gate|ab]` — v1's PLACE_AIM ship/no-ship bars,
+  kept as a RECORD since v2 (Joe: "pilling is OK"): the region throw against
+  the placeless baseline on identical seeds (Δ pile, Δ median settle, worst
+  cell), printed and never gated — exit 0 either way. `ab` prices the shipped
+  dials against `on: 0`. Simulates: minutes.
 - `place-spawn.mjs [seeds]` — the laned spawn line priced against the laneless
   one: wall clearance in every laned cell and the F1 separation delta.
 - `place-look.mjs [outDir] [w] [h]` — the placard itself: one card, the full
@@ -96,6 +97,18 @@ merged, and two look passes:
   3d6) and `#result-banner` (the card's printed panels and the NAME inside them
   against the panel's live DOM rect, and against the widest that rect can grow).
   Desktop and phone. Looks + simulates (one throw per frame size).
+- `place-region.mjs [zoom] [seeds] [variants-json] [stations] [pools]` — where a
+  stamped throw comes to rest (v2): per cell, the share of dice and of pool
+  centroids inside the roller's region, pile and median settle against the
+  placeless baseline, rim-hugging, the mean centroid. The record behind
+  PLACE_AIM's dials and the tool to re-price them (pass a JSON array of
+  PLACE_AIM shapes to try variants). Recorded, never gated. Simulates: minutes.
+- `place-two-rolls.mjs [outDir] [w] [h] [zoom]` — Joe's own two-tab frame,
+  re-taken: two seated tabs, 3d6 each, both pools on the felt in their own
+  regions from both chairs, desktop and phone; prints the die's px edge, every
+  card's px box, each pool's centroid and region membership, and whether the
+  two chairs' feltPoses are byte-equal. Looks + simulates (two throws per
+  frame size).
 - `place-view.mjs [outDir] [w] [h]` — the view from every chair: three real
   tabs at the front, the back and the right head on 1600×900. Prints each
   chair's place base, the orbit the ladder rested on, the die span (the

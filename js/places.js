@@ -424,11 +424,22 @@ export function inRegion(region, x, z) {
 //            rad/s. Measured inert at 0.6 and 0.35 (the drop is the scatter,
 //            not the spin) and left at 1: the tumble is the life of the die.
 //
-// Pile and settle, for the record and NOT as a gate (Joe: "pilling is OK"):
-// see tools/steps/place-region.mjs's printout beside the commit that set
-// these. The only cell that piles noticeably is 6d6 at a head (15–18% of
-// dice, against a placeless 6d6's 5.6%): six dice dropped low onto a third of
-// the mat, which is what a handful into a corner of a tray does.
+// THE RECORD AT THESE DIALS (tools/steps/place-region.mjs, 24 seeds a cell,
+// stations 0/1/4/6, 2026-09-01). Centroid in region — medium: 3d6 92–100%,
+// 6d6 100%, a lone d20 63–92% (one die IS its centroid, so that is the
+// per-die rate); wide: 3d6 96–100%, 6d6 96–100%, d20 79–83%; close: 3d6
+// 92–100%, 6d6 42–100% (six d6 do not fit a 4.3 × 2.6 quadrant), d20 58–92%.
+// Dice in region at medium: 85–93% for a laned or head 3d6, 54% at the centre
+// slot (its band is the narrowest), 63–85% for a 6d6. Pile and settle, FOR
+// THE RECORD AND NOT AS A GATE (Joe: "pilling is OK"; v1's bars read mean
+// +7.7pp, median +0.30 s, worst +22.2pp — place-settle.mjs prints them and
+// exits 0): against the placeless throw a low toss piles 6d6 +5–6pp and 3d20
+// +8–11pp at medium (a d20 set down gently rests cocked more often than one
+// that skids), 12d6 at a head +19pp, and 6d6 at a head at `close` +22pp — six
+// dice dropped onto a third of a small mat; a 3d6 piles +0–8pp. Settle: a 3d6
+// stops 0.2 s SOONER (it travels less), a 6d6 into a corner takes +0.9–1.5 s
+// longer at medium (the dice lean on one another before they lie down) and
+// +0.1–0.4 s at wide.
 export const PLACE_AIM = { on: 1, speed: 0.5, h: 0.45, box: 0.5, corner: 1, own: 1, spin: 1 };
 
 // The widest die's rest ceiling, kept off every wall the aim box touches by
