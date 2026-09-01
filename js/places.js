@@ -61,11 +61,14 @@ export const PLACE_MAX = 8;
 // (laneSpread, the film), and the pitch of the flank rows under a tower.
 //
 // RE-DERIVED 2026-09-01 WITH THE CARD (v2, Joe: "the placards … are smaller
-// than the dice"). It is no longer a free number: three stations share a long
-// edge at a full house, so the pitch is the card's own footprint plus the gap
-// floor and a little air — PLACARD_W 3.20 + PLACARD_GAP 0.30 = 3.50 is the
-// point at which the middle card of a three-card edge TOUCHES its neighbours,
-// and 4.30 is what ships. The extra 0.80 is MEASURED, not taste: it is what
+// than the dice"; the v3 card grew ×1.15 on top and the pitch story moved to
+// PLACE_LANE_SHARE — this constant is the THROW's lane and is consumed
+// × PLACE_PUSH since v3). It is no longer a free number: three stations share
+// a long edge at a full house, so the pitch is the card's own footprint plus
+// the gap floor and a little air — v2's PLACARD_W 3.20 + PLACARD_GAP 0.30 =
+// 3.50 was the point at which the middle card of a three-card edge TOUCHED
+// its neighbours, and 4.30 is what shipped. The extra 0.80 was MEASURED, not
+// taste: it is what
 // carries the near card clear of `#result-banner` — the fixed DOM panel at the
 // bottom centre of the felt that Joe's shot caught the old centre card
 // printing through — at every width that panel can take, up to its css
@@ -78,32 +81,50 @@ export const PLACE_MAX = 8;
 // FILM STATE: spawnDie multiplies this into the pool's line (laneSpread), so
 // it is a constant of the seed's determinism class and does not move with the
 // picture — where the CARD stands is placeLane(w) below, a share of the mat:
-// 4.49 at wide, 3.50 at medium, 2.74 at close. The throw still comes in over
-// the card's own face at every zoom: a lone die's line sits at 4.30 / 4.2 /
-// 3.0 (laneSpread caps it at the room the mat has), within 0.7 of the card's
-// centre and inside its 1.60 half-width; a handful's line yields toward the
-// middle as it always did.
+// 5.10 at wide, 3.98 at medium, 3.11 at close. The throw still comes in over
+// the card's own face at every zoom: a lone die's line sits at 5.16 / 4.2 /
+// 3.0 (the PUSHED lane below; laneSpread caps it at the room the mat has),
+// within 0.7 of the card's centre and inside its 1.73 half-width; a handful's
+// line yields toward the middle as it always did.
 export const PLACE_LANE = 4.30;
+
+// V3, THE PUSH (Joe, 2026-09-01, on the deployed 7f93c05: "the players should
+// have more space between them on the table by at least 20%"). ONE factor,
+// film-side and lawful — pure shared constants, identical on every client —
+// consumed in exactly two places: regionFor pushes every region's CENTRE away
+// from the table's centre by this factor (walls fixed, open sides pulled in,
+// so the pushed centres are the old centres × 1.2 exactly and opposite
+// quadrants' centres sit 20% further apart), and laneSpread throws from a
+// lane of PLACE_LANE × PLACE_PUSH so the ENTRIES read apart too, not just
+// the rests (the room cap and the F1 pitch floor keep the last word — at
+// medium and close the wall room already binds and the laned table is
+// bit-identical; the push shows where there is room to spend it). The CARD
+// does not move with this dial: placeLane(w) is the picture's own share and
+// scaled with the v3 card instead.
+export const PLACE_PUSH = 1.2;
 
 // The clear ground two cards must leave each other, anywhere on the table.
 // The assertion the felt shelf never had, and now also the floor PLACE_LANE
 // is derived from — one number, one place, so the two can never drift.
 export const PLACARD_GAP = 0.30;
 
-// The placard's centre, OUTBOARD of the wall plane. The footprint is 1.32
+// The placard's centre, OUTBOARD of the wall plane. The footprint is 1.52
 // deep, so the inboard edge stands 0.10 past the plane where dice stop: no die
 // can ever reach a placard, which is what makes depthWrite, a real shadow, and
 // a raycast seating pass all legal at once (IMMERSION law 8's `surfaceUnder`
 // trap is void BY GEOMETRY, not by care).
-export const PLACARD_STANDOFF = 0.76;
+export const PLACARD_STANDOFF = 0.86;
 
 // The card's footprint on the ground (docs/UX.md §7.63; js/placard.js builds
-// the rig to these numbers — 3.20 × 1.32 × 1.83 ridge, a 3.00 × 1.80 card face
-// at 20° off vertical). They live here because the outboard-of-the-wall
-// property above is a fact about the LAYOUT, and a layout invariant may not be
-// asserted against a number that lives somewhere else.
-export const PLACARD_W = 3.20;
-export const PLACARD_D = 1.32;
+// the rig to these numbers — 3.68 × 1.52 × 2.09 ridge, a 3.45 × 2.07 card face
+// at 20° off vertical; V3 2026-09-01, the v2 form × 1.15 on every axis —
+// Joe: "the name plaquards should be slightly bigger overall (… make the
+// plaquards 15% bigger or something)"). They live here because the
+// outboard-of-the-wall property above is a fact about the LAYOUT, and a
+// layout invariant may not be asserted against a number that lives somewhere
+// else.
+export const PLACARD_W = 3.68;
+export const PLACARD_D = 1.52;
 
 // WHERE THE CARD STANDS ALONG ITS EDGE, as a share of the mat's width — one
 // card's footprint plus the gap floor on the medium mat (3.50 of 11), 4.49 at
@@ -134,28 +155,30 @@ export const PLACARD_D = 1.32;
 //     2.62: the two do not meet. A 1.8 name, a 2.3 banner and their margins
 //     do not fit a frame 6.9 units wide at that depth.
 // 0.318 — a footprint and a gap at medium, the pitch three cards need to
-// stand apart — is inside the first two windows and takes close's cost on
-// the outer side: at 1600 × 900 the name clears the canvas edge by 47 px at
-// medium and the widest banner by 77 / 57 / 33 px at the three zooms, the
-// band clears it by 13 px at wide, and at close the first letter loses 24 px
-// ("Front") to the rim — against 310 px of the name before. (The v1 share
-// failed because it was a share of a 2.00-wide card's OWN gap; this is a
-// share of the picture.) tools/steps/place-card.mjs reads these numbers off
-// the live page.
+// stand apart — was inside the first two windows and took close's cost on
+// the outer side (v2's measured record: name clear of the canvas edge by
+// 47 px at medium, of the widest banner by 77 / 57 / 33 px at the three
+// zooms, the band by 13 px at wide, close's first letter −24 px to the rim).
+// (The v1 share failed because it was a share of a 2.00-wide card's OWN gap;
+// this is a share of the picture.) tools/steps/place-card.mjs reads these
+// numbers off the live page. V3 (2026-09-01) keeps the same construction —
+// a footprint and a gap of pitch at medium — and the footprint grew ×1.15
+// with the card, so the share is 0.362 now: 5.10 at wide, 3.98 at medium,
+// 3.11 at close; the v3 measured record beside the shipped gates is in the
+// scenario text (place-two-views, placard-look) and ROADMAP row 14.
 //
-// WHAT IT COSTS, recorded: the full house at close. Three cards need 3.50 of
-// pitch to stand a gap apart; wide (4.49) and medium (3.50, exactly) have it,
-// and at close (2.74 of pitch for a 3.20 card) the centre slot — the seventh
-// chair, dealt last for exactly this — OVERLAPS its neighbours by 0.46.
+// WHAT IT COSTS, recorded: the full house at close. Three cards need 3.98 of
+// pitch to stand a gap apart; wide (5.10) and medium (3.98, exactly) have it,
+// and at close (3.11 of pitch for a 3.68 card) the centre slot — the seventh
+// chair, dealt last for exactly this — OVERLAPS its neighbours by 0.57.
 // tests/places.test.mjs pins the six outer and head stations at the 0.30
 // floor on every mat, the centre slots at wide and medium, and the close
-// number to the digit. The alternative — the 3.50 floor at every zoom — keeps
-// seven cards apart at close by cutting every two-player table's own name to
-// "ront" there, which is the defect this fixes; so the rare table pays, and
-// pays at the one zoom whose picture crops by design. The longest names the
-// fitter allows (2.52 units of ink) clear the frame's edge at medium by a
-// few px and cannot have both bounds at close; recorded, not gated — the
-// gates are the shipped default's, and the two chairs' own names at medium.
+// number to the digit. The alternative — the 3.98 floor at every zoom — keeps
+// seven cards apart at close by cutting every two-player table's own name
+// there, which is the defect the v2 share fixed; so the rare table pays, and
+// pays at the one zoom whose picture crops by design. Recorded, not gated —
+// the gates are the shipped default's, and the two chairs' own names at
+// medium.
 export const PLACE_LANE_SHARE = (PLACARD_W + PLACARD_GAP) / 11;   // 11: the medium mat — a footprint and a gap of pitch there
 export function placeLane(w) {
   return PLACE_LANE_SHARE * w;
@@ -365,19 +388,23 @@ export function placardGap(a, b) {
 // centre is legal for every die in it. `laneSlot` is roll.lane (−1 | 0 | +1);
 // slot 0 returns its inputs untouched, which is the bit-identical shipped path.
 //
-// Worked at the v2 lane (4.30), medium, room 4.2: 1 die → the whole 3.60;
-// a pair → 3.20; 3d6 → 2.20; 6d6 → 0.90 with the pool's 6.6 spread and its
-// 1.32 pitch both kept. Close/6d6 → 0.90, spread 4.2, no collapse. The wider
+// Worked at the v3 lane (4.30 × 1.2 = 5.16), medium, room 4.2: 1 die → the
+// whole 4.2 (the wall room binds before the lane does); a pair → 3.20; 3d6 →
+// 2.20; 6d6 → 0.90 with the pool's 6.6 spread and its 1.32 pitch both kept —
+// identical to the v2 numbers, because at this zoom the room already bound.
+// Close/6d6 → 0.90, spread 4.2, no collapse. At wide, where there IS room,
+// the push shows: a lone die comes in at 5.16 instead of 4.30. The wider
 // lane costs the small pools some spread (a pair's line compresses to the 2.0
 // pitch floor) and costs the big ones nothing at all, which is the right way
 // round: a handful comes from your side of the table, a single d20 from your
 // spot, and neither is ever folded onto one x.
 export function laneSpread(laneSlot, room, spread, count) {
   if (!laneSlot) return { lane: 0, spread };            // shipped path, bit-identical
+  const pushed = PLACE_LANE * PLACE_PUSH;               // the v3 throw lane
   const s = Math.min(spread,
-    Math.max(2 * (room - PLACE_LANE), (count - 1) * PITCH_MIN));
+    Math.max(2 * (room - pushed), (count - 1) * PITCH_MIN));
   const lane = Math.sign(laneSlot)
-    * Math.min(PLACE_LANE, Math.max(0, room - s / 2));
+    * Math.min(pushed, Math.max(0, room - s / 2));
   return { lane, spread: s };
 }
 
@@ -399,12 +426,24 @@ export function laneSpread(laneSlot, room, spread, count) {
 // THE REGION IS A FUNCTION OF THE STAMP AND THE MAT, AND OF NOTHING ELSE:
 // (entry, lane, w, d) → an axis-aligned rectangle of the mat. No new wire
 // field, no roster read in the film (the whole point of the entry/lane split
-// above). A long-edge station owns its NEAR HALF of the mat, z toward its own
-// edge; two stations on one long edge split that half laterally by lane sign
-// into QUADRANTS, and the centre slot (lane 0, the seventh chair) takes the
-// centre band of the same width — its felt overlaps its neighbours', which is
-// what a seven-person table costs, and it is the last chair dealt for exactly
-// that reason. A head station owns its END THIRD, full depth.
+// above). A long-edge station owns its slice of the NEAR side of the mat, z
+// toward its own edge; two stations on one long edge split it laterally by
+// lane sign into corner boxes, and the centre slot (lane 0, the seventh
+// chair) takes the centre band of the quadrant width — its felt overlaps its
+// neighbours', which is what a seven-person table costs, and it is the last
+// chair dealt for exactly that reason. A head station owns its own END of the
+// mat, full depth.
+//
+// V3, THE PUSH (2026-09-01): every region's CENTRE stands PLACE_PUSH × where
+// the v2 centre stood — pushed away from the table's centre, toward its own
+// corner or edge. The walls are fixed, so the push is taken on the OPEN sides
+// (the centre lines): a quadrant's inner edges pull outward by `off` of the
+// half-extent, the head's end-third narrows to an end-fifth, and opposite
+// chairs' region centres sit exactly 20% further apart, which is the half of
+// Joe's "more space between them" the felt can answer. The centre band keeps
+// its width (its centre IS the centre line; it has no direction to push) and
+// takes the z push like its edge-mates. The die-hull cap on the aim box
+// (AIM_HULL, below) is untouched — dice are still never aimed AT a rim.
 //
 // Regions are for LANDING. They are not walls (no new physics bodies — a die
 // may still roll out of its region, and the walls are the mat's own), not
@@ -417,13 +456,17 @@ export function regionFor(entry, lane, w, d) {
   if (!Number.isInteger(entry) || entry < 0 || entry > 3) return null;
   const hw = w / 2;
   const hd = d / 2;
+  const off = PLACE_PUSH - 1;
   if (entry <= 1) {
-    const z = entry === 0 ? [0, hd] : [-hd, 0];
-    const x = lane < 0 ? [-hw, 0] : lane > 0 ? [0, hw] : [-hw / 2, hw / 2];
+    const z = entry === 0 ? [hd * off, hd] : [-hd, -(hd * off)];
+    const x = lane < 0 ? [-hw, -(hw * off)] : lane > 0 ? [hw * off, hw] : [-hw / 2, hw / 2];
     return { x0: x[0], x1: x[1], z0: z[0], z1: z[1] };
   }
-  const third = w / 3;
-  const x = entry === 2 ? [-hw, -hw + third] : [hw - third, hw];
+  // The head's end, its centre at PLACE_PUSH × the end-third's: the wall side
+  // stays the wall, so the inner edge comes in to 2c − hw and the third is an
+  // end-fifth at PLACE_PUSH 1.2.
+  const c = (hw - w / 6) * PLACE_PUSH;
+  const x = entry === 2 ? [-hw, -(2 * c - hw)] : [2 * c - hw, hw];
   return { x0: x[0], x1: x[1], z0: -hd, z1: hd };
 }
 

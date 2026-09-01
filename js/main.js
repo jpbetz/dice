@@ -27577,6 +27577,25 @@ function matSquarePoints() {
 // back. On, a failed scan costs nothing and the eye returns to `from`. Only the
 // MAT rung passes it; see the block in framingFor for the measurement that says
 // why the mat is different from every other subject on the felt.
+// V3, THE ONE RETREAT LEVER (Joe, 2026-09-01, on the deployed 7f93c05: "I
+// think the view should be more zoomed out … maybe zoom out 20%"). ON A
+// PLACED TABLE — two or more occupied stations — every frame fitCameraTo
+// fits is then retreated ×1.2 along the same ray, clamped to the scan's own
+// 3.671 ceiling. One lever, applied where the fitted scale is consumed, so
+// every rung of the ladder (mat, cropped square, dice, deciding) buys the
+// same air and no ratio the rung-2 gain gate compares is disturbed. It is
+// RENDER-ONLY (the camera is per-viewer, ruling ②): placeRows() is roster
+// state and reading it here is lawful because nothing downstream of a pixel
+// feeds the film. A solo table, a spectator's empty room and every one-place
+// room retreat by exactly 1 — the multiply is skipped — so every solo
+// framing, fog and span pin is byte-identical to the pre-V3 build; the fog
+// floor follows automatically because camFogEye rides the pose destination
+// (updateMatFogFloor), and no-die-sits-in-fog re-pins the multi-place floors.
+const PLACE_RETREAT = 1.2;
+function placeRetreatNow() {
+  return placeRows().length >= 2 ? PLACE_RETREAT : 1;
+}
+
 function fitCameraTo(pts, target = camTarget, from = 1, refundOnFail = false) {
   const eye = new THREE.Vector3(
     ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
@@ -27620,7 +27639,18 @@ function fitCameraTo(pts, target = camTarget, from = 1, refundOnFail = false) {
       v.copy(p).project(camera);
       return Math.abs(v.x) <= 1 - mx && Math.abs(v.y) <= 1 - my;
     });
-    if (fits) return true;
+    if (fits) {
+      // The V3 placed-table retreat (PLACE_RETREAT above): a fitted frame —
+      // and only a fitted frame; a refund or a give-up is not a fit — steps
+      // back once more. r is 1 everywhere but a ≥2-place table, and the
+      // skip keeps the solo path bit-identical.
+      const r = placeRetreatNow();
+      if (r !== 1) {
+        camera.position.copy(target).addScaledVector(ray, Math.min(3.671, s * r));
+        aimCamera(target);
+      }
+      return true;
+    }
   }
 }
 

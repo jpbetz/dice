@@ -54,16 +54,17 @@ limitations under the License.
 // for the whole life of a table, which is the felt's own recompositeFelt
 // no-churn law applied to geometry. Per-player hue rides the VERTEX COLOURS
 // (the felt's mottle mechanism, js/main.js:2606-2621) so eight hues cost one
-// material; the name rides one row of a 1024 × 2048 atlas so a rename repaints
-// 256 scanlines in place.
+// material; the name rides one row of a 1024 × 2560 atlas so a rename repaints
+// 320 scanlines in place.
 //
 // THE TEXT IS FITTED, AND THAT IS THE DISCIPLINE THE KILLED MAT TEXT LACKED.
 // The floor atlas gives 12.8 px per world unit and "THE GATE OF STORMS"
 // rendered as "ATE OF ST" off both edges (GOALS goal 2's amendment). The card
-// face is 512 × 256 px over 3.00 × 1.50 world units — 170.7 px/world-unit both
-// ways, THIRTEEN TIMES the floor — and the name is measured down from 128 px
-// to an 88 px floor and then truncated with a VISIBLE ellipsis. `fontPx` and
-// `shown` are both reported, so the floor is asserted rather than hoped for.
+// face is 640 × 320 px over 3.45 × 1.725 world units — 185.5 px/world-unit
+// both ways, FOURTEEN TIMES the floor — and the name is measured down from
+// 160 px to a 108 px floor and then truncated with a VISIBLE ellipsis.
+// `fontPx` and `shown` are both reported, so the floor is asserted rather
+// than hoped for.
 
 import * as THREE from 'three';
 import { PLACE_MAX, PLACARD_W, PLACARD_D } from './places.js';
@@ -77,10 +78,21 @@ import { PLACE_MAX, PLACARD_W, PLACARD_D } from './places.js';
 // placards … are smaller than the dice". Measured on his frames: a d6 is 1.35
 // world units on an edge (js/dice.js:40) and the card face was 2.00 × 0.70 —
 // a die is TWICE the card's height in the world, and on screen after a 3d6 a
-// die stood 250 px tall against a far card's 174 × 47. The card face now
-// measures 3.00 × 1.80 (the brief's floor is 3.0 × 1.6), its PRINTED band
-// 3.00 × 1.50, and the ridge stands 1.83 above the ground — bigger than a d6
-// on every axis, in the world, before any projection.
+// die stood 250 px tall against a far card's 174 × 47. The v2 card measured
+// 3.00 × 1.80 (the brief's floor was 3.0 × 1.6), printed band 3.00 × 1.50,
+// ridge 1.83 — bigger than a d6 on every axis, in the world, before any
+// projection.
+//
+// V3, SAME DAY, ×1.15 (Joe, on the v2 tree: "the name plaquards should be
+// slightly bigger overall (maybe zoom out 20% and make the plaquards 15%
+// bigger or something)"). Every world dimension below is the v2 number
+// × 1.15 — face 3.45 × 2.07, printed band 3.45 × 1.725, ridge 2.09, footprint
+// 3.68 × 1.52 in js/places.js — and TENT_ALPHA holds at 20° (the tent's depth
+// grows ×1.15 with the slope, and the v3 standoff 0.86 absorbs it). The pair
+// of dials is the point: the v3 camera retreats ×1.2 on a placed table
+// (js/main.js PLACE_RETREAT), which shrinks dice and cards alike, so the
+// card's net screen size is ≈ 0.96 of v2 while the card:die ratio — the thing
+// Joe actually judged — improves ×1.15.
 //
 // THE OPENING ANGLE MOVED WITH THE SIZE, and it had to. A tent's DEPTH is
 // 2·slope·sin α, so keeping the authored 56° off vertical at a 1.80 slope
@@ -102,19 +114,19 @@ import { PLACE_MAX, PLACARD_W, PLACARD_D } from './places.js';
 // and 2.34 / 4.03 after: the card you read from ACROSS THE TABLE, the one that
 // carries somebody else's name, is nearly FIVE times the face it was, and your
 // own is three.
-const BASE_W = PLACARD_W;                 // 3.20 — the footprint js/places.js
-const BASE_D = PLACARD_D;                 // 1.32   asserts gaps against
+const BASE_W = PLACARD_W;                 // 3.68 — the footprint js/places.js
+const BASE_D = PLACARD_D;                 // 1.52   asserts gaps against
 const BASE_H = 0.14;
 const CHAMFER = 0.06;                     // the seam that makes it an object
-const CARD_W = 3.00;
-const CARD_SLOPE = 1.80;
+const CARD_W = 3.45;                      // v3: 3.00 × 1.15
+const CARD_SLOPE = 2.07;                  // v3: 1.80 × 1.15
 const CARD_T = 0.06;
 const TENT_ALPHA = 20 * Math.PI / 180;    // half-opening, FROM VERTICAL
 // Written once, in one expression order (the anchor rule): every other height
 // in this file is derived from these two and never re-typed.
-const TENT_RUN = CARD_SLOPE * Math.sin(TENT_ALPHA);   // 0.6157 — half the tent's depth
-const TENT_RISE = CARD_SLOPE * Math.cos(TENT_ALPHA);  // 1.6914
-const RIDGE_Y = BASE_H + TENT_RISE;                   // 1.8314
+const TENT_RUN = CARD_SLOPE * Math.sin(TENT_ALPHA);   // 0.7080 — half the tent's depth
+const TENT_RISE = CARD_SLOPE * Math.cos(TENT_ALPHA);  // 1.9451
+const RIDGE_Y = BASE_H + TENT_RISE;                   // 2.0851
 // THE READABLE FACE STARTS ABOVE THE FOOT, and this is a measurement, not a
 // taste. Built without the split — with the name running the whole slope — the
 // near card's printed area reached ndc −1.037 at close on a 16:9 frame and the
@@ -123,13 +135,13 @@ const RIDGE_Y = BASE_H + TENT_RISE;                   // 1.8314
 //
 // IT IS AUTHORED THE OTHER WAY ROUND SINCE v2: the PRINTED HEIGHT is the
 // number, because it is the number the atlas has to match. FACE_H over CARD_W
-// is 1.50 over 3.00 — exactly 1:2 — and the atlas row is 256 px over a 512 px
+// is 1.725 over 3.45 — exactly 1:2 — and the atlas row is 320 px over a 640 px
 // card region, exactly 1:2, so a glyph painted round on the canvas arrives
 // round on the card. (At the old proportions the two ratios were 4.63 and
 // 4.00, close enough to pass unnoticed; at these they are not, and a card that
 // stretches every name 40% taller than it was drawn is the kind of wrong you
 // see before you can name it.)
-const FACE_H = 1.50;                                  // printed band, along the slope
+const FACE_H = 1.725;                                 // printed band, along the slope — CARD_W / 2, the 1:2 the atlas row keeps
 const FACE_S = FACE_H / CARD_SLOPE;                   // 0.8333 of the slope, from the ridge
 const FACE_Y0 = RIDGE_Y - FACE_S * TENT_RISE;         // 0.3944 — where the foot begins
 const BEAD_W_MINE = BASE_W - 2 * CHAMFER; // YOUR card's bead runs the full base
@@ -168,39 +180,47 @@ const TRIS = QUADS * 2;                   // 48 per placard, 384 for the rig
 // The atlas — 8 rows of 256 px, one row per station
 // ---------------------------------------------------------------------------
 
-// IT IS NOT SQUARE, AND THAT IS THE CHEAP HALF OF THE RESIZE. The card face
-// grew from 2.00 × 0.43 to 3.00 × 1.50 — 3.5× the area — so a row that stayed
-// 128 px tall would have printed a name at 57 px per world unit down the card.
-// Doubling a 1024² atlas to 2048² would have cost 16 MB of texture for a page
-// that is otherwise one felt and eight dice. Only the ROWS need the height, so
-// only the height doubles: 1024 wide × 2048 tall, 8 MB, and the card region
-// keeps half the width. 512 px over 3.00 world units and 256 px over 1.50 is
-// 170.7 px per world unit BOTH WAYS — down from the old 256 across, but the
-// card itself is half again as wide, so the name arrives with more absolute
-// pixels than before and no anisotropy. (The retired floor atlas, the reason
-// GOALS goal 2 carries an amendment, gave 12.8.)
+// IT IS NOT SQUARE, AND THAT IS THE CHEAP HALF OF THE RESIZE. The v2 card
+// face grew from 2.00 × 0.43 to 3.00 × 1.50 — 3.5× the area — so a row that
+// stayed 128 px tall would have printed a name at 57 px per world unit down
+// the card. Doubling a 1024² atlas to 2048² would have cost 16 MB of texture
+// for a page that is otherwise one felt and eight dice. Only the ROWS need
+// the height, so only the height grows: v2 shipped 1024 × 2048 (8 MB) at
+// 170.7 px per world unit both ways, and the v3 card (×1.15, 3.45 × 1.725
+// printed) would have dropped that to 148 — under the 170 floor the fitter's
+// numbers were derived at. So v3 adds one more row-height step, 1024 × 2560
+// (10 MB), AND hands the card region 0.625 of the width instead of 0.5:
+// 640 px over 3.45 world units across and 320 px over 1.725 down — 185.5 px
+// per world unit BOTH WAYS, no anisotropy, and the name arrives with more
+// absolute pixels than v2 did. (The retired floor atlas, the reason GOALS
+// goal 2 carries an amendment, gave 12.8.) NPOT is fine: the renderer is
+// WebGL2, and the texture units never assumed a power of two — only the row
+// arithmetic below does, and it divides exactly (2560 / 8 = 320).
 const ATLAS_W = 1024;
-const ATLAS_H = 2048;
-const ROW_PX = ATLAS_H / PLACE_MAX;       // 256
+const ATLAS_H = 2560;
+const ROW_PX = ATLAS_H / PLACE_MAX;       // 320
 const ORM_PX = 512;
 const ORM_ROW = ORM_PX / PLACE_MAX;       // 64 — flat data, and the v maths is
 const EMIS_PX = 512;                      //      in row fractions, not pixels
 
-// U regions, as fractions of the atlas width. The card face takes half the
-// row: 512 px over the card's 3.00 world units.
-const U_CARD = [0, 0.5];
-const U_BASE = [0.5, 0.75];
-const U_BEAD = [0.75, 0.8125];
-const U_EDGE = [0.8125, 1];
+// U regions, as fractions of the atlas width. The card face takes 0.625 of
+// the row since v3: 640 px over the card's 3.45 world units, which is what
+// keeps the density at 185.5 ≥ the 170 floor. The brass, bead and edge stock
+// give up the width the card took — they are gradients and flats, and 192 /
+// 48 / 144 px carry them exactly as well as 256 / 64 / 192 did.
+const U_CARD = [0, 0.625];
+const U_BASE = [0.625, 0.8125];
+const U_BEAD = [0.8125, 0.859375];
+const U_EDGE = [0.859375, 1];
 
-const CARD_PX = ATLAS_W * (U_CARD[1] - U_CARD[0]);    // 512
-// The fitter's range rides the ROW, not a constant: the row doubled, so the
-// type doubles with it and the name keeps the same share of a card that is now
-// three times taller. The 44 px floor placard-look asserts is still a floor —
-// it is simply nowhere near binding any more.
-const PAD_PX = Math.round(ROW_PX * 0.16); // 41
-const FONT_MAX = Math.round(ROW_PX * 0.50);  // 128
-const FONT_MIN = 2 * Math.round(ROW_PX * 0.17);  // 88 — the 44 px floor, doubled.
+const CARD_PX = ATLAS_W * (U_CARD[1] - U_CARD[0]);    // 640
+// The fitter's range rides the ROW, not a constant: the row grew again, so
+// the type grows with it and the name keeps the same share of the card. The
+// 44 px floor placard-look asserts is still a floor — it is simply nowhere
+// near binding any more.
+const PAD_PX = Math.round(ROW_PX * 0.16); // 51
+const FONT_MAX = Math.round(ROW_PX * 0.50);  // 160
+const FONT_MIN = 2 * Math.round(ROW_PX * 0.17);  // 108 — v2's 88, one row-step up.
 // EVEN, because the fitter steps down in 2s from an even maximum: an odd floor
 // is a floor the loop steps straight past (measured: FONT_MIN 87 landed at 86).
 
@@ -222,10 +242,11 @@ const KIT_TABLE = {
 // The wash — the pick ring's exact recipe, and for the pick ring's reason
 // ---------------------------------------------------------------------------
 
-// Sized TO THE CARD (v2): an arc narrower than the object it belongs to
-// reads as a light somebody left on rather than as that card's own ground.
+// Sized TO THE CARD (v2; outer × 1.15 with the v3 card, same reason): an arc
+// narrower than the object it belongs to reads as a light somebody left on
+// rather than as that card's own ground.
 const WASH_INNER = 0.45;
-const WASH_OUTER = 3.30;
+const WASH_OUTER = 3.80;
 const WASH_SEG = 32;
 const WASH_SPAN = Math.PI * 0.9;
 const WASH_PEAK = 0.62;

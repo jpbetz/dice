@@ -25,7 +25,7 @@ limitations under the License.
 
 import assert from 'node:assert/strict';
 import {
-  PLACE_MAX, PLACE_LANE, PLACE_LANE_SHARE, PITCH_MIN, PLACARD_STANDOFF, PLACARD_W, PLACARD_D, PLACARD_GAP,
+  PLACE_MAX, PLACE_LANE, PLACE_PUSH, PLACE_LANE_SHARE, PITCH_MIN, PLACARD_STANDOFF, PLACARD_W, PLACARD_D, PLACARD_GAP,
   STATIONS, PLACE_AIM, AIM_ZERO,
   entryFor, placeLane, placeAnchor, placardFootprint, placardGap, laneSpread, aimFor, regionFor, inRegion,
 } from '../js/places.js';
@@ -226,20 +226,21 @@ t('every card stands outboard of a wall, by 0.10 of clear ground', () => {
 
 t('no two cards come within 0.30 of each other — any station, any mat — except the centre slots on a small mat', () => {
   // THE FULL HOUSE AT CLOSE IS THE RECORDED COST of the card standing where
-  // the frame can hold it (placeLane, 2026-09-01): three cards need 3.50 of
-  // pitch to stand a gap apart; wide (4.49) and medium (3.50, by construction)
-  // have it and close (2.74) does not. The six outer and head stations keep
-  // the floor on every mat; the two centre slots — the seventh and eighth
-  // chairs, dealt last for exactly this — stand 1.29 clear at wide, exactly
-  // the 0.30 floor at medium, and overlap their neighbours by 0.46 at close.
-  // Pinned to the digit so a change to any of the three is a change somebody
-  // made on purpose.
+  // the frame can hold it (placeLane, 2026-09-01; re-pinned for the v3 ×1.15
+  // card): three cards need 3.98 of pitch to stand a gap apart; wide (5.10)
+  // and medium (3.98, by construction) have it and close (3.11) does not.
+  // The six outer and head stations keep the floor on every mat; the two
+  // centre slots — the seventh and eighth chairs, dealt last for exactly
+  // this — stand 1.42 clear at wide, exactly the 0.30 floor at medium, and
+  // overlap their neighbours by 0.57 at close. Pinned to the digit so a
+  // change to any of the three is a change somebody made on purpose.
   // Under a tower the back centre slot (7) is on a flank, the second card
-  // down a row pitched at the film's PLACE_LANE (4.30 along z), so at wide the
-  // flank pair's 1.10 is the number and not the front row's 1.29; at the
+  // down a row pitched at the film's raw PLACE_LANE (4.30 along z — the card
+  // row, NOT pushed; PLACE_PUSH moves throws, not cards), so at wide the
+  // flank pair's 0.62 is the number and not the front row's 1.42; at the
   // other two zooms the front centre slot is still the worst.
   const CENTRE = new Set([6, 7]);
-  const want = { wide: 1.286, 'wide+tower': 1.10, medium: 0.30, 'medium+tower': 0.30, close: -0.464, 'close+tower': -0.464 };
+  const want = { wide: 1.422, 'wide+tower': 0.62, medium: 0.30, 'medium+tower': 0.30, close: -0.568, 'close+tower': -0.568 };
   for (const mat of MATS) {
     const all = anchorsOf(mat);
     let centreWorst = Infinity;
@@ -297,14 +298,14 @@ t('no flank card lands inside a tower volume', () => {
 });
 
 t('the anchor arithmetic is the design table, to the digit', () => {
-  // RE-AUTHORED WITH THE CARD (v2, 2026-09-01): the standoff is 0.76 for a
-  // footprint 1.32 deep, so front/back z = +-5.06 wide / +-4.11 medium /
-  // +-3.36 close; heads x = +-7.81 / +-6.26 / +-5.06; lanes at x in {0,
-  // +-placeLane(w)} — a footprint and a gap of pitch on the medium mat
-  // (3.50) and that share of the others, 4.49 at wide, 2.74 at close, so the
-  // card's centre stands at the same point of a frame the mat fills at every
-  // zoom.
-  const want = { wide: [5.06, 7.81, 4.486], medium: [4.11, 6.26, 3.50], close: [3.36, 5.06, 2.736] };
+  // RE-AUTHORED WITH THE CARD (v2, 2026-09-01; v3 same day, ×1.15): the
+  // standoff is 0.86 for a footprint 1.52 deep, so front/back z = +-5.16
+  // wide / +-4.21 medium / +-3.46 close; heads x = +-7.91 / +-6.36 / +-5.16;
+  // lanes at x in {0, +-placeLane(w)} — a footprint and a gap of pitch on
+  // the medium mat (3.98) and that share of the others, 5.10 at wide, 3.11
+  // at close, so the card's centre stands at the same point of a frame the
+  // mat fills at every zoom.
+  const want = { wide: [5.16, 7.91, 5.102], medium: [4.21, 6.36, 3.98], close: [3.46, 5.16, 3.112] };
   for (const [id, [edgeZ, headX, lane]] of Object.entries(want)) {
     const { w, d } = ZOOMS[id];
     assert.ok(Math.abs(placeAnchor(0, w, d).z - edgeZ) < 5e-3, `${id} front z`);
@@ -319,13 +320,14 @@ t('the anchor arithmetic is the design table, to the digit', () => {
   }
   assert.ok(Math.abs(placeLane(ZOOMS.medium.w) - (PLACARD_W + PLACARD_GAP)) < 1e-9,
     'on the medium mat the card\'s pitch is exactly a footprint and a gap');
-  assert.ok(Math.abs(PLACE_LANE_SHARE - 0.318) < 1e-3, `the share is 0.318 of the mat (${PLACE_LANE_SHARE})`);
-  assert.ok(Math.abs(placeLane(ZOOMS.wide.w) - PLACE_LANE) < 0.25,
-    `and on the wide mat the card stands within a quarter unit of the film\'s lane (${placeLane(ZOOMS.wide.w)} vs ${PLACE_LANE})`);
+  assert.ok(Math.abs(PLACE_LANE_SHARE - 0.362) < 1e-3, `the share is 0.362 of the mat (${PLACE_LANE_SHARE})`);
+  assert.ok(Math.abs(placeLane(ZOOMS.wide.w) - PLACE_LANE * PLACE_PUSH) < 0.25,
+    `and on the wide mat the card stands within a quarter unit of the film\'s pushed lane (${placeLane(ZOOMS.wide.w)} vs ${PLACE_LANE * PLACE_PUSH})`);
   assert.ok(Math.abs((PLACARD_STANDOFF - PLACARD_D / 2) - 0.10) < 1e-12,
     'the standoff leaves exactly 0.10 of clear ground inboard');
-  assert.equal(PLACARD_W, 3.20);
-  assert.equal(PLACARD_D, 1.32);
+  assert.equal(PLACARD_W, 3.68);
+  assert.equal(PLACARD_D, 1.52);
+  assert.equal(PLACE_PUSH, 1.2, 'the v3 push is the 20% Joe asked for, once');
   // THE PITCH: the film's lane clears a card's footprint plus the gap floor,
   // and so does the card's pitch on the wide and medium mats; at close it
   // does not — the recorded full-house cost, pinned to the digit in the gap
@@ -354,10 +356,12 @@ t('lane slot 0 returns its inputs untouched — the bit-identical shipped path',
 t('the F1 table — the lane yields to the pool, and the line never collapses', () => {
   // room 4.2 is medium (5.5 - 1.25 - 0.05); room 3.00 is close (4.3 - 1.25 - 0.05).
   const medium = (count) => laneSpread(1, 4.2, poolSpread(ZOOMS.medium.w, count), count);
-  // The v2 lane is 4.30, wider than a medium mat's own ROOM (4.2 for the widest
-  // hull), so at this zoom the room binds before the lane does — which is the
-  // rule working, not an exception to it: the lane never puts a die where fit()
-  // would have to rescue it.
+  // The v3 lane is 4.30 × 1.2 = 5.16, wider than a medium mat's own ROOM (4.2
+  // for the widest hull), so at this zoom the room binds before the lane does
+  // — which is the rule working, not an exception to it: the lane never puts
+  // a die where fit() would have to rescue it, and the whole medium/close
+  // table below is bit-identical to the v2 one (the push shows only at wide,
+  // where there is room to spend it — the pin after the table).
   assert.ok(Math.abs(medium(1).lane - 4.2) < 1e-12, 'a single die comes from your spot');
   assert.ok(Math.abs(medium(2).lane - 3.20) < 1e-12, 'a pair gives up a foot of it');
   assert.ok(Math.abs(medium(3).lane - 2.2) < 1e-12, '3d6 gives a little more ground');
@@ -373,6 +377,15 @@ t('the F1 table — the lane yields to the pool, and the line never collapses', 
   const left = laneSpread(-1, 4.2, poolSpread(ZOOMS.medium.w, 3), 3);
   assert.equal(left.lane, -medium(3).lane, 'the near lane mirrors the far one');
   assert.equal(left.spread, medium(3).spread);
+
+  // THE PUSH SHOWS AT WIDE (v3): a lone d20's room there is 5.75, past the
+  // pushed lane, so the line comes in at PLACE_LANE × PLACE_PUSH exactly —
+  // `s = 2·(room − L)` makes `room − s/2` land on L to the bit (2·x and /2
+  // are exact scalings). place-throws-from-your-edge pins the same number
+  // off the live film.
+  const wide1 = laneSpread(1, ZOOMS.wide.w / 2 - HULL_MAX - 0.05, 2.6, 1);
+  assert.ok(Math.abs(wide1.lane - PLACE_LANE * PLACE_PUSH) < 1e-12,
+    `at wide a single die comes from the pushed spot (${wide1.lane} vs ${PLACE_LANE * PLACE_PUSH})`);
 });
 
 t('a laned line always fits inside the room fit() would clamp it to', () => {
@@ -432,17 +445,36 @@ t('the dial is on, and switching it off returns the identity for every stamp', (
   assert.deepEqual(PLACE_AIM, was, 'the shipped dial is back');
 });
 
-t('the regions: near halves split by lane sign, a centre band, end thirds', () => {
+t('the regions: pushed corner boxes, a centre band, end fifths (v3)', () => {
+  // V3 (PLACE_PUSH 1.2): every region's centre is the v2 centre × 1.2, pushed
+  // toward its own corner or edge — the walls stay walls, so the open sides
+  // pull outward by `off` of the half-extent, and the head's end-third
+  // narrows to an end-fifth. The expressions here REPLICATE js/places.js's
+  // own, in its expression order, so the doubles agree to the bit.
+  const off = PLACE_PUSH - 1;
   for (const [id, z] of Object.entries(ZOOMS)) {
     const hw = z.w / 2;
     const hd = z.d / 2;
-    assert.deepEqual(regionFor(0, -1, z.w, z.d), { x0: -hw, x1: 0, z0: 0, z1: hd }, `${id}: front-left quadrant`);
-    assert.deepEqual(regionFor(0, 1, z.w, z.d), { x0: 0, x1: hw, z0: 0, z1: hd }, `${id}: front-right quadrant`);
-    assert.deepEqual(regionFor(1, 1, z.w, z.d), { x0: 0, x1: hw, z0: -hd, z1: 0 }, `${id}: back-right quadrant`);
-    assert.deepEqual(regionFor(1, -1, z.w, z.d), { x0: -hw, x1: 0, z0: -hd, z1: 0 }, `${id}: back-left quadrant`);
-    assert.deepEqual(regionFor(0, 0, z.w, z.d), { x0: -hw / 2, x1: hw / 2, z0: 0, z1: hd }, `${id}: the front centre band`);
-    assert.deepEqual(regionFor(3, 0, z.w, z.d), { x0: hw - z.w / 3, x1: hw, z0: -hd, z1: hd }, `${id}: the right end third`);
-    assert.deepEqual(regionFor(2, 0, z.w, z.d), { x0: -hw, x1: -hw + z.w / 3, z0: -hd, z1: hd }, `${id}: the left end third`);
+    const c = (hw - z.w / 6) * PLACE_PUSH;
+    assert.deepEqual(regionFor(0, -1, z.w, z.d), { x0: -hw, x1: -(hw * off), z0: hd * off, z1: hd }, `${id}: front-left corner box`);
+    assert.deepEqual(regionFor(0, 1, z.w, z.d), { x0: hw * off, x1: hw, z0: hd * off, z1: hd }, `${id}: front-right corner box`);
+    assert.deepEqual(regionFor(1, 1, z.w, z.d), { x0: hw * off, x1: hw, z0: -hd, z1: -(hd * off) }, `${id}: back-right corner box`);
+    assert.deepEqual(regionFor(1, -1, z.w, z.d), { x0: -hw, x1: -(hw * off), z0: -hd, z1: -(hd * off) }, `${id}: back-left corner box`);
+    assert.deepEqual(regionFor(0, 0, z.w, z.d), { x0: -hw / 2, x1: hw / 2, z0: hd * off, z1: hd }, `${id}: the front centre band keeps its width and takes the z push`);
+    assert.deepEqual(regionFor(3, 0, z.w, z.d), { x0: 2 * c - hw, x1: hw, z0: -hd, z1: hd }, `${id}: the right end fifth`);
+    assert.deepEqual(regionFor(2, 0, z.w, z.d), { x0: -hw, x1: -(2 * c - hw), z0: -hd, z1: hd }, `${id}: the left end fifth`);
+    // The push, stated as the sentence Joe said: opposite corner boxes'
+    // centres stand exactly 20% further apart than the v2 quadrants' did.
+    const mid = (r) => [(r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2];
+    const [ax, az] = mid(regionFor(0, -1, z.w, z.d));
+    const [bx, bz] = mid(regionFor(1, 1, z.w, z.d));
+    const v3 = Math.hypot(ax - bx, az - bz);
+    const v2 = Math.hypot(hw, hd);                       // the old centres, ±(hw/2, hd/2)
+    assert.ok(Math.abs(v3 / v2 - PLACE_PUSH) < 1e-9,
+      `${id}: region centres sit ${PLACE_PUSH}× apart (${(v3 / v2).toFixed(6)})`);
+    // …and the head's centre is 1.2× out along its own axis.
+    const [rx] = mid(regionFor(3, 0, z.w, z.d));
+    assert.ok(Math.abs(rx / (hw - z.w / 6) - PLACE_PUSH) < 1e-9, `${id}: the head's end is pushed the same 20%`);
   }
 });
 
@@ -458,19 +490,28 @@ t('the two chairs of a fresh table own disjoint felt, and so do all four long-ed
       assert.equal(overlap(R(p), R(q)), 0, `stations ${p} and ${q} own disjoint felt`);
     }
   }
-  // …and each region is exactly a quarter of the mat: nobody owns more than
-  // their share, and together the four tile it.
+  // …and nobody owns more than a v2 quarter: the pushed corner box is 0.64 of
+  // one (0.8 × 0.8 — the open sides pulled in by `off` on both axes), and the
+  // strip it gave up is the no-man's band along the centre lines that reads
+  // as the space BETWEEN the pools.
+  const off = PLACE_PUSH - 1;
   const area = (r) => (r.x1 - r.x0) * (r.z1 - r.z0);
-  for (let p = 0; p < 4; p++) assert.ok(Math.abs(area(R(p)) - (w * d) / 4) < 1e-9, `station ${p} owns a quarter`);
+  const boxArea = (w / 2 - (w / 2) * off) * (d / 2 - (d / 2) * off);
+  for (let p = 0; p < 4; p++) {
+    assert.ok(area(R(p)) < (w * d) / 4, `station ${p} owns less than a quarter`);
+    assert.ok(Math.abs(area(R(p)) - boxArea) < 1e-9, `station ${p} owns the pushed box exactly`);
+  }
 });
 
-t('inRegion is closed on its edges — a die on the centre line belongs to both neighbours', () => {
-  const R = regionFor(0, -1, 11, 6.7);
+t('inRegion is closed on its own edges, and the centre lines belong to nobody since the push', () => {
+  const R = regionFor(0, -1, 11, 6.7);               // x [-5.5, -1.1], z [0.67, 3.35]
   assert.equal(inRegion(R, -2, 1), true);
-  assert.equal(inRegion(R, 0, 0), true, 'the corner on both centre lines is in');
-  assert.equal(inRegion(regionFor(0, 1, 11, 6.7), 0, 0), true, '…and in its neighbour');
-  assert.equal(inRegion(R, 0.01, 1), false);
-  assert.equal(inRegion(R, -2, -0.01), false);
+  assert.equal(inRegion(R, R.x1, R.z0), true, 'the inner corner, on both of its own edges, is in');
+  assert.equal(inRegion(regionFor(0, 1, 11, 6.7), regionFor(0, 1, 11, 6.7).x0, 1), true, '…and the neighbour is closed on its own edge too');
+  assert.equal(inRegion(R, 0, 0), false, 'the mat\'s centre is in NEITHER front box — the pushed no-man\'s band');
+  assert.equal(inRegion(regionFor(0, 1, 11, 6.7), 0, 0), false);
+  assert.equal(inRegion(R, R.x1 + 0.01, 1), false);
+  assert.equal(inRegion(R, -2, R.z0 - 0.01), false);
   assert.equal(inRegion(null, 0, 0), false, 'no region, nothing is in it');
 });
 

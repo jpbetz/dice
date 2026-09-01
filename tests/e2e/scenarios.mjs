@@ -55,7 +55,7 @@ const { minTowerDataUrl, minTowerGlb, MIN_TOWER_PORTALS } =
 // axis-aligned ground box and `placardGap` measures the clear ground between
 // two of them — negative when they overlap, which is the assertion the felt
 // shelf never had.
-const { placardFootprint, placardGap, PLACE_LANE, PLACARD_W, PLACARD_GAP, PLACARD_STANDOFF,
+const { placardFootprint, placardGap, PLACE_LANE, PLACE_PUSH, PLACARD_W, PLACARD_GAP, PLACARD_STANDOFF,
   entryFor, regionFor, inRegion }
   = await import('../../js/places.js');
 
@@ -2342,21 +2342,30 @@ export const scenarios = [
         `each zoom derives its own floor (${floors.map((f) => f.toFixed(2)).join(', ')})`);
 
       // ---- the four azimuths (§7.63; DESIGN §5.4) ---------------------------
-      // The design's table, medium, eye at the preset (s = 1):
-      //   0 → 16.53   π → 15.93   π/2 → 17.12   3π/2 → 17.12
-      // THERE IS NO 0↔π SYMMETRY — CAM_TARGET_HOME.z is +0.5, which breaks
-      // the reflection — and nothing here assumes one: front and back are
-      // asserted to DIFFER. The heads mirror each other in x and must agree.
+      // The resting table, medium, ONE occupied station (no V3 retreat —
+      // that leg is below), re-measured 2026-09-01:
+      //   0 → 16.53   π → 16.53   π/2 → 20.76   3π/2 → 20.76
+      // FRONT AND BACK AGREE SINCE camHomeFor (2026-09-01): the half-unit
+      // home offset turns with the chair, so the back eye is the front eye
+      // mirrored exactly and the two floors are equal to the printed digit.
+      // (The 15.93 this file pinned before was the pre-camHomeFor back eye —
+      // a unit nearer its own edge — and the 17.12 heads predate the head
+      // frame's 1.33× long-axis retreat; both went stale with the ordering
+      // assert below them, which is how this scenario was red on a green
+      // tree.) The heads mirror each other in x and must agree, and they
+      // rest FURTHER than the long edges — the short-edge retreat pays in
+      // fog floor too.
       //
-      // Only the front chair rests at s = 1 on this frame (measured: the back
-      // eye stands a unit nearer its own edge and retreats to 1.03; a head eye
-      // looks down the long axis and retreats to 1.33), so the design's
-      // numbers are pinned exactly where the eye is at the preset and are the
-      // LOWER BOUND everywhere else — a retreat along the eye's own ray can
-      // only move a far corner further. What is exact at every chair is the
-      // derivation itself: the floor re-computed here from the mat's corners
-      // and the eye framingInfo reports, with the margin read off the front
-      // chair rather than copied out of js/main.js.
+      // Only the front chair rests at s = 1 on this frame (the back rests at
+      // its mirror, which camScaleNow's un-turned preset ray under-reports as
+      // 0.96 — an instrument quirk, not a nearer eye; a head eye looks down
+      // the long axis and retreats to 1.30), so the numbers are pinned
+      // exactly where camScale reads 1 and are the LOWER BOUND everywhere
+      // else — a retreat along the eye's own ray can only move a far corner
+      // further. What is exact at every chair is the derivation itself: the
+      // floor re-computed here from the mat's corners and the eye
+      // framingInfo reports, with the margin read off the front chair rather
+      // than copied out of js/main.js.
       //
       // simulatePlaceView(n) is the instrument: it sets placeOrbit to station
       // n's azimuth and runs the SHIPPED ladder, so this is the frame a viewer
@@ -2373,7 +2382,7 @@ export const scenarios = [
         }
         return far;
       };
-      const CHAIRS = [[0, 0, 16.53], [1, Math.PI, 15.93], [4, Math.PI / 2, 17.12], [5, 3 * Math.PI / 2, 17.12]];
+      const CHAIRS = [[0, 0, 16.53], [1, Math.PI, 16.53], [4, Math.PI / 2, 20.76], [5, 3 * Math.PI / 2, 20.76]];
       const seen = {};
       let margin = null;
       for (const [place, azim, atPreset] of CHAIRS) {
@@ -2404,15 +2413,17 @@ export const scenarios = [
         seen[place] = { floor: p.matFogFloor, camScale: f.camScale, orbit: f.orbit };
       }
       assert.equal(seen[0].camScale, 1,
-        'the front chair rests at the preset eye, so at least one exact pin above was actually made');
-      assert.notEqual(seen[0].floor.toFixed(3), seen[1].floor.toFixed(3),
-        `front and back derive DIFFERENT floors — there is no 0↔π symmetry `
-        + `(${seen[0].floor.toFixed(2)} / ${seen[1].floor.toFixed(2)}; CAM_TARGET_HOME.z is +0.5)`);
+        'a ONE-place table takes no V3 retreat — the front chair rests at the preset eye, '
+        + 'so at least one exact pin above was actually made, and every solo fog number below '
+        + 'this line is the pre-V3 build\'s');
+      assert.equal(seen[0].floor.toFixed(3), seen[1].floor.toFixed(3),
+        `front and back derive the SAME floor since camHomeFor — the back eye is the front `
+        + `eye mirrored (${seen[0].floor.toFixed(2)} / ${seen[1].floor.toFixed(2)})`);
       assert.equal(seen[4].floor.toFixed(3), seen[5].floor.toFixed(3),
         `the two heads mirror each other in x and agree (${seen[4].floor.toFixed(2)})`);
-      assert.ok(seen[1].floor < seen[0].floor && seen[0].floor < seen[4].floor,
-        `back < front < heads — the order of the design's table `
-        + `(${seen[1].floor.toFixed(2)} < ${seen[0].floor.toFixed(2)} < ${seen[4].floor.toFixed(2)})`);
+      assert.ok(seen[0].floor < seen[4].floor,
+        `long edges < heads — the head's 1.30× long-axis retreat pays in fog floor too `
+        + `(${seen[0].floor.toFixed(2)} < ${seen[4].floor.toFixed(2)})`);
       assert.equal((await a.dbg('simulatePlaceView(null)')).orbit, 0, 'the instrument hands the real chair back');
       assert.equal((await a.dbg('framingInfo()')).placeOrbit, 0, 'and the frame is the front chair again');
 
@@ -2432,6 +2443,49 @@ export const scenarios = [
           + `(deepest ${deepest.toFixed(1)} vs fogNear ${d.near.toFixed(1)})`);
       }
       await a.dbg('simulatePlaceView(null)');
+
+      // ---- V3: THE PLACED TABLE RETREATS, AND THE FOG FOLLOWS ---------------
+      // (Joe, 2026-09-01: "the view should be more zoomed out … maybe zoom
+      // out 20%".) With TWO or more occupied stations every fitted frame
+      // steps back ×1.2 (js/main.js PLACE_RETREAT), the pose destination
+      // moves, and camFogEye rides the destination — so it is the
+      // MULTI-PLACE floors that re-derive, never the solo ones: the leg
+      // above ran on a one-place table and pinned the pre-V3 numbers
+      // unchanged, front at camScale exactly 1. Medium re-measured
+      // 2026-09-01: 0/π → 18.68, heads → 23.75 (for the record: wide 23.52,
+      // heads 30.00; close 14.89 — under the shipped 15.00 tune floor —
+      // heads 18.87). The derivation assert runs again — the floor is still
+      // the furthest corner from THIS eye plus the same margin — so the
+      // retreat cannot drift from the fog by construction.
+      await a.dbg('clearTable()');
+      await a.settle();
+      await ctx.rawPlayer('Bram');
+      await a.waitFor('window.__diceDebug.places().stations.length === 2',
+        { desc: 'a second station — the table is PLACED now' });
+      const V3_CHAIRS = [[0, 0, 18.68], [1, Math.PI, 18.68], [4, Math.PI / 2, 23.75], [5, 3 * Math.PI / 2, 23.75]];
+      for (const [place, azim, atRest] of V3_CHAIRS) {
+        await a.dbg(`simulatePlaceView(${place})`);
+        const f = await a.dbg('framingInfo()');
+        const p = JSON.parse(await a.eval(probe));
+        assert.equal(f.placeOrbit, Math.round(azim * 100) / 100,
+          `V3 station ${place}: the ladder's base is the chair's azimuth`);
+        assert.ok(p.fogNear >= p.matFogFloor - 1e-9,
+          `V3 station ${place}: fog starts past the retreated floor (${p.fogNear.toFixed(2)} vs ${p.matFogFloor.toFixed(2)})`);
+        assert.equal(p.matFogFloor.toFixed(2), atRest.toFixed(2),
+          `V3 station ${place}: the multi-place floor is the re-measured number `
+          + `(${p.matFogFloor.toFixed(3)} vs ${atRest})`);
+        const far = farCorner(p, f.eye);
+        assert.ok(Math.abs((p.matFogFloor - far) - margin) < 2e-3,
+          `V3 station ${place}: the floor is STILL the furthest corner from this eye plus the same margin `
+          + `(${(p.matFogFloor - far).toFixed(3)} vs ${margin.toFixed(3)})`);
+        if (place === 0) {
+          assert.equal(f.camScale, 1.2,
+            'the front chair reads the one retreat lever exactly — PLACE_RETREAT 1.2 on a fitted frame');
+          assert.ok(p.matFogFloor > seen[0].floor + 1,
+            `and the placed floor stands past the solo floor (${p.matFogFloor.toFixed(2)} vs ${seen[0].floor.toFixed(2)})`);
+        }
+      }
+      assert.equal((await a.dbg('simulatePlaceView(null)')).orbit, 0, 'the chair is handed back');
       } finally {
         await a.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, a.page.sessionId)
           .catch(() => {});
@@ -20779,8 +20833,8 @@ export const scenarios = [
         assert.equal(mine.wire.lane, -1, 'and the left lane of it');
         assert.equal(mine.org.from, 'place', 'the film took the stamp, not the draw');
         assert.equal(mine.org.side, 0, 'and came in over the front');
-        assert.ok(Math.abs(mine.org.laneWorld + PLACE_LANE) < 1e-9,
-          `a single die comes from her SPOT, the whole lane (${mine.org.laneWorld} of ${-PLACE_LANE})`);
+        assert.ok(Math.abs(mine.org.laneWorld + PLACE_LANE * PLACE_PUSH) < 1e-9,
+          `a single die comes from her SPOT, the whole pushed lane (${mine.org.laneWorld} of ${-(PLACE_LANE * PLACE_PUSH)} — v3, PLACE_PUSH)`);
 
         // Gus sits at the same edge's centre slot — same entry, no lane at all.
         // The pair is what makes the lane a real film input rather than a field
@@ -20808,8 +20862,8 @@ export const scenarios = [
         assert.equal(laned.org.side, 0, 'front edge');
         assert.equal(laned.org.lane, 1, 'right lane, as stamped');
         assert.ok(laned.org.laneWorld > 0, `the line shifted right (laneWorld ${laned.org.laneWorld})`);
-        assert.ok(Math.abs(laned.org.laneWorld) < PLACE_LANE,
-          `and the lane YIELDED to a six-die pool (${laned.org.laneWorld} of the ${PLACE_LANE} a single die gets)`);
+        assert.ok(Math.abs(laned.org.laneWorld) < PLACE_LANE * PLACE_PUSH,
+          `and the lane YIELDED to a six-die pool (${laned.org.laneWorld} of the ${PLACE_LANE * PLACE_PUSH} a single die gets)`);
         assert.equal(laned.line.length, 6, 'six spawn rows');
         assert.ok(laned.line.every((s) => s.from === 'place' && s.lane > 0 && s.clear >= 0),
           `every row laned, every row clear of the wall (${JSON.stringify(laned.line.map((s) => [s.lane, s.clear]))})`);
@@ -21701,8 +21755,8 @@ export const scenarios = [
         assert.equal(b.materials, 1, 'ONE material — eight hues ride the vertex colours');
         assert.equal(b.textures, 3, 'albedo + ORM + emissive, and nothing else');
         assert.equal(b.atlasPx, 1024, 'a 1024-wide atlas…');
-        assert.equal(b.atlasH, 2048, '…2048 TALL since v2: only the rows needed the height, and '
-          + 'doubling both axes would have cost 16 MB of texture for eight names');
+        assert.equal(b.atlasH, 2560, '…2560 TALL since v3 (2048 in v2): only the rows need the height, '
+          + 'and doubling both axes would have cost 16 MB of texture for eight names');
         assert.equal(b.rows, 8, '…of eight rows, one per station, repainted in place');
 
         // ---- THE SIZE, which is the whole of the v2 change ------------------
@@ -21779,9 +21833,10 @@ export const scenarios = [
             }));
             // THE CENTRE SLOTS AT CLOSE ARE THE RECORDED COST of the card
             // standing where the frame can hold it (js/places.js placeLane,
-            // 2026-09-01): the pitch is a footprint and a gap at medium and
-            // scales with the mat, so at close (2.74 for a 3.20 card) the
-            // seventh and eighth chairs overlap their neighbours by 0.46.
+            // 2026-09-01; the v3 ×1.15 card kept the construction): the pitch
+            // is a footprint and a gap at medium and scales with the mat, so
+            // at close (3.11 for a 3.68 card) the seventh and eighth chairs
+            // overlap their neighbours by 0.57.
             // Every other pair keeps the floor at every zoom, tower up or
             // down; tests/places.test.mjs pins the three numbers to the digit.
             const outer = minGap(boxes.filter((b) => b.place !== 6 && b.place !== 7));
@@ -21793,8 +21848,11 @@ export const scenarios = [
               assert.ok(worst.gap >= 0.30 - 1e-9,
                 `${tower}/${z}: the centre slots keep the floor too (${worst.a}/${worst.b}: ${worst.gap.toFixed(3)})`);
             } else {
-              assert.ok((worst.a === 6 || worst.a === 7 || worst.b === 6 || worst.b === 7) && worst.gap > -0.5,
-                `${tower}/${z}: only a centre slot fuses, and by less than half a unit `
+              // −0.7: the recorded v3 overlap is 0.568 (the ×1.15 card on the
+              // close mat; tests/places.test.mjs pins it to the digit) — the
+              // bar here only says a fused centre slot never becomes a pile-up.
+              assert.ok((worst.a === 6 || worst.a === 7 || worst.b === 6 || worst.b === 7) && worst.gap > -0.7,
+                `${tower}/${z}: only a centre slot fuses, and by less than 0.7 `
                 + `(${worst.a}/${worst.b}: ${worst.gap.toFixed(3)})`);
               console.log(`    [recorded] ${tower}/${z}: the centre slot overlaps its neighbour by ${(-worst.gap).toFixed(3)} — the full house at close`);
             }
