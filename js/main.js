@@ -16435,30 +16435,82 @@ window.__diceDebug = {
   },
   // THE CARD FACE, IN THE FRAME (UX §7.63, §4 amendment 1). The tent's own
   // corners — never the holder's — projected through the live camera, as an
-  // ndc and a pixel box. The standoff constant is 0.72 and it GRAZES the
+  // ndc and a pixel box. The standoff constant is 1.10 and it GRAZES the
   // bottom of a wide 16:9 frame, so the gate that decides whether it ships is
-  // on the readable FACE (which sits 0.10–0.49 above the ground and therefore
+  // on the readable FACE (which sits 0.39–1.67 above the ground and therefore
   // projects higher than the base), not on the anchor. Null for a station
   // nobody is standing at.
+  //
+  // The px box is what the no-overlap gate is written against: `#result-banner`
+  // is fixed DOM at the bottom centre of the felt and the near card is 3D in
+  // the same place, so the only way to know they do not print through each
+  // other is to compare this rect with that element's (place-two-views).
   placardFrame(place) {
     const row = placardRig ? placardRig.rowAt(place) : null;
     if (!row || !row.corners) return null;
     const v = new THREE.Vector3();
     let nx0 = Infinity, nx1 = -Infinity, ny0 = Infinity, ny1 = -Infinity;
     let inFrame = true;
-    for (const c of row.corners) {
-      v.set(c[0], c[1], c[2]).project(camera);
-      nx0 = Math.min(nx0, v.x); nx1 = Math.max(nx1, v.x);
-      ny0 = Math.min(ny0, v.y); ny1 = Math.max(ny1, v.y);
-      if (!(v.z > -1 && v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1)) inFrame = false;
+    // THE PIXELS ARE VIEWPORT PIXELS, NOT CANVAS PIXELS — `view.left` is added
+    // in. The canvas starts where the side panel ends, so a box measured from
+    // its own left edge is 300-odd px adrift of every `getBoundingClientRect`
+    // in the DOM, and the one question this box exists to answer (does the near
+    // card print through the result banner) is a comparison with exactly such a
+    // rect. Measured wrong once: a 22 px overlap read as 293 px of clearance.
+    const toPx = (p) => {
+      v.set(p[0], p[1], p[2]).project(camera);
+      return { x: view.left + (v.x + 1) / 2 * view.width, y: (1 - v.y) / 2 * view.height, ndc: { x: v.x, y: v.y, z: v.z } };
+    };
+    const faces = [];
+    const ink = [];
+    // The card region's corners come in the builder's order — ridge-left,
+    // foot-left, foot-right, ridge-right — so a point at (s across, t down the
+    // slope) is one bilinear step, and the NAME's own box is the centred
+    // (row.ink.w x row.ink.h) share of it. The atlas row may be printed
+    // mirrored or flipped for the reader (READ_TURN), which moves a CENTRED
+    // box by nothing at all, so the same s/t serve every station.
+    const iw = row.ink ? row.ink.w : 0;
+    const ih = row.ink ? row.ink.h : 0;
+    const lerp3 = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
+    const at = (q, sx, tz) => lerp3(lerp3(q[0], q[3], sx), lerp3(q[1], q[2], sx), tz);
+    for (let i = 0; i < row.corners.length; i += 4) {
+      const q = row.corners.slice(i, i + 4);
+      const face = [];
+      for (const c of q) {
+        const p = toPx(c);
+        nx0 = Math.min(nx0, p.ndc.x); nx1 = Math.max(nx1, p.ndc.x);
+        ny0 = Math.min(ny0, p.ndc.y); ny1 = Math.max(ny1, p.ndc.y);
+        face.push({ x: p.x, y: p.y });
+        if (!(p.ndc.z > -1 && p.ndc.z < 1 && Math.abs(p.ndc.x) <= 1 && Math.abs(p.ndc.y) <= 1)) inFrame = false;
+      }
+      faces.push(face);
+      if (iw > 0 && ih > 0) {
+        const s0 = 0.5 - iw / 2, s1 = 0.5 + iw / 2, t0 = 0.5 - ih / 2, t1 = 0.5 + ih / 2;
+        ink.push([[s0, t0], [s0, t1], [s1, t1], [s1, t0]]
+          .map(([sx, tz]) => { const p = toPx(at(q, sx, tz)); return { x: p.x, y: p.y }; }));
+      }
     }
     return {
       place,
       ndc: { x0: nx0, x1: nx1, y0: ny0, y1: ny1 },
       px: {
-        x0: (nx0 + 1) / 2 * view.width, x1: (nx1 + 1) / 2 * view.width,
+        x0: view.left + (nx0 + 1) / 2 * view.width, x1: view.left + (nx1 + 1) / 2 * view.width,
         y0: (1 - ny1) / 2 * view.height, y1: (1 - ny0) / 2 * view.height,
       },
+      // THE PRINTED BANDS THEMSELVES, one convex quad per tent panel (a tent
+      // has two, and from the shipped eye you look down on both). Corners in
+      // the builder's order: ridge-left, foot-left, foot-right, ridge-right.
+      // Each is a TRAPEZOID on screen — near foot wide, far ridge narrow — so
+      // an axis-aligned box around the pair claims a great deal of screen the
+      // card never paints, and an overlap gate written on the box alone fails
+      // frames that are fine. `ndc`/`px` stay the box, for the rim gates that
+      // want a box; the no-collision gate takes these.
+      faces,
+      // …and the NAME inside them, one quad per panel. The band is the object;
+      // the ink is the thing a reader would call a collision, and the two are
+      // not the same rectangle — a card whose corner slides behind the banner
+      // is fine, a card whose name does is what Joe photographed.
+      ink,
       cx: (nx0 + nx1) / 2,
       cy: (ny0 + ny1) / 2,
       in: inFrame,

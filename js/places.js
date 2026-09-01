@@ -52,25 +52,51 @@ export const PLACE_MAX = 8;
 
 // The lateral pitch of the off-centre stations: how far apart two chairs sit.
 // ABSOLUTE, never a fraction of the mat — a fraction gives a 0.036-unit card
-// gap at `close`, which is what killed the felt shelf. Clamped by the mat in
-// placeAnchor (see laneX) so a hypothetical narrow preset cannot push a card
-// off its own edge; at all three shipped zooms the clamp does not bind.
-export const PLACE_LANE = 2.55;
+// gap at `close`, which is what killed the felt shelf.
+//
+// RE-DERIVED 2026-09-01 WITH THE CARD (v2, Joe: "the placards … are smaller
+// than the dice"). It is no longer a free number: three stations share a long
+// edge at a full house, so the pitch is the card's own footprint plus the gap
+// floor and a little air — PLACARD_W 3.20 + PLACARD_GAP 0.30 = 3.50 is the
+// point at which the middle card of a three-card edge TOUCHES its neighbours,
+// and 4.30 is what ships. The extra 0.80 is MEASURED, not taste: it is what
+// carries the near card clear of `#result-banner` — the fixed DOM panel at the
+// bottom centre of the felt that Joe's shot caught the old centre card
+// printing through — at every width that panel can take, up to its css
+// max-width of 520 px. Read off the live page at 1600 × 900 in
+// tools/steps/place-card.mjs: at 3.60 the card's own name grazed the widest
+// banner's edge, at 3.90 its blank right end still slid under a live one, and
+// at 4.30 the whole printed band clears with 27-50 px to spare while the card
+// itself stays inside the frame (own-card ndc x0 −0.942, rim −1).
+//
+// THE MAT CLAMP THAT USED TO SIT HERE IS GONE, on
+// purpose: it shrank the lane on a narrow mat, which is exactly the state in
+// which the three cards fuse. Three 3.20 cards with their gaps need 10.2 units
+// of edge; `wide` (14.1) and `medium` (11) hold them inside the mat, and at
+// `close` (8.6) the two outer cards overhang the mat's corner by 1.60 and
+// stand on the table beyond it — which is where a place card at a crowded
+// table goes anyway. The invariant is the PITCH, never the overhang.
+export const PLACE_LANE = 4.30;
 
-// The placard's centre, OUTBOARD of the wall plane. The footprint is 1.24
+// The clear ground two cards must leave each other, anywhere on the table.
+// The assertion the felt shelf never had, and now also the floor PLACE_LANE
+// is derived from — one number, one place, so the two can never drift.
+export const PLACARD_GAP = 0.30;
+
+// The placard's centre, OUTBOARD of the wall plane. The footprint is 1.32
 // deep, so the inboard edge stands 0.10 past the plane where dice stop: no die
 // can ever reach a placard, which is what makes depthWrite, a real shadow, and
 // a raycast seating pass all legal at once (IMMERSION law 8's `surfaceUnder`
 // trap is void BY GEOMETRY, not by care).
-export const PLACARD_STANDOFF = 0.72;
+export const PLACARD_STANDOFF = 0.76;
 
 // The card's footprint on the ground (docs/UX.md §7.63; js/placard.js builds
-// the rig to these numbers — 2.20 × 1.24 × 0.49 ridge, 56° half-opening).
-// They live here because the outboard-of-the-wall property above is a fact
-// about the LAYOUT, and a layout invariant may not be asserted against a
-// number that lives somewhere else.
-export const PLACARD_W = 2.20;
-export const PLACARD_D = 1.24;
+// the rig to these numbers — 3.20 × 1.32 × 1.83 ridge, a 3.00 × 1.80 card face
+// at 20° off vertical). They live here because the outboard-of-the-wall
+// property above is a fact about the LAYOUT, and a layout invariant may not be
+// asserted against a number that lives somewhere else.
+export const PLACARD_W = 3.20;
+export const PLACARD_D = 1.32;
 
 // The spawn line's pitch floor under a lane. A lane may compress a pool's
 // line toward the roller's side, but never below a real pitch — see
@@ -97,15 +123,28 @@ export const PITCH_MIN = 2.0;
 // decides WHO occupies a station; every client agrees WHERE a station is by
 // construction. Nobody is ever renumbered, so the placard never lies: dice
 // always enter where the roller's placard actually stands.
+//
+// NOBODY SITS DEAD CENTRE OF A LONG EDGE UNTIL SEVEN PEOPLE ARE HERE, and
+// that is a v2 correction with a measured cause (2026-09-01). Station 0 used
+// to be the middle of the front edge, which puts the viewer's OWN card at the
+// bottom centre of their own frame — the same square of screen the result
+// banner is fixed to (`#result-banner`, bottom 26px, centred over the felt,
+// css/style.css:3413). Joe's two-tab shot caught the two printing through each
+// other. So the first chair on each long edge is an OUTER lane and the centre
+// slot is filled last: station 0 takes the left third of the front edge and
+// station 1 the right third of the back, which is the same 180° rotation the
+// four-chair table already had. Both viewers still read the table the same way
+// — own card low and to the LEFT, the other player's high and to the RIGHT —
+// because a half turn of the world maps one to the other exactly.
 export const STATIONS = Object.freeze([
-  /* 0 FRONT   */ { edge: 'front', side: 0, lane:  0, azim: 0 },
-  /* 1 BACK    */ { edge: 'back',  side: 1, lane:  0, azim: Math.PI },
-  /* 2 FRONT_L */ { edge: 'front', side: 0, lane: -1, azim: 0 },
-  /* 3 BACK_R  */ { edge: 'back',  side: 1, lane: +1, azim: Math.PI },
+  /* 0 FRONT_L */ { edge: 'front', side: 0, lane: -1, azim: 0 },
+  /* 1 BACK_R  */ { edge: 'back',  side: 1, lane: +1, azim: Math.PI },
+  /* 2 FRONT_R */ { edge: 'front', side: 0, lane: +1, azim: 0 },
+  /* 3 BACK_L  */ { edge: 'back',  side: 1, lane: -1, azim: Math.PI },
   /* 4 RIGHT   */ { edge: 'right', side: 3, lane:  0, azim: Math.PI / 2 },
   /* 5 LEFT    */ { edge: 'left',  side: 2, lane:  0, azim: 3 * Math.PI / 2 },
-  /* 6 FRONT_R */ { edge: 'front', side: 0, lane: +1, azim: 0 },
-  /* 7 BACK_L  */ { edge: 'back',  side: 1, lane: -1, azim: Math.PI },
+  /* 6 FRONT_C */ { edge: 'front', side: 0, lane:  0, azim: 0 },
+  /* 7 BACK_C  */ { edge: 'back',  side: 1, lane:  0, azim: Math.PI },
 ].map(Object.freeze));
 
 // WHEN A TOWER IS SOCKETED IT OWNS THE WHOLE BACK EDGE (docs/TOWER.md): the
@@ -116,12 +155,16 @@ export const STATIONS = Object.freeze([
 // model's best angle; azim π is forbidden while socketed, the pit backstop is
 // un-skinned), and their re-throws enter from the flank beside their own card.
 //
-// Split across BOTH flanks so one side does not crowd. WHILE SOCKETED THE
-// ENTRY IS NOT A PER-PLAYER READ: stations 1 and 3 land on entry side 3,
-// which the RIGHT HEAD (station 4, lane 0, not relocated) already owns, so
-// THREE stations stamp the identical {entry: 3, lane: 0} and their re-throws
-// are born on one spawn line — centred on z = 0, in front of the head's card,
-// while the flanked cards stand 2.55 and 5.10 units down the flank. Station 7
+// Split across BOTH flanks so one side does not crowd, and EACH BACK CHAIR
+// GOES TO THE FLANK IT ALREADY SAT NEAREST (v2, 2026-09-01: the lanes moved,
+// so the remap moved with them — station 1 stands at x +3.60 and goes right,
+// station 3 at −4.30 and goes left, and the centre chair 7 takes the far slot
+// on the right). WHILE SOCKETED THE ENTRY IS NOT A PER-PLAYER READ: stations 1
+// and 7 land on entry side 3, which the RIGHT HEAD (station 4, lane 0, not
+// relocated) already owns, so THREE stations stamp the identical
+// {entry: 3, lane: 0} and their re-throws are born on one spawn line — centred
+// on z = 0, in front of the head's card, while the flanked cards stand 4.30
+// and 8.60 units down the flank. Station 3
 // likewise shares side 2 with the left head (station 5). (The design and this
 // comment first counted the collision as two stations; it is three and two,
 // and the count matters because the edge does not merely go ambiguous under
@@ -136,9 +179,9 @@ export const STATIONS = Object.freeze([
 // `slot` counts back from the head's card at z = 0 in units of PLACE_LANE, so
 // a flank row keeps the front row's pitch and therefore the front row's gap.
 const TOWER_FLANKS = Object.freeze({
-  1: Object.freeze({ flank: +1, slot: 2, side: 3, azim: Math.PI / 2 }),
-  3: Object.freeze({ flank: +1, slot: 1, side: 3, azim: Math.PI / 2 }),
-  7: Object.freeze({ flank: -1, slot: 1, side: 2, azim: 3 * Math.PI / 2 }),
+  1: Object.freeze({ flank: +1, slot: 1, side: 3, azim: Math.PI / 2 }),
+  3: Object.freeze({ flank: -1, slot: 1, side: 2, azim: 3 * Math.PI / 2 }),
+  7: Object.freeze({ flank: +1, slot: 2, side: 3, azim: Math.PI / 2 }),
 });
 
 // ---------------------------------------------------------------------------
@@ -160,11 +203,6 @@ export function entryFor(place, towerUp = false) {
 // ---------------------------------------------------------------------------
 // Anchors — the world half
 // ---------------------------------------------------------------------------
-
-// The lane offset a card actually stands at, clamped by the mat: a card must
-// keep its own half-width plus a card gap inboard of the corner. Absolute
-// 2.55 everywhere the mat is at least 7.4 wide, which is every shipped zoom.
-function laneX(w) { return Math.min(PLACE_LANE, w / 2 - 1.20); }
 
 // WHERE A STATION'S PLACARD STANDS, in world units, on the ground.
 //
@@ -202,7 +240,7 @@ export function placeAnchor(place, w, d, towerUp = false) {
   const st = STATIONS[place];
   if (st.edge === 'front' || st.edge === 'back') {
     return {
-      x: st.lane * laneX(w),
+      x: st.lane * PLACE_LANE,
       y: 0,
       z: (st.side === 0 ? 1 : -1) * (d / 2 + PLACARD_STANDOFF),
       azim: st.azim,
@@ -263,6 +301,14 @@ export function placardGap(a, b) {
 // `room` is computed once per roll from the pool's LARGEST hull, so the line's
 // centre is legal for every die in it. `laneSlot` is roll.lane (−1 | 0 | +1);
 // slot 0 returns its inputs untouched, which is the bit-identical shipped path.
+//
+// Worked at the v2 lane (4.30), medium, room 4.2: 1 die → the whole 3.60;
+// a pair → 3.20; 3d6 → 2.20; 6d6 → 0.90 with the pool's 6.6 spread and its
+// 1.32 pitch both kept. Close/6d6 → 0.90, spread 4.2, no collapse. The wider
+// lane costs the small pools some spread (a pair's line compresses to the 2.0
+// pitch floor) and costs the big ones nothing at all, which is the right way
+// round: a handful comes from your side of the table, a single d20 from your
+// spot, and neither is ever folded onto one x.
 export function laneSpread(laneSlot, room, spread, count) {
   if (!laneSlot) return { lane: 0, spread };            // shipped path, bit-identical
   const s = Math.min(spread,

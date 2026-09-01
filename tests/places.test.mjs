@@ -25,7 +25,7 @@ limitations under the License.
 
 import assert from 'node:assert/strict';
 import {
-  PLACE_MAX, PLACE_LANE, PITCH_MIN, PLACARD_STANDOFF, PLACARD_W, PLACARD_D,
+  PLACE_MAX, PLACE_LANE, PITCH_MIN, PLACARD_STANDOFF, PLACARD_W, PLACARD_D, PLACARD_GAP,
   STATIONS, PLACE_AIM, PLACE_AIM_AUTHORED, AIM_ZERO,
   entryFor, placeAnchor, placardFootprint, placardGap, laneSpread, aimFor,
 } from '../js/places.js';
@@ -86,13 +86,23 @@ t('the ladder fills the long edges first — heads at index >= 4', () => {
   assert.deepEqual(heads.map(([, i]) => i), [4, 5], 'the two heads are 4 and 5');
 });
 
-t('a fresh table of two sits opposing, dead centre', () => {
+t('a fresh table of two sits opposing, and NEITHER of them dead centre', () => {
+  // v2, 2026-09-01. The first two chairs used to be the middles of the two
+  // long edges, which put each viewer's own card at the bottom centre of their
+  // own frame — the square of screen the result banner is fixed to. They are
+  // outer lanes now, mirrored through the table's centre, so a half turn of
+  // the world still maps one chair onto the other exactly: both players read
+  // their own card low-left and the other player's high-right.
   const { w, d } = ZOOMS.medium;
   const a = placeAnchor(0, w, d), b = placeAnchor(1, w, d);
-  assert.equal(a.x, 0);
-  assert.equal(b.x, 0);
+  assert.equal(a.x, -PLACE_LANE, 'the front chair takes the left third of its edge');
+  assert.equal(b.x, PLACE_LANE, 'the back chair is its 180-degree mirror');
   assert.equal(a.z, -b.z);
   assert.ok(a.z > 0, 'place 0 is the near edge');
+  assert.ok(Math.abs(a.x) > 0 && Math.abs(b.x) > 0,
+    'and nobody sits dead centre of a long edge until a seventh player arrives');
+  assert.equal(STATIONS[6].lane, 0, 'station 6 is the front edge\'s centre slot');
+  assert.equal(STATIONS[7].lane, 0, 'station 7 the back edge\'s');
 });
 
 t('a fresh table of four is two per long edge, 180-degree symmetric', () => {
@@ -134,11 +144,14 @@ t('with no tower every station enters over its own edge', () => {
 });
 
 t('a socketed tower moves the back stations to the flanks, both of them', () => {
-  // 7 BACK_L to the -x flank, 3 BACK_R and 1 BACK to the +x flank
+  // 3 BACK_L to the -x flank, 1 BACK_R and 7 BACK_C to the +x flank
   // (docs/TOWER.md; DESIGN §7.1).
-  assert.deepEqual(entryFor(7, true), { entry: 2, lane: 0 });
-  assert.deepEqual(entryFor(3, true), { entry: 3, lane: 0 });
+  // Each back chair goes to the flank it already sat nearest (v2): station 1
+  // stands at x +3.60 and turns right, station 3 at -3.60 and turns left, and
+  // the centre chair 7 takes the far slot on the right.
+  assert.deepEqual(entryFor(3, true), { entry: 2, lane: 0 });
   assert.deepEqual(entryFor(1, true), { entry: 3, lane: 0 });
+  assert.deepEqual(entryFor(7, true), { entry: 3, lane: 0 });
   const flanks = [1, 3, 7].map((p) => placeAnchor(p, 11, 11.2, true));
   assert.ok(flanks.every((a) => a.relocated), 'a flanked card knows it moved');
   assert.ok(flanks.filter((a) => a.x < 0).length === 1
@@ -159,10 +172,10 @@ t('under a tower the entry is not a per-player read: three stations share side 3
   // placard) is the whole of attribution on a tower table; a change that
   // gives the flanks their own lanes should turn these into notDeepEquals.
   const stamp = (p) => JSON.stringify(entryFor(p, true));
-  assert.deepEqual([1, 3, 4].map(stamp), Array(3).fill(stamp(4)),
-    'stations 1, 3 and the right head stamp the identical entry while socketed');
-  assert.deepEqual([7, 5].map(stamp), Array(2).fill(stamp(5)),
-    'stations 7 and the left head stamp the identical entry while socketed');
+  assert.deepEqual([1, 7, 4].map(stamp), Array(3).fill(stamp(4)),
+    'stations 1, 7 and the right head stamp the identical entry while socketed');
+  assert.deepEqual([3, 5].map(stamp), Array(2).fill(stamp(5)),
+    'stations 3 and the left head stamp the identical entry while socketed');
   assert.equal(new Set([0, 1, 2, 3, 4, 5, 6, 7].map(stamp)).size, 5,
     'eight stations, five distinct stamps under a tower (eight without one)');
   assert.equal(new Set([0, 1, 2, 3, 4, 5, 6, 7].map((p) => JSON.stringify(entryFor(p, false)))).size, 8);
@@ -262,22 +275,33 @@ t('no flank card lands inside a tower volume', () => {
 });
 
 t('the anchor arithmetic is the design table, to the digit', () => {
-  // DESIGN §2.3: front/back z = +-5.02 wide / +-4.07 medium / +-3.32 close;
-  // heads x = +-7.77 / +-6.22 / +-5.02; lanes at x in {0, +-2.55}.
-  const want = { wide: [5.02, 7.77], medium: [4.07, 6.22], close: [3.32, 5.02] };
+  // RE-AUTHORED WITH THE CARD (v2, 2026-09-01): the standoff is 0.76 for a
+  // footprint 1.32 deep, so front/back z = +-5.06 wide / +-4.11 medium /
+  // +-3.36 close; heads x = +-7.81 / +-6.26 / +-5.06; lanes at x in
+  // {0, +-4.30}, absolute at every zoom now that the mat clamp is gone.
+  const want = { wide: [5.06, 7.81], medium: [4.11, 6.26], close: [3.36, 5.06] };
   for (const [id, [edgeZ, headX]] of Object.entries(want)) {
     const { w, d } = ZOOMS[id];
     assert.ok(Math.abs(placeAnchor(0, w, d).z - edgeZ) < 5e-3, `${id} front z`);
     assert.ok(Math.abs(placeAnchor(1, w, d).z + edgeZ) < 5e-3, `${id} back z`);
     assert.ok(Math.abs(placeAnchor(4, w, d).x - headX) < 5e-3, `${id} right head x`);
     assert.ok(Math.abs(placeAnchor(5, w, d).x + headX) < 5e-3, `${id} left head x`);
-    assert.ok(Math.abs(placeAnchor(2, w, d).x + PLACE_LANE) < 1e-12, `${id} front-left lane`);
-    assert.ok(Math.abs(placeAnchor(6, w, d).x - PLACE_LANE) < 1e-12, `${id} front-right lane`);
+    assert.ok(Math.abs(placeAnchor(0, w, d).x + PLACE_LANE) < 1e-12, `${id} front-left lane`);
+    assert.ok(Math.abs(placeAnchor(2, w, d).x - PLACE_LANE) < 1e-12, `${id} front-right lane`);
+    assert.equal(placeAnchor(6, w, d).x, 0, `${id} front-centre lane`);
     assert.equal(placeAnchor(0, w, d).y, 0, 'a card stands on the ground');
   }
   assert.ok(Math.abs((PLACARD_STANDOFF - PLACARD_D / 2) - 0.10) < 1e-12,
     'the standoff leaves exactly 0.10 of clear ground inboard');
-  assert.equal(PLACARD_W, 2.20);
+  assert.equal(PLACARD_W, 3.20);
+  assert.equal(PLACARD_D, 1.32);
+  // THE PITCH IS THE INVARIANT, and it is derived rather than chosen: three
+  // cards share a long edge at a full house, so the lane may never fall below
+  // one card's footprint plus the gap floor the whole layout is asserted at.
+  assert.ok(PLACE_LANE >= PLACARD_W + PLACARD_GAP,
+    `the lane clears a card's width plus the gap floor (${PLACE_LANE} vs `
+    + `${PLACARD_W} + ${PLACARD_GAP})`);
+  assert.equal(PLACARD_GAP, 0.30);
 });
 
 // --- the lane: F1, the pin the felt shelf never had -------------------------
@@ -295,9 +319,13 @@ t('lane slot 0 returns its inputs untouched — the bit-identical shipped path',
 t('the F1 table — the lane yields to the pool, and the line never collapses', () => {
   // room 4.2 is medium (5.5 - 1.25 - 0.05); room 3.00 is close (4.3 - 1.25 - 0.05).
   const medium = (count) => laneSpread(1, 4.2, poolSpread(ZOOMS.medium.w, count), count);
-  assert.ok(Math.abs(medium(1).lane - 2.55) < 1e-12, 'a single die comes from your spot');
-  assert.ok(Math.abs(medium(2).lane - 2.55) < 1e-12, 'so does a pair');
-  assert.ok(Math.abs(medium(3).lane - 2.2) < 1e-12, '3d6 gives a little ground');
+  // The v2 lane is 4.30, wider than a medium mat's own ROOM (4.2 for the widest
+  // hull), so at this zoom the room binds before the lane does — which is the
+  // rule working, not an exception to it: the lane never puts a die where fit()
+  // would have to rescue it.
+  assert.ok(Math.abs(medium(1).lane - 4.2) < 1e-12, 'a single die comes from your spot');
+  assert.ok(Math.abs(medium(2).lane - 3.20) < 1e-12, 'a pair gives up a foot of it');
+  assert.ok(Math.abs(medium(3).lane - 2.2) < 1e-12, '3d6 gives a little more ground');
   const six = medium(6);
   assert.ok(Math.abs(six.lane - 0.9) < 1e-12, '6d6 comes from your side of the table');
   assert.ok(Math.abs(six.spread - 6.6) < 1e-12, 'and keeps the whole pool spread');
@@ -441,10 +469,19 @@ t('every bias is a nudge — nothing owns felt (authored dials)', () => underAut
   // edges (heads are single-station), so those are the only combinations a
   // table can actually produce. Pinned under the AUTHORED dials — the shipped
   // zero satisfies every line here trivially, and a vacuous pin is no pin.
+  //
+  // THE LANE HANDED IN IS THE ONE A POOL CAN ACTUALLY PRODUCE (v2). It used to
+  // be the constant PLACE_LANE, which at 2.55 was reachable and at 4.30 is not:
+  // laneSpread caps the effective lane at the pool's own room, so feeding the
+  // raw constant here would have been asserting a bias no throw can be given —
+  // and would have gone red at `close` for a cell that cannot happen.
   let worst = 0;
   for (const [id, z] of Object.entries(ZOOMS)) {
     for (let entry = 0; entry < 4; entry++) {
-      for (const lane of entry <= 1 ? [-PLACE_LANE, 0, PLACE_LANE] : [0]) {
+      const alongZ = entry <= 1;
+      const reach = laneSpread(1, poolRoom(alongZ ? z.w : z.d, HULL_MAX),
+        poolSpread(z.w, 3), 3).lane;
+      for (const lane of alongZ ? [-reach, 0, reach] : [0]) {
         const aim = aimFor(entry, lane, z.w, z.d, THROW_TARGET);
         assert.ok(Math.abs(aim.x) <= z.w / 6 && Math.abs(aim.z) <= z.d / 6,
           `${id}/${entry}: the aim never leaves the middle third of the mat`);
@@ -454,7 +491,7 @@ t('every bias is a nudge — nothing owns felt (authored dials)', () => underAut
   }
   assert.ok(worst <= 0.99 + 1e-9,
     `the largest bias on the default mat is ${worst.toFixed(3)} — on a mat 11 wide`);
-  assert.ok(worst > 0.9, `and the pin is not vacuous: the authored dials really bias (${worst.toFixed(3)})`);
+  assert.ok(worst > 0.8, `and the pin is not vacuous: the authored dials really bias (${worst.toFixed(3)})`);
 }));
 
 console.log(process.exitCode ? `${n} tests, FAILURES above` : `all ${n} places tests pass`);

@@ -90,6 +90,12 @@ merged, and two look passes:
 - `place-look.mjs [outDir] [w] [h]` — the placard itself: one card, the full
   house at three zooms, the numbers `placard-look` gates on, and the wash
   mid-film. Looks.
+- `place-card.mjs [outDir] [w] [h]` — the v2 card, measured against the two
+  things Joe said were broken: a die (`spanPx` × a d6's 1.35 edge, beside every
+  card's projected face box, from both chairs, at three zooms, idle and after a
+  3d6) and `#result-banner` (the card's printed panels and the NAME inside them
+  against the panel's live DOM rect, and against the widest that rect can grow).
+  Desktop and phone. Looks + simulates (one throw per frame size).
 - `place-view.mjs [outDir] [w] [h]` — the view from every chair: three real
   tabs at the front, the back and the right head on 1600×900. Prints each
   chair's place base, the orbit the ladder rested on, the die span (the

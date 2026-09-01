@@ -55,7 +55,45 @@ const { minTowerDataUrl, minTowerGlb, MIN_TOWER_PORTALS } =
 // axis-aligned ground box and `placardGap` measures the clear ground between
 // two of them — negative when they overlap, which is the assertion the felt
 // shelf never had.
-const { placardFootprint, placardGap } = await import('../../js/places.js');
+const { placardFootprint, placardGap, PLACE_LANE, PLACARD_W, PLACARD_GAP, PLACARD_STANDOFF }
+  = await import('../../js/places.js');
+
+// DOES A CARD PRINT THROUGH A PANEL? Two renderers draw the frame — WebGL puts
+// the cards on the felt, the DOM puts `#result-banner` over it — so the only
+// way to know they do not collide is to compare the card's projected corners
+// with the element's own rect. A card is a TRAPEZOID on screen (near foot wide,
+// far ridge narrow), so its axis-aligned box claims a lot of screen it never
+// paints; this is a separating-axis test on the quad itself, over the rect's
+// two axes plus one normal per quad edge.
+function quadHitsRect(quad, r) {
+  if (!quad || !r) return false;
+  const rect = [{ x: r.x0, y: r.y0 }, { x: r.x1, y: r.y0 }, { x: r.x1, y: r.y1 }, { x: r.x0, y: r.y1 }];
+  const axes = [{ x: 1, y: 0 }, { x: 0, y: 1 }];
+  for (let i = 0; i < quad.length; i++) {
+    const a = quad[i], b = quad[(i + 1) % quad.length];
+    axes.push({ x: -(b.y - a.y), y: b.x - a.x });
+  }
+  for (const ax of axes) {
+    const span = (pts) => pts.reduce((m, p) => {
+      const d = p.x * ax.x + p.y * ax.y;
+      return { lo: Math.min(m.lo, d), hi: Math.max(m.hi, d) };
+    }, { lo: Infinity, hi: -Infinity });
+    const p = span(quad), q = span(rect);
+    if (p.hi <= q.lo || q.hi <= p.lo) return false;
+  }
+  return true;
+}
+
+// The result banner's live rect, or null while it is down. Read from the DOM
+// on purpose: its width is content-driven (css min 320 / max 520, centred over
+// the FELT rather than the viewport), so a gate written against a number in a
+// stylesheet would be a gate against a guess.
+const BANNER_RECT = `(() => {
+  const el = document.getElementById('result-banner');
+  if (!el || el.classList.contains('hidden') || !el.offsetWidth) return null;
+  const r = el.getBoundingClientRect();
+  return { x0: r.left, y0: r.top, x1: r.right, y1: r.bottom };
+})()`;
 
 // The closest pair in an arrangement, named. "They fuse somewhere" is not a
 // failure report; "cards 2 and 6 are 0.04 apart" is.
@@ -20383,6 +20421,29 @@ export const scenarios = [
         'the first four chairs are two per LONG edge');
       assert.deepEqual(full.stations.slice(4, 6).map((s) => s.station), ['right', 'left'],
         'the heads are the fifth and sixth chairs — nobody pays the short-edge tax early');
+
+      // …AND NOBODY SITS DEAD CENTRE OF A LONG EDGE UNTIL THE SEVENTH ARRIVES
+      // (v2, 2026-09-01). The first chair on each edge is an OUTER lane and the
+      // centre slot is dealt last, because a card in the middle of the front
+      // edge stands at the bottom centre of its owner's frame — the square of
+      // screen `#result-banner` is fixed to, where Joe's two-tab shot caught
+      // the two printing through each other. The mirror is what keeps the
+      // two-player table readable: a half turn of the world maps chair 0 onto
+      // chair 1 exactly, so BOTH players read their own card low-left.
+      assert.deepEqual(full.stations.slice(0, 4).map((s) => s.lane), [-1, 1, 1, -1],
+        'the four long-edge chairs are outer lanes, 180-degree mirrored in pairs');
+      assert.deepEqual(full.stations.slice(6, 8).map((s) => s.lane), [0, 0],
+        'and the two centre slots are the last chairs dealt');
+      for (const [p, q] of [[0, 1], [2, 3], [6, 7]]) {
+        const at = (n) => full.stations.find((st) => st.place === n).world;
+        assert.ok(Math.abs(at(p).x + at(q).x) < 1e-9 && Math.abs(at(p).z + at(q).z) < 1e-9,
+          `stations ${p} and ${q} are a 180-degree pair (${at(p).x}/${at(q).x})`);
+      }
+      assert.ok(Math.abs(full.stations[0].world.x) > PLACARD_W / 2,
+        'the first card is at least its own width off the middle of its edge '
+        + `(x ${full.stations[0].world.x})`);
+      assert.ok(PLACE_LANE >= PLACARD_W + PLACARD_GAP,
+        `and the lane still clears a card's width plus the gap floor (${PLACE_LANE})`);
       assert.equal(full.on, true, 'the table has places');
       assert.equal(full.layout, 'table', 'wearing the grounded dress');
       assert.equal(full.myOrbit, 0, "and the front chair's own azimuth is zero");
@@ -20627,11 +20688,17 @@ export const scenarios = [
       const seating = await a.dbg('places()');
       const stationOf = (nm) => (seating.stations.find((s) => s.name === nm) || {}).place;
       assert.equal(stationOf('Bram'), 1, 'Bram sits opposite');
-      assert.equal(stationOf('Cass'), 2, 'Cass on the front-left lane');
+      assert.equal(stationOf('Cass'), 2, 'Cass on the front-right lane');
       assert.equal(stationOf('Eluned'), 4, 'Eluned at the right head');
+      assert.equal(stationOf('Gus'), 6, 'Gus on the front edge\'s centre slot');
       assert.equal(stationOf('Iris'), undefined, 'Iris holds no station');
-      assert.equal(seating.stations.find((s) => s.name === 'Cass').lane, -1,
-        'the front-left chair is a laned station');
+      assert.equal(seating.stations.find((s) => s.name === 'Ann').lane, -1,
+        'the first chair is a LANED station since v2 — nobody sits dead centre '
+        + 'of a long edge until the seventh player arrives (js/places.js)');
+      assert.equal(seating.stations.find((s) => s.name === 'Cass').lane, 1,
+        'and the second chair on that edge is its mirror');
+      assert.equal(seating.stations.find((s) => s.name === 'Gus').lane, 0,
+        'the centre slot is the seventh chair handed out');
 
       await a.dbg('holdClock(true)');
       try {
@@ -20646,13 +20713,23 @@ export const scenarios = [
           return { wire: r.data.roll, org: await a.dbg('throwOrigin()'), line: await a.dbg('spawnLine()') };
         };
 
-        // Ann's own d20 comes from HER spot — front, lane 0.
+        // Ann's own d20 comes from HER spot — the front edge's LEFT lane, and a
+        // single die gets the whole lane because there is no pool to yield to.
         const mine = await rollAs(await a.playerId(), '1d20 # From my chair', 1);
         assert.equal(mine.wire.entry, 0, 'the payload carries the front edge');
-        assert.equal(mine.wire.lane, 0, 'and the centre lane');
+        assert.equal(mine.wire.lane, -1, 'and the left lane of it');
         assert.equal(mine.org.from, 'place', 'the film took the stamp, not the draw');
         assert.equal(mine.org.side, 0, 'and came in over the front');
-        assert.equal(mine.org.laneWorld, 0, 'a centre station shifts nothing');
+        assert.ok(Math.abs(mine.org.laneWorld + PLACE_LANE) < 1e-9,
+          `a single die comes from her SPOT, the whole lane (${mine.org.laneWorld} of ${-PLACE_LANE})`);
+
+        // Gus sits at the same edge's centre slot — same entry, no lane at all.
+        // The pair is what makes the lane a real film input rather than a field
+        // that rides along: one edge, two stations, two different spawn lines.
+        const centre = await rollAs(raws.Gus.playerId, '1d20 # From the middle', 1);
+        assert.equal(centre.wire.entry, 0, 'the centre chair shares Ann\'s edge');
+        assert.equal(centre.wire.lane, 0, '…and takes no lane');
+        assert.equal(centre.org.laneWorld, 0, 'a centre station shifts nothing');
 
         // Bram's from across the table; Eluned's from the right head.
         const opposite = await rollAs(raws.Bram.playerId, '2d6 # From across', 2);
@@ -20665,17 +20742,17 @@ export const scenarios = [
         assert.equal(new Set([mine.org.side, opposite.org.side, head.org.side]).size, 3,
           'three stations, three DIFFERENT edges — the read is not a coin the draw could flip');
 
-        // Cass's handful from the front-LEFT lane: laned, and the lane yields
+        // Cass's handful from the front-RIGHT lane: laned, and the lane yields
         // to the pool rather than collapsing it.
-        const laned = await rollAs(raws.Cass.playerId, '6d6 # A handful from the left', 6);
-        assert.equal(laned.wire.lane, -1, 'the payload carries the lane');
+        const laned = await rollAs(raws.Cass.playerId, '6d6 # A handful from the right', 6);
+        assert.equal(laned.wire.lane, 1, 'the payload carries the lane');
         assert.equal(laned.org.side, 0, 'front edge');
-        assert.equal(laned.org.lane, -1, 'left lane, as stamped');
-        assert.ok(laned.org.laneWorld < 0, `the line shifted left (laneWorld ${laned.org.laneWorld})`);
-        assert.ok(Math.abs(laned.org.laneWorld) < 2.55,
-          `and the lane YIELDED to a six-die pool (${laned.org.laneWorld} of the 2.55 a single die gets)`);
+        assert.equal(laned.org.lane, 1, 'right lane, as stamped');
+        assert.ok(laned.org.laneWorld > 0, `the line shifted right (laneWorld ${laned.org.laneWorld})`);
+        assert.ok(Math.abs(laned.org.laneWorld) < PLACE_LANE,
+          `and the lane YIELDED to a six-die pool (${laned.org.laneWorld} of the ${PLACE_LANE} a single die gets)`);
         assert.equal(laned.line.length, 6, 'six spawn rows');
-        assert.ok(laned.line.every((s) => s.from === 'place' && s.lane < 0 && s.clear >= 0),
+        assert.ok(laned.line.every((s) => s.from === 'place' && s.lane > 0 && s.clear >= 0),
           `every row laned, every row clear of the wall (${JSON.stringify(laned.line.map((s) => [s.lane, s.clear]))})`);
         const xs = laned.line.map((s) => s.x).sort((p, q) => p - q);
         let pair = Infinity;
@@ -20842,6 +20919,16 @@ export const scenarios = [
             `${who}: my own card sits lowest in my frame (cy ${own.cy.toFixed(3)} vs ${other.cy.toFixed(3)})`);
           assert.ok(other.in, `${who}: the card opposite is inside the frame`);
           assert.ok(Math.abs(own.cx) <= 0.94, `${who}: my own card is inside the frame laterally (cx ${own.cx.toFixed(3)})`);
+          // NOBODY SITS DEAD CENTRE (v2): the first chair on each long edge is
+          // an OUTER lane, mirrored through the table's centre, so both viewers
+          // read their own card low and to the LEFT. Asserted on both tabs,
+          // where a build that put either of them back in the middle of its
+          // edge — the arrangement whose card printed through the result
+          // banner — goes red.
+          assert.ok(own.cx < -0.2,
+            `${who}: my own card is off to the left of my frame, not under the banner (cx ${own.cx.toFixed(3)})`);
+          assert.ok(other.cx > 0.2,
+            `${who}: and the card opposite is off to the right (cx ${other.cx.toFixed(3)})`);
           // The front's own card is in frame on 16:9 (placard-look's -0.98
           // bar); the back's own card FACE clips below the rim — the eye
           // orbits about CAM_TARGET_HOME, 0.5 toward the front chair, so the
@@ -20877,6 +20964,50 @@ export const scenarios = [
         assert.equal(fb2.decidingOnScreen, true, 'back: the deciding die is in frame from the other chair too');
         assert.deepEqual(await front.dbg('throwOrigin()'), await back.dbg('throwOrigin()'),
           'and both tabs lined the throw up on the same stamp — the chair is not a film input');
+
+        // ---- THE CARD AND THE PANEL DO NOT PRINT THROUGH EACH OTHER --------
+        // Joe, 2026-09-01, looking at exactly this frame: the own card sat
+        // UNDER the result-chip panel with the text visibly colliding. Two
+        // renderers draw that corner — the cards are WebGL, `#result-banner` is
+        // fixed DOM centred over the felt — so nothing short of comparing the
+        // projected card with the element's own rect can catch it, which is why
+        // every gate this repo had was green while the picture was broken.
+        //
+        // Two bars, and the second is the one that stops this drifting back:
+        //   the BAND (the whole printed face) must clear the banner as it
+        //     actually stands in this frame;
+        //   the INK (the name inside it) must clear the WIDEST the banner can
+        //     ever be — its css max-width of 520 px, centred on the same felt
+        //     centre — because a long roll title grows the panel and a gate
+        //     that only measured this title's width would be a gate over
+        //     nothing.
+        for (const [t, mine, who] of [[front, 0, 'front'], [back, 1, 'back']]) {
+          const banner = await t.eval(BANNER_RECT);
+          assert.ok(banner, `${who}: the result banner is up after the roll — or this leg proves nothing`);
+          const own = await t.dbg(`placardFrame(${mine})`);
+          assert.ok(own.faces.length === 2 && own.ink.length === 2,
+            `${who}: the card projects two printed panels and two inks`);
+          for (const [i, face] of own.faces.entries()) {
+            assert.equal(quadHitsRect(face, banner), false,
+              `${who}: printed panel ${i} of my own card is clear of the banner `
+              + `(card ${JSON.stringify(face.map((q) => [Math.round(q.x), Math.round(q.y)]))} vs `
+              + `banner ${Math.round(banner.x0)}..${Math.round(banner.x1)} x `
+              + `${Math.round(banner.y0)}..${Math.round(banner.y1)})`);
+          }
+          const felt = (banner.x0 + banner.x1) / 2;
+          const widest = { x0: felt - 260, x1: felt + 260, y0: banner.y0, y1: banner.y1 };
+          for (const [i, ink] of own.ink.entries()) {
+            assert.equal(quadHitsRect(ink, widest), false,
+              `${who}: my NAME on panel ${i} clears even a 520px banner `
+              + `(ink ${JSON.stringify(ink.map((q) => [Math.round(q.x), Math.round(q.y)]))} vs `
+              + `${Math.round(widest.x0)}..${Math.round(widest.x1)})`);
+          }
+          const inkRight = Math.max(...own.ink.flat().map((q) => q.x));
+          console.log(`    [measured] ${who}: banner ${Math.round(banner.x1 - banner.x0)}px wide at `
+            + `${Math.round(banner.x0)}; my name ends at ${Math.round(inkRight)} — `
+            + `${Math.round(banner.x0 - inkRight)}px of clear screen, ${Math.round(widest.x0 - inkRight)}px `
+            + 'against the widest the panel can grow');
+        }
       } finally {
         for (const t of [front, back]) {
           await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId)
@@ -20980,8 +21111,9 @@ export const scenarios = [
 
         // (a2) THE ANCHOR IS THE CARD, NOT THE EDGE — provable only from a
         // station whose place and entry are DIFFERENT integers. Cass holds
-        // station 2: the front edge's LEFT lane, entry 0 exactly like Ann's,
-        // card at x = −2.55 — so the entry does not move and the anchor must.
+        // station 2: the front edge's RIGHT lane, entry 0 exactly like Ann's,
+        // card at x = +4.30 while Ann's stands at −4.30 — so the entry does not
+        // move and the anchor must.
         // Eluned holds station 4, the right head, entry 3. Under a socketed
         // tower three stations share entry side 3 (js/places.js TOWER_FLANKS),
         // which is where an edge-anchored wash would light somebody else's
@@ -21208,8 +21340,34 @@ export const scenarios = [
         assert.ok(b.tris <= 700, `and <= 700 triangles for all eight (got ${b.tris})`);
         assert.equal(b.materials, 1, 'ONE material — eight hues ride the vertex colours');
         assert.equal(b.textures, 3, 'albedo + ORM + emissive, and nothing else');
-        assert.equal(b.atlasPx, 1024, 'a 1024² atlas…');
+        assert.equal(b.atlasPx, 1024, 'a 1024-wide atlas…');
+        assert.equal(b.atlasH, 2048, '…2048 TALL since v2: only the rows needed the height, and '
+          + 'doubling both axes would have cost 16 MB of texture for eight names');
         assert.equal(b.rows, 8, '…of eight rows, one per station, repainted in place');
+
+        // ---- THE SIZE, which is the whole of the v2 change ------------------
+        // Joe, 2026-09-01: "the placards … are smaller than the dice." A d6 is
+        // 1.35 world units on an edge (js/dice.js:40) and the card face WAS
+        // 2.00 × 0.70 — half a die tall. Every number below is world units,
+        // before any projection, so it cannot be argued with by re-framing.
+        const D6 = 1.35;
+        assert.ok(b.face.w >= 3.0 && b.face.slope >= 1.6,
+          `the card face is at least 3.0 x 1.6 (got ${b.face.w} x ${b.face.slope})`);
+        assert.ok(b.face.w > D6 && b.face.printed > D6,
+          `and its PRINTED band alone is bigger than a d6 on both axes `
+          + `(${b.face.w} x ${b.face.printed} vs ${D6})`);
+        assert.ok(b.face.ridgeY > D6,
+          `the object stands taller than a die too (ridge ${b.face.ridgeY.toFixed(3)} vs ${D6})`);
+        assert.ok(b.face.pxPerUnit >= 150 && b.face.pxPerUnitDown >= 150,
+          `the atlas gives it ${b.face.pxPerUnit.toFixed(1)} x ${b.face.pxPerUnitDown.toFixed(1)} px `
+          + 'per world unit — the retired floor atlas gave 12.8');
+        assert.ok(Math.abs(b.face.pxPerUnit - b.face.pxPerUnitDown) < 1,
+          'and it is ISOTROPIC: a glyph painted round on the canvas arrives round on the card '
+          + `(${b.face.pxPerUnit.toFixed(1)} across vs ${b.face.pxPerUnitDown.toFixed(1)} down)`);
+        assert.ok(b.face.fontMin >= 44, `the 44px font floor still holds, with room to spare (${b.face.fontMin})`);
+        assert.equal(b.face.fontMin % 2, 0,
+          'and it is EVEN — the fitter steps down in 2s from an even maximum, so an odd floor '
+          + 'is a floor it steps straight past (measured: 87 landed at 86)');
 
         // ---- the fit -------------------------------------------------------
         const house = await a.dbg('places()');
@@ -21233,7 +21391,13 @@ export const scenarios = [
         const long = house.stations.find((s) => s.name === 'Cassiopeia Winterbourne');
         assert.ok(long.shown.endsWith('…'),
           'the longest name truncates VISIBLY rather than running off the card');
-        assert.equal(long.fontPx, 44, 'and only after the fitter has spent the whole 68→44 range');
+        assert.equal(long.fontPx, b.face.fontMin,
+          `and only after the fitter has spent its whole ${b.face.fontMax}→${b.face.fontMin} range`);
+        const short = house.stations.find((s) => s.name === 'Dev');
+        assert.equal(short.shown, 'Dev',
+          'a name that FITS is painted whole — the fitter used to reserve room for an ellipsis it '
+          + 'was not going to use, which at v2 type sizes painted the front chair\'s card "Fron…"');
+        assert.equal(short.fontPx, b.face.fontMax, 'at the full size');
         const dicey = house.stations.find((s) => s.name.startsWith('Han '));
         assert.ok(dicey.shown.endsWith('…') && dicey.shown.length < dicey.name.length,
           `the emoji-tailed name is actually cut (${JSON.stringify(dicey.shown)}) — or the surrogate check above proves nothing`);
@@ -21304,11 +21468,26 @@ export const scenarios = [
         await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'the tower is put away' });
 
         // ---- the frame ------------------------------------------------------
-        // The standoff is 0.72 and cannot be smaller: the card's footprint is
-        // 1.24 deep, so anything less puts its inboard edge back inside the
+        // The standoff is 0.76 and cannot be smaller: the card's footprint is
+        // 1.32 deep, so anything less puts its inboard edge back inside the
         // wall and hands a die somewhere to land on. The gate is therefore on
-        // the readable FACE, which stands 0.25–0.49 above the ground and
+        // the readable FACE, which stands 0.39–1.83 above the ground and
         // projects higher than the base does.
+        //
+        // THE ZOOM IS PART OF THE CLAIM SINCE v2, and the split is measured
+        // rather than convenient. `wide` is the shipped default and the frame
+        // every look pass and every one of Joe's shots is taken on: there the
+        // whole ring is in the picture, and that is a hard gate. At `medium`
+        // and `close` the mat itself overflows the frame — at close the near
+        // corners are a whole card-width outside it — so a card standing
+        // OUTBOARD of a cropped edge is outside by construction, and the honest
+        // gate is the one on the NAME: the row you are reading is somebody
+        // else's, and its ink has to reach the picture. The v1 card was small
+        // enough to hide inside the crop; the v2 card is the size Joe asked
+        // for, and this is what that costs. The named follow-up lever is
+        // unchanged — the edge-anchored mat crop (UX §7.63).
+        const VIEW_H = 900;
+        const rim = [];
         for (const z of ['wide', 'medium', 'close']) {
           await a.dbg(`setZoom('${z}')`);
           await a.waitFor(`window.__diceDebug.zoom === '${z}'`, { desc: `zoom ${z}` });
@@ -21318,16 +21497,36 @@ export const scenarios = [
             const f = await a.dbg(`placardFrame(${s.place})`);
             assert.ok(f, `station ${s.place} has a card face to project`);
             if (s.station === mineEdge) {
-              assert.ok(f.ndc.y0 >= -0.98,
+              const bar = z === 'wide' ? -0.98 : -1.10;
+              assert.ok(f.ndc.y0 >= bar,
                 `${z}: the near row's name is in the picture — station ${s.place} `
-                + `bottoms out at ndc ${f.ndc.y0.toFixed(3)}, the bar is -0.98`);
-            } else {
-              assert.ok(f.ndc.y0 >= -0.94 && f.ndc.y1 <= 0.94,
+                + `bottoms out at ndc ${f.ndc.y0.toFixed(3)}, the bar is ${bar}`);
+            } else if (z === 'wide') {
+              assert.ok(f.ndc.y0 >= -0.94 && f.ndc.y1 <= 0.96,
                 `${z}: station ${s.place} sits clear of both rims `
-                + `(ndc y ${f.ndc.y0.toFixed(3)}..${f.ndc.y1.toFixed(3)}, the bar is ±0.94)`);
+                + `(ndc y ${f.ndc.y0.toFixed(3)}..${f.ndc.y1.toFixed(3)}, the bars are -0.94/+0.96)`);
+              assert.ok(f.ink.every((q) => q.every((c) => c.y > 0 && c.y < VIEW_H)),
+                `${z}: and its NAME is wholly on screen (ink y `
+                + `${Math.min(...f.ink.flat().map((c) => c.y)).toFixed(0)}..`
+                + `${Math.max(...f.ink.flat().map((c) => c.y)).toFixed(0)} of ${VIEW_H})`);
+            } else {
+              // The card may cross the top rim at these zooms; its ink may not
+              // leave the picture altogether.
+              assert.ok(f.ndc.y0 <= 0.94,
+                `${z}: station ${s.place} still meets the picture (band bottom ndc ${f.ndc.y0.toFixed(3)})`);
+              assert.ok(f.ink.some((q) => q.some((c) => c.y > 0 && c.y < VIEW_H)),
+                `${z}: and some of its NAME is on screen (ink y `
+                + `${Math.min(...f.ink.flat().map((c) => c.y)).toFixed(0)}..`
+                + `${Math.max(...f.ink.flat().map((c) => c.y)).toFixed(0)} of ${VIEW_H})`);
+              if (s.place === 1) {
+                rim.push(`${z}/st1: band ndc y[${f.ndc.y0.toFixed(3)},${f.ndc.y1.toFixed(3)}] `
+                  + `ink y ${Math.min(...f.ink.flat().map((c) => c.y)).toFixed(0)}..`
+                  + `${Math.max(...f.ink.flat().map((c) => c.y)).toFixed(0)}`);
+              }
             }
           }
         }
+        console.log(`    [recorded] the far row past the top rim at the tighter zooms: ${rim.join('  ')}`);
 
         // ---- …and from every other chair (§7.63; DESIGN §4 amendment 1 asks
         // for the face gates at all four orbits) -------------------------------
@@ -21380,16 +21579,36 @@ export const scenarios = [
                 assert.ok(f.cy < farthest,
                   `${z} from station ${place}: the near row is MINE — station ${s.place} is lower in the `
                   + `frame than every card on another edge (cy ${f.cy.toFixed(3)} vs ${farthest.toFixed(3)})`);
-                assert.ok(Math.abs(f.cx) <= 0.94,
-                  `${z} from station ${place}: and it is inside the frame laterally (cx ${f.cx.toFixed(3)})`);
+                // LATERALLY TOO, AT THE ZOOM THE TABLE SHIPS AT. Since v2 the
+                // first chair on a long edge is an OUTER lane (it has to be:
+                // the middle of the front edge is where the result banner
+                // stands), so at the tighter zooms — where the mat's own near
+                // corners are already outside the picture — the viewer's own
+                // card crosses the side rim with them. It may cross; it may not
+                // wander off by more than its own width, and it may never end
+                // up on the far side of the frame.
+                const lat = z === 'wide' ? 0.94 : 1.40;
+                assert.ok(Math.abs(f.cx) <= lat,
+                  `${z} from station ${place}: and it is inside the frame laterally `
+                  + `(cx ${f.cx.toFixed(3)}, the bar is ${lat})`);
                 assert.ok(f.ndc.y1 >= -1.5,
                   `${z} from station ${place}: its printed band has not drifted away from the rim `
                   + `(top at ndc ${f.ndc.y1.toFixed(3)})`);
                 if (s.place === place) nearRow.push(`${z}/st${place}: y[${f.ndc.y0.toFixed(3)},${f.ndc.y1.toFixed(3)}]`);
-              } else {
-                assert.ok(f.ndc.y0 >= -0.94 && f.ndc.y1 <= 0.94,
+              } else if (z === 'wide') {
+                assert.ok(f.ndc.y0 >= -0.94 && f.ndc.y1 <= 0.96,
                   `${z} from station ${place}: station ${s.place} sits clear of both rims `
-                  + `(ndc y ${f.ndc.y0.toFixed(3)}..${f.ndc.y1.toFixed(3)}, the bar is ±0.94)`);
+                  + `(ndc y ${f.ndc.y0.toFixed(3)}..${f.ndc.y1.toFixed(3)}, the bars are -0.94/+0.96)`);
+              } else {
+                // Same v2 split as the orbit-0 leg above: at the tighter zooms
+                // the mat itself overflows the frame, so a card outboard of a
+                // cropped edge crosses the rim by construction. The band must
+                // still meet the picture; the ink must still reach it.
+                assert.ok(f.ndc.y0 <= 0.94,
+                  `${z} from station ${place}: station ${s.place} still meets the picture `
+                  + `(band bottom ndc ${f.ndc.y0.toFixed(3)})`);
+                assert.ok(f.ink.some((q) => q.some((c) => c.y > 0 && c.y < 900)),
+                  `${z} from station ${place}: and some of station ${s.place}'s NAME is on screen`);
               }
             }
           }
@@ -21399,8 +21618,8 @@ export const scenarios = [
 
         // ---- rule 15: the rejected frame must FAIL ---------------------------
         // Eight cards on one edge is the arrangement this layout exists
-        // instead of, and it cannot be built: eight 2.20-wide cards with a
-        // 0.30 gap need 19.7 units of edge and the longest edge the mat ever
+        // instead of, and it cannot be built: eight 3.20-wide cards with a
+        // 0.30 gap need 27.7 units of edge and the longest edge the mat ever
         // has is 14.1. Spread them to fit and they fuse; the same three gates
         // that pass above go red, at every zoom.
         const reds = [];
@@ -21411,7 +21630,7 @@ export const scenarios = [
           for (let i = 0; i < 8; i++) {
             boxes.push({
               place: i,
-              ...placardFootprint({ x: (i - 3.5) * pitch, z: p.d / 2 + 0.72, azim: 0 }),
+              ...placardFootprint({ x: (i - 3.5) * pitch, z: p.d / 2 + PLACARD_STANDOFF, azim: 0 }),
             });
           }
           const worst = minGap(boxes);
@@ -21419,7 +21638,7 @@ export const scenarios = [
           if (boxes.some((x, i) => boxes.some((y, j) => j > i
             && Math.abs(x.x - y.x) < x.hx + y.hx))) reds.push(`${z}: two cards overlap on the ground`);
           const half = boxes[7].x + boxes[7].hx;
-          if (half > p.w / 2 + 0.72) reds.push(`${z}: the end card overhangs the mat by ${(half - p.w / 2).toFixed(2)}`);
+          if (half > p.w / 2 + PLACARD_STANDOFF) reds.push(`${z}: the end card overhangs the mat by ${(half - p.w / 2).toFixed(2)}`);
         }
         assert.ok(reds.length >= 3,
           `all eight on one edge must fail the gates the shipped ring passes — `
