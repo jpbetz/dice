@@ -20067,6 +20067,80 @@ export const scenarios = [
     },
   },
   {
+    name: 'place-seeds-unchanged',
+    tags: ['place', 'roll', 'perf'],
+    timeout: 120000,
+    // THE LAW-17 PIN for a place at the table (UX §7.63). The reader — the
+    // playRoll/spawnDie code that CAN line a throw up on a stamped
+    // `roll.entry` — ships one slice before the writer, so today no payload
+    // carries a stamp, and a stampless payload must bake byte-for-byte the
+    // film this table baked before the reader existed. The golden below is a
+    // feltPoses() string captured at 04ed6e9, on the PRISTINE tree, before
+    // the reader landed: four seeded throws, one per spawn side (covering
+    // both rng draw-order groups — sides 0/1 draw jitter-then-height, sides
+    // 2/3 height-then-jitter), each seed chosen so the SEEDED draw picks that
+    // side, later rolls baking against the earlier rolls' frozen dice. If
+    // this ever goes red, the reader changed the stampless film: the draw
+    // budget slipped, a shared zero stopped being zero, or an expression
+    // order got "cleaned up".
+    async fn(ctx) {
+      const GOLDEN =
+          '[{"rollId":"seeded-2026-3-1","i":0,"type":"d4","shrouded":false,"pos":[0.483,0.383,-2.569],"'
+        + 'quat":[-0.362,-0.107,0.284,0.882]},{"rollId":"seeded-2026-3-1","i":1,"type":"d8","shrouded":'
+        + 'false,"pos":[-1.898,0.606,1.673],"quat":[-0.705,0.06,-0.541,0.456]},{"rollId":"seeded-2026-3'
+        + '-1","i":2,"type":"d12","shrouded":false,"pos":[-0.591,0.989,0.556],"quat":[-0.279,-0.156,-0.'
+        + '828,-0.461]},{"rollId":"seeded-424242-7-0","i":0,"type":"d6","shrouded":false,"pos":[-1.905,'
+        + '0.671,-1.323],"quat":[0.647,0.647,-0.286,-0.286]},{"rollId":"seeded-424242-7-0","i":1,"type"'
+        + ':"d6","shrouded":false,"pos":[-2.941,0.675,-2.343],"quat":[0,0.88,0,-0.475]},{"rollId":"seed'
+        + 'ed-424242-7-0","i":2,"type":"d6","shrouded":false,"pos":[-4.514,0.675,-1.777],"quat":[0.217,'
+        + '-0.673,-0.673,-0.217]},{"rollId":"seeded-424242-7-0","i":3,"type":"d6","shrouded":false,"pos'
+        + '":[4.336,0.675,3.235],"quat":[-0.679,0.198,-0.198,-0.679]},{"rollId":"seeded-424242-7-0","i"'
+        + ':4,"type":"d6","shrouded":false,"pos":[-5.964,0.675,-2.592],"quat":[-0.37,0,0.929,0]},{"roll'
+        + 'Id":"seeded-424242-7-0","i":5,"type":"d6","shrouded":false,"pos":[-4.951,0.662,-0.245],"quat'
+        + '":[-0.559,0.559,0.433,-0.433]},{"rollId":"seeded-424242-7-0","i":6,"type":"d20","shrouded":f'
+        + 'alse,"pos":[2.183,0.993,-0.723],"quat":[-0.141,-0.269,-0.877,0.373]},{"rollId":"seeded-64352'
+        + '-3-3","i":0,"type":"d6","shrouded":false,"pos":[3.514,0.675,-2.843],"quat":[0,0.893,0,-0.449'
+        + ']},{"rollId":"seeded-64352-3-3","i":1,"type":"d6","shrouded":false,"pos":[0.049,0.992,-1.131'
+        + '],"quat":[-0.045,0.706,-0.706,-0.045]},{"rollId":"seeded-64352-3-3","i":2,"type":"d6","shrou'
+        + 'ded":false,"pos":[-2.97,0.664,-0.345],"quat":[0.627,-0.627,-0.326,0.326]},{"rollId":"seeded-'
+        + '808-2-2","i":0,"type":"d20","shrouded":false,"pos":[-1.168,1.025,-3.188],"quat":[-0.372,0.87'
+        + '7,0.269,0.141]},{"rollId":"seeded-808-2-2","i":1,"type":"d20","shrouded":false,"pos":[0.975,'
+        + '0.966,2.597],"quat":[0.006,0.008,0.567,0.824]}]';
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Golden' });
+      await a.dbg('holdClock(true)');
+      try {
+        const throwOne = async (types, seed, values, wantSide) => {
+          await a.eval('window.__diceDebug.throwSeeded('
+            + `${JSON.stringify(types)}, ${seed}, ${JSON.stringify(values)})`);
+          await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+            { desc: `seed ${seed} settles`, timeout: 60000 });
+          // The reader is INERT on these rolls, and says so: no stamp, no
+          // lane, the seeded draw decides — the negative control that the
+          // golden below is comparing the path it claims to compare.
+          const org = await a.dbg('throwOrigin()');
+          assert.equal(org.from, 'seed', `seed ${seed}: the seeded draw decided the edge`);
+          assert.equal(org.entry, null, `seed ${seed}: no payload stamp`);
+          assert.equal(org.side, wantSide, `seed ${seed}: the seeded draw picked side ${wantSide}`);
+          assert.equal(org.laneWorld, 0, `seed ${seed}: no lane`);
+          assert.deepEqual(org.aim, { x: 0, z: 0 }, `seed ${seed}: the aim box sits on the centre`);
+          const line = await a.dbg('spawnLine()');
+          assert.ok(line.length === types.length
+            && line.every((s) => s.from === 'seed' && s.lane === 0),
+          `seed ${seed}: every spawn row is the seeded, laneless line`);
+        };
+        await throwOne(['d6', 'd6', 'd6', 'd6', 'd6', 'd6', 'd20'], 424242, [1, 2, 3, 4, 5, 6, 17], 0);
+        await throwOne(['d4', 'd8', 'd12'], 2026, [3, 7, 11], 1);
+        await throwOne(['d20', 'd20'], 808, [1, 20], 2);
+        await throwOne(['d6', 'd6', 'd6'], 64352, [2, 4, 6], 3);
+        const poses = await a.eval('JSON.stringify(window.__diceDebug.feltPoses())');
+        assert.equal(poses, GOLDEN,
+          'a stampless film is bit-identical to the pre-places build — the golden replays');
+      } finally {
+        await a.dbg('holdClock(false)');
+      }
+    },
+  },
+  {
     name: 'framing-dials-ship-on',
     tags: ['fx', 'look'],
     // C27 SHIPPED ON, 2026-08-18, and this pin now guards the flip BACK.

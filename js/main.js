@@ -26,6 +26,12 @@ import { recentTables, rememberTable, forgetTable, mintRoomKey, isMintedKey } fr
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
   scoringIndices, pushTally, faceScores, drawBag, MAX_PUSH_THROWS } from './rollspec.js';
+// A PLACE AT THE TABLE (UX §7.63): the layout/entry algebra lives in ONE
+// shared module — server.js stamps `roll.entry`/`roll.lane` out of it, this
+// file reads the stamps back (the rollspec.js precedent). The film half only:
+// laneSpread (the lane yields to the pool), aimFor (a translated aim box),
+// and AIM_ZERO (the shared frozen zero every unstamped roll aims through).
+import { laneSpread, aimFor, AIM_ZERO } from './places.js';
 import { previewOf, countingPmfs, sumForecast, sumAtLeast, sumBins, sumPeak,
   throwForecast, facesOf } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
@@ -3040,6 +3046,18 @@ const SPAWN = { axis: 'clamp', pad: 4.4, per: 2.6 };
 // NEGATIVE means it spawned INSIDE the wall plane. Read by __diceDebug.spawnLine.
 let spawnLine = [];
 
+// WHERE THE LAST THROW CAME IN FROM (UX §7.63). Written by playRoll before
+// the first die spawns, one record per roll: the validated stamp (`entry`,
+// `lane` — null / 0 when the payload carried none or carried garbage), the
+// edge the film actually used (`side`), the effective lane after it yielded
+// to the pool (`laneWorld`), the translated aim box centre, and which
+// authority decided (`from: 'place' | 'seed'`). `washAt` stays null until the
+// placard slice stands something to anchor a wash to. An instrument, not an
+// input: nothing in the app reads this back — it exists so a scenario can ask
+// "which edge did that film enter over, and why" without re-deriving the
+// draw. Read by __diceDebug.throwOrigin.
+let throwOrigin = null;
+
 // cannon's native sleep, made tunable. world.allowSleep is already true, so
 // bodies sleep at these thresholds today; the question is whether a coarser
 // bar retires a dithering die sooner than damping does.
@@ -5255,7 +5273,15 @@ function dieBody(type) {
   return createDieBody(type, diceMat);
 }
 
-function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
+// The three trailing params are the place reader's (UX §7.63), and their
+// defaults ARE the shipped throw: `lane` shifts the side-0/1 line along its
+// edge (0 adds nothing — `0 + v === v` on the same double), `spreadOverride`
+// is the pool line laneSpread already compressed (null keeps the expression
+// below untouched), and `aim` translates the landing box (AIM_ZERO is the
+// shared frozen zero). playRoll is the only caller; every value is computed
+// once per roll there, never per die, and none of them draws rng.
+function spawnDie(type, index, count, side, rng, shrouded = false, set = null,
+  lane = 0, spreadOverride = null, aim = AIM_ZERO) {
   const variant = dieVariant(shrouded, set);
   const mesh = createDieMesh(type, variant);
   const body = dieBody(type);
@@ -5289,7 +5315,12 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
   // clamp behind it, it is no longer standing in for anything.
   const alongZ = side >= 2;
   const extent = SPAWN.axis === 'own' && alongZ ? TABLE_D : TABLE_W;
-  const spread = Math.min(extent - SPAWN.pad, count * SPAWN.per);
+  // A laned throw may have compressed the pool's line (js/places.js
+  // laneSpread: the lane yields to the pool, never the other way round); the
+  // override IS the line then — for the offsets and for the instrument row
+  // both. Null on every unstamped roll, so `??` leaves the shipped expression
+  // untouched to the bit.
+  const spread = spreadOverride ?? Math.min(extent - SPAWN.pad, count * SPAWN.per);
   const offset = count === 1 ? 0 : -spread / 2 + (spread * index) / (count - 1);
   const lateral = SPAWN.axis === 'own' ? offset : offset * 0.5;
   const jitter = () => (rng() - 0.5) * 1.2;
@@ -5302,8 +5333,11 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
   const room = (alongZ ? TABLE_D : TABLE_W) / 2 - restCeiling(type) - 0.05;
   const fit = (v) => (SPAWN.axis === 'width' ? v : Math.max(-room, Math.min(room, v)));
 
-  if (side === 0) body.position.set(fit(offset + jitter()), 6 + rng() * 4 + index * 0.9, TABLE_D / 2 - 2.2);
-  else if (side === 1) body.position.set(fit(offset + jitter()), 6 + rng() * 4 + index * 0.9, -TABLE_D / 2 + 2.2);
+  // `lane +` on the long edges only — the head stations are single-station,
+  // so a lane never rides a side-2/3 throw. The lane moves the whole line;
+  // fit() still has the last word, per die, against the wall.
+  if (side === 0) body.position.set(fit(lane + offset + jitter()), 6 + rng() * 4 + index * 0.9, TABLE_D / 2 - 2.2);
+  else if (side === 1) body.position.set(fit(lane + offset + jitter()), 6 + rng() * 4 + index * 0.9, -TABLE_D / 2 + 2.2);
   else if (side === 2) body.position.set(-TABLE_W / 2 + 2.2, 6 + rng() * 4 + index * 0.9, fit(lateral + jitter()));
   else body.position.set(TABLE_W / 2 - 2.2, 6 + rng() * 4 + index * 0.9, fit(lateral + jitter()));
 
@@ -5319,14 +5353,22 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
       type, side, index,
       x: body.position.x, z: body.position.z,
       spread: Math.round(spread * 100) / 100,
+      // The place reader's two rows: the world lane this line was shifted by,
+      // and which authority put the throw on this edge ('place' | 'seed').
+      lane: Math.round(lane * 100) / 100,
+      from: throwOrigin ? throwOrigin.from : 'seed',
       clear: Math.round((half - Math.abs(at) - r) * 100) / 100,
     });
   }
 
   // hurl it toward a random point near the middle of the table (THROW_TARGET
-  // is the width of that box as a fraction of the table; 0.4 = shipped)
+  // is the width of that box as a fraction of the table; 0.4 = shipped).
+  // `aim` TRANSLATES that box toward the roller's station and never shrinks
+  // it (js/places.js aimFor) — AIM_ZERO on every unstamped roll, which is the
+  // shipped centre on the same doubles.
   const target = new CANNON.Vec3(
-    (rng() - 0.5) * TABLE_W * THROW_TARGET, 0, (rng() - 0.5) * TABLE_D * THROW_TARGET);
+    aim.x + (rng() - 0.5) * TABLE_W * THROW_TARGET, 0,
+    aim.z + (rng() - 0.5) * TABLE_D * THROW_TARGET);
   const dir = target.vsub(body.position);
   dir.y = 0;
   dir.normalize();
@@ -6336,7 +6378,62 @@ function playRoll(roll, rethrow = null) {
   // BODY until it exits — a hidden die has no physics at all, which is what
   // makes a model unable to deflect an entry.
   const pouring = towerOn() && !rethrow; // see the header: a re-throw is thrown
-  const side = pouring ? 0 : Math.floor(rng() * 4);
+  // WHICH EDGE THIS THROW COMES IN FROM (UX §7.63). A roll stamped with a
+  // place's entry comes in over that edge; everything else keeps the seeded
+  // draw. THE DRAW IS ALWAYS TAKEN ON THE THROWN PATH, stamped or not — the
+  // draw budget is the contract that keeps a stampless film bit-identical to
+  // the pre-places build (`place-seeds-unchanged` pins it against a golden
+  // captured before this reader existed), and every draw after this one (the
+  // spawn jitters, the aim, the nudges) sits at the stream position it always
+  // did. A pour draws zero, exactly as it always has — the same `pouring`
+  // ternary shape guards it. Boundary validation, not trust: a malformed
+  // stamp falls back to the seeded side / lane 0 and never throws. The stamp
+  // rides the ROLL payload (and a rethrow's refreshed payload), server-set at
+  // the moment the dice were drawn — the film never reads the roster.
+  const sideRoll = pouring ? 0 : Math.floor(rng() * 4);
+  const stamped = !pouring && Number.isInteger(roll.entry)
+    && roll.entry >= 0 && roll.entry < 4;
+  const side = pouring ? 0 : (stamped ? roll.entry : sideRoll);
+  const laneSlot = stamped && [-1, 0, 1].includes(roll.lane) ? roll.lane : 0;
+  // THE LANE YIELDS TO THE POOL (js/places.js laneSpread — fix F1): the
+  // pool's line may compress toward the lane's room but never below a real
+  // pitch, and the lane then takes whatever room remains — a constant lane
+  // fed into spawnDie's per-die fit() would collapse the outboard half of a
+  // big pool onto one x. Computed ONCE per roll from the pool's LARGEST hull
+  // so the line's centre is legal for every die in it; zero rng draws. Lanes
+  // exist only on sides 0/1 (the head stations are single-station, so the
+  // server never stamps a lane beside entry 2/3), and spawnDie only applies
+  // one there.
+  let laneWorld = 0;
+  let spreadOverride = null;
+  if (laneSlot) {
+    const pool = rethrow
+      ? rethrow.thrown.map((di) => types[di]).filter((t) => DIE_DEFS[t]) : types;
+    const hull = pool.reduce((m, t) => Math.max(m, restCeiling(t)), 0);
+    const room = TABLE_W / 2 - hull - 0.05;
+    const spread = Math.min(TABLE_W - SPAWN.pad, throwCount * SPAWN.per);
+    const laid = laneSpread(laneSlot, room, spread, throwCount);
+    laneWorld = laid.lane;
+    spreadOverride = laid.spread;
+  }
+  // The aim box, TRANSLATED toward the roller's station, never shrunk
+  // (js/places.js aimFor; IMMERSION:1399-1403 — no felt is owned, the box
+  // still straddles the centre). AIM_ZERO for an unstamped roll is the shared
+  // frozen zero: `0 + v === v` on the same double, so a payload without a
+  // stamp bakes the film this table baked before places existed.
+  const aim = stamped ? aimFor(side, laneWorld, TABLE_W, TABLE_D, THROW_TARGET) : AIM_ZERO;
+  // The instrument's record — written before the first die spawns, so the
+  // spawn-line rows can carry `from` too. See the declaration for the shape.
+  throwOrigin = {
+    entry: stamped ? side : null,
+    lane: laneSlot,
+    side,
+    laneWorld,
+    aim: { x: aim.x, z: aim.z },
+    from: stamped ? 'place' : 'seed',
+    pour: pouring,
+    washAt: null,
+  };
   // A pour never touches spawnDie, so nothing would clear the last THROWN
   // roll's spawn line and the instrument would report a stale one as this
   // roll's. Empty is the honest answer: a poured die has no body until it exits.
@@ -6350,7 +6447,7 @@ function playRoll(roll, rethrow = null) {
       const held = keptByIndex.get(i);
       if (held) return held;
       return spawnDie(t, rethrow ? throwOrdinal.get(i) : i, throwCount, side, rng,
-        shrouded, rollDieSet(roll, i));
+        shrouded, rollDieSet(roll, i), laneWorld, spreadOverride, aim);
     });
   if (rethrow) {
     // The dice being thrown again leave the table as objects — their meshes
@@ -16133,6 +16230,16 @@ window.__diceDebug = {
   // plane — invisible in the film, and a frame-zero contact storm in the
   // recorder. Empty for a POUR (a poured die has no body until it exits).
   spawnLine() { return spawnLine.map((s) => ({ ...s })); },
+  // WHERE THE LAST THROW CAME IN FROM (UX §7.63): the film-input half of a
+  // place, as the film actually consumed it. `entry`/`lane` echo the payload
+  // stamp after boundary validation (null / 0 when absent or malformed);
+  // `side` is the edge the film used — the stamp when present, the seeded
+  // draw otherwise, 0 for a pour; `laneWorld` is the lane after it yielded to
+  // the pool; `aim` is the translated landing-box centre; `from` names the
+  // deciding authority ('place' | 'seed'); `washAt` stays null until the
+  // placard slice stands something to anchor a wash to. Null before any roll
+  // has thrown.
+  throwOrigin() { return throwOrigin ? { ...throwOrigin, aim: { ...throwOrigin.aim } } : null; },
   // The settle terminator (SETTLEGATE). mode 'displacement' is shipped — the
   // three-point AABB rest test, `eps` its tolerance as a fraction of a die's
   // WIDTH; 'velocity' restores the pre-2026-08-11 predicate. Takes effect on
@@ -29243,6 +29350,12 @@ function replaySettledRoll(r) {
     push: r.push,               // MECHANICS M4: …and a push keeps its rule and tally
     set: r.set,                 // Tier 6 §9: a reload keeps the roller's skin
     sets: r.sets,               // §9 per-die (mixed pools survive a reload)
+    // UX §7.63: the stamp rides the LOG ENTRY, not the roster — a replay
+    // after the roller left still enters from the edge it entered from
+    // (GOALS:297-306, history vs live state). Same pair the 'roll' broadcast
+    // carries; absent on every pre-places and placeless entry.
+    entry: r.entry,
+    lane: r.lane,
     playerId: r.playerId,
     seed: r.seed,
     label: r.label || formula(r.dice || []),
@@ -29458,6 +29571,15 @@ function handleNetEvent(type, data) {
         push: data.push,               // MECHANICS M4: …and its scoring rule and tally
         set: data.set,                 // Tier 6 §9: the roller's dice-set skin
         sets: data.sets,               // §9 per-die (mixed pools)
+        // UX §7.63: the stamped entry edge and its lane — film inputs of the
+        // seed's class, validated at playRoll's boundary. Absent today and on
+        // every placeless roll; the reader ships before the writer, so a
+        // client running this build bakes the stamped film the moment the
+        // server starts stamping. Dropping them HERE would be the silent
+        // desync: this client would fall back to the seeded side while
+        // stamp-reading clients entered from the place's edge.
+        entry: data.entry,
+        lane: data.lane,
         playerId: data.playerId,
         seed: data.seed,
         label: data.label || formula(data.dice || []),
