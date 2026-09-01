@@ -2354,10 +2354,28 @@ function collectEntries(room, entries) {
 // its edge (GOALS:297-306, history vs live state). A one-player table is
 // identical to the old rule by construction — every prior roll is the
 // roller's own. Rethrows (M2) collect nothing, as before: a turn is one roll.
+//
+// "ONE ROLL PER PLACE" IS LITERAL: "the roller's own priors" are the rolls
+// wearing the same playerId AND the rolls wearing the same STAMP. The first
+// alone (as shipped for a morning, 2026-09-01) left a ghost: a roller leaves
+// for good with dice standing, the chair is handed to the next arrival
+// (freePlace — lowest free), and the newcomer's first throw, stamped with the
+// very same {entry, lane}, swept nothing of the departed roller's — two pools
+// on one region, forever (the v2 verification's successor probe). Matching
+// the stamp is what a place owning its felt means; matching the playerId is
+// still needed on its own, because a stamp can change under one roller — a
+// roll made while a tower was up wears the flank's stamp, and its roller's
+// next throw after the tower comes down must still put it away. Off a tower
+// the non-flank stamps are one-to-one with the stations (js/places.js
+// STATIONS: eight distinct (side, lane) pairs), so "same stamp" is "same
+// chair" exactly; a lingering flank-stamped roll is swept by whichever head
+// shares that side, which is the chair it was standing in front of anyway.
 function arrivalSweep(room, roll) {
   const towerUp = !!(room.settings.tower && room.settings.tower !== 'none');
   if (!Number.isInteger(roll.entry) || towerUp) return room.log;
-  return room.log.filter((r) => r.playerId === roll.playerId || !Number.isInteger(r.entry));
+  return room.log.filter((r) => r.playerId === roll.playerId
+    || (r.entry === roll.entry && r.lane === roll.lane)
+    || !Number.isInteger(r.entry));
 }
 
 // Compose, log, and broadcast a roll for a player from a validated spec.
