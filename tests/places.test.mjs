@@ -26,8 +26,8 @@ limitations under the License.
 import assert from 'node:assert/strict';
 import {
   PLACE_MAX, PLACE_LANE, PITCH_MIN, PLACARD_STANDOFF, PLACARD_W, PLACARD_D, PLACARD_GAP,
-  STATIONS, PLACE_AIM, PLACE_AIM_AUTHORED, AIM_ZERO,
-  entryFor, placeAnchor, placardFootprint, placardGap, laneSpread, aimFor,
+  STATIONS, PLACE_AIM, AIM_ZERO,
+  entryFor, placeAnchor, placardFootprint, placardGap, laneSpread, aimFor, regionFor, inRegion,
 } from '../js/places.js';
 
 let n = 0;
@@ -362,136 +362,145 @@ t('a laned line always fits inside the room fit() would clamp it to', () => {
   }
 });
 
-// --- the aim: translated, never shrunk --------------------------------------
+// --- the region, and the throw into it (v2) ---------------------------------
 
-t('an unstamped roll gets the one shared zero, by reference', () => {
+t('an unstamped roll gets the one shared identity, by reference', () => {
   assert.equal(aimFor(null, 0, 11, 6.7, THROW_TARGET), AIM_ZERO);
   for (const bad of [undefined, -1, 4, 1.5, '0', NaN]) {
     assert.equal(aimFor(bad, 0, 11, 6.7, THROW_TARGET), AIM_ZERO, `${String(bad)} is not an entry`);
+    assert.equal(regionFor(bad, 0, 11, 6.7), null, `${String(bad)} owns no region`);
   }
-  assert.ok(Object.is(AIM_ZERO.x, 0) && Object.is(AIM_ZERO.z, 0),
-    'positive zero on both axes — 0 + v is v, bit for bit');
+  // Every factor spawnDie multiplies by is exactly 1 and every offset exactly
+  // +0, so the shipped expressions ARE the pre-places expressions on a stampless
+  // payload (place-seeds-unchanged is the golden).
+  assert.ok(Object.is(AIM_ZERO.x, 0) && Object.is(AIM_ZERO.z, 0), 'positive zero on both axes');
+  for (const k of ['kx', 'kz', 'k', 'h', 'spin']) assert.ok(Object.is(AIM_ZERO[k], 1), `${k} is the identity`);
+  assert.equal(AIM_ZERO.own, 0, 'and no die aims from its own abscissa');
   assert.throws(() => { AIM_ZERO.x = 5; }, 'the shared zero cannot be poisoned');
+  for (const v of [0.1, 1, 7.25, -3.9, 1e-9]) {
+    assert.ok(Object.is(AIM_ZERO.x + v, v) && Object.is(v * AIM_ZERO.k, v), `${v} passes through unchanged`);
+  }
 });
 
-// THE DIALS SHIP AT ZERO (the gate's pre-declared fallback, taken 2026-08-31 —
-// see PLACE_AIM in js/places.js for the numbers). The MECHANISM is still
-// pinned, against the authored dials it was designed and measured with, so
-// re-enabling it is one assignment and not a re-derivation: the two worked
-// tests below run under PLACE_AIM_AUTHORED and put the shipped dial back.
-const underAuthoredAim = (fn) => {
-  const shipped = { ...PLACE_AIM };
-  Object.assign(PLACE_AIM, PLACE_AIM_AUTHORED);
-  try { fn(); } finally {
+t('the dial is on, and switching it off returns the identity for every stamp', () => {
+  assert.equal(PLACE_AIM.on, 1, 'regions ship on — this is what Joe asked for twice');
+  const was = { ...PLACE_AIM };
+  try {
+    PLACE_AIM.on = 0;
+    for (let entry = 0; entry < 4; entry++) {
+      for (const lane of [-1, 0, 1]) assert.equal(aimFor(entry, lane, 11, 6.7, THROW_TARGET), AIM_ZERO);
+    }
+  } finally {
     for (const k of Object.keys(PLACE_AIM)) delete PLACE_AIM[k];
-    Object.assign(PLACE_AIM, shipped);
+    Object.assign(PLACE_AIM, was);
   }
-};
+  assert.deepEqual(PLACE_AIM, was, 'the shipped dial is back');
+});
 
-t('the shipped dial is zero, and a zero dial aims every stamped throw at the centre', () => {
-  assert.deepEqual(PLACE_AIM, { lateral: 0, entry: 0, minTravel: 0 },
-    'the pre-declared fallback ships: the edge alone carries');
-  assert.deepEqual(PLACE_AIM_AUTHORED, { lateral: 0.34, entry: 0.18, minTravel: 1.6 },
-    'and the authored dials are kept on record, frozen');
-  assert.throws(() => { PLACE_AIM_AUTHORED.entry = 1; }, 'the record cannot be edited in place');
-  for (const [, z] of Object.entries(ZOOMS)) {
-    for (let entry = 0; entry < 4; entry++) {
-      for (const lane of [-PLACE_LANE, -0.98, 0, 0.98, PLACE_LANE]) {
-        const aim = aimFor(entry, lane, z.w, z.d, THROW_TARGET);
-        // Numerically zero on both axes — `0 + v` and `-0 + v` are both `v`,
-        // so a stamped throw lands through the box an unstamped one does.
-        assert.equal(aim.x + 1, 1, `w${z.w}/${entry}/${lane}: no lateral bias`);
-        assert.equal(aim.z + 1, 1, `w${z.w}/${entry}/${lane}: no entry bias`);
-      }
-    }
+t('the regions: near halves split by lane sign, a centre band, end thirds', () => {
+  for (const [id, z] of Object.entries(ZOOMS)) {
+    const hw = z.w / 2;
+    const hd = z.d / 2;
+    assert.deepEqual(regionFor(0, -1, z.w, z.d), { x0: -hw, x1: 0, z0: 0, z1: hd }, `${id}: front-left quadrant`);
+    assert.deepEqual(regionFor(0, 1, z.w, z.d), { x0: 0, x1: hw, z0: 0, z1: hd }, `${id}: front-right quadrant`);
+    assert.deepEqual(regionFor(1, 1, z.w, z.d), { x0: 0, x1: hw, z0: -hd, z1: 0 }, `${id}: back-right quadrant`);
+    assert.deepEqual(regionFor(1, -1, z.w, z.d), { x0: -hw, x1: 0, z0: -hd, z1: 0 }, `${id}: back-left quadrant`);
+    assert.deepEqual(regionFor(0, 0, z.w, z.d), { x0: -hw / 2, x1: hw / 2, z0: 0, z1: hd }, `${id}: the front centre band`);
+    assert.deepEqual(regionFor(3, 0, z.w, z.d), { x0: hw - z.w / 3, x1: hw, z0: -hd, z1: hd }, `${id}: the right end third`);
+    assert.deepEqual(regionFor(2, 0, z.w, z.d), { x0: -hw, x1: -hw + z.w / 3, z0: -hd, z1: hd }, `${id}: the left end third`);
   }
 });
 
-t('the worked aims at medium (under the authored dials)', () => underAuthoredAim(() => {
+t('the two chairs of a fresh table own disjoint felt, and so do all four long-edge chairs', () => {
+  // Stations 0 and 1 are the two-player table; 0-3 the four-player one. Their
+  // regions must not overlap, or "room for two" is a picture and not a fact.
   const { w, d } = ZOOMS.medium;
-  const near = (got, want, why) => assert.ok(Math.abs(got - want) < 1e-9, `${why}: ${got}`);
-  const front = aimFor(0, 0, w, d, THROW_TARGET);
-  near(front.x, 0, 'front lane-0 x');
-  near(front.z, -0.45, 'front lane-0 z, floored past centre by the travel minimum');
-  const frontLeft = aimFor(0, -2.2, w, d, THROW_TARGET);
-  near(frontLeft.x, -0.748, 'front-left 3d6 x');
-  near(frontLeft.z, -0.45, 'front-left 3d6 z');
-  const back = aimFor(1, 0, w, d, THROW_TARGET);
-  near(back.z, 0.45, 'the back edge mirrors the front');
-  const right = aimFor(3, 0, w, d, THROW_TARGET);
-  near(right.x, 0.99, 'the right head aims off its own edge');
-  near(right.z, 0, 'and takes no lateral bias — heads are single-station');
-  near(aimFor(2, 0, w, d, THROW_TARGET).x, -0.99, 'the left head mirrors it');
-}));
-
-t('the wall cap binds at close and not at medium (the negative control, authored dials)', () => underAuthoredAim(() => {
-  const capOf = (extent) => ZOOMS.close[extent === 'z' ? 'd' : 'w'];
-  const closeFront = aimFor(0, 0, ZOOMS.close.w, ZOOMS.close.d, THROW_TARGET);
-  const cap = capOf('z') / 2 - capOf('z') * THROW_TARGET / 2 - 1.25;
-  assert.ok(Math.abs(closeFront.z + cap) < 1e-9,
-    `close front is held at the cap (${closeFront.z} vs ${-cap})`);
-  const medFront = aimFor(0, 0, ZOOMS.medium.w, ZOOMS.medium.d, THROW_TARGET);
-  const medCap = ZOOMS.medium.d / 2 - ZOOMS.medium.d * THROW_TARGET / 2 - 1.25;
-  assert.ok(Math.abs(medFront.z) < medCap - 1e-9,
-    'at medium the travel floor decides, not the wall');
-}));
-
-t('the dial is restored after the authored-dial pins', () => {
-  assert.deepEqual(PLACE_AIM, { lateral: 0, entry: 0, minTravel: 0 },
-    'a pin that ran under the authored dials put the shipped zero back');
-});
-
-t('the box is translated, never shrunk — and it always straddles the centre (authored dials)', () => underAuthoredAim(() => {
-  for (const [id, z] of Object.entries(ZOOMS)) {
-    for (let entry = 0; entry < 4; entry++) {
-      const alongZ = entry <= 1;
-      const room = poolRoom(alongZ ? z.w : z.d, HULL_MAX);
-      const lane = laneSpread(alongZ ? 1 : 0, room, poolSpread(z.w, 3), 3).lane;
-      const aim = aimFor(entry, lane, z.w, z.d, THROW_TARGET);
-      const entHalf = (alongZ ? z.d : z.w) / 2;
-      const latHalf = (alongZ ? z.w : z.d) / 2;
-      const entAim = alongZ ? aim.z : aim.x;
-      const latAim = alongZ ? aim.x : aim.z;
-      assert.ok(Math.abs(entAim) < (alongZ ? z.d : z.w) * THROW_TARGET / 2,
-        `${id}/${entry}: the aim box still contains the table's centre`);
-      assert.ok(Math.abs(entAim) + (alongZ ? z.d : z.w) * THROW_TARGET / 2 + 1.25 <= entHalf + 1e-12,
-        `${id}/${entry}: the box's far lip clears the wall by a hull`);
-      assert.ok(Math.abs(latAim) + (alongZ ? z.w : z.d) * THROW_TARGET / 2 + 1.25 <= latHalf + 1e-12,
-        `${id}/${entry}: and so does its lateral lip`);
-      assert.ok(Math.abs(latAim) <= PLACE_LANE * PLACE_AIM.lateral + 1e-12,
-        `${id}/${entry}: the lateral bias never exceeds one lane's worth`);
+  const overlap = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0))
+    * Math.max(0, Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0));
+  const R = (p) => { const e = entryFor(p, false); return regionFor(e.entry, e.lane, w, d); };
+  for (let p = 0; p < 4; p++) {
+    for (let q = p + 1; q < 4; q++) {
+      assert.equal(overlap(R(p), R(q)), 0, `stations ${p} and ${q} own disjoint felt`);
     }
   }
-}));
+  // …and each region is exactly a quarter of the mat: nobody owns more than
+  // their share, and together the four tile it.
+  const area = (r) => (r.x1 - r.x0) * (r.z1 - r.z0);
+  for (let p = 0; p < 4; p++) assert.ok(Math.abs(area(R(p)) - (w * d) / 4) < 1e-9, `station ${p} owns a quarter`);
+});
 
-t('every bias is a nudge — nothing owns felt (authored dials)', () => underAuthoredAim(() => {
-  // IMMERSION:1399-1403, re-affirmed unamended. A lane only exists on the long
-  // edges (heads are single-station), so those are the only combinations a
-  // table can actually produce. Pinned under the AUTHORED dials — the shipped
-  // zero satisfies every line here trivially, and a vacuous pin is no pin.
-  //
-  // THE LANE HANDED IN IS THE ONE A POOL CAN ACTUALLY PRODUCE (v2). It used to
-  // be the constant PLACE_LANE, which at 2.55 was reachable and at 4.30 is not:
-  // laneSpread caps the effective lane at the pool's own room, so feeding the
-  // raw constant here would have been asserting a bias no throw can be given —
-  // and would have gone red at `close` for a cell that cannot happen.
-  let worst = 0;
+t('inRegion is closed on its edges — a die on the centre line belongs to both neighbours', () => {
+  const R = regionFor(0, -1, 11, 6.7);
+  assert.equal(inRegion(R, -2, 1), true);
+  assert.equal(inRegion(R, 0, 0), true, 'the corner on both centre lines is in');
+  assert.equal(inRegion(regionFor(0, 1, 11, 6.7), 0, 0), true, '…and in its neighbour');
+  assert.equal(inRegion(R, 0.01, 1), false);
+  assert.equal(inRegion(R, -2, -0.01), false);
+  assert.equal(inRegion(null, 0, 0), false, 'no region, nothing is in it');
+});
+
+t('the aim box lies inside its region, a hull clear of every rim it touches, at every zoom', () => {
   for (const [id, z] of Object.entries(ZOOMS)) {
     for (let entry = 0; entry < 4; entry++) {
-      const alongZ = entry <= 1;
-      const reach = laneSpread(1, poolRoom(alongZ ? z.w : z.d, HULL_MAX),
-        poolSpread(z.w, 3), 3).lane;
-      for (const lane of alongZ ? [-reach, 0, reach] : [0]) {
-        const aim = aimFor(entry, lane, z.w, z.d, THROW_TARGET);
-        assert.ok(Math.abs(aim.x) <= z.w / 6 && Math.abs(aim.z) <= z.d / 6,
-          `${id}/${entry}: the aim never leaves the middle third of the mat`);
-        if (id === 'medium') worst = Math.max(worst, Math.hypot(aim.x, aim.z));
+      for (const lane of entry <= 1 ? [-1, 0, 1] : [0]) {
+        const R = regionFor(entry, lane, z.w, z.d);
+        const a = aimFor(entry, lane, z.w, z.d, THROW_TARGET);
+        const bw = z.w * THROW_TARGET * a.kx;
+        const bd = z.d * THROW_TARGET * a.kz;
+        assert.ok(a.kx <= 1 + 1e-12 && a.kz <= 1 + 1e-12, `${id}/${entry}/${lane}: the box is shrunk, never grown`);
+        assert.ok(a.kx > 0 && a.kz > 0, `${id}/${entry}/${lane}: and it is a box, not a point`);
+        const box = { x0: a.x - bw / 2, x1: a.x + bw / 2, z0: a.z - bd / 2, z1: a.z + bd / 2 };
+        assert.ok(box.x0 >= R.x0 - 1e-9 && box.x1 <= R.x1 + 1e-9 && box.z0 >= R.z0 - 1e-9 && box.z1 <= R.z1 + 1e-9,
+          `${id}/${entry}/${lane}: the box is inside its region (${JSON.stringify(box)} in ${JSON.stringify(R)})`);
+        // A hull off every side of the region that is a wall of the mat.
+        if (R.x0 <= -z.w / 2) assert.ok(box.x0 >= -z.w / 2 + HULL_MAX - 1e-9, `${id}/${entry}/${lane}: clear of the left rim`);
+        if (R.x1 >= z.w / 2) assert.ok(box.x1 <= z.w / 2 - HULL_MAX + 1e-9, `${id}/${entry}/${lane}: clear of the right rim`);
+        if (R.z0 <= -z.d / 2) assert.ok(box.z0 >= -z.d / 2 + HULL_MAX - 1e-9, `${id}/${entry}/${lane}: clear of the back rim`);
+        if (R.z1 >= z.d / 2) assert.ok(box.z1 <= z.d / 2 - HULL_MAX + 1e-9, `${id}/${entry}/${lane}: clear of the front rim`);
+        // The box centre is in the region too — a translated box, not one that
+        // merely grazes it.
+        assert.ok(inRegion(R, a.x, a.z), `${id}/${entry}/${lane}: the centre is in the region`);
+        // A stamped throw is the eased, low toss; the factors are the dials.
+        assert.equal(a.k, PLACE_AIM.speed);
+        assert.equal(a.h, PLACE_AIM.h);
+        assert.equal(a.spin, PLACE_AIM.spin);
       }
     }
   }
-  assert.ok(worst <= 0.99 + 1e-9,
-    `the largest bias on the default mat is ${worst.toFixed(3)} — on a mat 11 wide`);
-  assert.ok(worst > 0.8, `and the pin is not vacuous: the authored dials really bias (${worst.toFixed(3)})`);
-}));
+});
+
+t('a laned long-edge throw aims into its own corner; heads and the centre slot aim from their own abscissa', () => {
+  const { w, d } = ZOOMS.medium;
+  const fl = aimFor(0, -1, w, d, THROW_TARGET);
+  const fr = aimFor(0, 1, w, d, THROW_TARGET);
+  const br = aimFor(1, 1, w, d, THROW_TARGET);
+  // The own corner: outboard of the capped region's midpoint on BOTH axes
+  // (the cap takes a hull off the rim side, so the midpoint is measured on
+  // what is left, not on the raw quadrant).
+  const midX = (w / 2 - HULL_MAX) / 2;
+  const midZ = (d / 2 - HULL_MAX) / 2;
+  assert.ok(fl.x < -midX && fl.z > midZ, `front-left aims into the front-left corner (${fl.x}, ${fl.z})`);
+  assert.ok(fr.x > midX && fr.z > midZ, `front-right into the front-right (${fr.x}, ${fr.z})`);
+  assert.ok(Math.abs(fl.x + fr.x) < 1e-9 && Math.abs(fl.z - fr.z) < 1e-9, 'the two front lanes mirror in x');
+  assert.ok(Math.abs(fr.x - br.x) < 1e-9 && Math.abs(fr.z + br.z) < 1e-9, 'front-right and back-right mirror in z');
+  assert.equal(fl.own, 0, 'a laned throw shares one box — the corner');
+  for (const [entry, lane, why] of [[0, 0, 'front centre'], [1, 0, 'back centre'], [2, 0, 'left head'], [3, 0, 'right head']]) {
+    const a = aimFor(entry, lane, w, d, THROW_TARGET);
+    assert.equal(a.own, 1, `${why}: each die aims from where it is on the line`);
+  }
+  const rh = aimFor(3, 0, w, d, THROW_TARGET);
+  assert.ok(rh.x > w / 2 - w / 3 && Math.abs(rh.z) < 1e-9, `the right head aims at its own rim, centred (${rh.x}, ${rh.z})`);
+});
+
+t('the aim is a pure function of the stamp and the mat — the pool never enters it', () => {
+  // v1 fed the pool's EFFECTIVE lane into the aim; v2 keys the region on the
+  // stamp's slot, so a big handful whose line yielded toward the middle still
+  // lands on its own side. Same inputs, same object, every time.
+  const a = aimFor(0, -1, 11, 6.7, THROW_TARGET);
+  const b = aimFor(0, -1, 11, 6.7, THROW_TARGET);
+  assert.deepEqual(a, b);
+  assert.notDeepEqual(aimFor(0, -1, 11, 6.7, THROW_TARGET), aimFor(0, 1, 11, 6.7, THROW_TARGET), 'the lane sign matters');
+  assert.notDeepEqual(aimFor(0, -1, 11, 6.7, THROW_TARGET), aimFor(0, -1, 14.1, 8.6, THROW_TARGET), 'and so does the mat');
+});
 
 console.log(process.exitCode ? `${n} tests, FAILURES above` : `all ${n} places tests pass`);

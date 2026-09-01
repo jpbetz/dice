@@ -14,59 +14,48 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// THE PLACE-AIM SHIP/NO-SHIP GATE (UX §7.63, DESIGN §6.2) — run before the
-// stamp slice merges, results pasted in its commit message.
+// THE PLACE-AIM SETTLE/PILE RECORD (UX §7.63; v1 DESIGN §6.2 wrote it as a
+// ship/no-ship GATE, and v2 demoted it to a RECORD — see below).
 //
-// The entry EDGE is the read and is not on trial here. On trial is the
-// NEGOTIABLE half: PLACE_AIM, the translated landing box that makes the read
-// felt in where the dice come to rest. A translated box could, in principle,
-// push pools toward a wall and buy the read with piling or with longer
-// settles — so the decision was made before the measurement ran:
+// The entry EDGE is the read and is not on trial here. What this step prices
+// is the throw INTO THE REGION — PLACE_AIM in js/places.js: the landing box
+// moved into the roller's region, the eased hurl, the low spawn — against the
+// placeless baseline on identical seeds and identical values:
 //
-//   SHIP PLACE_AIM as-is iff, against the placeless baseline on identical
-//   seeds and identical values:
-//     Δ pile        <= +2.0 points  (mean over all stamped cells)
-//     Δ median dur  <= +0.25 s      (mean over all stamped cells)
-//     no cell       >  +4.0 points  (worst single stamped cell's Δ pile)
-//   else PLACE_AIM ships {lateral: 0, entry: 0} and the edge alone carries.
+//     Δ pile        (mean over all stamped cells, and the worst cell)
+//     Δ median dur  (mean over all stamped cells)
 //
 // Cells: {close, medium} x {6d6, 12d6, 3d20} x stations {0, 2, 4} vs the
-// placeless baseline, N seeds each (default 24). Station 0 is the front
-// centre (entry 0, lane 0), station 2 the front-left lane (entry 0, lane -1),
-// station 4 the right head (entry 3, lane 0) — a centre, a laned, and a
-// short-edge throw. The pile bar is the theorem bar, restCeiling(type): the
-// highest a convex die touching the felt can hold its centre (the 6d6 pools
-// also read comparably on the historical y>1.2 bar; 3d20 does not, which is
-// why the theorem bar is the one used). Stamps are injected via netEvent —
-// the same payload shape the server now writes — so the film under test is
-// the real stamped path: laneSpread, aimFor, and the translated target box.
+// placeless baseline, N seeds each (default 24). Station 0 is the front-left
+// lane (entry 0, lane -1), station 2 the front-right lane (entry 0, lane +1),
+// station 4 the right head (entry 3, lane 0) — two laned throws into their
+// corners and a short-edge throw. The pile bar is the theorem bar,
+// restCeiling(type): the highest a convex die touching the felt can hold its
+// centre. Stamps are injected via netEvent — the same payload shape the
+// server writes — so the film under test is the real stamped path.
 //
-// THE CONFOUND THE PRE-DECLARED BARS DID NOT ANTICIPATE, and the `ab` mode
-// that separates it (2026-08-31, first run): the placeless baseline's seeded
-// draw lands on all FOUR sides, while a station cell is one side only — so a
-// head cell's Δpile mixes "a short-edge throw piles more than the four-side
-// average" (an ENTRY effect, which ships whatever this gate says — the edge
-// is the read) with "the translated box piles more" (the AIM effect, the
-// only thing on trial). `ab` runs every station cell twice on the same seeds,
-// aim at the AUTHORED dials and aim at zero, written through the page's own
-// module instance, and prints the aim's OWN cost beside the pre-declared
-// verdict. The pre-declared verdict is printed first and decides; the
-// attribution is so the fallback, if taken, is taken for a cause it actually
-// addresses.
+// V1 (2026-08-31) RAN THIS AS A GATE with pre-declared bars (Δpile <= +2.0pp,
+// Δmedian <= +0.25 s, no cell > +4.0pp) on a TRANSLATED-ONLY box, and the
+// box failed the worst-cell bar (+8.3pp at close/3d20 from the head), so the
+// fallback shipped: aim zero. The `ab` attribution beside it found the
+// over-bar cells were the HEAD station with or without the aim — a short-edge
+// throw piles more than the four-side average — and the aim's own cost was
+// +0.2pp mean.
 //
-// WHAT IT READ, 2026-08-31 (24 seeds): pre-declared gate on the authored
-// dials — mean Δpile +1.0pp PASS, mean Δmedian +0.02 s PASS, worst cell
-// +8.3pp (close/3d20, station 4) FAIL → the fallback shipped, PLACE_AIM is
-// zero. Attribution: the fallback itself reads +9.0pp worst against the same
-// baseline (medium/12d6, station 4) — every over-bar cell was the head
-// station, aim or no aim; the aim's own cost (on minus off) was mean +0.2pp,
-// +0.04 s, worst +6.9pp (five dice of 72 in one 3d20 cell). `gate` mode now
-// measures the shipped zero — i.e. the ENTRY's own cost — and `ab` is how the
-// authored dials are re-tried.
+// V2 (2026-09-01) IS NOT GATED ON THESE BARS. Joe, on the deployed table:
+// "there is not enough room for two people to roll the dice at the same
+// time" — a region per place is the requirement, and his standing ruling on
+// the other side of the scale is "pilling is OK" (js/main.js, the Joe quote
+// beside the pile arithmetic). So this step prints the bars' verdict FOR THE
+// RECORD and exits 0 either way; the landing story itself (where the dice
+// come to rest) is tools/steps/place-region.mjs. `ab` runs every station cell
+// twice on the same seeds — the shipped dials, and `on: 0` (a true zero, the
+// pre-places throw on the same stamps) — so the region throw's OWN cost is
+// separable from the entry's, exactly as before.
 //
 //   node tools/drive.mjs tools/steps/place-settle.mjs [seeds] [gate|ab]
 
-import { entryFor, PLACE_AIM_AUTHORED } from '../../js/places.js';
+import { entryFor, PLACE_AIM } from '../../js/places.js';
 
 const ZOOMS = ['close', 'medium'];
 const POOLS = [
@@ -75,8 +64,8 @@ const POOLS = [
   ['3d20', Array(3).fill('d20')],
 ];
 const STATIONS = [0, 2, 4];
-const AIM_ON = { ...PLACE_AIM_AUTHORED };                // the dials as designed
-const AIM_OFF = { lateral: 0, entry: 0, minTravel: 0 }; // a true zero: no bias, no travel floor
+const AIM_ON = { ...PLACE_AIM };   // the shipped dials (the region throw)
+const AIM_OFF = { on: 0 };         // a true zero: AIM_ZERO by reference, the pre-places throw
 
 const FACES = { d6: 6, d20: 20 };
 const valuesFor = (types, seed) => types.map((t, i) => 1 + ((seed + i * 7) % FACES[t]));
@@ -210,7 +199,7 @@ export default async function run(stage, [seedCount = '24', mode = 'gate']) {
           const dm = c.medDur - b.medDur;
           vsBase[which].pile.push(dp);
           vsBase[which].med.push(dm);
-          const label = ab ? (which === 'on' ? ' aim authored' : ' aim zero') : ' (shipped dial)';
+          const label = ab ? (which === 'on' ? ' region throw' : ' aim zero') : ' (shipped dials)';
           rows.push([zoom, pname, `station ${st}${label}`, c.pilePct.toFixed(1),
             pp(dp), c.medDur.toFixed(2), secs(dm), c.capped || '']);
         }
@@ -229,12 +218,12 @@ export default async function run(stage, [seedCount = '24', mode = 'gate']) {
 
   // --- the verdicts ----------------------------------------------------------
   const ship = verdict(ab
-    ? 'THE PRE-DECLARED GATE — the authored dials vs the placeless baseline (DESIGN §6.2):'
-    : 'THE PRE-DECLARED GATE — the shipped dial vs the placeless baseline (DESIGN §6.2):',
+    ? "V1'S BARS, FOR THE RECORD — the shipped dials vs the placeless baseline (DESIGN §6.2):"
+    : "V1'S BARS, FOR THE RECORD — the shipped dials vs the placeless baseline (DESIGN §6.2):",
   vsBase.on.pile, vsBase.on.med);
   console.log(ship
-    ? '\n  PASS: this dial costs within the bars.'
-    : '\n  FAIL: this dial does not clear the bars — the fallback is PLACE_AIM {lateral: 0, entry: 0}.');
+    ? '\n  within v1\'s bars.'
+    : '\n  outside v1\'s bars — RECORDED, NOT GATED (Joe: "pilling is OK"; a region per place is the requirement).');
   if (ab) {
     verdict('ATTRIBUTION — the fallback itself (aim zero, entry stamped) vs the same baseline;'
       + '\n  what the bars read with the AIM removed and the ENTRY kept:', vsBase.off.pile, vsBase.off.med);
@@ -243,5 +232,4 @@ export default async function run(stage, [seedCount = '24', mode = 'gate']) {
     console.log(`\n  the aim's own contribution ${ownOk ? 'sits inside' : 'exceeds'} the bars;`
       + ' the pre-declared verdict above is the one that decides.');
   }
-  if (!ship) process.exitCode = 1;
 }

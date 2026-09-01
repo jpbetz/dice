@@ -318,79 +318,185 @@ export function laneSpread(laneSlot, room, spread, count) {
   return { lane, spread: s };
 }
 
+
 // ---------------------------------------------------------------------------
-// The aim — a translated landing box, never a shrunken one
+// The region — the felt a place owns for landing (v2, 2026-09-01)
 // ---------------------------------------------------------------------------
 
-// THE NEGOTIABLE HALF, NAMED BEFORE THE MEASUREMENT RAN. The entry edge is the
-// read; this is the nudge that makes the read felt in where the dice come to
-// rest. The rule, made before the numbers existed: it ships only if the gate
-// (tools/steps/place-settle.mjs) says Δ pile ≤ +2.0 points AND Δ median
-// duration ≤ +0.25 s AND no cell regresses > +4.0 points against the
-// placeless baseline — else the dials ship at 0 and the edge alone carries.
+// A PLACE OWNS ITS REGION OF FELT FOR LANDING. Joe, on the deployed two-tab
+// table (BRIEF-V2, 2026-09-01): "there is not enough room for two people to
+// roll the dice at the same time … I talked about the latter" — and what he
+// had talked about is BRAINSTORM §1's own sentence, "Their rolls are in a
+// region near them." That is the owner's adjudication of IMMERSION item 16's
+// "a seat … owns no region of felt", stated twice; the v1 design deferred to
+// the clause and shipped a zero aim bias, and that was the wrong reading. The
+// clause is amended by his word in docs/IMMERSION.md; it is not re-litigated
+// here.
 //
-// THE GATE RAN 2026-08-31 AND THE DIALS SHIP AT ZERO. Measured over {close,
-// medium} × {6d6, 12d6, 3d20} × stations {0, 2, 4}, 24 seeds a cell: mean
-// Δpile +1.0pp (pass), mean Δmedian +0.02 s (pass), worst cell +8.3pp at
-// close/3d20 from the right head (FAIL, bar +4.0). The pre-declared fallback
-// is taken as declared. What the attribution run beside it found — recorded
-// so the dial is never re-decided from the headline alone: every cell over
-// the bar was the HEAD station, and the fallback itself (aim zero, entry
-// kept) reads +9.0pp worst against the same baseline — a short-edge throw
-// piles more than the four-side average whether or not the box moves, and
-// the entry is the read, not the negotiable half. The aim's OWN cost, same
-// stamps and seeds, aim on minus aim off: mean +0.2pp, +0.04 s, worst cell
-// +6.9pp (5 dice of 72, one 3d20 cell). The authored dials are kept below as
-// PLACE_AIM_AUTHORED, the values the mechanism is unit-pinned against and
-// the value the gate's `ab` mode measures; re-enabling is one assignment.
+// THE REGION IS A FUNCTION OF THE STAMP AND THE MAT, AND OF NOTHING ELSE:
+// (entry, lane, w, d) → an axis-aligned rectangle of the mat. No new wire
+// field, no roster read in the film (the whole point of the entry/lane split
+// above). A long-edge station owns its NEAR HALF of the mat, z toward its own
+// edge; two stations on one long edge split that half laterally by lane sign
+// into QUADRANTS, and the centre slot (lane 0, the seventh chair) takes the
+// centre band of the same width — its felt overlaps its neighbours', which is
+// what a seven-person table costs, and it is the last chair dealt for exactly
+// that reason. A head station owns its END THIRD, full depth.
 //
-// The measurement's dial is this object, written in place (the setThrowTarget
-// pattern — tools/steps/place-settle.mjs reaches it through the page's own
-// module instance), so it is a mutable const on purpose. With every dial at 0
-// aimFor returns a numerically zero aim: `0 + v` is `v` on the same double,
-// so a stamped throw aims exactly where an unstamped one does and differs
-// from it only by its edge and its lane.
-export const PLACE_AIM = { lateral: 0, entry: 0, minTravel: 0 };
-export const PLACE_AIM_AUTHORED = Object.freeze({ lateral: 0.34, entry: 0.18, minTravel: 1.6 });
+// Regions are for LANDING. They are not walls (no new physics bodies — a die
+// may still roll out of its region, and the walls are the mat's own), not
+// claims (nothing refuses a die for being in the wrong place), and not read by
+// anything after the throw is in the air. The other half of "room for two" is
+// the sweep rule in server.js executeRoll: a placed roller's arrival collects
+// only their OWN prior rolls and any placeless one, so the felt holds one roll
+// PER PLACE.
+export function regionFor(entry, lane, w, d) {
+  if (!Number.isInteger(entry) || entry < 0 || entry > 3) return null;
+  const hw = w / 2;
+  const hd = d / 2;
+  if (entry <= 1) {
+    const z = entry === 0 ? [0, hd] : [-hd, 0];
+    const x = lane < 0 ? [-hw, 0] : lane > 0 ? [0, hw] : [-hw / 2, hw / 2];
+    return { x0: x[0], x1: x[1], z0: z[0], z1: z[1] };
+  }
+  const third = w / 3;
+  const x = entry === 2 ? [-hw, -hw + third] : [hw - third, hw];
+  return { x0: x[0], x1: x[1], z0: -hd, z1: hd };
+}
 
-// The widest die's rest ceiling, kept off the mat's rim by the cap below.
+// Is a point of the mat inside a region? The scenario's own read
+// (place-two-rolls), written here so the test and the film share one
+// boundary rule: closed on both ends, so a die resting exactly on the centre
+// line is in BOTH neighbouring regions rather than in neither.
+export function inRegion(region, x, z) {
+  return !!region && x >= region.x0 && x <= region.x1 && z >= region.z0 && z <= region.z1;
+}
+
+// ---------------------------------------------------------------------------
+// The aim — the landing box, translated into the region and shrunk to it
+// ---------------------------------------------------------------------------
+
+// THE DIALS. A mutable const on purpose — the setThrowTarget pattern:
+// tools/steps/place-region.mjs and place-settle.mjs reach this object through
+// the page's own module instance to price the shipped dials against a true
+// zero. `on: 0` makes every stamped throw aim exactly as an unstamped one
+// (AIM_ZERO, by reference).
+//
+// MEASURED 2026-09-01 (tools/steps/place-region.mjs, medium, 12 seeds a cell,
+// stations 0 / 4 / 6, 3d6 and 6d6). The v1 design believed a translated aim
+// box would move where the dice come to rest. It moves where they POINT:
+// spawnDie's target sets the throw's DIRECTION only — `dir = normalize(target
+// − spawn)`, then a speed drawn independently of the distance — so the first
+// thing tried here, the box alone at the shipped hurl, left the pool's
+// centroid in its region 42–58% of the time. Easing the hurl to 0.55 raised
+// that to 67–100% and no further: at 0.25 it was the same. What was scattering
+// the dice was not the throw but the DROP — a die spawned 6–10 units up meets
+// the felt at ~47 u/s (GRAVITY −110) and a cube landing on an edge converts
+// that into a kick in whatever direction the edge points, ~2 units of it,
+// which on a spawn line 1.15 units from the centre line is the far half. So:
+//
+//   speed  — the stamped hurl, as a factor of the shipped 14–22 u/s. 0.5.
+//   h      — the stamped spawn HEIGHT, as a factor of the shipped 6–10 (+0.9
+//            a die). 0.45: a toss from a low hand, 2.7–4.5 units up. This is
+//            the dial that did the work: at 0.5 and 0.4 the centroid came in
+//            at 92–100% in every cell measured; the dice themselves 81–97%
+//            for a laned 3d6, 50–64% for a 6d6 (a handful spreads).
+//   box    — the aim box's side as a fraction of the region's own after the
+//            hull cap. 0.5. Shrunk, not merely translated: the shipped box
+//            (0.4 of the mat) no longer fits a quadrant with the cap on.
+//   corner — 1: a LANED long-edge throw is hurled into its region's own
+//            corner (the roller's rim and the lane's side rim), which is the
+//            backstop that makes the quadrant stick. 0: against the own rim,
+//            laterally centred.
+//   own    — 1: a station with no lane side — the heads and the centre slot —
+//            throws each die straight at its own rim from where that die is
+//            on the line, instead of at one shared box the pool converges on
+//            (the convergence was measured as dice-on-dice collisions flinging
+//            one die of three across the mat one throw in three at the head).
+//   spin   — the stamped angular velocity as a factor of the shipped ±15
+//            rad/s. Measured inert at 0.6 and 0.35 (the drop is the scatter,
+//            not the spin) and left at 1: the tumble is the life of the die.
+//
+// Pile and settle, for the record and NOT as a gate (Joe: "pilling is OK"):
+// see tools/steps/place-region.mjs's printout beside the commit that set
+// these. The only cell that piles noticeably is 6d6 at a head (15–18% of
+// dice, against a placeless 6d6's 5.6%): six dice dropped low onto a third of
+// the mat, which is what a handful into a corner of a tray does.
+export const PLACE_AIM = { on: 1, speed: 0.5, h: 0.45, box: 0.5, corner: 1, own: 1, spin: 1 };
+
+// The widest die's rest ceiling, kept off every wall the aim box touches by
+// the cap below — dice must not be aimed AT a rim.
 const AIM_HULL = 1.25;
 
-// One shared zero, returned BY REFERENCE for every unstamped roll: `aim.x + v`
-// is `v` on the same double, so a film with no stamp is the film this table
-// baked before places existed. Frozen — a caller that mutated the shared zero
-// would poison every throw after it.
-export const AIM_ZERO = Object.freeze({ x: 0, z: 0 });
+// One shared zero, returned BY REFERENCE for every unstamped roll, and the
+// identity on every factor: `0 + v` is `v` and `v * 1` is `v` on the same
+// double (IEEE 754: adding +0 and multiplying by 1 are both exact), so a film
+// with no stamp is the film this table baked before places existed — the
+// golden in `place-seeds-unchanged` is the pin. Every factor spawnDie reads
+// (`kx`, `kz`, `k`, `h`, `spin`) is 1 here and `own` is off, which is what
+// keeps the shipped expressions the shipped expressions. Frozen: a caller
+// that mutated the shared zero would poison every throw after it.
+export const AIM_ZERO = Object.freeze({ x: 0, z: 0, kx: 1, kz: 1, k: 1, own: 0, spin: 1, h: 1 });
 
-// WHERE THIS THROW AIMS. Bias, then travel floor, then wall cap, in that order.
+// WHERE THIS THROW AIMS, AND HOW IT IS THROWN. Returns {x, z, kx, kz, k, h,
+// spin, own}: the aim box's centre, its two extents as factors of the shipped
+// box (spawnDie draws `(rng() − 0.5) * TABLE_W * THROW_TARGET * kx`), the
+// hurl, height and spin factors, and whether each die aims from its own
+// abscissa. Nothing here draws rng and nothing here changes how many times
+// spawnDie does: the factors multiply draws that are taken anyway.
 //
-// THROW_TARGET is untouched at 0.4: the box is TRANSLATED, never shrunk — no
-// felt is owned (IMMERSION:1399-1403, re-affirmed unamended), no exclusivity,
-// no claim, and the box still straddles the table's centre from every station.
-// The travel floor exists because a bias toward your own edge with nothing
-// under it is a throw that barely leaves your hand: the aim point is pushed to
-// at least PLACE_AIM.minTravel from the spawn line, which at the long edges
-// carries it past the centre. The cap then keeps the aim box's far lip clear
-// of the opposite wall by a die's hull.
+// Region first, then the hull cap pulls the region's WALL sides in by a die's
+// hull (its open sides — the centre lines — are not walls and are not pulled),
+// then the box is cut to `PLACE_AIM.box` of what is left and set against the
+// roller's own wall: in the own corner for a laned long-edge throw, laterally
+// centred otherwise. `lane` is the STAMP's slot (−1 | 0 | +1), not the pool's
+// effective lane — the region is a property of the chair, and a big handful
+// from the front-left chair still lands front-left even when its line has
+// yielded toward the middle.
 //
-// `laneWorld` is the effective lane laneSpread returned — pool-derived, so the
-// lateral bias shrinks with the handful exactly as the spawn line does.
-export function aimFor(entry, laneWorld, w, d, throwTarget) {
-  if (!Number.isInteger(entry) || entry < 0 || entry > 3) return AIM_ZERO;
-  const alongZ = entry <= 1;
-  const entHalf = alongZ ? d / 2 : w / 2;
-  const entSign = entry === 0 ? 1 : entry === 1 ? -1 : entry === 2 ? -1 : 1;
-  let ent = entSign * entHalf * PLACE_AIM.entry;
-  const spawnEnt = entSign * (entHalf - 2.2);
-  if (Math.abs(spawnEnt - ent) < PLACE_AIM.minTravel)
-    ent = spawnEnt - Math.sign(spawnEnt) * PLACE_AIM.minTravel;
-  // The aim box's own half-span is `extent * throwTarget / 2` — spawnDie draws
-  // `(rng() - 0.5) * extent * THROW_TARGET`, which is ±20% of the mat at the
-  // shipped 0.4, not ±40%. (The design's draft dropped the /2 and its own
-  // three worked numbers refuted it: the cap bound at every zoom and the whole
-  // bias died silently at 0.)
-  const cap = (h, half) => Math.max(0, half - h * throwTarget / 2 - AIM_HULL);
-  ent = Math.max(-cap(alongZ ? d : w, entHalf), Math.min(cap(alongZ ? d : w, entHalf), ent));
-  const lat = laneWorld * PLACE_AIM.lateral;             // effective lane, pool-derived
-  return alongZ ? { x: lat, z: ent } : { x: ent, z: lat };
+// Dice may still leave a region: these are dials on a throw, not walls, and
+// the measured containment is a rate, not a law. The scenario that pins the
+// picture (place-two-rolls) therefore asserts the pool's CENTROID against the
+// region with a die's width of margin at its open sides, which is the claim
+// the numbers support; the per-die rates are printed for the record.
+export function aimFor(entry, lane, w, d, throwTarget) {
+  if (!PLACE_AIM.on) return AIM_ZERO;
+  const region = regionFor(entry, lane, w, d);
+  if (!region) return AIM_ZERO;
+  const hw = w / 2;
+  const hd = d / 2;
+  // The cap: pull each side that IS a wall in by a hull.
+  const x0 = region.x0 <= -hw ? region.x0 + AIM_HULL : region.x0;
+  const x1 = region.x1 >= hw ? region.x1 - AIM_HULL : region.x1;
+  const z0 = region.z0 <= -hd ? region.z0 + AIM_HULL : region.z0;
+  const z1 = region.z1 >= hd ? region.z1 - AIM_HULL : region.z1;
+  const bw = Math.max(0, (x1 - x0) * PLACE_AIM.box);
+  const bd = Math.max(0, (z1 - z0) * PLACE_AIM.box);
+  let cx;
+  let cz;
+  let own = 0;
+  if (entry <= 1) {
+    // Against the own wall (the front's is +z, the back's −z)…
+    cz = entry === 0 ? z1 - bd / 2 : z0 + bd / 2;
+    // …and in the own corner when there is a lane side; the centre slot has
+    // none, so each of its dice is thrown straight at the rim from where it
+    // is on the line.
+    if (PLACE_AIM.corner && lane < 0) cx = x0 + bw / 2;
+    else if (PLACE_AIM.corner && lane > 0) cx = x1 - bw / 2;
+    else { cx = (x0 + x1) / 2; own = 1; }
+  } else {
+    cx = entry === 2 ? x0 + bw / 2 : x1 - bw / 2;
+    cz = (z0 + z1) / 2;
+    own = 1;
+  }
+  return {
+    x: cx,
+    z: cz,
+    kx: bw / (w * throwTarget),
+    kz: bd / (d * throwTarget),
+    k: PLACE_AIM.speed,
+    own: PLACE_AIM.own ? own : 0,
+    spin: PLACE_AIM.spin,
+    h: PLACE_AIM.h,
+  };
 }

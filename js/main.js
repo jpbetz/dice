@@ -31,7 +31,7 @@ import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
 // file reads the stamps back (the rollspec.js precedent). The film half only:
 // laneSpread (the lane yields to the pool), aimFor (a translated aim box),
 // and AIM_ZERO (the shared frozen zero every unstamped roll aims through).
-import { laneSpread, aimFor, AIM_ZERO, placeAnchor, STATIONS } from './places.js';
+import { laneSpread, aimFor, regionFor, AIM_ZERO, placeAnchor, STATIONS } from './places.js';
 // …and the OBJECT standing at a place: the merged eight-station placard rig
 // (one mesh, one material, three textures) plus the roller's wash, which is
 // the other half of "attribution is edge + wash". Render-only, top to bottom:
@@ -3087,9 +3087,11 @@ let spawnLine = [];
 // the first die spawns, one record per roll: the validated stamp (`entry`,
 // `lane` — null / 0 when the payload carried none or carried garbage), the
 // edge the film actually used (`side`), the effective lane after it yielded
-// to the pool (`laneWorld`), the translated aim box centre, and which
-// authority decided (`from: 'place' | 'seed'`), and `washAt` — whose placard
-// this roll's attribution arc lit, or null when nobody's. An instrument, not
+// to the pool (`laneWorld`), the aim box's centre (`aim`), its extents and
+// the hurl factor (`box`), the region the throw is meant to rest in
+// (`region`, v2 — null for a stampless throw), which authority decided
+// (`from: 'place' | 'seed'`), and `washAt` — whose placard this roll's
+// attribution arc lit, or null when nobody's. An instrument, not
 // an input: nothing in the app reads this back — it exists so a scenario can
 // ask "which edge did that film enter over, and why" without re-deriving the
 // draw. Read by __diceDebug.throwOrigin.
@@ -5337,9 +5339,10 @@ function dieBody(type) {
 // defaults ARE the shipped throw: `lane` shifts the side-0/1 line along its
 // edge (0 adds nothing — `0 + v === v` on the same double), `spreadOverride`
 // is the pool line laneSpread already compressed (null keeps the expression
-// below untouched), and `aim` translates the landing box (AIM_ZERO is the
-// shared frozen zero). playRoll is the only caller; every value is computed
-// once per roll there, never per die, and none of them draws rng.
+// below untouched), and `aim` is the region's throw — the landing box moved
+// and shrunk, the hurl, height and spin factors (js/places.js aimFor; AIM_ZERO
+// is the shared frozen identity). playRoll is the only caller; every value is
+// computed once per roll there, never per die, and none of them draws rng.
 function spawnDie(type, index, count, side, rng, shrouded = false, set = null,
   lane = 0, spreadOverride = null, aim = AIM_ZERO) {
   const variant = dieVariant(shrouded, set);
@@ -5395,11 +5398,14 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null,
 
   // `lane +` on the long edges only — the head stations are single-station,
   // so a lane never rides a side-2/3 throw. The lane moves the whole line;
-  // fit() still has the last word, per die, against the wall.
-  if (side === 0) body.position.set(fit(lane + offset + jitter()), 6 + rng() * 4 + index * 0.9, TABLE_D / 2 - 2.2);
-  else if (side === 1) body.position.set(fit(lane + offset + jitter()), 6 + rng() * 4 + index * 0.9, -TABLE_D / 2 + 2.2);
-  else if (side === 2) body.position.set(-TABLE_W / 2 + 2.2, 6 + rng() * 4 + index * 0.9, fit(lateral + jitter()));
-  else body.position.set(TABLE_W / 2 - 2.2, 6 + rng() * 4 + index * 0.9, fit(lateral + jitter()));
+  // fit() still has the last word, per die, against the wall. `aim.h` scales
+  // the spawn HEIGHT for a stamped throw (js/places.js PLACE_AIM.h — a toss
+  // from a low hand is what keeps a pool in its region; the drop, not the
+  // hurl, was the scatter) and is 1 on AIM_ZERO, an exact multiply.
+  if (side === 0) body.position.set(fit(lane + offset + jitter()), (6 + rng() * 4 + index * 0.9) * aim.h, TABLE_D / 2 - 2.2);
+  else if (side === 1) body.position.set(fit(lane + offset + jitter()), (6 + rng() * 4 + index * 0.9) * aim.h, -TABLE_D / 2 + 2.2);
+  else if (side === 2) body.position.set(-TABLE_W / 2 + 2.2, (6 + rng() * 4 + index * 0.9) * aim.h, fit(lateral + jitter()));
+  else body.position.set(TABLE_W / 2 - 2.2, (6 + rng() * 4 + index * 0.9) * aim.h, fit(lateral + jitter()));
 
   // The spawn line, recorded for the one instrument that can see this failing
   // (spawnLine / spawn-clear.mjs). `index === 0` is the throw boundary: playRoll
@@ -5423,18 +5429,30 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null,
 
   // hurl it toward a random point near the middle of the table (THROW_TARGET
   // is the width of that box as a fraction of the table; 0.4 = shipped).
-  // `aim` TRANSLATES that box toward the roller's station and never shrinks
-  // it (js/places.js aimFor) — AIM_ZERO on every unstamped roll, which is the
-  // shipped centre on the same doubles.
+  // `aim` moves that box INTO THE ROLLER'S REGION and shrinks it to fit
+  // (js/places.js aimFor, v2): `x`/`z` translate it, `kx`/`kz` scale each
+  // extent, and `k` scales the hurl — because the target only ever set the
+  // throw's DIRECTION, and at the shipped 14–22 u/s a die is in the air long
+  // enough to cross the mat whatever it was pointed at. AIM_ZERO on every
+  // unstamped roll is the shipped centre on the same doubles: +0 added and 1
+  // multiplied are both exact, so the expression below IS the pre-places one
+  // for a payload with no stamp (the `place-seeds-unchanged` golden pins it).
+  // Same rng draws, same order, stamped or not. `own` (heads and the centre
+  // slot) aims each die straight at its own rim from where IT is on the line
+  // — one shared box had the pool converging on a point and colliding.
+  const ax = aim.own && !alongZ ? body.position.x : aim.x;
+  const az = aim.own && alongZ ? body.position.z : aim.z;
   const target = new CANNON.Vec3(
-    aim.x + (rng() - 0.5) * TABLE_W * THROW_TARGET, 0,
-    aim.z + (rng() - 0.5) * TABLE_D * THROW_TARGET);
+    ax + (rng() - 0.5) * TABLE_W * THROW_TARGET * aim.kx, 0,
+    az + (rng() - 0.5) * TABLE_D * THROW_TARGET * aim.kz);
   const dir = target.vsub(body.position);
   dir.y = 0;
   dir.normalize();
-  const speed = 14 + rng() * 8;
+  // `k` eases the hurl and `spin` the tumble for a stamped throw; both 1 on
+  // AIM_ZERO (exact), and neither adds or moves a draw.
+  const speed = (14 + rng() * 8) * aim.k;
   body.velocity.set(dir.x * speed, -2 - rng() * 3, dir.z * speed);
-  body.angularVelocity.set((rng() - 0.5) * 30, (rng() - 0.5) * 30, (rng() - 0.5) * 30);
+  body.angularVelocity.set((rng() - 0.5) * 30 * aim.spin, (rng() - 0.5) * 30 * aim.spin, (rng() - 0.5) * 30 * aim.spin);
   body.quaternion.setFromEuler(rng() * Math.PI * 2, rng() * Math.PI * 2, rng() * Math.PI * 2);
 
   world.addBody(body);
@@ -6479,12 +6497,16 @@ function playRoll(roll, rethrow = null) {
     laneWorld = laid.lane;
     spreadOverride = laid.spread;
   }
-  // The aim box, TRANSLATED toward the roller's station, never shrunk
-  // (js/places.js aimFor; IMMERSION:1399-1403 — no felt is owned, the box
-  // still straddles the centre). AIM_ZERO for an unstamped roll is the shared
-  // frozen zero: `0 + v === v` on the same double, so a payload without a
-  // stamp bakes the film this table baked before places existed.
-  const aim = stamped ? aimFor(side, laneWorld, TABLE_W, TABLE_D, THROW_TARGET) : AIM_ZERO;
+  // The aim box, moved INTO THE ROLLER'S REGION of the mat and shrunk to fit
+  // it, and the hurl eased so the dice can stop there (js/places.js regionFor
+  // / aimFor, v2 — a place owns its region of felt for landing, by Joe's word;
+  // docs/IMMERSION.md item 16). Keyed on the STAMP's lane slot, not the
+  // pool's effective lane: the region is the chair's, and a handful from the
+  // front-left chair still lands front-left. AIM_ZERO for an unstamped roll
+  // is the shared frozen identity — `0 + v` and `v * 1` are `v` on the same
+  // double — so a payload without a stamp bakes the film this table baked
+  // before places existed.
+  const aim = stamped ? aimFor(side, laneSlot, TABLE_W, TABLE_D, THROW_TARGET) : AIM_ZERO;
   // THE OTHER HALF OF THE ATTRIBUTION RULE (UX §7.63, §6.3). While this film
   // plays, a soft arc of the roller's hue lies on the ground under THEIR
   // placard. It is read from `roll.entry` — the payload stamp — and NOT from
@@ -6508,6 +6530,13 @@ function playRoll(roll, rethrow = null) {
     side,
     laneWorld,
     aim: { x: aim.x, z: aim.z },
+    // The v2 landing story, for the scenario's read: the aim box's full
+    // extents in world units and the hurl / height / spin factors (the
+    // shipped box and factors of 1 for an unstamped roll), and the region
+    // this throw is meant to come to rest in — null when the stamp carries
+    // none.
+    box: { w: TABLE_W * THROW_TARGET * aim.kx, d: TABLE_D * THROW_TARGET * aim.kz, k: aim.k, h: aim.h, spin: aim.spin, own: aim.own },
+    region: stamped ? regionFor(side, laneSlot, TABLE_W, TABLE_D) : null,
     from: stamped ? 'place' : 'seed',
     pour: pouring,
     washAt: washPlan ? { place: washPlan.place, x: washPlan.x, z: washPlan.z } : null,
@@ -16370,6 +16399,8 @@ window.__diceDebug = {
     return throwOrigin ? {
       ...throwOrigin,
       aim: { ...throwOrigin.aim },
+      box: { ...throwOrigin.box },
+      region: throwOrigin.region ? { ...throwOrigin.region } : null,
       washAt: throwOrigin.washAt ? { ...throwOrigin.washAt } : null,
     } : null;
   },
