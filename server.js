@@ -966,6 +966,13 @@ const heartbeat = setInterval(() => {
         }
       }
     }
+    // A STATION CAN COME FREE WITH NOBODY LEAVING (§7.63): a vacated stub's
+    // 60 s clock lapses and the chair it held goes back into the ladder
+    // (placesHeld). No timer marks that moment, so the sweep that already
+    // walks every room is where a placeless player waiting for it is seated —
+    // one Map scan when nobody is placeless, one `place-changed` when somebody
+    // is. See promotePlaceless for the defect this closes.
+    promotePlaceless(room);
   }
 }, HEARTBEAT_MS);
 if (heartbeat.unref) heartbeat.unref();
@@ -1273,13 +1280,27 @@ function keepPlace(room, wanted) {
   return freePlace(room);
 }
 
-// THE ONE REASSIGNMENT. A station has just come free and somebody is sitting
-// at this table without one: the earliest-joined placeless player takes the
+// THE ONE REASSIGNMENT. A station has come free and somebody is sitting at
+// this table without one: the earliest-joined placeless player takes the
 // lowest free station and the room is told. `room.players` is a Map, so
 // insertion order IS join order — "earliest-joined" is deterministic and costs
-// no field. Called only from removePlayer, which is the only thing that can
-// free a station; every other door either assigns at the moment of arrival
-// (and rides `player-joined`) or reuses a place that never moved.
+// no field. A no-op unless somebody is placeless AND a station is free, so it
+// is cheap to ask from anywhere; nothing else ever reassigns a place.
+//
+// TWO THINGS FREE A STATION, and it is called after both:
+//   · removePlayer — the seat left. On the gesture door (`immediate`) the
+//     chair is free at once and the promotion fires right there. On the
+//     DISCONNECT reap the stub buried a line earlier still holds the chair
+//     (the 60 s memory clock), so the call there correctly promotes nobody…
+//   · …and the STUB LAPSING, which is the passage of time and nothing else:
+//     placesHeld stops counting it and the chair is back in the ladder with no
+//     event, no timer and no caller. Found in review (2026-09-01) — with the
+//     promotion hooked ONLY on removePlayer, a nine-person table whose eighth
+//     chair emptied through a closed tab left the ninth player placeless for
+//     ever, and handed that chair to the NEXT arrival ahead of them. So the
+//     heartbeat sweep asks once per room per tick (≤ HEARTBEAT_MS after the
+//     lapse), and handleJoin asks BEFORE seating a newcomer, so whoever has
+//     been waiting longest is seated first, whatever freed the chair.
 function promotePlaceless(room) {
   if (!PLACES_ON) return;
   for (const p of room.players.values()) {
@@ -1506,6 +1527,15 @@ async function handleJoin(req, res) {
   }
 
   const room = getRoom(roomName);
+  // WHOEVER HAS BEEN WAITING LONGEST SITS FIRST (§7.63). A station freed by a
+  // stub lapsing is handed to the next thing that reads the ladder, and that
+  // must never be this arrival: a placeless player who has been at the table
+  // since before the chair came free takes it here, and the newcomer is
+  // seated by freePlace below in whatever is left. BEFORE takeVacatedSeat, so
+  // a reviving seat's own chair — unheld for the instant between its stub
+  // being consumed and keepPlace reading the ladder — can never be taken out
+  // from under it. Synchronous, like everything from here to room.players.set.
+  promotePlaceless(room);
   // COMING BACK AFTER THE REAP (IDENTITY §8). The roster let this seat go on
   // the ordinary schedule and nothing about that changed — the room saw the
   // departure, and this arrival is a real `player-joined`, not the invisible

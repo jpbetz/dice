@@ -42,7 +42,12 @@ limitations under the License.
 //      not a fallback station — and everything else about their table is
 //      unchanged. The one reassignment the system ever makes is the PROMOTION:
 //      a station comes free, the earliest-joined placeless player takes it, and
-//      the room is told once.
+//      the room is told once. A station comes free TWO ways — a seat leaves
+//      for good, or a vacated stub's memory clock lapses with nobody leaving
+//      and nobody arriving — and the promotion must follow both (section 4:
+//      the lapse leg was missing, and with it the promotion never fired on
+//      the ordinary departure, a closed tab, and the next arrival was seated
+//      ahead of the player who had been waiting).
 //
 //   4. ONE PROJECTION ONTO THE WIRE. `player-joined` used to carry a
 //      hand-built literal, which is how a roster field could be — and once was
@@ -135,12 +140,33 @@ const base = `http://127.0.0.1:${port}`;
 // relation cannot be asserted by waiting less.
 const GRACE_MS = 400;
 const TTL_MS = 6000;
-const portFast = await freePort();
-const procFast = await startServer(portFast, {
-  DICE_DISCONNECT_GRACE_MS: String(GRACE_MS),
-  DICE_RESUME_TTL_MS: String(TTL_MS),
-});
+// The lapse legs (section 4) need the same relation on a shorter memory clock,
+// and they need the heartbeat sweep in two opposite states: PARKED, so the
+// door is provably the thing that seats a waiting player when an arrival
+// follows a lapse; and FAST, so the lapse alone — nobody leaving, nobody
+// arriving — is provably enough. One server cannot be both.
+const LAPSE_TTL_MS = 1500;
+const SWEEP_MS = 300;
+const [portFast, portDoor, portSweep] = await Promise.all([freePort(), freePort(), freePort()]);
+const [procFast, procDoor, procSweep] = await Promise.all([
+  startServer(portFast, {
+    DICE_DISCONNECT_GRACE_MS: String(GRACE_MS),
+    DICE_RESUME_TTL_MS: String(TTL_MS),
+  }),
+  startServer(portDoor, {
+    DICE_DISCONNECT_GRACE_MS: String(GRACE_MS),
+    DICE_RESUME_TTL_MS: String(LAPSE_TTL_MS),
+    DICE_HEARTBEAT_MS: String(10 * 60 * 1000),   // the sweep never runs here
+  }),
+  startServer(portSweep, {
+    DICE_DISCONNECT_GRACE_MS: String(GRACE_MS),
+    DICE_RESUME_TTL_MS: String(LAPSE_TTL_MS),
+    DICE_HEARTBEAT_MS: String(SWEEP_MS),
+  }),
+]);
 const baseFast = `http://127.0.0.1:${portFast}`;
+const baseDoor = `http://127.0.0.1:${portDoor}`;
+const baseSweep = `http://127.0.0.1:${portSweep}`;
 
 const postTo = async (at, path, body) => {
   const res = await fetch(at + path, {
@@ -420,6 +446,66 @@ await t('a stub that expires gives its station up', async () => {
     'gone for good is gone for good — the chair goes back into the ladder');
 });
 
+// THE LAPSE IS THE SECOND WAY A STATION COMES FREE, and until 2026-09-01 the
+// promotion did not know it. removePlayer promotes right after burying the
+// stub — which on the disconnect reap still HOLDS the chair, so that call
+// correctly seats nobody — and nothing asked again when the stub lapsed. At
+// a nine-person table one closed tab left the ninth player placeless for
+// ever and handed the freed chair to the next stranger through the door.
+// Both halves are pinned here: the door seats the waiter first, and the
+// sweep seats them even when nobody comes to the door at all.
+
+/** Eight seated with a browser key (so the reap buries a stub), a ninth
+ *  placeless, and then seat `victim`'s tab dies the ordinary way: the beacon
+ *  lands, the socket drops, the reap follows. Returns the roster and the
+ *  ninth, whose stream is the witness. */
+async function fullHouseThenLapse(at, room, victim) {
+  const people = [];
+  for (let i = 0; i < PLACE_MAX; i++) {
+    people.push(await seat(at, room, `P${i}`, { who: `who-p${i}-${room}` }));
+  }
+  const ninth = await seat(at, room, 'Ninth');
+  assert.equal(placeOf(ninth.players, ninth.playerId), undefined, 'the ninth is placeless');
+  await postTo(at, '/api/leave', { room, playerId: people[victim].playerId, streamId: people[victim].streamId });
+  people[victim].stream.ac.abort();
+  await waitForEvent(ninth.stream, 'player-left', (d) => d.playerId === people[victim].playerId, 5000);
+  return { people, ninth };
+}
+const promotions = (who) => who.stream.events().filter((e) => e.type === 'place-changed');
+
+await t('a chair freed by a LAPSED stub goes to the player who was waiting — nobody leaves, nobody arrives', async () => {
+  const room = 'wire-lapse-sweep';
+  const { ninth } = await fullHouseThenLapse(baseSweep, room, 3);
+  // INSIDE THE TTL the chair is held for the browser on its way back: the
+  // promotion in removePlayer seats nobody, and neither does the sweep.
+  await sleep(LAPSE_TTL_MS / 2);
+  assert.deepEqual(promotions(ninth), [], 'nobody is promoted while the stub still holds the chair');
+  // THE STUB LAPSES. The sweep is the only thing that runs — and it is enough.
+  const ev = await waitForEvent(ninth.stream, 'place-changed', () => true, LAPSE_TTL_MS + 2000);
+  assert.deepEqual(ev.data, { playerId: ninth.playerId, place: 3 },
+    'the waiting player takes the lapsed chair');
+  await sleep(SWEEP_MS * 3);
+  assert.equal(promotions(ninth).length, 1, `exactly once (got ${promotions(ninth).length})`);
+  const view = await joinAt(baseSweep, room, 'Peek');
+  assert.equal(placeOf(view.data.players, ninth.playerId), 3, 'and the roster agrees');
+  assert.equal(placeOf(view.data.players, view.data.playerId), undefined,
+    'the table is full again: the peeker is placeless');
+});
+
+await t('an arrival after the lapse is seated BEHIND the player who was waiting, never ahead', async () => {
+  const room = 'wire-lapse-door';
+  const { ninth } = await fullHouseThenLapse(baseDoor, room, 5);
+  await sleep(LAPSE_TTL_MS + 300);   // the stub lapses; this server's sweep is parked
+  assert.deepEqual(promotions(ninth), [], 'nothing has read the ladder since the lapse');
+  const late = await joinAt(baseDoor, room, 'Late');
+  assert.equal(placeOf(late.data.players, ninth.playerId), 5,
+    'the door seats the player who was waiting first…');
+  assert.equal(placeOf(late.data.players, late.data.playerId), undefined,
+    '…and the arrival behind them: the table is full, so they are placeless');
+  const ev = await waitForEvent(ninth.stream, 'place-changed');
+  assert.deepEqual(ev.data, { playerId: ninth.playerId, place: 5 }, 'and the room was told');
+});
+
 // ---------------------------------------------------------------------------
 // 5. Redaction — the stamp rides it, the values never do
 // ---------------------------------------------------------------------------
@@ -540,8 +626,7 @@ await t('a re-throw is re-stamped from the live place — the tower remap includ
   assert.equal(again.data.roll.lane, flank.lane, 'flanks are single-station: lane 0');
 });
 
-await stopServer(proc);
-await stopServer(procFast);
+await Promise.all([proc, procFast, procDoor, procSweep].map(stopServer));
 
 console.log(`${n - failed}/${n} places-wire checks passed`);
 if (failed) process.exit(1);
