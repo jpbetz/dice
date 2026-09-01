@@ -31,7 +31,12 @@ import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
 // file reads the stamps back (the rollspec.js precedent). The film half only:
 // laneSpread (the lane yields to the pool), aimFor (a translated aim box),
 // and AIM_ZERO (the shared frozen zero every unstamped roll aims through).
-import { laneSpread, aimFor, AIM_ZERO, placeAnchor, PLACE_MAX, STATIONS } from './places.js';
+import { laneSpread, aimFor, AIM_ZERO, placeAnchor, STATIONS } from './places.js';
+// …and the OBJECT standing at a place: the merged eight-station placard rig
+// (one mesh, one material, three textures) plus the roller's wash, which is
+// the other half of "attribution is edge + wash". Render-only, top to bottom:
+// nothing in here is ever read by a film.
+import { PlacardRig } from './placard.js';
 import { previewOf, countingPmfs, sumForecast, sumAtLeast, sumBins, sumPeak,
   throwForecast, facesOf } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
@@ -3051,12 +3056,33 @@ let spawnLine = [];
 // `lane` — null / 0 when the payload carried none or carried garbage), the
 // edge the film actually used (`side`), the effective lane after it yielded
 // to the pool (`laneWorld`), the translated aim box centre, and which
-// authority decided (`from: 'place' | 'seed'`). `washAt` stays null until the
-// placard slice stands something to anchor a wash to. An instrument, not an
-// input: nothing in the app reads this back — it exists so a scenario can ask
-// "which edge did that film enter over, and why" without re-deriving the
+// authority decided (`from: 'place' | 'seed'`), and `washAt` — whose placard
+// this roll's attribution arc lit, or null when nobody's. An instrument, not
+// an input: nothing in the app reads this back — it exists so a scenario can
+// ask "which edge did that film enter over, and why" without re-deriving the
 // draw. Read by __diceDebug.throwOrigin.
 let throwOrigin = null;
+
+// THE PLACARD RIG'S STATE, DECLARED HERE AND NOT BESIDE ITS CODE, for two
+// boot-order reasons that both cost a page that would not start.
+//
+// `animate()` runs its first `tick()` synchronously during module evaluation,
+// and tick asks tryFlushRoomChanges — which reaches tryFlushPlaces — on every
+// frame including that one. A `let` further down the file would still be in
+// its temporal dead zone at that moment. (`pendingZoom` sits at the top of
+// this file for exactly the same reason.)
+//
+// And the two counters start EQUAL rather than at some "nothing built yet"
+// sentinel: nothing has ASKED for a restanding yet, so that first flush must
+// be a no-op — `netOnline` is itself still in its dead zone there, and asking
+// who is seated would throw. The first real ask is initNet's, after the join.
+//
+// Everything that USES these lives with the flush, far below.
+let placardQueued = 0;   // how many roster doors have asked for a restanding
+let placardBuilt = 0;    // the placardQueued the standing arrangement was made from
+let placardRig = null;   // built lazily: a solo table never allocates one
+// The camera pose simulatePlaceView() borrowed, so it can be handed back exactly.
+let simulatedPlaceView = null;
 
 // cannon's native sleep, made tunable. world.allowSleep is already true, so
 // bodies sleep at these thresholds today; the question is whether a coarser
@@ -6422,6 +6448,18 @@ function playRoll(roll, rethrow = null) {
   // frozen zero: `0 + v === v` on the same double, so a payload without a
   // stamp bakes the film this table baked before places existed.
   const aim = stamped ? aimFor(side, laneWorld, TABLE_W, TABLE_D, THROW_TARGET) : AIM_ZERO;
+  // THE OTHER HALF OF THE ATTRIBUTION RULE (UX §7.63, §6.3). While this film
+  // plays, a soft arc of the roller's hue lies on the ground under THEIR
+  // placard. It is read from `roll.entry` — the payload stamp — and NOT from
+  // `stamped` above, and that distinction is load-bearing twice over: a POUR
+  // is never `stamped` (the doorway erases the entry read entirely), and the
+  // pour is exactly when the wash is the only thing left saying whose dice
+  // these are. The anchor is the roller's PLACARD, not their entry edge,
+  // because under a tower two flank stations share one edge (§7.1) and only
+  // the card tells them apart. A placeless roll carries no stamp, so it
+  // lights nothing — which is what stops a ninth player's dice ever wearing
+  // an eighth player's name.
+  const washPlan = placeWashFor(roll);
   // The instrument's record — written before the first die spawns, so the
   // spawn-line rows can carry `from` too. See the declaration for the shape.
   throwOrigin = {
@@ -6432,7 +6470,7 @@ function playRoll(roll, rethrow = null) {
     aim: { x: aim.x, z: aim.z },
     from: stamped ? 'place' : 'seed',
     pour: pouring,
-    washAt: null,
+    washAt: washPlan ? { place: washPlan.place, x: washPlan.x, z: washPlan.z } : null,
   };
   // A pour never touches spawnDie, so nothing would clear the last THROWN
   // roll's spawn line and the instrument would report a stale one as this
@@ -7417,6 +7455,11 @@ function playRoll(roll, rethrow = null) {
     if (camEase) camEase.dur = CAM_ARRIVE_S;
   }
 
+  // …and the wash lights, for as long as the film runs. It must come after
+  // `currentRoll`, because the cue's whole job is to last exactly as long as
+  // the thing it is attributing, and the film's length is only known here.
+  placeWashFire(washPlan, currentRoll.duration);
+
   // Roll moments (UX §2): a Check/Cinematic attachment stages the playback.
   // Held rolls keep their FULL ceremony (goal 11): the stakes — declaration,
   // dice, dc — are public; only the result is hidden, so the verdict card
@@ -7526,6 +7569,13 @@ function soloPushState(values, rule, thrown, kept) {
 // curve is — sim() and fastForwardPlayback drain films at speeds no ear was
 // meant to hear, and a sustained source must never be created off one.
 function stepPlayback(dt, tempo = 1, curve = false, realtime = curve) {
+  // A RESYNC IS NOT A MOMENT (UX §7.63). `suppressRollFx` is the flag a
+  // fast-forward sets while it drains a roll the room already watched — a
+  // rejoining player must not be shown a beat that has already happened, and
+  // an attribution cue for a throw nobody at this table saw thrown is the
+  // clearest case of that there is. It is caught HERE rather than at the arm
+  // site because replaySettledRoll calls playRoll first and only then drains.
+  if (suppressRollFx) placeWashClear();
   const roll = currentRoll;
   if (!roll || roll.done) return;
   const cer = roll.ceremony;
@@ -10072,6 +10122,10 @@ function skipCeremony() {
   if (!roll || roll.done || !roll.ceremony) return false;
   const cer = roll.ceremony;
   ceremonyLayer.classList.add('skip'); // suppress decorative motion this jump
+  // §7.63: the film is over, so the cue that names its roller is over too. A
+  // wash still breathing under a card after the verdict is up would outlive
+  // the thing it was attributing.
+  placeWashClear();
   if (cer.phase === 'declare') ceremonyEnterTumble(roll);
   if (cer.phase === 'tumble') {
     roll.time = roll.duration;
@@ -11226,6 +11280,7 @@ function tick(dt, render = true, realtime = false) {
   particleField.tick(dt, SHADER_TIME.value);
   decalField.tick(dt);
   dieLights.tick(dt, SHADER_TIME.value);
+  if (placardRig) placardRig.washTick(dt); // §7.63: the roller's arc, on the same clock
   stepPlayback(dt, realtime ? TEMPO.k : 1, realtime, realtime);
   stepSinking(dt);   // per-roll Done departures (§7.5)
   stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
@@ -12455,6 +12510,7 @@ function towerMatDepth(layer, extra) {
   walls.front.position.set(0, 0, TABLE_D / 2);
   updateShadowFrustum();
   refitView();
+  placardRelay();      // §7.63: the second writer of the extents, same reason
 }
 
 // The sum, in ONE fixed order, so a room reached by different routes is the
@@ -16236,10 +16292,17 @@ window.__diceDebug = {
   // `side` is the edge the film used — the stamp when present, the seeded
   // draw otherwise, 0 for a pour; `laneWorld` is the lane after it yielded to
   // the pool; `aim` is the translated landing-box centre; `from` names the
-  // deciding authority ('place' | 'seed'); `washAt` stays null until the
-  // placard slice stands something to anchor a wash to. Null before any roll
-  // has thrown.
-  throwOrigin() { return throwOrigin ? { ...throwOrigin, aim: { ...throwOrigin.aim } } : null; },
+  // deciding authority ('place' | 'seed'); `washAt` is `{place, x, z}` — whose
+  // card the attribution arc lit — or null when nobody's, which is the honest
+  // answer for a placeless roller, a solo table and a roller who has left.
+  // Null before any roll has thrown.
+  throwOrigin() {
+    return throwOrigin ? {
+      ...throwOrigin,
+      aim: { ...throwOrigin.aim },
+      washAt: throwOrigin.washAt ? { ...throwOrigin.washAt } : null,
+    } : null;
+  },
   // WHO SITS WHERE (UX §7.63) — the roster half of a place, as this client
   // understands it, plus where each occupied station's card stands in world
   // units. Read-only and derived on the spot: nothing here is state, and
@@ -16251,37 +16314,37 @@ window.__diceDebug = {
   // cards would wear ('table', the grounded kit; the venue kits arrive with the
   // venue dress slice). `world` comes from js/places.js against the mat AS THE
   // WALLS CURRENTLY STAND — this zoom, this tower — so it already carries the
-  // tower's flank relocation. `shown`/`fontPx`/`visible` stay empty-but-shaped
-  // until there is something painted to report; `queued` counts the roster
-  // events that have asked for a rebuild, which is this slice's only proof that
-  // every door is wired to one.
+  // tower's flank relocation. `shown` is the string actually painted on the
+  // card and `fontPx` the size it was fitted at (>= 44 by law); `yaw` is the
+  // card's own world rotation about Y, which is its STATION's azimuth this
+  // slice — the per-viewer turn-toward-the-reader lands with orientation.
+  // `queued` counts the roster events that have asked for a restanding and
+  // `built` the one the standing arrangement was made from; equal means the
+  // cards agree with the roster.
   places() {
     const towerUp = towerOn();
-    const seated = netOnline ? players : [];
-    const mineRow = (netOnline && net) ? seated.find((p) => p.id === net.playerId) : null;
-    const mine = mineRow && Number.isInteger(mineRow.place) ? mineRow.place : null;
-    const stations = [];
-    for (let place = 0; place < PLACE_MAX; place++) {
-      const p = seated.find((q) => Number.isInteger(q.place) && q.place === place);
-      if (!p) continue;                       // an empty station stands nothing
-      const st = STATIONS[place];
-      const a = placeAnchor(place, TABLE_W, TABLE_D, towerUp);
-      stations.push({
-        place,
+    const rows = placeRows();
+    const mineRow = rows.find((r) => r.mine) || null;
+    const mine = mineRow ? mineRow.place : null;
+    const stations = rows.map((r) => {
+      const st = STATIONS[r.place];
+      const painted = placardRig ? placardRig.rowAt(r.place) : null;
+      return {
+        place: r.place,
         station: st.edge,
         lane: st.lane,
-        playerId: p.id,
-        name: p.name,
-        shown: null,
-        fontPx: 0,
-        color: p.color || null,
-        world: { x: a.x, y: a.y, z: a.z },
-        yaw: 0,
-        visible: false,
-        relocated: a.relocated,
-        mine: p.id === (net ? net.playerId : null),
-      });
-    }
+        playerId: r.playerId,
+        name: r.name,
+        shown: painted ? painted.shown : null,
+        fontPx: painted ? painted.fontPx : 0,
+        color: r.color,
+        world: { x: r.anchor.x, y: painted ? painted.seatY : r.anchor.y, z: r.anchor.z },
+        yaw: r.anchor.azim,
+        visible: !!(painted && placardRig.mesh && placardRig.mesh.visible),
+        relocated: r.anchor.relocated,
+        mine: r.mine,
+      };
+    });
     const myAnchor = mine === null ? null : placeAnchor(mine, TABLE_W, TABLE_D, towerUp);
     return {
       on: stations.length > 0,
@@ -16289,8 +16352,106 @@ window.__diceDebug = {
       mine,
       myOrbit: myAnchor ? myAnchor.azim : 0,
       queued: placardQueued,
+      built: placardBuilt,
       stations,
     };
+  },
+  // THE CARD FACE, IN THE FRAME (UX §7.63, §4 amendment 1). The tent's own
+  // corners — never the holder's — projected through the live camera, as an
+  // ndc and a pixel box. The standoff constant is 0.72 and it GRAZES the
+  // bottom of a wide 16:9 frame, so the gate that decides whether it ships is
+  // on the readable FACE (which sits 0.10–0.49 above the ground and therefore
+  // projects higher than the base), not on the anchor. Null for a station
+  // nobody is standing at.
+  placardFrame(place) {
+    const row = placardRig ? placardRig.rowAt(place) : null;
+    if (!row || !row.corners) return null;
+    const v = new THREE.Vector3();
+    let nx0 = Infinity, nx1 = -Infinity, ny0 = Infinity, ny1 = -Infinity;
+    let inFrame = true;
+    for (const c of row.corners) {
+      v.set(c[0], c[1], c[2]).project(camera);
+      nx0 = Math.min(nx0, v.x); nx1 = Math.max(nx1, v.x);
+      ny0 = Math.min(ny0, v.y); ny1 = Math.max(ny1, v.y);
+      if (!(v.z > -1 && v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1)) inFrame = false;
+    }
+    return {
+      place,
+      ndc: { x0: nx0, x1: nx1, y0: ny0, y1: ny1 },
+      px: {
+        x0: (nx0 + 1) / 2 * view.width, x1: (nx1 + 1) / 2 * view.width,
+        y0: (1 - ny1) / 2 * view.height, y1: (1 - ny0) / 2 * view.height,
+      },
+      cx: (nx0 + nx1) / 2,
+      cy: (ny0 + ny1) / 2,
+      in: inFrame,
+      mine: !!row.mine,
+    };
+  },
+  // THE EXACT PAINTED STRING — the vocabulary sweep's reach into 3D. Either
+  // the roster name or its visible ellipsis-truncation of it, and nothing
+  // else is ever legal: 3D words are provably a projection of the words the
+  // DOM sweep already judges.
+  placardText(place) {
+    return placardRig ? placardRig.text(place) : null;
+  },
+  // What the rig costs, from the rig itself. `draws` counts the mesh, its
+  // shadow-map pass and the wash while a film runs (the design's <= 4 gate);
+  // `tris` is the WHOLE buffer, degenerate stations included, because that is
+  // what is actually submitted.
+  placardBudget() {
+    return placardRig ? placardRig.budget()
+      : { draws: 0, tris: 0, atlasPx: 0, rows: 0, materials: 0, textures: 0, occupied: 0, shown: true };
+  },
+  // The rig's kill switch, so a budget can be measured on ONE frame with the
+  // cards and without them — a gate that only measured the new frame would
+  // pass just as happily with the feature off.
+  placardShow(on) {
+    return placardRig ? placardRig.setShown(on) : !!on;
+  },
+  // THE ATTRIBUTION ARC (§6.3). `active` while it is lit, `station` whose card
+  // it is under, `world` where, `color` the roller's hue, `opacity` where the
+  // 0 -> 0.5 -> 0 envelope has got to.
+  washInfo() {
+    return placardRig ? placardRig.washInfo()
+      : { active: false, station: null, world: null, color: null, opacity: 0 };
+  },
+  // LOOK AT THE TABLE FROM SOMEBODY ELSE'S CHAIR, without being them. Render
+  // only, and STRICTLY an instrument: it swings THIS tab's eye about the
+  // table's vertical axis to station n's azimuth, exactly the way
+  // `restFrameProbe` swings it, and puts it back on `simulatePlaceView(null)`.
+  // No roster write, no place, nothing another client could see, and nothing
+  // any film reads. It is the look pass's only route to the six- and
+  // eight-place pictures, since three concurrent tabs is the harness ceiling.
+  //
+  // WHAT IT IS NOT: the shipped frame for a rotated viewer. Turning the table
+  // for real means re-basing the framing ladder itself on a per-viewer
+  // `placeOrbit`, which is its own slice; this borrows the CURRENT resting
+  // pose and rotates it, so the picture it makes is the right picture of the
+  // cards and an approximation of the frame. Judge geometry with it, not
+  // framing.
+  simulatePlaceView(n) {
+    if (n === null || n === undefined) {
+      if (simulatedPlaceView) {
+        camera.position.copy(simulatedPlaceView.pos);
+        camTarget.copy(simulatedPlaceView.tgt);
+        aimCamera(camTarget);
+        simulatedPlaceView = null;
+        applyCameraFraming(false);
+      }
+      return { place: null, orbit: 0 };
+    }
+    const a = placeAnchor(n, TABLE_W, TABLE_D, towerOn());
+    if (!a) return null;
+    if (!simulatedPlaceView) {
+      simulatedPlaceView = { pos: camera.position.clone(), tgt: camTarget.clone() };
+    }
+    const ray = simulatedPlaceView.pos.clone().sub(CAM_TARGET_HOME);
+    if (a.azim) ray.applyAxisAngle(Y_AXIS, a.azim);
+    camera.position.copy(CAM_TARGET_HOME).add(ray);
+    camTarget.copy(CAM_TARGET_HOME);
+    aimCamera(camTarget);
+    return { place: n, orbit: a.azim, world: { x: a.x, y: a.y, z: a.z } };
   },
   // The settle terminator (SETTLEGATE). mode 'displacement' is shipped — the
   // three-point AABB rest test, `eps` its tolerance as a fraction of a die's
@@ -24692,25 +24853,136 @@ function tryFlushTower() {
 // `player-renamed` (one card repaints its row) and `place-changed` (the one
 // promotion the server ever makes).
 //
-// A STUB, on purpose and for exactly one slice. The wire lands before anything
-// it stands up: this slice proves the field arrives at every client through
-// every door, with nothing on the felt to see and no physics touched. The
-// rebuild itself joins tryFlushRoomChanges below — the roll-boundary defer the
-// zoom and the tower already ride — because restanding the cards, or turning a
-// viewer's own table, while dice are in the air is precisely what that rule
-// exists to prevent (IMMERSION ruling ①).
-let placardQueued = 0;
+// It only ever ASKS. The rebuild itself rides tryFlushRoomChanges below — the
+// same roll-boundary defer the zoom and the tower take — because restanding
+// the cards while dice are in the air is precisely what that rule exists to
+// prevent (IMMERSION ruling ①), and because a roster event can arrive at any
+// frame of a film. (`placardQueued` itself is declared at the top of the file
+// with `throwOrigin` — see the boot-order note there.)
 function placardQueue() {
   placardQueued++;
+  // ASK, THEN TRY ONCE — and this second half is not an optimisation. The
+  // deferred flush rides `tick`, and a browser suspends rAF in a background
+  // tab: a second seat at the same table would otherwise stand its cards
+  // whenever the operating system next felt like painting it. Trying here is
+  // free (it returns immediately while the table is busy, which is the whole
+  // rule) and it means an idle table restands in the same task the roster
+  // changed in, with no frame of a card standing where nobody sits.
+  tryFlushPlaces();
   return placardQueued;
 }
 
-// ONE roll boundary, both deferred room changes. Zoom first: applyZoom
+// WHO SITS WHERE, WITH THE GROUND UNDER THEM. One derivation, read by the rig
+// and by the `places()` instrument alike, so the cards a player sees and the
+// numbers a scenario reads can never be two different answers.
+//
+// It reads the ROSTER, and that is allowed: `player.place` is display state
+// and nothing downstream of a pixel touches it. The FILM's half of a place —
+// which edge a throw comes in over — rides its own roll payload and never
+// looks here (js/places.js's header, the split the feature rests on).
+function placeRows() {
+  if (!netOnline) return [];
+  const towerUp = towerOn();
+  const mineId = net ? net.playerId : null;
+  const rows = [];
+  for (const p of players) {
+    if (!p || !Number.isInteger(p.place)) continue;      // the +N fold sits nowhere
+    const anchor = placeAnchor(p.place, TABLE_W, TABLE_D, towerUp);
+    if (!anchor) continue;
+    rows.push({
+      place: p.place,
+      playerId: p.id,
+      name: p.name || '',
+      color: p.color || null,
+      mine: !!mineId && p.id === mineId,
+      anchor,
+    });
+  }
+  rows.sort((a, b) => a.place - b.place);
+  return rows;
+}
+
+// The rig is LAZY: a solo table, an offline table and a table whose server has
+// PLACES_ON off never build a canvas, never upload a texture and never add an
+// object to the scene — which is what keeps `scene-draw-budget`'s
+// places-are-off leg at exactly the baseline it was measured at.
+// (`placardRig` / `placardBuilt` are declared at the top of the file.)
+
+function placardRebuild() {
+  const rows = placeRows();
+  if (!placardRig) {
+    if (!rows.length) { placardBuilt = placardQueued; return; }
+    placardRig = new PlacardRig(scene);
+  }
+  placardRig.update(rows);
+  placardBuilt = placardQueued;
+}
+
+// THE MAT MOVED, SO THE CARDS DID. Both writers of the playable extents relay
+// here (law 9: derive live, relay from BOTH writers) — a zoom and a tower
+// socket each move the walls, and a placard's whole licence is that it stands
+// OUTBOARD of them. A rig that has never been built stays unbuilt.
+function placardRelay() {
+  if (!placardRig) return;
+  placardRig.update(placeRows());
+}
+
+function tryFlushPlaces() {
+  if (placardBuilt === placardQueued) return;
+  if (tableIsBusyForZoom()) return;
+  placardRebuild();
+}
+
+// WHOSE CARD SHOULD LIGHT FOR THIS ROLL — or nobody's (UX §7.63 §6.3).
+//
+// Three gates, and every one of them is a truth rule rather than a guard:
+//   · the payload must carry a STAMP. Read `roll.entry` and not the film's
+//     `stamped` flag: a pour is never stamped in the film (a poured die never
+//     touches spawnDie) and the pour is exactly the case where the wash is
+//     the only attribution left.
+//   · the roller must CURRENTLY HOLD A PLACE. This reads the live roster on
+//     purpose — the wash is a cue, not a film input, so it is allowed to
+//     answer "nobody" for a roller who has since left, and a table that has
+//     never heard of them simply shows no arc.
+//   · the anchor is the PLACARD, never the entry edge. Under a socketed
+//     tower two flank stations share entry side 3 (§7.1); the card is what
+//     tells them apart.
+// A secret roll needs no rule at all: for everybody else the projection is
+// null, so there is no event to react to and no leak channel to close.
+function placeWashFor(roll) {
+  if (!roll || !netOnline || !roll.playerId) return null;
+  if (!Number.isInteger(roll.entry) || roll.entry < 0 || roll.entry > 3) return null;
+  const p = players.find((q) => q && q.id === roll.playerId);
+  if (!p || !Number.isInteger(p.place)) return null;
+  const a = placeAnchor(p.place, TABLE_W, TABLE_D, towerOn());
+  if (!a) return null;
+  return { place: p.place, x: a.x, z: a.z, color: roll.color || p.color || null };
+}
+
+// A new roll always replaces the last one's cue, wash or no wash — a stale arc
+// under the previous roller's card while somebody else's dice are in the air
+// would be the one thing this cue must never be: confidently wrong.
+function placeWashFire(plan, dur) {
+  if (suppressRollFx) return;              // a resync fast-forward is not a moment
+  if (!plan) { if (placardRig) placardRig.washClear(); return; }
+  if (!placardRig) placardRebuild();
+  if (!placardRig) return;
+  placardRig.washFire(plan, dur);
+}
+
+function placeWashClear() {
+  if (placardRig) placardRig.washClear();
+}
+
+// ONE roll boundary, every deferred room change. Zoom first: applyZoom
 // re-sockets whatever tower is already up, so doing it the other way round
 // would build a model against the old preset and immediately rebuild it.
+// Places last, so the cards are restood against the mat both of the above
+// just finished moving.
 function tryFlushRoomChanges() {
   tryFlushZoom();
   tryFlushTower();
+  tryFlushPlaces();
 }
 
 function applyZoom(level) {
@@ -24759,6 +25031,7 @@ function applyZoom(level) {
   refitView();         // camera framing + particle/post + chip anchors
   if (towerWasOn) towerLabSet(true);
   if (socketed !== 'none') towerSocket(socketed);
+  placardRelay();      // §7.63: the walls moved, so the cards outboard of them did
 }
 
 // The room settings that belong to the closed beta (js/stability.js).

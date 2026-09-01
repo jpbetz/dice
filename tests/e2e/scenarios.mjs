@@ -49,6 +49,27 @@ const TOWER_SNAP = 'JSON.stringify(window.__diceDebug.towerContractSnapshot())';
 const { minTowerDataUrl, minTowerGlb, MIN_TOWER_PORTALS } =
   await import('./fixtures/make-min-tower.mjs');
 
+// A PLACE AT THE TABLE (UX §7.63). The layout algebra is imported rather than
+// restated: a test that carries its own copy of the number it is checking
+// passes forever. `placardFootprint` turns a card's anchor into its
+// axis-aligned ground box and `placardGap` measures the clear ground between
+// two of them — negative when they overlap, which is the assertion the felt
+// shelf never had.
+const { placardFootprint, placardGap } = await import('../../js/places.js');
+
+// The closest pair in an arrangement, named. "They fuse somewhere" is not a
+// failure report; "cards 2 and 6 are 0.04 apart" is.
+function minGap(boxes) {
+  let worst = { gap: Infinity, a: null, b: null };
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      const g = placardGap(boxes[i], boxes[j]);
+      if (g < worst.gap) worst = { gap: g, a: boxes[i].place, b: boxes[j].place };
+    }
+  }
+  return worst;
+}
+
 // Name the FIRST field that moved, with both values. A bare string compare of
 // two 1000-line snapshots reports "they differ" and leaves a human to diff
 // them by eye; the whole value of a byte-level freeze is that when it goes red
@@ -8714,6 +8735,25 @@ export const scenarios = [
         `no user-facing 'tray'/'group'/'rack'/'compose'/'category' remains `
         + `(found ${JSON.stringify(swept.bad)})`);
 
+      // …AND THE WORDS THAT ARE NOT IN THE DOM AT ALL (UX §7.63). The placard
+      // is the app's second piece of 3D text after the die faces, and it
+      // carries the one string a player types. It is inside this sweep rather
+      // than beside it because the claim is a PROJECTION claim: a name on a
+      // card is the roster's name or a visibly-cut prefix of it, and never a
+      // third spelling that a DOM sweep could not see.
+      const seats = await a.dbg('places()');
+      assert.ok(seats.stations.length > 0,
+        'somebody is seated, so there is a card to read — an empty ring would be '
+        + 'a green check over nothing');
+      for (const st of seats.stations) {
+        const painted = await a.dbg(`placardText(${st.place})`);
+        const cut = typeof painted === 'string' && painted.endsWith('…')
+          && st.name.startsWith(painted.slice(0, -1));
+        assert.ok(painted === st.name || cut,
+          `the card at station ${st.place} reads ${JSON.stringify(painted)}, which must be `
+          + `${JSON.stringify(st.name)} or a visible truncation of it`);
+      }
+
       await a.dbg('peek(null)');
       await a.dbg('setPoolsEditMode(false)');
     },
@@ -10540,8 +10580,28 @@ export const scenarios = [
         { desc: 'a quiet rAF frame is drawn after the roll settles' });
       const plain = await a.dbg('renderAudit()');
       assert.equal(plain.post, false, 'a quiet frame does not pay for the post stack');
-      assert.ok(plain.calls <= 220,
-        `the worst plain frame stays under budget (measured 186, got ${plain.calls})`);
+      // THE DUAL GATE (UX §7.63). This tab is online and therefore holds a
+      // place, so a placard is standing in every frame above: the budget has
+      // to be read BOTH ways or a baseline regression hides behind the new
+      // feature's allowance. The cards' own cost is the difference, measured
+      // on one frame rather than remembered from two runs.
+      assert.equal((await a.dbg('places()')).on, true,
+        'the tab holds a place, so the cards are in this frame — otherwise the '
+        + 'leg below measures the same thing twice and proves nothing');
+      assert.ok(plain.calls <= 200,
+        `the worst plain frame WITH the cards stays under budget (measured 188, got ${plain.calls})`);
+      await a.dbg('placardShow(false)');
+      await a.waitFor(`window.__diceDebug.renderAudit().calls < ${plain.calls}`,
+        { desc: 'a frame drawn without the placard rig' });
+      const bare = await a.dbg('renderAudit()');
+      assert.ok(bare.calls <= 186,
+        `and the same frame WITHOUT them is still the 186 it was measured at (got ${bare.calls})`);
+      assert.ok(plain.calls - bare.calls <= 2,
+        `the whole eight-station rig is the mesh and its shadow — two calls `
+        + `(got ${plain.calls - bare.calls})`);
+      await a.dbg('placardShow(true)');
+      await a.waitFor(`window.__diceDebug.renderAudit().calls === ${plain.calls}`,
+        { desc: 'the cards come back' });
       // THE CLAMP, ASSERTED RATHER THAN REMEMBERED. IMMERSION-AUDIT §10 called
       // this an open gap for days; `git log -S` says the clamp has been there
       // since `init` and was never missing. A gate is how a claim like that
@@ -20564,19 +20624,54 @@ export const scenarios = [
         // in from Ann's edge, and so does Ann's own.
         const r1 = await ctx.api('/api/roll', { playerId: annId, notation: '3d6 # Mine' });
         assert.equal(r1.status, 200, JSON.stringify(r1.data));
-        await landsOn(bob, r1.data.roll.rollId, 3, 'Ann\'s roll lands on Bob\'s felt');
+        // MID-FLIGHT FIRST. The arc lasts exactly as long as the film it is
+        // attributing, so everything about the cue has to be read while the
+        // dice are still in the air; `landsOn` below drives the film to its
+        // end and would leave nothing to look at.
+        await bob.waitFor('(window.__diceDebug.sim(1), window.__diceDebug.tableDice.length === 3)',
+          { desc: 'Ann\'s dice arrive on Bob\'s felt', timeout: 30000 });
+        await bob.dbg('sim(20)');
         const heard = await bob.dbg('throwOrigin()');
         assert.equal(heard.from, 'place', 'Bob\'s film took the stamp');
         assert.equal(heard.entry, 0, 'and it names Ann\'s edge — the front');
-        assert.equal(heard.washAt, null, 'no anchor yet: the wash lands with the placard');
+        const annCard = (await bob.dbg('places()')).stations.find((st) => st.name === 'Ann');
+        assert.deepEqual(heard.washAt, { place: 0, x: annCard.world.x, z: annCard.world.z },
+          'and the cue is anchored at Ann\'s CARD, not at the edge it came over');
+        // …and it is actually lit, on Bob's screen, while the film runs. Read
+        // mid-flight on purpose: the arc lasts exactly as long as the thing it
+        // is attributing, so a check after the settle is a check of nothing.
+        const lit = await bob.dbg('washInfo()');
+        assert.equal(lit.active, true, 'the wash is lit under a card on Bob\'s table');
+        assert.equal(lit.station, 0, 'and it is ANN\'S station, not the edge, not the roller\'s tab');
+        assert.deepEqual({ x: lit.world.x, z: lit.world.z },
+          { x: annCard.world.x, z: annCard.world.z }, 'exactly under her card');
+        assert.equal(lit.color, annCard.color, 'wearing her hue');
+        assert.ok(lit.opacity > 0.05, `and visible (opacity ${lit.opacity})`);
+        await landsOn(bob, r1.data.roll.rollId, 3, 'Ann\'s roll lands on Bob\'s felt');
         await landsOn(ann, r1.data.roll.rollId, 3, 'and on Ann\'s');
         assert.equal((await ann.dbg('throwOrigin()')).entry, 0, 'Ann\'s own film agrees');
+        // TRANSIENT AND CAUSED, NEVER ACCUMULATING (IMMERSION §1's Q5 answer,
+        // and the whole reason this is a wash and not a mark): the film ends,
+        // the arc ends. Nothing is left on the felt.
+        await bob.dbg('sim(600)');
+        assert.equal((await bob.dbg('washInfo()')).active, false,
+          'the film ended and so did the cue — the felt keeps nothing');
 
         // (b) A PLACELESS ROLLER'S ROLL IS NOT. Seeded edge, no stamp, no anchor
         // — the rule that keeps a ninth player's dice from wearing an eighth's name.
         const r2 = await ctx.api('/api/roll', { playerId: iris.playerId, notation: '2d6 # From the fold' });
         assert.equal(r2.status, 200, JSON.stringify(r2.data));
         assert.equal('entry' in r2.data.roll, false, 'no stamp on the placeless payload');
+        // Sampled MID-FLIGHT, in the same window leg (a) found a wash burning
+        // in — an absence checked after the film would be an absence of
+        // nothing, which is this repo's signature green-over-nothing failure.
+        await bob.waitFor('(window.__diceDebug.sim(1), window.__diceDebug.tableDice.length === 2)',
+          { desc: 'Iris\'s dice arrive on Bob\'s felt', timeout: 30000 });
+        await bob.dbg('sim(20)');
+        const dark = await bob.dbg('washInfo()');
+        assert.equal(dark.active, false,
+          'nothing lit mid-flight — a placeless roll wears nobody\'s name');
+        assert.equal(dark.station, null, 'and names no station at all');
         await landsOn(bob, r2.data.roll.rollId, 2, 'Iris\'s roll lands on Bob\'s felt');
         const loose = await bob.dbg('throwOrigin()');
         assert.equal(loose.from, 'seed', 'the seeded draw decided');
@@ -20610,9 +20705,194 @@ export const scenarios = [
         assert.deepEqual(leaked, [], 'the secret roll\'s id never crossed the wire to a bystander');
         assert.equal(iris.events().filter((e) => e.type === 'roll').length, 2,
           'the bystander\'s stream carried exactly the two open rolls, never a third');
+
+        // (d) A RESYNC IS NOT A MOMENT. One more placed roll from Ann, left on
+        // the felt; then somebody arrives and rebuilds the room from the
+        // snapshot. They must get the DICE and not the beat — a rejoining
+        // player being told "Ann is rolling right now" about a throw the room
+        // finished watching is the cue lying about the present tense.
+        const r4 = await ctx.api('/api/roll', { playerId: annId, notation: '2d6 # Still on the felt' });
+        assert.equal(r4.status, 200, JSON.stringify(r4.data));
+        await landsOn(bob, r4.data.roll.rollId, 2, 'the last roll settles for Bob');
+        const late = await ctx.newTable({ origin: '127.0.0.70', name: 'Late' });
+        await late.waitFor(`window.__diceDebug.tableDice.length === 2`,
+          { desc: 'the newcomer rebuilds the felt from the snapshot' });
+        const cold = await late.dbg('washInfo()');
+        assert.equal(cold.active, false,
+          'the replay put the dice down without lighting a cue for a moment that has passed');
+        assert.equal((await late.dbg('throwOrigin()')).entry, 0,
+          'though the replayed FILM still came in over Ann\'s edge — history, not a beat');
       } finally {
         await ann.dbg('holdClock(false)');
         await bob.dbg('holdClock(false)');
+      }
+    },
+  },
+  {
+    name: 'placard-look',
+    tags: ['place', 'look'],
+    timeout: 150000,
+    // THE OBJECT ITSELF (UX §7.63, js/placard.js). A cosmetic lane: eight
+    // cards stand, ZERO dice are ever built, and everything below is read off
+    // geometry, materials and the live projection — which is exactly what the
+    // `look` tag buys and what the runner proves afterwards by asking
+    // `diceEverMade()`.
+    //
+    // FOUR CLAIMS, AND EACH ONE IS A THING THE FELT SHELF DIED FOR WANT OF:
+    //
+    //   the BUDGET — one mesh, one material, three textures, and the whole
+    //     eight-station rig inside the design's ≤ 4 draws / ≤ 700 triangles.
+    //   the GAP — no two cards closer than 0.30 on the ground, at every zoom
+    //     and with a tower up or down. The shelf reported five clean clusters
+    //     while rendering one interpenetrating slab, because it asserted
+    //     COUNTS instead of CLEARANCES.
+    //   the FIT — every name is painted at 44 px or better, and the string on
+    //     the card is the roster's name or a VISIBLY truncated prefix of it.
+    //     "THE GATE OF STORMS" rendered as "ATE OF ST" for want of this.
+    //   the FRAME — the readable face of the near row is not pushed off the
+    //     bottom of the picture by the standoff, and no other row is pushed off
+    //     the top. Measured on the frame the design named (1600×900, the 16:9
+    //     case that was expected to be the tight one) at all three zooms.
+    //
+    // …and then RULE 15: the gates are re-run against the arrangement this
+    // design rejected — all eight cards crowded onto one edge — and must go
+    // RED there. A composition gate that only measures the shipped frame
+    // passes just as happily with the feature off.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.90', name: 'Ann' });
+      const zoomWas = await a.dbg('zoom');
+      await a.page.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
+      try {
+        const names = ['Bram', 'Cassiopeia Winterbourne', 'Dev', 'Eluned', 'Fionn', 'Gus', 'Hana'];
+        for (const nm of names) await ctx.rawPlayer(nm);
+        await a.waitFor('window.__diceDebug.places().stations.length === 8',
+          { desc: 'a full house of eight cards' });
+        await a.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
+          { desc: 'and the rig agrees with the roster' });
+
+        // ---- the budget ----------------------------------------------------
+        const b = await a.dbg('placardBudget()');
+        assert.equal(b.occupied, 8, 'eight stations standing');
+        assert.ok(b.draws <= 4, `the whole rig is <= 4 draw calls (got ${b.draws})`);
+        assert.ok(b.tris <= 700, `and <= 700 triangles for all eight (got ${b.tris})`);
+        assert.equal(b.materials, 1, 'ONE material — eight hues ride the vertex colours');
+        assert.equal(b.textures, 3, 'albedo + ORM + emissive, and nothing else');
+        assert.equal(b.atlasPx, 1024, 'a 1024² atlas…');
+        assert.equal(b.rows, 8, '…of eight rows, one per station, repainted in place');
+
+        // ---- the fit -------------------------------------------------------
+        const house = await a.dbg('places()');
+        for (const s of house.stations) {
+          const painted = await a.dbg(`placardText(${s.place})`);
+          assert.equal(painted, s.shown, `station ${s.place}: the hook and the row agree`);
+          assert.ok(s.fontPx >= 44,
+            `station ${s.place} (${s.name}) is painted at ${s.fontPx}px — the floor is 44`);
+          const truncated = painted.endsWith('…')
+            && s.name.startsWith(painted.slice(0, -1)) && painted.length < s.name.length + 1;
+          assert.ok(painted === s.name || truncated,
+            `station ${s.place}: "${painted}" is the roster name or a visibly cut prefix of it`);
+        }
+        const long = house.stations.find((s) => s.name === 'Cassiopeia Winterbourne');
+        assert.ok(long.shown.endsWith('…'),
+          'the longest name truncates VISIBLY rather than running off the card');
+        assert.equal(long.fontPx, 44, 'and only after the fitter has spent the whole 68→44 range');
+        assert.equal(house.stations.filter((s) => s.mine).length, 1, 'exactly one card is mine');
+
+        // ---- the gap, and the wall, per zoom × tower ------------------------
+        for (const tower of ['none', 'blackanvil']) {
+          await a.dbg(`setTower(${JSON.stringify(tower)})`);
+          await a.waitFor(`window.__diceDebug.tower === ${JSON.stringify(tower)}`,
+            { desc: `tower ${tower}` });
+          for (const z of ['wide', 'medium', 'close']) {
+            await a.dbg(`setZoom('${z}')`);
+            await a.waitFor(`window.__diceDebug.zoom === '${z}'`, { desc: `zoom ${z}` });
+            const pl = await a.dbg('places()');
+            const ext = await a.dbg('tableExtents()');
+            const boxes = pl.stations.map((s) => ({
+              place: s.place,
+              ...placardFootprint({ x: s.world.x, z: s.world.z, azim: s.yaw }),
+            }));
+            const worst = minGap(boxes);
+            assert.ok(worst.gap >= 0.30,
+              `${tower}/${z}: cards ${worst.a} and ${worst.b} clear each other by `
+              + `${worst.gap.toFixed(3)} — the floor is 0.30`);
+            for (const s of pl.stations) {
+              const box = boxes.find((x) => x.place === s.place);
+              const clearsZ = Math.abs(s.world.z) - box.hz >= ext.d / 2;
+              const clearsX = Math.abs(s.world.x) - box.hx >= ext.w / 2;
+              assert.ok(clearsZ || clearsX,
+                `${tower}/${z}: station ${s.place} stands OUTBOARD of a wall — nothing `
+                + `that lands on this table can reach it (x ${s.world.x.toFixed(2)}±`
+                + `${box.hx}, z ${s.world.z.toFixed(2)}±${box.hz} vs walls `
+                + `${(ext.w / 2).toFixed(2)}/${(ext.d / 2).toFixed(2)})`);
+            }
+            if (tower === 'blackanvil') {
+              assert.equal(pl.stations.filter((s) => s.relocated).length, 3,
+                'and with a tower up, the three back chairs are pulled round to the flanks');
+            }
+          }
+        }
+        await a.dbg(`setTower('none')`);
+        await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'the tower is put away' });
+
+        // ---- the frame ------------------------------------------------------
+        // The standoff is 0.72 and cannot be smaller: the card's footprint is
+        // 1.24 deep, so anything less puts its inboard edge back inside the
+        // wall and hands a die somewhere to land on. The gate is therefore on
+        // the readable FACE, which stands 0.25–0.49 above the ground and
+        // projects higher than the base does.
+        for (const z of ['wide', 'medium', 'close']) {
+          await a.dbg(`setZoom('${z}')`);
+          await a.waitFor(`window.__diceDebug.zoom === '${z}'`, { desc: `zoom ${z}` });
+          const pl = await a.dbg('places()');
+          const mineEdge = pl.stations.find((s) => s.mine).station;
+          for (const s of pl.stations) {
+            const f = await a.dbg(`placardFrame(${s.place})`);
+            assert.ok(f, `station ${s.place} has a card face to project`);
+            if (s.station === mineEdge) {
+              assert.ok(f.ndc.y0 >= -0.98,
+                `${z}: the near row's name is in the picture — station ${s.place} `
+                + `bottoms out at ndc ${f.ndc.y0.toFixed(3)}, the bar is -0.98`);
+            } else {
+              assert.ok(f.ndc.y0 >= -0.94 && f.ndc.y1 <= 0.94,
+                `${z}: station ${s.place} sits clear of both rims `
+                + `(ndc y ${f.ndc.y0.toFixed(3)}..${f.ndc.y1.toFixed(3)}, the bar is ±0.94)`);
+            }
+          }
+        }
+
+        // ---- rule 15: the rejected frame must FAIL ---------------------------
+        // Eight cards on one edge is the arrangement this layout exists
+        // instead of, and it cannot be built: eight 2.20-wide cards with a
+        // 0.30 gap need 19.7 units of edge and the longest edge the mat ever
+        // has is 14.1. Spread them to fit and they fuse; the same three gates
+        // that pass above go red, at every zoom.
+        const reds = [];
+        for (const z of ['wide', 'medium', 'close']) {
+          const p = await a.dbg(`zoomPreset('${z}')`);
+          const pitch = p.w / 8;
+          const boxes = [];
+          for (let i = 0; i < 8; i++) {
+            boxes.push({
+              place: i,
+              ...placardFootprint({ x: (i - 3.5) * pitch, z: p.d / 2 + 0.72, azim: 0 }),
+            });
+          }
+          const worst = minGap(boxes);
+          if (!(worst.gap >= 0.30)) reds.push(`${z}: gap ${worst.gap.toFixed(3)} < 0.30`);
+          if (boxes.some((x, i) => boxes.some((y, j) => j > i
+            && Math.abs(x.x - y.x) < x.hx + y.hx))) reds.push(`${z}: two cards overlap on the ground`);
+          const half = boxes[7].x + boxes[7].hx;
+          if (half > p.w / 2 + 0.72) reds.push(`${z}: the end card overhangs the mat by ${(half - p.w / 2).toFixed(2)}`);
+        }
+        assert.ok(reds.length >= 3,
+          `all eight on one edge must fail the gates the shipped ring passes — `
+          + `it failed ${reds.length}: ${JSON.stringify(reds)}`);
+      } finally {
+        await a.dbg(`setZoom(${JSON.stringify(zoomWas)})`);
+        await a.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, a.page.sessionId)
+          .catch(() => {});
       }
     },
   },
