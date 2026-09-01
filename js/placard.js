@@ -686,7 +686,12 @@ export class PlacardRig {
   // ---- the wash ---------------------------------------------------------
 
   // at: {place, x, z, color}; dur is the film's own length, so the cue lasts
-  // exactly as long as the thing it is attributing.
+  // exactly as long as the thing it is attributing — and it is positioned on
+  // that length by washAt(t) from the FILM'S clock (roll.time), never by a
+  // clock of its own. A wash that kept its own dt accumulator ran through the
+  // ceremony's 1.35 s declaration hold (roll.time pinned at 0, the dice
+  // hidden) and was dark before the first tumble frame of every Check roll;
+  // it also kept breathing after a plain skip had jumped the film to its end.
   washFire(at, dur) {
     if (!at) return this.washClear();
     this._ensureBuilt();
@@ -719,12 +724,15 @@ export class PlacardRig {
     return this.wash;
   }
 
-  // Opacity 0 → 0.5 → 0 across the film, on the dt clock everything else in
-  // this app runs on (so holdClock freezes it and sim() steps it).
-  washTick(dt) {
+  // Opacity 0 → 0.62 → 0 across the film. `t` is the film's own position
+  // (roll.time, in seconds) — ABSOLUTE, not a delta — so the arc is a pure
+  // function of where the film is: held while the film is held, jumped when
+  // the film is jumped, and over when the film is over. main.js drives it
+  // from placeWashSync, once per tick, after the film has stepped.
+  washAt(t) {
     if (!this.built || !this.wash.active) return;
-    this.wash.t += dt;
-    const u = this.wash.t / this.wash.dur;
+    this.wash.t = t;
+    const u = t / this.wash.dur;
     if (u >= 1) { this.washClear(); return; }
     this.washMat.opacity = WASH_PEAK * Math.sin(Math.PI * Math.max(0, u));
   }

@@ -6351,6 +6351,9 @@ function clearTable() {
   dismissCeremonyUI();
   currentRoll = null;
   rollQueue.length = 0;
+  // §7.63: the sweep took the film, so it takes the arc that was attributing
+  // it — an arc still breathing over bare felt would name a roll that is gone.
+  placeWashClear();
   // The rolling pool is driven from stepPlayback, and clearing the table
   // means stepPlayback stops being called — so nothing would ever bring the
   // levels down. A sustained source left grinding over an empty felt is the
@@ -10534,6 +10537,11 @@ function skipPlainPlayback() {
   const roll = currentRoll;
   if (!roll || roll.done || roll.ceremony) return false;
   stepPlayback(roll.duration - roll.time + FIXED_DT);
+  // §7.63: the film just jumped to its end, so the cue naming its roller ends
+  // with it — in this call, not on the next frame. Measured before this line
+  // existed: a 12d6 skipped 0.1 s in left the arc rising to its peak 1.4 s
+  // AFTER the dice were at rest, over a settled pile.
+  placeWashSync();
   return true;
 }
 container.addEventListener('click', () => { skipPlainPlayback(); skipRevealFx(); });
@@ -11314,8 +11322,8 @@ function tick(dt, render = true, realtime = false) {
   particleField.tick(dt, SHADER_TIME.value);
   decalField.tick(dt);
   dieLights.tick(dt, SHADER_TIME.value);
-  if (placardRig) placardRig.washTick(dt); // §7.63: the roller's arc, on the same clock
   stepPlayback(dt, realtime ? TEMPO.k : 1, realtime, realtime);
+  placeWashSync(); // §7.63: the roller's arc follows the film's clock, AFTER the film stepped
   stepSinking(dt);   // per-roll Done departures (§7.5)
   stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
   stepPickMarks();   // MECHANICS M1: the picked-die marker follows finalPos
@@ -25097,6 +25105,29 @@ function placeWashFire(plan, dur) {
 
 function placeWashClear() {
   if (placardRig) placardRig.washClear();
+}
+
+// THE WASH KEEPS THE FILM'S CLOCK, NOT ITS OWN (§7.63 §6.3: "0 → 0.5 → 0 over
+// the film"). Called once per tick AFTER stepPlayback, and from the plain
+// skip, it places the arc on its envelope by `roll.time` and nothing else, so
+// every way a film can be held, jumped or dropped is already handled:
+//   · the ceremony's declaration beat pins roll.time at 0 with the dice
+//     hidden → the arc waits at zero and rises with the FIRST TUMBLE FRAME.
+//     (With its own dt accumulator it burned through the whole 1.35 s hold
+//     and was dark for the tumble of every Check — measured: a d20 check's
+//     arc peaked and cleared before the dice were shown.)
+//   · a plain skip jumps roll.time past the duration → cleared in that call.
+//   · the verdict (ceremony 'settle') and a finished film are not the film →
+//     cleared; a clear drops currentRoll → cleared.
+// A roll that has not started (queued) has no wash yet: placeWashFire arms it
+// in playRoll, and a new roll's fire replaces the last roll's cue.
+function placeWashSync() {
+  if (!placardRig || !placardRig.wash.active) return;
+  const roll = currentRoll;
+  const cer = roll ? roll.ceremony : null;
+  if (!roll || roll.done || (cer && cer.phase === 'settle')) { placardRig.washClear(); return; }
+  if (cer && cer.phase === 'declare') return;   // held with the film: the dice are not out yet
+  placardRig.washAt(roll.time);
 }
 
 // ONE roll boundary, every deferred room change. Zoom first: applyZoom

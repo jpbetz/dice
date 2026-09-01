@@ -20853,13 +20853,28 @@ export const scenarios = [
     //                      ALL: no payload, no film, no cue. Nothing to
     //                      suppress, because nothing arrived.
     //
-    // `washAt` is asserted null on purpose: the field exists so the cue has a
-    // named anchor to fill, and today it is honest about having none.
+    // `washAt` is asserted null on purpose for the placeless roll: the field
+    // exists so the cue has a named anchor to fill, and it is honest about
+    // having none.
+    //
+    // TWO THINGS THIS SCENARIO WAS GREEN WITHOUT, found in review (2026-09-01)
+    // and pinned below so they cannot be lost again:
+    //   · THE ANCHOR IS THE CARD, NOT THE EDGE (leg a2). Ann sits at station
+    //     0 over entry 0 — the same integer — so every assertion in leg (a)
+    //     was satisfied identically by a build that anchored the wash on
+    //     `roll.entry`. A sabotage run proved it: place lane 8/8 green with
+    //     the anchor on the edge. Only a roller whose place and entry differ
+    //     can tell the two apart.
+    //   · THE ARC KEEPS THE FILM'S CLOCK (legs e–g). It ran on a clock of its
+    //     own, sized to the film: a Check's declaration hold burned the whole
+    //     envelope before the dice were shown, a plain skip left it rising
+    //     over a settled pile, a clear left it breathing over bare felt.
     async fn(ctx) {
       const ann = await ctx.newTable({ origin: '127.0.0.68', name: 'Ann' });
       const bob = await ctx.newTable({ origin: '127.0.0.69', name: 'Bob' });
       await bob.waitFor('window.__diceDebug.places().stations.length === 2', { desc: 'both seated' });
-      for (const nm of ['Cass', 'Dev', 'Eluned', 'Fionn', 'Gus', 'Hana']) await ctx.rawPlayer(nm);
+      const raws = {};
+      for (const nm of ['Cass', 'Dev', 'Eluned', 'Fionn', 'Gus', 'Hana']) raws[nm] = await ctx.rawPlayer(nm);
       const iris = await ctx.rawPlayer('Iris');            // ninth: placeless, and a raw witness
       await bob.waitFor('window.__diceDebug.players.length === 9', { desc: 'nine at the table' });
       assert.equal((await bob.dbg('places()')).stations.some((s) => s.name === 'Iris'), false,
@@ -20912,6 +20927,37 @@ export const scenarios = [
         assert.equal((await bob.dbg('washInfo()')).active, false,
           'the film ended and so did the cue — the felt keeps nothing');
 
+        // (a2) THE ANCHOR IS THE CARD, NOT THE EDGE — provable only from a
+        // station whose place and entry are DIFFERENT integers. Cass holds
+        // station 2: the front edge's LEFT lane, entry 0 exactly like Ann's,
+        // card at x = −2.55 — so the entry does not move and the anchor must.
+        // Eluned holds station 4, the right head, entry 3. Under a socketed
+        // tower three stations share entry side 3 (js/places.js TOWER_FLANKS),
+        // which is where an edge-anchored wash would light somebody else's
+        // card with a confidently wrong name; the card is what tells them
+        // apart, and this leg is what tells a card-anchored build from an
+        // edge-anchored one.
+        for (const [who, place, entry] of [['Cass', 2, 0], ['Eluned', 4, 3]]) {
+          const r = await ctx.api('/api/roll', { playerId: raws[who].playerId, notation: `2d6 # ${who}` });
+          assert.equal(r.status, 200, JSON.stringify(r.data));
+          await bob.waitFor('(window.__diceDebug.sim(1), window.__diceDebug.tableDice.length === 2)',
+            { desc: `${who}'s dice arrive on Bob's felt`, timeout: 30000 });
+          await bob.dbg('sim(20)');
+          const org = await bob.dbg('throwOrigin()');
+          const card = (await bob.dbg('places()')).stations.find((st) => st.name === who);
+          assert.equal(org.entry, entry, `${who}'s film enters over side ${entry}`);
+          assert.equal(org.washAt && org.washAt.place, place,
+            `…and the cue is anchored at station ${place}, not at side ${entry}`);
+          const lit = await bob.dbg('washInfo()');
+          assert.equal(lit.active, true, `the wash is lit for ${who}`);
+          assert.equal(lit.station, place, `under ${who}'s card`);
+          assert.deepEqual({ x: lit.world.x, z: lit.world.z }, { x: card.world.x, z: card.world.z },
+            `exactly under it`);
+          assert.notDeepEqual({ x: lit.world.x, z: lit.world.z }, { x: annCard.world.x, z: annCard.world.z },
+            `and not under Ann's${who === 'Cass' ? ', though the two share an edge' : ''}`);
+          await landsOn(bob, r.data.roll.rollId, 2, `${who}'s roll lands on Bob's felt`);
+        }
+
         // (b) A PLACELESS ROLLER'S ROLL IS NOT. Seeded edge, no stamp, no anchor
         // — the rule that keeps a ninth player's dice from wearing an eighth's name.
         const r2 = await ctx.api('/api/roll', { playerId: iris.playerId, notation: '2d6 # From the fold' });
@@ -20958,8 +21004,78 @@ export const scenarios = [
         // carried the id, in any event of any type.
         const leaked = iris.events().filter((e) => JSON.stringify(e.data).includes(secretId));
         assert.deepEqual(leaked, [], 'the secret roll\'s id never crossed the wire to a bystander');
-        assert.equal(iris.events().filter((e) => e.type === 'roll').length, 2,
-          'the bystander\'s stream carried exactly the two open rolls, never a third');
+        assert.equal(iris.events().filter((e) => e.type === 'roll').length, 4,
+          'the bystander\'s stream carried exactly the four open rolls, never a fifth');
+
+        // (e) A ROLL MOMENT: THE ARC WAITS FOR THE DICE. A Check holds the film
+        // for CEREMONY_DECLARE_S with the dice hidden behind the declaration
+        // card. The wash keeps the FILM's clock, so it waits at zero through
+        // the hold and rises with the first tumble frame — the part of the
+        // film a spectator is actually watching to work out whose dice these
+        // are. (On a clock of its own it peaked and cleared during the hold
+        // and was dark for the whole tumble of every Check.)
+        const r5 = await ctx.api('/api/roll', { playerId: annId, notation: 'd20 check dc10 # A moment' });
+        assert.equal(r5.status, 200, JSON.stringify(r5.data));
+        await bob.waitFor('(window.__diceDebug.sim(1), !!window.__diceDebug.ceremonyState)',
+          { desc: 'the Check declares itself on Bob\'s table', timeout: 30000 });
+        assert.equal((await bob.dbg('ceremonyState')).phase, 'declare', 'the declaration holds the stage');
+        await bob.dbg('sim(40)');   // two thirds of the way through a 1.35 s hold
+        const held = await bob.dbg('washInfo()');
+        assert.equal(held.active, true, 'the cue is armed through the declaration…');
+        assert.equal(held.opacity, 0, '…and waiting: nothing is lit while the dice are hidden');
+        const firstTumble = await bob.eval(`(() => {
+          const D = window.__diceDebug;
+          for (let i = 0; i < 240 && D.ceremonyState && D.ceremonyState.phase === 'declare'; i++) D.sim(1);
+          return { phase: D.ceremonyState && D.ceremonyState.phase, wash: D.washInfo() };
+        })()`);
+        assert.equal(firstTumble.phase, 'tumble', 'the hold ends and the dice come out');
+        assert.equal(firstTumble.wash.active, true, 'the arc is alive on the FIRST tumble frame');
+        assert.equal(firstTumble.wash.station, 0, 'under Ann\'s card');
+        // The flip frame is the one that ends the hold; the film's clock moves
+        // from the next frame on, and the arc rises with it.
+        await bob.dbg('sim(1)');
+        const rising = await bob.dbg('washInfo()');
+        assert.ok(rising.opacity > 0, `and rising with the dice (opacity ${rising.opacity})`);
+        await bob.dbg('sim(24)');
+        const mid = await bob.dbg('washInfo()');
+        assert.ok(mid.active && mid.opacity > 0.3, `mid-tumble it is plainly lit (opacity ${mid.opacity})`);
+        assert.equal(await bob.dbg('skipCeremony()'), true, 'Bob skips to the verdict');
+        assert.equal((await bob.dbg('washInfo()')).active, false,
+          'and the arc goes with the film — a wash under the verdict would outlive what it named');
+        await bob.waitFor('(window.__diceDebug.sim(30), !window.__diceDebug.busy)',
+          { desc: 'the verdict runs its course', timeout: 30000 });
+
+        // (f) A PLAIN SKIP ENDS THE ARC WITH THE FILM. Always interruptible
+        // (GOALS) covers a plain tumble too: click the felt and a 12d6 jumps to
+        // rest — and the cue that was attributing it must not go on breathing
+        // over a settled pile, let alone reach its peak there.
+        const r6 = await ctx.api('/api/roll', { playerId: annId, notation: '12d6 # Skipped' });
+        assert.equal(r6.status, 200, JSON.stringify(r6.data));
+        await bob.waitFor('(window.__diceDebug.sim(1), window.__diceDebug.tableDice.length === 12)',
+          { desc: 'the handful arrives on Bob\'s felt', timeout: 30000 });
+        await bob.dbg('sim(6)');
+        assert.equal((await bob.dbg('washInfo()')).active, true, 'lit while the handful is in the air');
+        assert.equal(await bob.dbg('skipPlain()'), true, 'Bob skips the tumble');
+        assert.equal(await bob.dbg('busy'), false, 'the film is over');
+        assert.equal((await bob.dbg('washInfo()')).active, false,
+          'and so is the arc — in the same call, not a frame later');
+        await bob.dbg('sim(90)');
+        assert.equal((await bob.dbg('washInfo()')).active, false, 'and it stays over');
+
+        // (g) A CLEAR TAKES THE ARC WITH THE FILM. Mid-throw, somebody sweeps
+        // the table: the dice vanish at once, and an arc left breathing over
+        // bare felt would be attributing nothing to nobody.
+        const r7 = await ctx.api('/api/roll', { playerId: annId, notation: '6d6 # Swept' });
+        assert.equal(r7.status, 200, JSON.stringify(r7.data));
+        await bob.waitFor('(window.__diceDebug.sim(1), window.__diceDebug.tableDice.length === 6)',
+          { desc: 'the six arrive on Bob\'s felt', timeout: 30000 });
+        await bob.dbg('sim(6)');
+        assert.equal((await bob.dbg('washInfo()')).active, true, 'lit mid-throw');
+        await bob.dbg('clearTable()');
+        assert.equal(await bob.dbg('tableDice.length'), 0, 'the felt is bare');
+        assert.equal((await bob.dbg('washInfo()')).active, false, 'and nothing is lit over it');
+        await bob.dbg('sim(60)');
+        assert.equal((await bob.dbg('washInfo()')).active, false, 'a second later, still nothing');
 
         // (d) A RESYNC IS NOT A MOMENT. One more placed roll from Ann, left on
         // the felt; then somebody arrives and rebuilds the room from the
