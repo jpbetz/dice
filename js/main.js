@@ -15292,9 +15292,16 @@ window.__diceDebug = {
       roll: Math.round(camRoll * 100) / 100,
       orbit: Math.round(camOrbit * 100) / 100,
       // THE BASE the two candidates were measured from (§7.63): this viewer's
-      // own place azimuth, and the place it came from. `orbit` is always
+      // own place azimuth, and the place it came from. `orbit` is
       // `placeOrbit` or `placeOrbit + π/2` — the ladder's decision on top of
-      // the place's base. 0 / null for a solo table and a spectator.
+      // the place's base — WHILE `mode !== 'tower'`. The tower's resting
+      // frame (applyCameraFraming's first rung) still pins orbit 0 for every
+      // chair: a rotated viewer idles looking from the front chair and swings
+      // to their own base the moment anything rests on the felt, then back
+      // on the clear. That is the deferred S8 slice (DESIGN §7.1: the tower
+      // eye turned for rotated viewers, towerCamTo's acts skipped for them);
+      // placard-look records the gap under its blackanvil leg until S8 lands.
+      // 0 / null for a solo table and a spectator.
       placeOrbit: Math.round(placeOrbit * 100) / 100,
       placeMine: (() => { const r = myPlaceRow(); return r ? r.place : null; })(),
       matFits: matOnScreen(),
@@ -25073,8 +25080,9 @@ function placeOrbitApply() {
 //     answer "nobody" for a roller who has since left, and a table that has
 //     never heard of them simply shows no arc.
 //   · the anchor is the PLACARD, never the entry edge. Under a socketed
-//     tower two flank stations share entry side 3 (§7.1); the card is what
-//     tells them apart.
+//     tower THREE stations stamp entry side 3 — the two flanked backs and
+//     the right head whose edge they were pulled round to — and two stamp
+//     side 2 (js/places.js TOWER_FLANKS); the card is what tells them apart.
 // A secret roll needs no rule at all: for everybody else the projection is
 // null, so there is no event to react to and no leak channel to close.
 function placeWashFor(roll) {

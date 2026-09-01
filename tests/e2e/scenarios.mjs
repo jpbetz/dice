@@ -21253,6 +21253,33 @@ export const scenarios = [
               assert.equal(pl.stations.filter((s) => s.relocated).length, 3,
                 'and with a tower up, the three back chairs are pulled round to the flanks');
             }
+            if (tower === 'blackanvil' && z === 'medium') {
+              // S8 DEBT, RECORDED RATHER THAN LATENT. The tower's resting
+              // frame (applyCameraFraming's first rung) pins orbit 0 for
+              // EVERY chair, so framingInfo()'s "orbit is placeOrbit or
+              // placeOrbit + π/2" holds only while mode !== 'tower': a
+              // rotated viewer idles looking from the front chair and swings
+              // to their own base the moment anything rests on the felt,
+              // then back on the clear (measured: two ~22-unit eye moves per
+              // roll, and two reprintings of every card). DESIGN §7.1 names
+              // the fix — the tower eye turned for rotated viewers, the pour
+              // acts skipped for them — and that is the deferred tower
+              // slice, not this one. Pinned here so the slice that turns it
+              // has to move this assertion to the invariant, on purpose.
+              const sim = await a.dbg('simulatePlaceView(1)');
+              assert.equal(sim.orbit, Math.PI / 2, 'station 1 is flanked to the right while socketed');
+              const fi = await a.dbg('framingInfo()');
+              assert.equal(fi.mode, 'tower', 'an empty felt under a tower rests on the tower rung');
+              assert.equal(fi.placeOrbit, 1.57, 'the flank remap is the base…');
+              console.log(`    [recorded] S8 debt: under ${tower} station 1 idles at orbit ${fi.orbit} `
+                + `on a base of ${fi.placeOrbit} (eye ${JSON.stringify(fi.eye)}) — the tower rest frame `
+                + 'pins orbit 0 for every chair until the tower slice turns it');
+              assert.equal(fi.orbit, 0,
+                'S8 DEBT PIN: the tower rest frame still pins orbit 0 for a rotated viewer. If this went '
+                + 'red because the tower slice landed, replace it with the invariant '
+                + '(orbit === placeOrbit) and drop the [recorded] line above.');
+              assert.equal((await a.dbg('simulatePlaceView(null)')).orbit, 0, 'the chair is handed back');
+            }
           }
         }
         await a.dbg(`setTower('none')`);
@@ -21293,8 +21320,11 @@ export const scenarios = [
         //
         // WHAT DOES NOT HOLD, AND IS RECORDED HERE RATHER THAN HIDDEN: at the
         // back and at both heads the viewer's own card FACE clips below the
-        // bottom rim on a 16:9 frame (measured at medium: back −1.155, heads
-        // −1.121, against the front's −0.903). Two causes, both structural.
+        // bottom rim on a 16:9 frame (face BOTTOMS, ndc.y0, measured at
+        // medium: back −1.155, heads −1.205, against the front's −0.903; the
+        // heads' whole printed band is under the rim, top at −1.037 — the
+        // `[recorded]` line below prints the live numbers). Two causes, both
+        // structural.
         // The eye orbits about CAM_TARGET_HOME, which sits 0.5 toward the
         // FRONT chair, so the back eye stands a unit nearer its own edge than
         // the front eye does and the near edge binds the fit; and a head eye

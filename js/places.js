@@ -116,10 +116,22 @@ export const STATIONS = Object.freeze([
 // model's best angle; azim π is forbidden while socketed, the pit backstop is
 // un-skinned), and their re-throws enter from the flank beside their own card.
 //
-// Split across BOTH flanks so one side does not crowd. Stations 1 and 3 share
-// entry side 3 while socketed; the wash — anchored per-placard, not per-edge —
-// is what still tells them apart, and only re-throws are thrown under a tower
-// anyway.
+// Split across BOTH flanks so one side does not crowd. WHILE SOCKETED THE
+// ENTRY IS NOT A PER-PLAYER READ: stations 1 and 3 land on entry side 3,
+// which the RIGHT HEAD (station 4, lane 0, not relocated) already owns, so
+// THREE stations stamp the identical {entry: 3, lane: 0} and their re-throws
+// are born on one spawn line — centred on z = 0, in front of the head's card,
+// while the flanked cards stand 2.55 and 5.10 units down the flank. Station 7
+// likewise shares side 2 with the left head (station 5). (The design and this
+// comment first counted the collision as two stations; it is three and two,
+// and the count matters because the edge does not merely go ambiguous under
+// a tower, it points at a specific other player's card.) The wash — anchored
+// per-PLACARD, never per-edge (js/main.js placeWashFor) — is the whole of
+// attribution on a tower table; only re-throws are thrown under a tower
+// anyway, since pours never touch spawnDie. Giving the flank rows their own
+// lanes along z (spawnDie applies `lane` on sides 0/1 only today) is the
+// S8 tower slice's call, not this file's; tests/places.test.mjs pins the
+// three-way collision so it is never re-forgotten.
 //
 // `slot` counts back from the head's card at z = 0 in units of PLACE_LANE, so
 // a flank row keeps the front row's pitch and therefore the front row's gap.

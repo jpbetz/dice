@@ -151,6 +151,23 @@ t('a socketed tower moves the back stations to the flanks, both of them', () => 
     'azim pi is forbidden while socketed — the pit backstop is un-skinned');
 });
 
+t('under a tower the entry is not a per-player read: three stations share side 3, two share side 2', () => {
+  // Spelled out as ONE assertion rather than left implicit across the two
+  // above: the flanked backs land on the edges the heads already own, so the
+  // stamp — and with it the spawn line — is identical for stations 1, 3 and
+  // the right head, and for 7 and the left head. The wash (anchored per
+  // placard) is the whole of attribution on a tower table; a change that
+  // gives the flanks their own lanes should turn these into notDeepEquals.
+  const stamp = (p) => JSON.stringify(entryFor(p, true));
+  assert.deepEqual([1, 3, 4].map(stamp), Array(3).fill(stamp(4)),
+    'stations 1, 3 and the right head stamp the identical entry while socketed');
+  assert.deepEqual([7, 5].map(stamp), Array(2).fill(stamp(5)),
+    'stations 7 and the left head stamp the identical entry while socketed');
+  assert.equal(new Set([0, 1, 2, 3, 4, 5, 6, 7].map(stamp)).size, 5,
+    'eight stations, five distinct stamps under a tower (eight without one)');
+  assert.equal(new Set([0, 1, 2, 3, 4, 5, 6, 7].map((p) => JSON.stringify(entryFor(p, false)))).size, 8);
+});
+
 t("a station's azim turns the viewer onto its own entry edge", () => {
   // The trig mirror of three.js's applyAxisAngle(Y_AXIS, camOrbit) at
   // js/main.js:26807: (x, z) -> (x cos + z sin, -x sin + z cos). The eye rides
