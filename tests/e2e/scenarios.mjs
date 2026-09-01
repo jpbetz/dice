@@ -20983,9 +20983,10 @@ export const scenarios = [
     // THE REGION CLAIM IS A CENTROID WITH A DIE OF MARGIN, and that is the
     // claim the numbers support, not a softening of one they do not: the
     // dials are a throw, not walls (no new physics bodies), and the measured
-    // containment (tools/steps/place-region.mjs) is a rate — the pool's
-    // centroid in its region 92–100% a cell at medium, individual dice
-    // 81–97% for a 3d6. The region is grown by one d6 edge on its OPEN sides
+    // containment (tools/steps/place-region.mjs, the v3.1 record at
+    // PLACE_AIM.box 0.25) is a rate — a laned 3d6's pool centroid in its
+    // region 92–100% a cell at wide and medium, the dice themselves
+    // 76–93%. The region is grown by one d6 edge on its OPEN sides
     // (the centre lines; the rims are the rims), and the two centroids are
     // also ordered against each other — Front's nearer the front and further
     // left than Back's — which is the picture itself: two pools, two corners.

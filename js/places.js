@@ -100,7 +100,11 @@ export const PLACE_LANE = 4.30;
 // medium and close the wall room already binds and the laned table is
 // bit-identical; the push shows where there is room to spend it). The CARD
 // does not move with this dial: placeLane(w) is the picture's own share and
-// scaled with the v3 card instead.
+// scaled with the v3 card instead. THE THROW ITSELF reaches the pushed
+// centre through PLACE_AIM.box (v3.1): the aim box is anchored in the
+// region's wall corner, which the push never moves, so the box's SIZE is
+// what places its centre — 0.25 stands the aim at ×1.21 of the v2 aim,
+// beside the ×1.2 the region centres moved. See the dial's own note.
 export const PLACE_PUSH = 1.2;
 
 // The clear ground two cards must leave each other, anywhere on the table.
@@ -508,8 +512,18 @@ export function inRegion(region, x, z) {
 //            at 92–100% in every cell measured; the dice themselves 81–97%
 //            for a laned 3d6, 50–64% for a 6d6 (a handful spreads).
 //   box    — the aim box's side as a fraction of the region's own after the
-//            hull cap. 0.5. Shrunk, not merely translated: the shipped box
-//            (0.4 of the mat) no longer fits a quadrant with the cap on.
+//            hull cap. 0.25 — and this is the dial THE PUSH RIDES IN ON
+//            (v3.1, 2026-09-01, the verification's D1). The box is anchored
+//            in the region's own WALL corner, and the walls never moved: at
+//            0.5 the pushed centre stood at only ×1.09 of the v2 aim while
+//            the region centres said ×1.2, and the pools' rests grew apart
+//            6–9% when Joe had asked at least 20. At 0.25 the corner-anchored
+//            centre lands at ×1.21 of the v2 aim on every mat (medium −3.86,
+//            1.92 of a −4.25/2.10 hull-cap floor). Swept 0.35/0.25/0.18 at 24
+//            seeds: the rest separation SATURATES past 0.25 (the settle smear
+//            clips at the walls and hands the rest back), and every
+//            lower-toss variant beside it (h 0.35, speed 0.4) gave
+//            separation back — the shipped toss stays.
 //   corner — 1: a LANED long-edge throw is hurled into its region's own
 //            corner (the roller's rim and the lane's side rim), which is the
 //            backstop that makes the quadrant stick. 0: against the own rim,
@@ -523,23 +537,30 @@ export function inRegion(region, x, z) {
 //            rad/s. Measured inert at 0.6 and 0.35 (the drop is the scatter,
 //            not the spin) and left at 1: the tumble is the life of the die.
 //
-// THE RECORD AT THESE DIALS (tools/steps/place-region.mjs, 24 seeds a cell,
-// stations 0/1/4/6, 2026-09-01). Centroid in region — medium: 3d6 92–100%,
-// 6d6 100%, a lone d20 63–92% (one die IS its centroid, so that is the
-// per-die rate); wide: 3d6 96–100%, 6d6 96–100%, d20 79–83%; close: 3d6
-// 92–100%, 6d6 42–100% (six d6 do not fit a 4.3 × 2.6 quadrant), d20 58–92%.
-// Dice in region at medium: 85–93% for a laned or head 3d6, 54% at the centre
-// slot (its band is the narrowest), 63–85% for a 6d6. Pile and settle, FOR
-// THE RECORD AND NOT AS A GATE (Joe: "pilling is OK"; v1's bars read mean
-// +7.7pp, median +0.30 s, worst +22.2pp — place-settle.mjs prints them and
-// exits 0): against the placeless throw a low toss piles 6d6 +5–6pp and 3d20
-// +8–11pp at medium (a d20 set down gently rests cocked more often than one
-// that skids), 12d6 at a head +19pp, and 6d6 at a head at `close` +22pp — six
-// dice dropped onto a third of a small mat; a 3d6 piles +0–8pp. Settle: a 3d6
-// stops 0.2 s SOONER (it travels less), a 6d6 into a corner takes +0.9–1.5 s
-// longer at medium (the dice lean on one another before they lie down) and
-// +0.1–0.4 s at wide.
-export const PLACE_AIM = { on: 1, speed: 0.5, h: 0.45, box: 0.5, corner: 1, own: 1, spin: 1 };
+// THE RECORD AT THESE DIALS (tools/steps/place-region.mjs, 24 seeds a cell —
+// 12 at close — stations 0/1/4/6; v3.1, 2026-09-01). Centroid in region —
+// wide: 3d6 100%, 6d6 96–100%, the head 100%/83%, d20 54–92%; medium: 3d6
+// 88–96%, 6d6 67–92%, the head 75%/50%, d20 42–67%; close: 3d6 75–92%, 6d6
+// in a pushed corner box 0% (six d6 do not fit a 3.4 × 2.1 corner of a small
+// mat — the v3 small-mat cost, deepened by the deeper aim and recorded), d20
+// 25–75%. Dice in region: wide 3d6 90–93%, 6d6 57–58%; medium 3d6 76–83%,
+// 6d6 47–51%. THE SPACE ITSELF, the number Joe asked for: two laned pools'
+// centroids stand apart, v2 → v3.1, medium 5.82 → 6.57 (+13%) for 3d6 and
+// 3.82 → 4.22 (+11%) for 6d6, wide 8.65 → 10.13 (+17%) and 5.56 → 6.44
+// (+16%); with BOTH pools standing (tools/steps/place-gap.mjs, the two-tab
+// flow) the clear ground between them grew medium 3.54 → 4.02 (+14%), wide
+// 6.14 → 7.11 (+16%). What is left of the 20 is a measured CEILING, not an
+// unspent dial: the box swept 0.35/0.25/0.18 and the softer tosses beside it
+// (h 0.35, speed 0.4) all SATURATE or reverse past these dials — the hull
+// cap (dice are never aimed at a rim), the wall-bound lane at medium and the
+// settle smear clipping at the rims own the remainder. Pile and settle, FOR
+// THE RECORD AND NOT AS A GATE (Joe: "pilling is OK"; place-settle.mjs
+// prints v1's bars and exits 0): v3.1 reads mean +8.6pp, median +0.27 s,
+// worst +20.8pp at close/3d20 from the head — the worst cell unchanged from
+// v3 (+8.0/+0.25/+20.8) and still under the +25pp pathological bar, so no
+// station's push was pulled; a 3d6 still piles +0–8pp and settles sooner, a
+// 6d6 into its corner leans +0.4–1.5 s at medium.
+export const PLACE_AIM = { on: 1, speed: 0.5, h: 0.45, box: 0.25, corner: 1, own: 1, spin: 1 };
 
 // The widest die's rest ceiling, kept off every wall the aim box touches by
 // the cap below — dice must not be aimed AT a rim.

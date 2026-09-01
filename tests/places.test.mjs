@@ -545,6 +545,27 @@ t('the aim box lies inside its region, a hull clear of every rim it touches, at 
   }
 });
 
+t('the aim rides the push: a laned aim centre stands past 1.2x the v2 aim, at every zoom (v3.1)', () => {
+  // The verification's D1: the aim box is anchored in the region's WALL
+  // corner, and the walls never move — at box 0.5 the pushed centre stood at
+  // only ×1.09 of the v2 aim (−3.46 of a −3.19 at medium) while the region
+  // centres said ×1.2, and the pools' rests grew apart 6–9% when Joe had
+  // asked at least 20. The 0.25 box is what stands the corner-anchored
+  // centre AT the push — ×1.2 of the v2 aim or past it on both axes, every
+  // mat — so the throw finally aims where the centres moved. The v2 aim it
+  // is measured against: the capped quadrant (hw − hull, one wall each
+  // axis), box 0.5, corner-anchored → ±0.75 · (half − hull).
+  for (const [id, z] of Object.entries(ZOOMS)) {
+    const a = aimFor(0, -1, z.w, z.d, THROW_TARGET);
+    const v2x = -(z.w / 2 - HULL_MAX) * 0.75;
+    const v2z = (z.d / 2 - HULL_MAX) * 0.75;
+    assert.ok(a.x <= v2x * PLACE_PUSH + 1e-9,
+      `${id}: the aim's x rides the full push (${a.x} vs ${v2x * PLACE_PUSH})`);
+    assert.ok(a.z >= v2z * PLACE_PUSH - 1e-9,
+      `${id}: and so does its z (${a.z} vs ${v2z * PLACE_PUSH})`);
+  }
+});
+
 t('a laned long-edge throw aims into its own corner; heads and the centre slot aim from their own abscissa', () => {
   const { w, d } = ZOOMS.medium;
   const fl = aimFor(0, -1, w, d, THROW_TARGET);

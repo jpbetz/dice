@@ -103,6 +103,12 @@ merged, and two look passes:
   placeless baseline, rim-hugging, the mean centroid. The record behind
   PLACE_AIM's dials and the tool to re-price them (pass a JSON array of
   PLACE_AIM shapes to try variants). Recorded, never gated. Simulates: minutes.
+- `place-gap.mjs [zooms-csv] [seeds] [pools-csv]` — the space BETWEEN the two
+  pools, with both standing (v3.1): station 0 rolls and settles, station 1
+  rolls and settles beside it, then per seed the centroid-to-centroid
+  separation and the clear ground between the pools (min pairwise die
+  distance). The measure behind Joe's "more space between them ... by at
+  least 20%". Recorded, never gated. Simulates: minutes.
 - `place-two-rolls.mjs [outDir] [w] [h] [zoom]` — Joe's own two-tab frame,
   re-taken: two seated tabs, 3d6 each, both pools on the felt in their own
   regions from both chairs, desktop and phone; prints the die's px edge, every
