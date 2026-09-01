@@ -10818,11 +10818,21 @@ let pendingTower = null;           // a change waiting on the roll boundary
 let towerRig = null;               // {id, group, bodies, cm} while socketed
 const TOWER_WALL_AWAY = -1000;     // where the back wall plane parks, socketed
 
-// A SETTLED ROLL WAITING FOR A TOWER TO ARRIVE (see towerReleaseHeldReplay).
+// SETTLED ROLLS WAITING FOR A TOWER TO ARRIVE (see towerReleaseHeldReplay).
 // Declared beside pendingTower because it is the same fact seen from the other
-// side: pendingTower is a tower with no model yet, heldReplay is the roll that
+// side: pendingTower is a tower with no model yet, heldReplay holds the rolls that
 // must not be rebuilt until it has one.
-let heldReplay = null;             // the roll stashed by replaySettledRoll
+//
+// A MAP, IN ARRIVAL ORDER, SINCE v2 (UX §7.63) — and it was a scalar for one
+// day longer than its sibling. resyncTable replays one open roll PER PLACE
+// since the felt started holding them (server.js arrivalSweep), and the idle
+// stash below it (idleReplay) became a Map in the same commit; this one did
+// not, so a late joiner whose room had a GLB tower socketed and two chairs'
+// dice standing stashed both rolls into one slot, the second over the first,
+// and rebuilt only the last of them when the model landed — silently and for
+// good, with its own log saying both were open (goal 8). Found by the v2
+// verification's probe (three of three runs), 2026-09-01.
+const heldReplay = new Map();      // rollId -> the roll stashed by replaySettledRoll
 let heldReplayTimer = null;        // the holdMaxMs escape hatch
 
 // THE TOWER LANTERN (Joe, 2026-08-11: "could we improve the lighting?").
@@ -12225,17 +12235,31 @@ let heldReplayReleasing = false;
 // clears the timer.
 function towerReleaseHeldReplay() {
   if (heldReplayTimer) { clearTimeout(heldReplayTimer); heldReplayTimer = null; }
-  const roll = heldReplay;
-  heldReplay = null;
-  if (!roll) return;
+  if (!heldReplay.size) return;
+  const rolls = [...heldReplay.values()];
+  heldReplay.clear();
   // THE ORDER IS THE LAW. Socket first — this is the same tryFlushRoomChanges
   // the roll boundary calls, and by now the gate it was failing has usually
-  // opened — and only then rebuild the roll, so playRoll bakes against the
-  // interior the rest of the room is baking against.
+  // opened — and only then rebuild the rolls, so playRoll bakes against the
+  // interior the rest of the room is baking against. Socketed ONCE, before
+  // the whole burst: every held roll waited on the same model.
   tryFlushRoomChanges();
   heldReplayReleasing = true;
   try {
-    replaySettledRoll(roll);
+    // In the order they were stashed, which is resyncTable's log order: each
+    // replay fast-forwards synchronously to its last keyframe before the next
+    // begins, so a later pool bakes against the earlier pools' frozen dice —
+    // the same felt every client that watched them arrive is looking at.
+    for (const roll of rolls) {
+      // FRESHNESS, NOT JUST ARRIVAL — drainIdleReplay's own rule, for the same
+      // reason: the hold can last holdMaxMs, and the room may have collected
+      // or cleared this roll in the meantime (hello or 'roll-collected' has
+      // written it into the state row, which is the truth). Rebuilding it then
+      // would stand dice back up that everyone else has put away.
+      const st = roll.rollId ? rollStates.get(roll.rollId) : null;
+      if (st && (st.cleared || st.collected)) continue;
+      replaySettledRoll(roll);
+    }
   } finally {
     heldReplayReleasing = false;
   }
@@ -14521,9 +14545,13 @@ window.__diceDebug = {
     if (typeof patch.holdMaxMs === 'number') TOWERGLB.holdMaxMs = patch.holdMaxMs;
     return { retryMs: [...TOWERGLB.retryMs], holdMaxMs: TOWERGLB.holdMaxMs };
   },
-  // Is a settled roll being held for a model? (See towerReleaseHeldReplay.)
+  // Are settled rolls being held for a model? (See towerReleaseHeldReplay.)
+  // `held` is the oldest, `heldAll` every one in arrival order — the same
+  // shape idleReplayInfo reports, because since v2 a snapshot can carry one
+  // open roll per place and the hold has to carry all of them.
   towerHeldReplay() {
-    return { held: heldReplay ? heldReplay.rollId : null, armed: !!heldReplayTimer };
+    const held = [...heldReplay.keys()];
+    return { held: held.length ? held[0] : null, heldAll: held, armed: !!heldReplayTimer };
   },
   // WHICH SKY THE FAE TOWER IS UNDER, and a setter for the proofs (W3).
   // Setting it re-sockets, because a palette is baked into the skin's
@@ -29978,7 +30006,7 @@ function replaySettledRoll(r) {
   // true by definition for a row with no glbUrl — so the reload-ordering
   // assertions in tower-roll take exactly the path they always did.
   if (towerReplayBlocked()) {
-    heldReplay = r;
+    heldReplay.set(r.rollId, r);   // one per open roll — a resync carries several (§7.63 v2)
     if (!heldReplayTimer) {
       heldReplayTimer = setTimeout(towerReleaseHeldReplay, TOWERGLB.holdMaxMs);
     }

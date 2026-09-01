@@ -21085,6 +21085,103 @@ export const scenarios = [
     },
   },
   {
+    name: 'place-held-for-tower',
+    tags: ['place', 'resync', 'tower'],
+    timeout: 150000,
+    // TWO OPEN ROLLS, ONE MODEL STILL LOADING (UX §7.63 v2 + docs/TOWER.md).
+    // The felt holds one roll per place, so a late joiner's snapshot carries
+    // several open rolls; and a room with a GLB tower socketed hands that
+    // snapshot to a client whose model has not arrived, so every one of those
+    // replays is HELD (replaySettledRoll's tower hold) until it does. The hold
+    // was a scalar — the idle stash beside it became a Map the day the sweep
+    // changed, this one did not — so the second roll overwrote the first and
+    // the newcomer's felt came up one pool short, for good, with its own log
+    // saying both were open (the v2 verification's probe, 3 of 3; goal 8).
+    //
+    // THE INSTANT IS DELIVERED BY HAND, the resync-hello-mid-playback pattern:
+    // in the real flow the hold lasts a few hundred milliseconds (measured:
+    // by the time a fresh tab answers its first CDP call the model is ready
+    // and the rebuild done), so a scenario that joined a real tab could only
+    // ever assert the outcome. Feeding the hello — the room's own join
+    // snapshot, wearing the tower it is about to get — to a tab whose model
+    // has not started loading, and reading the hold IN THE SAME EVAL, pins the
+    // mechanism: two rolls held, then two rolls rebuilt.
+    async fn(ctx) {
+      const front = await ctx.newTable({ origin: '127.0.0.74', name: 'Front' });
+      const back = await ctx.newTable({ origin: '127.0.0.75', name: 'Back' });
+      await back.waitFor('window.__diceDebug.places().stations.length === 2', { desc: 'both seated' });
+      const frontId = await front.playerId();
+      const backId = await back.playerId();
+      const rollAs = async (playerId, notation) => {
+        const r = await ctx.api('/api/roll', { playerId, notation });
+        assert.equal(r.status, 200, `roll "${notation}": ${JSON.stringify(r.data)}`);
+        return r.data.roll;
+      };
+      const lands = (t, rid, n, desc) => t.waitFor(
+        `(window.__diceDebug.sim(120), !window.__diceDebug.busy && ${diceOf(rid, n)})`, { desc, timeout: 60000 });
+      const a = await rollAs(frontId, '3d6 # Front');
+      for (const t of [front, back]) await lands(t, a.rollId, 3, "Front's dice land");
+      const b = await rollAs(backId, '3d6 # Back');
+      for (const t of [front, back]) await lands(t, b.rollId, 3, "Back's dice land");
+      assert.equal(await front.dbg('tableDice.length'), 6, 'two pools stand — one per place');
+
+      // The newcomer: joins now, while the room is towerless, so its copy of
+      // the GLB has never been asked for.
+      const c = await ctx.newTable({ origin: '127.0.0.76', name: 'Late' });
+      await c.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy && window.__diceDebug.tableDice.length === 6)`,
+        { desc: 'the newcomer rebuilds both pools the ordinary way first', timeout: 60000 });
+      assert.deepEqual(await c.dbg(`towerModelStatus('nullstone')`).then((s) => s.ready), false,
+        'and its nullstone model is not ready — nothing has fetched it');
+
+      // The snapshot the room hands a joiner right now, wearing the tower it
+      // is about to be given.
+      const joined = await ctx.api('/api/join', { name: 'Witness' });
+      assert.equal(joined.ok, true, 'a bare client can ask the room what it holds');
+      const open = joined.data.log.filter((r) => !r.cleared && !r.collected).map((r) => r.rollId).sort();
+      assert.deepEqual(open, [a.rollId, b.rollId].sort(), 'the snapshot carries BOTH open rolls');
+      const snap = JSON.stringify({ ...joined.data, settings: { ...(joined.data.settings || {}), tower: 'nullstone' } });
+
+      // Lose the felt (the aftermath of a blip) and take the hello, in ONE
+      // eval, reading the hold and everything asserted about it before the
+      // event loop turns — with a warm HTTP cache (this lane's earlier tower
+      // scenarios fetched the same GLB) the model lands and the hold drains
+      // within a CDP round trip, so a second call would be reading the
+      // aftermath.
+      const at = await c.eval(`(() => {
+        const d = window.__diceDebug;
+        d.clearTable();
+        d.netEvent('hello', ${snap});
+        return { held: d.towerHeldReplay(), pending: d.pendingTower, dice: d.tableDice.length };
+      })()`);
+      assert.deepEqual(at.held.heldAll, [a.rollId, b.rollId],
+        `BOTH rolls are held for the model, in log order (got ${JSON.stringify(at.held)})`);
+      assert.equal(at.held.held, a.rollId, 'the oldest first');
+      assert.equal(at.held.armed, true, 'with the holdMaxMs deadline armed');
+      assert.equal(at.pending, 'nullstone', 'because the tower is queued on a model still loading');
+      assert.equal(at.dice, 0, 'and nothing was rebuilt against the wrong interior');
+
+      // The room really gets the tower now, so the fixture and the room agree
+      // from here on (a settings change sweeps nothing — six dice stay up).
+      const set = await ctx.api('/api/settings', { playerId: frontId, settings: { tower: 'nullstone' } });
+      assert.equal(set.status, 200, `set tower: ${JSON.stringify(set.data)}`);
+      await front.waitFor(`window.__diceDebug.tower === 'nullstone'`, { desc: 'the tower goes up for the room' });
+      assert.equal(await front.dbg('tableDice.length'), 6, 'the standing pools survive the socket');
+
+      // …AND BOTH LAND. The model arrives, the tower sockets, the hold drains
+      // in log order — each replay fast-forwarded before the next begins.
+      await c.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy
+        && window.__diceDebug.tower === 'nullstone'
+        && window.__diceDebug.towerHeldReplay().heldAll.length === 0
+        && window.__diceDebug.tableDice.length === 6)`,
+      { desc: 'both held rolls are rebuilt once the model lands', timeout: 60000 });
+      assert.equal(await c.eval(diceOf(a.rollId, 3)), true, "Front's three came back");
+      assert.equal(await c.eval(diceOf(b.rollId, 3)), true, "…and Back's three — the pool a scalar hold lost");
+      assert.equal(await c.dbg('pendingTower'), null, 'nothing left queued');
+      const onC = (await c.dbg('onTable')).filter((r) => !r.collected).map((r) => r.rollId).sort();
+      assert.deepEqual(onC, [a.rollId, b.rollId].sort(), 'and the log agrees with the felt about what is open');
+    },
+  },
+  {
     name: 'place-two-views',
     tags: ['place', 'presence'],
     timeout: 150000,
