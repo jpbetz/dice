@@ -36,8 +36,13 @@ const POST_TIMEOUT_MS = 8000;
 const STREAM_OPEN_TIMEOUT_MS = 3000;
 const REOPEN_MIN_MS = 1000;
 const REOPEN_MAX_MS = 15000;
+// THE EVENT WHITELIST, AND IT IS SILENT: an event type the server pushes and
+// this list does not name is dropped here with no error anywhere. A new
+// broadcast that is not added on this line simply never happens, on every
+// client, forever — so a server change and this line ship together or the
+// feature does not ship. ('place-changed', §7.63, is the most recent one.)
 const SSE_EVENTS = [
-  'hello', 'player-joined', 'player-left', 'player-renamed', 'pools-changed',
+  'hello', 'player-joined', 'player-left', 'player-renamed', 'place-changed', 'pools-changed',
   'roll', 'clear', 'reveal', 'rethrow', 'banked', 'roll-cleared', 'roll-collected',
   'offer', 'offer-claimed', 'offer-rescinded',
   'settings-changed', 'table-setup', 'table-split',

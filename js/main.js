@@ -31,7 +31,7 @@ import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
 // file reads the stamps back (the rollspec.js precedent). The film half only:
 // laneSpread (the lane yields to the pool), aimFor (a translated aim box),
 // and AIM_ZERO (the shared frozen zero every unstamped roll aims through).
-import { laneSpread, aimFor, AIM_ZERO } from './places.js';
+import { laneSpread, aimFor, AIM_ZERO, placeAnchor, PLACE_MAX, STATIONS } from './places.js';
 import { previewOf, countingPmfs, sumForecast, sumAtLeast, sumBins, sumPeak,
   throwForecast, facesOf } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
@@ -16240,6 +16240,58 @@ window.__diceDebug = {
   // placard slice stands something to anchor a wash to. Null before any roll
   // has thrown.
   throwOrigin() { return throwOrigin ? { ...throwOrigin, aim: { ...throwOrigin.aim } } : null; },
+  // WHO SITS WHERE (UX §7.63) — the roster half of a place, as this client
+  // understands it, plus where each occupied station's card stands in world
+  // units. Read-only and derived on the spot: nothing here is state, and
+  // nothing downstream of a pixel reads a place, so a stale answer here can
+  // never cost anyone a frame of film.
+  //
+  // `on` is "this table has stations handed out at all" — false solo, false
+  // offline, false on a server with PLACES_ON off. `layout` names the dress the
+  // cards would wear ('table', the grounded kit; the venue kits arrive with the
+  // venue dress slice). `world` comes from js/places.js against the mat AS THE
+  // WALLS CURRENTLY STAND — this zoom, this tower — so it already carries the
+  // tower's flank relocation. `shown`/`fontPx`/`visible` stay empty-but-shaped
+  // until there is something painted to report; `queued` counts the roster
+  // events that have asked for a rebuild, which is this slice's only proof that
+  // every door is wired to one.
+  places() {
+    const towerUp = towerOn();
+    const seated = netOnline ? players : [];
+    const mineRow = (netOnline && net) ? seated.find((p) => p.id === net.playerId) : null;
+    const mine = mineRow && Number.isInteger(mineRow.place) ? mineRow.place : null;
+    const stations = [];
+    for (let place = 0; place < PLACE_MAX; place++) {
+      const p = seated.find((q) => Number.isInteger(q.place) && q.place === place);
+      if (!p) continue;                       // an empty station stands nothing
+      const st = STATIONS[place];
+      const a = placeAnchor(place, TABLE_W, TABLE_D, towerUp);
+      stations.push({
+        place,
+        station: st.edge,
+        lane: st.lane,
+        playerId: p.id,
+        name: p.name,
+        shown: null,
+        fontPx: 0,
+        color: p.color || null,
+        world: { x: a.x, y: a.y, z: a.z },
+        yaw: 0,
+        visible: false,
+        relocated: a.relocated,
+        mine: p.id === (net ? net.playerId : null),
+      });
+    }
+    const myAnchor = mine === null ? null : placeAnchor(mine, TABLE_W, TABLE_D, towerUp);
+    return {
+      on: stations.length > 0,
+      layout: stations.length ? 'table' : 'none',
+      mine,
+      myOrbit: myAnchor ? myAnchor.azim : 0,
+      queued: placardQueued,
+      stations,
+    };
+  },
   // The settle terminator (SETTLEGATE). mode 'displacement' is shipped — the
   // three-point AABB rest test, `eps` its tolerance as a fraction of a die's
   // WIDTH; 'velocity' restores the pre-2026-08-11 predicate. Takes effect on
@@ -24634,6 +24686,25 @@ function tryFlushTower() {
   towerSocket(id);
 }
 
+// A PLACE AT THE TABLE (docs/UX.md §7.63) — THE ROSTER MOVED, SO THE PLACARDS
+// ARE STALE. Every door that can change who sits where ends here: `hello`
+// (the roster is replaced wholesale), `player-joined`, `player-left`,
+// `player-renamed` (one card repaints its row) and `place-changed` (the one
+// promotion the server ever makes).
+//
+// A STUB, on purpose and for exactly one slice. The wire lands before anything
+// it stands up: this slice proves the field arrives at every client through
+// every door, with nothing on the felt to see and no physics touched. The
+// rebuild itself joins tryFlushRoomChanges below — the roll-boundary defer the
+// zoom and the tower already ride — because restanding the cards, or turning a
+// viewer's own table, while dice are in the air is precisely what that rule
+// exists to prevent (IMMERSION ruling ①).
+let placardQueued = 0;
+function placardQueue() {
+  placardQueued++;
+  return placardQueued;
+}
+
 // ONE roll boundary, both deferred room changes. Zoom first: applyZoom
 // re-sockets whatever tower is already up, so doing it the other way round
 // would build a model against the old preset and immediately rebuild it.
@@ -29494,6 +29565,7 @@ function handleNetEvent(type, data) {
       // NOW the presence row can be drawn: roster and setup are both current,
       // so the unclaimed chairs describe the room this hello just described.
       renderPlayers();
+      placardQueue(); // §7.63: a wholesale roster replacement restands every card
       maybeRepushTable();
       resyncTable(data);
       break;
@@ -29501,6 +29573,7 @@ function handleNetEvent(type, data) {
       if (data.player && !players.some((p) => p.id === data.player.id)) {
         players.push(data.player);
         renderPlayers();
+        placardQueue(); // §7.63: their card stands at the station they were given
         refreshPoolsPresence(); // the owner switcher gains a chip
         // Somebody came. A minted table that nobody had rolled at yet has
         // just become one worth finding again — the second of the two things
@@ -29512,6 +29585,10 @@ function handleNetEvent(type, data) {
       const gone = players.find((p) => p.id === data.playerId);
       players = players.filter((p) => p.id !== data.playerId);
       renderPlayers();
+      // §7.63: the card goes with the seat — the placard answers the 5 s roster
+      // clock. The STATION it stood at is held for the 60 s memory clock by the
+      // server's own vacated stub, so nobody is seated in it meanwhile.
+      placardQueue();
       if (poolsOwner === data.playerId && gone) {
         showSettingsNote(`${gone.name} left \u2014 back to your pools`);
       }
@@ -29524,6 +29601,26 @@ function handleNetEvent(type, data) {
         p.name = data.name;
         renderPlayers();
         refreshPoolsPresence(); // switcher chip + a standing owner banner track names
+        placardQueue(); // §7.63: one card repaints its row, in place
+      }
+      break;
+    }
+    // WHERE SOMEBODY SITS CHANGED (§7.63) — and this is the ONLY event that
+    // ever says so, because a place is assigned once, at the door, and rides
+    // `player-joined`/`hello` from there. The single exception is the
+    // promotion: a station came free and the earliest-joined placeless player
+    // takes it. Nobody is ever renumbered, so this can only ever be a player
+    // GAINING a station.
+    //
+    // Roster state, and allowed to be a moment stale — the film never reads it.
+    // A throw's entry edge rides its own roll payload, so a client that has not
+    // heard this yet still bakes the same tumble as everyone else; all it is
+    // missing is where the card stands.
+    case 'place-changed': {
+      const p = players.find((x) => x.id === data.playerId);
+      if (p) {
+        p.place = Number.isInteger(data.place) ? data.place : null;
+        placardQueue();
       }
       break;
     }
@@ -30830,6 +30927,11 @@ async function initNet() {
     roomParent = conn.parent || null;
     roomChildren = conn.children || [];
     renderPlayers(); // the rail roster fills in (solo it is simply empty)
+    // §7.63: the join snapshot is a roster door like any other — the FIRST one
+    // this tab walks through. `hello` will restand the cards again a moment
+    // later; standing them here is what stops the table being placardless for
+    // the length of a stream open.
+    placardQueue();
     renderGroups();  // the owner switcher appears once the roster is known
     publishPools();  // share the rack (display copy; localStorage stays truth)
     log = (conn.log || []).map(rollToLogEntry); // server history for late joiners

@@ -20067,6 +20067,153 @@ export const scenarios = [
     },
   },
   {
+    name: 'place-assign',
+    tags: ['place', 'seat', 'smoke'],
+    timeout: 120000,
+    // WHO SITS WHERE, AND WHAT EVERY CLIENT IS TOLD (UX §7.63). The wire lands
+    // one slice before anything reads it: no card is standing yet and no throw
+    // has moved, so everything asserted here is roster truth arriving at a real
+    // browser through real events.
+    //
+    // THE LADDER IS THE CLAIM, not merely the numbering: long edges fill first,
+    // and the heads stay empty until N >= 5, because a head seat costs its
+    // sitter ~30% of the table at the default zoom (spanPx 98 -> 68) for no
+    // arrangement benefit at four people or fewer.
+    //
+    // THE PROMOTION IS THE TRANSITION LEG, and it doubles as the proof for this
+    // slice's one silent trap: `place-changed` is a NEW SSE type, and js/net.js
+    // whitelists event types and drops the rest with no error anywhere. The
+    // browser below learns about the promotion through that whitelist or not at
+    // all — a raw player's event stream would have passed either way.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Ann' });
+      await a.waitFor('window.__diceDebug.places().mine === 0',
+        { desc: 'the first arrival takes station 0' });
+      const names = ['Bram', 'Cass', 'Dev', 'Eluned', 'Fionn', 'Gus', 'Hana'];
+      const raws = [];
+      for (const nm of names) raws.push(await ctx.rawPlayer(nm));
+      await a.waitFor('window.__diceDebug.places().stations.length === 8',
+        { desc: 'eight chairs, eight stations' });
+
+      const full = await a.dbg('places()');
+      assert.deepEqual(full.stations.map((s) => s.place), [0, 1, 2, 3, 4, 5, 6, 7],
+        'lowest free, handed out in join order');
+      assert.deepEqual(full.stations.map((s) => s.name), ['Ann', ...names],
+        'and each card carries the name of the player who was given it');
+      assert.deepEqual(full.stations.slice(0, 4).map((s) => s.station),
+        ['front', 'back', 'front', 'back'],
+        'the first four chairs are two per LONG edge');
+      assert.deepEqual(full.stations.slice(4, 6).map((s) => s.station), ['right', 'left'],
+        'the heads are the fifth and sixth chairs — nobody pays the short-edge tax early');
+      assert.equal(full.on, true, 'the table has places');
+      assert.equal(full.layout, 'table', 'wearing the grounded dress');
+      assert.equal(full.myOrbit, 0, "and the front chair's own azimuth is zero");
+
+      // EVERY CARD STANDS OUTBOARD OF A WALL — the property that makes a
+      // placard unreachable by any die, and therefore lets it cast a real
+      // shadow and be seated by a raycast later. Asserted against the mat AS
+      // THE WALLS CURRENTLY STAND, which is what js/places.js is handed.
+      const ext = await a.dbg('tableExtents()');
+      for (const s of full.stations) {
+        if (s.station === 'front' || s.station === 'back') {
+          assert.ok(Math.abs(s.world.z) > ext.d / 2,
+            `station ${s.place} stands past the wall (z ${s.world.z} vs ${ext.d / 2})`);
+        } else {
+          assert.ok(Math.abs(s.world.x) > ext.w / 2,
+            `station ${s.place} stands past the wall (x ${s.world.x} vs ${ext.w / 2})`);
+        }
+        assert.equal(s.relocated, false, 'no tower is up, so nobody has moved to a flank');
+      }
+
+      // THE NINTH ARRIVAL IS PLACELESS — the key is absent, and nothing else
+      // about the table cliffs. Their rolls come in from a seeded edge and
+      // light no wash, which is what keeps a placeless roll from ever wearing
+      // somebody else's name.
+      const iris = await ctx.rawPlayer('Iris');
+      await a.waitFor('window.__diceDebug.players.length === 9',
+        { desc: 'the ninth is at the table' });
+      const nine = await a.dbg('places()');
+      assert.equal(nine.stations.length, 8, 'still eight cards');
+      assert.equal(nine.stations.some((s) => s.name === 'Iris'), false,
+        'the ninth arrival holds no station');
+
+      // P8 — THE TRANSITION. A station comes free (leaving on purpose buries
+      // no stub, so it is free at once) and the earliest-joined placeless
+      // player takes it. One player gains; nobody else moves.
+      await ctx.api('/api/leave', { playerId: raws[1].playerId, immediate: true });
+      const ev = await raws[0].waitForEvent('place-changed');
+      assert.deepEqual(ev.data, { playerId: iris.playerId, place: 2 },
+        'the promotion names the player and the station, and nothing else');
+      await a.waitFor(
+        `window.__diceDebug.places().stations.some((s) => s.name === 'Iris' && s.place === 2)`,
+        { desc: 'the browser heard place-changed — it is on the SSE whitelist' });
+
+      const after = await a.dbg('places()');
+      assert.equal(after.mine, 0, 'and nobody is renumbered: Ann still sits where she sat');
+      assert.deepEqual(after.stations.map((s) => s.name),
+        ['Ann', 'Bram', 'Iris', 'Dev', 'Eluned', 'Fionn', 'Gus', 'Hana'],
+        'one chair changed hands; the other seven did not move');
+      assert.ok(after.queued > full.queued,
+        'every roster door asks the placards to be restood (the rebuild itself lands next slice)');
+    },
+  },
+  {
+    name: 'place-sticks',
+    tags: ['place', 'seat', 'identity'],
+    timeout: 120000,
+    // TWO CLOCKS, ONE CHAIR (IDENTITY §8, UX §7.63). The PLACARD answers the
+    // 5 s roster clock — it goes when the seat does. The PLACE answers the 60 s
+    // memory clock: the server's vacated stub holds the station, so a browser
+    // that was gone long enough to be reaped comes back to the chair it left,
+    // and an arrival in that window is seated somewhere else rather than in it.
+    //
+    // The revive path itself is pinned protocol-side in tests/places-wire.test.mjs
+    // with both clocks shrunk; what this scenario adds is that a REAL browser,
+    // through a real reload and a real reap, ends up in the same chair — and
+    // that a rename repaints one card without moving anyone.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await b.waitFor('window.__diceDebug.places().stations.length === 2',
+        { desc: 'both seated' });
+      assert.equal(await a.dbg('places().mine'), 0, 'Alice at the front');
+      assert.equal(await b.dbg('places().mine'), 1, 'Bob opposite');
+
+      // A refresh is the same player — the seat is remembered per tab, and the
+      // station rides the seat with nothing to restore.
+      await a.reload();
+      assert.equal(await a.dbg('places().mine'), 0, 'a refresh sits back down in the same chair');
+
+      const seat = await a.playerId();
+      await a.close();
+      await b.waitFor(
+        `!window.__diceDebug.places().stations.some((s) => s.name === 'Alice')`,
+        { desc: 'the card goes with the seat', timeout: 20000 });
+
+      // The roster has let go and the server has not: this arrival is seated
+      // NEXT, not in the chair Alice is walking back to.
+      await ctx.rawPlayer('Cass');
+      await b.waitFor(
+        `window.__diceDebug.places().stations.some((s) => s.name === 'Cass' && s.place === 2)`,
+        { desc: 'a joiner skips the held station' });
+
+      const back = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      assert.equal(await back.playerId(), seat, 'the same seat came back');
+      assert.equal(await back.dbg('places().mine'), 0, 'and with it the same chair');
+
+      // A rename repaints ONE row. (The painted string itself arrives with the
+      // placard; today the card's name is the roster's name, which is the
+      // property the vocabulary sweep will later reach into 3D for.)
+      assert.equal(await back.dbg("changeName('Alys')"), true, 'the rename is accepted');
+      await b.waitFor(
+        `window.__diceDebug.places().stations.some((s) => s.place === 0 && s.name === 'Alys')`,
+        { desc: 'the card follows the name' });
+      const rows = await b.dbg('places()');
+      assert.deepEqual(rows.stations.map((s) => s.place), [0, 1, 2],
+        'and nobody moved to make room for a longer name');
+    },
+  },
+  {
     name: 'place-seeds-unchanged',
     tags: ['place', 'roll', 'perf'],
     timeout: 120000,

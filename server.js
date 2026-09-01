@@ -47,6 +47,12 @@ import { composeRoll, composeThrow, validateMods, validateSpec, DIE_MAX,
 import { parseNotation } from './js/notation.js';
 import { SET_IDS } from './js/themes.js';
 import { SYSTEM_IDS } from './js/meanings.js';
+// A place at the table (docs/UX.md §7.63). The station arithmetic is written
+// ONCE, in js/places.js, and this process and every browser import the same
+// file — the js/rollspec.js precedent. Here it is the ladder's own ceiling:
+// how many stations there are to hand out is a fact about the LAYOUT, not a
+// number the server gets to hold a second copy of.
+import { PLACE_MAX } from './js/places.js';
 // C22: the stamp's SHAPE only. The server carries `ver` on a table setup and
 // never judges it — see handleTable — so it imports the parser and nothing
 // else, which is also what keeps the regex in one file.
@@ -94,6 +100,17 @@ const MAX_ROOM = 64;
 const LOG_CAP = 100;              // rolls kept per room (client also caps at 100; keep in lockstep — ROADMAP §0b)
 const MAX_ROOMS = 500;            // live rooms across the server
 const MAX_PLAYERS_PER_ROOM = 40;
+// A PLACE AT THE TABLE (docs/UX.md §7.63) — the server-side kill switch, and
+// the only one there is: the feature is not beta-gated and carries no room
+// setting (js/stability.js gates OFFERS, never capability, and a film input
+// gated per client is the desync stability.js exists to prevent).
+//
+// One process decides. Flipping this to false stops the stamp AND — because
+// `place` is only ever assigned while it is on — empties the roster field, so
+// the placards and the films degrade together, with no skew between clients and
+// no deploy. PLACE_MAX (8, and the ladder that fills it) lives in js/places.js:
+// the arithmetic is written once, and the browser imports the same module.
+const PLACES_ON = true;
 const MAX_POOLS_PER_PLAYER = 40;
 const MAX_POOL_NOTATION = 200;
 // Prepared player profiles in a room's table setup (docs/PROFILES.md §3.2).
@@ -564,8 +581,15 @@ function getRoom(name) {
   return room;
 }
 
-function publicPlayers(room) {
-  return [...room.players.values()].map((p) => ({
+// ONE PROJECTION OF A PLAYER ONTO THE WIRE, and after this extraction there is
+// structurally no other: `player-joined` used to carry a hand-built literal of
+// its own, which is how a field could be — and once was — dropped by two of the
+// three ingress paths that build a roster (the `set` bug, docs/IDENTITY.md).
+// A new roster field is added HERE and every client learns it whichever door it
+// came in through. Present-or-absent all the way down, so a room that never
+// used a field sends today's payload byte for byte.
+function publicPlayer(p) {
+  return {
     id: p.id, name: p.name, color: p.color, pools: p.pools || [],
     // C17: their whole library, so a joiner is offered every character at
     // the table rather than only the one each player happens to be holding.
@@ -585,7 +609,23 @@ function publicPlayers(room) {
     // keeps no library (goal 7). Both fields are present-or-absent.
     ...(p.profile ? { profile: p.profile } : {}),
     ...(p.system ? { system: p.system } : {}),
-  }));
+    // §7.63: WHICH STATION AT THE TABLE THIS PLAYER SITS AT — an integer 0–7,
+    // server-assigned, sticky, absent when they hold none (the 9th arrival, or
+    // a server with PLACES_ON off). DISPLAY STATE, and allowed to be wrong: it
+    // stands the placards and turns the viewer's own camera, and nothing
+    // downstream of a pixel reads it. The FILM never reads the roster — a
+    // throw's edge rides its own roll payload (`entry`/`lane`, stamped at
+    // executeRoll in the seed's determinism class), so a client whose roster is
+    // a moment stale still bakes the same tumble as everyone else.
+    //
+    // Never read off a request body, never in GET /api/table, never in the
+    // portable YAML, never in the URL (docs/IDENTITY.md §6).
+    ...(Number.isInteger(p.place) ? { place: p.place } : {}),
+  };
+}
+
+function publicPlayers(room) {
+  return [...room.players.values()].map((p) => publicPlayer(p));
 }
 
 // The last player left. An ordinary room dies here, as it always has; a room
@@ -733,7 +773,20 @@ function rememberVacatedSeat(room, player, why) {
   while (room.vacated.size >= MAX_VACATED_PER_ROOM) {
     room.vacated.delete(room.vacated.keys().next().value);
   }
-  room.vacated.set(player.id, { id: player.id, who: player.who, color: player.color, at: now });
+  // THE STUB HOLDS THE STATION TOO (§7.63, IDENTITY §8's two clocks). The
+  // PLACARD answers the 5 s roster clock and vanishes with the seat; the PLACE
+  // answers this 60 s one, so a reload lands back in the same chair — and,
+  // because placesHeld reads these stubs, nobody else is seated in it while the
+  // browser is on its way back. Null rather than absent: the field is read by
+  // Number.isInteger everywhere, and a stub that says "no station" out loud is
+  // one nobody has to guess about.
+  room.vacated.set(player.id, {
+    id: player.id,
+    who: player.who,
+    color: player.color,
+    place: Number.isInteger(player.place) ? player.place : null,
+    at: now,
+  });
 }
 
 // The seat this arrival may sit back down in, or null. Consuming: a stub is
@@ -775,6 +828,9 @@ function removePlayer(room, player, why) {
   rememberVacatedSeat(room, player, why);
   log(`left    ${logField('room', room.name)} ${logField('name', player.name)} (${why})`);
   broadcast(room, 'player-left', { playerId: player.id });
+  // AFTER the stub is buried, so a station a browser may still come back to is
+  // not handed to somebody else while it is on its way (the 60 s clock above).
+  promotePlaceless(room);
   dropRoomIfEmpty(room);
 }
 
@@ -1151,6 +1207,88 @@ function keepColor(room, wanted) {
   return next;
 }
 
+// WHERE THIS ARRIVAL SITS (docs/UX.md §7.63) — modelled on keepColor above,
+// deliberately: same shape, same doors, same "honour it when it is free, hand
+// out the next one otherwise". The differences are the two that matter.
+//
+//   1. STATIONS ARE ABSOLUTE AND NOBODY IS EVER RENUMBERED. A colour is a
+//      preference; a place is a position on the felt that a throw comes in
+//      over. Compacting the table when somebody leaves would move the edge
+//      a stamped roll already entered from — the placard would then be
+//      lying about a roll still on the table (IMMERSION.md:1379-1382). So
+//      the only reassignment in the system is the promotion below: one
+//      placeless player GAINS a station; nobody loses one, nobody moves.
+//
+//   2. A VACATED STUB HOLDS ITS STATION for the 60 s memory clock, which is
+//      why placesHeld reads room.vacated as well as room.players. That is the
+//      whole of "a reload lands in the same chair".
+//
+// Lowest free, so a fresh table fills 0, 1, 2… in the ladder order js/places.js
+// writes down: long edges first, the heads empty until N >= 5.
+function placesHeld(room) {
+  const held = new Set();
+  const now = Date.now();
+  for (const p of room.players.values()) if (Number.isInteger(p.place)) held.add(p.place);
+  for (const v of room.vacated.values()) {
+    // AN EXPIRED STUB HOLDS NOTHING — takeVacatedSeat's own rule, read the same
+    // way here rather than left to whenever the prune next runs. Stubs are
+    // pruned lazily (rememberVacatedSeat, on the NEXT disconnect reap), so at a
+    // quiet table a lapsed browser's chair would otherwise stay empty for as
+    // long as the room lived, and the arrival standing in front of it would be
+    // seated further down the ladder for no reason anybody could see.
+    if (now - v.at > RESUME_TTL_MS) continue;
+    if (Number.isInteger(v.place)) held.add(v.place);
+  }
+  return held;
+}
+
+// The lowest station nobody holds, or null — the 9th arrival at a table with
+// eight stations is PLACELESS by design, not refused: they roll from a seeded
+// edge with no stamp and no wash, their name lives in the roster's +N fold, and
+// nothing about the table cliffs (§2.5). No cliff, and no confidently wrong
+// name: attribution is edge AND wash, so a placeless roll never wears somebody
+// else's placard.
+function freePlace(room) {
+  if (!PLACES_ON) return null;
+  const held = placesHeld(room);
+  for (let i = 0; i < PLACE_MAX; i++) if (!held.has(i)) return i;
+  return null;
+}
+
+// The station a revived seat asks for, honoured when it is really free. The
+// keepColor idiom, verbatim in shape — and the reason a stub carries `place`
+// at all.
+//
+// NO AWAIT BETWEEN THIS AND `room.players.set` (see handleJoin, which is the
+// only caller of either): both this and freePlace decide out of the LIVE
+// roster, so an await in that stretch would let a second join interleave and
+// seat two arrivals in one chair.
+function keepPlace(room, wanted) {
+  if (!PLACES_ON) return null;
+  if (Number.isInteger(wanted) && wanted >= 0 && wanted < PLACE_MAX
+      && !placesHeld(room).has(wanted)) return wanted;
+  return freePlace(room);
+}
+
+// THE ONE REASSIGNMENT. A station has just come free and somebody is sitting
+// at this table without one: the earliest-joined placeless player takes the
+// lowest free station and the room is told. `room.players` is a Map, so
+// insertion order IS join order — "earliest-joined" is deterministic and costs
+// no field. Called only from removePlayer, which is the only thing that can
+// free a station; every other door either assigns at the moment of arrival
+// (and rides `player-joined`) or reuses a place that never moved.
+function promotePlaceless(room) {
+  if (!PLACES_ON) return;
+  for (const p of room.players.values()) {
+    if (Number.isInteger(p.place)) continue;
+    const place = freePlace(room);
+    if (place === null) return;             // the table is full again: nobody moves
+    p.place = place;
+    log(`place   ${logField('room', room.name)} ${logField('name', p.name)} place=${place} (promoted)`);
+    broadcast(room, 'place-changed', { playerId: p.id, place });
+  }
+}
+
 // THE ROOM-CREATION THROTTLE (ROADMAP §0j). Room creation is the one door that
 // ALLOCATES out of MAX_ROOMS, so it is the one a script uses to lock a real
 // table out with `server_full`. Cloud Armor is still the authority (DEPLOY.md
@@ -1381,6 +1519,18 @@ async function handleJoin(req, res) {
     id: vacated ? vacated.id : crypto.randomUUID(),
     name,
     color: keepColor(room, vacated ? vacated.color : cleanString(body.value.color, 16)),
+    // WHERE THEY SIT (§7.63). Two of the four join doors reach this literal —
+    // FRESH takes the lowest free station, REVIVE asks for the one its stub was
+    // holding — and the other two never do: a resume by seat id or by `who`
+    // reuses the player object, so its place is already right and there is
+    // nothing to write and nothing to broadcast.
+    //
+    // NO AWAIT BETWEEN takeVacatedSeat/keepPlace AND room.players.set below.
+    // Both read the live roster to decide what is free, so an await here would
+    // let a second join interleave and hand two arrivals the same chair. (There
+    // is none — the whole stretch is synchronous, and this comment is the guard
+    // against a future one, exactly as keepColor's cursor needs.)
+    place: vacated ? keepPlace(room, vacated.place) : freePlace(room),
     pools: [],
     clients: new Set(),
     reapTimer: null,
@@ -1420,7 +1570,12 @@ async function handleJoin(req, res) {
   } else {
     log(`join    ${logField('room', roomName)} ${logField('name', name)} color=${player.color} players=${room.players.size}`);
   }
-  broadcast(room, 'player-joined', { player: { id: player.id, name: player.name, color: player.color, pools: [] } });
+  // publicPlayer, not a literal of its own: this payload and the roster in
+  // `hello` are now provably the same projection of the same player, which is
+  // the structural fix for a field that reaches a client through one door and
+  // not another. A fresh player's pools is [], so this is byte-identical to the
+  // literal it replaces apart from the station it now carries.
+  broadcast(room, 'player-joined', { player: publicPlayer(player) });
 
   sendJson(res, 200, joinSnapshot(room, player));
 }
