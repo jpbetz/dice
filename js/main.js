@@ -791,8 +791,56 @@ camera.lookAt(0, 0, 0.5);
 // contain the mat — then it follows the dice, because a cropped frame centred
 // on empty felt is the worst of both. Only fitCameraTo and the framing ladder
 // read it; nothing else in the app knows the camera has a target.
+//
+// THE HALF UNIT IS TOWARD THE VIEWER'S OWN EDGE, not toward world +z. It was
+// tuned from the front chair — the only chair there was — and it is what
+// balances a steep eye over a mat whose near edge looms: the frame sits a
+// little toward the near rim so the near rim, the one the viewer's own card
+// stands past, is in the picture. When §7.63 gave the other chairs their own
+// orbit the ray turned about this point but the point stayed put, so the back
+// chair's eye stood a whole unit nearer its own edge than the front chair's
+// and its own card's name went under the bottom rim at every zoom (measured
+// 1600×900: ink 25 px under at wide, 60% under at medium — the v2
+// verification's D3, and the "back's own card FACE clips below the rim"
+// allowance place-two-views and placard-look used to carry). camHomeFor turns
+// the offset with the orbit, so the back chair gets the frame the front chair
+// was tuned to — a half turn of the world maps one onto the other exactly,
+// which is the claim the stations' 180° pairing already made — and the heads,
+// whose frame is bound the other way, take the mat's centre (see there).
 const CAM_TARGET_HOME = new THREE.Vector3(0, 0, 0.5);
 let camTarget = CAM_TARGET_HOME.clone();
+
+// The home target for a viewer whose table is turned by `orbit` (§7.63's four
+// quarter-turns). Orbit 0 is CAM_TARGET_HOME itself, bit for bit — the solo
+// table, every spectator and every one-tab scenario frame exactly as before;
+// the back chair is its mirror, (0, 0, −0.5), mapped exactly rather than
+// through a rotation (not (6e-17, 0, −0.5)).
+//
+// THE HEADS TAKE THE MAT'S CENTRE. The half unit is a LONG-EDGE tuning: from
+// a long edge the frame is bound by the mat's width and has vertical slack to
+// spend on the near rim. A head eye looks down the mat's long axis, retreats
+// 1.33× to fit it to the frame's height, and has none — measured 2026-09-01
+// at wide from station 4: turning the half unit toward the head put the
+// opposite head's card over the top rim (ndc 1.013 against the +0.96 bar)
+// while its own card stayed under the bottom one, where a card outboard of a
+// rim-fitted edge is by construction. Unturned, the same offset was merely a
+// sideways half unit at the heads, which read nothing; so they get zero, and
+// their frame is the one placard-look's four-orbit leg passed before.
+const _camHome = new THREE.Vector3();
+function camHomeFor(orbit) {
+  const h = CAM_TARGET_HOME;
+  if (!orbit) return _camHome.copy(h);
+  const q = Math.round(orbit / (Math.PI / 2));
+  if (Math.abs(orbit - q * (Math.PI / 2)) < 1e-9) {
+    switch (((q % 4) + 4) % 4) {
+      case 2: return _camHome.set(-h.x, h.y, -h.z);  // back chair: toward −z
+      case 1:                                         // the heads: centred
+      case 3: return _camHome.set(0, h.y, 0);
+      default: return _camHome.copy(h);
+    }
+  }
+  return _camHome.copy(h).applyAxisAngle(Y_AXIS, orbit);
+}
 
 // Camera MOTION state, declared here with the camera rather than beside the
 // framing code: tick() is primed once during boot and stepCamera reads these,
@@ -15242,7 +15290,6 @@ window.__diceDebug = {
     const savedOrbit = camOrbit;
     const savedPos = camera.position.clone();
     const savedTgt = camTarget.clone();
-    const home = CAM_TARGET_HOME;
     const eye = new THREE.Vector3(
       ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
     );
@@ -15255,7 +15302,11 @@ window.__diceDebug = {
     for (let k = 0; k < PLACE_ORBITS.length; k++) {
       const orbit = PLACE_ORBITS[k];
       camOrbit = orbit;
-      const ray = eye.clone().sub(home);
+      // The ladder's own geometry for this chair (camHomeFor / fitCameraTo):
+      // the preset ray is taken from the front chair's home and turned with
+      // the target, so every chair is priced on the frame it actually gets.
+      const home = camHomeFor(orbit).clone();
+      const ray = eye.clone().sub(CAM_TARGET_HOME);
       if (orbit) ray.applyAxisAngle(Y_AXIS, orbit);
       for (const s of scales) {
         camera.position.copy(home).addScaledVector(ray, s);
@@ -27530,8 +27581,25 @@ function fitCameraTo(pts, target = camTarget, from = 1, refundOnFail = false) {
   const eye = new THREE.Vector3(
     ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
   );
-  const ray = eye.clone().sub(target);
-  if (camOrbit) ray.applyAxisAngle(Y_AXIS, camOrbit);
+  // THE RAY IS TAKEN IN THE VIEWER'S OWN FRAME (§7.63). The preset eye is a
+  // world point tuned from the front chair, so for a turned viewer the target
+  // is un-turned first, the eye-to-target ray taken there, and the ray turned
+  // back — a viewer at the back chair then stands exactly where the front
+  // chair's viewer would if the world were turned under them. Until 2026-09-01
+  // the ray was `eye − target` and only then turned, which turns the eye about
+  // the TARGET rather than about the table: with the target a half unit off
+  // the centre (camHomeFor) that put the back eye a whole unit further from
+  // its own edge than the front eye is from its (and, with the target at a
+  // dice cluster's centre, displaced the turned eye by twice the cluster's
+  // offset). At orbit 0 the two expressions are the same subtraction, bit for
+  // bit, so a solo table, a spectator and every one-tab scenario frame exactly
+  // as they always did.
+  const ray = eye.clone();
+  if (camOrbit) {
+    ray.sub(target.clone().applyAxisAngle(Y_AXIS, -camOrbit)).applyAxisAngle(Y_AXIS, camOrbit);
+  } else {
+    ray.sub(target);
+  }
   const refund = () => {
     camera.position.copy(target).addScaledVector(ray, from);
     aimCamera(target);
@@ -27748,7 +27816,7 @@ function spanPxNow() {
 function framingFor(orbit) {
   const prev = camOrbit;
   camOrbit = orbit;
-  const home = CAM_TARGET_HOME;
+  const home = camHomeFor(orbit);   // the half unit turns with the chair (§7.63)
   let mode = 'mat';
   // THE MAT FITTING DOES NOT MEAN THE DICE DO. Dice pile — C24 measured heaps
   // up to 4.7 units tall — and a die resting on two others projects from well

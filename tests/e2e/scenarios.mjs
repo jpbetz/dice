@@ -21256,19 +21256,35 @@ export const scenarios = [
             `${who}: my own card is off to the left of my frame, not under the banner (cx ${own.cx.toFixed(3)})`);
           assert.ok(other.cx > 0.2,
             `${who}: and the card opposite is off to the right (cx ${other.cx.toFixed(3)})`);
-          // The front's own card is in frame on 16:9 (placard-look's -0.98
-          // bar); the back's own card FACE clips below the rim — the eye
-          // orbits about CAM_TARGET_HOME, 0.5 toward the front chair, so the
-          // back eye stands a unit nearer its own edge. Recorded in
-          // placard-look's four-orbit leg with the numbers; the frame outranks
-          // the place, and your own card is the one name you never need.
-          if (mine === 0) assert.ok(own.in, `${who}: the front's own card is inside the frame`);
+          // BOTH own cards are in frame on 16:9, and the two frames are one
+          // frame turned (2026-09-01, camHomeFor / fitCameraTo): the eye used
+          // to orbit about CAM_TARGET_HOME, 0.5 toward the FRONT chair, so the
+          // back eye stood a unit nearer its own edge and its own card's name
+          // went under the bottom rim — the half unit turns with the chair
+          // now, and the back chair gets the frame the front was tuned to.
+          assert.ok(own.in, `${who}: my own card is inside the frame`);
           // The printing follows the frame: the rig turned every name for the
           // orbit this tab is cut to, not for world +z.
           const p = await t.dbg('places()');
           const f = await t.dbg('framingInfo()');
           assert.equal(Math.round(p.readerOrbit * 100) / 100, f.orbit,
             `${who}: the names are printed for the reader the frame was cut to (${p.readerOrbit.toFixed(2)} vs ${f.orbit})`);
+        }
+
+        // ---- …and it is the SAME frame from both chairs --------------------
+        // The card's projected box is the name-independent part of the read
+        // (the ink differs by the two names' widths), so the two own cards
+        // and the two far cards must project to the same ndc box from the
+        // two chairs — a half turn of the world maps one chair onto the other
+        // exactly, which is what the stations' 180° pairing promised.
+        {
+          const fo = await front.dbg('placardFrame(0)');
+          const bo = await back.dbg('placardFrame(1)');
+          const near = (f) => Object.values(f.ndc).map((v) => v.toFixed(6)).join(',');
+          assert.equal(near(fo), near(bo), `own cards: front ${near(fo)} vs back ${near(bo)}`);
+          const ff1 = await front.dbg('placardFrame(1)');
+          const bf0 = await back.dbg('placardFrame(0)');
+          assert.equal(near(ff1), near(bf0), `far cards: front ${near(ff1)} vs back ${near(bf0)}`);
         }
 
         // ---- one roll, one film, two frames ---------------------------------
@@ -21550,9 +21566,22 @@ export const scenarios = [
         await bob.dbg('sim(1)');
         const rising = await bob.dbg('washInfo()');
         assert.ok(rising.opacity > 0, `and rising with the dice (opacity ${rising.opacity})`);
-        await bob.dbg('sim(24)');
+        // MID-FILM BY THE FILM'S OWN CLOCK, not by a frame count. This read
+        // was `sim(24)` — 0.42 s in — and `> 0.3`, which on a 0 → 0.62 → 0
+        // sine over the film's length is a bound on the LENGTH: 0.42 s < dur
+        // < 2.59 s. A d20 check from a chair is a low toss since v2 (js/places.js
+        // aimFor) and its film measured 0.32–1.53 s over twelve seeds
+        // (scratch probe d20-dur, 2026-09-01): a 0.32 s film has FINISHED by
+        // the 25th frame (read 0 — the arc goes with the film, correctly) and
+        // a long, cocked one reads 0.2 — a flake in one run of three, and
+        // never about the wash. The wash caps its envelope at WASH_MAX_S 6.
+        const film = await bob.eval('(() => { const r = window.__diceDebug.currentRoll; return { duration: r.duration, time: r.time }; })()');
+        const envelope = Math.min(6, film.duration);
+        const toMid = Math.max(1, Math.round((envelope / 2 - film.time) * 60));
+        await bob.dbg(`sim(${toMid})`);
         const mid = await bob.dbg('washInfo()');
-        assert.ok(mid.active && mid.opacity > 0.3, `mid-tumble it is plainly lit (opacity ${mid.opacity})`);
+        assert.ok(mid.active && mid.opacity > 0.5,
+          `at the film's midpoint (${(envelope / 2).toFixed(2)} s of ${film.duration.toFixed(2)}) it is plainly lit (opacity ${mid.opacity}, the peak is 0.62)`);
         assert.equal(await bob.dbg('skipCeremony()'), true, 'Bob skips to the verdict');
         assert.equal((await bob.dbg('washInfo()')).active, false,
           'and the arc goes with the film — a wash under the verdict would outlive what it named');
@@ -21748,10 +21777,27 @@ export const scenarios = [
               place: s.place,
               ...placardFootprint({ x: s.world.x, z: s.world.z, azim: s.yaw }),
             }));
+            // THE CENTRE SLOTS AT CLOSE ARE THE RECORDED COST of the card
+            // standing where the frame can hold it (js/places.js placeLane,
+            // 2026-09-01): the pitch is a footprint and a gap at medium and
+            // scales with the mat, so at close (2.74 for a 3.20 card) the
+            // seventh and eighth chairs overlap their neighbours by 0.46.
+            // Every other pair keeps the floor at every zoom, tower up or
+            // down; tests/places.test.mjs pins the three numbers to the digit.
+            const outer = minGap(boxes.filter((b) => b.place !== 6 && b.place !== 7));
+            assert.ok(outer.gap >= 0.30,
+              `${tower}/${z}: cards ${outer.a} and ${outer.b} clear each other by `
+              + `${outer.gap.toFixed(3)} — the floor is 0.30`);
             const worst = minGap(boxes);
-            assert.ok(worst.gap >= 0.30,
-              `${tower}/${z}: cards ${worst.a} and ${worst.b} clear each other by `
-              + `${worst.gap.toFixed(3)} — the floor is 0.30`);
+            if (z !== 'close') {
+              assert.ok(worst.gap >= 0.30 - 1e-9,
+                `${tower}/${z}: the centre slots keep the floor too (${worst.a}/${worst.b}: ${worst.gap.toFixed(3)})`);
+            } else {
+              assert.ok((worst.a === 6 || worst.a === 7 || worst.b === 6 || worst.b === 7) && worst.gap > -0.5,
+                `${tower}/${z}: only a centre slot fuses, and by less than half a unit `
+                + `(${worst.a}/${worst.b}: ${worst.gap.toFixed(3)})`);
+              console.log(`    [recorded] ${tower}/${z}: the centre slot overlaps its neighbour by ${(-worst.gap).toFixed(3)} — the full house at close`);
+            }
             for (const s of pl.stations) {
               const box = boxes.find((x) => x.place === s.place);
               const clearsZ = Math.abs(s.world.z) - box.hz >= ext.d / 2;
@@ -21866,25 +21912,24 @@ export const scenarios = [
         // sits clear of both rims, and the near row — the viewer's own — is
         // the LOWEST row in the frame and horizontally inside it.
         //
-        // WHAT DOES NOT HOLD, AND IS RECORDED HERE RATHER THAN HIDDEN: at the
-        // back and at both heads the viewer's own card FACE clips below the
-        // bottom rim on a 16:9 frame (face BOTTOMS, ndc.y0, measured at
-        // medium: back −1.155, heads −1.205, against the front's −0.903; the
-        // heads' whole printed band is under the rim, top at −1.037 — the
-        // `[recorded]` line below prints the live numbers). Two causes, both
-        // structural.
-        // The eye orbits about CAM_TARGET_HOME, which sits 0.5 toward the
-        // FRONT chair, so the back eye stands a unit nearer its own edge than
-        // the front eye does and the near edge binds the fit; and a head eye
-        // looks down the mat's long axis, retreats 1.33× to fit it vertically,
-        // and once the mat's near edge is fitted to the rim a card OUTBOARD of
-        // that edge is below the rim by construction. The frame outranks the
-        // place (§5.2 — no framing geometry moves for a card) and your own
-        // card is the one name you never need (§7.2), so the allowance below
-        // is exactly the clip and nothing more: the near row may cross the rim
-        // but must stay the nearest row and stay put laterally, and its
-        // printed band's top may not drift further than 0.5 below the rim.
-        // The named follow-up lever is the edge-anchored crop (UX §7.63).
+        // THE BACK CHAIR IS THE FRONT CHAIR TURNED (2026-09-01, camHomeFor):
+        // the eye used to orbit about CAM_TARGET_HOME, 0.5 toward the FRONT
+        // chair, so the back eye stood a unit nearer its own edge and its own
+        // card's face bottomed at −1.155 (medium) against the front's −0.903;
+        // the half unit turns with the chair now and the back's numbers are
+        // the front's to the digit (the `[recorded]` line below prints them).
+        // WHAT STILL DOES NOT HOLD, RECORDED RATHER THAN HIDDEN: at both heads
+        // the viewer's own card FACE clips below the bottom rim on a 16:9
+        // frame — a head eye looks down the mat's long axis, retreats 1.33× to
+        // fit it vertically, and once the mat's near edge is fitted to the rim
+        // a card OUTBOARD of that edge is below the rim by construction. The
+        // frame outranks the place (§5.2 — no framing geometry moves for a
+        // card) and your own card is the one name you never need (§7.2), so
+        // the allowance below is exactly the clip and nothing more: the near
+        // row may cross the rim but must stay the nearest row and stay put
+        // laterally, and its printed band's top may not drift further than
+        // 0.5 below the rim. The named follow-up lever is the edge-anchored
+        // crop (UX §7.63).
         const nearRow = [];
         for (const [place, azim] of [[1, Math.PI], [4, Math.PI / 2], [5, 3 * Math.PI / 2]]) {
           const sim = await a.dbg(`simulatePlaceView(${place})`);

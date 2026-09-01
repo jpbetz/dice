@@ -25,9 +25,9 @@ limitations under the License.
 
 import assert from 'node:assert/strict';
 import {
-  PLACE_MAX, PLACE_LANE, PITCH_MIN, PLACARD_STANDOFF, PLACARD_W, PLACARD_D, PLACARD_GAP,
+  PLACE_MAX, PLACE_LANE, PLACE_LANE_SHARE, PITCH_MIN, PLACARD_STANDOFF, PLACARD_W, PLACARD_D, PLACARD_GAP,
   STATIONS, PLACE_AIM, AIM_ZERO,
-  entryFor, placeAnchor, placardFootprint, placardGap, laneSpread, aimFor, regionFor, inRegion,
+  entryFor, placeLane, placeAnchor, placardFootprint, placardGap, laneSpread, aimFor, regionFor, inRegion,
 } from '../js/places.js';
 
 let n = 0;
@@ -95,8 +95,8 @@ t('a fresh table of two sits opposing, and NEITHER of them dead centre', () => {
   // their own card low-left and the other player's high-right.
   const { w, d } = ZOOMS.medium;
   const a = placeAnchor(0, w, d), b = placeAnchor(1, w, d);
-  assert.equal(a.x, -PLACE_LANE, 'the front chair takes the left third of its edge');
-  assert.equal(b.x, PLACE_LANE, 'the back chair is its 180-degree mirror');
+  assert.equal(a.x, -placeLane(w), 'the front chair takes the left third of its edge');
+  assert.equal(b.x, placeLane(w), 'the back chair is its 180-degree mirror');
   assert.equal(a.z, -b.z);
   assert.ok(a.z > 0, 'place 0 is the near edge');
   assert.ok(Math.abs(a.x) > 0 && Math.abs(b.x) > 0,
@@ -224,16 +224,38 @@ t('every card stands outboard of a wall, by 0.10 of clear ground', () => {
   }
 });
 
-t('no two cards come within 0.30 of each other — any station, any mat', () => {
+t('no two cards come within 0.30 of each other — any station, any mat — except the centre slots on a small mat', () => {
+  // THE FULL HOUSE AT CLOSE IS THE RECORDED COST of the card standing where
+  // the frame can hold it (placeLane, 2026-09-01): three cards need 3.50 of
+  // pitch to stand a gap apart; wide (4.49) and medium (3.50, by construction)
+  // have it and close (2.74) does not. The six outer and head stations keep
+  // the floor on every mat; the two centre slots — the seventh and eighth
+  // chairs, dealt last for exactly this — stand 1.29 clear at wide, exactly
+  // the 0.30 floor at medium, and overlap their neighbours by 0.46 at close.
+  // Pinned to the digit so a change to any of the three is a change somebody
+  // made on purpose.
+  // Under a tower the back centre slot (7) is on a flank, the second card
+  // down a row pitched at the film's PLACE_LANE (4.30 along z), so at wide the
+  // flank pair's 1.10 is the number and not the front row's 1.29; at the
+  // other two zooms the front centre slot is still the worst.
+  const CENTRE = new Set([6, 7]);
+  const want = { wide: 1.286, 'wide+tower': 1.10, medium: 0.30, 'medium+tower': 0.30, close: -0.464, 'close+tower': -0.464 };
   for (const mat of MATS) {
     const all = anchorsOf(mat);
+    let centreWorst = Infinity;
     for (let i = 0; i < all.length; i++) {
       for (let j = i + 1; j < all.length; j++) {
         const gap = placardGap(all[i].box, all[j].box);
-        assert.ok(gap >= 0.30,
-          `${mat.id}: places ${all[i].p} and ${all[j].p} are ${gap.toFixed(3)} apart`);
+        const centre = CENTRE.has(all[i].p) || CENTRE.has(all[j].p);
+        if (centre) centreWorst = Math.min(centreWorst, gap);
+        else {
+          assert.ok(gap >= 0.30,
+            `${mat.id}: places ${all[i].p} and ${all[j].p} are ${gap.toFixed(3)} apart`);
+        }
       }
     }
+    assert.ok(Math.abs(centreWorst - want[mat.id]) < 5e-3,
+      `${mat.id}: the centre slot's worst clearance is ${centreWorst.toFixed(3)} (recorded ${want[mat.id]})`);
   }
 });
 
@@ -277,30 +299,43 @@ t('no flank card lands inside a tower volume', () => {
 t('the anchor arithmetic is the design table, to the digit', () => {
   // RE-AUTHORED WITH THE CARD (v2, 2026-09-01): the standoff is 0.76 for a
   // footprint 1.32 deep, so front/back z = +-5.06 wide / +-4.11 medium /
-  // +-3.36 close; heads x = +-7.81 / +-6.26 / +-5.06; lanes at x in
-  // {0, +-4.30}, absolute at every zoom now that the mat clamp is gone.
-  const want = { wide: [5.06, 7.81], medium: [4.11, 6.26], close: [3.36, 5.06] };
-  for (const [id, [edgeZ, headX]] of Object.entries(want)) {
+  // +-3.36 close; heads x = +-7.81 / +-6.26 / +-5.06; lanes at x in {0,
+  // +-placeLane(w)} — a footprint and a gap of pitch on the medium mat
+  // (3.50) and that share of the others, 4.49 at wide, 2.74 at close, so the
+  // card's centre stands at the same point of a frame the mat fills at every
+  // zoom.
+  const want = { wide: [5.06, 7.81, 4.486], medium: [4.11, 6.26, 3.50], close: [3.36, 5.06, 2.736] };
+  for (const [id, [edgeZ, headX, lane]] of Object.entries(want)) {
     const { w, d } = ZOOMS[id];
     assert.ok(Math.abs(placeAnchor(0, w, d).z - edgeZ) < 5e-3, `${id} front z`);
     assert.ok(Math.abs(placeAnchor(1, w, d).z + edgeZ) < 5e-3, `${id} back z`);
     assert.ok(Math.abs(placeAnchor(4, w, d).x - headX) < 5e-3, `${id} right head x`);
     assert.ok(Math.abs(placeAnchor(5, w, d).x + headX) < 5e-3, `${id} left head x`);
-    assert.ok(Math.abs(placeAnchor(0, w, d).x + PLACE_LANE) < 1e-12, `${id} front-left lane`);
-    assert.ok(Math.abs(placeAnchor(2, w, d).x - PLACE_LANE) < 1e-12, `${id} front-right lane`);
+    assert.ok(Math.abs(placeAnchor(0, w, d).x + lane) < 5e-3, `${id} front-left lane (${placeAnchor(0, w, d).x})`);
+    assert.ok(Math.abs(placeAnchor(2, w, d).x - lane) < 5e-3, `${id} front-right lane`);
+    assert.ok(Math.abs(placeAnchor(0, w, d).x + placeLane(w)) < 1e-12, `${id} is placeLane(w) exactly`);
     assert.equal(placeAnchor(6, w, d).x, 0, `${id} front-centre lane`);
     assert.equal(placeAnchor(0, w, d).y, 0, 'a card stands on the ground');
   }
+  assert.ok(Math.abs(placeLane(ZOOMS.medium.w) - (PLACARD_W + PLACARD_GAP)) < 1e-9,
+    'on the medium mat the card\'s pitch is exactly a footprint and a gap');
+  assert.ok(Math.abs(PLACE_LANE_SHARE - 0.318) < 1e-3, `the share is 0.318 of the mat (${PLACE_LANE_SHARE})`);
+  assert.ok(Math.abs(placeLane(ZOOMS.wide.w) - PLACE_LANE) < 0.25,
+    `and on the wide mat the card stands within a quarter unit of the film\'s lane (${placeLane(ZOOMS.wide.w)} vs ${PLACE_LANE})`);
   assert.ok(Math.abs((PLACARD_STANDOFF - PLACARD_D / 2) - 0.10) < 1e-12,
     'the standoff leaves exactly 0.10 of clear ground inboard');
   assert.equal(PLACARD_W, 3.20);
   assert.equal(PLACARD_D, 1.32);
-  // THE PITCH IS THE INVARIANT, and it is derived rather than chosen: three
-  // cards share a long edge at a full house, so the lane may never fall below
-  // one card's footprint plus the gap floor the whole layout is asserted at.
+  // THE PITCH: the film's lane clears a card's footprint plus the gap floor,
+  // and so does the card's pitch on the wide and medium mats; at close it
+  // does not — the recorded full-house cost, pinned to the digit in the gap
+  // test above.
   assert.ok(PLACE_LANE >= PLACARD_W + PLACARD_GAP,
     `the lane clears a card's width plus the gap floor (${PLACE_LANE} vs `
     + `${PLACARD_W} + ${PLACARD_GAP})`);
+  assert.ok(placeLane(ZOOMS.wide.w) >= PLACARD_W + PLACARD_GAP, 'three cards stand a gap apart on the wide mat');
+  assert.ok(placeLane(ZOOMS.medium.w) >= PLACARD_W + PLACARD_GAP - 1e-9, 'and on the medium one');
+  assert.ok(placeLane(ZOOMS.close.w) < PLACARD_W, 'and overlap at close — the recorded cost, not an accident');
   assert.equal(PLACARD_GAP, 0.30);
 });
 
