@@ -56,7 +56,7 @@ const { minTowerDataUrl, minTowerGlb, MIN_TOWER_PORTALS } =
 // two of them — negative when they overlap, which is the assertion the felt
 // shelf never had.
 const { placardFootprint, placardGap, PLACE_LANE, PLACE_PUSH, PLACARD_W, PLACARD_GAP, PLACARD_STANDOFF,
-  entryFor, regionFor, inRegion }
+  entryFor, regionFor, inRegion, aimFor, STATIONS }
   = await import('../../js/places.js');
 
 // DOES A CARD PRINT THROUGH A PANEL? Two renderers draw the frame — WebGL puts
@@ -21695,6 +21695,383 @@ export const scenarios = [
         await ann.dbg('holdClock(false)');
         await bob.dbg('holdClock(false)');
       }
+    },
+  },
+  {
+    name: 'demo-door-shut',
+    tags: ['demo', 'place', 'look'],
+    timeout: 120000,
+    // THE NEGATIVE CLAIM, AND IT COMES FIRST BECAUSE IT IS THE ONE THAT
+    // MATTERS (js/demo.js). Demo mode is dev tooling that stands fake roster
+    // rows, paints lines on the felt and stamps its own films. Every one of
+    // those is a thing a player must never meet — so the load-bearing
+    // assertion about this whole feature is that a tab which did not ask for
+    // it is the tab it was before the feature existed.
+    //
+    // Proved by COMPARISON rather than by inspection, because "I looked and
+    // there was no panel" is exactly the check that stays green while a
+    // listener, a scene object or a draw call leaks in behind it. Two real
+    // tabs at two real (minted) tables: one carrying `?demo=0` — the param
+    // PRESENT and readable as a falsehood — and one carrying no param at all.
+    // Same viewport, same seeded name, same everything. Their framing, their
+    // places, their placard budget, their world bodies and their DRAW COUNT
+    // must agree.
+    //
+    // `?demo=0` rather than `?demo=1` for the compared tab, deliberately: a
+    // tab with `?demo=1` would mint no room (the door suppresses the mint) and
+    // so would not be comparable at all. The falsehood is the case where the
+    // door is REACHED and declines, which is the code path a typo takes.
+    async fn(ctx) {
+      const shut = await bootTab(ctx, {
+        origin: '127.0.0.60', path: '/?demo=0', seed: { 'dice.name.v1': 'Ann' },
+        readyExpr: '!!window.__diceDebug && window.__diceDebug.netReady',
+        readyDesc: 'the ?demo=0 tab is up',
+      });
+      const plain = await bootTab(ctx, {
+        origin: '127.0.0.61', path: '/', seed: { 'dice.name.v1': 'Ann' },
+        readyExpr: '!!window.__diceDebug && window.__diceDebug.netReady',
+        readyDesc: 'the no-param tab is up',
+      });
+      const tabs = [[shut, '?demo=0'], [plain, 'no param']];
+      for (const [t, tag] of tabs) {
+        await ctx.browser.send('Emulation.setDeviceMetricsOverride',
+          { width: 1400, height: 900, deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
+        await t.eval('window.dispatchEvent(new Event("resize"))');
+        assert.equal(await t.eval('window.__diceDebug.netReady.then((r) => r && r.online)'), true,
+          `${tag} minted a table and joined it`);
+      }
+      // Let both frames settle onto the same pose before anything is compared.
+      for (const [t] of tabs) await t.dbg('sim(240)');
+
+      for (const [t, tag] of tabs) {
+        const d = await t.dbg('demoInfo()');
+        assert.equal(d.on, false, `${tag}: the door is SHUT`);
+        assert.equal(d.n, 0, `${tag}: nobody was dealt`);
+        assert.deepEqual(d.players, [], `${tag}: and there is no cast`);
+        assert.equal(d.overlay.on, false, `${tag}: no overlay`);
+        assert.equal(d.overlay.objects, 0, `${tag}: and not one object of one`);
+        assert.equal(await t.eval(`!!document.getElementById('demo-panel')`), false,
+          `${tag}: no dev panel in the document`);
+        // The hooks EXIST on every tab (P7's sweep calls the zero-arg ones),
+        // and the two that would change the world refuse rather than pretend.
+        assert.equal(await t.dbg('demoDeal(4)'), null, `${tag}: demoDeal refuses`);
+        assert.equal(await t.dbg('demoSit(1)'), null, `${tag}: demoSit refuses`);
+        assert.equal((await t.dbg('demoInfo()')).n, 0, `${tag}: …and refusing changed nothing`);
+      }
+
+      // …AND THE TWO TABS ARE THE SAME TAB. Strip only what is per-identity
+      // (the server's playerId, which differs by origin by construction);
+      // everything else is compared to the value.
+      const strip = (p) => ({ ...p, stations: p.stations.map((s) => ({ ...s, playerId: null })) });
+      const a = { framing: await shut.dbg('framingInfo()'), places: strip(await shut.dbg('places()')),
+        cards: await shut.dbg('placardBudget()'), bodies: await shut.dbg('worldBodies()'),
+        draws: (await shut.dbg('renderAudit()')).calls, ext: await shut.dbg('tableExtents()') };
+      const b = { framing: await plain.dbg('framingInfo()'), places: strip(await plain.dbg('places()')),
+        cards: await plain.dbg('placardBudget()'), bodies: await plain.dbg('worldBodies()'),
+        draws: (await plain.dbg('renderAudit()')).calls, ext: await plain.dbg('tableExtents()') };
+      assert.deepEqual(a.framing, b.framing, 'the same frame, to the digit');
+      assert.deepEqual(a.places, b.places, 'the same places');
+      assert.deepEqual(a.cards, b.cards, 'the same placard rig');
+      assert.deepEqual(a.ext, b.ext, 'the same mat');
+      assert.deepEqual(a.bodies, b.bodies, 'the same world — the overlay adds no body, in either');
+      assert.equal(a.draws, b.draws,
+        `the same DRAW COUNT (${a.draws} vs ${b.draws}) — nothing of the demo is being submitted`);
+      assert.equal(a.places.on, true, 'and this is a real table, not two empty ones');
+    },
+  },
+  {
+    name: 'demo-dial',
+    tags: ['demo', 'place', 'look'],
+    timeout: 120000,
+    // THE DIAL, THE CAST AND THE SEAT SWITCHER (js/demo.js, BRIEF-V4). One
+    // tab, up to eight chairs — which is the whole point: the six- and
+    // eight-place pictures used to be unreachable, the harness ceiling being
+    // three tabs and `place-view` needing one origin per player.
+    //
+    // The claim is not "a demo table has N cards" — it is that a demo table's
+    // chairs are the chairs a REAL table would have handed out. So the ladder
+    // is asserted against the ladder (long edges first, heads at N >= 5, the
+    // centre slots last), through the same `places()` instrument `place-assign`
+    // reads for a table of eight real browsers.
+    async fn(ctx) {
+      const t = await ctx.demoTab({ origin: '127.0.0.62' });
+      assert.equal((await t.dbg('demoInfo()')).n, 4,
+        'the door opens on four — both long edges full, nobody paying the head tax yet');
+      assert.equal(await t.eval(`!!document.getElementById('demo-panel')`), true,
+        'and the dev panel is there to turn');
+
+      for (let n = 0; n <= 8; n++) {
+        const info = await t.dbg(`demoDeal(${n})`);
+        assert.equal(info.n, n, `the dial stands ${n}`);
+        const p = await t.dbg('places()');
+        assert.equal(p.stations.length, n, `${n} cards`);
+        assert.deepEqual(p.stations.map((s) => s.place), [...Array(n).keys()],
+          'lowest free, one after another — the ladder, not a range');
+        assert.deepEqual(p.stations.map((s) => s.name), info.players.map((q) => q.name),
+          'and every card carries the name the deal gave that station');
+        assert.deepEqual(p.stations.map((s) => s.color), info.players.map((q) => q.color));
+        assert.equal(p.on, n > 0, 'an empty table is a legal setting, and reports itself as one');
+      }
+      const eight = await t.dbg('places()');
+      assert.deepEqual(eight.stations.slice(0, 4).map((s) => s.station),
+        ['front', 'back', 'front', 'back'], 'the first four are two per LONG edge');
+      assert.deepEqual(eight.stations.slice(4, 6).map((s) => s.station), ['right', 'left'],
+        'the heads are fifth and sixth');
+      assert.deepEqual(eight.stations.slice(6, 8).map((s) => s.lane), [0, 0],
+        'and the centre slots are dealt last');
+      // The FITTER is really running — which is why the name list carries a
+      // 23-character name and an emoji rather than eight five-letter ones.
+      const painted = eight.stations.map((s) => s.fontPx);
+      assert.ok(painted.every((px) => px >= 44), `every name is painted at 44px or better (${painted})`);
+      assert.ok(painted.some((px) => px < 160), 'and at least one long name was measured down');
+      assert.ok(eight.stations.every((s) => s.shown && s.shown.length),
+        'every card carries a string');
+
+      // RESHUFFLE: the cast changes, the table does not. A station keeps its
+      // hue on purpose (js/demo.js) — the tint you are reading in the overlay
+      // must not move under you while you flip through casts.
+      const before = await t.dbg('demoInfo()');
+      let after = before;
+      for (let i = 0; i < 8 && JSON.stringify(after.players.map((p) => p.name))
+        === JSON.stringify(before.players.map((p) => p.name)); i++) {
+        after = await t.dbg('demoDeal(8)');
+      }
+      assert.notDeepEqual(after.players.map((p) => p.name), before.players.map((p) => p.name),
+        'a reshuffle draws a fresh cast');
+      assert.deepEqual(after.players.map((p) => p.color), before.players.map((p) => p.color),
+        '…and moves not one hue');
+
+      // THE SEAT SWITCHER, AND THE THING THAT MAKES IT DIFFERENT FROM
+      // simulatePlaceView: it is STICKY. The dial owns the chair, myPlaceRow
+      // derives from the dial, and the eye follows through the SHIPPED
+      // placeOrbitSync — so a places flush restores the chair instead of
+      // handing a borrowed eye back to station 0.
+      for (const k of [0, 4, 5, 1, 7]) {
+        const sat = await t.dbg(`demoSit(${k})`);
+        assert.equal(sat.seat, k, `sitting at ${k}`);
+        const p = await t.dbg('places()');
+        assert.equal(p.mine, k, `places() agrees the viewer holds ${k}`);
+        assert.equal(p.orbit, STATIONS[k].azim,
+          `and the eye is at station ${k}'s own azimuth (${p.orbit} vs ${STATIONS[k].azim})`);
+        // framingInfo rounds its readout to two places (it is a report, not a
+        // film input), so the comparison is rounded too rather than loosened.
+        assert.equal((await t.dbg('framingInfo()')).placeOrbit,
+          Math.round(STATIONS[k].azim * 100) / 100,
+          'the framing ladder is standing on that base, not on a borrowed one');
+      }
+      assert.equal(await t.dbg('demoSit(9)'), null, 'there is no station 9');
+      const reflushed = await t.dbg('demoDeal(8)');
+      assert.equal(reflushed.seat, 7, 'a re-deal does not move the chair you are sitting in');
+      assert.equal((await t.dbg('places()')).mine, 7, '…and the flush restored it rather than reset it');
+      // The dial can shrink out from under you: fall to the last chair that
+      // still exists, so counting DOWN walks the table instead of teleporting
+      // home at every step.
+      assert.equal((await t.dbg('demoDeal(3)')).seat, 2, 'the chair falls to the last one standing');
+      assert.equal((await t.dbg('demoDeal(0)')).seat, null, 'and an empty table seats nobody');
+      assert.equal((await t.dbg('places()')).on, false, 'no cards…');
+      assert.equal((await t.dbg('demoInfo()')).overlay.objects, 0, '…and nothing drawn');
+    },
+  },
+  {
+    name: 'demo-room-wins',
+    tags: ['demo', 'place', 'seat'],
+    timeout: 120000,
+    // THE DOOR IS SOLO-ONLY, AND A ROOM SHUTS IT (js/demo.js). This is the
+    // law rather than a preference: demo mode stands fake roster rows and
+    // stamps its own films, and both are lawful only where there is no second
+    // viewer to fork a film away from. A `?room=` is exactly the presence of
+    // one, so the param loses — and the tab that asked for it is an ordinary
+    // tab at an ordinary table, with a second real browser to prove it.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Ann', query: '&demo=1' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.waitFor('window.__diceDebug.places().stations.length === 2',
+        { desc: 'two real players at one real table' });
+      const d = await a.dbg('demoInfo()');
+      assert.equal(d.on, false, 'the room won: no demo');
+      assert.deepEqual(d.players, [], 'and no fake cast');
+      assert.equal(await a.eval(`!!document.getElementById('demo-panel')`), false,
+        'no dev panel at a real table');
+      const p = await a.dbg('places()');
+      assert.deepEqual(p.stations.map((s) => s.name), ['Ann', 'Bob'],
+        'the cards carry the names the SERVER handed out');
+      assert.equal(p.mine, 0, 'and the viewer is who the server says they are');
+      assert.equal(await a.dbg('demoDeal(6)'), null,
+        'the dial refuses at a table — it cannot invent six people for one player to see');
+      assert.equal((await a.dbg('places()')).stations.length, 2, '…and refusing changed nothing');
+      assert.equal((await b.dbg('places()')).stations.length, 2,
+        'the other browser sees the same two chairs, which is the whole reason for the refusal');
+    },
+  },
+  {
+    name: 'demo-regions',
+    tags: ['demo', 'place', 'look'],
+    timeout: 150000,
+    // THE OVERLAY CANNOT LIE ABOUT THE MECHANISM (BRIEF-V4). It is drawn from
+    // js/places.js regionFor / aimFor and from js/main.js's own laneAndLine —
+    // never from a second copy of their arithmetic — and this is where that
+    // stops being a claim in a comment: every rectangle the page reports is
+    // compared against `regionFor` / `aimFor` called HERE, in Node, from the
+    // same module, against the mat's live extents.
+    //
+    // A `look` scenario: not one die is made. The overlay's whole point is
+    // that it is render-only.
+    async fn(ctx) {
+      const t = await ctx.demoTab({ origin: '127.0.0.63', players: 8 });
+      const bare = await t.dbg('worldBodies()');
+
+      // THROW_TARGET off the page rather than off a memory of it: the box is
+      // a fraction of it, and a scenario that carried its own copy of the
+      // number it is checking passes for ever.
+      const target = await t.dbg('throwTarget');
+      const check = async (label) => {
+        const ext = await t.dbg('tableExtents()');
+        const ov = await t.dbg('demoInfo().overlay');
+        assert.equal(ov.on, true, `${label}: the overlay is up`);
+        assert.equal(ov.stations.length, 8, `${label}: one mark per occupied station`);
+        for (const s of ov.stations) {
+          const st = entryFor(s.place, false);
+          assert.deepEqual({ entry: s.entry, lane: s.lane }, st,
+            `${label}: station ${s.place} is drawn for the stamp entryFor gives it`);
+          const region = regionFor(st.entry, st.lane, ext.w, ext.d);
+          assert.deepEqual(s.region, region,
+            `${label}: station ${s.place}'s outline IS regionFor's rectangle`);
+          const aim = aimFor(st.entry, st.lane, ext.w, ext.d, target);
+          const bw = ext.w * target * aim.kx;
+          const bd = ext.d * target * aim.kz;
+          assert.equal(s.aim.own, aim.own, `${label}: station ${s.place} own-aims or does not`);
+          if (!aim.own) {
+            assert.ok(Math.abs((s.aim.x1 - s.aim.x0) - bw) < 1e-9
+              && Math.abs((s.aim.z1 - s.aim.z0) - bd) < 1e-9,
+            `${label}: station ${s.place}'s aim box is aimFor's own box`);
+            assert.ok(Math.abs((s.aim.x0 + s.aim.x1) / 2 - aim.x) < 1e-9
+              && Math.abs((s.aim.z0 + s.aim.z1) / 2 - aim.z) < 1e-9,
+            `${label}: …centred where aimFor puts it`);
+          }
+          // The aim box never touches a rim: the hull cap is what stops dice
+          // being thrown AT a wall, and an overlay that drew past it would be
+          // advertising a throw the engine never makes.
+          assert.ok(s.aim.x0 >= -ext.w / 2 && s.aim.x1 <= ext.w / 2
+            && s.aim.z0 >= -ext.d / 2 && s.aim.z1 <= ext.d / 2,
+          `${label}: station ${s.place}'s aim box is on the mat`);
+          // …and the spawn line stands 2.2 in from the wall it comes over,
+          // which is spawnDie's own number.
+          const at = st.entry <= 1 ? Math.abs(s.spawn.z0) : Math.abs(s.spawn.x0);
+          const half = st.entry <= 1 ? ext.d / 2 : ext.w / 2;
+          assert.ok(Math.abs(at - (half - 2.2)) < 1e-9,
+            `${label}: station ${s.place}'s dice are born 2.2 in from their own wall`);
+        }
+        return ov;
+      };
+
+      const wide = await check('medium');
+
+      // IT RE-DERIVES WHERE THE CARDS DO. A zoom moves the walls, and an
+      // overlay built for the old mat would go on confidently drawing the old
+      // one — the exact failure `placardRelay` exists to prevent for the
+      // cards. Same flush, same guarantee.
+      await t.dbg(`setZoom('close')`);
+      await t.waitFor(`window.__diceDebug.zoom === 'close'`, { desc: 'zoomed in' });
+      const close = await check('close');
+      assert.notDeepEqual(close.stations[0].region, wide.stations[0].region,
+        'the mat moved, so the regions did');
+      await t.dbg(`setZoom('medium')`);
+      await t.waitFor(`window.__diceDebug.zoom === 'medium'`, { desc: 'back to medium' });
+
+      // RENDER-ONLY, ASKED OF THE WORLD RATHER THAN OF A COMMENT.
+      assert.deepEqual(await t.dbg('worldBodies()'), bare,
+        'not one physics body was added by any of that');
+
+      // THE TOGGLE really removes it: no object, not a hidden one.
+      const off = await t.dbg('demoInfo()');
+      assert.ok(off.overlay.objects > 8, `something is actually drawn (${off.overlay.objects} objects)`);
+      await t.eval(`document.getElementById('demo-regions').click()`);
+      const gone = await t.dbg('demoInfo()');
+      assert.equal(gone.regions, false, 'the checkbox turned it off');
+      assert.equal(gone.overlay.on, false, 'and the overlay says so');
+      assert.equal(gone.overlay.objects, 0, 'with nothing left in the scene');
+      assert.deepEqual(await t.dbg('worldBodies()'), bare, 'and still no bodies');
+      await t.eval(`document.getElementById('demo-regions').click()`);
+      assert.equal((await t.dbg('demoInfo()')).overlay.on, true, 'and back on again');
+    },
+  },
+  {
+    name: 'demo-roll-from-seat',
+    tags: ['demo', 'place', 'roll', 'physics'],
+    timeout: 180000,
+    // THROWING FROM A CHAIR, IN ONE TAB (BRIEF-V4). The film is stamped
+    // LOCALLY here — `roll.entry` / `roll.lane` from js/places.js entryFor,
+    // the same function server.js executeRoll calls with the same two
+    // arguments — and that is lawful in demo mode and nowhere else: solo has
+    // no second viewer, so the film this tab bakes IS the film. The door
+    // already refused a `?room=` (demo-room-wins), which is the whole of the
+    // condition.
+    //
+    // What is proved here is that the stamp goes through the PRODUCTION path:
+    // the same playRoll, so the same entry edge, the same lane, the same
+    // region, the same wash, and the same per-place sweep.
+    async fn(ctx) {
+      const t = await ctx.demoTab({ origin: '127.0.0.64', players: 4 });
+      const ext = await t.dbg('tableExtents()');
+
+      for (const k of [0, 1, 2, 3]) {
+        const fired = await t.dbg(`demoRoll(${k})`);
+        assert.equal(fired.place, k, `seat ${k} threw`);
+        await t.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+          { desc: `seat ${k}'s film`, timeout: 60000 });
+        const org = await t.dbg('throwOrigin()');
+        const st = entryFor(k, false);
+        assert.equal(org.from, 'place', `seat ${k}: the PLACE decided the edge, not the seed`);
+        assert.equal(org.entry, st.entry, `seat ${k}: over its own edge`);
+        assert.equal(org.lane, st.lane, `seat ${k}: in its own lane`);
+        assert.deepEqual(org.region, regionFor(st.entry, st.lane, ext.w, ext.d),
+          `seat ${k}: aimed into its own region of felt`);
+        assert.equal(org.washAt.place, k, `seat ${k}: and its own card lit`);
+        // THE OVERLAY'S TICK IS A PROMISE THE THROW KEEPS. The spawn line the
+        // overlay drew for this station and the lane the throw actually used
+        // come from one function (laneAndLine), and this is the empirical
+        // pin on top of that: same number, measured on the felt.
+        const drawn = (await t.dbg('demoInfo().overlay')).stations.find((s) => s.place === k);
+        assert.ok(Math.abs(drawn.spawn.lane - org.laneWorld) < 1e-9,
+          `seat ${k}: the drawn spawn lane ${drawn.spawn.lane} is the lane the dice used `
+          + `(${org.laneWorld})`);
+      }
+
+      // THE FELT HOLDS ONE ROLL PER PLACE (server.js arrivalSweep, mirrored in
+      // js/demo.js for the tab with no server). Four seats have thrown; four
+      // pools stand.
+      const four = await t.dbg('tableDiceInfo()');
+      const rollsOnFelt = new Set(four.map((d) => d.rollId));
+      assert.equal(rollsOnFelt.size, 4, `four pools on the felt, one per chair (${rollsOnFelt.size})`);
+      assert.equal(four.length, 12, 'three dice each');
+
+      // …and seat 2's SECOND throw sweeps seat 2's first and nobody else's.
+      const before = new Set((await t.dbg('tableDiceInfo()')).map((d) => d.rollId));
+      await t.dbg('demoRoll(2)');
+      await t.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        { desc: "seat 2's second film", timeout: 60000 });
+      const after = await t.dbg('tableDiceInfo()');
+      const ids = new Set(after.map((d) => d.rollId));
+      assert.equal(ids.size, 4, 'still four pools — the felt did not empty');
+      assert.equal(after.length, 12, 'and still twelve dice');
+      const kept = [...ids].filter((id) => before.has(id));
+      assert.equal(kept.length, 3,
+        `three of the four standing pools were left exactly where they were (${kept.length})`);
+      const org2 = await t.dbg('throwOrigin()');
+      assert.equal(org2.entry, entryFor(2, false).entry, 'and the new pool is seat 2\'s own');
+
+      // A PLACELESS ROLL IS THE OLD TABLE: it takes the whole felt, and the
+      // next placed roll takes it away from it. Typed at the command box, the
+      // way a person rolls when they are nobody in particular.
+      await t.dbg('commandRoll("2d6 # nobody")');
+      await t.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        { desc: 'the placeless roll', timeout: 60000 });
+      const alone = await t.dbg('tableDiceInfo()');
+      assert.equal(new Set(alone.map((d) => d.rollId)).size, 1,
+        'an unstamped arrival sweeps every chair — the pre-places beat');
+      assert.equal((await t.dbg('throwOrigin()')).from, 'seed',
+        'and it came in over a SEEDED edge, wearing nobody\'s name');
+      assert.equal((await t.dbg('throwOrigin()')).washAt, null, 'lighting no card');
     },
   },
   {

@@ -6278,7 +6278,7 @@ function soloCollectEntries(rollIds) {
 // clears it: the client's own tidy-away clock retired with the shelf, so
 // dice now stay put until the next roll. Only session rolls (rollStates rows)
 // are candidates; entries restored from localStorage never grew dice here.
-function soloAutoCollect() {
+function soloAutoCollect(arriving = null) {
   const ids = [];
   const seen = new Set();
   const push = (id) => {
@@ -6290,7 +6290,16 @@ function soloAutoCollect() {
   for (const e of log) push(e.rollId);
   if (currentRoll && currentRoll.rollId) push(currentRoll.rollId);
   for (const r of rollQueue) push(r.rollId);
-  soloCollectEntries(ids);
+  // …AND ONE ROLL PER PLACE WHEN THE ARRIVAL CARRIES A STAMP (server.js
+  // arrivalSweep, mirrored in js/demo.js demoArrivalSweep for the one caller
+  // that has no server behind it: a demo tab's own throw). `arriving` is null
+  // on every ordinary solo roll and the whole felt goes exactly as it always
+  // has — the sweep is not even reached. It is what lets eight demo pools
+  // stand on the table at once, which is the crowd picture the door exists to
+  // produce; without it the eighth throw would be the only one left.
+  if (!arriving) { soloCollectEntries(ids); return; }
+  const standing = ids.map((id) => ({ id, ...(demoStamps.get(id) || {}) }));
+  soloCollectEntries(demoArrivalSweep(standing, arriving, towerOn()).map((r) => r.id));
 }
 
 // THE TURNS ON THE FELT (MECHANICS M2), by rollId. A log entry is
@@ -7669,9 +7678,20 @@ function pourVisibleAt(spans, f) {
 function rollDice(types, label, opts = {}) {
   if (!types.length) return;
   if (validateMods(types, opts.mods || null)) return; // invalid spec: no-op
+  // THE DEMO DOOR'S LOCAL STAMP (js/demo.js — read its header for why this is
+  // lawful). `opts.demoPlace` is set by nothing but demoRollFrom, and `DEMO`
+  // is false on every tab that did not type the door into its address bar, so
+  // both halves of this are unreachable in production. entryFor is the same
+  // function server.js executeRoll calls, with the same two arguments.
+  const seat = DEMO && Number.isInteger(opts.demoPlace)
+    ? demoRows.find((r) => r.place === opts.demoPlace) || null : null;
+  const stamp = seat ? entryFor(seat.place, towerOn()) : null;
+  const arriving = stamp ? { playerId: seat.id, entry: stamp.entry, lane: stamp.lane } : null;
   // §7.7 arrival beat, mirrored locally: the new roll's execution collects
-  // everything this session still has on the felt (evictions sink first).
-  soloAutoCollect();
+  // everything this session still has on the felt (evictions sink first) —
+  // or, for a stamped demo throw, only its OWN chair's rolls and the
+  // placeless ones, which is the server's rule.
+  soloAutoCollect(arriving);
   const composed = composeRoll(types, opts.mods || null, Math.random);
   const spec = { dice: [...types], mods: opts.mods || null };
   if (opts.sources) spec.sources = [...opts.sources]; // 2b-⑤ attribution
@@ -7680,9 +7700,19 @@ function rollDice(types, label, opts = {}) {
   // secret/whisper act as OPEN), so existence is the whole gate.
   const rerollOfId = typeof opts.rerollOfId === 'string'
     && log.some((e) => e.rollId === opts.rerollOfId) ? opts.rerollOfId : null;
+  const rollId = `${seat ? 'demo' : 'solo'}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  if (arriving) {
+    // The demo's own `room.log`: the sweep above needs a stamp per standing
+    // roll and this client's log entries do not carry one (entryFromRoll
+    // drops entry/lane — the WIRE's log keeps them, this file's does not).
+    // Pruned to the rolls the session still tracks, so a long look pass does
+    // not accumulate stamps for dice nobody can see.
+    for (const id of demoStamps.keys()) if (!rollStates.has(id)) demoStamps.delete(id);
+    demoStamps.set(rollId, arriving);
+  }
   playRoll({
     ...composed,
-    rollId: `solo-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+    rollId,
     spec,
     dc: Number.isInteger(opts.dc) ? opts.dc : null,
     exp: opts.exp || null,
@@ -7715,6 +7745,15 @@ function rollDice(types, label, opts = {}) {
       ? soloPushState(composed.values, spec.mods.push,
         composed.values.map((_, i) => i), [])
       : undefined,
+    // THE DEMO THROW'S ROLLER AND ITS STAMP, present-or-absent like every
+    // optional field above — an ordinary solo payload is byte-for-byte the
+    // one it always was, which `place-seeds-unchanged` pins against a golden
+    // taken before any of this existed. The roller is what lights the card
+    // (placeWashFor reads roll.playerId) and names the log line; the stamp is
+    // what puts the throw over that chair's edge, in its lane, into its
+    // region — through the SHIPPED playRoll, not through a demo of it.
+    ...(seat ? { playerId: seat.id, playerName: seat.name, color: seat.color } : {}),
+    ...(stamp ? { entry: stamp.entry, lane: stamp.lane } : {}),
   });
 }
 
@@ -16747,6 +16786,18 @@ window.__diceDebug = {
   demoDeal(n) {
     return demoDealPlayers(n);
   },
+  // THROW FROM CHAIR k — the one demo hook that makes dice, so it takes an
+  // argument and P7's zero-arg sweep leaves it alone. Returns the stamp the
+  // throw carries ({place, name, notation, entry, lane}), null for a chair
+  // nobody is standing at and null on every tab without the door. The pool
+  // defaults to the demo's own 3d6; any notation the box would accept works.
+  demoRoll(k, notation) {
+    return demoRollFrom(k, notation);
+  },
+  // …and from every chair. The playback queue is the stagger.
+  demoRollAll(notation) {
+    return demoRollEveryone(notation);
+  },
   // SIT AT CHAIR k. Sticky, unlike simulatePlaceView below: it writes the
   // dial, so a places flush restores this chair rather than handing the eye
   // back to station 0. null for a station nobody is standing at.
@@ -25554,7 +25605,9 @@ function demoPanelBuild() {
   const regions = line('<label style="display:flex;align-items:center;gap:6px;cursor:pointer">'
     + '<input id="demo-regions" type="checkbox"><span>show regions</span></label>'
     + '<span id="demo-regions-out" style="opacity:.55;margin-left:auto"></span>');
-  for (const el of [head, dial, cast, seat, regions]) box.append(el);
+  const throwOne = line(`<button id="demo-throw" style="flex:1">throw ${DEMO_POOL} from this seat</button>`);
+  const throwAll = line('<button id="demo-throw-all" style="flex:1">…from every seat</button>');
+  for (const el of [head, dial, cast, seat, regions, throwOne, throwAll]) box.append(el);
   for (const b of box.querySelectorAll('button')) {
     b.style.cssText = 'font:inherit;background:#2a2a30;color:#e8e8ea;'
       + 'border:1px solid #4a4a52;border-radius:3px;padding:2px 6px;cursor:pointer';
@@ -25571,6 +25624,8 @@ function demoPanelBuild() {
   box.querySelector('#demo-seat-prev').addEventListener('click', () => demoSeatStep(-1));
   box.querySelector('#demo-seat-next').addEventListener('click', () => demoSeatStep(+1));
   box.querySelector('#demo-regions').addEventListener('change', (e) => demoOverlayApply(e.target.checked));
+  box.querySelector('#demo-throw').addEventListener('click', () => demoRollFrom(demoSeat));
+  box.querySelector('#demo-throw-all').addEventListener('click', () => demoRollEveryone());
 }
 
 // Walk to the next OCCUPIED chair, wrapping. Occupied rather than numbered,
@@ -25590,9 +25645,10 @@ function demoPanelSync() {
   demoPanel.querySelector('#demo-n-out').textContent = String(n);
   const me = demoRows.find((r) => r.place === demoSeat) || null;
   demoPanel.querySelector('#demo-seat-out').textContent = me ? `${me.place} · ${me.name}` : '—';
-  for (const id of ['#demo-seat-prev', '#demo-seat-next']) {
+  for (const id of ['#demo-seat-prev', '#demo-seat-next', '#demo-throw']) {
     demoPanel.querySelector(id).disabled = !me;
   }
+  demoPanel.querySelector('#demo-throw-all').disabled = !n;
   demoPanel.querySelector('#demo-regions').checked = demoShowRegions;
   demoPanel.querySelector('#demo-regions-out').textContent =
     demoOverlay ? `${demoOverlay.rows.length} drawn` : '';
@@ -25883,6 +25939,52 @@ function demoOverlayInfo() {
     pool: DEMO_POOL,
     stations: demoOverlay ? demoOverlay.rows : [],
   };
+}
+
+// ---- throwing from a chair ------------------------------------------------
+
+// THROW FROM CHAIR k — the demo's own dice, down the SHIPPED path.
+//
+// THE STAMP IS MADE LOCALLY, AND THAT IS LAWFUL HERE AND NOWHERE ELSE.
+// `roll.entry` / `roll.lane` are FILM inputs of the seed's own determinism
+// class: online they are stamped by server.js executeRoll at the instant the
+// dice are drawn, out of the server's roster, precisely so that no client
+// ever invents one and bakes a second film of one seed (goal 15). A demo tab
+// has no connection, no room and no second viewer — the film it bakes IS the
+// film — and js/places.js `entryFor` is the same function the server calls
+// with the same two arguments. The one condition that would make this
+// unlawful is the one the door already refuses: a `?room=`.
+//
+// Everything after the stamp is production. requestRoll -> rollDice ->
+// playRoll, so the entry edge, the lane's yield to the pool, the aim into the
+// region, the wash under the card and the per-place sweep are the shipped
+// ones and not a demo's imitation of them — which is the only way this
+// instrument can be evidence about the real thing.
+function demoRollFrom(k, notation = DEMO_POOL) {
+  if (!DEMO) return null;
+  const row = demoRows.find((r) => r.place === k);
+  if (!row) return null;
+  const asked = typeof notation === 'string' && notation.trim() ? notation : DEMO_POOL;
+  const res = parseNotation(asked);
+  if (!res.ok) return null;
+  requestRoll(res.spec.dice, res.comment || res.canonical, {
+    notation: res.canonical,
+    mods: res.spec.mods || undefined,
+    demoPlace: row.place,
+  });
+  return { place: row.place, name: row.name, notation: res.canonical,
+    ...entryFor(row.place, towerOn()) };
+}
+
+// …AND FROM EVERY CHAIR, for the crowd picture. playRoll queues overlapping
+// films FIFO and drains the queue as each one ends, so firing them in a loop
+// IS the stagger — eight throws one after another, each landing in its own
+// region and sweeping only its own chair. That last clause is the whole
+// reason this picture is possible: before the per-place sweep the eighth
+// throw would have been the only pool left standing.
+function demoRollEveryone(notation = DEMO_POOL) {
+  if (!DEMO) return null;
+  return demoRows.map((r) => demoRollFrom(r.place, notation)).filter(Boolean);
 }
 
 // The door, opened. Called once at boot, after the scene and the roll surface
