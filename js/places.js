@@ -346,27 +346,38 @@ export function placeAnchor(place, w, d, towerUp = false) {
   };
 }
 
-// The card's axis-aligned footprint on the ground. Every azim here is a
-// quarter turn, so the box stays axis-aligned and the gap between two cards is
-// exact arithmetic rather than a hull test.
+// The card's footprint on the ground, ORIENTED (RING, 2026-09-01): the OBB
+// (hw, hd about the two ground axes ax, az) for the separating-axis gap below,
+// and the AABB half-extents (hx, hz) that are correct at EVERY azimuth now —
+// the old `|cos| < 0.5` swap under-reported hz by 2.4× at 45°. At a quarter
+// turn hx/hz are the old numbers to the bit (seatTrig snaps the trig).
 export function placardFootprint(anchor) {
   if (!anchor) return null;
-  const turned = Math.abs(Math.cos(anchor.azim)) < 0.5;   // ±π/2 -> width lies along z
+  const { s, c } = seatTrig(anchor.azim);
   return {
-    x: anchor.x,
-    z: anchor.z,
-    hx: (turned ? PLACARD_D : PLACARD_W) / 2,
-    hz: (turned ? PLACARD_W : PLACARD_D) / 2,
+    x: anchor.x, z: anchor.z, azim: anchor.azim,
+    hw: PLACARD_W / 2, hd: PLACARD_D / 2,          // the OBB, for the SAT
+    ax: { x: c, z: -s }, az: { x: s, z: c },       // the card's two ground axes
+    hx: cardHx(anchor.azim), hz: cardHz(anchor.azim), // the AABB, correct at EVERY angle now
   };
 }
 
-// The clear ground between two cards: 0 when they touch, negative when they
-// overlap. The assertion the felt shelf never had.
+// SEPARATING-AXIS clearance over the four edge normals: positive is clear ground
+// along the best separating axis (a FLOOR on the distance — for two cards
+// separated diagonally the old AABB form returned hypot, this returns the axis
+// gap), negative the least penetration. tools/steps/place-card.mjs quadHitsRect
+// is the same test. The assertion the felt shelf never had.
 export function placardGap(a, b) {
-  const dx = Math.abs(a.x - b.x) - a.hx - b.hx;
-  const dz = Math.abs(a.z - b.z) - a.hz - b.hz;
-  if (dx >= 0 && dz >= 0) return Math.hypot(dx, dz);
-  return Math.max(dx, dz);
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  let best = -Infinity;
+  for (const n of [a.ax, a.az, b.ax, b.az]) {
+    const ea = a.hw * Math.abs(n.x * a.ax.x + n.z * a.ax.z) + a.hd * Math.abs(n.x * a.az.x + n.z * a.az.z);
+    const eb = b.hw * Math.abs(n.x * b.ax.x + n.z * b.ax.z) + b.hd * Math.abs(n.x * b.az.x + n.z * b.az.z);
+    const sep = Math.abs(dx * n.x + dz * n.z) - ea - eb;
+    if (sep > best) best = sep;
+  }
+  return best;
 }
 
 // ---------------------------------------------------------------------------
@@ -563,8 +574,9 @@ export function inRegion(region, x, z) {
 export const PLACE_AIM = { on: 1, speed: 0.5, h: 0.45, box: 0.25, corner: 1, own: 1, spin: 1 };
 
 // The widest die's rest ceiling, kept off every wall the aim box touches by
-// the cap below — dice must not be aimed AT a rim.
-const AIM_HULL = 1.25;
+// the cap below — dice must not be aimed AT a rim. Exported for the ring's
+// box-inclusive hull pin (tests/places.test.mjs); the value is untouched.
+export const AIM_HULL = 1.25;
 
 // One shared zero, returned BY REFERENCE for every unstamped roll, and the
 // identity on every factor: `0 + v` is `v` and `v * 1` is `v` on the same
@@ -637,4 +649,380 @@ export function aimFor(entry, lane, w, d, throwTarget) {
     spin: PLACE_AIM.spin,
     h: PLACE_AIM.h,
   };
+}
+
+// ===========================================================================
+// THE RING (BRIEF-RING, Joe, 2026-09-01: "players sit in a circular
+// orientation not around a rectangular table … 2 players should sit opposite,
+// 3 players should sit in a triangular orientation … it's simple math").
+//
+// Everything below is the ring's algebra, landed BESIDE the rectangle's above
+// and called by nothing in the app yet (S1 of SLICES-RING). θ is now COMPUTED
+// where `entry` was ENUMERATED — one expression order in this module is the
+// whole of goal 15's defence. Every expression here is written in exactly the
+// order shown; a reordering is a two-films bug. Zero rng draws, no Date, no
+// DOM, no Math.random.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// The ring's constants
+// ---------------------------------------------------------------------------
+
+// Seat 0 sits at +z — camOrbit's own zero, "front" as spawnDie names it.
+export const RING_BASE = 0;
+
+// Half-width of the arc the chairs occupy while a tower is socketed (the
+// machine owns the back edge, azim π is forbidden — docs/TOWER.md). 150°: at
+// 120° the N=8 cards OVERLAP on every tower mat (medium+tower −0.288,
+// close+tower −0.909); at 150° nothing overlaps (worst 0.263, close+tower N=8,
+// RECORDED), no card stands on the back wall at any mat, and every chair is
+// ≥ 48.75° from π.
+export const TOWER_ARC = (5 * Math.PI) / 6;
+
+// The card's clear ground past the wall plane — the same 0.10 PLACARD_STANDOFF
+// always left, now derived once and applied along whichever axis binds.
+export const PLACARD_CLEAR = PLACARD_STANDOFF - PLACARD_D / 2;
+
+// The shared copy of spawnDie's literal 2.2 — how far inboard of its wall a
+// pool's line is born. The four literal branches in spawnDie keep their
+// literal; this is the ring branch's.
+export const SPAWN_IN = 2.2;
+
+// A die's width, the unit of angular slack the centroid claim allows at a
+// wedge boundary (place-two-rolls).
+export const DIE_W = 1.35;
+
+// The two printing turns a panel can take: [mirror across the card's width,
+// flip the row end-over-end]. Moved here from js/placard.js's READ_TURN so the
+// predicate below can be pinned in Node.
+export const TURN_NONE = Object.freeze([false, false]);
+export const TURN_HALF = Object.freeze([true, true]);
+
+// ---------------------------------------------------------------------------
+// The primitives
+// ---------------------------------------------------------------------------
+
+// THE ONLY sin/cos of a seat angle in the app. The exact-quarter SNAP is part of
+// the anchor rule: it makes N=2/4/8's axis seats bit-identical to the shipped
+// stations, keeps the front/back mirror exact (place-two-views pins the two
+// frames equal to SIX decimals), and stops sin(Math.PI) = 1.22e-16 leaking a
+// 5e-16 x into a card that must be dead centre.
+export function seatTrig(theta) {
+  const q = Math.round(theta / (Math.PI / 2));
+  if (Math.abs(theta - q * (Math.PI / 2)) < 1e-12) {
+    const m = ((q % 4) + 4) % 4;
+    return { s: [0, 1, 0, -1][m], c: [1, 0, -1, 0][m] };
+  }
+  return { s: Math.sin(theta), c: Math.cos(theta) };
+}
+
+// WHERE A RAY FROM THE TABLE'S CENTRE LEAVES AN AXIS-ALIGNED BOX: the ray
+// parameter t for direction (sin θ, cos θ) against |x| <= ax, |z| <= az. The
+// corner is a TOTAL ORDER, not a coin flip: `<=` hands an exact corner to the x
+// wall on every client on the same doubles.
+export function rayRect(theta, ax, az) {
+  const { s, c } = seatTrig(theta);
+  const as = Math.abs(s);
+  const ac = Math.abs(c);
+  const tx = as === 0 ? Infinity : ax / as;
+  const tz = ac === 0 ? Infinity : az / ac;
+  return tx <= tz ? tx : tz;
+}
+
+// LIANG-BARSKY on one line against one box: the interval {lo, hi} of u for
+// which (px + u*tx, pz + u*tz) is inside |x| <= ax, |z| <= az, or null. ONE clip
+// routine, three callers (the spawn chord, the die clamp, the aim's tangent room).
+export function slabSpan(px, pz, tx, tz, ax, az) {
+  let lo = -Infinity;
+  let hi = Infinity;
+  for (const [p, q, lim] of [[px, tx, ax], [pz, tz, az]]) {
+    if (q === 0) { if (Math.abs(p) > lim) return null; continue; }
+    const a = (-lim - p) / q;
+    const b = (lim - p) / q;
+    lo = Math.max(lo, Math.min(a, b));
+    hi = Math.min(hi, Math.max(a, b));
+  }
+  return hi < lo ? null : { lo, hi };
+}
+
+// (-π, π]. One helper, one place. atan2(x, z) is the azimuth convention camOrbit
+// uses (+z is 0, +x is +π/2) — NOT atan2(z, x), which is silently wrong by 90°.
+export function wrapPi(a) {
+  const t = (a + Math.PI) % (2 * Math.PI);
+  return (t < 0 ? t + 2 * Math.PI : t) - Math.PI;
+}
+
+// ---------------------------------------------------------------------------
+// The stamp and the seat angle
+// ---------------------------------------------------------------------------
+
+// THE ONE BOUNDARY PREDICATE. The film reader, arrivalSweep and js/demo.js all
+// ask this and nothing else.
+export function seatValid(seat, seats, arc = 0) {
+  return Number.isInteger(seat) && Number.isInteger(seats) && (arc === 0 || arc === 1)
+    && seats >= 1 && seats <= PLACE_MAX && seat >= 0 && seat < seats;
+}
+
+// WHO SITS WHERE, AS THE STAMP CARRIES IT. `occupied` is whatever list the caller
+// DISPLAYS (server: room.players with an integer place — stubs are in
+// room.vacated and are NOT chairs; browser/demo: placeRoster() rows). Counted,
+// never sorted: the rank is how many occupied places are below this one, so the
+// list's order is irrelevant. null for anything that is not an occupied place —
+// a placeless roll carries no stamp and the film falls to its seeded draw, the
+// contract entryFor had, kept word for word.
+export function seatStamp(occupied, place, towerUp = false) {
+  if (!Array.isArray(occupied)) return null;
+  if (!Number.isInteger(place) || place < 0 || place >= PLACE_MAX) return null;
+  let seat = 0;
+  let seats = 0;
+  let held = false;
+  for (const p of occupied) {
+    if (!Number.isInteger(p) || p < 0 || p >= PLACE_MAX) continue;
+    seats += 1;
+    if (p < place) seat += 1;
+    if (p === place) held = true;
+  }
+  if (!held) return null;
+  return { seat, seats, arc: towerUp ? 1 : 0 };
+}
+
+// THE SEAT'S AZIMUTH — "it's simple math". Azimuth 0 is +z (front); k walks
+// counter-clockwise seen from above (+x is π/2).
+//   open ring:  θ = RING_BASE + 2πk/N          → N=2 opposite, N=3 a triangle, N=6 a hexagon
+//   tower arc:  θ = RING_BASE + TOWER_ARC·(2k−N+1)/N, wrapped into [0, 2π)
+// Written as ONE expression per branch: (2 * Math.PI * seat) / seats, never
+// Math.PI * 2 * (seat / seats). placeTheta(0, N, 0) is the double +0 for every N —
+// framingInfo().placeOrbit === 0 and camScale === 1 for a lone player rest on it.
+// null for an invalid stamp (never a guess).
+export function placeTheta(seat, seats, arc = 0) {
+  if (!seatValid(seat, seats, arc)) return null;
+  if (!arc) return RING_BASE + (2 * Math.PI * seat) / seats;
+  const t = RING_BASE + (TOWER_ARC * (2 * seat - seats + 1)) / seats;
+  return t < 0 ? t + 2 * Math.PI : t;
+}
+
+// ---------------------------------------------------------------------------
+// The anchor — the card stands ON ITS OWN RAY
+// ---------------------------------------------------------------------------
+
+// The card's AABB half-extents at azimuth θ (PLACARD_W across local x,
+// PLACARD_D along local z; local +z is the azimuth ray).
+function cardHx(theta) { const { s, c } = seatTrig(theta); return (PLACARD_W / 2) * Math.abs(c) + (PLACARD_D / 2) * Math.abs(s); }
+function cardHz(theta) { const { s, c } = seatTrig(theta); return (PLACARD_W / 2) * Math.abs(s) + (PLACARD_D / 2) * Math.abs(c); }
+
+// THE CHAIR. The card's centre is where the ray at θ leaves the rectangle GROWN
+// by the card's own oriented footprint plus PLACARD_CLEAR. Three things this buys:
+//   (a) THE PICTURE — centres lie exactly on their θ rays, so six cards are an
+//       exact hexagon in azimuth and three an exact triangle (a fixed push along
+//       the wall normal puts a 60° card 6.1° off its ray and the hexagon reads
+//       crooked: clean's oval, measured).
+//   (b) THE LICENCE — along the binding axis the footprint spans
+//       [wall + 0.10, wall + 0.10 + 2h]: the whole card is outboard of a wall
+//       plane at EVERY θ and EVERY mat, by construction (0.1000 in all 288 cells).
+//       That is what licenses depthWrite, the real shadow and the seating raycast.
+//   (c) THE SHIPPED NUMBERS — cardHz(0) = PLACARD_D/2, so z = d/2 + PLACARD_STANDOFF:
+//       today's 4.21 / 6.36 / 5.16 / 7.91 / 3.46 / 5.16 to the bit at the quarter turns.
+// Pure in (seat, seats, arc, w, d). Takes the LIVE TABLE_D (matExtra 4.5 under
+// a tower deepens the mat, and the rim moves at EVERY θ now, so the trap
+// placeAnchor's comment records is worse under a ring, not better).
+//
+// THE PARENTHESES ARE LOAD-BEARING (S1, measured): PLACARD_CLEAR is the double
+// 0.09999999999999998, and `half + hx + CLEAR` lands one ulp off today's
+// `half + PLACARD_STANDOFF` in 9 of the 12 quarter-turn cells (wide 5.16 →
+// 5.159999999999999, medium heads 6.36 → 6.359999999999999). `hx + CLEAR` is
+// 0.86 to the bit at every quarter turn, so `half + (hx + CLEAR)` IS the
+// shipped sum — all 12 cells bit-equal placeAnchor's. Written once, this way.
+export function seatAnchor(seat, seats, arc, w, d) {
+  const theta = placeTheta(seat, seats, arc);
+  if (theta === null) return null;
+  const { s, c } = seatTrig(theta);
+  const t = rayRect(theta, w / 2 + (cardHx(theta) + PLACARD_CLEAR),
+                           d / 2 + (cardHz(theta) + PLACARD_CLEAR));
+  return { x: t * s, y: 0, z: t * c, azim: theta, seat, seats, arc, r: t, relocated: arc === 1 };
+}
+
+// ---------------------------------------------------------------------------
+// The spawn line — spawnMid, laneAndChord, sideFor
+// ---------------------------------------------------------------------------
+
+// THE LINE'S MIDPOINT: the point on the seat's own ray furthest out that is still
+// SPAWN_IN clear of EVERY wall — rayRect against the mat shrunk by 2.2 on both
+// pairs. At θ=0 medium this is (0, 3.35 − 2.2) = (0, 1.15), spawnDie's own
+// side-0 literal; at π/2 it is (3.3, 0), side 3's. The tangent t = (cos θ, −sin θ)
+// is PERPENDICULAR TO θ (at 0 it is +x̂, side 0's direction). Not "the rim's own
+// tangent": a corner chair throwing along its nearest wall reads as throwing
+// sideways past the person next to it (and clean's version measured a shorter
+// line than the rule it rejected).
+export function spawnMid(theta, w, d) {
+  const { s, c } = seatTrig(theta);
+  const t = rayRect(theta, w / 2 - SPAWN_IN, d / 2 - SPAWN_IN);
+  return { x: t * s, z: t * c, tx: c, tz: -s, theta };
+}
+
+// THE RAY YIELDS TO THE POOL (F1, one dimension over). The pool's line is laid
+// along the tangent; `want` is the caller's shipped spread
+// (min(TABLE_W − SPAWN.pad, count·SPAWN.per)); it is capped by the chord the
+// pool's largest hull leaves inside the mat (BOTH wall pairs), and the centre `at`
+// stays on the seat's own ray whenever the chord has room, sliding along the
+// tangent only as far as it must. Zero rng draws.
+export function laneAndChord(theta, w, d, hull, count, want) {
+  const mid = spawnMid(theta, w, d);
+  const span = slabSpan(mid.x, mid.z, mid.tx, mid.tz, w / 2 - hull - 0.05, d / 2 - hull - 0.05)
+    || { lo: 0, hi: 0 };
+  const room = span.hi - span.lo;
+  const spread = Math.min(want, room);
+  const at = Math.max(span.lo + spread / 2, Math.min(span.hi - spread / 2, 0));
+  return { mid, lo: span.lo, hi: span.hi, room, spread, at };
+}
+
+// WHICH WALL THIS SEAT IS BEHIND, for the INSTRUMENTS only (0 front/+z, 1 back/−z,
+// 2 left/−x, 3 right/+x — spawnDie's own four names, so `spawn-inside-walls`'
+// `some(d => d.side >= 2)` and every tool that groups by side keep working). It
+// selects NOTHING on the ring path: the position comes from the tangent.
+export function sideFor(theta, w, d) {
+  const { s, c } = seatTrig(theta);
+  const as = Math.abs(s);
+  const ac = Math.abs(c);
+  const tx = as === 0 ? Infinity : (w / 2) / as;
+  const tz = ac === 0 ? Infinity : (d / 2) / ac;
+  return tx <= tz ? (s >= 0 ? 3 : 2) : (c >= 0 ? 0 : 1);
+}
+
+// ---------------------------------------------------------------------------
+// The wedge — wedgeFor, inWedge
+// ---------------------------------------------------------------------------
+
+// A PLACE OWNS ITS WEDGE OF THE FELT FOR LANDING: the mat points whose azimuth
+// from the centre is within ±half of θ (half = π/N open, TOWER_ARC/N under a
+// tower — N=1 is the whole mat, N=2 the two half-planes), MINUS the centre
+// cut-out. THE PUSH (PLACE_PUSH 1.2) is radial now: the cut-out is the mat scaled
+// by (PLACE_PUSH − 1) about the centre — 2.2 × 1.34 at medium, v3's untinted
+// corridor — so the centre belongs to nobody, as it did, and no apex is shared.
+// `outer` walks the rim from θ−half to θ+half (corners emitted as the LITERALS
+// ±hw/±hd, so the polygon has no rounding seam at a corner); `inner` is `outer`
+// scaled by `off`. The overlay DRAWS these; it never re-derives them. Pure in
+// (seat, seats, arc, w, d). Still not a claim: nothing refuses a die for where it stops.
+export function wedgeFor(seat, seats, arc, w, d) {
+  const theta = placeTheta(seat, seats, arc);
+  if (theta === null) return null;
+  const hw = w / 2;
+  const hd = d / 2;
+  const half = (arc ? TOWER_ARC : Math.PI) / seats;
+  const off = PLACE_PUSH - 1;
+  const outer = half >= Math.PI
+    ? [[-hw, -hd], [-hw, hd], [hw, hd], [hw, -hd]]              // N=1 open: the whole mat
+    : rimChain(theta - half, theta + half, hw, hd);
+  const inner = outer.map(([x, z]) => [x * off, z * off]);
+  return { seat, seats, arc, theta, half, hw, hd, off, outer, inner };
+}
+
+// The point where the ray at t leaves the mat's rim.
+function rimPoint(t, hw, hd) {
+  const { s, c } = seatTrig(t);
+  const r = rayRect(t, hw, hd);
+  return [r * s, r * c];
+}
+
+// rimPoint(a), then every mat corner whose azimuth lies STRICTLY inside (a, b)
+// in ascending order, then rimPoint(b). Corner azimuths: ca = atan2(hw, hd),
+// π − ca, π + ca, 2π − ca, each mapped into (a, a + 2π] before the compare.
+// The corners are emitted as the literals ±hw/±hd, never re-derived by trig.
+function rimChain(a, b, hw, hd) {
+  const ca = Math.atan2(hw, hd);
+  const corners = [
+    [ca, [hw, hd]],
+    [Math.PI - ca, [hw, -hd]],
+    [Math.PI + ca, [-hw, -hd]],
+    [2 * Math.PI - ca, [-hw, hd]],
+  ];
+  const span = b - a;
+  const inside = [];
+  for (const [t, p] of corners) {
+    let u = (t - a) % (2 * Math.PI);
+    if (u <= 0) u += 2 * Math.PI;                     // (0, 2π]: u is (t − a) mapped into (a, a + 2π]
+    if (u < span) inside.push([u, p]);                // strictly inside (a, b)
+  }
+  inside.sort((p, q) => p[0] - q[0]);
+  const out = [rimPoint(a, hw, hd)];
+  for (const [, p] of inside) out.push(p);
+  out.push(rimPoint(b, hw, hd));
+  return out;
+}
+
+// Closed on both wedge boundaries (a die resting exactly on one is in BOTH
+// neighbours, never in neither — the v2 rule kept) and on the cut-out's edge;
+// bounded by the mat (a point off the felt is in no wedge).
+export function inWedge(region, x, z) {
+  if (!region) return false;
+  if (Math.abs(x) > region.hw || Math.abs(z) > region.hd) return false;
+  if (Math.abs(x) < region.hw * region.off && Math.abs(z) < region.hd * region.off) return false;
+  if (region.half >= Math.PI) return true;
+  return Math.abs(wrapPi(Math.atan2(x, z) - region.theta)) <= region.half;
+}
+
+// ---------------------------------------------------------------------------
+// The aim — seatAim
+// ---------------------------------------------------------------------------
+
+// ON THE θ RAY, IN THE OUTER PART OF THE WEDGE, THE WHOLE BOX A HULL CLEAR OF
+// EVERY RIM. Radially: the box's FAR edge sits at capEdge = rayRect against the
+// hull-shrunk mat (today's z1 = hd − 1.25 = 2.10 exactly); its radial length is
+// PLACE_AIM.box of the run from the cut-out (r0 = 0.2·rim = today's 0.67) to that
+// edge (0.3575 today); so ra0 = 1.92125, the shipped front aim to the digit.
+// Tangentially: PLACE_AIM.box of min(the wedge's own width at ra0, the mat's
+// hull-shrunk chord through it). THEN the centre is pulled in by one more rayRect
+// against the hull rect shrunk by the oriented box's own AABB half-extents — so
+// the box's AABB is inside the hull rect at EVERY θ (slack 0.000 everywhere; a
+// centre-only cap left the 45° box 1.051 from the rim). At θ = 0 the shrink is
+// only along z by bl/2, which is exactly capEdge − bl/2: bit-identical.
+// AIM_ZERO is returned BY REFERENCE for the dial off and for a bad stamp.
+// Math.tan is asked only when half < π/2 (tan(π) is a NEGATIVE 1.2e-16 and would
+// silently invert the box). Every seat is `own` (each die aims from its own point
+// on the tangent); PLACE_AIM.corner is inert here — a corner is a rectangle idea.
+export function seatAim(seat, seats, arc, w, d, throwTarget) {
+  if (!PLACE_AIM.on) return AIM_ZERO;
+  const theta = placeTheta(seat, seats, arc);
+  if (theta === null) return AIM_ZERO;
+  const { s, c } = seatTrig(theta);
+  const as = Math.abs(s);
+  const ac = Math.abs(c);
+  const hw = w / 2;
+  const hd = d / 2;
+  const hx = hw - AIM_HULL;
+  const hz = hd - AIM_HULL;
+  const half = (arc ? TOWER_ARC : Math.PI) / seats;
+  const r0 = (PLACE_PUSH - 1) * rayRect(theta, hw, hd);
+  const capEdge = rayRect(theta, hx, hz);
+  const bl = Math.max(0, (capEdge - r0) * PLACE_AIM.box);
+  const ra0 = capEdge - bl / 2;
+  const wedgeT = half < Math.PI / 2 ? 2 * ra0 * Math.tan(half) : Infinity;
+  const ch = slabSpan(ra0 * s, ra0 * c, c, -s, hx, hz);
+  const chordT = ch ? ch.hi - ch.lo : 0;
+  const bt = Math.max(0, PLACE_AIM.box * Math.min(wedgeT, chordT));
+  const bwx = (bl * as + bt * ac) / 2;
+  const bwz = (bl * ac + bt * as) / 2;
+  const ra = rayRect(theta, hx - bwx, hz - bwz);
+  return {
+    x: ra * s, z: ra * c,
+    kx: (2 * bwx) / (w * throwTarget), kz: (2 * bwz) / (d * throwTarget),
+    k: PLACE_AIM.speed, own: PLACE_AIM.own ? 1 : 0, spin: PLACE_AIM.spin, h: PLACE_AIM.h,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The printing predicate — readTurn (pure; js/placard.js imports it)
+// ---------------------------------------------------------------------------
+
+// WHICH WAY UP THE PRINTING GOES, at ANY relative angle. A panel's unflipped
+// text-up runs foot-to-ridge: azimuth (azim + π) on the +z panel, azim on the −z
+// panel. Ground-projected screen-up for a reader orbiting at φ is (φ + π). So the
+// +z panel reads upright iff cos(azim − φ) > 0, the −z panel iff < 0 — and the
+// panel FACING the reader is the +z one on exactly the same test. EDGE-ON
+// (cos ≈ 0) keeps the head treatment: +sin takes the near pair, −sin the far —
+// READ_TURN rows 1 and 3 verbatim. Returns [ +z panel turn, −z panel turn ].
+export function readTurn(azim, readerAzim) {
+  const d = azim - readerAzim;
+  const c = Math.cos(d);
+  const near = c > 1e-9 || (Math.abs(c) <= 1e-9 && Math.sin(d) > 0);
+  return near ? [TURN_NONE, TURN_HALF] : [TURN_HALF, TURN_NONE];
 }
