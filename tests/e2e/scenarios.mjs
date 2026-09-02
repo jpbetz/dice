@@ -22512,7 +22512,12 @@ export const scenarios = [
         };
         const record = [];
         const barB = [];
-        for (let n = 1; n <= 8; n++) {
+        // A TABLE OF ONE STANDS NO CARD (Joe, 2026-09-02): the seat is yours,
+        // the card appears with the second chair.
+        await t.dbg('demoDeal(1)');
+        await sit(0, 1);
+        assert.equal(await t.dbg('placardFrame(0)'), null, 'N=1: a table of one stands no card');
+        for (let n = 2; n <= 8; n++) {
           await t.dbg(`demoDeal(${n})`);
           await sit(0, n);
           const p = await t.dbg('places()');
@@ -22637,7 +22642,7 @@ export const scenarios = [
         await t.dbg(`setZoom('wide')`);
         await t.waitFor(`window.__diceDebug.zoom === 'wide'`, { desc: 'wide' });
         const record = [];
-        for (let n = 1; n <= 8; n++) {
+        for (let n = 2; n <= 8; n++) {   // a table of one stands no card
           await t.dbg(`demoDeal(${n})`);
           await t.dbg('demoSit(0)');
           await t.waitFor(`(() => { const p = window.__diceDebug.places(); return p.mine === 0 && p.stations.length === ${n} && p.built === p.queued; })()`,

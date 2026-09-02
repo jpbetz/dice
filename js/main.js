@@ -7798,8 +7798,12 @@ function rollDice(types, label, opts = {}) {
   // is false on every tab that did not type the door into its address bar, so
   // both halves of this are unreachable in production. entryFor is the same
   // function server.js executeRoll calls, with the same two arguments.
+  // In demo, a roll from the panel names its chair (opts.demoPlace); a roll
+  // from the ordinary ROLL button is thrown by the chair the dial is sitting
+  // in — so the main button tosses onto YOUR spot too, not the seeded hurl.
   const seat = DEMO && Number.isInteger(opts.demoPlace)
-    ? demoRows.find((r) => r.place === opts.demoPlace) || null : null;
+    ? demoRows.find((r) => r.place === opts.demoPlace) || null
+    : (DEMO && demoRows.length ? demoRows.find((r) => r.place === demoSeat) || null : null);
   // SOLO IS A TABLE FOR ONE (2026-09-01): with no roster the film tosses as
   // seat 0 of 1 — onto the spot in front of the one player — which is lawful
   // because solo has no second viewer to disagree with.
@@ -25554,7 +25558,10 @@ function placardRebuild() {
     if (!rows.length) { placardBuilt = placardQueued; demoOverlaySync(); return; }
     placardRig = new PlacardRig(scene);
   }
-  placardRig.update(rows);
+  // A TABLE OF ONE STANDS NO CARD (Joe, 2026-09-02: "Single player doesn't
+  // need a name tag. It feels more than a little silly"). The seat, the toss
+  // and the frame are still yours; the card appears with the second chair.
+  placardRig.update(rows.length >= 2 ? rows : []);
   placardBuilt = placardQueued;
   // THE FOG FLOOR IS TAKEN OVER THESE CARDS (updateMatFogFloor, DESIGN-RING
   // §7.5), so the arrangement's writer re-takes it: a card that stands or
@@ -25589,7 +25596,8 @@ function placardRelay() {
   // what keeps this safe to reach from the extent writers at any point in
   // the boot (the roster state below is declared far down the file).
   if (!placardRig) return;
-  placardRig.update(placeRows());
+  const rows = placeRows();
+  placardRig.update(rows.length >= 2 ? rows : []);
   // The cards moved with the walls, so the floor taken over them is re-taken
   // here as well. Usually a no-op: both extent writers run updateShadowFrustum
   // (which re-takes the floor over the LIVE anchors) and a reframe that moves
@@ -25685,6 +25693,7 @@ function placeWashFor(roll) {
   // door's cast lights its own cards without a second branch here.
   const p = placeRoster().find((q) => q && q.id === roll.playerId);
   if (!p || !Number.isInteger(p.place)) return null;
+  if (placeRows().length < 2) return null;   // a table of one stands no card to light
   // The CARD, as it stands right now on the ring (placeRows — rank and count
   // included), which is what the wash sits under; never the edge.
   const row = placeRows().find((r) => r.place === p.place);
