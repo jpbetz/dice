@@ -221,7 +221,7 @@ node tests/e2e/run.mjs --only demo                 # the door's own scenarios
 
 Hooks: `demoInfo()` (zero-arg, so P7's sweep calls it on every ordinary tab
 too), `demoDeal(n)`, `demoSit(k)`, `demoRoll(k, notation)`, `demoRollAll()`,
-`demoRegions(on)` —
+`demoRegions(on)`, `demoLight({lampY, lampAngle, …})` (the panel's LIGHT sliders: patch `MOOD.tune`, re-apply, read back) —
 each of the last four returning `null` rather than pretending on a tab without
 the door. The harness opens one with `ctx.demoTab({ players })`, never
 `newTable`, whose url is `?room=` by construction.

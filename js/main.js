@@ -1901,8 +1901,14 @@ const MOOD = {
   tune: {
     hemi: 0.1, key: 1.7, rim: 0.4,         // room levels while the mood is on
     lampIntensity: 2.8, lampColor: '#ffe8c4',
-    lampY: 19, lampZ: 1.5,                  // over the felt, nudged to the front
-    lampAngle: 0.5, lampPenumbra: 0.75,
+    // THE POOL WAS WIDENED FOR THE ROUND TABLE (Joe, 2026-09-02: "the lighted
+    // area needs to be widened a lot"): the table is 2.5x the rectangle the
+    // lamp was tuned over, so the cone opens 0.5 -> 0.85 and the lamp rises
+    // 19 -> 24 — a pool of radius ~27 at the felt, over a table of radius
+    // 13.75, with the penumbra still rolling off past the cards. Dial it live
+    // behind ?demo=1 (the panel's light sliders; __diceDebug.demoLight).
+    lampY: 24, lampZ: 1.5,                  // over the felt, nudged to the front
+    lampAngle: 0.85, lampPenumbra: 0.75,
     fogNear: 15, fogFar: 46,
   },
   // DUST MOTES (js/motes.js, Tier V2): specks drifting in the lamp cone. One
@@ -16954,6 +16960,7 @@ window.__diceDebug = {
   // dial, so a places flush restores this chair rather than handing the eye
   // back to station 0. null for a station nobody is standing at.
   demoRegions(on) { return demoOverlayApply(on); },
+  demoLight(patch) { return demoLight(patch); },
   demoSit(k) {
     return demoSitAt(k);
   },
@@ -25833,6 +25840,40 @@ function demoInfoValue() {
 // a rule somebody has to read. It never touches the real settings panel and
 // it never appears in the stability channel's offers (js/stability.js): those
 // decide what a PLAYER is shown, and no player is ever shown this.
+// [input id, label, min, max, step, MOOD.tune key]
+const DEMO_LIGHT_DIALS = Object.freeze([
+  ['demo-lamp-y', 'height', 5, 80, 0.5, 'lampY'],
+  ['demo-lamp-angle', 'cone', 0.1, 1.5, 0.01, 'lampAngle'],
+  ['demo-lamp-pen', 'soft', 0, 1, 0.01, 'lampPenumbra'],
+  ['demo-lamp-i', 'bright', 0, 10, 0.1, 'lampIntensity'],
+  ['demo-lamp-z', 'nudge', -30, 30, 0.5, 'lampZ'],
+  ['demo-hemi', 'room', 0, 1.5, 0.01, 'hemi'],
+  ['demo-key', 'key', 0, 4, 0.05, 'key'],
+  ['demo-fog-far', 'fog far', 20, 200, 1, 'fogFar'],
+]);
+const DEMO_LIGHT_BASE = Object.freeze(Object.fromEntries(DEMO_LIGHT_DIALS.map(([, , , , , k]) => [k, MOOD.tune[k]])));
+function demoLightSync() {
+  if (!demoPanel) return;
+  for (const [id, , , , , key] of DEMO_LIGHT_DIALS) {
+    const el = demoPanel.querySelector('#' + id);
+    const out = demoPanel.querySelector('#' + id + '-out');
+    if (el) el.value = MOOD.tune[key];
+    if (out) out.textContent = String(Math.round(MOOD.tune[key] * 100) / 100);
+  }
+  const out = demoPanel.querySelector('#demo-light-out');
+  if (out) out.textContent = DEMO_LIGHT_DIALS.map(([, , , , , k]) => `${k} ${Math.round(MOOD.tune[k] * 100) / 100}`).join(' · ');
+}
+// The hook and the dials' one writer: patch MOOD.tune, re-apply, report.
+function demoLight(patch) {
+  if (!DEMO) return null;
+  if (patch && typeof patch === 'object') {
+    for (const [k, v] of Object.entries(patch)) if (k in MOOD.tune && Number.isFinite(v)) MOOD.tune[k] = v;
+    applyMoodLights();
+    demoLightSync();
+  }
+  return { ...MOOD.tune };
+}
+
 function demoPanelBuild() {
   if (!DEMO || demoPanel) return;
   const box = document.createElement('div');
@@ -25840,7 +25881,7 @@ function demoPanelBuild() {
   box.style.cssText = 'position:fixed;top:8px;right:8px;z-index:9999;'
     + 'font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;'
     + 'background:rgba(16,16,18,0.88);color:#e8e8ea;border:1px solid #4a4a52;'
-    + 'border-radius:4px;padding:8px 10px;min-width:196px;'
+    + 'border-radius:4px;padding:8px 10px;min-width:196px;max-width:300px;'
     + 'user-select:none;pointer-events:auto';
   const line = (html) => {
     const d = document.createElement('div');
@@ -25869,7 +25910,18 @@ function demoPanelBuild() {
     + '<span id="demo-regions-out" style="opacity:.55;margin-left:auto"></span>');
   const throwOne = line(`<button id="demo-throw" style="flex:1">throw ${DEMO_POOL} from this seat</button>`);
   const throwAll = line('<button id="demo-throw-all" style="flex:1">…from every seat</button>');
-  for (const el of [head, dial, cast, seat, regions, throwOne, throwAll]) box.append(el);
+  // THE LIGHT DIALS (Joe, 2026-09-02: "add some dials to demo to let me play
+  // with the lighting"): each writes one MOOD.tune field and re-applies the
+  // mood; the readout under them prints the whole lamp so the numbers can be
+  // read straight off the panel and handed back.
+  const lightHead = line('<span style="letter-spacing:.08em;opacity:.7">LIGHT</span>'
+    + '<button id="demo-light-reset" style="margin-left:auto">reset</button>');
+  const slider = ([id, label, min, max, step]) => line(`<span style="width:52px">${label}</span>`
+    + `<input id="${id}" type="range" min="${min}" max="${max}" step="${step}" style="flex:1;accent-color:#8d6ae0">`
+    + `<b id="${id}-out" style="width:36px;text-align:right"></b>`);
+  const lightRows = DEMO_LIGHT_DIALS.map(slider);
+  const lightOut = line('<span id="demo-light-out" style="opacity:.6;font-size:10px;white-space:normal;flex:1;min-width:0"></span>');
+  for (const el of [head, dial, cast, seat, regions, throwOne, throwAll, lightHead, ...lightRows, lightOut]) box.append(el);
   for (const b of box.querySelectorAll('button')) {
     b.style.cssText = 'font:inherit;background:#2a2a30;color:#e8e8ea;'
       + 'border:1px solid #4a4a52;border-radius:3px;padding:2px 6px;cursor:pointer';
@@ -25889,6 +25941,11 @@ function demoPanelBuild() {
   box.querySelector('#demo-throw').addEventListener('click', () => demoRollFrom(demoSeat));
   box.querySelector('#demo-throw-all').addEventListener('click', () => demoRollEveryone());
   box.querySelector('#demo-fold').addEventListener('click', () => demoPanelFold());
+  for (const [id, , , , , key] of DEMO_LIGHT_DIALS) {
+    box.querySelector('#' + id).addEventListener('input', (e) => demoLight({ [key]: Number(e.target.value) }));
+  }
+  box.querySelector('#demo-light-reset').addEventListener('click', () => demoLight({ ...DEMO_LIGHT_BASE }));
+  demoLightSync();
   window.addEventListener('resize', () => {
     if (window.innerWidth < DEMO_PANEL_NARROW) demoPanelFold(true);
   });
