@@ -32,7 +32,7 @@ import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
 // laneSpread (the lane yields to the pool), aimFor (a translated aim box),
 // and AIM_ZERO (the shared frozen zero every unstamped roll aims through).
 import { laneSpread, aimFor, regionFor, AIM_ZERO, placeAnchor, STATIONS,
-  entryFor } from './places.js';
+  entryFor, seatTrig } from './places.js';
 // THE DEMO DOOR (js/demo.js — read its header for the law): a dev instrument
 // for looking at a full table in ONE TAB. Solo-only, param-only, and every
 // line of it in this file is behind `DEMO`.
@@ -838,12 +838,21 @@ camera.lookAt(0, 0, 0.5);
 // whose frame is bound the other way, take the mat's centre (see there).
 const CAM_TARGET_HOME = new THREE.Vector3(0, 0, 0.5);
 let camTarget = CAM_TARGET_HOME.clone();
+// THE ONE BANNER LEVER (DESIGN-RING §7.6, remedy R2): a gain on the half-unit
+// home offset. 1 is the shipped offset and multiplies EXACTLY, so at 1 every
+// quarter-turn home below is byte-identical to the one that shipped; > 1
+// would stand the target toward the viewer, lifting the near rim and the own
+// card up the screen, priced against the top-rim bar (turning the half unit
+// toward a head is what put a far card over the top rim). Moved only by a
+// measurement, never by taste.
+const PLACE_HOME_GAIN = 1;
 
-// The home target for a viewer whose table is turned by `orbit` (§7.63's four
-// quarter-turns). Orbit 0 is CAM_TARGET_HOME itself, bit for bit — the solo
-// table, every spectator and every one-tab scenario frame exactly as before;
-// the back chair is its mirror, (0, 0, −0.5), mapped exactly rather than
-// through a rotation (not (6e-17, 0, −0.5)).
+// The home target for a viewer whose table is turned by `orbit` — any real
+// angle, since the chairs sit on a ring (§7.63). Orbit 0 is CAM_TARGET_HOME
+// itself, bit for bit — the solo table, every spectator and every one-tab
+// scenario frame exactly as before; the back chair is its mirror, (0, 0,
+// −0.5), mapped exactly rather than through a rotation (not (6e-17, 0,
+// −0.5)).
 //
 // THE HEADS TAKE THE MAT'S CENTRE. The half unit is a LONG-EDGE tuning: from
 // a long edge the frame is bound by the mat's width and has vertical slack to
@@ -855,20 +864,34 @@ let camTarget = CAM_TARGET_HOME.clone();
 // rim-fitted edge is by construction. Unturned, the same offset was merely a
 // sideways half unit at the heads, which read nothing; so they get zero, and
 // their frame is the one placard-look's four-orbit leg passed before.
+//
+// BETWEEN THE QUARTERS THE HALF UNIT TURNS WITH THE CHAIR AND FADES TO ZERO
+// AT THE ELBOWS: |cos θ| agrees with all four quarter cases (0.5 front, 0 at
+// ±π/2 — the measured head finding, generalised — −0.5 back) and never jumps
+// as θ crosses ±π/2. The exact-quarter switch stays as a fast path so the
+// four shipped homes are the literals above and not trig within an ulp of
+// them (seatTrig snaps the quarters too, but the switch is what the six-
+// decimal front/back mirror in place-two-views was pinned against).
 const _camHome = new THREE.Vector3();
 function camHomeFor(orbit) {
   const h = CAM_TARGET_HOME;
-  if (!orbit) return _camHome.copy(h);
+  const G = PLACE_HOME_GAIN;                                  // 1 → every multiply exact; the one banner lever (§7.6)
+  if (!orbit) return _camHome.set(h.x, h.y, h.z * G);
   const q = Math.round(orbit / (Math.PI / 2));
   if (Math.abs(orbit - q * (Math.PI / 2)) < 1e-9) {
     switch (((q % 4) + 4) % 4) {
-      case 2: return _camHome.set(-h.x, h.y, -h.z);  // back chair: toward −z
-      case 1:                                         // the heads: centred
+      case 2: return _camHome.set(-h.x, h.y, -h.z * G);  // back chair: toward −z
+      case 1:                                             // the heads: centred
       case 3: return _camHome.set(0, h.y, 0);
-      default: return _camHome.copy(h);
+      default: return _camHome.set(h.x, h.y, h.z * G);
     }
   }
-  return _camHome.copy(h).applyAxisAngle(Y_AXIS, orbit);
+  // THE HALF UNIT TURNS WITH THE CHAIR AND FADES TO ZERO AT THE ELBOWS: |cos θ|
+  // agrees with all four quarter cases (0.5 front, 0 at ±π/2 — the measured head
+  // finding, generalised — −0.5 back) and never jumps as θ crosses ±π/2.
+  const { s, c } = seatTrig(orbit);
+  const g = Math.abs(c) * G;
+  return _camHome.set(s * h.z * g, h.y, c * h.z * g);
 }
 
 // Camera MOTION state, declared here with the camera rather than beside the
@@ -899,23 +922,30 @@ let camRoll = 0;
 let camOrbit = 0;
 // THE VIEWER'S OWN CHAIR (docs/UX.md §7.63). The framing ladder above chooses
 // between two candidate orbits; this is the BASE both candidates are measured
-// from — the azimuth of the station this viewer holds, quantised to the four
-// quarter-turns camOrbit already ships (0 front, π/2 right head, π back,
-// 3π/2 left head). "The ladder owns the DECISION; the place owns the BASE."
+// from — the azimuth of the chair this viewer holds, a CONTINUOUS angle in
+// radians (0 is +z, the front, as camOrbit already has it): the chairs sit on
+// a ring, so any real angle is a resting orbit and every consumer below
+// (camHomeFor, matSquarePoints, camScaleNow, the fog floor) reads it as one.
+// "The ladder owns the DECISION; the place owns the BASE."
 //
 // Per-viewer and wire-free, like camOrbit: nothing shared reads it, no film
 // input is derived from it, and two players at one table are looking at the
 // same dice from two different chairs (ruling ②). WRITTEN ONLY BY THE PLACES
 // FLUSH (placeOrbitSync, on the tryFlushRoomChanges roll-boundary defer) and
-// by the simulatePlaceView instrument, which restores it — so no code path
-// can turn the table while dice are in the air, and ruling ① holds by
-// construction rather than by care. Zero for a solo table, a spectator, a
-// placeless ninth player and every one-tab scenario, where every path below
-// is byte-for-byte the function that shipped before places existed.
+// by the simulatePlaceView / simulateOrbit instruments, which restore it — so
+// no code path can turn the table while dice are in the air, and ruling ①
+// holds by construction rather than by care. Zero for a solo table, a
+// spectator, a placeless ninth player and every one-tab scenario, where every
+// path below is byte-for-byte the function that shipped before places existed.
 let placeOrbit = 0;
-// The four azimuths a viewer can rest at, in station order front / right head
-// / back / left head, and the labels the probes report them under — the first
-// two are the names the portrait work shipped and its consumers still read.
+// A PROBE SAMPLE SET, not the set of resting orbits: the four quarter turns
+// restFrameProbe and framingProbe price a frame at, and the labels they
+// report the rows under. Row 0 (0 / 'landscape') is the name the portrait
+// work shipped and its consumers still read (the-flight-is-framed-like-the-
+// landing, tools/steps/place-view.mjs); the rest are the rectangle era's four
+// chairs, kept as a sample because they are where the pinned numbers live. A
+// viewer on the ring rests at ANY angle (placeOrbit above), and a sweep over
+// the live seat angles goes through simulateOrbit, not through this list.
 const PLACE_ORBITS = Object.freeze([0, Math.PI / 2, Math.PI, 3 * Math.PI / 2]);
 const PLACE_ORBIT_LABELS = Object.freeze(['landscape', 'portrait', 'landscape-back', 'portrait-left']);
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -1717,6 +1747,35 @@ let camFogEye = null;
 // because that function is invoked during module evaluation, and a `let` below
 // its definition would be read from its own dead zone on that first call.
 let moodReady = false;
+// THE PLACARD RIG'S STATE, DECLARED HERE AND NOT BESIDE ITS CODE, for three
+// boot-order reasons that each cost a page that would not start.
+//
+// `animate()` runs its first `tick()` synchronously during module evaluation,
+// and tick asks tryFlushRoomChanges — which reaches tryFlushPlaces — on every
+// frame including that one. A `let` further down the file would still be in
+// its temporal dead zone at that moment. (`pendingZoom` sits at the top of
+// this file for exactly the same reason.)
+//
+// And the two counters start EQUAL rather than at some "nothing built yet"
+// sentinel: nothing has ASKED for a restanding yet, so that first flush must
+// be a no-op — `netOnline` is itself still in its dead zone there, and asking
+// who is seated would throw. The first real ask is initNet's, after the join.
+//
+// And updateMatFogFloor (a few lines below) reads `placardRig` to decide
+// whether there are standing cards to keep out of the fog, and it runs at
+// module evaluation through updateShadowFrustum's boot call — so the rig's
+// handle has to be declared ABOVE it, like `moodReady`. (Found the way the
+// first two were: the app never reached ready, 2026-09-01.)
+//
+// Everything that USES these lives with the flush, far below.
+let placardQueued = 0;   // how many roster doors have asked for a restanding
+let placardBuilt = 0;    // the placardQueued the standing arrangement was made from
+let placardRig = null;   // built lazily: a solo table never allocates one
+// The viewer's REAL placeOrbit while simulatePlaceView() / simulateOrbit()
+// has borrowed the eye, so it can be handed back exactly — and so a places
+// flush that lands mid-simulation updates the value to restore rather than
+// the picture.
+let simulatedPlaceView = null;
 const MAT_FOG_MARGIN = 1.5;   // units of clear air past the corner
 let matFogFloor = 0;
 function updateMatFogFloor() {
@@ -1730,6 +1789,25 @@ function updateMatFogFloor() {
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
       far = Math.max(far, Math.hypot(sx * TABLE_W / 2 - px, py, sz * TABLE_D / 2 - pz));
+    }
+  }
+  // …AND THE CARDS (DESIGN-RING §7.5, gate G8). A placard stands OUTBOARD of
+  // the rim on its own ray, and on a ring a diagonal chair's card stands past
+  // the mat's corner radius (medium: 1.85 beyond at N=3/6, 2.16 at N=7), so a
+  // floor derived from the corners alone would fog a name. The same max, over
+  // the standing anchors too — angle-free, and it rides camFogEye exactly as
+  // the corners do. Guarded on the rig the way placardRelay is: this runs once
+  // at module evaluation (updateShadowFrustum, boot) and the roster state
+  // placeRows reads is declared far down the file; a rig exists only after
+  // placardRebuild has read that state, and a solo table never builds one, so
+  // the solo floor is the four-corner max, byte for byte. On the rectangle no
+  // anchor is past a corner from any quarter eye (the rectangle era's fog
+  // literals are re-pinned unchanged in no-die-sits-in-fog); the clause earns
+  // its keep at the ring's diagonals.
+  if (placardRig) {
+    for (const row of placeRows()) {
+      const a = row.anchor;
+      far = Math.max(far, Math.hypot(a.x - px, py - a.y, a.z - pz));
     }
   }
   matFogFloor = far + MAT_FOG_MARGIN;
@@ -3174,28 +3252,10 @@ let spawnLine = [];
 // draw. Read by __diceDebug.throwOrigin.
 let throwOrigin = null;
 
-// THE PLACARD RIG'S STATE, DECLARED HERE AND NOT BESIDE ITS CODE, for two
-// boot-order reasons that both cost a page that would not start.
-//
-// `animate()` runs its first `tick()` synchronously during module evaluation,
-// and tick asks tryFlushRoomChanges — which reaches tryFlushPlaces — on every
-// frame including that one. A `let` further down the file would still be in
-// its temporal dead zone at that moment. (`pendingZoom` sits at the top of
-// this file for exactly the same reason.)
-//
-// And the two counters start EQUAL rather than at some "nothing built yet"
-// sentinel: nothing has ASKED for a restanding yet, so that first flush must
-// be a no-op — `netOnline` is itself still in its dead zone there, and asking
-// who is seated would throw. The first real ask is initNet's, after the join.
-//
-// Everything that USES these lives with the flush, far below.
-let placardQueued = 0;   // how many roster doors have asked for a restanding
-let placardBuilt = 0;    // the placardQueued the standing arrangement was made from
-let placardRig = null;   // built lazily: a solo table never allocates one
-// The viewer's REAL placeOrbit while simulatePlaceView() has borrowed the
-// eye, so it can be handed back exactly — and so a places flush that lands
-// mid-simulation updates the value to restore rather than the picture.
-let simulatedPlaceView = null;
+// (The placard rig's state — placardQueued / placardBuilt / placardRig /
+// simulatedPlaceView — used to be declared here; it now sits beside
+// `moodReady`, above updateMatFogFloor, for the third boot-order reason
+// recorded there.)
 
 // THE DEMO TABLE (js/demo.js). All three are inert and unread while the door
 // is shut — `demoRows` empty means `placeRoster()` answers exactly what it
@@ -15400,9 +15460,6 @@ window.__diceDebug = {
     const savedOrbit = camOrbit;
     const savedPos = camera.position.clone();
     const savedTgt = camTarget.clone();
-    const eye = new THREE.Vector3(
-      ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
-    );
     const span = () => {
       const a = new THREE.Vector3(0, 0, 0).project(camera);
       const b = new THREE.Vector3(1, 0, 0).project(camera);
@@ -15413,11 +15470,14 @@ window.__diceDebug = {
       const orbit = PLACE_ORBITS[k];
       camOrbit = orbit;
       // The ladder's own geometry for this chair (camHomeFor / fitCameraTo):
-      // the preset ray is taken from the front chair's home and turned with
-      // the target, so every chair is priced on the frame it actually gets.
+      // the preset ray is THE ray fitCameraTo scans along (presetRay — the one
+      // expression, R(θ)·eye − target), so every chair is priced on the frame
+      // it actually gets. Until 2026-09-01 this held a third copy of the ray,
+      // R(eye − h), which agrees with the ladder only where camHomeFor(θ) is
+      // R·h — i.e. not at the heads, whose home is the centre; the rows at
+      // orbit 0 (the only rows a gate reads) are unchanged.
       const home = camHomeFor(orbit).clone();
-      const ray = eye.clone().sub(CAM_TARGET_HOME);
-      if (orbit) ray.applyAxisAngle(Y_AXIS, orbit);
+      const ray = presetRay(home);
       for (const s of scales) {
         camera.position.copy(home).addScaledVector(ray, s);
         aimCamera(home);
@@ -16817,8 +16877,8 @@ window.__diceDebug = {
   // hands the real orbit back on `simulatePlaceView(null)`. No roster write,
   // no place, nothing another client could see, and nothing any film reads.
   // It is the look pass's only route to the six- and eight-place pictures,
-  // since three concurrent tabs is the harness ceiling, and the fog
-  // scenario's route to the four azimuths from one tab.
+  // since three concurrent tabs is the harness ceiling. (For an angle nobody
+  // is sitting at, simulateOrbit below.)
   //
   // It is the one writer of placeOrbit besides the places flush, and the
   // flush knows it: a roster change that lands mid-simulation updates the
@@ -16838,6 +16898,32 @@ window.__diceDebug = {
     placeOrbit = a.azim;
     placeOrbitApply();
     return { place: n, orbit: a.azim, world: { x: a.x, y: a.y, z: a.z } };
+  },
+  // LOOK AT THE TABLE FROM AN ANGLE, without anybody sitting there. The same
+  // instrument as simulatePlaceView with the roster taken out of it: parks
+  // THIS tab's `placeOrbit` at `theta` (radians; 0 is +z, the front) and runs
+  // the SHIPPED ladder, lamp and printing from there; `null` hands the real
+  // orbit back. Shares the parking slot with simulatePlaceView, so a flush
+  // that lands mid-simulation updates the value to RESTORE and never the
+  // picture, and either form's `null` restores whichever was parked. This is
+  // how a fog or frame sweep visits angles the roster does not hold — on a
+  // ring a one-place table has exactly one chair, so "sit at station 4 of a
+  // one-place table" (no-die-sits-in-fog's old shape) stops meaning anything,
+  // while "look from π/2" always does. Render-only; nothing any film reads.
+  simulateOrbit(theta) {
+    if (theta === null || theta === undefined) {
+      if (simulatedPlaceView) {
+        placeOrbit = simulatedPlaceView.orbit;
+        simulatedPlaceView = null;
+        placeOrbitApply();
+      }
+      return { orbit: placeOrbit };
+    }
+    if (!Number.isFinite(theta)) return null;
+    if (!simulatedPlaceView) simulatedPlaceView = { orbit: placeOrbit };
+    placeOrbit = theta;
+    placeOrbitApply();
+    return { orbit: placeOrbit };
   },
   // The settle terminator (SETTLEGATE). mode 'displacement' is shipped — the
   // three-point AABB rest test, `eps` its tolerance as a fraction of a die's
@@ -18367,6 +18453,12 @@ window.__diceDebug = {
       // corner plus a margin. Reported so a scenario can state that no die
       // sits in fog, which is the claim, rather than that a number is a number.
       matFogFloor,
+      // …and the standing cards the floor was ALSO taken over (updateMatFogFloor,
+      // DESIGN-RING §7.5): the anchors, [x, y, z], empty until a rig stands. A
+      // scenario re-derives the floor from the mat's corners AND these, so a
+      // card past a corner (the ring's diagonals; on the rectangle, the front
+      // card seen from the back chair) is covered by derivation, not by digit.
+      fogAnchors: placardRig ? placeRows().map((r) => [r.anchor.x, r.anchor.y, r.anchor.z]) : [],
       // Ratios against the shipped dials, so this stays true through a re-tune.
       hemi: hemiLight.intensity / t.hemi,
       key: keyLight.intensity / t.key,
@@ -25400,6 +25492,13 @@ function tryFlushPlaces() {
 // move ruling ① forbids. Under a simulatePlaceView the new value is parked
 // for the hand-back instead of applied, so an instrument's picture is never
 // yanked from under the person judging it.
+//
+// THE `===` BELOW IS EXACT ON PURPOSE, AND IT IS SAFE BECAUSE THERE IS ONE
+// PRODUCER: `want` is the very double the anchor rule in js/places.js
+// returned as `azim`, read here and never re-derived — a second expression
+// for the same angle, associated differently, would differ in its last bits
+// and cut the table on every flush forever. Read the anchor; do not compute
+// the angle.
 function placeOrbitSync() {
   const row = myPlaceRow();
   const want = row ? row.anchor.azim : 0;
@@ -28272,12 +28371,29 @@ function framingPoints() {
 // tuned against a viewport that will change. It lands the resting eye a little
 // closer than a roll's own frame, which is the direction that flatters the cut
 // when a throw begins.
+//
+// AND THE SQUARE IS TAKEN IN THE VIEWER'S OWN FRAME (DESIGN-RING §7.3): turned
+// by camOrbit about the mat's axis, so every chair crops the same picture. A
+// WORLD square is not rotation-invariant — its screen half-extent is
+// h(|cos θ| + |sin θ|), h at the quarters and h√2 at 45°, so the phone's
+// resting crop would breathe 41% between ring seats and the dice in it shrink
+// 29% at a diagonal chair. Turned with the viewer it is the same square on
+// every screen. The turn is seatTrig's (snapped at the quarters), so at 0 the
+// points are the literals above and at π/2, π, 3π/2 the same four corners in
+// another order — the shipped phone crop is bit-identical at every quarter.
 function matSquarePoints() {
   const h = Math.min(TABLE_W, TABLE_D) / 2;
   const pts = [];
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
-      pts.push({ p: new THREE.Vector3(sx * h, 0, sz * h), mx: 0.02, my: 0.02, of: 'felt' });
+      const p = new THREE.Vector3(sx * h, 0, sz * h);
+      if (camOrbit) {
+        // R_y(θ): (x, z) → (x cos θ + z sin θ, −x sin θ + z cos θ), the same
+        // map applyAxisAngle(Y_AXIS, θ) is, written out so the quarter snap holds.
+        const { s, c } = seatTrig(camOrbit);
+        p.set(p.x * c + p.z * s, 0, -p.x * s + p.z * c);
+      }
+      pts.push({ p, mx: 0.02, my: 0.02, of: 'felt' });
     }
   }
   return pts;
@@ -28328,29 +28444,41 @@ function placeRetreatNow() {
   return placeRows().length >= 2 ? PLACE_RETREAT : 1;
 }
 
-function fitCameraTo(pts, target = camTarget, from = 1, refundOnFail = false) {
-  const eye = new THREE.Vector3(
+// THE PRESET RAY, TAKEN IN THE VIEWER'S OWN FRAME (§7.63) — the ONE expression
+// for "where the eye stands, per unit of retreat, for a viewer turned by
+// camOrbit": R(θ)·eye − target. fitCameraTo scans along it, camScaleNow reads
+// the live camera against it, restFrameProbe prices a frame on it; three
+// readers, one producer, so no instrument can misprice the frame the ladder
+// actually chose (camScaleNow did, until 2026-09-01: an un-turned ray reads
+// 0.957 at π and 0.968 at 2π/3 for a true 1.000).
+//
+// The preset eye is a world point tuned from the front chair, so for a turned
+// viewer the target is un-turned first, the eye-to-target ray taken there, and
+// the ray turned back — a viewer at the back chair then stands exactly where
+// the front chair's viewer would if the world were turned under them. Until
+// 2026-09-01 the ray was `eye − target` and only then turned, which turns the
+// eye about the TARGET rather than about the table: with the target a half
+// unit off the centre (camHomeFor) that put the back eye a whole unit further
+// from its own edge than the front eye is from its (and, with the target at a
+// dice cluster's centre, displaced the turned eye by twice the cluster's
+// offset). At orbit 0 the two expressions are the same subtraction, bit for
+// bit, so a solo table, a spectator and every one-tab scenario frame exactly
+// as they always did. Returns a fresh Vector3.
+function presetRay(target) {
+  const ray = new THREE.Vector3(
     ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
   );
-  // THE RAY IS TAKEN IN THE VIEWER'S OWN FRAME (§7.63). The preset eye is a
-  // world point tuned from the front chair, so for a turned viewer the target
-  // is un-turned first, the eye-to-target ray taken there, and the ray turned
-  // back — a viewer at the back chair then stands exactly where the front
-  // chair's viewer would if the world were turned under them. Until 2026-09-01
-  // the ray was `eye − target` and only then turned, which turns the eye about
-  // the TARGET rather than about the table: with the target a half unit off
-  // the centre (camHomeFor) that put the back eye a whole unit further from
-  // its own edge than the front eye is from its (and, with the target at a
-  // dice cluster's centre, displaced the turned eye by twice the cluster's
-  // offset). At orbit 0 the two expressions are the same subtraction, bit for
-  // bit, so a solo table, a spectator and every one-tab scenario frame exactly
-  // as they always did.
-  const ray = eye.clone();
   if (camOrbit) {
     ray.sub(target.clone().applyAxisAngle(Y_AXIS, -camOrbit)).applyAxisAngle(Y_AXIS, camOrbit);
   } else {
     ray.sub(target);
   }
+  return ray;
+}
+
+function fitCameraTo(pts, target = camTarget, from = 1, refundOnFail = false) {
+  // THE RAY IS TAKEN IN THE VIEWER'S OWN FRAME — presetRay, the one expression.
+  const ray = presetRay(target);
   const refund = () => {
     camera.position.copy(target).addScaledVector(ray, from);
     aimCamera(target);
@@ -28443,13 +28571,15 @@ function matOnScreen() { const w = matWorstNdc(); return w.x <= 1 && w.y <= 1; }
 // Where the eye sits along its own ray, as a multiple of the preset distance —
 // the same `s` fitCameraTo scans. 1.00 is the preset exactly; > 1 is a retreat;
 // < 1 is an approach, which only the dice rung is allowed to ask for. Read from
-// the LIVE camera and the LIVE target, so it reports what is painted.
+// the LIVE camera and the LIVE target, so it reports what is painted — against
+// THE SAME TURNED RAY the ladder scanned (presetRay). Until 2026-09-01 the
+// denominator was the un-turned `eye − target`, whose length differs from the
+// turned ray's at every orbit but 0: the back chair read 0.957 and a 2π/3
+// chair 0.968 for a true 1.000, so no-die-sits-in-fog's exact pin (gated on
+// `camScale === 1`) could only ever fire at the front chair. On a ring every
+// chair but one is off-axis; the instrument now reads 1.00 / 1.20 everywhere.
 function camScaleNow() {
-  const eye = new THREE.Vector3(
-    ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
-  );
-  const ray = eye.clone().sub(camTarget);
-  const len = ray.length();
+  const len = presetRay(camTarget).length();
   return len > 1e-6 ? camera.position.distanceTo(camTarget) / len : 1;
 }
 

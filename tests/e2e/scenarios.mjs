@@ -2344,10 +2344,16 @@ export const scenarios = [
       // ---- the four azimuths (§7.63; DESIGN §5.4) ---------------------------
       // The resting table, medium, ONE occupied station (no V3 retreat —
       // that leg is below), re-measured 2026-09-01:
-      //   0 → 16.53   π → 16.53   π/2 → 20.76   3π/2 → 20.76
-      // FRONT AND BACK AGREE SINCE camHomeFor (2026-09-01): the half-unit
+      //   0 → 16.53   π → 16.61   π/2 → 20.76   3π/2 → 20.76
+      // FRONT AND BACK EYES AGREE SINCE camHomeFor (2026-09-01): the half-unit
       // home offset turns with the chair, so the back eye is the front eye
-      // mirrored exactly and the two floors are equal to the printed digit.
+      // mirrored exactly and the two CORNER terms are equal to the printed
+      // digit. The back FLOOR is 0.08 higher since the S3 ring slice, because
+      // the floor is now taken over the standing cards too (updateMatFogFloor)
+      // and the one card at this table — station 0's, at the front — is 0.08
+      // past the far corner from the back eye. (The design's expectation that
+      // no rectangle card is past a corner from a quarter eye was measured
+      // false by exactly this digit, 2026-09-01.)
       // (The 15.93 this file pinned before was the pre-camHomeFor back eye —
       // a unit nearer its own edge — and the 17.12 heads predate the head
       // frame's 1.33× long-axis retreat; both went stale with the ordering
@@ -2356,16 +2362,21 @@ export const scenarios = [
       // rest FURTHER than the long edges — the short-edge retreat pays in
       // fog floor too.
       //
-      // Only the front chair rests at s = 1 on this frame (the back rests at
-      // its mirror, which camScaleNow's un-turned preset ray under-reports as
-      // 0.96 — an instrument quirk, not a nearer eye; a head eye looks down
-      // the long axis and retreats to 1.30), so the numbers are pinned
-      // exactly where camScale reads 1 and are the LOWER BOUND everywhere
-      // else — a retreat along the eye's own ray can only move a far corner
-      // further. What is exact at every chair is the derivation itself: the
-      // floor re-computed here from the mat's corners and the eye
-      // framingInfo reports, with the margin read off the front chair rather
-      // than copied out of js/main.js.
+      // Both long edges rest at s = 1 on this frame and READ 1.00 (a head eye
+      // looks down the long axis and retreats to 1.30), so the exact pin
+      // below fires at the front AND the back and the numbers are the LOWER
+      // BOUND everywhere else — a retreat along the eye's own ray can only
+      // move a far corner further. Until 2026-09-01 the back chair read
+      // camScale 0.96 for the same eye: camScaleNow measured the live camera
+      // against the UN-turned preset ray, whose length differs from the
+      // turned ray fitCameraTo actually scans at every orbit but 0 (0.957 at
+      // π, 0.968 at 2π/3 for a true 1.000) — an instrument quirk this file
+      // used to record as such. It now reads the same ray as the ladder
+      // (presetRay), which is what lets the pin be chair-agnostic on a ring,
+      // where every chair but one is off-axis. What is exact at every chair
+      // is the derivation itself: the floor re-computed here from the mat's
+      // corners and the eye framingInfo reports, with the margin read off the
+      // front chair rather than copied out of js/main.js.
       //
       // simulatePlaceView(n) is the instrument: it sets placeOrbit to station
       // n's azimuth and runs the SHIPPED ladder, so this is the frame a viewer
@@ -2382,7 +2393,26 @@ export const scenarios = [
         }
         return far;
       };
-      const CHAIRS = [[0, 0, 16.53], [1, Math.PI, 16.53], [4, Math.PI / 2, 20.76], [5, 3 * Math.PI / 2, 20.76]];
+      // THE FLOOR IS TAKEN OVER THE MAT'S CORNERS AND THE STANDING CARDS (js/main.js
+      // updateMatFogFloor, DESIGN-RING §7.5 gate G8): a placard stands OUTBOARD of
+      // its rim, and from the chair opposite it is further than the mat's far
+      // corner — on this rectangle by 0.08 (station 0's card, z 4.21, seen from
+      // the back eye); on the ring's diagonals by 1.85–2.16. The probe reports
+      // the anchors the floor was taken over, and the derivation below is the
+      // max over BOTH, so a card past a corner is covered by derivation and not
+      // by a digit somebody remembered to bump.
+      const farPoint = (p, eye) => {
+        let far = farCorner(p, eye);
+        for (const [x, y, z] of p.fogAnchors || []) {
+          far = Math.max(far, Math.hypot(x - eye[0], eye[1] - y, z - eye[2]));
+        }
+        return far;
+      };
+      // Per chair: [station, azimuth, floor at the preset eye]. Front and back
+      // eyes are exact mirrors (camHomeFor), so their CORNER terms agree —
+      // but the one standing card is at the front, so the back chair's floor
+      // carries the card's 0.08 and the front chair's does not: 16.53 / 16.61.
+      const CHAIRS = [[0, 0, 16.53], [1, Math.PI, 16.61], [4, Math.PI / 2, 20.76], [5, 3 * Math.PI / 2, 20.76]];
       const seen = {};
       let margin = null;
       for (const [place, azim, atPreset] of CHAIRS) {
@@ -2401,24 +2431,39 @@ export const scenarios = [
         assert.ok(p.matFogFloor >= atPreset - 0.005,
           `station ${place}: the floor is never under the design's preset-eye number `
           + `(${p.matFogFloor.toFixed(3)} vs ${atPreset})`);
-        const far = farCorner(p, f.eye);
+        const far = farPoint(p, f.eye);
         if (margin === null) margin = p.matFogFloor - far;
         assert.ok(Math.abs((p.matFogFloor - far) - margin) < 2e-3,
-          `station ${place}: the floor is the furthest mat corner from THIS eye plus the same `
-          + `margin every chair gets (${(p.matFogFloor - far).toFixed(3)} vs ${margin.toFixed(3)})`);
+          `station ${place}: the floor is the furthest mat corner OR standing card from THIS eye plus `
+          + `the same margin every chair gets (${(p.matFogFloor - far).toFixed(3)} vs ${margin.toFixed(3)})`);
         if (f.camScale === 1) {
           assert.equal(p.matFogFloor.toFixed(2), atPreset.toFixed(2),
             `station ${place}: at the preset eye the floor is the design's number exactly`);
         }
-        seen[place] = { floor: p.matFogFloor, camScale: f.camScale, orbit: f.orbit };
+        seen[place] = { floor: p.matFogFloor, camScale: f.camScale, orbit: f.orbit, eye: f.eye,
+          corner: farCorner(p, f.eye), card: far - farCorner(p, f.eye) };
       }
       assert.equal(seen[0].camScale, 1,
         'a ONE-place table takes no V3 retreat — the front chair rests at the preset eye, '
         + 'so at least one exact pin above was actually made, and every solo fog number below '
         + 'this line is the pre-V3 build\'s');
-      assert.equal(seen[0].floor.toFixed(3), seen[1].floor.toFixed(3),
-        `front and back derive the SAME floor since camHomeFor — the back eye is the front `
-        + `eye mirrored (${seen[0].floor.toFixed(2)} / ${seen[1].floor.toFixed(2)})`);
+      assert.equal(seen[1].camScale, 1,
+        `the back chair reads the SAME scale for the mirrored eye (${seen[1].camScale}) — `
+        + 'camScaleNow measures against the turned ray the ladder scanned, not the un-turned '
+        + 'preset (which read 0.96 here); on a ring this is what makes the instrument chair-agnostic');
+      // THE BACK EYE IS THE FRONT EYE MIRRORED (camHomeFor), stated on the eye
+      // itself and on the corner term — the two floors are no longer equal,
+      // because the one card at this table stands at the FRONT: from the back
+      // chair it is the furthest thing on the felt (0.08 past the corner) and
+      // from the front chair it is the nearest. The mirror is exact to the
+      // probe's four decimals; the card term is recorded, not tuned.
+      assert.deepEqual(seen[1].eye.map((c, i) => (i === 1 ? c : (-c || 0))), seen[0].eye,
+        `the back eye is the front eye mirrored through the mat's axis (${seen[0].eye} / ${seen[1].eye})`);
+      assert.equal(seen[0].corner.toFixed(3), seen[1].corner.toFixed(3),
+        `so front and back see the same furthest CORNER (${seen[0].corner.toFixed(2)} / ${seen[1].corner.toFixed(2)})`);
+      assert.equal(seen[0].card, 0, 'from the front chair its own card is nearer than the far corner');
+      assert.equal(seen[1].card.toFixed(2), '0.08',
+        `from the back chair the front card stands past the far corner by the recorded 0.08 (${seen[1].card.toFixed(3)})`);
       assert.equal(seen[4].floor.toFixed(3), seen[5].floor.toFixed(3),
         `the two heads mirror each other in x and agree (${seen[4].floor.toFixed(2)})`);
       assert.ok(seen[0].floor < seen[4].floor,
@@ -2452,17 +2497,28 @@ export const scenarios = [
       // MULTI-PLACE floors that re-derive, never the solo ones: the leg
       // above ran on a one-place table and pinned the pre-V3 numbers
       // unchanged, front at camScale exactly 1. Medium re-measured
-      // 2026-09-01: 0/π → 18.68, heads → 23.75 (for the record: wide 23.52,
-      // heads 30.00; close 14.89 — under the shipped 15.00 tune floor —
-      // heads 18.87). The derivation assert runs again — the floor is still
-      // the furthest corner from THIS eye plus the same margin — so the
-      // retreat cannot drift from the fog by construction.
+      // 2026-09-01: 0/π → 18.68, heads → 23.75 (for the record, CORNER-ONLY
+      // floors of the rectangle era: wide 23.52, heads 30.00; close 14.89 —
+      // under the shipped 15.00 tune floor — heads 18.87); then with the
+      // cards in the max (S3, same day) the long edges read 18.81 — the
+      // opposite edge's card is 0.13 past the far corner at the ×1.2 eye —
+      // and the heads keep 23.75. The derivation assert runs again — the
+      // floor is still the furthest corner or card from THIS eye plus the
+      // same margin — so the retreat cannot drift from the fog by construction.
       await a.dbg('clearTable()');
       await a.settle();
       await ctx.rawPlayer('Bram');
       await a.waitFor('window.__diceDebug.places().stations.length === 2',
         { desc: 'a second station — the table is PLACED now' });
-      const V3_CHAIRS = [[0, 0, 18.68], [1, Math.PI, 18.68], [4, Math.PI / 2, 23.75], [5, 3 * Math.PI / 2, 23.75]];
+      // Re-measured 2026-09-01 (S3) with the floor taken over the cards too:
+      // from EACH long edge the OTHER edge's card (stations 0 and 1 are the
+      // front-left and back-right pair) stands past the far corner, so both
+      // long-edge floors carry a card term now — 18.68 → 18.81 — while the
+      // heads look along the long axis, where the cards are inboard of the
+      // corners, and keep 23.75. The whole table is compared at once so one
+      // failure shows all four numbers.
+      const V3_CHAIRS = [[0, 0, 18.81], [1, Math.PI, 18.81], [4, Math.PI / 2, 23.75], [5, 3 * Math.PI / 2, 23.75]];
+      const v3Floors = [];
       for (const [place, azim, atRest] of V3_CHAIRS) {
         await a.dbg(`simulatePlaceView(${place})`);
         const f = await a.dbg('framingInfo()');
@@ -2471,20 +2527,24 @@ export const scenarios = [
           `V3 station ${place}: the ladder's base is the chair's azimuth`);
         assert.ok(p.fogNear >= p.matFogFloor - 1e-9,
           `V3 station ${place}: fog starts past the retreated floor (${p.fogNear.toFixed(2)} vs ${p.matFogFloor.toFixed(2)})`);
-        assert.equal(p.matFogFloor.toFixed(2), atRest.toFixed(2),
-          `V3 station ${place}: the multi-place floor is the re-measured number `
-          + `(${p.matFogFloor.toFixed(3)} vs ${atRest})`);
-        const far = farCorner(p, f.eye);
+        v3Floors.push({ place, floor: p.matFogFloor.toFixed(2), expected: atRest.toFixed(2) });
+        const far = farPoint(p, f.eye);
         assert.ok(Math.abs((p.matFogFloor - far) - margin) < 2e-3,
-          `V3 station ${place}: the floor is STILL the furthest corner from this eye plus the same margin `
+          `V3 station ${place}: the floor is STILL the furthest corner or card from this eye plus the same margin `
           + `(${(p.matFogFloor - far).toFixed(3)} vs ${margin.toFixed(3)})`);
-        if (place === 0) {
+        if (place === 0 || place === 1) {
           assert.equal(f.camScale, 1.2,
-            'the front chair reads the one retreat lever exactly — PLACE_RETREAT 1.2 on a fitted frame');
+            `station ${place} reads the one retreat lever exactly — PLACE_RETREAT 1.2 on a fitted frame, `
+            + 'from the front chair and from its mirror alike');
+        }
+        if (place === 0) {
           assert.ok(p.matFogFloor > seen[0].floor + 1,
             `and the placed floor stands past the solo floor (${p.matFogFloor.toFixed(2)} vs ${seen[0].floor.toFixed(2)})`);
         }
       }
+      assert.deepEqual(v3Floors.map((r) => r.floor), v3Floors.map((r) => r.expected),
+        `the multi-place floors are the re-measured numbers, station by station: `
+        + v3Floors.map((r) => `${r.place} → ${r.floor} (expected ${r.expected})`).join(', '));
       assert.equal((await a.dbg('simulatePlaceView(null)')).orbit, 0, 'the chair is handed back');
       } finally {
         await a.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, a.page.sessionId)
