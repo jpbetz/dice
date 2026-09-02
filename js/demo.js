@@ -14,95 +14,48 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// THE DEMO DOOR — a dev instrument for looking at a full table in ONE TAB
+// THE CAST — a dev instrument for looking at a full table in ONE TAB
 // (BRIEF-V4, Joe 2026-09-01: "a demo mode where you can have a dial to
 // control player count (random names) and some extra lines on the table to
 // show the various regions dividing up the table that are hidden in normal
 // play").
 //
 // It is DEV TOOLING, not player chrome. Nothing here is offered to anybody
-// who did not type the door into their address bar, nothing here is on the
-// wire, and nothing here changes a film that is not this tab's own.
+// who did not open developer mode, nothing here is on the wire, and nothing
+// here changes a film that is not this tab's own.
 //
-// ── THE DOOR ───────────────────────────────────────────────────────────────
-//   ?demo=1     →  this tab is a demo tab, for this page load only
+// ── THE DOOR IS DEVELOPER MODE (docs/DEVMODE.md, 2026-09-02) ───────────────
+// The backtick key on any table, or `__diceDebug.devOpen()`, and the cast is
+// a section of that panel. `?demo=1` was the first door and is GONE (Joe,
+// DEVMODE revision 3: "I don't need ?demo=1 once this is implemented"): the
+// URL carries no dev state at all, the room-mint suppression went with it,
+// and a dev tab is an ordinary tab — at a real table of one, with a real
+// place the server handed out — that has dealt a cast AROUND itself.
 //
-// The js/stability.js precedent is the SHAPE (a url param nobody meets by
-// accident) and NOT the mechanism, and the difference is the whole of why
-// this file is short. A channel is an ENROLMENT: it persists, it mirrors, it
-// is redeemed and stripped, because a beta tester must stay a beta tester
-// across reloads. A demo is a MODE: it lasts exactly as long as the tab that
-// asked for it, so it is read once and never stored, never mirrored, and
-// never stripped — the param IS the state, the way `?lobby=1` is, and a
-// reload of the same address is the same demo. GOALS §7 ("the URL addresses a
-// TABLE and carries no user state") is untouched: a dev-mode flag is not user
-// state any more than `?lobby` is, and no share flow can leak an enrolment
-// that does not exist.
-//
-// ── SOLO ONLY, AND WHY THAT IS A LAW RATHER THAN A PREFERENCE ──────────────
-// Demo mode stands FAKE PLAYERS in the roster the placards read and stamps
-// its own rolls with the entry/lane the server would have stamped. Both are
-// lawful in exactly one situation: THERE IS NO SECOND VIEWER. Solo has no
-// other client to disagree with, so a locally-stamped film is not a fork of
-// anybody's film — it is the only film. Put the same code at a real table and
-// it would be a client inventing roster rows and film inputs, which is goal
-// 15 broken at the source.
-//
-// So: a `?room=` present anywhere in the query REFUSES the demo (with a
-// console line saying so — a door that silently does nothing is a door people
-// file bugs about), and a demo tab MINTS NO ROOM. That second half matters:
-// every front-door visit mints a room key and writes it into the address bar
-// (js/main.js's ROOM iife), so without the suppression a demo tab would land
-// online at a table of one, and its own reload would then carry a `?room=`
-// that refuses the demo it was opened with.
+// ── A TABLE OF ONE, AND WHY THAT IS A LAW RATHER THAN A PREFERENCE ────────
+// The cast stands FAKE PLAYERS in the roster the placards read and its
+// throws are stamped locally with the seat the server would have stamped.
+// Both are lawful in exactly one situation: THERE IS NO SECOND VIEWER. A
+// table of one has no other client to disagree with, so a locally-stamped
+// film is not a fork of anybody's film — it is the only film. Put the same
+// code at a real table of two and it would be a client inventing roster rows
+// and film inputs, which is goal 15 broken at the source. So the FILM LOCK
+// (js/main.js devFilmSync): when a second real seat appears in the roster
+// the cast is dealt to zero and stays refused until the seat leaves.
 //
 // ── ZERO-DEP AND PURE ──────────────────────────────────────────────────────
 // No DOM, no three.js, no cannon — the same discipline js/places.js keeps, so
-// the decisions with rules in them (which door opens, who sits where, what a
-// throw sweeps) are unit-testable without a browser. The DOM panel, the scene
-// overlay and the roll path live in js/main.js behind `DEMO`.
+// the decisions with rules in them (who sits where, what a throw sweeps) are
+// unit-testable without a browser. The scene overlay and the roll path live
+// in js/main.js behind `devOn()`.
 
-// ---------------------------------------------------------------------------
-// The door
-// ---------------------------------------------------------------------------
-
-export const DEMO_PARAM = 'demo';
-
-// How many fake players the dial can stand. 0 is a legal setting (an empty
-// table is a picture too, and it is the one that proves the door adds no
-// cards of its own), and 8 is PLACE_MAX — a full house.
+// How many players a table holds — 8 is PLACE_MAX, a full house — and so how
+// far the cast dial can reach when the viewer's own chair is not counted. 0
+// is a legal setting (an empty table is a picture too, and it is the one
+// that proves the door adds no cards of its own).
 export const DEMO_MAX = 8;
 
-// Is this boot a demo boot? Pure in (param, room), so the precedence is
-// provable without a browser.
-//
-// Returns { on, refusedByRoom }:
-//   on            — demo mode is in force for this page load
-//   refusedByRoom — the param was asked for AND a room was present, which is
-//                   the one case that owes the console a sentence. An absent
-//                   param at a table is not a refusal, it is the normal world.
-//
-// A param that is PRESENT but unreadable ('0', 'no', '') is a param that says
-// nothing, and saying nothing is not asking: `?demo=0` boots an ordinary tab.
-// The readable falsehoods are spelled out rather than inferred, because the
-// alternative ("anything but the empty string is true") makes `?demo=off` a
-// demo tab, which is the sort of joke a dev tool should not tell.
-const FALSEY = new Set(['0', 'no', 'off', 'false']);
-
 import { seatValid } from './places.js';
-
-export function resolveDemo({ param, room } = {}) {
-  const present = param !== null && param !== undefined;
-  const asked = present && !FALSEY.has(String(param).trim().toLowerCase());
-  const roomed = typeof room === 'string' && room.length > 0;
-  return { on: asked && !roomed, refusedByRoom: asked && roomed };
-}
-
-// What to say when the door is refused. One sentence, and it names the fix.
-export const DEMO_REFUSAL = '?demo ignored: this tab is at a table (?room=). '
-  + 'Demo mode is SOLO-ONLY — it stands fake players and stamps its own rolls, '
-  + 'which is only lawful where there is no second viewer. Open the demo door '
-  + 'on a tab with no room.';
 
 // ---------------------------------------------------------------------------
 // The cast
@@ -163,7 +116,15 @@ export function freeDemoPlace(held) {
 // `id` is a demo id and is MARKED AS ONE ('demo:0'), because these rows go
 // into the roster the placards read and a debugging session must never have
 // to wonder whether a row came from a server. Nothing ever sends one
-// anywhere: there is no connection in demo mode to send it down.
+// anywhere: the cast is local to the tab that dealt it.
+//
+// `occupied` (2026-09-02, developer mode) is the set of places already held
+// by REAL players — the viewer's own server-assigned chair at a table of one
+// — and the deal fills around them exactly as server.js freePlace would fill
+// around a seated player: a cast of four dealt beside a viewer at place 0
+// stands at 1, 2, 3, 4. The table has eight chairs in all, so a full cast
+// beside one real player is seven, and an eighth asked for is not dealt
+// rather than dealt into somebody's lap.
 //
 // The hue is PALETTE[place], not PALETTE[joinOrder]: the server hands hues out
 // round-robin from a per-room cursor and a fresh room's first eight players
@@ -176,7 +137,7 @@ export function freeDemoPlace(held) {
 // `rand` is the draw (Math.random in the app, a seeded generator in a test).
 // It is consumed ONLY for the name shuffle, so a deal of the same n with the
 // same draw is the same cast, and nothing about the LAYOUT depends on it.
-export function dealDemo(n, rand = Math.random) {
+export function dealDemo(n, rand = Math.random, occupied = null) {
   const count = Math.max(0, Math.min(DEMO_MAX, Math.floor(Number(n) || 0)));
   const pool = [...DEMO_NAMES];
   // Fisher-Yates, top-down — the shuffle every deck in this repo uses.
@@ -185,6 +146,7 @@ export function dealDemo(n, rand = Math.random) {
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
   const held = new Set();
+  for (const p of occupied || []) if (Number.isInteger(p)) held.add(p);
   const rows = [];
   for (let k = 0; k < count; k++) {
     const place = freeDemoPlace(held);
@@ -206,12 +168,12 @@ export function dealDemo(n, rand = Math.random) {
 // ---------------------------------------------------------------------------
 
 // WHICH STANDING ROLLS A NEW ONE TAKES AWAY — server.js arrivalSweep, mirrored
-// for the one caller that has no server: a demo tab's own throws.
+// for the one caller that has no server: the cast's own throws.
 //
 // Solo already had an arrival beat (js/main.js soloAutoCollect: a new roll
 // collects EVERYTHING this session still has on the felt), and that is the
 // pre-places rule — correct for a table with one chair in it and wrong for a
-// demo table, where the whole point of standing eight players is to watch
+// cast table, where the whole point of standing eight players is to watch
 // eight pools coexist. The server's rule is the one that makes "the felt holds
 // one roll PER PLACE" literal, and it is three clauses:
 //

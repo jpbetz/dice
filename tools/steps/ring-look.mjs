@@ -14,26 +14,35 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// THE ROUND TABLE, LOOKED AT. One demo tab; deal N for each N asked, shoot it
-// with the overlay on; then throw from every seat at one N and shoot the rests.
+// THE ROUND TABLE, LOOKED AT. One dev tab (developer mode, docs/DEVMODE.md);
+// stand a table of N for each N asked, shoot it with the overlay on; then
+// throw from every seat at one N and shoot the rests.
 //   node tools/drive.mjs tools/steps/ring-look.mjs [outDir] [w] [h] [Ns] [throwN]
+//
+// N is CHAIRS AT THE TABLE: chair 0 is the viewer's own real seat and the
+// cast is dealt around it at 1..N−1 (N=0 is the solo table of one: nobody
+// dealt). A throw from chair 0 is the viewer's own and goes through the
+// server; the others are the cast's, stamped locally.
 
 import { mkdirSync } from 'node:fs';
 
 export default async function run(stage,
   [outDir = 'tools/shots/ring-look', w = '1600', h = '900', ns = '2,3,6,8', throwN = '3']) {
   mkdirSync(`tools/out/${outDir}`, { recursive: true });   // stage.shot writes under tools/out/
-  const t = await stage.ctx.demoTab({ origin: '127.0.0.91', players: 2 });
+  const t = await stage.ctx.devTab({ origin: '127.0.0.91', players: 1 });
   await stage.ctx.browser.send('Emulation.setDeviceMetricsOverride',
     { width: Number(w), height: Number(h), deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
   await t.eval('window.dispatchEvent(new Event("resize"))');
+  // The overlay starts DISABLED (the panel's regions row and the door agree);
+  // this step's measurement is pool-against-spot, so it is switched on here.
+  await t.dbg("demoRegions('enabled')");
   const shot = async (name) => {
     await new Promise((r) => setTimeout(r, 400));
     await stage.shot(t, `${outDir}/${name}.png`);
     console.log(`shot ${outDir}/${name}.png`);
   };
   const deal = async (n) => {
-    await t.dbg(`demoDeal(${n})`);
+    await t.dbg(`demoDeal(${n === 0 ? 0 : n - 1})`);   // the viewer holds chair 0
     await t.waitFor(`window.__diceDebug.places().built === window.__diceDebug.places().queued`,
       { desc: `cards agree at N=${n}` });
     await new Promise((r) => setTimeout(r, 300));

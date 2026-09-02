@@ -32,7 +32,7 @@ light:
     near: 15
     far: 46
   motes:                   # dust in the lamp cone (Joe 2026-08-15: "this looks good")
-    state: "on"            # "on" | "off"  (quoted: a bare on/off is a YAML boolean, which the reader refuses)
+    state: enabled         # enabled | disabled
     count: 200
     size: 0.19
     peak: 0.07
@@ -44,14 +44,13 @@ light:
     wander: 0.28
     twinkleHz: 0.11
   breath:                  # the declare beat, told in light; fractions of the shipped room
-    state: "on"            # "on" | "off"  (quoted: a bare on/off is a YAML boolean, which the reader refuses)
+    state: enabled         # enabled | disabled
     dur: 0.6               # seconds, each way
     hemiDrop: 0.65         # the ambient falls furthest — it is what "closing in" is
     rimDrop: 0.75
     keyDrop: 0.45          # the key stays halfway: dice must not go unreadable
     lampLift: 0.12         # the pool comes UP, so it reads as focus not failure
     angleNarrow: 0.3
-    depth: 1               # how far this cloth takes the beat; a theme pushes its own
   tower:                   # the socketed tower's lantern rake and ember
     rakeIntensity: 2.4
     rakeColor: "#ffd9a0"
@@ -128,12 +127,12 @@ throw:
     pileScale: 1.05        # tidy on (Joe 2026-08-11); 0 is off
     pileSpread: 12
   aim:                     # the seat's aim (js/places.js PLACE_AIM)
-    state: "on"            # "on" | "off"  (quoted: a bare on/off is a YAML boolean, which the reader refuses)
+    state: enabled         # enabled | disabled
     speed: 0.5
     h: 0.45                # a low hand
     box: 0.25              # the fraction of the run the box is cut to
-    corner: "on"           # "on" | "off" — a lane sets the box against its corner (quoted: a bare on/off is a YAML boolean)
-    own: "on"              # "on" | "off" — the seat throws along its own axis (quoted: a bare on/off is a YAML boolean)
+    corner: enabled        # enabled | disabled — a lane sets the box against its corner
+    own: enabled           # enabled | disabled — the seat throws along its own axis
     spin: 1
   settle:
     mode: displacement     # velocity | displacement — displacement shipped 2026-08-11

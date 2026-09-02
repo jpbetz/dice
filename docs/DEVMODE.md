@@ -1,9 +1,10 @@
 # Developer mode
 
-*Status: PROPOSAL, revision 3 (2026-09-02), for Joe's review before the
-build. Nothing here is built. Binding authority is [GOALPOST.md](GOALPOST.md);
-every other rule this design touches is guidance, and §2 says which ones it
-sets aside.*
+*Status: phase 1 building (2026-09-02). Revision 3 is the design being built;
+the primitives, the wiring and the door have landed (§11 commits 1–4), the
+apply tool and the proving scenarios are next. Binding authority is
+[GOALPOST.md](GOALPOST.md); every other rule this design touches is guidance,
+and §2 says which ones it sets aside.*
 
 *Brief (Joe, 2026-09-02): "dramatically build out the demo section of the
 app … think of the app as having a developer mode … a UX for building out
@@ -32,7 +33,9 @@ the app's nouns, `app`, `table`, `light`, `camera`, `throw`, `pace`,
 constant developer mode can move is a leaf somewhere under one of them.
 Every leaf is optional: a leaf you leave out takes the default the code
 carries. No leaf is a boolean: a two-state value is an enum with two named
-states. Comments are welcome; the file is meant to be read.
+states, and no state is a boolean word (`enabled | disabled`, never
+`on | off`, because the reader refuses `on` and `off` as booleans).
+Comments are welcome; the file is meant to be read.
 
 Press `` ` `` on any table and a panel folds out of the right edge with
 those leaves as dials, grouped the way the file is. Drag one and the scene
@@ -515,7 +518,8 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
   rows ▲ when locked; reload rows ⟳ with a stepper. There is no switch
   control, because there is no boolean.
 - **Cast** is today's demo rows verbatim: players 0–8, reshuffle, sit
-  prev/next, show regions, throw from seat, throw from every seat.
+  prev/next, regions (`enabled | disabled`), throw from seat, throw from
+  every seat.
 - **Footer:** the judged viewport and DPR (so a screenshot says what it
   measured), fps and draw calls (phase 2), changed and pending counts, the
   verbs.

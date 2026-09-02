@@ -34,8 +34,14 @@ limitations under the License.
 // the drift test in whichever direction it drifted.
 //
 // NO BOOLEANS (Joe, revision 3). A two-state value is an enum with two
-// named states — `state: on | off`, `prefer: dice | table` — so `pick` is
-// the only way to declare one and createTune throws on a boolean anywhere.
+// named states — `state: enabled | disabled`, `prefer: dice | table` — so
+// `pick` is the only way to declare one and createTune throws on a boolean
+// anywhere. AND NO STATE IS A BOOLEAN WORD: an enum state is never one of
+// `true false yes no on off y n` in any case, because the YAML reader
+// refuses those as booleans (js/yaml.js), so a state spelled `on` could
+// only be written quoted and read back as a string that LOOKS like a flag —
+// 2026-09-02, the first draft of dice.yaml did exactly that and apologised
+// for it in a comment. The state says what it means, or it is not a state.
 //
 // THE DECLARATION IS CHECKED AT BIRTH, AND THE CODE IS THE FALLBACK. A live
 // edit of dice.yaml reaches createTune unreviewed (server.js re-reads on
@@ -213,7 +219,7 @@ export const FORBIDDEN_LEAF = /(^|[^a-z])(rng|value|values|face|faces|seed|fixed
 // finite value. Source of each default is named beside its section.
 // ---------------------------------------------------------------------------
 
-const ON_OFF = ['on', 'off'];
+const ENABLED = ['enabled', 'disabled'];
 const surface = (friction, restitution, why) => ({
   friction: film('friction', friction, [0, 1.5, 0.01], 'apply', why),
   restitution: film('restitution', restitution, [0, 1, 0.01], 'apply', why),
@@ -252,7 +258,7 @@ export const DIALS = {
     },
     // MOOD.moteTune — dust in the lamp cone; `on` → state.
     motes: {
-      state: pick('motes', 'on', ON_OFF, 'look', 'apply'),
+      state: pick('motes', 'enabled', ENABLED, 'look', 'apply'),
       count: look('mote count', 200, [0, 1000, 10], 'apply', 'Joe 2026-08-15: "this looks good"'),
       size: look('mote size', 0.19, [0.02, 1, 0.01], 'apply'),
       peak: look('mote peak', 0.07, [0, 0.5, 0.005], 'apply'),
@@ -268,14 +274,18 @@ export const DIALS = {
     // the shipped room. `t` and `target` are the beat's own clock, not
     // dials, and stay on the object.
     breath: {
-      state: pick('breath', 'on', ON_OFF, 'look', 'apply', 'device-local; the reduced-motion path skips the traverse'),
+      state: pick('breath', 'enabled', ENABLED, 'look', 'apply', 'device-local; the reduced-motion path skips the traverse'),
       dur: look('breath duration', 0.6, [0.05, 3, 0.05], 'apply', 'seconds, each way'),
       hemiDrop: look('hemi drop', 0.65, [0, 1, 0.01], 'apply', 'the ambient falls furthest — it is what closing in is'),
       rimDrop: look('rim drop', 0.75, [0, 1, 0.01], 'apply'),
       keyDrop: look('key drop', 0.45, [0, 1, 0.01], 'apply', 'the key stays halfway: dice must not go unreadable'),
       lampLift: look('lamp lift', 0.12, [0, 1, 0.01], 'apply', 'the pool comes UP, so it reads as focus'),
       angleNarrow: look('cone narrow', 0.3, [0, 1, 0.01], 'apply'),
-      depth: look('breath depth', 1, [0, 1.6, 0.05], 'apply', 'how far this cloth takes the beat; a theme pushes its own'),
+      // NO `depth` HERE (2026-09-02, found wiring B1): BREATH.depth is the
+      // CLOTH's number, pushed by applyFeltTheme — obsidian, the default felt,
+      // pushes 1.5 at boot — so a dial for it read "changed" on every fresh
+      // tab and a Save would have written the felt's value over the file's.
+      // It becomes `felts.<id>.breath` when the felt rows migrate (phase 3).
     },
     // TOWERLIGHT.tune — the socketed tower's lantern rake and ember.
     tower: {
@@ -376,12 +386,12 @@ export const DIALS = {
     },
     // PLACE_AIM (places.js) — the seat's aim; on → state.
     aim: {
-      state: pick('aim', 'on', ON_OFF, 'film', 'roll'),
+      state: pick('aim', 'enabled', ENABLED, 'film', 'roll'),
       speed: film('aim speed', 0.5, [0, 2, 0.05], 'roll'),
       h: film('aim height', 0.45, [0, 3, 0.05], 'roll', 'a low hand'),
       box: film('aim box', 0.25, [0, 1, 0.01], 'roll', 'the fraction of the run the box is cut to'),
-      corner: pick('aim corner', 'on', ON_OFF, 'film', 'roll', 'on: a lane sets the box against its corner'),
-      own: pick('aim own', 'on', ON_OFF, 'film', 'roll', 'on: the seat throws along its own axis'),
+      corner: pick('aim corner', 'enabled', ENABLED, 'film', 'roll', 'enabled: a lane sets the box against its corner'),
+      own: pick('aim own', 'enabled', ENABLED, 'film', 'roll', 'enabled: the seat throws along its own axis'),
       spin: film('aim spin', 1, [0, 4, 0.05], 'roll'),
     },
     // SETTLEGATE — the settle terminator.

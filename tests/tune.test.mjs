@@ -110,8 +110,8 @@ t('dial constructors and isDial', () => {
   assert.deepEqual(l, { label: 'a', def: 1, range: [0, 2, 0.1], cls: 'look', read: 'apply', why: 'why' });
   const f = film('b', 'x', null, 'roll');
   assert.equal(f.cls, 'film'); assert.equal(f.range, null); assert.equal(f.why, '');
-  const p = pick('c', 'on', ['on', 'off'], 'look', 'frame');
-  assert.deepEqual(p.options, ['on', 'off']);
+  const p = pick('c', 'enabled', ['enabled', 'disabled'], 'look', 'frame');
+  assert.deepEqual(p.options, ['enabled', 'disabled']);
   assert.ok(isDial(l) && isDial(f) && isDial(p));
   assert.ok(!isDial({ label: 'x' }) && !isDial(null) && !isDial(3) && !isDial({ lamp: l }));
   assert.throws(() => look('a', 1, null, 'sometimes'), /read/);
@@ -153,20 +153,20 @@ t('no dial path matches FORBIDDEN_LEAF, and the regex bites what it should', () 
   }
 });
 
-t('the shipped tree has the phase-1 shape and every on/off is an enum', () => {
+t('the shipped tree has the phase-1 shape and every two-state value is an enabled|disabled enum', () => {
   const d = defaultsOf(DIALS);
   assert.deepEqual(Object.keys(d), ['app', 'table', 'light', 'camera', 'throw', 'pace', 'sound']);
   assert.equal(d.app.mode, 'development');
   assert.equal(d.table.scale, 2.5);
   assert.equal(d.light.lamp.y, 24);
   assert.equal(d.light.lamp.color, '#ffe8c4');
-  assert.equal(d.light.motes.state, 'on');
-  assert.equal(d.light.breath.state, 'on');
-  assert.equal(d.throw.aim.state, 'on');
-  assert.equal(d.throw.aim.corner, 'on', 'places.js reads corner as a flag: an enum, not a 0|1 number');
-  assert.equal(d.throw.aim.own, 'on', 'places.js reads own as a flag: an enum, not a 0|1 number');
-  assert.deepEqual(DIALS.throw.aim.corner.options, ['on', 'off']);
-  assert.deepEqual(DIALS.throw.aim.own.options, ['on', 'off']);
+  assert.equal(d.light.motes.state, 'enabled');
+  assert.equal(d.light.breath.state, 'enabled');
+  assert.equal(d.throw.aim.state, 'enabled');
+  assert.equal(d.throw.aim.corner, 'enabled', 'places.js reads corner as a flag: an enum, not a 0|1 number');
+  assert.equal(d.throw.aim.own, 'enabled', 'places.js reads own as a flag: an enum, not a 0|1 number');
+  assert.deepEqual(DIALS.throw.aim.corner.options, ['enabled', 'disabled']);
+  assert.deepEqual(DIALS.throw.aim.own.options, ['enabled', 'disabled']);
   assert.equal(d.camera.framing.prefer, 'dice');
   assert.equal(d.throw.physics.gravity, -110);
   assert.equal(d.throw.physics.floor.friction, 0.6);

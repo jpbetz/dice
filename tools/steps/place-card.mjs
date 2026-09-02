@@ -27,20 +27,23 @@ limitations under the License.
 //
 //   node tools/drive.mjs tools/steps/place-card.mjs [outDir] [width] [height] [N] [other]
 //
-// N is the number of chairs dealt (default 2); `other` the second chair
-// measured beside seat 0 (default: the most off-axis seat, ⌊N/2⌉ — opposite
-// at N=2, a diagonal at N=3/6/8). THE RING (S4, 2026-09-01): seat 0 sits dead
+// N is the number of chairs AT THE TABLE (default 2) — chair 0 is the
+// viewer's own real seat, server-assigned, and the cast is dealt around it
+// at 1..N−1 (`devTab({ players: N − 1 })`, the deal `place-ring` uses);
+// `other` the second chair measured beside seat 0 (default: the most
+// off-axis seat, ⌊N/2⌉ — opposite at N=2, a diagonal at N=3/6/8). THE RING (S4, 2026-09-01): seat 0 sits dead
 // centre of the front edge for every viewer at every N, which is exactly the
 // square of screen `#result-banner` is fixed to — so this step is DESIGN-RING
 // §7.6's measurement: run at N=1 and N=2 BEFORE choosing a remedy, and the
 // `INK HITS` lines against the 520 px worst-case banner are gate G1.
 //
-// ONE TAB, THROUGH THE DEMO DOOR (v4, 2026-09-01 — `?demo=1`, js/demo.js).
+// ONE TAB, THROUGH DEVELOPER MODE (v4, 2026-09-01 through `?demo=1`; since
+// 2026-09-02 `ctx.devTab` — docs/DEVMODE.md, js/demo.js holds the cast).
 // This used to be two real tabs at two loopback origins joined to one room,
 // because "does it read from BOTH chairs" is the question and the old
 // `simulatePlaceView` could not answer it while a roll was on the felt: it
 // borrows the eye and hands it back, so a frame taken through it is not the
-// frame a viewer seated there gets. The demo door's seat switcher is STICKY —
+// frame a viewer seated there gets. The cast's seat switcher is STICKY —
 // it writes the dial that `myPlaceRow` derives from, so the eye is set by the
 // shipped `placeOrbitSync` on the shipped flush — which is the same code path
 // a real second tab takes, at a tenth of the setup. The measurements below are
@@ -112,7 +115,10 @@ export default async function run(stage, [outDir = 'tools/shots/place-card', w =
     await stage.shot(t, `${outDir}/${name}.png`);
   };
 
-  const tab = await stage.ctx.demoTab({ origin: '127.0.0.91', players: N });
+  // N chairs INCLUDING the viewer's own at place 0: the cast fills the other
+  // N − 1 (a `players: N` deal stood N + 1 and the wait below never ended —
+  // found by the B2 review, 2026-09-02).
+  const tab = await stage.ctx.devTab({ origin: '127.0.0.91', players: Math.max(0, N - 1) });
   await frame(tab, w, h);
   await tab.waitFor(`window.__diceDebug.places().stations.length === ${N}`, { desc: `${N} at the table` });
   // Sit down, and WAIT for the flush rather than for a clock: the chair rides
@@ -192,7 +198,7 @@ export default async function run(stage, [outDir = 'tools/shots/place-card', w =
   }
 
   // …and the same chairs with a 3d6 from seat 0 ON the felt, at the two
-  // desktop zooms G1 names and on the phone. Thrown through the demo door's
+  // desktop zooms G1 names and on the phone. Thrown through the cast's
   // own seat, so the throw carries seat 0's stamp (the rectangle's until S5).
   for (const [ww, hh, tag, zooms] of [[w, h, 'desk', ['wide', 'medium']], ['390', '844', 'phone', ['wide', 'medium']]]) {
     await frame(tab, ww, hh);

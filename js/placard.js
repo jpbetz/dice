@@ -882,6 +882,32 @@ export class PlacardRig {
 
   // ---- the instruments --------------------------------------------------
 
+  // ---- teardown ---------------------------------------------------------
+  // The reverse of _ensureBuilt, for the ONE caller that owes it: developer
+  // mode's Shut (js/main.js devClose, 2026-09-02), whose promise is that a
+  // tab measures identical to one that never opened the door — and a rig
+  // built for a cast that has since gone holds a material and three textures
+  // that a never-dealt table never allocated. A real table keeps its rig
+  // through comings and goings exactly as before; nothing else calls this.
+  // After it the object is the one the constructor made: unbuilt, empty.
+  dispose() {
+    if (!this.built) return;
+    for (const m of [this.mesh, this.washMesh]) {
+      if (!m) continue;
+      this._scene.remove(m);
+      if (m.geometry) m.geometry.dispose();
+    }
+    for (const t of [this.albedo, this.orm, this.emissive]) if (t) t.dispose();
+    for (const m of [this.material, this.washMat]) if (m) m.dispose();
+    this.mesh = null; this.washMesh = null; this.material = null; this.washMat = null;
+    this.albedo = null; this.orm = null; this.emissive = null;
+    this.canvas = null; this.ctx = null; this.ormCtx = null;
+    this.built = false;
+    this.rows = [];
+    this.occupied = 0;
+    this.wash = { active: false, t: 0, dur: 0, place: null, x: 0, y: 0, z: 0, color: null };
+  }
+
   budget() {
     const standing = this.built && this.mesh.visible;
     return {

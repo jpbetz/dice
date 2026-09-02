@@ -868,7 +868,7 @@ t('the cast section drives the cast object and reads it back', () => {
   click(byText(sec, '◀')); click(byText(sec, '◀'));
   assert.equal(cast.log.at(-1), 'sit(2)', 'wraps below zero');
   click(byClass(rowFor(sec, 'cast.regions'), 'dev-seg').buttons[0]);
-  assert.equal(cast.log.at(-1), 'regions(on)');
+  assert.equal(cast.log.at(-1), 'regions(enabled)');
   click(byText(sec, 'throw 3d6 from seat'));
   assert.equal(cast.log.at(-1), 'roll(2)');
   click(byText(sec, 'throw from every seat'));
@@ -953,6 +953,42 @@ t('file: Reset all, paste preview lists refusals, Apply merges, Shut calls back'
     panel.unmount();
     assert.equal(root.parentNode, null);
   });
+});
+
+// Found by the B2 review (2026-09-02): Shut at moonrise put the table's lamp
+// under the venue's sky. The panel's own resets take the same care.
+t('a light reset under a venue lands on the venue\'s light, and is refused with one line when that light is unknown', () => {
+  const venueLight = { 'light.lamp.y': 22, 'light.lamp.color': '#bcd2ff', 'light.room.hemi': 0.12 };
+  const info = { declared: DECLARED, venue: 'moonrise', venueLight };
+  const { root, tune, panel } = fresh({ info });
+  tune.set(venueLight);                                             // the venue Object.assigns at moonrise
+  tune.set({ 'light.lamp.y': 40, 'light.lamp.penumbra': 0.9, 'throw.physics.gravity': -80 });   // then the dials move
+  panel.repaint();
+  const light = root.find((s) => s.classList.contains('dev-section') && s.dataset.section === 'light');
+  click(byClass(light, 'dev-sec-reset'));
+  assert.equal(tune.T.light.lamp.y, 22, 'the lamp went back to the VENUE\'s height, not the file\'s');
+  assert.equal(tune.T.light.lamp.color, '#bcd2ff', 'a held leaf the dials never touched stays');
+  assert.equal(tune.T.light.room.hemi, 0.12);
+  assert.equal(tune.T.light.lamp.penumbra, 0.3, 'a light leaf the venue does not hold resets to the file');
+  assert.equal(tune.T.throw.physics.gravity, -80, 'another section is not a light reset');
+  const file = root.find((s) => s.classList.contains('dev-section') && s.dataset.section === 'file');
+  click(byText(file, 'Reset all'));
+  assert.equal(tune.T.throw.physics.gravity, -110, 'Reset all takes the rest');
+  assert.equal(tune.T.light.lamp.y, 22, 'and still leaves the venue its lamp');
+  assert.ok(!tune.calls.some(([p, v]) => p === 'light.lamp.y' && v === 24), 'the file\'s lamp height was never written');
+  // the venue leaves: the same rows reset to the file
+  info.venue = null; info.venueLight = null;
+  click(byText(file, 'Reset all'));
+  assert.equal(tune.T.light.lamp.y, 24);
+  assert.equal(tune.T.light.lamp.color, '#ffe8c4');
+  // a venue with no known light: refused, one line, nothing written
+  const two = fresh({ info: { declared: DECLARED, venue: 'foxfire' } });
+  two.tune.set({ 'light.lamp.y': 40, 'light.room.hemi': 0.5 });
+  two.panel.repaint();
+  click(byText(byClass(two.root, 'dev-foot'), 'Reset'));
+  assert.equal(two.tune.T.light.lamp.y, 40, 'held');
+  assert.equal(two.tune.T.light.room.hemi, 0.5, 'held');
+  assert.match(byClass(two.root, 'dev-statusslot').textContent, /light: 2 held by the foxfire venue/);
 });
 
 t('the panel never reaches for location, storage or the network', async () => {

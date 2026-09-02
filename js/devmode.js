@@ -42,11 +42,14 @@ limitations under the License.
 // verb was download-then-`location.reload()`; this file keeps the stronger
 // rule and reports "downloaded — reload to apply" instead.
 //
-// `info` (optional): `{ declared, venue }` — `declared` is the tree the file
-// names (a leaf absent from it wears the faint "default" mark); `venue` is
-// the id of a venue holding the light, or null (light rows wear a `venue`
-// badge while one does). Both are read on every repaint, so a live object
-// keeps the marks honest.
+// `info` (optional): `{ declared, venue, venueLight }` — `declared` is the
+// tree the file names (a leaf absent from it wears the faint "default"
+// mark); `venue` is the id of a venue holding the light, or null (light rows
+// wear a `venue` badge while one does); `venueLight` is the light the venue
+// holds as `{ 'light.lamp.y': 22, … }`, which is what a light reset lands on
+// while it stands (a venue named with no `venueLight` has its light rows
+// refused by every reset, with one line). All are read on every repaint or
+// reset, so a live object keeps the marks honest.
 
 import {
   el, button, segmented, section, subhead,
@@ -172,14 +175,31 @@ export function mount({
   // that moved app.mode is not undone by a section ↺ or Reset all (DEVMODE
   // §4: no panel control writes it), and the film lock holds — a locked
   // film row is refused here like anywhere else. scope: 'all' | section | path.
+  //
+  // A VENUE'S LIGHT (DEVMODE §5, phase 1): while `info.venue` names one, a
+  // `light.*` leaf the venue holds (`info.venueLight`, tree paths → the
+  // venue's values) resets to the VENUE's value, not the file's — the glade's
+  // moon is what "shipped" means under the glade's sky. A caller that names a
+  // venue but hands over no `venueLight` gets the section refused with one
+  // line, never the table's lamp under the venue.
   const resetScope = (scope) => {
     let diff = [];
     try { diff = tune.diff() || []; } catch { diff = []; }
+    const venue = info && info.venue ? String(info.venue) : '';
+    const venueLight = venue && isMap(info.venueLight) ? info.venueLight : null;
     const patch = {};
+    let held = 0;
     for (const d of diff) {
       const p = dotted(d.path);
       if (READ_ONLY_PATHS.includes(p)) continue;
       if (scope !== 'all' && p !== scope && !p.startsWith(scope + '.')) continue;
+      if (venue && p.startsWith('light.')) {
+        if (!venueLight) { held++; continue; }
+        if (p in venueLight) {
+          if (stringOf(venueLight[p]) !== stringOf(d.live)) patch[p] = venueLight[p];
+          continue;
+        }
+      }
       patch[p] = d.shipped;
     }
     const written = Object.keys(patch);
@@ -188,6 +208,7 @@ export function mount({
       try { r = tune.set(patch, { filmLocked }); } catch (e) { showStatus(e.message, 'error'); }
     }
     settle(r, written);
+    if (held) showStatus(`light: ${held} held by the ${venue} venue — leave it to reset them`, 'warn');
     panel.repaint();
     return r;
   };
@@ -347,7 +368,11 @@ export function mount({
     const reshuffle = button('reshuffle names', () => call(() => castApi.reshuffle()));
     // sit prev / next
     const seatOut = el('output', { class: 'dev-seat', text: '—' });
+    // A cast that knows its own occupied chairs (main.js's, which include
+    // the viewer's real one) walks them itself through `sitStep`; a cast
+    // that does not gets the modulo over its count.
     const sit = (d) => call(() => {
+      if (typeof castApi.sitStep === 'function') { castApi.sitStep(d); return; }
       const n = castCount();
       if (!n) return;
       const cur = castSeat();
@@ -360,9 +385,9 @@ export function mount({
       el('span', { class: 'dev-row-label' }, [el('span', { class: 'dev-row-name', text: 'seat' })]),
       el('div', { class: 'dev-row-ctl dev-seatctl' }, [prev, seatOut, next]),
     ]);
-    // regions on|off
+    // regions enabled|disabled (never on|off: a state is never a boolean word)
     const regions = rowEnum({
-      label: 'regions', value: 'off', options: ['on', 'off'],
+      label: 'regions', value: 'disabled', options: ['enabled', 'disabled'],
       onCommit: (v) => call(() => castApi.regions(v)), why: 'cast.regions — draw the landing regions and aim boxes',
     });
     regions.root.dataset.path = 'cast.regions';

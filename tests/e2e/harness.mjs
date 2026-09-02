@@ -33,10 +33,6 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { Browser } from './cdp.mjs';
-// The demo door's param name, from the module that owns it (js/demo.js is
-// zero-dep and runs in Node): the harness must never spell a url key the app
-// could rename out from under it.
-import { DEMO_PARAM } from '../../js/demo.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -499,58 +495,30 @@ export class Ctx {
     }
   }
 
-  // A DEMO TAB — `?demo=1`, and therefore NO ROOM (js/demo.js: the door is
-  // solo-only, and a demo tab mints no room key of its own). One tab that can
-  // stand up to eight cards and throw from any chair, which is what the
-  // multi-origin dance below this used to cost three tabs and a raw player or
-  // two to reach — and the six- and eight-place pictures it could not reach
-  // at all, the harness ceiling being three tabs.
+  // A DEV TAB — an ordinary tab at this scenario's room, seated with a name,
+  // that then opens DEVELOPER MODE through its hook and deals a cast around
+  // its own chair (docs/DEVMODE.md; js/demo.js). One tab that can stand up
+  // to eight cards and throw from any chair, which is what the multi-origin
+  // dance used to cost three tabs and a raw player or two to reach — and the
+  // six- and eight-place pictures it could not reach at all, the harness
+  // ceiling being three tabs.
   //
-  // `players` deals that many at boot, through the debug hook rather than
-  // through a url param, so the DIAL is what a script drives and the door
-  // stays a boolean. Pass null to keep whatever the door dealt itself.
+  // It IS newTable (2026-09-02): `?demo=1` is gone, the door is the key or
+  // `devOpen()`, and a dev tab is a table of ONE with a server-assigned
+  // place — which is the condition that makes its cast and its local stamps
+  // lawful. Two dev tabs at one room are two real seats, and the second one
+  // finds the film LOCKED (dev-room-look proves it).
   //
-  // It does NOT go through newTable: newTable's url is `?room=` by
-  // construction, and a room is precisely what refuses this door.
-  async demoTab({ origin = 'localhost', players = null, query = '', param = '1' } = {}) {
-    for (let attempt = 0; ; attempt++) {
-      const page = await this.browser.newPage();
-      await page.addInitScript('window.__diceTestMode = true;');
-      await page.addInitScript(
-        // The same three seeds newTable lays down, for the same three reasons:
-        // view preferences at their defaults, the schema stamped current so
-        // the one-time purge does not eat them, and a beta channel because
-        // the suite's job includes unreleased work.
-        `try { localStorage.removeItem('dice.sections.v1');`
-        + ` localStorage.removeItem('dice.railmode.v1');`
-        + ` localStorage.setItem('dice.schema.v1','2');`
-        + ` localStorage.setItem('dice.stability.v1','beta'); } catch {}`,
-      );
-      const url = `http://${origin}:${this.port}/?${DEMO_PARAM}=${encodeURIComponent(param)}${query}`;
-      await page.navigate(url);
-      const t = new Table(page, url);
-      try {
-        // The DOOR is the readiness bar, not netReady: a demo tab is solo by
-        // law, so netReady resolves {online:false} and waiting on `online`
-        // would wait for ever.
-        await t.waitFor(`!!window.__diceDebug && window.__diceDebug.demoInfo
-          && window.__diceDebug.demoInfo().on === true`,
-        { desc: `demo door open (${origin})`, timeout: 30000 });
-        if (players !== null) await t.dbg(`demoDeal(${Number(players)})`);
-      } catch (e) {
-        if (attempt > 0) { this.tables.push(t); throw e; }
-        console.log(`    (boot retry: ${String(e.message || e).slice(0, 100)})`);
-        await t.close().catch(() => {});
-        continue;
-      }
-      if (attempt === 0 && page.errors.length) {
-        console.log(`    (boot retry: page exception on load — ${String(page.errors[0]).slice(0, 120)})`);
-        await t.close().catch(() => {});
-        continue;
-      }
-      this.tables.push(t);
-      return t;
-    }
+  // `players` deals that many (default 4) through the hook rather than a url
+  // param, so the DIAL is what a script drives; the cast fills the chairs
+  // this viewer does not hold, so a cast of four beside a viewer at place 0
+  // stands at 1..4. Pass 0 for an empty table.
+  async devTab({ origin = 'localhost', players = 4, query = '', name = 'Dev' } = {}) {
+    const t = await this.newTable({ origin, name, query });
+    const info = await t.dbg('devOpen()');
+    if (!info || info.panel === 'shut') throw new Error(`developer mode did not open (${origin}): ${JSON.stringify(info)}`);
+    await t.dbg(`devDeal(${Number(players)})`);
+    return t;
   }
 
   async closeAll() {

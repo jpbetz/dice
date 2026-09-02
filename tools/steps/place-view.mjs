@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 // THE VIEW FROM EVERY CHAIR (docs/UX.md §7.63 — per-viewer orientation), in
-// ONE TAB, through the demo door (`?demo=1`, js/demo.js). Prints the numbers
+// ONE TAB, through developer mode (`devOpen()` + `devDeal(n)`, docs/DEVMODE.md;
+// js/demo.js holds the cast). Prints the numbers
 // the orientation slice is judged on — each chair's place base, the orbit the
 // ladder rested on, the die span in px (the short-edge tax — measured −23% at
 // every zoom once the span was read along the camera's right axis; M2's
@@ -55,8 +56,11 @@ import { mkdirSync } from 'node:fs';
 export default async function run(stage,
   [outDir = 'tools/shots/place-view', w = '1600', h = '900', players = '8']) {
   mkdirSync(outDir, { recursive: true });
+  // `players` is CHAIRS AT THE TABLE: the viewer's own real seat at place 0
+  // plus a cast of n − 1 around it (the argument kept its meaning when the
+  // door began dealing around the viewer, 2026-09-02).
   const n = Math.max(2, Math.min(8, Number(players) || 8));
-  const t = await stage.ctx.demoTab({ origin: '127.0.0.91', players: n });
+  const t = await stage.ctx.devTab({ origin: '127.0.0.91', players: n - 1 });
   await stage.ctx.browser.send('Emulation.setDeviceMetricsOverride',
     { width: Number(w), height: Number(h), deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
   await t.eval('window.dispatchEvent(new Event("resize"))');

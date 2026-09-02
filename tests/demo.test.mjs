@@ -14,18 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// tests/demo.test.mjs — THE DEMO DOOR's decisions (js/demo.js), the half that
-// has rules in it: which door opens, who sits where, and what a throw takes
-// away. The half that touches the DOM, the scene and the film is the `demo`
-// e2e tag.
+// tests/demo.test.mjs — THE CAST's decisions (js/demo.js), the half that
+// has rules in it: who sits where, and what a throw takes away. The half
+// that touches the DOM, the scene and the film is the `dev` e2e tag
+// (developer mode is the door since 2026-09-02; `?demo=1` is gone).
 //
 // The load-bearing claims here:
-//   · a ROOM refuses the demo, in both directions and loudly (the door is
-//     solo-only because a locally-stamped film is only lawful where there is
-//     no second viewer);
 //   · the deal fills stations the way server.js freePlace does — the ladder,
-//     not a range — so a demo table's chairs are the chairs a real table
-//     would have handed out;
+//     not a range — so a cast table's chairs are the chairs a real table
+//     would have handed out, and it fills AROUND the real player's own
+//     chair (a dev tab is a table of one with a server-assigned place);
 //   · the hues ARE server.js's PALETTE (imported from both sides and
 //     compared: a hand copy that can drift is the bug);
 //   · the names exercise the card's fitter rather than flattering it;
@@ -35,8 +33,8 @@ limitations under the License.
 
 import assert from 'node:assert/strict';
 import {
-  resolveDemo, dealDemo, freeDemoPlace, demoArrivalSweep,
-  DEMO_PARAM, DEMO_MAX, DEMO_NAMES, DEMO_PALETTE, DEMO_REFUSAL,
+  dealDemo, freeDemoPlace, demoArrivalSweep,
+  DEMO_MAX, DEMO_NAMES, DEMO_PALETTE,
 } from '../js/demo.js';
 import { PLACE_MAX } from '../js/places.js';
 import { PALETTE } from '../server.js';
@@ -63,42 +61,11 @@ const seeded = (seed) => {
 };
 
 // ---------------------------------------------------------------------------
-// The door
+// The table
 // ---------------------------------------------------------------------------
 
-t('the param is the name Joe asked for, and the dial spans the table', () => {
-  assert.equal(DEMO_PARAM, 'demo');
+t('the dial spans the table', () => {
   assert.equal(DEMO_MAX, PLACE_MAX, 'a full house is the same eight stations');
-});
-
-t('no param is no demo, and asks for nothing', () => {
-  assert.deepEqual(resolveDemo({}), { on: false, refusedByRoom: false });
-  assert.deepEqual(resolveDemo({ param: null, room: 'r-abc' }),
-    { on: false, refusedByRoom: false },
-    'an ordinary tab at an ordinary table is not a refusal — it is the world');
-});
-
-t('?demo=1 with no room opens the door', () => {
-  assert.deepEqual(resolveDemo({ param: '1' }), { on: true, refusedByRoom: false });
-  assert.deepEqual(resolveDemo({ param: '' }), { on: true, refusedByRoom: false },
-    'a bare ?demo is an ask: the param is the flag, the value is decoration');
-  assert.deepEqual(resolveDemo({ param: 'yes', room: '' }), { on: true, refusedByRoom: false },
-    'and an empty room key is no room');
-});
-
-t('a readable falsehood boots an ordinary tab', () => {
-  for (const v of ['0', 'no', 'off', 'false', 'OFF', ' 0 ']) {
-    assert.deepEqual(resolveDemo({ param: v }), { on: false, refusedByRoom: false },
-      `?demo=${v} is not a demo`);
-  }
-});
-
-t('A ROOM REFUSES THE DEMO, and the refusal is loud', () => {
-  const d = resolveDemo({ param: '1', room: 'r-abc' });
-  assert.equal(d.on, false, 'solo-only: no fake roster and no local stamp at a real table');
-  assert.equal(d.refusedByRoom, true, 'and the one case that owes the console a sentence');
-  assert.match(DEMO_REFUSAL, /SOLO-ONLY/, 'which says why');
-  assert.match(DEMO_REFUSAL, /\?room=/, '…and what it saw');
 });
 
 // ---------------------------------------------------------------------------
@@ -119,6 +86,24 @@ t('N players take the first N stations of the LADDER', () => {
     assert.equal(rows.length, k, `${k} players stand ${k} rows`);
     assert.deepEqual(rows.map((r) => r.place), [...Array(k).keys()],
       'lowest free, one after another — the long edges first, the heads at N >= 5');
+  }
+});
+
+t('THE DEAL FILLS AROUND THE REAL PLAYER — the viewer\'s own chair is never dealt', () => {
+  const rows = dealDemo(4, seeded(7), new Set([0]));
+  assert.deepEqual(rows.map((r) => r.place), [1, 2, 3, 4],
+    'a viewer at place 0 gets a cast at 1..4, the way freePlace seats a second joiner');
+  assert.deepEqual(dealDemo(3, seeded(7), new Set([2])).map((r) => r.place), [0, 1, 3],
+    'a hole below the held chair is filled first — the ladder, around the chair');
+  assert.equal(dealDemo(8, seeded(7), new Set([0])).length, 7,
+    'a full cast beside one real player is SEVEN: the eighth is not dealt into anybody\'s lap');
+  assert.deepEqual(dealDemo(2, seeded(7), [5, 'x', null]).map((r) => r.place), [0, 1],
+    'occupied may be any iterable; a non-integer in it holds nothing');
+  assert.deepEqual(dealDemo(2, seeded(7)).map((r) => r.place), [0, 1],
+    'and with nothing occupied the deal is the deal it always was');
+  for (const r of dealDemo(4, seeded(7), new Set([0]))) {
+    assert.equal(r.color, DEMO_PALETTE[r.place], 'the hue is still the STATION\'s, not the join order\'s');
+    assert.equal(r.id, `demo:${r.place}`);
   }
 });
 

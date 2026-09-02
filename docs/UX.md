@@ -8072,11 +8072,23 @@ table sees the ring. The table is 2.5× the old rectangle (`TABLE_SCALE`) so a
 d6 reads as a die on it. On a seated table the ladder keeps the whole-table
 frame; the dice rungs are the solo felt's.
 
-**Demo mode** (`?demo=1`, TESTING.md) draws the ring, each seat's spot and
-spawn line from `seatToss`'s own output, so the overlay cannot disagree with
-the film; `tools/steps/ring-look.mjs` deals N, shoots it, throws from every
-seat and prints each pool's distance from its spot.
+**The cast** (developer mode, §7.64; TESTING.md) draws the ring, each seat's
+spot and spawn line from `seatToss`'s own output, so the overlay cannot
+disagree with the film; `tools/steps/ring-look.mjs` deals N, shoots it,
+throws from every seat and prints each pool's distance from its spot.
 
 **Not yet:** the venues' dress was composed on the rectangle and stands out of
 frame on the round table (ROADMAP row 17); the tower's pour is untouched and
 its chairs share the front arc (row 15).
+
+### 7.64 Developer mode (2026-09-02)
+
+The backtick key on any table folds a panel out of the right edge with every
+leaf of `dice.yaml` — the declaration of the app — as a dial, grouped the way
+the file is; a second press folds it to a corner glyph with the values held,
+and **Shut** puts every value back and leaves the tab the tab it was. Look
+dials (light, camera, pace) are per-viewer and work at any table; film dials
+(physics, throw, table geometry) and the cast work at a table of one and lock
+when a second seat arrives. `?demo=1` is gone; the cast that was that door is
+a section of this panel. Design, phases and proofs: [DEVMODE.md](DEVMODE.md);
+the hooks and the harness door: [TESTING.md](TESTING.md).
