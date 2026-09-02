@@ -1,8 +1,8 @@
 # Developer mode
 
-*Status: phase 1 building (2026-09-02). Revision 3 is the design being built;
-the primitives, the wiring and the door have landed (§11 commits 1–4), the
-apply tool and the proving scenarios are next. Binding authority is
+*Status: phase 1 landed (2026-09-02). Revision 3 is the design as built: the
+primitives, the wiring, the door, the apply tool and the proving scenarios
+(§11 commits 1–5; `node tests/e2e/run.mjs --only dev`). Binding authority is
 [GOALPOST.md](GOALPOST.md); every other rule this design touches is guidance,
 and §2 says which ones it sets aside.*
 
@@ -279,8 +279,10 @@ generated module, so production can be switched with one
 `--update-env-vars` and no commit, and back the same way. In production
 mode the key does nothing, `devmode.js` is never imported, and every
 mutating `dev*` / `tune*` hook returns null. `app.mode` is **not a dial**:
-no panel control writes it, and the line-patching Save only rewrites lines
-a dial changed, so a Save from a running dev session can never flip it. It
+no panel control writes it, `tune.set` refuses it by name (`STATIC_PATHS`
+in `js/tune.js`, reason `static`, so the console, the Paste box and a reset
+are all refused at the one writer), and the line-patching Save only
+rewrites lines a dial changed, so a Save from a running dev session can never flip it. It
 is a lock, not a boundary: `__diceDebug.moodTune` stays on the console as
 it does today, and that is enough because developer mode can only affect
 the tab that opened it. Phase 3 also drops `js/devmode.js` and

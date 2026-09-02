@@ -56,9 +56,14 @@ import {
   rowRange, rowStepper, rowColor, rowEnum, rowText, rowStatic,
   find, diffList, status, stopKeys, fmtNum,
 } from './devui.js';
+import { STATIC_PATHS } from './tune.js';
 
 export const DEV_PANEL_ID = 'dev-panel';
-export const READ_ONLY_PATHS = ['app.mode'];   // drawn, never written (DEVMODE §4)
+// Drawn, never written (DEVMODE §4). The list is tune.js's, not a copy: the
+// panel draws static exactly the leaves `tune.set` refuses as 'static', so
+// the two can never disagree about which those are (2026-09-02, B3 review:
+// the panel's own copy drew app.mode static while its Paste box wrote it).
+export const READ_ONLY_PATHS = STATIC_PATHS;
 export const DEV_GLYPH_ID = 'dev-glyph';
 export const DEV_NARROW_QUERY = '(max-width: 639px)';
 export const STATUS_MS = 3000;

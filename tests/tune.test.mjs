@@ -50,7 +50,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   DIALS, look, film, pick, isDial, defaultsOf, merge, leaves, getLeaf, setLeaf, hasLeaf,
-  alias, FORBIDDEN_LEAF, createTune,
+  alias, FORBIDDEN_LEAF, STATIC_PATHS, createTune,
 } from '../js/tune.js';
 import { parseYaml } from '../js/yaml.js';
 
@@ -377,8 +377,10 @@ t('set: the four refusals, and an accepted write lands in T', () => {
   assert.equal(tune.T.throw.physics.gravity, -110, 'refused: untouched');
   assert.equal(tune.T.light.fog.far, 60, 'a look dial takes while the film is locked');
 
+  // app.mode is static (STATIC_PATHS): refused as such BEFORE type or option
+  // is looked at, so a null or a stray word there says 'static', never 'type'.
   r = tune.set({ 'light.lamp.y': '30', 'light.lamp.color': 5, 'app.mode': null });
-  assert.deepEqual(r.refused, [['light.lamp.y', 'type'], ['light.lamp.color', 'type'], ['app.mode', 'type']]);
+  assert.deepEqual(r.refused, [['light.lamp.y', 'type'], ['light.lamp.color', 'type'], ['app.mode', 'static']]);
   assert.equal(tune.T.light.lamp.y, 30);
   r = tune.set({ 'light.fog.far': NaN });
   assert.deepEqual(r.refused, [['light.fog.far', 'type']], 'NaN is not a number here');
@@ -387,9 +389,39 @@ t('set: the four refusals, and an accepted write lands in T', () => {
   assert.equal(tune.T.light.fog.far, 60);
 
   r = tune.set({ 'throw.spawn.axis': 'sideways', 'app.mode': 'staging' });
-  assert.deepEqual(r.refused, [['throw.spawn.axis', 'option'], ['app.mode', 'option']]);
+  assert.deepEqual(r.refused, [['throw.spawn.axis', 'option'], ['app.mode', 'static']]);
   r = tune.set({ 'throw.spawn.axis': 'own' });
   assert.deepEqual(r.refused, []); assert.equal(tune.T.throw.spawn.axis, 'own');
+});
+
+t('set: the static leaves are refused at the writer — app.mode never moves from a running tab (DEVMODE §4)', () => {
+  assert.deepEqual(STATIC_PATHS, ['app.mode']);
+  assert.ok(Object.isFrozen(STATIC_PATHS));
+  const tune = mini({}, readFileSync(YAML_PATH, 'utf8'));
+  // A lawful-looking value: in the options, the right type, and still refused.
+  let r = tune.set({ 'app.mode': 'production', 'light.lamp.y': 30 });
+  assert.deepEqual(r.refused, [['app.mode', 'static']]);
+  assert.equal(tune.T.app.mode, 'development', 'T unchanged');
+  assert.equal(tune.T.light.lamp.y, 30, 'the rest of the patch still lands');
+  assert.deepEqual(r.diff.map((d) => d.path), ['light.lamp.y'], 'and the diff never names it');
+  assert.deepEqual(r.pending, [], 'a refused reload-class leaf is not pending either');
+  // Neither door around set: the paste fragment and a Map patch.
+  r = tune.applyPatchText('app:\n  mode: production\n');
+  assert.deepEqual(r.refused, [['app.mode', 'static']]);
+  assert.equal(tune.T.app.mode, 'development');
+  r = tune.set(new Map([[['app', 'mode'], 'production']]));
+  assert.deepEqual(r.refused, [['app.mode', 'static']]);
+  // So neither export can carry it: the download is the file's own line and
+  // the copy-patch fragment is only the lamp.
+  assert.doesNotMatch(tune.exportYaml(), /mode: production/);
+  assert.equal(tune.patchText(), 'light:\n  lamp:\n    y: 30\n');
+  // Even a reset cannot write it (it runs through the same apply): a value
+  // that reached T some other way stays, and is named as static.
+  tune.T.app.mode = 'production';
+  r = tune.reset('all');
+  assert.deepEqual(r.refused, [['app.mode', 'static']]);
+  assert.equal(tune.T.app.mode, 'production', 'reset does not touch a static leaf either way');
+  assert.equal(tune.T.light.lamp.y, 24, 'while the lamp went back');
 
   // Map patches, array keys, and a leaf with no dial
   const t2 = mini({ extra: { note: 'a' } });
@@ -508,8 +540,11 @@ t('binders run after the whole patch is in T: a re-apply that reads T sees every
 
 t('pending: reload-class writes nobody bound, only when the value moved', () => {
   const tune = mini();
+  // app.mode is reload-class too, but static (STATIC_PATHS): refused before
+  // it could ever be pending — until 2026-09-02 this line expected it here.
   let r = tune.set({ 'pace.ceremony.declareS': 2, 'pace.clear.sinkS': 0.3, 'light.lamp.y': 30, 'app.mode': 'production' });
-  assert.deepEqual(r.pending, ['pace.ceremony.declareS', 'app.mode'], 'sinkS did not move; lamp.y is apply-class');
+  assert.deepEqual(r.pending, ['pace.ceremony.declareS'], 'sinkS did not move; lamp.y is apply-class; app.mode is static');
+  assert.deepEqual(r.refused, [['app.mode', 'static']]);
   tune.bind('pace.clear.*', () => {});
   r = tune.set({ 'pace.clear.sinkS': 1 });
   assert.deepEqual(r.pending, [], 'a binder covers it now');

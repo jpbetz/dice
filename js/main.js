@@ -3406,7 +3406,9 @@ let throwOrigin = null;
 //               names in the presence rail, the whisper picker and the pools
 //               owner switcher, none of which is what was asked for.
 //   demoSeat  — the CAST chair the viewer is sitting in, or null for home
-//               (the viewer's own real chair, when the tab holds one). THE
+//               (the viewer's own real chair, when the tab holds one; with
+//               no chair to call home — no room — a deal sits the viewer in
+//               the first cast chair, see demoDealPlayers). THE
 //               STICKY HALF of the seat switcher: myPlaceRow() reads it, so
 //               the shipped placeOrbitSync path derives the eye from it and
 //               a places flush RESTORES the view instead of yanking it back
@@ -26131,6 +26133,16 @@ function devFold(on) {
 function devClose(_opts) {
   if (!devOn()) return null;
   tune.reset('all');
+  // THE VENUE'S SNAPSHOT IS TAKEN THROUGH THE VIEW (found by the B2 review,
+  // 2026-09-02): faeConceptStart copies MOOD.tune as it stands at moonrise,
+  // and a dial turned BEFORE the venue was entered is in that copy — so
+  // faeConceptStop would put the dial back on the table's lamp after this
+  // Shut, and the tab would read "changed 1" where a never-opened one reads
+  // 0. Now that every leaf is shipped, the copy is retaken from the tree, so
+  // the venue's exit lands on the file's light, as it does for a tab that
+  // never opened the door. (Film leaves never enter MOOD.tune, so the lock's
+  // per-path resets need no such refresh.)
+  if (FAECONCEPT.on && FAECONCEPT.saved) FAECONCEPT.saved.tune = { ...MOOD.tune };
   // …except the light a venue holds: a never-opened tab at moonrise wears
   // the venue's lamp, so this one must too (venueLightPatch; the binders
   // run again, so the scene follows).
@@ -26272,6 +26284,14 @@ function demoDealPlayers(n) {
   if (demoSeat !== null && !demoRows.some((r) => r.place === demoSeat)) {
     demoSeat = demoRows.length ? demoRows[demoRows.length - 1].place : null;
   }
+  // NO HOME, SO THE FIRST CAST CHAIR IS THE SEAT (found by the B2 review,
+  // 2026-09-02). A tab with no room — `?lobby`, or a server that is down —
+  // holds no real chair, and "sitting nowhere in the cast" would then be
+  // sitting nowhere at all: the ordinary ROLL button reached rollDice with
+  // no seat and threw an UNSTAMPED hurl, whose arrival then swept the whole
+  // felt (js/demo.js, the placeless clause). The old door defaulted the seat
+  // to chair 0 and tossed onto its spot; a deal with no home keeps that.
+  if (demoSeat === null && demoRows.length && devHomePlace() === null) demoSeat = demoRows[0].place;
   // A roster door, spelled the way every other roster door is spelled: ask,
   // and let the roll-boundary flush restand the cards (IMMERSION ruling ① —
   // cards do not move while dice are in the air, cast or not). The overlay

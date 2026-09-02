@@ -22,11 +22,13 @@ limitations under the License.
 // fits). If a scenario needs app state a script can't reach, add a hook to
 // window.__diceDebug rather than scraping fragile DOM.
 
-import { readFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { assert, Table } from './harness.mjs';
+import { assert, Table, freePort, startServer } from './harness.mjs';
 
 // THE FROZEN ENGINE CONTRACT (docs/TOWER.md; captured by
 // tools/steps/tower-contract-capture.mjs). Read from disk rather than imported
@@ -62,6 +64,17 @@ const { placardFootprint, placardGap, PLACE_LANE, PLACE_PUSH, PLACARD_W, PLACARD
   // module's own, never with a copy.
   placeTheta, seatAnchor, wrapPi, TOWER_ARC }
   = await import('../../js/places.js');
+
+// THE DECLARATION (docs/DEVMODE.md). `dev-export-roundtrip` states what the
+// panel's export IS by computing the same patch in Node with the same
+// patchYaml, and `dev-shell-loads` counts the shell's rows against the dial
+// tree's own leaves — imported, not restated, for the same reason as above.
+const { patchYaml } = await import('../../js/yaml.js');
+const { DIALS, defaultsOf, leaves: dialLeaves } = await import('../../js/tune.js');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// Scratch trees for the apply tool — DICE_TEST_SCRATCH points them somewhere
+// other than the OS tmpdir (an agent's own scratchpad); never the checkout.
+const SCRATCH_BASE = process.env.DICE_TEST_SCRATCH || tmpdir();
 
 // DOES A CARD PRINT THROUGH A PANEL? Two renderers draw the frame — WebGL puts
 // the cards on the felt, the DOM puts `#result-banner` over it — so the only
@@ -19064,13 +19077,21 @@ export const scenarios = [
           `and the card it is under has ${who}'s name painted on it`);
         return card.place;
       };
+      // RE-PINNED FOR THE ROUND TABLE (2026-09-02, found running the journey
+      // gate for developer mode phase 1; red since the ring shipped 0b762f9,
+      // ROADMAP row 14 "THE ROUND TABLE": `roll.entry`/`roll.lane` and the
+      // front/back/left/right stations are gone from every writer and
+      // reader). The film's record of where a throw came in is now the seat's
+      // RAY — `throwOrigin().ring.theta`, seat k of N at 2π·k/N — and the
+      // roster's record of who sits there is the station carrying that same
+      // theta. The claim is unchanged: the felt alone names the roller, and
+      // names a different one for Bram than for Ada.
       const rollerByEdge = (t) => t.eval(`(() => {
         const D = window.__diceDebug;
         const org = D.throwOrigin();
-        if (!org || org.from !== 'place') return { who: null, org };
-        const SIDE = { front: 0, back: 1, left: 2, right: 3 };
-        const st = D.places().stations.find((s) => SIDE[s.station] === org.entry && s.lane === org.lane);
-        return { who: st ? st.name : null, entry: org.entry };
+        if (!org || org.from !== 'place' || !org.ring) return { who: null, org };
+        const st = D.places().stations.find((s) => Math.abs(s.theta - org.ring.theta) < 1e-9 && s.seat === org.ring.seat);
+        return { who: st ? st.name : null, entry: org.ring.theta };
       })()`);
       const landsFor = (t, rid, count) => t.waitFor(
         `(window.__diceDebug.sim(120), !window.__diceDebug.busy`
@@ -19101,7 +19122,7 @@ export const scenarios = [
       assert.equal(readSecond.who, 'Bram',
         `and Bram's over Bram's (${JSON.stringify(readSecond)})`);
       assert.notEqual(readFirst.entry, readSecond.entry,
-        'two rollers, two edges — the spectator can tell them apart by where the dice came from');
+        'two rollers, two rays — the spectator can tell them apart by where the dice came from');
       assert.notEqual(adaCard, bramCard,
         'and two cards lit — the wash is a difference claim, not a light that is always on');
       await cass.dbg('holdClock(false)');
@@ -22255,6 +22276,58 @@ export const scenarios = [
       await t.dbg('sim(10)');
       assert.equal((await t.dbg('devInfo()')).changed, 0, 'no leaf differs once the venue has gone');
       assert.equal((await t.dbg('lampInfo()')).position[1], 24, 'the file\'s lamp');
+      // THE OTHER ORDER (found by the B2 review, 2026-09-02): a dial turned
+      // BEFORE the venue is entered rode in faeConceptStart's snapshot of
+      // MOOD.tune, and the venue's exit put it back after Shut — the tab
+      // read 40 / changed 1 where a never-opened one reads 24 / 0. Shut now
+      // retakes the snapshot from the shipped tree.
+      assert.equal((await t.dbg('devOpen()')).panel, 'open');
+      assert.deepEqual((await t.dbg(`tuneSet({'light.lamp.y': 40})`)).refused, [], 'a lamp dial at the table');
+      assert.equal((await t.dbg('lampInfo()')).position[1], 40, 'the lamp moved');
+      await t.dbg("setVenue('moonrise')");
+      await t.waitFor("window.__diceDebug.venue === 'moonrise'", { desc: 'the glade stands again' });
+      await t.dbg('sim(10)');
+      assert.equal((await t.dbg('lampInfo()')).position[1], 22, 'the venue holds the lamp over the dial');
+      assert.equal((await t.dbg('devClose()')).panel, 'shut');
+      await t.dbg('sim(10)');
+      assert.equal((await t.dbg('lampInfo()')).position[1], 22, 'Shut under the sky: still the venue\'s lamp');
+      await t.dbg("setVenue('table')");
+      await t.waitFor("window.__diceDebug.venue === 'table'", { desc: 'back at the table again' });
+      await t.dbg('sim(10)');
+      assert.equal((await t.dbg('lampInfo()')).position[1], 24, 'the venue\'s exit lands on the FILE\'s lamp, not the dial it rode in on');
+      assert.equal((await t.dbg('devInfo()')).changed, 0, 'no leaf differs: identical to a never-opened tab');
+      assert.deepEqual(t.page.consoleErrors, []);
+    },
+  },
+  {
+    name: 'dev-lobby-seat',
+    tags: ['dev', 'place'],
+    timeout: 90000,
+    // A TAB WITH NO ROOM HOLDS NO HOME (found by the B2 review, 2026-09-02):
+    // in `?lobby` (or under a server that is down) there is no chair to call
+    // the viewer's own, and a cast dealt around "nowhere" left the ordinary
+    // ROLL button throwing an UNSTAMPED hurl that the next cast throw swept
+    // off the felt. The old door sat the viewer in chair 0 and tossed onto
+    // its spot; a deal with no home does the same.
+    async fn(ctx) {
+      const t = await lobbyTab(ctx, { origin: '127.0.0.189' });
+      assert.equal((await t.dbg('devOpen()')).panel, 'open');
+      const dealt = await t.dbg('devDeal(2)');
+      assert.equal(dealt.home, null, 'no room, no chair to call home');
+      assert.equal(dealt.seat, 0, 'so the deal sits the viewer in the first cast chair');
+      await t.waitFor('window.__diceDebug.places().stations.length === 2', { desc: 'two cast chairs' });
+      const ext = await t.dbg('tableExtents()');
+      await t.roll('3d6');
+      const org = await t.dbg('throwOrigin()');
+      assert.equal(org.from, 'place', 'the ROLL button tossed from a chair, not an unstamped hurl');
+      assert.equal(org.ring.theta, seatToss(0, 2, 0, ext.w).theta, 'chair 0 of 2: its own ray');
+      assert.ok(org.box.k < 1 && org.box.h < 1, 'a toss, not a hurl');
+      // …and a cast throw from the other chair sweeps only its own chair, so
+      // the button's pool still stands beside it.
+      const fired = await t.dbg('demoRoll(1)');
+      assert.equal(fired && fired.via, 'local', 'chair 1 threw locally');
+      await t.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)', { desc: 'chair 1\'s film', timeout: 60000 });
+      assert.equal((await t.dbg('feltPoses()')).length, 6, 'two pools of three stand — a placeless sweep would have left one');
       assert.deepEqual(t.page.consoleErrors, []);
     },
   },
@@ -26293,6 +26366,321 @@ export const scenarios = [
       assert.equal((await t.dbg('physicsInfo()')).gravity[1], -110, 'and so is gravity');
       assert.equal(await t.dbg('tuneExport()'), file, 'and the export is the file again');
       assert.equal(await t.dbg(`tuneGet('light.lamp.y')`), 24);
+    },
+  },
+  {
+    name: 'dev-key-door',
+    tags: ['dev'],
+    timeout: 90000,
+    // THE KEY IS THE DOOR (docs/DEVMODE.md §4), walked with REAL key events
+    // — CDP Input.dispatchKeyEvent, the same path a keyboard takes, because
+    // the claim is about the physical key: it is matched on `e.code ===
+    // 'Backquote'` (on several layouts `e.key` is `Dead`), it inherits the
+    // global handler's guards, and it is the ONE key with a three-state
+    // walk: shut → open → folded → open. A synthetic KeyboardEvent at the
+    // document would prove the handler's arithmetic and nothing about which
+    // handler the browser hands the key to.
+    //
+    // And GOALPOST 4's proof rides here: the URL and localStorage are
+    // snapshotted before the first press and compared after Shut — the door
+    // sets a tab-local state and stores nothing, mirrors nothing, strips
+    // nothing (DEVMODE §2, "nothing in the URL").
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.66', name: 'Keys' });
+      // The roll box is the notation section of the pools panel, off by
+      // default; it is stood up HERE, before the storage snapshot, because
+      // showing a section is a stored view preference and the claim below
+      // is about what the DOOR stores (nothing), not what the setup did.
+      await t.dbg('setPanelState({pools: true})');
+      await t.dbg('setSections({notation: true})');
+      await t.dbg('sim(60)');
+      // Showing the section focuses its box; the walk starts from the felt.
+      await t.eval(`document.activeElement && document.activeElement.blur()`);
+      const press = async () => {
+        const key = { key: '`', code: 'Backquote', windowsVirtualKeyCode: 192, nativeVirtualKeyCode: 192 };
+        await ctx.browser.send('Input.dispatchKeyEvent', { type: 'keyDown', text: '`', unmodifiedText: '`', ...key }, t.page.sessionId);
+        await ctx.browser.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key }, t.page.sessionId);
+      };
+      const snapshot = () => t.eval(`({ search: location.search, hash: location.hash, ls: Object.keys(localStorage).sort() })`);
+      const dom = () => t.eval(`(() => {
+        const p = document.getElementById('dev-panel'), g = document.getElementById('dev-glyph'), c = document.getElementById('dev-css');
+        return { panel: !!p, panelHidden: p ? p.hidden : null, glyph: !!g, glyphHidden: g ? g.hidden : null,
+                 glyphText: g ? g.textContent.trim() : null, css: !!c };
+      })()`);
+      const before = await snapshot();
+      assert.match(before.search, /^\?room=/, 'an ordinary tab at an ordinary (minted) table');
+      assert.equal((await t.dbg('devInfo()')).panel, 'shut');
+      assert.equal(await t.eval(`document.activeElement === document.body`), true, 'nothing focused: the key lands on the felt');
+
+      // ① shut → open. The panel module is imported on the press, so the
+      // state is awaited rather than read.
+      await press();
+      await t.waitFor(`window.__diceDebug.devInfo().panel === 'open' && !!document.getElementById('dev-panel')`,
+        { desc: 'the panel opened on the key' });
+      let d = await dom();
+      assert.equal(d.panelHidden, false, 'the panel is showing');
+      assert.equal(d.css, true, 'with its stylesheet');
+      assert.equal(d.glyphHidden, true, 'and the fold glyph is not');
+
+      // THE PRODUCTION SWITCH IS NOT A DIAL (DEVMODE §4), proved from inside
+      // the open session where it matters: the B3 review (2026-09-02) flipped
+      // app.mode through tuneSet with the panel up, every mutating hook went
+      // null and this very key stopped folding. The write is refused by name
+      // at the writer, the mode reads as it was, and the fold below still
+      // answers the key.
+      const rMode = await t.dbg(`tuneSet({'app.mode': 'production'})`);
+      assert.deepEqual(rMode.refused, [['app.mode', 'static']], 'app.mode is static: refused at tune.set');
+      assert.equal((await t.dbg('devInfo()')).mode, 'development', 'and the mode did not move');
+      assert.equal((await t.dbg('devInfo()')).panel, 'open', 'the session is still a dev session');
+
+      // ② open → folded: hidden entirely, values held, the corner glyph only.
+      // (The panel repaints once per tick while open, and a headless tab
+      // ticks only through sim(): one beat so the glyph's count is current.)
+      await t.dbg(`tuneSet({'light.lamp.y': 40})`);
+      await t.dbg('sim(10)');
+      await press();
+      await t.waitFor(`window.__diceDebug.devInfo().panel === 'folded'`, { desc: 'folded on the second press' });
+      d = await dom();
+      assert.equal(d.panel, true, 'the panel is still in the document (values held)…');
+      assert.equal(d.panelHidden, true, '…but hidden entirely');
+      assert.equal(d.glyphHidden, false, 'the corner glyph shows');
+      assert.match(d.glyphText, /DEV/, 'and reads DEV');
+      assert.match(d.glyphText, /1 changed/, 'with the count of held changes');
+      assert.equal((await t.dbg('lampInfo()')).position[1], 40, 'the dial is held through the fold');
+
+      // ③ folded → open.
+      await press();
+      await t.waitFor(`window.__diceDebug.devInfo().panel === 'open'`, { desc: 'open again on the third press' });
+      d = await dom();
+      assert.equal(d.panelHidden, false);
+      assert.equal(d.glyphHidden, true);
+
+      // ④ THE TYPING GUARD. With the roll box focused the key is a character,
+      // not a door: the panel state does not move and the backtick lands in
+      // the box.
+      await t.eval(`document.getElementById('cmd-input').focus()`);
+      assert.equal(await t.eval(`document.activeElement && document.activeElement.id`), 'cmd-input', 'the roll box has focus');
+      await press();
+      await t.dbg('sim(10)');
+      assert.equal((await t.dbg('devInfo()')).panel, 'open', 'typing: the key did not fold the panel');
+      assert.equal(await t.eval(`document.getElementById('cmd-input').value`), '`', 'the key went where the cursor was');
+      await t.eval(`(() => { const i = document.getElementById('cmd-input'); i.value = ''; i.blur(); })()`);
+
+      // ⑤ Shut: no panel, no stylesheet, and the tab's URL and storage are
+      // what they were before the first press.
+      assert.equal((await t.dbg('devClose()')).panel, 'shut');
+      d = await dom();
+      assert.equal(d.panel, false, 'no panel');
+      assert.equal(d.glyph, false, 'no glyph');
+      assert.equal(d.css, false, 'no stylesheet');
+      assert.equal((await t.dbg('lampInfo()')).position[1], 24, 'Shut put the dial back');
+      assert.deepEqual(await snapshot(), before, 'the URL and localStorage are untouched by open, fold, and Shut');
+      assert.deepEqual(t.page.consoleErrors, []);
+    },
+  },
+  {
+    name: 'dev-mode-production',
+    tags: ['dev'],
+    timeout: 90000,
+    // THE PRODUCTION SWITCH IS REAL, AND ITS PROOF FIRES (docs/DEVMODE.md
+    // §4, §10). `DICE_MODE=production` is read by server.js once at boot and
+    // lands in the served declaration's `app.mode` — so the suite's own
+    // server cannot be it. A SECOND server on its own free port for the
+    // length of this scenario, a tab at a table there, and: the key is not a
+    // key, `devOpen()` is null, the cheat sheet's row is hidden, and every
+    // writer answers null while every reader still answers (P7's sweep
+    // calls the zero-arg ones on every tab, production included).
+    //
+    // Paired with the development tab beside it (P9: a claim about an
+    // absence needs the presence to stand next to), so "the row is hidden"
+    // cannot pass because the row was never there.
+    async fn(ctx) {
+      const port = await freePort();
+      const server = await startServer(port, { env: { DICE_MODE: 'production' } });
+      try {
+        const page = await ctx.browser.newPage();
+        await page.addInitScript('window.__diceTestMode = true;');
+        await page.addInitScript(`try { localStorage.setItem('dice.schema.v1','2');`
+          + ` localStorage.setItem('dice.stability.v1','beta');`
+          + ` localStorage.setItem('dice.name.v1','Prod'); } catch {}`);
+        const url = `http://127.0.0.67:${port}/?room=${encodeURIComponent(ctx.room)}`;
+        await page.navigate(url);
+        const prod = new Table(page, url);
+        ctx.tables.push(prod);
+        await prod.waitFor('!!window.__diceDebug && window.__diceDebug.netReady', { desc: 'the production tab is up', timeout: 30000 });
+        assert.equal(await prod.eval('window.__diceDebug.netReady.then((r) => r && r.online)'), true, 'and online at the production server');
+        await prod.dbg('sim(60)');
+
+        const info = await prod.dbg('devInfo()');
+        assert.equal(info.mode, 'production', 'the served declaration says production');
+        assert.equal(info.panel, 'shut');
+        assert.equal(await prod.dbg(`tuneGet('app.mode')`), 'production', 'the live tree carries the override');
+        assert.equal(await prod.dbg('devOpen()'), null, 'devOpen is null');
+        assert.equal(await prod.dbg('devFold(true)'), null);
+        assert.equal(await prod.dbg('devClose()'), null);
+        assert.equal(await prod.dbg('devDeal(2)'), null);
+        assert.equal(await prod.dbg('demoDeal(2)'), null);
+        assert.equal(await prod.dbg(`tuneSet({'light.lamp.y': 40})`), null, 'tuneSet is null');
+        assert.equal(await prod.dbg(`tuneReset('all')`), null, 'tuneReset is null');
+        assert.equal((await prod.dbg('lampInfo()')).position[1], 24, 'and the lamp did not move');
+        // The readers still answer: a production tab is not a broken tab.
+        assert.equal((await prod.dbg('tuneInfo()')).changed, 0);
+        assert.deepEqual(await prod.dbg('tuneDiff()'), []);
+        assert.equal(typeof await prod.dbg('tuneExport()'), 'string');
+
+        // The key is not a key. A real press, and nothing opens.
+        const key = { key: '`', code: 'Backquote', windowsVirtualKeyCode: 192, nativeVirtualKeyCode: 192 };
+        await ctx.browser.send('Input.dispatchKeyEvent', { type: 'keyDown', text: '`', unmodifiedText: '`', ...key }, page.sessionId);
+        await ctx.browser.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key }, page.sessionId);
+        await prod.dbg('sim(30)');
+        assert.equal((await prod.dbg('devInfo()')).panel, 'shut', 'the key did nothing');
+        assert.equal(await prod.eval(`!!document.getElementById('dev-panel')`), false, 'no panel');
+        assert.equal(await prod.eval(`!!document.getElementById('dev-css')`), false, 'no stylesheet');
+        assert.equal(await prod.eval(`document.getElementById('kbd-dev-row').hidden`), true, 'the cheat sheet\'s row is hidden');
+
+        // …and beside it, the suite's own (development) server: the row is
+        // there, and the door opens.
+        const dev = await ctx.newTable({ origin: '127.0.0.68', name: 'Dev' });
+        assert.equal((await dev.dbg('devInfo()')).mode, 'development');
+        assert.equal(await dev.eval(`document.getElementById('kbd-dev-row').hidden`), false, 'the same row shows in development');
+        assert.equal((await dev.dbg('devOpen()')).panel, 'open');
+        assert.equal((await dev.dbg('devClose()')).panel, 'shut');
+        assert.deepEqual(prod.page.consoleErrors, []);
+      } finally {
+        if (server.exitCode === null) server.kill('SIGTERM');
+      }
+    },
+  },
+  {
+    name: 'dev-export-roundtrip',
+    tags: ['dev'],
+    timeout: 120000,
+    // THE LOOP EXISTS (docs/DEVMODE.md §11, "proves it"): a dev tab sets a
+    // look dial (lamp height) and a film dial (table scale); the lamp moves
+    // now and the mat widens once the table is quiet (queueZoom's roll-
+    // boundary rule — the dial is a stepper that "applies when the table is
+    // quiet"); the export is, BYTE FOR BYTE, patchYaml of the checked-in
+    // file with the same two changes computed here in Node; the apply tool
+    // reads that export against a scratch copy of the tree and reports the
+    // two changes, writing nothing under --check and the patched checkout
+    // without it; and after Reset the export is the file again.
+    //
+    // The file is read from the checkout and never written: every write
+    // lands in a scratch tree that is removed in a finally.
+    async fn(ctx) {
+      const t = await ctx.devTab({ origin: '127.0.0.69', players: 0 });
+      const file = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
+      await t.dbg('sim(60)');
+      const ext0 = await t.dbg('tableExtents()');
+      assert.ok(ext0.w > 0, 'a mat stands');
+      assert.equal((await t.dbg('lampInfo()')).position[1], 24);
+      assert.equal(await t.dbg('tuneExport()'), file, 'nothing changed: the export is the file');
+
+      const set = await t.dbg(`tuneSet({'light.lamp.y': 30, 'table.scale': 3})`);
+      assert.deepEqual(set.refused, [], 'a table of one: the look dial and the film dial both take');
+      assert.deepEqual(set.pending, [], 'both bound: nothing waits on a reload');
+      assert.equal((await t.dbg('lampInfo()')).position[1], 30, 'the lamp moved now');
+      await t.waitFor(`window.__diceDebug.pendingZoom === null && window.__diceDebug.tableExtents().w > ${ext0.w}`,
+        { desc: 'the mat widened once the table was quiet' });
+      const ext1 = await t.dbg('tableExtents()');
+      // Every zoom preset is its base width × the scale (rewriteZoomPresets),
+      // so whichever preset the tab wears, the mat grew by exactly 3 / 2.5.
+      assert.ok(Math.abs(ext1.w - ext0.w * 3 / 2.5) < 1e-9, `the mat is the preset × the new scale (${ext0.w} → ${ext1.w})`);
+      assert.ok(Math.abs(ext1.d - ext0.d * 3 / 2.5) < 1e-9, 'and so is its depth');
+      assert.equal((await t.dbg('devInfo()')).changed, 2);
+
+      const exported = await t.dbg('tuneExport()');
+      const expected = patchYaml(file, { 'light.lamp.y': 30, 'table.scale': 3 });
+      assert.notEqual(expected, file, 'the patch moved something');
+      assert.equal(exported, expected, 'the export IS patchYaml of the file with the same two changes, byte for byte');
+      const a = file.split('\n'), b = exported.split('\n');
+      assert.equal(a.length, b.length, 'no line added or removed');
+      const moved = a.map((l, i) => (l === b[i] ? null : i + 1)).filter(Boolean);
+      assert.equal(moved.length, 2, `exactly two lines differ (${moved.join(', ')})`);
+      assert.ok(b[moved[0] - 1].includes('scale: 3') && b[moved[0] - 1].includes('# the one dial for table size'),
+        'the scale line moved and kept its comment');
+      assert.ok(b[moved[1] - 1].includes('y: 30') && b[moved[1] - 1].includes('# pool ~27'),
+        'the lamp line moved and kept its comment');
+
+      // THE APPLY TOOL, against a scratch copy of the tree: the two-line
+      // report and the count under --check, nothing written; then the write.
+      const dir = mkdtempSync(join(SCRATCH_BASE, 'dev-export-'));
+      try {
+        mkdirSync(join(dir, 'tools'));
+        mkdirSync(join(dir, 'js'));
+        cpSync(join(ROOT, 'tools', 'dice-apply.mjs'), join(dir, 'tools', 'dice-apply.mjs'));
+        cpSync(join(ROOT, 'js', 'yaml.js'), join(dir, 'js', 'yaml.js'));
+        cpSync(join(ROOT, 'js', 'tune.js'), join(dir, 'js', 'tune.js'));
+        writeFileSync(join(dir, 'dice.yaml'), file);
+        writeFileSync(join(dir, 'download.yaml'), exported);
+        const tool = join(dir, 'tools', 'dice-apply.mjs');
+        const check = spawnSync(process.execPath, [tool, join(dir, 'download.yaml'), '--check'], { encoding: 'utf8' });
+        assert.equal(check.status, 0, check.stderr);
+        assert.deepEqual(check.stdout.split('\n'),
+          ['table.scale: 2.5 → 3', 'light.lamp.y: 24 → 30', '2 changes; --check, nothing written', ''],
+          'the two changes in file order, and the count');
+        assert.equal(readFileSync(join(dir, 'dice.yaml'), 'utf8'), file, '--check wrote nothing');
+        const write = spawnSync(process.execPath, [tool, join(dir, 'download.yaml')], { encoding: 'utf8' });
+        assert.equal(write.status, 0, write.stderr);
+        assert.equal(readFileSync(join(dir, 'dice.yaml'), 'utf8'), exported,
+          'the scratch checkout is now what the tab exported — the loop closed');
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+
+      const reset = await t.dbg(`tuneReset('all')`);
+      assert.deepEqual(reset.diff, []);
+      assert.equal(await t.dbg('tuneExport()'), file, 'reset: the export is the file again');
+      assert.equal((await t.dbg('lampInfo()')).position[1], 24, 'the lamp is back');
+      await t.waitFor(`window.__diceDebug.pendingZoom === null && window.__diceDebug.tableExtents().w === ${ext0.w}`,
+        { desc: 'the mat is back' });
+      assert.deepEqual(t.page.consoleErrors, []);
+    },
+  },
+  {
+    name: 'dev-shell-loads',
+    tags: ['dev'],
+    timeout: 60000,
+    // THE SHELL (tools/devshell.html): the panel over a placeholder, with no
+    // scene, no engine, no network — how the panel is LOOKED AT before and
+    // beside main.js. It opens with zero page exceptions and zero console
+    // errors, draws exactly one row per leaf of the dial tree (the shell
+    // declares a slice; the rest wear the default mark, and the count is
+    // the tree's own, imported), and fetches no engine module at all —
+    // which is the cosmetic claim the `look` tag would make, proved here on
+    // the network log instead: the lane's guard is main.js's own dice
+    // counter, and a page with no main.js cannot answer it, so the tag
+    // stays off rather than the guard being faked.
+    async fn(ctx) {
+      const t = await bootTab(ctx, {
+        origin: 'localhost', path: '/tools/devshell.html', netLog: true,
+        readyExpr: '!!(window.__devShell && window.__devShell.panel && document.getElementById("dev-panel"))',
+        readyDesc: 'the dev shell is up',
+      });
+      assert.deepEqual(t.page.errors, [], 'no page exception');
+      assert.deepEqual(t.page.consoleErrors, [], 'no console error');
+      const want = dialLeaves(defaultsOf(DIALS)).map((p) => p.join('.')).sort();
+      const all = await t.eval(`[...document.querySelectorAll('#dev-panel .dev-row[data-path]')].map((e) => e.dataset.path).sort()`);
+      // The cast section's two dial-shaped rows (players, regions) carry a
+      // `cast.` path so the find filter can reach them; they are not leaves.
+      const rows = all.filter((p) => !p.startsWith('cast.'));
+      assert.deepEqual(all.filter((p) => p.startsWith('cast.')), ['cast.players', 'cast.regions'], 'the cast\'s own two rows, and no other stranger');
+      assert.equal(rows.length, want.length, `one row per phase-1 leaf (${rows.length} vs ${want.length})`);
+      assert.deepEqual(rows, want, 'and they are the dial tree\'s leaves, exactly');
+      // A declared leaf and an omitted one both stand as rows; the omitted
+      // one wears the default mark (DEVMODE §3).
+      const isDefault = (p) => t.eval(`document.querySelector('#dev-panel .dev-row[data-path="${p}"]').classList.contains('is-default')`);
+      assert.equal(await isDefault('light.lamp.y'), false, 'a leaf the shell declares is not marked default');
+      assert.equal(await isDefault('light.motes.count'), true, 'a leaf it omits is');
+      const fetched = t.responses.map((r) => r.url);
+      assert.ok(fetched.some((u) => u.endsWith('/js/devmode.js')), 'the panel module loaded');
+      assert.ok(fetched.some((u) => u.endsWith('/css/dev.css')), 'and its stylesheet');
+      const engine = fetched.filter((u) => /three|cannon|\/js\/main\.js|\/js\/tunables\.js/.test(u));
+      assert.deepEqual(engine, [], 'no engine, no scene, no served declaration: the shell is the panel alone');
+      // (The browser's own /favicon.ico probe is the one 404 that is not the
+      // page's: the shell declares no icon, and index.html's is inline.)
+      const bad = t.responses.filter((r) => r.status >= 400 && !r.url.endsWith('/favicon.ico'));
+      assert.deepEqual(bad, [], 'nothing the page asked for 404ed');
     },
   },
 ];

@@ -25,8 +25,9 @@ limitations under the License.
 //   createTune — the live tree. SHIPPED is defaults ⊕ declared, frozen;
 //            T is its mutable clone, the one object every consumer reads.
 //            `set` is THE writer (panel, hooks, paste all come through it)
-//            and refuses unknown paths, film writes while the film is
-//            locked, type changes and enum values outside the list.
+//            and refuses unknown paths, the static leaves (STATIC_PATHS),
+//            film writes while the film is locked, type changes and enum
+//            values outside the list.
 //
 // Defaults here are the SHIPPED values of the objects they mirror in
 // main.js / places.js / faelife.js as of 2026-09-02. tests/tune.test.mjs
@@ -212,6 +213,20 @@ export function alias(tree, map) {
 // No dial may reach the RNG, the values, the faces, the seed or the clock
 // (GOALPOST 2). The unit test walks every dial path against this.
 export const FORBIDDEN_LEAF = /(^|[^a-z])(rng|value|values|face|faces|seed|fixedDt)([^a-z]|$)/i;
+
+// THE STATIC LEAVES: declared, drawn, never written by a running tab.
+// `app.mode` is the production switch (DEVMODE §4: "not a dial: no panel
+// control writes it … a Save from a running dev session can never flip
+// it"). The panel already drew it static and skipped it on Reset, but the
+// refusal has to live at THE writer, or it is not a refusal: 2026-09-02 the
+// B3 review flipped it from the console (`tuneSet({'app.mode':
+// 'production'})`) and from the panel's own Paste box, and both escaped —
+// every mutating hook went null, the backtick stopped folding, and
+// Download carried `mode: production` to disk. `set`, `reset` and
+// `applyPatchText` all run through `apply`, so one check here covers every
+// door; the reason is 'static'. The list is exported so devmode.js draws
+// the same leaves static that this refuses, from one source.
+export const STATIC_PATHS = Object.freeze(['app.mode']);
 
 // ---------------------------------------------------------------------------
 // THE DIAL TREE (phase 1). Shape = docs/DEVMODE.md §3. Ranges are the
@@ -592,7 +607,8 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
     return Object.entries(patch).map(([k, v]) => [toPath(k), v]);
   }
 
-  // THE writer, in two passes. First every accepted leaf lands in T;
+  // THE writer, in two passes. First every accepted leaf lands in T
+  // (refusals, in order: unknown, static, film, type, option);
   // reload-class leaves no binder covers are reported as pending. Then
   // each distinct binder runs ONCE, after the whole patch is in T, as
   // fn(firstPath, firstValue, covered) where covered is every [path, value]
@@ -609,6 +625,7 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
     for (const [p, v] of entries) {
       const key = p.join('.');
       if (!hasLeaf(SHIPPED, p)) { refused.push([key, 'unknown']); continue; }
+      if (STATIC_PATHS.includes(key)) { refused.push([key, 'static']); continue; }
       const spec = dialAt(p);
       if (spec && spec.cls === 'film' && filmLocked) { refused.push([key, 'film']); continue; }
       if (!typeFits(getLeaf(SHIPPED, p), v)) { refused.push([key, 'type']); continue; }

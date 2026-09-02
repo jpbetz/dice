@@ -317,3 +317,22 @@ exiting non-zero if `p(Success) === p(Success & Bonus)` or unit mass ever
 breaks. It exists because the design pass behind §2l ran on numbers and
 **two of them were fabricated** by the agents that produced them; a
 figure you cannot regenerate is a figure you should not trust.
+
+## The apply tool (developer mode)
+
+```bash
+node tools/dice-apply.mjs ~/Downloads/dice.yaml            # patch the checkout's dice.yaml
+node tools/dice-apply.mjs ~/Downloads/dice.yaml --check    # report only, write nothing
+node tools/dice-apply.mjs dl.yaml --root /path/to/checkout # another tree
+```
+
+The other half of the panel's **Download** ([docs/DEVMODE.md](../docs/DEVMODE.md)
+§6). No browser, no server, no port. Validates the given file against the
+dial tree in `js/tune.js` (exit 2, one line per problem, nothing written: an
+unknown path, a wrong type, an enum value outside its options, any boolean),
+finds the leaves that DIFFER from the checkout's `dice.yaml`, and patches the
+checkout's **own** text one span at a time through `js/yaml.js` — so a comment
+added locally after the download survives and `git diff dice.yaml` is exactly
+the lines that moved. Prints `path: old → new` per change and a count; writes
+atomically. `tests/dice-apply.test.mjs` runs it only ever against a scratch
+copy of the tree.

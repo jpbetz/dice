@@ -57,9 +57,13 @@ export async function freePort() {
 // to every other one (an unprepared room is deleted immediately either way).
 const SETUP_TTL_MS = 4000;
 
-export async function startServer(port) {
+// `env` is laid over the run's own: a scenario that needs a server the suite's
+// one cannot be — `DICE_MODE=production`, which server.js reads once at boot
+// (dev-mode-production) — starts a SECOND one on its own free port for the
+// length of the scenario, and kills it in a finally.
+export async function startServer(port, { env = {} } = {}) {
   const proc = spawn(process.execPath, [join(ROOT, 'server.js')], {
-    env: { ...process.env, PORT: String(port), DICE_SETUP_TTL_MS: String(SETUP_TTL_MS) },
+    env: { ...process.env, PORT: String(port), DICE_SETUP_TTL_MS: String(SETUP_TTL_MS), ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let out = '';
