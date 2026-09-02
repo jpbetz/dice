@@ -1,5 +1,13 @@
 # IDENTITY.md — what a "who" is at this table (2026-08-17, §8 added 2026-08-18, decision 7 added 2026-08-31)
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 *THE ORDER #9. The structural-bet entry said "schedule the later pass before
 the next feature that needs a stable who; B1 is that feature and it has
 already arrived." This record is that pass. Its two results: **B1's server

@@ -16,6 +16,14 @@ limitations under the License.
 
 # VENUE COMPOSITION — how a scene becomes ONE scene (W2b–W7, 2026-08-14)
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 Commissioned by Joe's W2 verdict, verbatim in ROADMAP W2b: good set
 pieces, no integration — "setting them next to each other in this way is
 simplistic. Please consider the visual flow of the scene as a whole."

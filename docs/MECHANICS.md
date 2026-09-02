@@ -16,6 +16,14 @@ limitations under the License.
 
 # MECHANICS.md — what a dice simulator has to cover
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 **Status: SHIPPED. Every row of Track C landed on 2026-08-28.**
 
 Joe's first ruling (2026-08-27) was M1–M3 with M4 deferred until a turn

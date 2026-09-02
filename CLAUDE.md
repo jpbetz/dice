@@ -4,8 +4,18 @@ Guidance for Claude Code agents working in this repository.
 
 ## Orientation
 
-Read [docs/GOALS.md](docs/GOALS.md) before feature work — it is the design
-authority (goals, invariants, priorities, superseded decisions).
+**Read [docs/GOALPOST.md](docs/GOALPOST.md) first.** It holds the eight things
+this project actually cares about and the assumption-challenging habits every
+design starts with. Everything else under `docs/` — including GOALS.md, the
+IMMERSION laws, the composition rules, the tower contract, the audio
+refusals, UX §7's rulings and every budget — is **guidance**: a dated lesson
+with a reason, which a design may set aside by saying why in the commit. The
+eight may not be set aside. (2026-09-02, Joe: "you've become over constrained
+on this project's requirements.")
+
+[docs/GOALS.md](docs/GOALS.md) is the fuller statement the goal post was
+distilled from (goals, former invariants, superseded decisions) — read it for
+reasons, not permission.
 [docs/CUJS.md](docs/CUJS.md) says what people come here to DO — thirteen
 numbered journeys, each with the scenario that proves it end to end — and it
 is the **only place a CUJ number is assigned**; cite from it, never mint one.
@@ -26,23 +36,26 @@ the WHAT IS TRUE TODAY table (U4, shipped). And GOALS wins ties, so where the
 audit found GOALS itself stale (the launcher carve-out), the doc you read
 first is the one that is wrong.
 
-## Validation policy — read docs/TESTING.md and follow it
+## Validation — docs/TESTING.md is guidance; GOALPOST 8 is the rule
 
 - Repeated validation is **scripted**: `npm test` (unit + fuzz + e2e smoke,
   seconds) plus targeted tags (`node tests/e2e/run.mjs --only <tags>`).
-  Do NOT re-verify established behavior by interactively driving a browser —
-  that is what made validation runs take 45+ minutes.
-- Interactive browser checks are only for judging *new* visuals/UX.
-- Every feature ships with an e2e scenario in `tests/e2e/scenarios.mjs`
-  (tagged); add `window.__diceDebug` hooks when a scenario needs reach —
-  never scrape fragile DOM.
+  Don't re-verify established behavior by hand-driving a browser.
+- A scripted check is the floor, not the proof: before calling a change done,
+  **look at the moment the owner named, on the device they named**
+  (GOALPOST 8). Take a screenshot; measure the thing, not a proxy.
+- A scenario per feature is the habit, not a gate; reach app state through
+  `window.__diceDebug` rather than scraping DOM. A golden pins the current
+  answer, not the right one — re-record it when a better design needs it,
+  and say why.
 - Full sweep (`npm run test:e2e:full` + interactive pass) is a pre-release
   gate, not a per-step cost.
 
-## Hard rules
+## Hard rules — environment facts, not design constraints
 
 - **Port 8123 is the user's live preview table — never start, stop, or test
-  against it.** Restart it only when server.js changes, and only from the
+  against it.** Never kill Chrome processes by name pattern; the owner's own
+  browser matches. Restart it only when server.js changes, and only from the
   main session. Tests pick their own ephemeral ports (the harness does this
   automatically).
 - The app is zero-dependency by design: no npm installs, no build step.

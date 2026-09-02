@@ -1,5 +1,13 @@
 # Pool analysis — the die spectrum and the dice-value ledger
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 **Status: DESIGN, four decisions taken; ①–⑥ ALL SHIPPED** — ⑥'s engine
 2026-08-16 and its rendering 2026-08-17 (UX.md §7.48). This is the detail
 behind §2l: the summary and the ship record are now in

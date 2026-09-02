@@ -5,6 +5,14 @@ description: Ship a new dice tower — a forge-baked GLB MODEL with declared dic
 
 # Shipping a new dice tower (v2 — the portal + GLB path)
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](../../../docs/GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 A tower is a **MODEL** (a forge-baked GLB that declares its two PORTALS), a
 **REGISTRY ROW** (id, label, glbUrl, title, `clunkVoice`, `ember`, flags),
 and optionally code-side **DRESS** (idle-motion FX the bake cannot carry).

@@ -1,5 +1,13 @@
 # TOWER_CORE — the tower geometry contract
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 ## THE PORTAL CONTRACT — v2, 2026-08-13 (supersedes the fixed six volumes as LAW; the numbers survive as the CLASSIC SPEC)
 
 A tower model now declares exactly two things about the engine's geometry —

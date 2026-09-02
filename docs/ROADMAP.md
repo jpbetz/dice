@@ -1,5 +1,13 @@
 # Roadmap
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 Open work only, priority-sorted. Shipped work, killed designs and verified
 patterns live in [SHIPPED.md](SHIPPED.md); section numbers are preserved
 there so cross-references still resolve.

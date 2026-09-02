@@ -16,6 +16,14 @@ limitations under the License.
 
 # IMMERSION AUDIT — the detail work vs the industry checklist (2026-08-12)
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 Joe: "cross check all our detail work so far against industry standards for
 building immersive graphical environments." The standard side comes from a
 research pass over the canon (Level Design Book, Yang's GDC lighting talks,

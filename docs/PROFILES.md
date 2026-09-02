@@ -1,5 +1,13 @@
 # The Prepared Table — profiles, the table file, and the shared link
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 *Design authority for ROADMAP Tier G. Written 2026-08-06 against Joe's
 game-night ask: "one person sets up all the saved pools for all the
 players ahead of time and sets up the table configuration… never lose

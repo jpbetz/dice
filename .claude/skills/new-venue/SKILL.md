@@ -5,6 +5,14 @@ description: Compose or integrate a venue's scene — the diorama discipline. Th
 
 # The venue skill — one scene, not set pieces
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](../../../docs/GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 A venue is a DIORAMA: watched from one composed eye (the resting eye)
 plus one secondary (the spread), never walked. This skill is the process
 for composing a new venue's stage or integrating an existing one —

@@ -16,6 +16,14 @@
 
 # Immersion — the research record and the experiment slate
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 *2026-08-09. Written against HEAD (`c4479b6`). Every mechanism claim below was
 re-read in source; where a proposal's mechanism was wrong, the corrected one is
 given and the correction is named. Nothing here is implemented.*

@@ -16,6 +16,14 @@ limitations under the License.
 
 # Audio (V1, phase one)
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 The design authority for sound. [GOALS.md](GOALS.md) still wins ties;
 [IMMERSION-AUDIT.md](IMMERSION-AUDIT.md) is what asked for this work and
 [ROADMAP.md](ROADMAP.md) Tier V sequences it — plus **Tier W6, the venue's

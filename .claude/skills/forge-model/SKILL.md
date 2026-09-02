@@ -5,6 +5,14 @@ description: Bake a complex 3D model to GLB through the forge pipeline (Blender 
 
 # Forging a model
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](../../../docs/GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 A model is a PYTHON RECIPE under `tools/forge/recipes/`, baked headlessly
 through pinned Blender into a gated, deterministic GLB. The pipeline, the
 kit, and the decision record (why Blender; six-tool bake-off, 2026-08-12)

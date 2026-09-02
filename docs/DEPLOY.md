@@ -1,5 +1,13 @@
 # Deploying the Dice Table
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 How this app gets onto the public web, why each choice was made, and what it
 costs. Researched and fact-checked against official pricing/docs pages on
 2026-08-04; re-verify prices if acting on this much later.

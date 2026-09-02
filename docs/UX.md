@@ -1,5 +1,13 @@
 # UX Design: Notation, Roll Moments, Visibility, Dice Sets
 
+> **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
+> and budget in this file is a dated lesson somebody paid for, with its reason
+> beside it. Read it before building near it; a design may set any of it aside
+> by saying, in the commit, which rule it set aside and why. The eight things
+> that may NOT be set aside are in [GOALPOST.md](GOALPOST.md) — where this file
+> and that one disagree, this file is history.
+
+
 *(Latest addendum: §7.23 — three independent section switches, the well at
 the head of the column, and a second source list in the collapsed one, all
 2026-08-08. Where a later section touches an earlier one it wins; superseded

@@ -1,8 +1,17 @@
 # Design Goals
 
-The durable statement of what this system is and how design decisions get
-made. [ROADMAP.md](ROADMAP.md) sequences work against these goals; [UX.md](UX.md)
-specifies components within them. Where the three disagree, this document wins.
+> **Superseded as the authority, 2026-09-02.** The eight things this project
+> actually cares about are in [GOALPOST.md](GOALPOST.md), and that file wins
+> every disagreement. What follows is the fuller statement the goal post was
+> distilled from — sixteen goals, eight former invariants, the superseded
+> decisions — kept as guidance and history: read it for the reasons, not for
+> permission. Joe, 2026-09-02: "you've become over constrained on this
+> project's requirements … reduce it down to 5–10 items we actually care
+> about … dramatically demote or remove all other constraints."
+
+The fuller statement of what this system is and how design decisions were
+made through 2026-09-01. [ROADMAP.md](ROADMAP.md) sequences work; [UX.md](UX.md)
+specifies components. Where documents disagree, GOALPOST.md wins.
 
 **The word is "pool."** The dice you assemble to roll are a *pool*; the named
 preset you keep is a *saved pool*. "Tray" and "group" are gone from every
@@ -241,7 +250,7 @@ dice sets; whether venue pieces later unbundle for à-la-carte use; how a
 venue rides the portable YAML and the room settings. None of these block
 the first fantasy venue.*
 
-## Invariants (every feature must preserve these)
+## Former invariants (guidance since 2026-09-02 — the binding ones are GOALPOST 1–8)
 
 - **The procedure never plays for you.** *(Added 2026-08-28 with goal 6's
   second layer.)* Every choice a procedure creates — which dice to keep,
