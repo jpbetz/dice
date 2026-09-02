@@ -186,8 +186,9 @@ reported but not fatal.
 
 `?demo=1` opens a **dev door** ([js/demo.js](../js/demo.js)): a solo tab with
 a small unthemed panel top-right that stands 0–8 fake players through the
-real place assignment, lets you sit in any of their chairs, draws the felt
-regions the film actually uses, and throws from any chair with the stamp the
+real place assignment, lets you sit in any of their chairs, draws the ring,
+each seat's landing SPOT and spawn line straight from the film's own toss
+(`js/places.js seatToss`), and throws from any chair with the stamp the
 server would have written. Dev tooling, not player chrome — every line of it
 is behind the door, and `demo-door-shut` is what makes that a fact rather than
 an intention: it boots `?demo=0` beside a tab carrying no param at all and
@@ -196,7 +197,7 @@ count**. "I looked and there was no panel" is exactly the check that stays
 green while a listener leaks in behind it.
 
 **It is SOLO-ONLY, and that is a law.** The door stands roster rows no server
-sent and stamps its own `roll.entry` / `roll.lane`, which are film inputs of
+sent and stamps its own `roll.seat` / `roll.seats`, which are film inputs of
 the seed's determinism class. Both are lawful in exactly one situation: no
 second viewer to fork a film away from. So a `?room=` refuses the door
 (`demo-room-wins`), and a demo tab mints no room of its own — without that
@@ -214,11 +215,13 @@ one film is the one thing a single tab cannot say.
 
 ```bash
 node tools/drive.mjs tools/steps/place-view.mjs    # every chair, one tab
+node tools/drive.mjs tools/steps/ring-look.mjs shots/ring 1600 900 2,3,8 3   # the round table: deal, shoot, throw from every seat and MEASURE each pool against its spot
 node tests/e2e/run.mjs --only demo                 # the door's own scenarios
 ```
 
 Hooks: `demoInfo()` (zero-arg, so P7's sweep calls it on every ordinary tab
-too), `demoDeal(n)`, `demoSit(k)`, `demoRoll(k, notation)`, `demoRollAll()` —
+too), `demoDeal(n)`, `demoSit(k)`, `demoRoll(k, notation)`, `demoRollAll()`,
+`demoRegions(on)` —
 each of the last four returning `null` rather than pretending on a tab without
 the door. The harness opens one with `ctx.demoTab({ players })`, never
 `newTable`, whose url is `?room=` by construction.

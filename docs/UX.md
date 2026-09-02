@@ -8025,3 +8025,50 @@ being a fair comparison the moment a roll frames itself — the two straddled a
 deliberate camera move. The claim was always about the beat and never about the
 camera, so both reads now sit on the same side of the frame and either side of
 the beat. Verified still to bite by making the beat touch `fogNear`.
+
+### 7.63 A place at the table — the round table (2026-09-02)
+
+**Two facts, everything else a consequence.** ① The table is round: a disc of
+felt of radius half the mat's width (`js/places.js ringRadius`; the invisible
+physics walls stand at ±w/2 on both axes and only ever catch a runaway die).
+② Seat k of N sits at 2π·k/N (`placeTheta`; a 300° arc under a tower that
+leaves the machine its back). Two sit opposite, three make a triangle, six a
+hexagon. Your card stands on your ray just outside the rim (`seatAnchor`),
+your camera looks in from there, and your dice are TOSSED from there onto the
+spot in front of you (`seatToss`): born a little behind a spot at half the
+radius, from a low hand, with almost no throw. Pools land by their spots (a
+centroid within one die, measured) and roll where they roll — the spot is a
+target, not a claim, and nothing is refused for where it stops.
+
+**The stamp.** The server writes `roll.seat`, `roll.seats` (and `roll.arc`
+under a tower) onto the roll payload when the dice are drawn; every client
+derives the same toss from the same integers in the same expression order, so
+one seed is one film (goal 15). `player.place` — the sticky chair 0–7 — is
+roster state and allowed to be wrong; a `seat` is the chair's rank among the
+chairs held right now, so the cards re-space when someone comes or goes, at
+the places flush, never with dice in the air. A placeless roll (the ninth
+player) carries no stamp and throws as the seeded hurl. Solo is a table for
+one: the film tosses as seat 0 of 1.
+
+**The felt holds one roll per chair.** A roller's arrival collects their own
+earlier rolls and any roll made from the chair they now hold (`roll.place`,
+stamped for the server's sweep alone), and leaves the other chairs' pools
+standing.
+
+**The frame.** From every chair the camera fits the same thing: every seat's
+spot and the OTHER players' cards — never the empty felt, never your own card
+(it stands centred at the bottom, at or below the frame's edge, under where the
+result banner used to be; the banner steps aside for a seated viewer,
+`body.seated`). A lone player sees their pool large in front of them; a full
+table sees the ring. The table is 2.5× the old rectangle (`TABLE_SCALE`) so a
+d6 reads as a die on it. On a seated table the ladder keeps the whole-table
+frame; the dice rungs are the solo felt's.
+
+**Demo mode** (`?demo=1`, TESTING.md) draws the ring, each seat's spot and
+spawn line from `seatToss`'s own output, so the overlay cannot disagree with
+the film; `tools/steps/ring-look.mjs` deals N, shoots it, throws from every
+seat and prints each pool's distance from its spot.
+
+**Not yet:** the venues' dress was composed on the rectangle and stands out of
+frame on the round table (ROADMAP row 17); the tower's pour is untouched and
+its chairs share the front arc (row 15).
