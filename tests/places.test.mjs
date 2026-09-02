@@ -33,6 +33,7 @@ import {
   AIM_HULL, RING_BASE, TOWER_ARC, PLACARD_CLEAR, SPAWN_IN, DIE_W, TURN_NONE, TURN_HALF,
   seatTrig, rayRect, slabSpan, wrapPi, seatValid, seatStamp, placeTheta, seatAnchor,
   spawnMid, laneAndChord, sideFor, wedgeFor, inWedge, seatAim, readTurn,
+  ringRadius, seatToss, RING_SPOT, TOSS_BACK,
 } from '../js/places.js';
 
 let n = 0;
@@ -445,6 +446,24 @@ t('the aim is a pure function of the stamp and the mat — the pool never enters
 const DEG = Math.PI / 180;
 const NS = [1, 2, 3, 4, 5, 6, 7, 8];
 // Every (mat × N × seat) cell: 6 mats × 36 seats = 216.
+// THE ROUND TABLE (2026-09-01): the real presets are the pre-ring ones x
+// TABLE_SCALE (js/main.js), square, and a card stands at ringRadius(w) +
+// PLACARD_STANDOFF on its own ray whatever the depth. These rows read the
+// ring's own mats; the rectangle-era rows above keep ZOOMS.
+const TABLE_SCALE = 2.5;
+const RING_MATS = [];
+for (const [id, z] of Object.entries(ZOOMS)) {
+  const w = z.w * TABLE_SCALE;
+  RING_MATS.push({ id, w, d: w, towerUp: false });
+  RING_MATS.push({ id: `${id}+tower`, w, d: w + TOWER_MAT_EXTRA, towerUp: true });
+}
+const ringR = (w) => ringRadius(w) + PLACARD_STANDOFF;
+const ringCells = (fn) => {
+  for (const mat of RING_MATS) {
+    const arc = mat.towerUp ? 1 : 0;
+    for (const N of NS) for (let k = 0; k < N; k++) fn(mat, N, k, arc);
+  }
+};
 const cells = (fn) => {
   for (const mat of MATS) {
     const arc = mat.towerUp ? 1 : 0;
@@ -607,80 +626,65 @@ t('ring P1: placeTheta is the one expression (2*pi*k)/N, and seat 0 is the doubl
   assert.equal(placeTheta(2, 2, 0), null);
 });
 
-t('ring P2: two sit opposite — theta differs by exactly pi, anchors exact negatives', () => {
-  // The v2 "neither dead centre" half of the old row is DELETED here on
-  // purpose: on the ring N=2 IS dead centre of each long edge, and the defect
-  // it guarded (the own card printing through #result-banner) moves to the
-  // camera gate G1 (DESIGN-RING §7.6), measured in S4 before the layout lands.
+t('ring P2: two sit opposite — theta differs by exactly pi, anchors exact negatives, both on the ring', () => {
   assert.equal(placeTheta(1, 2, 0) - placeTheta(0, 2, 0), Math.PI);
-  for (const mat of MATS.filter((m) => !m.towerUp)) {
+  for (const mat of RING_MATS.filter((m) => !m.towerUp)) {
     const a = seatAnchor(0, 2, 0, mat.w, mat.d);
     const b = seatAnchor(1, 2, 0, mat.w, mat.d);
     assert.ok(a.x === -b.x, `${mat.id}: x mirrors exactly (${a.x} vs ${-b.x})`);
     assert.ok(a.z === -b.z, `${mat.id}: z mirrors exactly (${a.z} vs ${-b.z})`);
     assert.ok(Object.is(a.x, 0) && Object.is(b.x, 0), `${mat.id}: both dead centre — +0, not 5e-16`);
     assert.ok(a.z > 0, 'seat 0 is the near edge');
-    assert.equal(a.z, mat.d / 2 + PLACARD_STANDOFF, `${mat.id}: the shipped front z`);
+    assert.equal(a.z, ringR(mat.w), `${mat.id}: on the ring, a standoff past the rim`);
   }
 });
 
-t('ring P3: three make a triangle — unit rays sum to zero at 0, 2pi/3, 4pi/3', () => {
+t('ring P3: three make a triangle — unit rays sum to zero at 0, 2pi/3, 4pi/3, all at one radius', () => {
   const th = [0, 1, 2].map((k) => placeTheta(k, 3, 0));
   assert.deepEqual(th, [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3]);
   let sx = 0;
   let sz = 0;
   for (const a of th) { const { s, c } = seatTrig(a); sx += s; sz += c; }
   assert.ok(Math.hypot(sx, sz) < 1e-12, `the three unit rays cancel (${Math.hypot(sx, sz)})`);
-  const { w, d } = ZOOMS.medium;
-  const A = [0, 1, 2].map((k) => seatAnchor(k, 3, 0, w, d));
-  assert.ok(Math.abs(A[1].x + A[2].x) < 1e-12 && Math.abs(A[1].z - A[2].z) < 1e-12, 'seats 1 and 2 mirror in x');
-  assert.ok(Math.abs(A[1].x - 7.178) < 5e-3 && Math.abs(A[1].z + 4.144) < 5e-3, `seat 1 at (7.178, -4.144): (${A[1].x}, ${A[1].z})`);
-  for (const a of A) assert.ok(Math.abs(wrapPi(Math.atan2(a.x, a.z) - a.azim)) < 1e-12, 'each card stands on its own ray');
+  for (const mat of RING_MATS.filter((m) => !m.towerUp)) {
+    const A = [0, 1, 2].map((k) => seatAnchor(k, 3, 0, mat.w, mat.d));
+    assert.ok(Math.abs(A[1].x + A[2].x) < 1e-12 && Math.abs(A[1].z - A[2].z) < 1e-12, 'seats 1 and 2 mirror in x');
+    for (const a of A) {
+      assert.ok(Math.abs(Math.hypot(a.x, a.z) - ringR(mat.w)) < 1e-9, `${mat.id}: every card at the ring's radius`);
+      assert.ok(Math.abs(wrapPi(Math.atan2(a.x, a.z) - a.azim)) < 1e-12, 'each card stands on its own ray');
+    }
+  }
 });
 
-t('ring P4: six make a hexagon — 60-degree steps, mirrored pairs', () => {
-  const { w, d } = ZOOMS.medium;
+t('ring P4: six make a hexagon — 60-degree steps, mirrored pairs, one radius', () => {
+  const { w, d } = RING_MATS[2];
   const A = [0, 1, 2, 3, 4, 5].map((k) => seatAnchor(k, 6, 0, w, d));
   for (let k = 1; k < 6; k++) assert.ok(Math.abs((A[k].azim - A[k - 1].azim) - Math.PI / 3) < 1e-12, `step ${k} is 60 degrees`);
   for (const [i, j] of [[1, 5], [2, 4]]) {
     assert.ok(Math.abs(A[i].x + A[j].x) < 1e-12 && Math.abs(A[i].z - A[j].z) < 1e-12, `${i} and ${j} mirror in x`);
   }
   assert.ok(Math.abs(A[0].x - A[3].x) < 1e-12 && Math.abs(A[0].z + A[3].z) < 1e-12, '0 and 3 mirror in z');
-  assert.ok(Math.abs(A[1].x - 7.178) < 5e-3 && Math.abs(A[1].z - 4.144) < 5e-3, `seat 1 at (7.178, 4.144): (${A[1].x}, ${A[1].z})`);
-  assert.ok(Math.abs(A[1].r - 8.289) < 5e-3, 'R alternates 4.21 / 8.29 because the MAT is 1.64:1, not because the ring is not a ring');
+  for (const a of A) assert.ok(Math.abs(a.r - ringR(w)) < 1e-9, 'a ring: every card at one radius');
 });
 
-t('ring P5: the axis seats of N=2 and N=4 are the rectangle\'s stations, to the bit, on every mat', () => {
-  // S1 checked seatAnchor(0,2)/(1,2)/(1,4)/(3,4) against placeAnchor(6)/(7)/
-  // (4)/(5) as an identity of doubles while both existed. placeAnchor is gone
-  // (S4), so the claim is pinned as the LITERAL EXPRESSION it computed —
-  // `+-(d / 2 + PLACARD_STANDOFF)` on the long edges, `+-(w / 2 +
-  // PLACARD_STANDOFF)` at the heads, the other coordinate the double 0 — with
-  // `===`, not a tolerance. The parenthesisation in seatAnchor (`half + (hx +
-  // CLEAR)`) is what makes these land on `half + 0.86`.
-  for (const mat of MATS.filter((m) => !m.towerUp)) {
-    const front = { x: 0, z: mat.d / 2 + PLACARD_STANDOFF, azim: 0 };
-    const back = { x: 0, z: -(mat.d / 2 + PLACARD_STANDOFF), azim: Math.PI };
-    const right = { x: mat.w / 2 + PLACARD_STANDOFF, z: 0, azim: Math.PI / 2 };
-    const left = { x: -(mat.w / 2 + PLACARD_STANDOFF), z: 0, azim: 3 * Math.PI / 2 };
-    for (const [k, N, o, who] of [[0, 2, front, 'front'], [1, 2, back, 'back'], [1, 4, right, 'right head'], [3, 4, left, 'left head'],
-      [0, 4, front, 'front'], [2, 4, back, 'back']]) {
-      const a = seatAnchor(k, N, 0, mat.w, mat.d);
-      assert.equal(a.x, o.x, `${mat.id} seat ${k}/${N} x === the ${who} station's (${a.x} vs ${o.x})`);
-      assert.equal(a.z, o.z, `${mat.id} seat ${k}/${N} z === the ${who} station's (${a.z} vs ${o.z})`);
-      assert.equal(a.azim, o.azim, `${mat.id} seat ${k}/${N} azim`);
+t('ring P5: four sit at the quarter turns, on the axes, at the ring\'s radius, with exact zeros', () => {
+  for (const mat of RING_MATS.filter((m) => !m.towerUp)) {
+    const r = ringR(mat.w);
+    const want = [[0, r, 0], [r, 0, Math.PI / 2], [0, -r, Math.PI], [-r, 0, 3 * Math.PI / 2]];
+    for (const [k, [x, z, azim]] of want.entries()) {
+      const a = seatAnchor(k, 4, 0, mat.w, mat.d);
+      assert.equal(a.x, x, `${mat.id} seat ${k}/4 x`);
+      assert.equal(a.z, z, `${mat.id} seat ${k}/4 z`);
+      assert.equal(a.azim, azim, `${mat.id} seat ${k}/4 azim`);
       assert.equal(a.y, 0);
       assert.equal(a.relocated, false);
     }
   }
-  // The digit table, for the reader: front/back z and head x per mat.
-  const want = { wide: [5.16, 7.91], medium: [4.21, 6.36], close: [3.46, 5.16] };
-  for (const [id, [edgeZ, headX]] of Object.entries(want)) {
-    const { w, d } = ZOOMS[id];
-    assert.ok(Math.abs(seatAnchor(0, 4, 0, w, d).z - edgeZ) < 5e-3, `${id} front z`);
-    assert.ok(Math.abs(seatAnchor(1, 4, 0, w, d).x - headX) < 5e-3, `${id} right head x`);
-    assert.ok(Math.abs(seatAnchor(2, 4, 0, w, d).z + edgeZ) < 5e-3, `${id} back z`);
-    assert.ok(Math.abs(seatAnchor(3, 4, 0, w, d).x + headX) < 5e-3, `${id} left head x`);
+  // The digit, for the reader: the ring's radius per preset.
+  const want = { wide: 18.49, medium: 14.61, close: 11.61 };
+  for (const [id, r] of Object.entries(want)) {
+    const mat = RING_MATS.find((m) => m.id === id);
+    assert.ok(Math.abs(seatAnchor(0, 4, 0, mat.w, mat.d).z - r) < 5e-3, `${id} ring radius ${r}`);
   }
 });
 
@@ -700,22 +704,15 @@ t('ring: every card stands on its own ray, and the anchor carries the stamp it w
 
 // --- the footprint and the gap: P8, P9, the regression, the frustum -----------
 
-t('ring P8: every card stands outboard of a wall by 0.10 of clear ground, on the OBB, at every theta', () => {
-  let mn = Infinity;
-  let mx = -Infinity;
+t('ring P8: every card\'s inboard edge stands PLACARD_CLEAR outside the rim, at every theta and every mat', () => {
   let count = 0;
-  cells((mat, N, k) => {
-    const [box] = [placardFootprint(seatAnchor(k, N, mat.towerUp ? 1 : 0, mat.w, mat.d))];
-    const outX = Math.abs(box.x) - box.hx - mat.w / 2;
-    const outZ = Math.abs(box.z) - box.hz - mat.d / 2;
-    const o = Math.max(outX, outZ);
-    mn = Math.min(mn, o);
-    mx = Math.max(mx, o);
+  ringCells((mat, N, k, arc) => {
+    const a = seatAnchor(k, N, arc, mat.w, mat.d);
+    const o = Math.hypot(a.x, a.z) - PLACARD_D / 2 - ringRadius(mat.w);
     count++;
-    assert.ok(o >= 0.0999 && o <= 0.1001, `${mat.id} ${k}/${N}: inboard edge is ${o.toFixed(4)} past the wall`);
+    assert.ok(Math.abs(o - PLACARD_CLEAR) < 1e-9, `${mat.id} ${k}/${N}: inboard edge is ${o.toFixed(4)} past the rim`);
   });
   assert.equal(count, 216, '6 mats x 36 seats');
-  assert.ok(mn > 0.0999 && mx < 0.1001, `0.1000 in every cell (min ${mn}, max ${mx})`);
 });
 
 t('ring: the footprint\'s AABB is right at every angle now — the old |cos| < 0.5 swap was 2.4x short at 45 degrees', () => {
@@ -735,7 +732,7 @@ t('ring: the footprint\'s AABB is right at every angle now — the old |cos| < 0
   assert.equal(placardFootprint(null), null);
 });
 
-t('ring: the SAT gap equals the old AABB gap for two cards on one edge, and stops lying about diagonal neighbours', () => {
+t('ring: the SAT gap equals the old AABB gap for two cards on one edge, and never exceeds the centre distance', () => {
   const oldGap = (a, b) => {
     const dx = Math.abs(a.x - b.x) - a.hx - b.hx;
     const dz = Math.abs(a.z - b.z) - a.hz - b.hz;
@@ -750,35 +747,11 @@ t('ring: the SAT gap equals the old AABB gap for two cards on one edge, and stop
   const c = placardFootprint({ x: 0, z: -(d / 2 + PLACARD_STANDOFF), azim: Math.PI });
   assert.ok(placardGap(b, c) > 6, 'opposite cards are the mat apart');
   assert.equal(placardGap(a, b), placardGap(b, a), 'symmetric');
-  // THE TWO LIES THE OLD FORMS TOLD, measured (S1; the design's own example
-  // cell did not reproduce — no ring pair has a negative AABB gap and a
-  // positive SAT gap — so the real pairs are pinned instead):
-  //   1. the |cos| < 0.5 SWAP over-reports at a diagonal: close / N=7 seats 3
-  //      and 4 read 0.349 — over the 0.30 floor — where the true clearance is
-  //      0.049. The old footprint would have HIDDEN the recorded exception.
-  //   2. the true-extent AABB under-reports at a diagonal: close+tower / N=8
-  //      seats 2 and 3 read 0.288 — a false floor breach — where the oriented
-  //      boxes stand 0.670 apart.
-  const oldSwap = (a) => {
-    const turned = Math.abs(Math.cos(a.azim)) < 0.5;
-    return { x: a.x, z: a.z, hx: (turned ? PLACARD_D : PLACARD_W) / 2, hz: (turned ? PLACARD_W : PLACARD_D) / 2 };
-  };
-  const c3 = placardFootprint(seatAnchor(3, 7, 0, 8.6, 5.2));
-  const c4 = placardFootprint(seatAnchor(4, 7, 0, 8.6, 5.2));
-  assert.ok(Math.abs(oldGap(oldSwap(c3), oldSwap(c4)) - 0.349) < 5e-3, `the swap said ${oldGap(oldSwap(c3), oldSwap(c4)).toFixed(3)}`);
-  assert.ok(Math.abs(placardGap(c3, c4) - 0.049) < 5e-3, `the SAT says ${placardGap(c3, c4).toFixed(3)}`);
-  const t2 = placardFootprint(seatAnchor(2, 8, 1, 8.6, 9.7));
-  const t3 = placardFootprint(seatAnchor(3, 8, 1, 8.6, 9.7));
-  assert.ok(Math.abs(oldGap(t2, t3) - 0.288) < 5e-3, `the true AABB said ${oldGap(t2, t3).toFixed(3)}`);
-  assert.ok(Math.abs(placardGap(t2, t3) - 0.670) < 5e-3, `the SAT says ${placardGap(t2, t3).toFixed(3)}`);
-  // And the SAT gap is a FLOOR on the true clear ground: it never exceeds the
-  // centre distance, and for two axis-aligned cards it is the axis gap, not
-  // the hypot the old form returned when both axes were clear.
   const p = placardFootprint({ x: 0, z: 0, azim: 0 });
   const q = placardFootprint({ x: 6, z: 4, azim: 0 });
   assert.ok(Math.abs(oldGap(p, q) - Math.hypot(6 - PLACARD_W, 4 - PLACARD_D)) < 1e-12, 'the old form: hypot of the two axis gaps');
   assert.ok(Math.abs(placardGap(p, q) - Math.max(6 - PLACARD_W, 4 - PLACARD_D)) < 1e-12, 'the SAT: the best single axis');
-  cells((mat, N, k, arc) => {
+  ringCells((mat, N, k, arc) => {
     if (k === 0) return;
     const a2 = placardFootprint(seatAnchor(k - 1, N, arc, mat.w, mat.d));
     const b2 = placardFootprint(seatAnchor(k, N, arc, mat.w, mat.d));
@@ -786,61 +759,28 @@ t('ring: the SAT gap equals the old AABB gap for two cards on one edge, and stop
   });
 });
 
-t('ring P9: no two cards overlap anywhere; the 0.30 floor holds everywhere but two RECORDED cells', () => {
-  // Every cell measured (DESIGN-RING §2.2). Two cells under the floor, recorded,
-  // not weakened: close/N=7 = 0.049 and close+tower/N=8 = 0.263 (v3's rectangle
-  // recorded a -0.568 OVERLAP at close; the ring overlaps nowhere).
-  const RECORDED = [
-    { id: 'close', N: 7, gap: 0.049 },
-    { id: 'close+tower', N: 8, gap: 0.263 },
-  ];
-  const seen = [];
-  for (const mat of MATS) {
+t('ring P9: no two cards overlap anywhere, and the 0.30 floor holds in every cell of the round table', () => {
+  for (const mat of RING_MATS) {
+    const arc = mat.towerUp ? 1 : 0;
     for (const N of NS.filter((n) => n >= 2)) {
-      const boxes = ringBoxes(mat, N);
+      const boxes = [];
+      for (let k = 0; k < N; k++) boxes.push(placardFootprint(seatAnchor(k, N, arc, mat.w, mat.d)));
       let worst = Infinity;
       for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) worst = Math.min(worst, placardGap(boxes[i], boxes[j]));
-      assert.ok(worst > 0, `${mat.id} N=${N}: cards overlap by ${(-worst).toFixed(3)}`);
-      const rec = RECORDED.find((r) => r.id === mat.id && r.N === N);
-      if (rec) {
-        seen.push(rec);
-        assert.ok(Math.abs(worst - rec.gap) < 5e-3, `${mat.id} N=${N}: recorded ${rec.gap}, measured ${worst.toFixed(3)}`);
-      } else {
-        assert.ok(worst >= PLACARD_GAP, `${mat.id} N=${N}: worst pair is ${worst.toFixed(3)} apart — the floor is 0.30`);
-      }
+      assert.ok(worst >= PLACARD_GAP, `${mat.id} N=${N}: worst pair is ${worst.toFixed(3)} apart — the floor is 0.30`);
     }
   }
-  assert.equal(seen.length, RECORDED.length, 'both recorded cells were visited');
-  // The medium table, to the digit, for the reader.
-  const medium = {};
-  for (const N of [2, 3, 4, 5, 6, 7, 8]) {
-    const boxes = ringBoxes(MATS[2], N);
-    let worst = Infinity;
-    for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) worst = Math.min(worst, placardGap(boxes[i], boxes[j]));
-    medium[N] = Number(worst.toFixed(2));
-  }
-  assert.equal(MATS[2].id, 'medium');
-  assert.deepEqual(medium, { 2: 6.9, 3: 7.66, 4: 3.76, 5: 2.92, 6: 3.76, 7: 0.7, 8: 1.61 });
 });
 
 t('ring: every card is inside the shadow frustum, on the OBB\'s true AABB', () => {
   // updateShadowFrustum (js/main.js): +-(TABLE_W/2 + 4) by +-(TABLE_D/2 + 6).
-  // Stricter for free now that hx/hz are right at a diagonal; tightest slack
-  // 0.169 at close+tower N7 k4, recorded (the design's 0.223 at medium+tower
-  // N8 k2 was derived at a 120-degree arc; 150 is what shipped).
-  let tight = Infinity;
-  let where = '';
-  cells((mat, N, k, arc) => {
+  ringCells((mat, N, k, arc) => {
     const box = placardFootprint(seatAnchor(k, N, arc, mat.w, mat.d));
     const sx = mat.w / 2 + 4 - (Math.abs(box.x) + box.hx);
     const sz = mat.d / 2 + 6 - (Math.abs(box.z) + box.hz);
     assert.ok(sx >= 0, `${mat.id} ${k}/${N} in x (${sx.toFixed(3)})`);
     assert.ok(sz >= 0, `${mat.id} ${k}/${N} in z (${sz.toFixed(3)})`);
-    const s = Math.min(sx, sz);
-    if (s < tight) { tight = s; where = `${mat.id} N${N} k${k}`; }
   });
-  assert.ok(Math.abs(tight - 0.169) < 5e-3, `tightest slack ${tight.toFixed(3)} at ${where} (recorded 0.169 at close+tower N7 k4)`);
-  assert.equal(where, 'close+tower N7 k4');
 });
 
 t('ring P12: under a tower the chairs spread over the front arc — equal pitch, symmetric, off the back wall', () => {
@@ -887,9 +827,9 @@ t('ring P12: under a tower the chairs spread over the front arc — equal pitch,
 
 t('ring: no arc card lands inside a tower volume, N=1..8, at every tower mat', () => {
   // towerVolumes (js/main.js) at the classic portal spec — the same seven boxes
-  // the rectangle's row above uses.
+  // the rectangle's row above uses; z0 is the back wall of the square mat.
   const S = 1.25;
-  for (const mat of MATS.filter((m) => m.towerUp)) {
+  for (const mat of RING_MATS.filter((m) => m.towerUp)) {
     const z0 = -mat.d / 2;
     const vols = {
       socket: { x: 0, z: z0 - 2.0 * S, hx: 5.2 * S / 2, hz: 4.4 * S / 2 },
@@ -908,6 +848,23 @@ t('ring: no arc card lands inside a tower volume, N=1..8, at every tower mat', (
       }
     }
   }
+});
+
+t('ring: the toss — born TOSS_BACK behind the spot on the seat\'s own ray, the spot at RING_SPOT of the radius', () => {
+  ringCells((mat, N, k, arc) => {
+    const toss = seatToss(k, N, arc, mat.w);
+    const theta = placeTheta(k, N, arc);
+    assert.equal(toss.theta, theta, 'one producer of theta');
+    const R = ringRadius(mat.w);
+    assert.ok(Math.abs(Math.hypot(toss.ax, toss.az) - R * RING_SPOT) < 1e-9, 'the spot is on the ring\'s half radius');
+    assert.ok(Math.abs(Math.hypot(toss.x, toss.z) - (R * RING_SPOT + TOSS_BACK)) < 1e-9, 'the line is TOSS_BACK behind it');
+    if (Math.hypot(toss.ax, toss.az) > 0) {
+      assert.ok(Math.abs(wrapPi(Math.atan2(toss.ax, toss.az) - theta)) < 1e-9, 'the spot is on the ray');
+      assert.ok(Math.abs(wrapPi(Math.atan2(toss.x, toss.z) - theta)) < 1e-9, 'so is the line');
+    }
+    assert.ok(Math.abs(toss.tx * Math.sin(theta) + toss.tz * Math.cos(theta)) < 1e-9, 'the line runs across the ray');
+  });
+  assert.equal(seatToss(1, 1, 0, 27.5), null, 'a bad stamp has no toss');
 });
 
 t('ring P11: no seat angle stands within 0.4 degrees of a rim corner — the anchor discontinuity is unreachable', () => {

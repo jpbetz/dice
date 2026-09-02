@@ -18,10 +18,11 @@ limitations under the License.
 //
 // A `place` is the station (js/places.js owns that arithmetic). A PLACARD is
 // the thing you can see: a folded tent card in a low holder, standing just
-// outboard of the wall where the dice stop, with somebody's name on it. Plus
+// outside the rim of the round table on its own ray, with somebody's name on
+// it (js/places.js seatAnchor: seat k of N at 2π·k/N since 2026-09-01). Plus
 // the WASH — the transient arc of the roller's hue that lies on the ground
 // under THEIR card while their film plays, which is the second half of the
-// attribution rule ("attribution is edge + wash"): a placeless roll comes in
+// attribution rule ("attribution is seat + wash"): a placeless roll comes in
 // on a seeded edge and lights nothing, so it can never wear the name of
 // whoever's card its random edge happened to cross.
 //

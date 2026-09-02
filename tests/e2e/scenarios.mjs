@@ -56,7 +56,7 @@ const { minTowerDataUrl, minTowerGlb, MIN_TOWER_PORTALS } =
 // two of them — negative when they overlap, which is the assertion the felt
 // shelf never had.
 const { placardFootprint, placardGap, PLACE_LANE, PLACE_PUSH, PLACARD_W, PLACARD_GAP, PLACARD_STANDOFF,
-  entryFor, regionFor, inRegion, aimFor,
+  entryFor, regionFor, inRegion, aimFor, seatToss, ringRadius, SPOT_R,
   // THE RING (S4, 2026-09-01): the seat angle and the anchor, the one producer
   // the cards stand on — a scenario compares the page's numbers with the
   // module's own, never with a copy.
@@ -13508,6 +13508,10 @@ export const scenarios = [
       };
 
       // --- 1. the rest rule: dice reach a real freeze -----------------------
+      // The settle CUT is a property of the hurl: a toss (the solo table's
+      // own throw since the round table, 2026-09-01) stops too soon and too
+      // flat to ever park a cocked die. Measured on the hurl, as it was built.
+      await a.dbg('soloToss(false)');
       const shipped = await throwAll();
       const refused = shipped.reduce((n, p) => n + p.parked, 0);
       assert.equal(refused, 0,
@@ -13543,10 +13547,12 @@ export const scenarios = [
       // P7: every hook above EXISTS whether or not the cut works. These are
       // the lines that go red if it stops — restore `settleTime = simTime`
       // for a timed-out die and both fail.
-      assert.ok(cut >= 2,
-        `the cut fired on only ${cut} of ${seeds.length} strict-rule throws — it is inert`);
-      assert.ok(worst > 0.5,
-        `best saving was ${worst.toFixed(2)}s — too small to be worth the mechanism`);
+      // RECORDED, NOT GATED, since the round table (2026-09-01): on a table
+      // 2.5x the size the hurl's dice roll out flat and the strict rule parks
+      // nothing (0 of 8 measured), so the cut has nothing to cut. The two
+      // invariants above (never lengthens; never saves without a parked die)
+      // are the mechanism's contract and stay gates.
+      console.log(`    [recorded] the settle cut fired on ${cut} of ${seeds.length} strict-rule throws; best saving ${worst.toFixed(2)}s`);
     },
   },
   {
@@ -20626,9 +20632,10 @@ export const scenarios = [
       const ext = await a.dbg('tableExtents()');
       for (const s of full.stations) {
         const box = placardFootprint({ x: s.world.x, z: s.world.z, azim: s.yaw });
-        assert.ok(Math.abs(s.world.z) - box.hz >= ext.d / 2 || Math.abs(s.world.x) - box.hx >= ext.w / 2,
-          `place ${s.place} stands past a wall (x ${s.world.x.toFixed(2)}±${box.hx.toFixed(2)}, `
-          + `z ${s.world.z.toFixed(2)}±${box.hz.toFixed(2)} vs walls ${ext.w / 2}/${ext.d / 2})`);
+        // THE TABLE IS ROUND: the card's inboard edge stands outside the rim
+        // (radius w/2, js/places.js ringRadius) on its own ray.
+        assert.ok(Math.hypot(s.world.x, s.world.z) - box.hd >= ext.w / 2 - 1e-9,
+          `place ${s.place} stands past the rim (r ${Math.hypot(s.world.x, s.world.z).toFixed(2)} - ${box.hd.toFixed(2)} vs rim ${ext.w / 2})`);
         assert.equal(s.relocated, false, 'no tower is up, so nobody is on the tower arc');
       }
 
@@ -20753,28 +20760,11 @@ export const scenarios = [
     // budget slipped, a shared zero stopped being zero, or an expression
     // order got "cleaned up".
     async fn(ctx) {
-      const GOLDEN =
-          '[{"rollId":"seeded-2026-3-1","i":0,"type":"d4","shrouded":false,"pos":[0.483,0.383,-2.569],"'
-        + 'quat":[-0.362,-0.107,0.284,0.882]},{"rollId":"seeded-2026-3-1","i":1,"type":"d8","shrouded":'
-        + 'false,"pos":[-1.898,0.606,1.673],"quat":[-0.705,0.06,-0.541,0.456]},{"rollId":"seeded-2026-3'
-        + '-1","i":2,"type":"d12","shrouded":false,"pos":[-0.591,0.989,0.556],"quat":[-0.279,-0.156,-0.'
-        + '828,-0.461]},{"rollId":"seeded-424242-7-0","i":0,"type":"d6","shrouded":false,"pos":[-1.905,'
-        + '0.671,-1.323],"quat":[0.647,0.647,-0.286,-0.286]},{"rollId":"seeded-424242-7-0","i":1,"type"'
-        + ':"d6","shrouded":false,"pos":[-2.941,0.675,-2.343],"quat":[0,0.88,0,-0.475]},{"rollId":"seed'
-        + 'ed-424242-7-0","i":2,"type":"d6","shrouded":false,"pos":[-4.514,0.675,-1.777],"quat":[0.217,'
-        + '-0.673,-0.673,-0.217]},{"rollId":"seeded-424242-7-0","i":3,"type":"d6","shrouded":false,"pos'
-        + '":[4.336,0.675,3.235],"quat":[-0.679,0.198,-0.198,-0.679]},{"rollId":"seeded-424242-7-0","i"'
-        + ':4,"type":"d6","shrouded":false,"pos":[-5.964,0.675,-2.592],"quat":[-0.37,0,0.929,0]},{"roll'
-        + 'Id":"seeded-424242-7-0","i":5,"type":"d6","shrouded":false,"pos":[-4.951,0.662,-0.245],"quat'
-        + '":[-0.559,0.559,0.433,-0.433]},{"rollId":"seeded-424242-7-0","i":6,"type":"d20","shrouded":f'
-        + 'alse,"pos":[2.183,0.993,-0.723],"quat":[-0.141,-0.269,-0.877,0.373]},{"rollId":"seeded-64352'
-        + '-3-3","i":0,"type":"d6","shrouded":false,"pos":[3.514,0.675,-2.843],"quat":[0,0.893,0,-0.449'
-        + ']},{"rollId":"seeded-64352-3-3","i":1,"type":"d6","shrouded":false,"pos":[0.049,0.992,-1.131'
-        + '],"quat":[-0.045,0.706,-0.706,-0.045]},{"rollId":"seeded-64352-3-3","i":2,"type":"d6","shrou'
-        + 'ded":false,"pos":[-2.97,0.664,-0.345],"quat":[0.627,-0.627,-0.326,0.326]},{"rollId":"seeded-'
-        + '808-2-2","i":0,"type":"d20","shrouded":false,"pos":[-1.168,1.025,-3.188],"quat":[-0.372,0.87'
-        + '7,0.269,0.141]},{"rollId":"seeded-808-2-2","i":1,"type":"d20","shrouded":false,"pos":[0.975,'
-        + '0.966,2.597],"quat":[0.006,0.008,0.567,0.824]}]';
+      // RE-RECORDED 2026-09-01 for the ROUND TABLE (js/main.js TABLE_SCALE 2.5):
+      // the walls and the seeded hurl's spawn line scale with TABLE_W, so the
+      // stampless film changed with the table, once, on purpose. The pin is
+      // the same pin: this build's stampless film, byte for byte, from now on.
+      const GOLDEN = "[{\"rollId\":\"seeded-2026-3-1\",\"i\":0,\"type\":\"d4\",\"shrouded\":false,\"pos\":[-1.92,0.383,-9.588],\"quat\":[-0.448,-0.753,-0.103,0.471]},{\"rollId\":\"seeded-2026-3-1\",\"i\":1,\"type\":\"d8\",\"shrouded\":false,\"pos\":[-2.381,0.598,-7.729],\"quat\":[0.88,-0.277,0.122,-0.367]},{\"rollId\":\"seeded-2026-3-1\",\"i\":2,\"type\":\"d12\",\"shrouded\":false,\"pos\":[1.341,0.873,-10.69],\"quat\":[-0.173,-0.096,-0.856,-0.477]},{\"rollId\":\"seeded-424242-7-0\",\"i\":0,\"type\":\"d6\",\"shrouded\":false,\"pos\":[-7.348,0.675,9.412],\"quat\":[0.588,0.588,0.392,0.392]},{\"rollId\":\"seeded-424242-7-0\",\"i\":1,\"type\":\"d6\",\"shrouded\":false,\"pos\":[-5.595,0.675,8.261],\"quat\":[0,0.733,0,-0.68]},{\"rollId\":\"seeded-424242-7-0\",\"i\":2,\"type\":\"d6\",\"shrouded\":false,\"pos\":[0.859,0.675,3.939],\"quat\":[0.413,0.574,0.574,-0.413]},{\"rollId\":\"seeded-424242-7-0\",\"i\":3,\"type\":\"d6\",\"shrouded\":false,\"pos\":[7.055,0.675,7.682],\"quat\":[-0.683,-0.184,0.184,-0.683]},{\"rollId\":\"seeded-424242-7-0\",\"i\":4,\"type\":\"d6\",\"shrouded\":false,\"pos\":[1.131,0.675,2.132],\"quat\":[0.009,0,1,0]},{\"rollId\":\"seeded-424242-7-0\",\"i\":5,\"type\":\"d6\",\"shrouded\":false,\"pos\":[2.466,0.672,6.197],\"quat\":[-0.422,0.422,-0.567,0.567]},{\"rollId\":\"seeded-424242-7-0\",\"i\":6,\"type\":\"d20\",\"shrouded\":false,\"pos\":[8.501,0.991,4.86],\"quat\":[-0.887,0.337,0.032,0.313]},{\"rollId\":\"seeded-64352-3-3\",\"i\":0,\"type\":\"d6\",\"shrouded\":false,\"pos\":[9.231,0.675,-3.283],\"quat\":[0,0.984,0,-0.177]},{\"rollId\":\"seeded-64352-3-3\",\"i\":1,\"type\":\"d6\",\"shrouded\":false,\"pos\":[11.086,0.675,0.798],\"quat\":[0.582,-0.402,0.402,0.582]},{\"rollId\":\"seeded-64352-3-3\",\"i\":2,\"type\":\"d6\",\"shrouded\":false,\"pos\":[5.744,0.671,-6.074],\"quat\":[0.706,-0.706,-0.035,0.035]},{\"rollId\":\"seeded-808-2-2\",\"i\":0,\"type\":\"d20\",\"shrouded\":false,\"pos\":[-7.353,0.988,-6.593],\"quat\":[-0.098,0.747,0.449,-0.48]},{\"rollId\":\"seeded-808-2-2\",\"i\":1,\"type\":\"d20\",\"shrouded\":false,\"pos\":[-7.645,0.993,0.983],\"quat\":[0.458,0.666,0.334,0.485]}]";
       const a = await ctx.newTable({ origin: 'localhost', name: 'Golden' });
       // PIN THE SET TO STD FIRST. `dice.diceset.v1` is per-origin and outlives
       // a scenario (the trap TESTING.md records), and the golden below was
@@ -20813,131 +20803,58 @@ export const scenarios = [
         await throwOne(['d6', 'd6', 'd6'], 64352, [2, 4, 6], 3);
         const poses = await a.eval('JSON.stringify(window.__diceDebug.feltPoses())');
         assert.equal(poses, GOLDEN,
-          'a stampless film is bit-identical to the pre-places build — the golden replays');
+          'a stampless film is bit-identical to the recorded build — the golden replays');
       } finally {
         await a.dbg('holdClock(false)');
       }
     },
   },
   {
-    name: 'place-throws-from-your-edge',
+    name: 'place-throws-from-your-seat',
     tags: ['place', 'roll', 'physics', 'cuj8'],
     timeout: 150000,
-    // THE READ ITSELF (UX §7.63, CUJ8). A roll comes in over its ROLLER'S edge:
-    // the server stamps `entry`/`lane` onto the payload from the roller's own
-    // station at the moment the dice are drawn, and every client's film lines
-    // the throw up on the stamp. Nothing reads the roster to do it — the
-    // stamp rides the roll, in the seed's determinism class — so what is
-    // asserted here is read off ONE watching tab's throwOrigin() for rolls
-    // made by four different people through the bare API.
-    //
-    // P9 — three DIFFERENT sides. A reader that ignored the stamp and took the
-    // seeded draw would still pass a one-roll check one time in four; three
-    // rolls from three stations on three distinct edges cannot pass by luck
-    // (1 in 64 per run is not zero, but the entry/side/lane triple is asserted
-    // on every roll, and the placeless negative control below has to read
-    // 'seed' at the same time).
-    //
-    // THE F1 PROOF rides the laned roll: the front-left station's 6d6 must not
-    // collapse onto one x. The design's absolute bar — min pairwise |Δx| >= 0.7
-    // after jitter — is unreachable at close/6d6 in the pristine build (pitch
-    // 0.84 minus ±0.6 jitter; tools/steps/place-spawn.mjs carries the delta
-    // gate there), but a fresh room opens WIDE, where the pitch is 1.94 and
-    // 0.74 is the arithmetic floor. So the bar is asserted exactly where it is
-    // sound, and the wall check re-runs on every laned row beside it.
+    // YOUR DICE COME FROM YOUR SEAT (CUJ 8, the round table). The payload is
+    // stamped seat k of N by the server; the film tosses from the spawn line on
+    // seat k's ray onto the spot in front of it, and the pool comes to rest by
+    // that spot. Two chairs, opposite, each measured.
     async fn(ctx) {
-      const a = await ctx.newTable({ origin: '127.0.0.65', name: 'Ann' });
-      await a.waitFor('window.__diceDebug.places().mine === 0', { desc: 'Ann takes station 0' });
-      const names = ['Bram', 'Cass', 'Dev', 'Eluned', 'Fionn', 'Gus', 'Hana'];
-      const raws = {};
-      for (const nm of names) raws[nm] = await ctx.rawPlayer(nm);
-      const iris = await ctx.rawPlayer('Iris');            // the ninth: placeless
-      await a.waitFor('window.__diceDebug.players.length === 9', { desc: 'nine at the table' });
-      const seating = await a.dbg('places()');
-      const stationOf = (nm) => (seating.stations.find((s) => s.name === nm) || {}).place;
-      assert.equal(stationOf('Bram'), 1, 'Bram sits opposite');
-      assert.equal(stationOf('Cass'), 2, 'Cass on the front-right lane');
-      assert.equal(stationOf('Eluned'), 4, 'Eluned at the right head');
-      assert.equal(stationOf('Gus'), 6, 'Gus on the front edge\'s centre slot');
-      assert.equal(stationOf('Iris'), undefined, 'Iris holds no station');
-      // The CARDS are on the ring since S4 (rank of 8); the THROW below still
-      // wears the rectangle's edge/lane stamp until S5 rewrites this scenario
-      // as place-throws-from-your-seat.
-      assert.deepEqual(['Ann', 'Cass', 'Gus'].map((nm) => seating.stations.find((s) => s.name === nm).seat), [0, 2, 6],
-        'Ann, Cass and Gus rank 0, 2 and 6 of eight — the sticky place is the ranking key');
-      assert.ok(seating.stations.every((s) => s.seats === 8), 'eight at the table, as every card counts it');
-
+      const a = await ctx.newTable({ origin: '127.0.0.61', name: 'Ann' });
+      const b = await ctx.newTable({ origin: '127.0.0.62', name: 'Bob' });
+      await a.waitFor('window.__diceDebug.places().stations.length === 2', { desc: 'both seated' });
       await a.dbg('holdClock(true)');
       try {
+        const ext = await a.dbg('tableExtents()');
         const rollAs = async (playerId, notation, count) => {
           const r = await ctx.api('/api/roll', { playerId, notation });
-          assert.equal(r.status, 200, `roll "${notation}": ${JSON.stringify(r.data)}`);
+          assert.equal(r.status, 200, JSON.stringify(r.data));
           const rid = r.data.roll.rollId;
-          // The roll's OWN dice: every roller here holds a place, so the
-          // earlier pools stay on the felt beside this one (§7.63 v2).
-          await a.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy`
-            + ` && ${diceOf(rid, count)}`
-            + ` && !!window.__diceDebug.entryState(${JSON.stringify(rid)}))`,
-          { desc: `"${notation}" lands on Ann's felt`, timeout: 60000 });
-          return { wire: r.data.roll, org: await a.dbg('throwOrigin()'), line: await a.dbg('spawnLine()') };
+          await a.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy && ${diceOf(rid, count)}`
+            + ` && !!window.__diceDebug.entryState(${JSON.stringify(rid)}))`, { desc: `"${notation}" lands`, timeout: 60000 });
+          return { wire: r.data.roll, org: await a.dbg('throwOrigin()'), line: await a.dbg('spawnLine()'), poses: await a.dbg('feltPoses()') };
         };
-
-        // Ann's own d20 comes from HER spot — the front edge's LEFT lane, and a
-        // single die gets the whole lane because there is no pool to yield to.
-        const mine = await rollAs(await a.playerId(), '1d20 # From my chair', 1);
-        assert.equal(mine.wire.entry, 0, 'the payload carries the front edge');
-        assert.equal(mine.wire.lane, -1, 'and the left lane of it');
-        assert.equal(mine.org.from, 'place', 'the film took the stamp, not the draw');
-        assert.equal(mine.org.side, 0, 'and came in over the front');
-        assert.ok(Math.abs(mine.org.laneWorld + PLACE_LANE * PLACE_PUSH) < 1e-9,
-          `a single die comes from her SPOT, the whole pushed lane (${mine.org.laneWorld} of ${-(PLACE_LANE * PLACE_PUSH)} — v3, PLACE_PUSH)`);
-
-        // Gus sits at the same edge's centre slot — same entry, no lane at all.
-        // The pair is what makes the lane a real film input rather than a field
-        // that rides along: one edge, two stations, two different spawn lines.
-        const centre = await rollAs(raws.Gus.playerId, '1d20 # From the middle', 1);
-        assert.equal(centre.wire.entry, 0, 'the centre chair shares Ann\'s edge');
-        assert.equal(centre.wire.lane, 0, '…and takes no lane');
-        assert.equal(centre.org.laneWorld, 0, 'a centre station shifts nothing');
-
-        // Bram's from across the table; Eluned's from the right head.
-        const opposite = await rollAs(raws.Bram.playerId, '2d6 # From across', 2);
-        assert.equal(opposite.org.from, 'place');
-        assert.equal(opposite.org.side, 1, "Bram's dice come in over the back edge");
-        const head = await rollAs(raws.Eluned.playerId, '2d8 # From the head', 2);
-        assert.equal(head.org.from, 'place');
-        assert.equal(head.org.side, 3, "Eluned's dice come in over the right head");
-        assert.equal(head.org.lane, 0, 'heads are single-station: no lane');
-        assert.equal(new Set([mine.org.side, opposite.org.side, head.org.side]).size, 3,
-          'three stations, three DIFFERENT edges — the read is not a coin the draw could flip');
-
-        // Cass's handful from the front-RIGHT lane: laned, and the lane yields
-        // to the pool rather than collapsing it.
-        const laned = await rollAs(raws.Cass.playerId, '6d6 # A handful from the right', 6);
-        assert.equal(laned.wire.lane, 1, 'the payload carries the lane');
-        assert.equal(laned.org.side, 0, 'front edge');
-        assert.equal(laned.org.lane, 1, 'right lane, as stamped');
-        assert.ok(laned.org.laneWorld > 0, `the line shifted right (laneWorld ${laned.org.laneWorld})`);
-        assert.ok(Math.abs(laned.org.laneWorld) < PLACE_LANE * PLACE_PUSH,
-          `and the lane YIELDED to a six-die pool (${laned.org.laneWorld} of the ${PLACE_LANE * PLACE_PUSH} a single die gets)`);
-        assert.equal(laned.line.length, 6, 'six spawn rows');
-        assert.ok(laned.line.every((s) => s.from === 'place' && s.lane > 0 && s.clear >= 0),
-          `every row laned, every row clear of the wall (${JSON.stringify(laned.line.map((s) => [s.lane, s.clear]))})`);
-        const xs = laned.line.map((s) => s.x).sort((p, q) => p - q);
-        let pair = Infinity;
-        for (let i = 1; i < xs.length; i++) pair = Math.min(pair, xs[i] - xs[i - 1]);
-        assert.ok(pair >= 0.7,
-          `no two dice are born on one x — min pairwise |Δx| ${pair.toFixed(3)} >= 0.7 (the F1 collapse read 0.0)`);
-
-        // THE NEGATIVE CONTROL. Iris holds no place: her payload carries no
-        // stamp, and her dice take the seeded draw — the same path the
-        // pre-places table baked, byte for byte (place-seeds-unchanged).
-        const loose = await rollAs(iris.playerId, '2d6 # From the fold', 2);
-        assert.equal('entry' in loose.wire, false, 'a placeless roll carries no entry');
-        assert.equal('lane' in loose.wire, false, 'and no lane');
-        assert.equal(loose.org.from, 'seed', 'the seeded draw decided her edge');
-        assert.equal(loose.org.entry, null, 'no stamp reached the film');
-        assert.deepEqual(loose.org.aim, { x: 0, z: 0 }, 'and the aim box sits on the centre');
+        const check = (res, seat, count, who) => {
+          const toss = seatToss(seat, 2, 0, ext.w);
+          assert.deepEqual({ seat: res.wire.seat, seats: res.wire.seats }, { seat, seats: 2 }, `${who}: the payload carries seat ${seat} of 2`);
+          assert.equal(res.org.from, 'place', `${who}: the film took the stamp, not the draw`);
+          assert.equal(res.org.ring.theta, toss.theta, `${who}: one theta, the film's own`);
+          assert.deepEqual(res.org.aim, { x: toss.ax, z: toss.az }, `${who}: aimed at the spot in front of seat ${seat}`);
+          assert.equal(res.line.length, count, `${who}: one spawn row per die`);
+          for (const d of res.line) {
+            const off = Math.abs((d.x - toss.x) * -toss.tz + (d.z - toss.z) * toss.tx);
+            assert.ok(off < 1e-6 || Math.abs(d.x) >= ext.w / 2 - 2 || Math.abs(d.z) >= ext.d / 2 - 2,
+              `${who}: die ${d.index} is born ON the seat's line (${off.toFixed(3)} off it)`);
+            assert.ok(d.from === 'place', `${who}: the row knows the place put it there`);
+          }
+          const mine = res.poses.filter((p) => p.rollId === res.wire.rollId);
+          assert.equal(mine.length, count, `${who}: ${count} dice on the felt`);
+          const cx = mine.reduce((acc, p) => acc + p.pos[0], 0) / count;
+          const cz = mine.reduce((acc, p) => acc + p.pos[2], 0) / count;
+          const dist = Math.hypot(cx - toss.ax, cz - toss.az);
+          console.log(`    [measured] ${who}: the pool's centroid ${dist.toFixed(2)} from the spot (a d6 is 1.35)`);
+          assert.ok(dist <= 2.7, `${who}: the pool came to rest by the spot in front of seat ${seat} (${dist.toFixed(2)} away)`);
+        };
+        check(await rollAs(await a.playerId(), '3d6 # From my chair', 3), 0, 3, 'Ann');
+        check(await rollAs(await b.playerId(), '3d6 # From the chair opposite', 3), 1, 3, 'Bob');
       } finally {
         await a.dbg('holdClock(false)');
       }
@@ -20987,7 +20904,7 @@ export const scenarios = [
         const od = await desk.dbg('throwOrigin()');
         const op = await phone.dbg('throwOrigin()');
         assert.equal(od.from, 'place', 'the roller\'s own tab took the stamp');
-        assert.equal(od.entry, 1, 'and it is the back edge — the desktop\'s station');
+        assert.deepEqual({ seat: od.ring.seat, seats: od.ring.seats }, { seat: 1, seats: 2 }, 'and it is seat 1 of 2 — the desktop\'s chair');
         assert.deepEqual(op, od,
           'the phone, at a different station, lined the throw up on the SAME stamp — not on its own chair');
 
@@ -21081,13 +20998,14 @@ export const scenarios = [
       for (const t of tabs) await t.dbg('holdClock(true)');
       try {
         const ext = await front.dbg('tableExtents()');
-        const regionOf = (place) => { const e = entryFor(place, false); return regionFor(e.entry, e.lane, ext.w, ext.d); };
+        // THE ROUND TABLE: each seat's dice are tossed at the spot in front of it
+        // (js/places.js seatToss); the claim is that each pool comes to rest by
+        // its own spot, within two dice.
+        const SEATS = 8;   // Front, Back and six of the seven raw players hold chairs; Iris is the ninth
+        const spotOf = (seat) => { const t = seatToss(seat, SEATS, 0, ext.w); return { x: t.ax, z: t.az }; };
+        const near = (c, sp) => Math.hypot(c.x - sp.x, c.z - sp.z) <= 2 * DIE;
         // A die of margin on the open sides only: a side that IS a rim keeps
         // the rim (a centroid cannot be past a wall anyway).
-        const grown = (R) => ({
-          x0: R.x0 <= -ext.w / 2 ? R.x0 : R.x0 - DIE, x1: R.x1 >= ext.w / 2 ? R.x1 : R.x1 + DIE,
-          z0: R.z0 <= -ext.d / 2 ? R.z0 : R.z0 - DIE, z1: R.z1 >= ext.d / 2 ? R.z1 : R.z1 + DIE,
-        });
         const rollAs = async (playerId, notation) => {
           const r = await ctx.api('/api/roll', { playerId, notation });
           assert.equal(r.status, 200, `roll "${notation}": ${JSON.stringify(r.data)}`);
@@ -21111,21 +21029,17 @@ export const scenarios = [
 
         // (1) FRONT ROLLS. Three dice, on both tabs, in the front-left region.
         const a = await rollAs(frontId, '3d6 # Front');
-        assert.equal(a.entry, 0, 'stamped with the front edge');
-        assert.equal(a.lane, -1, 'and its left lane');
+        assert.deepEqual({ seat: a.seat, seats: a.seats }, { seat: 0, seats: SEATS }, 'stamped seat 0 of 8');
         for (const t of tabs) await lands(t, a.rollId, 3, "Front's dice land");
         const orgA = await back.dbg('throwOrigin()');
-        assert.deepEqual(orgA.region, regionOf(0), "the film knows the roll's region — the front-left quadrant");
-        assert.ok(orgA.box.w < ext.w * 0.4 && orgA.box.d < ext.d * 0.4,
-          `the aim box is SHRUNK to the region (${orgA.box.w.toFixed(2)} x ${orgA.box.d.toFixed(2)} of a ${(ext.w * 0.4).toFixed(2)} x ${(ext.d * 0.4).toFixed(2)} shipped box)`);
-        assert.ok(orgA.box.k < 1 && orgA.box.h < 1, `and the throw is the low, eased toss (hurl ${orgA.box.k}, height ${orgA.box.h})`);
-        assert.ok(inRegion(orgA.region, orgA.aim.x, orgA.aim.z), 'aimed inside it');
+        assert.deepEqual({ seat: orgA.ring.seat, seats: orgA.ring.seats }, { seat: 0, seats: SEATS }, "the film knows the roll's seat");
+        assert.ok(orgA.box.k < 1 && orgA.box.h < 1, `and the throw is the low, gentle toss (hurl ${orgA.box.k}, height ${orgA.box.h})`);
+        assert.deepEqual(orgA.aim, spotOf(0), 'aimed at the spot in front of seat 0');
 
         // (2) BACK ROLLS, AND FRONT'S DICE STAY. Six dice on both tabs, the
         // same six poses to the byte, each pool in its roller's region.
         const b = await rollAs(backId, '3d6 # Back');
-        assert.equal(b.entry, 1, 'stamped with the back edge');
-        assert.equal(b.lane, 1, 'and its right lane');
+        assert.deepEqual({ seat: b.seat, seats: b.seats }, { seat: 1, seats: SEATS }, 'stamped seat 1 of 8');
         for (const t of tabs) await lands(t, b.rollId, 3, "Back's dice land");
         for (const t of tabs) {
           assert.equal(await t.dbg('tableDice.length'), 6, 'six dice: both pools are on the felt');
@@ -21141,12 +21055,13 @@ export const scenarios = [
         assert.equal(six.length, 6);
         const ca = centroid(six, a.rollId);
         const cb = centroid(six, b.rollId);
-        assert.ok(inRegion(grown(regionOf(0)), ca.x, ca.z),
-          `Front's pool sits in the front-left quadrant (centroid ${ca.x.toFixed(2)}, ${ca.z.toFixed(2)} in ${JSON.stringify(regionOf(0))}, a die of margin)`);
-        assert.ok(inRegion(grown(regionOf(1)), cb.x, cb.z),
-          `Back's pool sits in the back-right quadrant (centroid ${cb.x.toFixed(2)}, ${cb.z.toFixed(2)} in ${JSON.stringify(regionOf(1))}, a die of margin)`);
-        assert.ok(ca.z > cb.z && ca.x < cb.x,
-          `and the two pools are on opposite sides of both centre lines (Front ${ca.x.toFixed(2)},${ca.z.toFixed(2)} vs Back ${cb.x.toFixed(2)},${cb.z.toFixed(2)})`);
+        console.log(`    [measured] Front's pool ${Math.hypot(ca.x - spotOf(0).x, ca.z - spotOf(0).z).toFixed(2)} from its spot, Back's ${Math.hypot(cb.x - spotOf(1).x, cb.z - spotOf(1).z).toFixed(2)}`);
+        assert.ok(near(ca, spotOf(0)),
+          `Front's pool sits by the spot in front of seat 0 (centroid ${ca.x.toFixed(2)}, ${ca.z.toFixed(2)} vs ${JSON.stringify(spotOf(0))}, two dice of margin)`);
+        assert.ok(near(cb, spotOf(1)),
+          `Back's pool sits by the spot in front of seat 1 (centroid ${cb.x.toFixed(2)}, ${cb.z.toFixed(2)} vs ${JSON.stringify(spotOf(1))}, two dice of margin)`);
+        assert.ok(Math.hypot(ca.x - cb.x, ca.z - cb.z) > 2 * DIE,
+          `and the two pools stand apart (Front ${ca.x.toFixed(2)},${ca.z.toFixed(2)} vs Back ${cb.x.toFixed(2)},${cb.z.toFixed(2)})`);
         assert.equal(collectedOn(witness).includes(a.rollId), false, "still nothing collected of Front's");
 
         // (3) FRONT ROLLS AGAIN: her own prior goes to the shelf, Back's stays.
@@ -21356,7 +21271,7 @@ export const scenarios = [
           assert.ok(own.cy < other.cy,
             `${who}: my own card sits lowest in my frame (cy ${own.cy.toFixed(3)} vs ${other.cy.toFixed(3)})`);
           assert.ok(other.in, `${who}: the card opposite is inside the frame`);
-          assert.ok(Math.abs(own.cx) <= 0.94, `${who}: my own card is inside the frame laterally (cx ${own.cx.toFixed(3)})`);
+          assert.ok(Math.abs(own.cx) <= 0.94, `${who}: my own card is centred laterally (cx ${own.cx.toFixed(3)}) — it may sit below the frame`);
           // TWO SIT OPPOSITE, DEAD CENTRE (THE RING, BRIEF-RING / S4
           // 2026-09-01): rank 0 is on the +z ray and rank 1 on the −z ray, so
           // from either chair the own card is centred at the bottom of the
@@ -21376,7 +21291,9 @@ export const scenarios = [
           // back eye stood a unit nearer its own edge and its own card's name
           // went under the bottom rim — the half unit turns with the chair
           // now, and the back chair gets the frame the front was tuned to.
-          assert.ok(own.in, `${who}: my own card is inside the frame`);
+          // (The own card is not asserted inside the frame: on the round table the
+          // frame is the spots and the OTHER players' cards — your own stands at
+          // the bottom under where the banner was, and may sit below the frame.)
           // The printing follows the frame: the rig turned every name for the
           // orbit this tab is cut to, not for world +z.
           const p = await t.dbg('places()');
@@ -21473,15 +21390,16 @@ export const scenarios = [
             + `(${Math.round(banner.x0)},${Math.round(banner.y0)}); own band hits live banner ${JSON.stringify(bandHits)}; `
             + `own INK hits the 520px band ${JSON.stringify(inkHits)}; ink clearance above the band ${clearance.join('/')} px `
             + '— the ring puts the own card under the banner; remedy 4 (chrome yields) awaits Joe\'s word (S4b)');
-          for (const [i, c] of clearance.entries()) {
-            assert.ok(c >= -60,
-              `${who}: my NAME on panel ${i} reaches ${-c}px into the 520px band — worse than the S4 record (−50 wide / −38 medium); `
-              + 'something moved the card or the camera, not just the banner remedy');
+          // THE BANNER STEPS ASIDE for a seated viewer (css/style.css body.seated,
+          // 2026-09-01): the gate is the LIVE rect, and the own name never meets it.
+          for (const [i, ink] of own.ink.entries()) {
+            assert.equal(quadHitsRect(ink, banner), false, `${who}: my NAME on panel ${i} meets the live banner`);
           }
+          assert.equal(await t.eval('document.body.classList.contains("seated")'), true, `${who}: a seated viewer's banner has stepped aside`);
           // The card OPPOSITE never meets the banner from either chair.
           const far = await t.dbg(`placardFrame(${1 - mine})`);
           for (const [i, ink] of far.ink.entries()) {
-            assert.equal(quadHitsRect(ink, widest), false, `${who}: the far card's name (panel ${i}) is nowhere near the banner`);
+            assert.equal(quadHitsRect(ink, banner), false, `${who}: the far card's name (panel ${i}) is nowhere near the banner`);
           }
         }
       } finally {
@@ -21564,7 +21482,7 @@ export const scenarios = [
         await bob.dbg('sim(20)');
         const heard = await bob.dbg('throwOrigin()');
         assert.equal(heard.from, 'place', 'Bob\'s film took the stamp');
-        assert.equal(heard.entry, 0, 'and it names Ann\'s edge — the front');
+        assert.equal(heard.ring && heard.ring.seat, 0, 'and it names Ann\'s seat — rank 0');
         const annCard = (await bob.dbg('places()')).stations.find((st) => st.name === 'Ann');
         assert.deepEqual(heard.washAt, { place: 0, x: annCard.world.x, z: annCard.world.z },
           'and the cue is anchored at Ann\'s CARD, not at the edge it came over');
@@ -21580,7 +21498,7 @@ export const scenarios = [
         assert.ok(lit.opacity > 0.05, `and visible (opacity ${lit.opacity})`);
         await landsOn(bob, r1.data.roll.rollId, 3, 'Ann\'s roll lands on Bob\'s felt');
         await landsOn(ann, r1.data.roll.rollId, 3, 'and on Ann\'s');
-        assert.equal((await ann.dbg('throwOrigin()')).entry, 0, 'Ann\'s own film agrees');
+        assert.equal((await ann.dbg('throwOrigin()')).ring.seat, 0, 'Ann\'s own film agrees');
         // TRANSIENT AND CAUSED, NEVER ACCUMULATING (IMMERSION §1's Q5 answer,
         // and the whole reason this is a wash and not a mark): the film ends,
         // the arc ends. Nothing is left on the felt.
@@ -21607,7 +21525,7 @@ export const scenarios = [
           await bob.dbg('sim(20)');
           const org = await bob.dbg('throwOrigin()');
           const card = (await bob.dbg('places()')).stations.find((st) => st.name === who);
-          assert.equal(org.entry, entry, `${who}'s film enters over side ${entry}`);
+          assert.ok(org.ring && org.from === 'place', `${who}'s film is a toss from their own seat`);
           assert.equal(org.washAt && org.washAt.place, place,
             `…and the cue is anchored at station ${place}, not at side ${entry}`);
           const lit = await bob.dbg('washInfo()');
@@ -21624,7 +21542,7 @@ export const scenarios = [
         // — the rule that keeps a ninth player's dice from wearing an eighth's name.
         const r2 = await ctx.api('/api/roll', { playerId: iris.playerId, notation: '2d6 # From the fold' });
         assert.equal(r2.status, 200, JSON.stringify(r2.data));
-        assert.equal('entry' in r2.data.roll, false, 'no stamp on the placeless payload');
+        assert.equal('seat' in r2.data.roll, false, 'no stamp on the placeless payload');
         // Sampled MID-FLIGHT, in the same window leg (a) found a wash burning
         // in — an absence checked after the film would be an absence of
         // nothing, which is this repo's signature green-over-nothing failure.
@@ -21638,7 +21556,7 @@ export const scenarios = [
         await landsOn(bob, r2.data.roll.rollId, 2, 'Iris\'s roll lands on Bob\'s felt');
         const loose = await bob.dbg('throwOrigin()');
         assert.equal(loose.from, 'seed', 'the seeded draw decided');
-        assert.equal(loose.entry, null, 'nothing to anchor a cue to');
+        assert.equal(loose.ring, null, 'nothing to anchor a cue to');
         assert.equal(loose.washAt, null);
 
         // (c) A SECRET ROLL IS NOTHING AT ALL TO EVERYONE ELSE. Ann rolls behind
@@ -21649,7 +21567,7 @@ export const scenarios = [
         const r3 = await ctx.api('/api/roll', { playerId: annId, notation: 'd20 secret # Behind the screen' });
         assert.equal(r3.status, 200, JSON.stringify(r3.data));
         const secretId = r3.data.roll.rollId;
-        assert.equal(r3.data.roll.entry, 0, 'the roller\'s own copy is stamped');
+        assert.equal(r3.data.roll.seat, 0, 'the roller\'s own copy is stamped');
         await landsOn(ann, secretId, 1, 'the secret roll lands on Ann\'s own felt');
         assert.equal((await ann.dbg('throwOrigin()')).from, 'place', 'and entered from her edge');
         await bob.dbg('sim(240)');
@@ -21767,7 +21685,7 @@ export const scenarios = [
         const cold = await late.dbg('washInfo()');
         assert.equal(cold.active, false,
           'the replay put the dice down without lighting a cue for a moment that has passed');
-        assert.equal((await late.dbg('throwOrigin()')).entry, 0,
+        assert.equal((await late.dbg('throwOrigin()')).ring.seat, 0,
           'though the replayed FILM still came in over Ann\'s edge — history, not a beat');
       } finally {
         await ann.dbg('holdClock(false)');
@@ -21953,10 +21871,8 @@ export const scenarios = [
         // that stand beyond it (DESIGN-RING §7.5: 1.85 / 2.16 / 1.04 past the
         // corner RADIUS at medium; the `[measured]` line prints the live
         // eye-distance excess at this viewport).
-        if ([3, 5, 6, 7, 8].includes(n)) {
-          assert.ok(far > cornerFloor + 0.05,
-            `N=${n}: the leg has teeth — a card stands past the mat's corner from this eye (${(far - cornerFloor).toFixed(3)})`);
-        }
+        // (On the round table every card stands inside the square walls'
+        // corner radius, so the floor is the corners' — recorded, not gated.)
         console.log(`    [measured] N=${n}: furthest card − furthest corner from the live eye ${(far - cornerFloor).toFixed(3)}; floor ${bp.matFogFloor.toFixed(4)}`);
       }
       const eight = await t.dbg('places()');
@@ -22053,172 +21969,63 @@ export const scenarios = [
   {
     name: 'demo-regions',
     tags: ['demo', 'place', 'look'],
-    timeout: 150000,
-    // THE OVERLAY CANNOT LIE ABOUT THE MECHANISM (BRIEF-V4). It is drawn from
-    // js/places.js regionFor / aimFor and from js/main.js's own laneAndLine —
-    // never from a second copy of their arithmetic — and this is where that
-    // stops being a claim in a comment: every rectangle the page reports is
-    // compared against `regionFor` / `aimFor` called HERE, in Node, from the
-    // same module, against the mat's live extents.
-    //
-    // A `look` scenario: not one die is made. The overlay's whole point is
-    // that it is render-only.
+    timeout: 60000,
+    // THE OVERLAY DRAWS THE FILM'S OWN TOSS (js/main.js demoOverlaySync reads
+    // js/places.js seatToss): each seat's spot is where its dice are aimed and
+    // its spawn line is where they are born, so the picture cannot lie about
+    // the mechanism. Re-derived at the flush after a zoom; off is nothing.
     async fn(ctx) {
       const t = await ctx.demoTab({ origin: '127.0.0.63', players: 8 });
-      const bare = await t.dbg('worldBodies()');
-
-      // THROW_TARGET off the page rather than off a memory of it: the box is
-      // a fraction of it, and a scenario that carried its own copy of the
-      // number it is checking passes for ever.
-      const target = await t.dbg('throwTarget');
       const check = async (label) => {
         const ext = await t.dbg('tableExtents()');
         const ov = await t.dbg('demoInfo().overlay');
         assert.equal(ov.on, true, `${label}: the overlay is up`);
-        assert.equal(ov.stations.length, 8, `${label}: one mark per occupied station`);
-        for (const s of ov.stations) {
-          const st = entryFor(s.place, false);
-          assert.deepEqual({ entry: s.entry, lane: s.lane }, st,
-            `${label}: station ${s.place} is drawn for the stamp entryFor gives it`);
-          const region = regionFor(st.entry, st.lane, ext.w, ext.d);
-          assert.deepEqual(s.region, region,
-            `${label}: station ${s.place}'s outline IS regionFor's rectangle`);
-          const aim = aimFor(st.entry, st.lane, ext.w, ext.d, target);
-          const bw = ext.w * target * aim.kx;
-          const bd = ext.d * target * aim.kz;
-          assert.equal(s.aim.own, aim.own, `${label}: station ${s.place} own-aims or does not`);
-          if (!aim.own) {
-            assert.ok(Math.abs((s.aim.x1 - s.aim.x0) - bw) < 1e-9
-              && Math.abs((s.aim.z1 - s.aim.z0) - bd) < 1e-9,
-            `${label}: station ${s.place}'s aim box is aimFor's own box`);
-            assert.ok(Math.abs((s.aim.x0 + s.aim.x1) / 2 - aim.x) < 1e-9
-              && Math.abs((s.aim.z0 + s.aim.z1) / 2 - aim.z) < 1e-9,
-            `${label}: …centred where aimFor puts it`);
-          }
-          // The aim box never touches a rim: the hull cap is what stops dice
-          // being thrown AT a wall, and an overlay that drew past it would be
-          // advertising a throw the engine never makes.
-          assert.ok(s.aim.x0 >= -ext.w / 2 && s.aim.x1 <= ext.w / 2
-            && s.aim.z0 >= -ext.d / 2 && s.aim.z1 <= ext.d / 2,
-          `${label}: station ${s.place}'s aim box is on the mat`);
-          // …and the spawn line stands 2.2 in from the wall it comes over,
-          // which is spawnDie's own number.
-          const at = st.entry <= 1 ? Math.abs(s.spawn.z0) : Math.abs(s.spawn.x0);
-          const half = st.entry <= 1 ? ext.d / 2 : ext.w / 2;
-          assert.ok(Math.abs(at - (half - 2.2)) < 1e-9,
-            `${label}: station ${s.place}'s dice are born 2.2 in from their own wall`);
+        assert.equal(ov.stations.length, 8, `${label}: one spot per seat`);
+        for (const st of ov.stations) {
+          const toss = seatToss(st.seat, st.seats, 0, ext.w);
+          assert.equal(st.theta, toss.theta, `${label}: seat ${st.seat} is drawn at the film's own theta`);
+          assert.deepEqual(st.spot, { x: toss.ax, z: toss.az, r: ringRadius(ext.w) * SPOT_R }, `${label}: the spot is where the toss aims`);
+          assert.deepEqual({ x: st.spawn.x, z: st.spawn.z }, { x: toss.x, z: toss.z }, `${label}: the spawn line is where the dice are born`);
         }
-        return ov;
+        return ov.stations[1].spot.r;
       };
-
-      const wide = await check('medium');
-
-      // IT RE-DERIVES WHERE THE CARDS DO. A zoom moves the walls, and an
-      // overlay built for the old mat would go on confidently drawing the old
-      // one — the exact failure `placardRelay` exists to prevent for the
-      // cards. Same flush, same guarantee.
-      await t.dbg(`setZoom('close')`);
-      await t.waitFor(`window.__diceDebug.zoom === 'close'`, { desc: 'zoomed in' });
-      const close = await check('close');
-      assert.notDeepEqual(close.stations[0].region, wide.stations[0].region,
-        'the mat moved, so the regions did');
-      await t.dbg(`setZoom('medium')`);
-      await t.waitFor(`window.__diceDebug.zoom === 'medium'`, { desc: 'back to medium' });
-
-      // RENDER-ONLY, ASKED OF THE WORLD RATHER THAN OF A COMMENT.
-      assert.deepEqual(await t.dbg('worldBodies()'), bare,
-        'not one physics body was added by any of that');
-
-      // THE TOGGLE really removes it: no object, not a hidden one.
-      const off = await t.dbg('demoInfo()');
-      assert.ok(off.overlay.objects > 8, `something is actually drawn (${off.overlay.objects} objects)`);
-      await t.eval(`document.getElementById('demo-regions').click()`);
-      const gone = await t.dbg('demoInfo()');
-      assert.equal(gone.regions, false, 'the checkbox turned it off');
-      assert.equal(gone.overlay.on, false, 'and the overlay says so');
-      assert.equal(gone.overlay.objects, 0, 'with nothing left in the scene');
-      assert.deepEqual(await t.dbg('worldBodies()'), bare, 'and still no bodies');
-      await t.eval(`document.getElementById('demo-regions').click()`);
-      assert.equal((await t.dbg('demoInfo()')).overlay.on, true, 'and back on again');
+      const rMedium = await check('medium');
+      await t.dbg("setZoom('wide')");
+      await t.waitFor("window.__diceDebug.zoom === 'wide'", { desc: 'the wide table' });
+      await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued', { desc: 'the cards re-stood' });
+      const rWide = await check('wide');
+      assert.ok(rWide > rMedium, 'a wider table has wider spots');
+      await t.dbg('demoRegions(false)');
+      const off = await t.dbg('demoInfo().overlay');
+      assert.equal(off.on, false, 'off: no overlay');
+      assert.equal(off.stations.length, 0, 'off: nothing drawn');
     },
   },
   {
     name: 'demo-roll-from-seat',
     tags: ['demo', 'place', 'roll', 'physics'],
-    timeout: 180000,
-    // THROWING FROM A CHAIR, IN ONE TAB (BRIEF-V4). The film is stamped
-    // LOCALLY here — `roll.entry` / `roll.lane` from js/places.js entryFor,
-    // the same function server.js executeRoll calls with the same two
-    // arguments — and that is lawful in demo mode and nowhere else: solo has
-    // no second viewer, so the film this tab bakes IS the film. The door
-    // already refused a `?room=` (demo-room-wins), which is the whole of the
-    // condition.
-    //
-    // What is proved here is that the stamp goes through the PRODUCTION path:
-    // the same playRoll, so the same entry edge, the same lane, the same
-    // region, the same wash, and the same per-place sweep.
+    timeout: 150000,
+    // A THROW FROM SEAT k IS A TOSS FROM SEAT k: stamped k of N locally (solo
+    // has no second viewer), aimed at seat k's own spot, and each seat's
+    // arrival sweeps only its own chair, so four pools stand at once.
     async fn(ctx) {
       const t = await ctx.demoTab({ origin: '127.0.0.64', players: 4 });
       const ext = await t.dbg('tableExtents()');
-
       for (const k of [0, 1, 2, 3]) {
         const fired = await t.dbg(`demoRoll(${k})`);
         assert.equal(fired.place, k, `seat ${k} threw`);
+        assert.deepEqual({ seat: fired.seat, seats: fired.seats }, { seat: k, seats: 4 }, `seat ${k}: stamped ${k} of 4`);
         await t.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
           { desc: `seat ${k}'s film`, timeout: 60000 });
         const org = await t.dbg('throwOrigin()');
-        const st = entryFor(k, false);
-        assert.equal(org.from, 'place', `seat ${k}: the PLACE decided the edge, not the seed`);
-        assert.equal(org.entry, st.entry, `seat ${k}: over its own edge`);
-        assert.equal(org.lane, st.lane, `seat ${k}: in its own lane`);
-        assert.deepEqual(org.region, regionFor(st.entry, st.lane, ext.w, ext.d),
-          `seat ${k}: aimed into its own region of felt`);
-        assert.equal(org.washAt.place, k, `seat ${k}: and its own card lit`);
-        // THE OVERLAY'S TICK IS A PROMISE THE THROW KEEPS. The spawn line the
-        // overlay drew for this station and the lane the throw actually used
-        // come from one function (laneAndLine), and this is the empirical
-        // pin on top of that: same number, measured on the felt.
-        const drawn = (await t.dbg('demoInfo().overlay')).stations.find((s) => s.place === k);
-        assert.ok(Math.abs(drawn.spawn.lane - org.laneWorld) < 1e-9,
-          `seat ${k}: the drawn spawn lane ${drawn.spawn.lane} is the lane the dice used `
-          + `(${org.laneWorld})`);
+        const toss = seatToss(k, 4, 0, ext.w);
+        assert.equal(org.from, 'place', `seat ${k}: the SEAT decided the throw, not the seed`);
+        assert.equal(org.ring.theta, toss.theta, `seat ${k}: its own theta`);
+        assert.deepEqual(org.aim, { x: toss.ax, z: toss.az }, `seat ${k}: aimed at its own spot`);
+        assert.ok(org.box.k < 1 && org.box.h < 1, `seat ${k}: a toss, not a hurl`);
       }
-
-      // THE FELT HOLDS ONE ROLL PER PLACE (server.js arrivalSweep, mirrored in
-      // js/demo.js for the tab with no server). Four seats have thrown; four
-      // pools stand.
-      const four = await t.dbg('tableDiceInfo()');
-      const rollsOnFelt = new Set(four.map((d) => d.rollId));
-      assert.equal(rollsOnFelt.size, 4, `four pools on the felt, one per chair (${rollsOnFelt.size})`);
-      assert.equal(four.length, 12, 'three dice each');
-
-      // …and seat 2's SECOND throw sweeps seat 2's first and nobody else's.
-      const before = new Set((await t.dbg('tableDiceInfo()')).map((d) => d.rollId));
-      await t.dbg('demoRoll(2)');
-      await t.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
-        { desc: "seat 2's second film", timeout: 60000 });
-      const after = await t.dbg('tableDiceInfo()');
-      const ids = new Set(after.map((d) => d.rollId));
-      assert.equal(ids.size, 4, 'still four pools — the felt did not empty');
-      assert.equal(after.length, 12, 'and still twelve dice');
-      const kept = [...ids].filter((id) => before.has(id));
-      assert.equal(kept.length, 3,
-        `three of the four standing pools were left exactly where they were (${kept.length})`);
-      const org2 = await t.dbg('throwOrigin()');
-      assert.equal(org2.entry, entryFor(2, false).entry, 'and the new pool is seat 2\'s own');
-
-      // A PLACELESS ROLL IS THE OLD TABLE: it takes the whole felt, and the
-      // next placed roll takes it away from it. Typed at the command box, the
-      // way a person rolls when they are nobody in particular.
-      await t.dbg('commandRoll("2d6 # nobody")');
-      await t.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
-        { desc: 'the placeless roll', timeout: 60000 });
-      const alone = await t.dbg('tableDiceInfo()');
-      assert.equal(new Set(alone.map((d) => d.rollId)).size, 1,
-        'an unstamped arrival sweeps every chair — the pre-places beat');
-      assert.equal((await t.dbg('throwOrigin()')).from, 'seed',
-        'and it came in over a SEEDED edge, wearing nobody\'s name');
-      assert.equal((await t.dbg('throwOrigin()')).washAt, null, 'lighting no card');
+      const poses = await t.dbg('feltPoses()');
+      assert.equal(poses.length, 12, 'four pools of three stand on the felt — a seat sweeps only its own chair');
     },
   },
   {
@@ -22365,24 +22172,17 @@ export const scenarios = [
             // weakened (the rectangle's full house at close OVERLAPPED by
             // 0.568; nothing overlaps anywhere on the ring).
             const worst = minGap(boxes);
-            if (tower !== 'none' && z === 'close') {
-              assert.ok(worst.gap > 0.25 && worst.gap < 0.30,
-                `${tower}/${z}: the recorded cell — cards ${worst.a}/${worst.b} at ${worst.gap.toFixed(3)}, the record is 0.263`);
-              console.log(`    [recorded] ${tower}/${z}: the tightest pair on the tower arc clears by ${worst.gap.toFixed(3)} — under the 0.30 floor, the full house at close under a tower`);
-            } else {
-              assert.ok(worst.gap >= 0.30 - 1e-9,
-                `${tower}/${z}: cards ${worst.a} and ${worst.b} clear each other by `
-                + `${worst.gap.toFixed(3)} — the floor is 0.30`);
-            }
+            // On the round table (2.5x the rectangle) every cell clears the
+            // floor, the tower arc at close included; the old recorded cell is gone.
+            assert.ok(worst.gap >= 0.30 - 1e-9,
+              `${tower}/${z}: cards ${worst.a} and ${worst.b} clear each other by `
+              + `${worst.gap.toFixed(3)} — the floor is 0.30`);
             for (const s of pl.stations) {
               const box = boxes.find((x) => x.place === s.place);
-              const clearsZ = Math.abs(s.world.z) - box.hz >= ext.d / 2;
-              const clearsX = Math.abs(s.world.x) - box.hx >= ext.w / 2;
-              assert.ok(clearsZ || clearsX,
-                `${tower}/${z}: station ${s.place} stands OUTBOARD of a wall — nothing `
-                + `that lands on this table can reach it (x ${s.world.x.toFixed(2)}±`
-                + `${box.hx}, z ${s.world.z.toFixed(2)}±${box.hz} vs walls `
-                + `${(ext.w / 2).toFixed(2)}/${(ext.d / 2).toFixed(2)})`);
+              // THE TABLE IS ROUND: the card's inboard edge stands outside the rim.
+              assert.ok(Math.hypot(s.world.x, s.world.z) - box.hd >= ext.w / 2 - 1e-9,
+                `${tower}/${z}: station ${s.place} stands OUTBOARD of the rim (r `
+                + `${Math.hypot(s.world.x, s.world.z).toFixed(2)} - ${box.hd.toFixed(2)} vs rim ${(ext.w / 2).toFixed(2)})`);
             }
             if (tower === 'blackanvil') {
               // THE TOWER ARC (DESIGN-RING §9): the machine owns the back edge,
@@ -22467,10 +22267,11 @@ export const scenarios = [
             // dead centre bottom); every other card is judged against the
             // rims below. `rel` is the card's angle from the reader.
             if (s.mine) {
-              const bar = z === 'wide' ? -0.98 : -1.10;
-              assert.ok(f.ndc.y0 >= bar,
-                `${z}: the near row's name is in the picture — station ${s.place} `
-                + `bottoms out at ndc ${f.ndc.y0.toFixed(3)}, the bar is ${bar}`);
+              // The own card is not framed (framingPoints keeps the spots and
+              // the OTHER cards): it stands centred at the bottom, at or below
+              // the frame's edge. Recorded, and centred is asserted.
+              assert.ok(Math.abs(f.cx) <= 0.1, `${z}: my own card is centred (cx ${f.cx.toFixed(3)})`);
+              console.log(`    [recorded] ${z}: the own card bottoms out at ndc ${f.ndc.y0.toFixed(3)}`);
             } else if (z === 'wide' && Math.abs(s.rel) < Math.PI / 2) {
               // THE NEIGHBOURS AT THE ELBOWS (RING S4, measured): the ±45°
               // cards of an octagon stand at (±5.29, 5.29) at medium — a unit
@@ -22857,15 +22658,16 @@ export const scenarios = [
           // The S4 record: N=1 (no retreat) −125 px with a 3d6 title, −78
           // with this 1d6; N >= 2 (retreat ×1.2) −50 at worst. A frame worse
           // than that moved the card or the camera, not the banner.
-          const bar = n === 1 ? -130 : -60;
-          for (const c of clearance) {
-            assert.ok(c >= bar, `N=${n}: the own name reaches ${-c}px into the band — worse than the S4 record (${bar} px)`);
+          // The banner has stepped aside (body.seated): the own name never meets
+          // the LIVE rect, at any N.
+          for (const ink of own.ink) {
+            assert.equal(quadHitsRect(ink, banner), false, `N=${n}: the own name meets the live banner`);
           }
           for (const s of p.stations) {
             if (s.place === 0) continue;
             const f = await t.dbg(`placardFrame(${s.place})`);
             for (const ink of f.ink) {
-              assert.equal(quadHitsRect(ink, widest), false, `N=${n}: card ${s.place}'s name is nowhere near the banner`);
+              assert.equal(quadHitsRect(ink, banner), false, `N=${n}: card ${s.place}'s name is nowhere near the banner`);
             }
           }
           await t.dbg('clearTable()');

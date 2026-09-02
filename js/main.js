@@ -26,13 +26,14 @@ import { recentTables, rememberTable, forgetTable, mintRoomKey, isMintedKey } fr
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
   scoringIndices, pushTally, faceScores, drawBag, MAX_PUSH_THROWS } from './rollspec.js';
-// A PLACE AT THE TABLE (UX §7.63): the layout/entry algebra lives in ONE
-// shared module — server.js stamps `roll.entry`/`roll.lane` out of it, this
-// file reads the stamps back (the rollspec.js precedent). The film half only:
-// laneSpread (the lane yields to the pool), aimFor (a translated aim box),
-// and AIM_ZERO (the shared frozen zero every unstamped roll aims through).
+// A PLACE AT THE TABLE (UX §7.63): the ring's algebra lives in ONE shared
+// module — server.js stamps `roll.seat`/`roll.seats`/`roll.arc` out of it,
+// this file reads the stamp back (the rollspec.js precedent): seatToss for the
+// toss the film plays, tossAim for its factors, seatAnchor for where the card
+// stands, AIM_ZERO for the shared frozen zero every unstamped roll aims through.
 import { laneSpread, aimFor, regionFor, AIM_ZERO, seatAnchor, wrapPi,
-  entryFor, seatTrig } from './places.js';
+  entryFor, seatTrig, seatValid, seatStamp, seatToss, tossAim, ringRadius,
+  TOSS_PER, SPOT_R, RING_SPOT, PLACARD_STANDOFF, PLACARD_D, PLACARD_W } from './places.js';
 // THE DEMO DOOR (js/demo.js — read its header for the law): a dev instrument
 // for looking at a full table in ONE TAB. Solo-only, param-only, and every
 // line of it in this file is behind `DEMO`.
@@ -278,8 +279,13 @@ if (!STABILITY_HELD) {
 // live (walls, shelf pitch, camera framing all follow). The base values here
 // are DEFAULT_ZOOM's preset and must move with it; ZOOM_PRESETS owns them all, and
 // applyZoom mutates these + the wall body positions in place.
-let TABLE_W = 11;            // playable width (x) — the DEFAULT ('medium')
-let TABLE_D = 6.7;           // playable depth (z) — DERIVED; see MAT_DEPTH
+// THE TABLE'S SIZE, ONE DIAL (Joe, 2026-09-01: "the dice are way too big for
+// that table"). The pre-ring presets (11 / 14.1 / 8.6 wide) × this; the eye
+// presets scale with it, and the camera fits the ring of cards, so a bigger
+// table IS smaller dice. Dice, cards and physics are untouched.
+const TABLE_SCALE = 2.5;
+let TABLE_W = 11 * TABLE_SCALE;   // playable width (x) — the DEFAULT ('medium')
+let TABLE_D = 11 * TABLE_SCALE;   // playable depth (z) — DERIVED; see MAT_DEPTH. Square: the table is round.
 // THE MAT'S DEPTH IS A SUM OF LAYERS, RE-DERIVED — NEVER ACCUMULATED (T1).
 // A tower brings its own mat with it (TOWER_MAT_EXTRA) and so does the lab
 // bench, and both used to be applied as `TABLE_D += extra` and taken back as
@@ -308,7 +314,7 @@ const MAT_DEPTH = { base: TABLE_D, socket: 0, lab: 0 };
 // MODULE EVALUATION, thousands of lines before that declaration. Reading a
 // `let` from its dead zone throws, so the declaration comes up here to the
 // other mat-extent state rather than the reader going defensive about it.
-let CAM_EYE = { full: [0, 10.4, 6.0], mini: [0, 8.6, 4.8] }; // the DEFAULT ('medium')
+let CAM_EYE = { full: [0, 10.4 * TABLE_SCALE, 6.0 * TABLE_SCALE], mini: [0, 8.6 * TABLE_SCALE, 4.8 * TABLE_SCALE] }; // the DEFAULT ('medium')
 // Zoom picker labels — declared here (not next to renderZoomPicker) because
 // setSound() → syncSettingsUI() → renderZoomPicker() runs during module
 // evaluation, and the picker's early build must not read this in TDZ.
@@ -5557,7 +5563,7 @@ function laneAndLine(laneSlot, pool, count) {
 }
 
 function spawnDie(type, index, count, side, rng, shrouded = false, set = null,
-  lane = 0, spreadOverride = null, aim = AIM_ZERO) {
+  lane = 0, spreadOverride = null, aim = AIM_ZERO, ring = null) {
   const variant = dieVariant(shrouded, set);
   const mesh = createDieMesh(type, variant);
   const body = dieBody(type);
@@ -5615,7 +5621,17 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null,
   // the spawn HEIGHT for a stamped throw (js/places.js PLACE_AIM.h — a toss
   // from a low hand is what keeps a pool in its region; the drop, not the
   // hurl, was the scatter) and is 1 on AIM_ZERO, an exact multiply.
-  if (side === 0) body.position.set(fit(lane + offset + jitter()), (6 + rng() * 4 + index * 0.9) * aim.h, TABLE_D / 2 - 2.2);
+  if (ring) {
+    // THE TOSS (js/places.js seatToss): the line is the tangent at the
+    // roller's spawn point, the dice spread along it, each clamped inside the
+    // walls on both axes. Same draws in the same order as the four edges.
+    const off = offset + jitter();
+    const rx = TABLE_W / 2 - restCeiling(type) - 0.05;
+    const rz = TABLE_D / 2 - restCeiling(type) - 0.05;
+    const px = Math.max(-rx, Math.min(rx, ring.x + ring.tx * off));
+    const pz = Math.max(-rz, Math.min(rz, ring.z + ring.tz * off));
+    body.position.set(px, (6 + rng() * 4 + index * 0.9) * aim.h, pz);
+  } else if (side === 0) body.position.set(fit(lane + offset + jitter()), (6 + rng() * 4 + index * 0.9) * aim.h, TABLE_D / 2 - 2.2);
   else if (side === 1) body.position.set(fit(lane + offset + jitter()), (6 + rng() * 4 + index * 0.9) * aim.h, -TABLE_D / 2 + 2.2);
   else if (side === 2) body.position.set(-TABLE_W / 2 + 2.2, (6 + rng() * 4 + index * 0.9) * aim.h, fit(lateral + jitter()));
   else body.position.set(TABLE_W / 2 - 2.2, (6 + rng() * 4 + index * 0.9) * aim.h, fit(lateral + jitter()));
@@ -6694,10 +6710,15 @@ function playRoll(roll, rethrow = null) {
   // rides the ROLL payload (and a rethrow's refreshed payload), server-set at
   // the moment the dice were drawn — the film never reads the roster.
   const sideRoll = pouring ? 0 : Math.floor(rng() * 4);
-  const stamped = !pouring && Number.isInteger(roll.entry)
-    && roll.entry >= 0 && roll.entry < 4;
-  const side = pouring ? 0 : (stamped ? roll.entry : sideRoll);
-  const laneSlot = stamped && [-1, 0, 1].includes(roll.lane) ? roll.lane : 0;
+  // THE RING STAMP (js/places.js seatToss): `roll.seat` of `roll.seats` (and
+  // `roll.arc` under a tower), server-set. A stamped throw is a TOSS from the
+  // roller's own ray onto the spot in front of them; an unstamped one is the
+  // seeded side, as it always was.
+  const ring = !pouring && seatValid(roll.seat, roll.seats, roll.arc || 0)
+    ? seatToss(roll.seat, roll.seats, roll.arc || 0, TABLE_W) : null;
+  const stamped = !!ring;
+  const side = pouring ? 0 : sideRoll;
+  const laneSlot = 0;   // lanes were the rectangle's; the ring has none
   // THE LANE YIELDS TO THE POOL (js/places.js laneSpread — fix F1): the
   // pool's line may compress toward the lane's room but never below a real
   // pitch, and the lane then takes whatever room remains — a constant lane
@@ -6709,6 +6730,8 @@ function playRoll(roll, rethrow = null) {
   // one there.
   let laneWorld = 0;
   let spreadOverride = null;
+  // A toss lines its dice up tighter than a hurl (js/places.js TOSS_PER).
+  if (ring) spreadOverride = Math.min(TABLE_W - SPAWN.pad, throwCount * TOSS_PER);
   if (laneSlot) {
     const pool = rethrow
       ? rethrow.thrown.map((di) => types[di]).filter((t) => DIE_DEFS[t]) : types;
@@ -6725,7 +6748,7 @@ function playRoll(roll, rethrow = null) {
   // is the shared frozen identity — `0 + v` and `v * 1` are `v` on the same
   // double — so a payload without a stamp bakes the film this table baked
   // before places existed.
-  const aim = stamped ? aimFor(side, laneSlot, TABLE_W, TABLE_D, THROW_TARGET) : AIM_ZERO;
+  const aim = ring ? tossAim(ring, TABLE_W, TABLE_D) : AIM_ZERO;
   // THE OTHER HALF OF THE ATTRIBUTION RULE (UX §7.63, §6.3). While this film
   // plays, a soft arc of the roller's hue lies on the ground under THEIR
   // placard. It is read from `roll.entry` — the payload stamp — and NOT from
@@ -6755,7 +6778,8 @@ function playRoll(roll, rethrow = null) {
     // this throw is meant to come to rest in — null when the stamp carries
     // none.
     box: { w: TABLE_W * THROW_TARGET * aim.kx, d: TABLE_D * THROW_TARGET * aim.kz, k: aim.k, h: aim.h, spin: aim.spin, own: aim.own },
-    region: stamped ? regionFor(side, laneSlot, TABLE_W, TABLE_D) : null,
+    region: null,
+    ring: ring ? { seat: roll.seat, seats: roll.seats, theta: ring.theta, spot: { x: ring.ax, z: ring.az }, spawn: { x: ring.x, z: ring.z } } : null,
     from: stamped ? 'place' : 'seed',
     pour: pouring,
     washAt: washPlan ? { place: washPlan.place, x: washPlan.x, z: washPlan.z } : null,
@@ -6773,7 +6797,7 @@ function playRoll(roll, rethrow = null) {
       const held = keptByIndex.get(i);
       if (held) return held;
       return spawnDie(t, rethrow ? throwOrdinal.get(i) : i, throwCount, side, rng,
-        shrouded, rollDieSet(roll, i), laneWorld, spreadOverride, aim);
+        shrouded, rollDieSet(roll, i), laneWorld, spreadOverride, aim, ring);
     });
   if (rethrow) {
     // The dice being thrown again leave the table as objects — their meshes
@@ -7776,13 +7800,18 @@ function rollDice(types, label, opts = {}) {
   // function server.js executeRoll calls, with the same two arguments.
   const seat = DEMO && Number.isInteger(opts.demoPlace)
     ? demoRows.find((r) => r.place === opts.demoPlace) || null : null;
-  const stamp = seat ? entryFor(seat.place, towerOn()) : null;
-  const arriving = stamp ? { playerId: seat.id, entry: stamp.entry, lane: stamp.lane } : null;
+  // SOLO IS A TABLE FOR ONE (2026-09-01): with no roster the film tosses as
+  // seat 0 of 1 — onto the spot in front of the one player — which is lawful
+  // because solo has no second viewer to disagree with.
+  const stamp = seat
+    ? seatStamp(demoRows.map((r) => r.place), seat.place, towerOn())
+    : ((DEMO && demoRows.length) || !SOLO_TOSS ? null : { seat: 0, seats: 1, arc: towerOn() ? 1 : 0 });
+  const arriving = stamp ? { playerId: seat ? seat.id : null, place: seat ? seat.place : null, ...stamp } : null;
   // §7.7 arrival beat, mirrored locally: the new roll's execution collects
   // everything this session still has on the felt (evictions sink first) —
   // or, for a stamped demo throw, only its OWN chair's rolls and the
   // placeless ones, which is the server's rule.
-  soloAutoCollect(arriving);
+  soloAutoCollect(seat ? arriving : null);   // solo keeps its own sweep (everything)
   const composed = composeRoll(types, opts.mods || null, Math.random);
   const spec = { dice: [...types], mods: opts.mods || null };
   if (opts.sources) spec.sources = [...opts.sources]; // 2b-⑤ attribution
@@ -7844,7 +7873,7 @@ function rollDice(types, label, opts = {}) {
     // what puts the throw over that chair's edge, in its lane, into its
     // region — through the SHIPPED playRoll, not through a demo of it.
     ...(seat ? { playerId: seat.id, playerName: seat.name, color: seat.color } : {}),
-    ...(stamp ? { entry: stamp.entry, lane: stamp.lane } : {}),
+    ...(stamp ? { seat: stamp.seat, seats: stamp.seats, arc: stamp.arc } : {}),
   });
 }
 
@@ -15586,6 +15615,20 @@ window.__diceDebug = {
   // The portrait-roll probe. Radians; Math.PI/2 stands the mat up on screen.
   setCamRoll(r) { camRoll = r; applyCameraFraming(false); return camRoll; },
   setCamOrbit(r) { camOrbit = r; applyCameraFraming(false); return camOrbit; },
+  // The ring fit, step by step: does the rest frame's point set fit, at what
+  // scale, and where does each point project at the end of the scan.
+  // The solo toss, as an instrument: off, a solo roll is the seeded hurl the
+  // table had before the ring (settle-tail measures the hurl's own cut).
+  soloToss(on) { if (on !== undefined) SOLO_TOSS = !!on; return SOLO_TOSS; },
+  fitProbe() {
+    const pts = framingPoints();
+    const ok = fitCameraTo(pts, pts.centre || camHomeFor(camOrbit), 1, true);
+    const v = new THREE.Vector3();
+    return {
+      ok, n: pts.length, eye: camera.position.toArray().map((x) => Math.round(x * 100) / 100),
+      pts: pts.map((q) => { v.copy(q.p).project(camera); return [Math.round(q.p.x * 10) / 10, Math.round(q.p.z * 10) / 10, Math.round(v.x * 100) / 100, Math.round(v.y * 100) / 100]; }),
+    };
+  },
   setHeroMargin(m) { HERO_MARGIN = m; applyCameraFraming(false); return HERO_MARGIN; },
   framingInfo() {
     const v = new THREE.Vector3();
@@ -16906,6 +16949,7 @@ window.__diceDebug = {
   // SIT AT CHAIR k. Sticky, unlike simulatePlaceView below: it writes the
   // dial, so a places flush restores this chair rather than handing the eye
   // back to station 0. null for a station nobody is standing at.
+  demoRegions(on) { return demoOverlayApply(on); },
   demoSit(k) {
     return demoSitAt(k);
   },
@@ -25299,9 +25343,13 @@ function clearTableIdentity() {
 // old `medium` and `wide`; `wide` is new, one ×0.78 pitch above the old wide,
 // eyes scaled by the same 1.28 with y/z ≈ 1.73 preserved.
 const ZOOM_PRESETS = {
-  wide:   { w: 14.1, d: 8.6, eyeFull: [0, 13.3, 7.7], eyeMini: [0, 11.0, 6.2] },
-  medium: { w: 11,   d: 6.7, eyeFull: [0, 10.4, 6.0], eyeMini: [0,  8.6, 4.8] },
-  close:  { w: 8.6,  d: 5.2, eyeFull: [0,  8.1, 4.7], eyeMini: [0,  6.7, 3.8] },
+  // THE TABLE IS ROUND (2026-09-01): the walls stand at ±w/2 on BOTH axes, so
+  // the disc of radius w/2 (js/places.js ringRadius) lies wholly inside them.
+  // ×1.6 on 2026-09-01 (Joe: "the dice are way too big for that table"): the
+  // camera fits the ring of cards, so a bigger table IS smaller dice.
+  wide:   { w: 14.1 * TABLE_SCALE, d: 14.1 * TABLE_SCALE, eyeFull: [0, 13.3 * TABLE_SCALE, 7.7 * TABLE_SCALE], eyeMini: [0, 11.0 * TABLE_SCALE, 6.2 * TABLE_SCALE] },
+  medium: { w: 11 * TABLE_SCALE,   d: 11 * TABLE_SCALE,   eyeFull: [0, 10.4 * TABLE_SCALE, 6.0 * TABLE_SCALE], eyeMini: [0,  8.6 * TABLE_SCALE, 4.8 * TABLE_SCALE] },
+  close:  { w: 8.6 * TABLE_SCALE,  d: 8.6 * TABLE_SCALE,  eyeFull: [0,  8.1 * TABLE_SCALE, 4.7 * TABLE_SCALE], eyeMini: [0,  6.7 * TABLE_SCALE, 3.8 * TABLE_SCALE] },
 };
 
 // pendingZoom is declared at module top with ZOOM_LEVELS (TDZ — see there).
@@ -25516,6 +25564,10 @@ function placardRebuild() {
   // gated flush, the ungated leave, the wash's mid-roll rig build — because
   // the fog is render-only and belongs with the cards, not with the orbit.
   fogFloorSync();
+  // THE BANNER STEPS ASIDE for a seated viewer (css/style.css body.seated):
+  // on the ring your own card stands bottom centre, exactly where the result
+  // banner is fixed, so while you hold a seat the banner sits bottom-left.
+  document.body.classList.toggle('seated', !!myPlaceRow());
   // THE DEMO OVERLAY RIDES THE CARDS' OWN FLUSH (js/demo.js). It is derived
   // from the mat, the tower and the dial exactly as the anchors are, so it
   // re-derives where they do — behind the roll boundary, never mid-tumble.
@@ -25627,7 +25679,7 @@ function placeOrbitApply() {
 // null, so there is no event to react to and no leak channel to close.
 function placeWashFor(roll) {
   if (!roll || !roll.playerId) return null;
-  if (!Number.isInteger(roll.entry) || roll.entry < 0 || roll.entry > 3) return null;
+  if (!seatValid(roll.seat, roll.seats, roll.arc || 0)) return null;
   // The roster, through the one seam (placeRoster): empty offline, so the
   // `netOnline` half of the old gate is kept by construction, and the demo
   // door's cast lights its own cards without a second branch here.
@@ -25965,6 +26017,15 @@ function demoSpawnLine(entry, lane) {
 }
 
 // The four line segments of an axis-aligned rectangle, pushed flat at y.
+// A circle as line segments, on the ground at height y.
+function demoCircleSegs(out, cx, cz, r, y, n) {
+  for (let i = 0; i < n; i++) {
+    const a0 = (2 * Math.PI * i) / n;
+    const a1 = (2 * Math.PI * (i + 1)) / n;
+    out.push(cx + r * Math.sin(a0), y, cz + r * Math.cos(a0), cx + r * Math.sin(a1), y, cz + r * Math.cos(a1));
+  }
+}
+
 function demoRectSegs(out, x0, x1, z0, z1, y) {
   const c = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
   for (let i = 0; i < 4; i++) {
@@ -26000,16 +26061,12 @@ function demoOverlaySync() {
   group.name = 'demoRegions';
   const atlas = demoDigitAtlas();
 
-  // THE MAT'S OWN EDGE FIRST, in a neutral grey — and it is not decoration.
-  // The push (js/places.js PLACE_PUSH) leaves a 2.2 x 1.34 CORRIDOR of
-  // untinted felt down the middle of the table, and on a dark felt that
-  // corridor reads as a gap between two tables rather than as the space the
-  // push bought. Outlining the playable rectangle puts the regions back
-  // inside one object. Same extents the walls are placed at, so it moves with
-  // every zoom and every tower socket.
+  // THE TABLE'S OWN EDGE FIRST: the ring the cards stand on, in a neutral
+  // grey (js/places.js ringRadius — the table is round).
+  const R = ringRadius(TABLE_W);
   {
     const segs = [];
-    demoRectSegs(segs, -TABLE_W / 2, TABLE_W / 2, -TABLE_D / 2, TABLE_D / 2, DEMO_OVERLAY_Y);
+    demoCircleSegs(segs, 0, 0, R, DEMO_OVERLAY_Y, 96);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3));
     const mat = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
@@ -26020,62 +26077,35 @@ function demoOverlaySync() {
     group.add(mat);
   }
 
+  // Per seat: the SPOT the toss is aimed at (a disc on the seat's ray), the
+  // ray from the spawn line to it, the spawn line itself, and the seat number.
+  // Drawn FROM seatToss's own output, which is what the film reads.
   const out = [];
+  const spotR = R * SPOT_R;
+  const y = DEMO_OVERLAY_Y + 0.004;
   for (const r of rows) {
-    const st = entryFor(r.place, towerUp);
-    if (!st) continue;
-    const region = regionFor(st.entry, st.lane, TABLE_W, TABLE_D);
-    if (!region) continue;
-    const aim = aimFor(st.entry, st.lane, TABLE_W, TABLE_D, THROW_TARGET);
-    const spawn = demoSpawnLine(st.entry, st.lane);
+    const toss = seatToss(r.seat, r.seats, r.arc, TABLE_W);
+    if (!toss) continue;
     const hue = new THREE.Color(r.color || '#ffffff');
 
-    // the aim box, in world units — throwOrigin.box's own two expressions
-    const bw = TABLE_W * THROW_TARGET * aim.kx;
-    const bd = TABLE_D * THROW_TARGET * aim.kz;
-    let ax0 = aim.x - bw / 2;
-    let ax1 = aim.x + bw / 2;
-    let az0 = aim.z - bd / 2;
-    let az1 = aim.z + bd / 2;
-    if (aim.own) {
-      // Each die aims at its own place on the spawn line (spawnDie's `ax`/`az`
-      // when `own` is set), so what the POOL aims at is a band across the line
-      // rather than one box. Drawn as the band, because the box would be a
-      // true rectangle in the wrong place.
-      if (st.entry <= 1) { ax0 = spawn.x0 - bw / 2; ax1 = spawn.x1 + bw / 2; }
-      else { az0 = spawn.z0 - bd / 2; az1 = spawn.z1 + bd / 2; }
-    }
-
-    // ---- the fill -------------------------------------------------------
     const fill = new THREE.Mesh(
-      new THREE.PlaneGeometry(region.x1 - region.x0, region.z1 - region.z0),
+      new THREE.CircleGeometry(spotR, 48),
       new THREE.MeshBasicMaterial({
         color: hue, transparent: true, opacity: DEMO_FILL_ALPHA,
         depthWrite: false, side: THREE.DoubleSide, fog: false,
       }),
     );
     fill.rotation.x = -Math.PI / 2;
-    fill.position.set((region.x0 + region.x1) / 2, DEMO_OVERLAY_Y, (region.z0 + region.z1) / 2);
+    fill.position.set(toss.ax, DEMO_OVERLAY_Y, toss.az);
     fill.renderOrder = 9;
     group.add(fill);
 
-    // ---- the lines: region, aim box, spawn line -------------------------
     const segs = [];
-    demoRectSegs(segs, region.x0, region.x1, region.z0, region.z1, DEMO_OVERLAY_Y + 0.002);
-    demoRectSegs(segs, ax0, ax1, az0, az1, DEMO_OVERLAY_Y + 0.004);
-    const y = DEMO_OVERLAY_Y + 0.004;
-    segs.push(spawn.x0, y, spawn.z0, spawn.x1, y, spawn.z1);
-    // …with an end cap at each end, across the line, so it reads as a line
-    // the dice are born ON rather than as a stray boundary.
-    if (st.entry <= 1) {
-      for (const x of [spawn.x0, spawn.x1]) {
-        segs.push(x, y, spawn.z0 - DEMO_TICK_CAP, x, y, spawn.z0 + DEMO_TICK_CAP);
-      }
-    } else {
-      for (const z of [spawn.z0, spawn.z1]) {
-        segs.push(spawn.x0 - DEMO_TICK_CAP, y, z, spawn.x0 + DEMO_TICK_CAP, y, z);
-      }
-    }
+    demoCircleSegs(segs, toss.ax, toss.az, spotR, y, 48);
+    segs.push(toss.x, y, toss.z, toss.ax, y, toss.az);
+    const half = spotR;   // the spawn line, drawn a spot's width wide
+    segs.push(toss.x - toss.tx * half, y, toss.z - toss.tz * half,
+      toss.x + toss.tx * half, y, toss.z + toss.tz * half);
     const lg = new THREE.BufferGeometry();
     lg.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3));
     const lines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({
@@ -26085,22 +26115,13 @@ function demoOverlaySync() {
     lines.renderOrder = 9;
     group.add(lines);
 
-    // ---- the numeral, in the region's OUTER corner -----------------------
-    // Outer = toward this station's own wall, and toward its lane's side; the
-    // centre slot and the heads have no lane side, so they take the middle of
-    // their own wall. That is the corner your eye is already at when you are
-    // reading whose felt this is.
-    const lx = st.entry === 2 ? region.x0 + DEMO_LABEL_INSET
-      : st.entry === 3 ? region.x1 - DEMO_LABEL_INSET
-        : st.lane < 0 ? region.x0 + DEMO_LABEL_INSET
-          : st.lane > 0 ? region.x1 - DEMO_LABEL_INSET
-            : (region.x0 + region.x1) / 2;
-    const lz = st.entry === 0 ? region.z1 - DEMO_LABEL_INSET
-      : st.entry === 1 ? region.z0 + DEMO_LABEL_INSET
-        : (region.z0 + region.z1) / 2;
+    // The seat number, just outside the spot toward the card.
+    const { s, c } = seatTrig(toss.theta);
+    const lx = toss.ax + s * (spotR + DEMO_LABEL_INSET);
+    const lz = toss.az + c * (spotR + DEMO_LABEL_INSET);
     const lgeo = new THREE.PlaneGeometry(DEMO_LABEL_W, DEMO_LABEL_W);
-    const u0 = r.place / DEMO_MAX;
-    const u1 = (r.place + 1) / DEMO_MAX;
+    const u0 = r.seat / DEMO_MAX;
+    const u1 = (r.seat + 1) / DEMO_MAX;
     lgeo.setAttribute('uv', new THREE.Float32BufferAttribute(
       [u0, 1, u1, 1, u0, 0, u1, 0], 2));
     const label = new THREE.Mesh(lgeo, new THREE.MeshBasicMaterial({
@@ -26108,24 +26129,15 @@ function demoOverlaySync() {
       depthWrite: false, side: THREE.DoubleSide, fog: false,
     }));
     label.rotation.x = -Math.PI / 2;
-    // Turned toward the reader, exactly as the names are and by the same
-    // number: `readerOrbit()` is the azimuth the rig last turned every card
-    // for, already quantised to the quarter. After the −90° about X the
-    // plane's own +Z is world +Y, so one rotateZ spins the digit flat on the
-    // ground; at orbit 0 it is zero and the numerals stand as authored.
     label.rotateZ(placardRig ? placardRig.readerOrbit() : 0);
     label.position.set(lx, DEMO_OVERLAY_Y + 0.006, lz);
     label.renderOrder = 9;
     group.add(label);
 
     out.push({
-      place: r.place,
-      entry: st.entry,
-      lane: st.lane,
-      color: r.color,
-      region: { ...region },
-      aim: { x0: ax0, x1: ax1, z0: az0, z1: az1, own: aim.own },
-      spawn: { ...spawn },
+      place: r.place, seat: r.seat, seats: r.seats, theta: toss.theta, color: r.color,
+      spot: { x: toss.ax, z: toss.az, r: spotR },
+      spawn: { x: toss.x, z: toss.z, tx: toss.tx, tz: toss.tz },
     });
   }
   scene.add(group);
@@ -26195,7 +26207,7 @@ function demoRollFrom(k, notation = DEMO_POOL) {
     demoPlace: row.place,
   });
   return { place: row.place, name: row.name, notation: res.canonical,
-    ...entryFor(row.place, towerOn()) };
+    ...seatStamp(demoRows.map((r) => r.place), row.place, towerOn()) };
 }
 
 // …AND FROM EVERY CHAIR, for the crowd picture. playRoll queues overlapping
@@ -28425,8 +28437,58 @@ function panelDebugState() {
 // `of` tags each point so the framing can still be priced by subset
 // (fitCameraTo takes any of them); with one class left it is a seam kept
 // deliberately open rather than a live distinction.
+// The disc the frame keeps round each landing spot, as a share of the table's
+// radius: SPOT_R (0.22) is the spot itself; the extra is where the dice roll.
+const FRAME_SPOT = 0.35;
+// Solo rolls are tossed as seat 0 of 1 (requestRoll). An instrument flag —
+// __diceDebug.soloToss(false) — restores the seeded hurl for the one
+// scenario that measures the hurl's own settle cut.
+let SOLO_TOSS = true;
 function framingPoints() {
   const pts = [];
+  // THE ROUND TABLE: when anyone holds a seat, the frame fits the ring the
+  // cards stand on (the table's true edge) — sixteen points round it, so the
+  // fit is the same from every chair. Unplaced tables fit the mat as before.
+  // THE ROUND TABLE FRAMES WHAT MATTERS: every seat's SPOT (a disc round the
+  // landing spot, FRAME_SPOT of the table's radius) and the OTHER players'
+  // cards. Not the empty felt, and not your own card — it stands under the
+  // banner at the bottom, and you know your own name. So a lone player sees
+  // their pool large in front of them, two players see both pools and the
+  // other's name, and a full table sees the ring. `pts.centre` is the hull's
+  // middle, which the fit aims at (framingFor); at N >= 3 that is the table's
+  // centre to within a die.
+  {
+    const rows = placeRows();
+    const add = (x, z) => pts.push({ p: new THREE.Vector3(x, 0, z), mx: 0.02, my: 0.02, of: 'felt' });
+    const spotDisc = (toss) => {
+      const r = ringRadius(TABLE_W) * FRAME_SPOT;
+      for (let i = 0; i < 8; i++) {
+        const a = (2 * Math.PI * i) / 8;
+        add(toss.ax + r * Math.sin(a), toss.az + r * Math.cos(a));
+      }
+    };
+    if (!rows.length) {
+      // Solo, a spectator, a placeless ninth: the film tosses as seat 0 of 1.
+      const t = seatToss(0, 1, towerOn() ? 1 : 0, TABLE_W);
+      if (t) spotDisc(t);
+    }
+    for (const r of rows) {
+      const toss = seatToss(r.seat, r.seats, r.arc, TABLE_W);
+      if (toss) spotDisc(toss);
+      if (!r.mine) {
+        const a = r.anchor;
+        const { s, c } = seatTrig(a.azim);
+        add(a.x + c * (PLACARD_W / 2), a.z - s * (PLACARD_W / 2));
+        add(a.x - c * (PLACARD_W / 2), a.z + s * (PLACARD_W / 2));
+      }
+    }
+    if (pts.length) {
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (const q of pts) { x0 = Math.min(x0, q.p.x); x1 = Math.max(x1, q.p.x); z0 = Math.min(z0, q.p.z); z1 = Math.max(z1, q.p.z); }
+      pts.centre = new THREE.Vector3((x0 + x1) / 2, 0, (z0 + z1) / 2);
+      return pts;
+    }
+  }
   for (const s of [-1, 1]) {
     pts.push({ p: new THREE.Vector3(s * TABLE_W / 2, 0, -TABLE_D / 2), mx: 0.02, my: 0.02, of: 'felt' });
     pts.push({ p: new THREE.Vector3(s * TABLE_W / 2, 0, TABLE_D / 2), mx: 0.02, my: 0.02, of: 'felt' });
@@ -28469,7 +28531,11 @@ function framingPoints() {
 // points are the literals above and at π/2, π, 3π/2 the same four corners in
 // another order — the shipped phone crop is bit-identical at every quarter.
 function matSquarePoints() {
-  const h = Math.min(TABLE_W, TABLE_D) / 2;
+  // The round table: when anyone holds a seat the frame fits the RING OF
+  // CARDS (the table's true edge), not the walls; unplaced tables fit the mat.
+  const h = placeRows().length >= 3
+    ? ringRadius(TABLE_W) + PLACARD_STANDOFF + PLACARD_D / 2
+    : ringRadius(TABLE_W) * (RING_SPOT + FRAME_SPOT);
   const pts = [];
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
@@ -28528,7 +28594,7 @@ function matSquarePoints() {
 // (updateMatFogFloor), and no-die-sits-in-fog re-pins the multi-place floors.
 const PLACE_RETREAT = 1.2;
 function placeRetreatNow() {
-  return placeRows().length >= 2 ? PLACE_RETREAT : 1;
+  return 1;   // the round table's fit already includes the cards (matSquarePoints)
 }
 
 // THE PRESET RAY, TAKEN IN THE VIEWER'S OWN FRAME (§7.63) — the ONE expression
@@ -28653,7 +28719,12 @@ function matWorstNdc() {
   }
   return { x, y };
 }
-function matOnScreen() { const w = matWorstNdc(); return w.x <= 1 && w.y <= 1; }
+// "The mat fits" means the FRAME'S OWN point set fits (framingPoints — on the
+// round table the spots and the other players' cards, not the felt's corners).
+function matOnScreen() {
+  const v = new THREE.Vector3();
+  return framingPoints().every(({ p }) => { v.copy(p).project(camera); return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1; });
+}
 
 // Where the eye sits along its own ray, as a multiple of the preset distance —
 // the same `s` fitCameraTo scans. 1.00 is the preset exactly; > 1 is a retreat;
@@ -28830,9 +28901,15 @@ function framingFor(orbit) {
   // exact shipped behaviour, including their failure behaviour — their scans
   // fail on big piles where the ceiling is a meaningful answer, and this file
   // has been bitten before by a rule that looked general and was not.
-  const matOk = fitCameraTo(framingPoints(), home, 1, true);
-  if (!matOk) fitCameraTo(matSquarePoints(), home, 1, true);
-  if (framingLadder && (!matOk || !decidingOnScreen())) {
+  const fp = framingPoints();
+  const matOk = fitCameraTo(fp, fp.centre || home, 1, true);
+  if (!matOk) fitCameraTo(matSquarePoints(), fp.centre || home, 1, true);
+  // THE ROUND TABLE IS THE FRAME. When anyone holds a seat the picture is the
+  // ring of cards with every pool in front of its owner, from every chair; the
+  // dice rungs below (frame the pool, frame the deciding die) are the solo
+  // felt's, where there is one pool and nothing else to look at.
+  const ringTable = placeRows().length > 0;
+  if (framingLadder && !ringTable && (!matOk || !decidingOnScreen())) {
     const dice = diceFramingPoints();
     if (dice && fitCameraTo(dice, dice.centre)) {
       mode = 'dice';
@@ -28843,7 +28920,7 @@ function framingFor(orbit) {
       if (hero && fitCameraTo(hero, hero.centre)) mode = 'deciding';
       else mode = 'mat-overflow';
     }
-  } else if (framingLadder && FRAMING.preferDice && mode === 'mat') {
+  } else if (framingLadder && !ringTable && FRAMING.preferDice && mode === 'mat') {
     // RUNG 1 SUCCEEDED — ask rung 2 anyway (C27, shipped on). Kept only if it
     // is better by BOTH of the measures the ladder already trusts: no die may
     // leave the frame, and the dice must actually get bigger by a margin, or
@@ -28872,7 +28949,7 @@ function framingFor(orbit) {
   const { on, span } = framingScore();
   const pose = {
     pos: camera.position.clone(),
-    tgt: (mode === 'mat' || mode === 'mat-overflow') ? home.clone()
+    tgt: (mode === 'mat' || mode === 'mat-overflow') ? (fp.centre || home).clone()
       : (mode === 'deciding' ? decidingDieFraming().centre : diceFramingPoints().centre),
     mode, orbit, on, span,
     hero: decidingOnScreen(),
@@ -31095,8 +31172,10 @@ function replaySettledRoll(r) {
     // after the roller left still enters from the edge it entered from
     // (GOALS:297-306, history vs live state). Same pair the 'roll' broadcast
     // carries; absent on every pre-places and placeless entry.
-    entry: r.entry,
-    lane: r.lane,
+    seat: r.seat,
+    seats: r.seats,
+    arc: r.arc,
+    place: r.place,
     playerId: r.playerId,
     seed: r.seed,
     label: r.label || formula(r.dice || []),
@@ -31355,8 +31434,10 @@ function handleNetEvent(type, data) {
         // server starts stamping. Dropping them HERE would be the silent
         // desync: this client would fall back to the seeded side while
         // stamp-reading clients entered from the place's edge.
-        entry: data.entry,
-        lane: data.lane,
+        seat: data.seat,
+        seats: data.seats,
+        arc: data.arc,
+        place: data.place,
         playerId: data.playerId,
         seed: data.seed,
         label: data.label || formula(data.dice || []),

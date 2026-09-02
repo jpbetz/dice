@@ -89,6 +89,8 @@ export const DEMO_MAX = 8;
 // demo tab, which is the sort of joke a dev tool should not tell.
 const FALSEY = new Set(['0', 'no', 'off', 'false']);
 
+import { seatValid } from './places.js';
+
 export function resolveDemo({ param, room } = {}) {
   const present = param !== null && param !== undefined;
   const asked = present && !FALSEY.has(String(param).trim().toLowerCase());
@@ -227,8 +229,8 @@ export function dealDemo(n, rand = Math.random) {
 // collect, in the order given.
 export function demoArrivalSweep(standing, arriving, towerUp = false) {
   const rows = Array.isArray(standing) ? standing : [];
-  if (!arriving || !Number.isInteger(arriving.entry) || towerUp) return [...rows];
+  if (!arriving || !seatValid(arriving.seat, arriving.seats, arriving.arc || 0) || towerUp) return [...rows];
   return rows.filter((r) => r.playerId === arriving.playerId
-    || (r.entry === arriving.entry && r.lane === arriving.lane)
-    || !Number.isInteger(r.entry));
+    || (Number.isInteger(arriving.place) && r.place === arriving.place)
+    || !seatValid(r.seat, r.seats, r.arc || 0));
 }

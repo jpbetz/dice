@@ -3445,6 +3445,11 @@ html, body {
   pointer-events: auto;
 }
 #result-banner.hidden { display: none; }
+/* THE BANNER STEPS ASIDE FOR A SEATED VIEWER (2026-09-01, the round table):
+   your own placard stands bottom centre of the felt, where this banner is
+   fixed, so while you hold a seat it sits bottom-left of the felt instead.
+   Set by js/main.js placardRebuild; read by nothing else. */
+body.seated #result-banner { left: calc(var(--table-left) + 24px); transform: none; text-align: left; }
 /* ---- the folded card (Joe 2026-08-03): body = the one big clear target.
    The removal dress must SAY removal: the roller's clear wears the red
    wash + hairline + a quiet ✕ watermark rising behind the content; a

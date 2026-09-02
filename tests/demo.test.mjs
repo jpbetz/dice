@@ -180,14 +180,14 @@ t('the names EXERCISE the card fitter rather than flattering it', () => {
 // ---------------------------------------------------------------------------
 
 const standing = [
-  { playerId: 'demo:0', entry: 0, lane: -1 },
-  { playerId: 'demo:2', entry: 0, lane: +1 },
-  { playerId: 'demo:4', entry: 3, lane: 0 },
-  { playerId: null, entry: undefined, lane: undefined },   // a placeless roll
+  { playerId: 'demo:0', place: 0, seat: 0, seats: 3, arc: 0 },
+  { playerId: 'demo:2', place: 2, seat: 1, seats: 3, arc: 0 },
+  { playerId: 'demo:4', place: 4, seat: 2, seats: 3, arc: 0 },
+  { playerId: null },   // a placeless roll
 ];
 
 t('THE FELT HOLDS ONE ROLL PER PLACE: an arrival sweeps its own chair only', () => {
-  const swept = demoArrivalSweep(standing, { playerId: 'demo:0', entry: 0, lane: -1 });
+  const swept = demoArrivalSweep(standing, { playerId: 'demo:0', place: 0, seat: 0, seats: 3, arc: 0 });
   assert.deepEqual(swept.map((r) => r.playerId), ['demo:0', null],
     "seat 0's second throw takes seat 0's first, and the placeless roll — "
     + 'and leaves seats 2 and 4 standing');
@@ -196,15 +196,15 @@ t('THE FELT HOLDS ONE ROLL PER PLACE: an arrival sweeps its own chair only', () 
 t('a chair handed on sweeps the roll its last sitter left standing', () => {
   // The v2 defect, verbatim: keyed on playerId alone this returns only the
   // placeless roll and the departed roller's ghost stands for ever.
-  const swept = demoArrivalSweep(standing, { playerId: 'demo:0b', entry: 0, lane: -1 });
+  const swept = demoArrivalSweep(standing, { playerId: 'demo:0b', place: 0, seat: 0, seats: 3, arc: 0 });
   assert.deepEqual(swept.map((r) => r.playerId), ['demo:0', null],
     'the stamp is the chair, not the person');
 });
 
 t('a placeless arrival takes the whole felt, and so does a tower table', () => {
-  assert.equal(demoArrivalSweep(standing, { playerId: 'x', entry: null }).length, standing.length,
+  assert.equal(demoArrivalSweep(standing, { playerId: 'x' }).length, standing.length,
     'no stamp, no per-place rule — the pre-places sweep');
-  assert.equal(demoArrivalSweep(standing, { playerId: 'demo:0', entry: 0, lane: -1 }, true).length,
+  assert.equal(demoArrivalSweep(standing, { playerId: 'demo:0', place: 0, seat: 0, seats: 3, arc: 0 }, true).length,
     standing.length,
     'and while a tower is up the entries collide (ROADMAP row 15), so per-place '
     + 'would take away the wrong player’s dice');
@@ -212,10 +212,10 @@ t('a placeless arrival takes the whole felt, and so does a tower table', () => {
 
 t('the sweep never mutates what it was handed', () => {
   const before = JSON.stringify(standing);
-  demoArrivalSweep(standing, { playerId: 'demo:4', entry: 3, lane: 0 });
-  demoArrivalSweep(standing, { playerId: 'z', entry: null }, true);
+  demoArrivalSweep(standing, { playerId: 'demo:4', place: 4, seat: 2, seats: 3, arc: 0 });
+  demoArrivalSweep(standing, { playerId: 'z' }, true);
   assert.equal(JSON.stringify(standing), before);
-  assert.deepEqual(demoArrivalSweep(null, { playerId: 'a', entry: 0, lane: 0 }), [],
+  assert.deepEqual(demoArrivalSweep(null, { playerId: 'a', place: 0, seat: 0, seats: 1, arc: 0 }), [],
     'and an empty felt sweeps nothing rather than throwing');
 });
 

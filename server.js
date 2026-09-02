@@ -55,7 +55,7 @@ import { SYSTEM_IDS } from './js/meanings.js';
 // which edge, and which lane of it, a station's throws come in from —
 // executeRoll stamps its answer onto the roll payload, and every client bakes
 // the film from the stamp, never from a roster of its own.
-import { PLACE_MAX, entryFor } from './js/places.js';
+import { PLACE_MAX, seatStamp, seatValid } from './js/places.js';
 // C22: the stamp's SHAPE only. The server carries `ver` on a table setup and
 // never judges it — see handleTable — so it imports the parser and nothing
 // else, which is also what keeps the regex in one file.
@@ -2213,7 +2213,7 @@ function projectEntryFor(entry, viewerId) {
     // value. The audience list itself is not repeated here.
     revealAuthority: vis.revealAuthority,
   };
-  // The place stamp survives redaction (UX §7.63): `entry`/`lane` are POSE
+  // The place stamp survives redaction (UX §7.63): `seat`/`seats`/`arc` are POSE
   // inputs of exactly the seed's class — the shrouded film visibly tumbles in
   // over the roller's edge, and this branch already ships the `playerId` and
   // name standing at that edge, so the stamp discloses strictly less than
@@ -2222,9 +2222,11 @@ function projectEntryFor(entry, viewerId) {
   // SECRET roll never reaches this line for anyone but its roller: the
   // projection above is null — no payload, no film, no cue, structurally
   // nothing to suppress.)
-  if (Number.isInteger(entry.entry)) {
-    out.entry = entry.entry;
-    out.lane = entry.lane;
+  if (Number.isInteger(entry.seat)) {
+    out.seat = entry.seat;
+    out.seats = entry.seats;
+    out.arc = entry.arc;
+    out.place = entry.place;
   }
   if (entry.exp) out.exp = entry.exp;
   // A TURN'S BUDGET IS A STAKE, not a value (MECHANICS M2). How many throws
@@ -2372,10 +2374,15 @@ function collectEntries(room, entries) {
 // shares that side, which is the chair it was standing in front of anyway.
 function arrivalSweep(room, roll) {
   const towerUp = !!(room.settings.tower && room.settings.tower !== 'none');
-  if (!Number.isInteger(roll.entry) || towerUp) return room.log;
+  if (!seatValid(roll.seat, roll.seats, roll.arc) || towerUp) return room.log;
+  // The felt holds one roll per CHAIR: a seated roller's arrival collects
+  // their own prior rolls, any roll made from the chair they now hold (a
+  // departed roller's dice do not outlive the chair), and any unstamped one —
+  // and leaves the other chairs' rolls standing. `roll.place` is stamped for
+  // this filter alone; the film never reads it.
   return room.log.filter((r) => r.playerId === roll.playerId
-    || (r.entry === roll.entry && r.lane === roll.lane)
-    || !Number.isInteger(r.entry));
+    || (Number.isInteger(roll.place) && r.place === roll.place)
+    || !seatValid(r.seat, r.seats, r.arc || 0));
 }
 
 // Compose, log, and broadcast a roll for a player from a validated spec.
@@ -2428,8 +2435,9 @@ function executeRoll(room, player, spec) {
   // change is still deferred to the next roll boundary cannot desync anyone.
   if (PLACES_ON && Number.isInteger(player.place)) {
     const towerUp = !!(room.settings.tower && room.settings.tower !== 'none');
-    const e = entryFor(player.place, towerUp);   // {entry, lane} | null
-    if (e) { roll.entry = e.entry; roll.lane = e.lane; }
+    const occupied = [...room.players.values()].map((p) => p.place);
+    const e = seatStamp(occupied, player.place, towerUp);   // {seat, seats, arc} | null
+    if (e) { roll.seat = e.seat; roll.seats = e.seats; roll.arc = e.arc; roll.place = player.place; }
   }
   // Only a dressed-up roll carries the field at all, so a Plain roll's payload
   // — broadcast, response and log entry alike — stays byte-for-byte what it
@@ -2797,8 +2805,9 @@ async function handleRethrow(req, res) {
   // been one, stays, because the entry is history and history keeps its edge.
   if (PLACES_ON && Number.isInteger(player.place)) {
     const towerUp = !!(room.settings.tower && room.settings.tower !== 'none');
-    const e = entryFor(player.place, towerUp);
-    if (e) { roll.entry = e.entry; roll.lane = e.lane; }
+    const occupied = [...room.players.values()].map((p) => p.place);
+    const e = seatStamp(occupied, player.place, towerUp);   // {seat, seats, arc} | null
+    if (e) { roll.seat = e.seat; roll.seats = e.seats; roll.arc = e.arc; roll.place = player.place; }
   }
 
   logDebug(() => `rethrow ${logField('room', room.name)} ${logField('name', player.name)} `

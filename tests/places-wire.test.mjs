@@ -71,7 +71,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { projectEntryFor } from '../server.js';
-import { PLACE_MAX, entryFor } from '../js/places.js';
+import { PLACE_MAX } from '../js/places.js';
 
 // server.js installs a swallow-and-continue uncaughtException handler for its
 // own resilience; a test run must crash loudly instead.
@@ -541,15 +541,14 @@ await t('a redacted roll still omits every value-bearing key', () => {
   assert.equal(out.redacted, true);
   // A stampless entry carries no stamp: present-or-absent, never invented, so
   // this projection is byte-for-byte what it was before places existed.
-  assert.equal('entry' in out, false, 'no entry key on a stampless entry');
-  assert.equal('lane' in out, false, 'no lane key on a stampless entry');
+  for (const k of ['seat', 'seats', 'arc', 'place']) assert.equal(k in out, false, `no ${k} key on a stampless entry`);
 });
 
 await t('a redacted roll carries the stamp, and still no values', () => {
-  const stamped = { ...heldEntry(), entry: 1, lane: -1 };
+  const stamped = { ...heldEntry(), seat: 1, seats: 3, arc: 0, place: 4 };
   const out = projectEntryFor(stamped, 'bystander');
-  assert.equal(out.entry, 1, 'the entry edge survives redaction — a pose input');
-  assert.equal(out.lane, -1, 'and the lane with it');
+  assert.deepEqual({ seat: out.seat, seats: out.seats, arc: out.arc, place: out.place }, { seat: 1, seats: 3, arc: 0, place: 4 },
+    'the ring stamp survives redaction — a pose input');
   assert.equal(out.redacted, true);
   for (const key of ['values', 'perDie', 'modifier', 'total', 'spec']) {
     assert.equal(key in out, false, `${key} still omitted beside the stamp`);
@@ -567,24 +566,27 @@ await t('a secret roll is projected as nothing at all', () => {
 // 6. The stamp itself — server-set, from the roster, onto the payload
 // ---------------------------------------------------------------------------
 
-await t('a roll is stamped with its roller\'s own entry and lane, and everyone gets the same integers', async () => {
+await t('a roll is stamped with its roller\'s seat of the table\'s seats, and everyone gets the same integers', async () => {
   const room = 'wire-stamp';
-  const ann = await seat(base, room, 'Ann');    // place 0 — front, lane 0
-  const bram = await seat(base, room, 'Bram');  // place 1 — back, lane 0
+  const ann = await seat(base, room, 'Ann');    // place 0 — seat 0 of 2
+  const bram = await seat(base, room, 'Bram');  // place 1 — seat 1 of 2
   const r = await postTo(base, '/api/roll', { room, playerId: ann.playerId, notation: '2d6' });
   assert.equal(r.status, 200, r.text.slice(0, 200));
-  const want = entryFor(0, false);
-  assert.equal(r.data.roll.entry, want.entry, 'the response carries the front station\'s edge');
-  assert.equal(r.data.roll.lane, want.lane, 'and its lane');
+  assert.deepEqual({ seat: r.data.roll.seat, seats: r.data.roll.seats, arc: r.data.roll.arc }, { seat: 0, seats: 2, arc: 0 },
+    'the response carries seat 0 of 2, no tower');
+  assert.equal(r.data.roll.place, 0, 'and the chair, for the sweep');
   // The same integers reach the OTHER side of the table on the broadcast —
   // the whole point: one payload, one film, no client-side re-derivation.
   const heard = await waitForEvent(bram.stream, 'roll', (d) => d.rollId === r.data.roll.rollId);
-  assert.equal(heard.data.entry, r.data.roll.entry, 'the broadcast carries the same edge');
-  assert.equal(heard.data.lane, r.data.roll.lane, 'and the same lane');
-  // And the stamp is the ROLLER's, not the room's: Bram's own roll comes in
-  // from Bram's station.
+  assert.equal(heard.data.seat, 0, 'the broadcast carries the same seat');
+  assert.equal(heard.data.seats, 2, 'and the same count');
+  // And the stamp is the ROLLER's, not the room's: Bram's own roll is seat 1.
   const r2 = await postTo(base, '/api/roll', { room, playerId: bram.playerId, notation: '1d20' });
-  assert.equal(r2.data.roll.entry, entryFor(1, false).entry, 'Bram\'s roll wears Bram\'s edge');
+  assert.deepEqual({ seat: r2.data.roll.seat, seats: r2.data.roll.seats }, { seat: 1, seats: 2 }, 'Bram\'s roll wears Bram\'s seat');
+  // A third chair re-ranks nobody below it, and the count is live.
+  const cass = await seat(base, room, 'Cass');
+  const r3 = await postTo(base, '/api/roll', { room, playerId: cass.playerId, notation: '1d20' });
+  assert.deepEqual({ seat: r3.data.roll.seat, seats: r3.data.roll.seats }, { seat: 2, seats: 3 }, 'Cass is seat 2 of 3');
 });
 
 await t('a placeless roller\'s payload carries no stamp at all', async () => {
@@ -595,39 +597,34 @@ await t('a placeless roller\'s payload carries no stamp at all', async () => {
     assert.equal(r.status, 200, r.text.slice(0, 200));
     ids.push(r.data.playerId);
   }
-  // The ninth chair does not exist: no place, so no entry, no lane — the key
-  // is ABSENT, and the film falls back to the seeded draw it always had.
+  // The ninth chair does not exist: no place, so no seat, no count — the keys
+  // are ABSENT, and the film falls back to the seeded throw it always had.
   const r = await postTo(base, '/api/roll', { room, playerId: ids[PLACE_MAX], notation: '2d6' });
   assert.equal(r.status, 200, r.text.slice(0, 200));
-  assert.equal('entry' in r.data.roll, false, 'no entry key on a placeless roll');
-  assert.equal('lane' in r.data.roll, false, 'no lane key either');
+  for (const k of ['seat', 'seats', 'arc', 'place', 'entry', 'lane']) assert.equal(k in r.data.roll, false, `no ${k} key on a placeless roll`);
 });
 
-await t('a re-throw is re-stamped from the live place — the tower remap included', async () => {
+await t('a re-throw is re-stamped from the live table — the tower arc included', async () => {
   const room = 'wire-stamp-rethrow';
   const ann = await seat(base, room, 'Ann');    // place 0
-  const bram = await seat(base, room, 'Bram');  // place 1 — BACK, remapped by a tower
+  const bram = await seat(base, room, 'Bram');  // place 1
   const first = await postTo(base, '/api/roll', { room, playerId: bram.playerId, notation: '2d6 t2' });
   assert.equal(first.status, 200, first.text.slice(0, 200));
-  assert.equal(first.data.roll.entry, entryFor(1, false).entry, 'throw one enters from the back');
-  // The tower socketed between throws: the back stations move to its flanks,
-  // and Bram's SECOND throw must enter beside where his placard stands now —
-  // entryFor's towerUp remap, read off the room's own live setting.
+  assert.deepEqual({ seat: first.data.roll.seat, seats: first.data.roll.seats, arc: first.data.roll.arc }, { seat: 1, seats: 2, arc: 0 }, 'throw one: seat 1 of 2, no tower');
+  // The tower socketed between throws: the chairs move onto the front arc,
+  // and Bram's SECOND throw must say so — the arc flag, read off the room's
+  // own live setting, never a client's.
   const set = await postTo(base, '/api/settings',
     { room, playerId: ann.playerId, settings: { tower: 'blackanvil' } });
   assert.equal(set.status, 200, set.text.slice(0, 200));
   const again = await postTo(base, '/api/rethrow',
     { room, playerId: bram.playerId, rollId: first.data.roll.rollId, keep: [0] });
   assert.equal(again.status, 200, again.text.slice(0, 200));
-  const flank = entryFor(1, true);
-  assert.notEqual(flank.entry, entryFor(1, false).entry,
-    'the remap is a real remap, or this leg proves nothing');
-  assert.equal(again.data.roll.entry, flank.entry, 'the re-throw enters from the flank');
-  assert.equal(again.data.roll.lane, flank.lane, 'flanks are single-station: lane 0');
+  assert.deepEqual({ seat: again.data.roll.seat, seats: again.data.roll.seats, arc: again.data.roll.arc }, { seat: 1, seats: 2, arc: 1 }, 'the re-throw wears the arc');
 });
 
 // ---------------------------------------------------------------------------
-// 7. The felt holds one roll per place — what an arrival sweeps (v2)
+// 7. The felt holds one roll per chair — what an arrival sweeps
 // ---------------------------------------------------------------------------
 
 const collectedOn = (stream) => stream.events()
@@ -689,48 +686,47 @@ await t('a roll whose roller has left keeps its felt — the sweep reads the log
 });
 
 await t('a chair handed to a newcomer is one place: their first throw sweeps the departed roller\'s roll', async () => {
-  // The v2 verification's successor probe (2026-09-01): keyed on playerId
-  // alone, the sweep let a roller leave with dice standing, hand the chair to
-  // the next arrival, and never put the ghost away — two rolls wearing the one
-  // stamp, on one region, for the life of the room.
+  // Keyed on playerId alone, the sweep let a roller leave with dice standing,
+  // hand the chair to the next arrival, and never put the ghost away — two
+  // pools on one spot for the life of the room. So the stamp carries the
+  // chair (roll.place, sweep-only) and the sweep keys on it too.
   const room = 'wire-sweep-successor';
   const ann = await seat(base, room, 'Ann');     // place 0
   const bram = await seat(base, room, 'Bram');   // place 1 — the witness
   const a = (await postTo(base, '/api/roll', { room, playerId: ann.playerId, notation: '3d6' })).data.roll;
-  assert.deepEqual({ entry: a.entry, lane: a.lane }, entryFor(0, false), 'Ann\'s roll wears station 0');
+  assert.deepEqual({ seat: a.seat, seats: a.seats, place: a.place }, { seat: 0, seats: 2, place: 0 }, 'Ann\'s roll wears chair 0');
   await leaveForGood(base, room, ann);
   const dave = await seat(base, room, 'Dave');
   assert.equal(placeOf(dave.players, dave.playerId), 0, 'Dave is seated in Ann\'s chair — lowest free');
   const d = (await postTo(base, '/api/roll', { room, playerId: dave.playerId, notation: '3d6' })).data.roll;
-  assert.deepEqual({ entry: d.entry, lane: d.lane }, entryFor(0, false), 'and his roll wears the same stamp');
+  assert.deepEqual({ seat: d.seat, seats: d.seats, place: d.place }, { seat: 0, seats: 2, place: 0 }, 'and his roll wears the same chair');
   assert.notEqual(d.playerId, a.playerId, 'from a different player — or this leg proves nothing');
   await waitForEvent(bram.stream, 'roll', (x) => x.rollId === d.rollId);
   assert.deepEqual(collectedOn(bram.stream), [a.rollId],
-    'his arrival put Ann\'s roll away — one roll per PLACE, not per player');
+    'his arrival put Ann\'s roll away — one roll per CHAIR, not per player');
   const late = await joinRoom(room, 'Late');
   assert.deepEqual(openIn(late.data.log), [d.rollId], 'the felt holds the chair\'s one roll');
 });
 
 await t('a roller\'s own prior is swept even when its stamp changed under a tower', async () => {
-  // Why the sweep still matches the playerId as well as the stamp: a roll
-  // made under a tower wears the flank's stamp (entryFor's towerUp remap), and
-  // when the tower comes down its roller's next throw wears the chair's own.
-  // Different stamps, same roller — the prior must still go to the shelf.
+  // Why the sweep matches the playerId as well as the chair: a roll made
+  // under a tower wears the arc flag, and when the tower comes down its
+  // roller's next throw does not. Different stamps, same roller — the prior
+  // must still go to the shelf.
   const room = 'wire-sweep-restamped';
   const ann = await seat(base, room, 'Ann');     // place 0
-  const bram = await seat(base, room, 'Bram');   // place 1 — BACK, flanked under a tower
+  const bram = await seat(base, room, 'Bram');   // place 1
   const cass = await seat(base, room, 'Cass');   // the witness
   const up = await postTo(base, '/api/settings', { room, playerId: ann.playerId, settings: { tower: 'blackanvil' } });
   assert.equal(up.status, 200, up.text.slice(0, 200));
   const flanked = (await postTo(base, '/api/roll', { room, playerId: bram.playerId, notation: '2d6' })).data.roll;
-  assert.deepEqual({ entry: flanked.entry, lane: flanked.lane }, entryFor(1, true), 'the pour wears the flank\'s stamp');
+  assert.deepEqual({ seat: flanked.seat, seats: flanked.seats, arc: flanked.arc }, { seat: 1, seats: 3, arc: 1 }, 'the pour wears the arc');
   const down = await postTo(base, '/api/settings', { room, playerId: ann.playerId, settings: { tower: 'none' } });
   assert.equal(down.status, 200, down.text.slice(0, 200));
   const again = (await postTo(base, '/api/roll', { room, playerId: bram.playerId, notation: '2d6' })).data.roll;
-  assert.deepEqual({ entry: again.entry, lane: again.lane }, entryFor(1, false), 'his next throw wears the chair\'s own');
-  assert.notEqual(again.entry, flanked.entry, 'a real re-stamp, or this leg proves nothing');
+  assert.deepEqual({ seat: again.seat, seats: again.seats, arc: again.arc }, { seat: 1, seats: 3, arc: 0 }, 'his next throw wears the ring\'s own');
   await waitForEvent(cass.stream, 'roll', (x) => x.rollId === again.rollId);
-  assert.deepEqual(collectedOn(cass.stream), [flanked.rollId], 'and it put his own flank-stamped roll away');
+  assert.deepEqual(collectedOn(cass.stream), [flanked.rollId], 'and it put his own arc-stamped roll away');
 });
 
 await t('under a tower the whole felt is swept, as before (row 15 owns the tower\'s regions)', async () => {

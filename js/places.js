@@ -14,39 +14,49 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// A PLACE AT THE TABLE — the layout and entry algebra (docs/UX.md §7.63).
+// A PLACE AT THE TABLE — THE ROUND TABLE (docs/UX.md §7.63).
 //
-// A `place` is the STATION at the table: an integer 0–7, server-assigned,
-// sticky. A `placard` is the object standing there. `seat` (the playerId
-// credential) and `chair` (an unclaimed prepared seat) keep their meanings —
-// see docs/IDENTITY.md §6.
+// Joe, 2026-09-01: "players sit in a circular orientation, not around a
+// rectangular table. 2 players should sit opposite, 3 players should sit in a
+// triangular orientation... it's simple math." And, when the first design
+// had grown walls, wedges and hull caps: "From first principles, what do you
+// actually need? ... Don't outsmart yourself." What you need is two facts:
+//
+//   1. THE TABLE IS ROUND. A disc of felt of radius ringRadius(w) = w/2. The
+//      physics walls stand at ±w/2 on both axes (the presets are square), so
+//      the disc lies inside them; the walls are invisible and only ever catch
+//      a runaway die. Nothing else about the mat is measured.
+//   2. SEAT k OF N SITS AT theta = 2π·k/N (placeTheta; under a tower the
+//      chairs share a 300° arc that leaves the machine its back). Your card
+//      stands on that ray just outside the rim (seatAnchor), your camera looks
+//      in from there (js/main.js placeOrbit), and your dice are TOSSED from
+//      there onto the spot in front of you (seatToss / tossAim): born a little
+//      behind the spot, from a low hand, with almost no throw, so they land by
+//      the spot and roll where they roll. The spot is a target, not a claim.
+//
+// A `place` is still the sticky chair index 0–7 the server assigns; a
+// `seat` is the rank of that chair among the chairs held right now, so the
+// cards RE-SPACE when someone comes or goes — at the places flush, never with
+// dice in the air. `seat`/`chair` keep their older meanings elsewhere
+// (docs/IDENTITY.md §6).
 //
 // THIS FILE IS THE ONE PLACE THE ARITHMETIC IS WRITTEN. server.js stamps
-// `roll.entry`/`roll.lane` out of `entryFor` at the moment the dice are drawn,
-// and js/main.js reads those stamps back to line the throw up and to stand the
-// placards; both import THIS module (the js/rollspec.js precedent — server.js
-// is ESM and already imports it). Zero-dep: no DOM, no three.js, no cannon,
-// runs identically in Node and the browser.
+// `roll.seat` / `roll.seats` (and `roll.arc` under a tower) out of seatStamp
+// at the moment the dice are drawn; js/main.js reads the stamp back through
+// seatToss to line the toss up and stand the cards; both import THIS module,
+// and every expression is written once, in one order (the anchor rule —
+// docs/TOWER.md): two clients that disagree in the last bit are two films of
+// one seed (goal 15). DO NOT REARRANGE AN EXPRESSION HERE TO MAKE IT PRETTIER.
 //
-// Written once, in one expression order, per docs/TOWER.md's anchor rule
-// (js/main.js:11495-11507): `5.6 * S + dRim` is not interchangeable with
-// `S * (5.6 + dRim/S)`, because the second is a different sequence of
-// roundings and lands on a different double. Two clients that disagree in the
-// last bit about where a throw comes in from are two films of one seed
-// (goal 15). DO NOT REARRANGE AN EXPRESSION HERE TO MAKE IT PRETTIER.
+// THE SPLIT the feature rests on: `player.place` is ROSTER state, allowed to
+// be wrong, display-only. `roll.seat`/`roll.seats`/`roll.arc` are FILM state,
+// server-stamped, riding the roll payload in the seed's determinism class. The
+// film never reads the roster. (`roll.place` rides too, for the server's own
+// arrivalSweep — the felt holds one roll per CHAIR — and nothing else.)
 //
-// THE SPLIT that the whole feature rests on: `player.place` is ROSTER state
-// and is allowed to be wrong — it is display-only, and nothing downstream of a
-// pixel reads it. `roll.entry` / `roll.lane` are FILM state: stamped
-// server-side, riding the roll payload in the seed's determinism class. The
-// film never reads the roster, not once.
-//
-// A PLACE OWNS ITS REGION OF THE FELT FOR LANDING, AND THE FELT HOLDS ONE ROLL
-// PER PLACE (v2, 2026-09-01, by Joe's word — docs/IMMERSION.md item 16 carries
-// the quote and the one clause of its risk rule this amends). The region is a
-// function of the stamp and the mat (regionFor), the throw into it a low toss
-// (aimFor), and the sweep that lets two pools coexist is server.js
-// arrivalSweep. Still not a claim: nothing refuses a die for where it stops.
+// THE RECTANGLE'S ALGEBRA BELOW (STATIONS, entryFor, regionFor, aimFor, the
+// lanes) is kept for the tools and the unit rows that price it; nothing on
+// the film path reads it any more.
 
 // ---------------------------------------------------------------------------
 // The constants
@@ -750,9 +760,64 @@ export function seatAnchor(seat, seats, arc, w, d) {
   const theta = placeTheta(seat, seats, arc);
   if (theta === null) return null;
   const { s, c } = seatTrig(theta);
-  const t = rayRect(theta, w / 2 + (cardHx(theta) + PLACARD_CLEAR),
-                           d / 2 + (cardHz(theta) + PLACARD_CLEAR));
+  // THE TABLE IS ROUND (Joe, 2026-09-01: "players sit in a circular
+  // orientation, not around a rectangular table"). The card stands on the
+  // ring at RING_R(w) + PLACARD_STANDOFF, on its own ray, facing the centre.
+  // `d` is accepted and ignored: a circle has one radius.
+  const t = ringRadius(w) + PLACARD_STANDOFF;
   return { x: t * s, y: 0, z: t * c, azim: theta, seat, seats, arc, r: t, relocated: arc === 1 };
+}
+
+// ---------------------------------------------------------------------------
+// The round table and the toss (2026-09-01)
+// ---------------------------------------------------------------------------
+
+// The table's radius: half the mat's width. The walls stand at ±w/2 on both
+// axes (the presets are square), so every point of the disc is inside them.
+export function ringRadius(w) {
+  return w / 2;
+}
+
+// Where your dice are born and where they land, both on YOUR ray:
+//   TOSS_IN   — the spawn line sits this far inside the rim
+//   RING_SPOT — the landing spot is this share of the radius from the centre
+// A toss, not a hurl: from a low hand (PLACE_AIM.h), gently (TOSS_SPEED of the
+// shipped hurl), toward the spot in front of you. Dice land roughly there and
+// roll where they roll — the spot is a target, not a claim.
+//   TOSS_BACK — the dice are born this far BEHIND the spot (toward the player)
+//   TOSS_H    — spawn height, as a share of the shipped 6–10: a low hand
+//   TOSS_SPEED— the hurl, as a share of the shipped 14–22 u/s: a drop, not a throw
+// Measured 2026-09-01 (tools/steps/ring-look.mjs prints each pool's centroid
+// against its spot): a die thrown from the rim at 0.35 of the hurl crossed the
+// spot and kept going; the drop is what lands.
+export const RING_SPOT = 0.5;
+export const SPOT_R = 0.22;     // the spot's drawn radius (overlay) and the frame's unit, as a share of the table's radius
+export const TOSS_BACK = 0.4;
+export const TOSS_H = 0.3;
+export const TOSS_PER = 1.5;    // the pool line's pitch for a toss (the hurl's is SPAWN.per 2.6)
+export const TOSS_SPEED = 0.12;
+export const TOSS_BOX = 0.15;   // the scatter box around the spot, as a share of the shipped THROW_TARGET box
+
+// The toss for a stamped roll: {theta, x, z (spawn line midpoint), tx, tz (the
+// line's direction — the tangent), ax, az (the spot)}. null for a bad stamp.
+// Written once, in one expression order (the anchor rule): two clients must
+// agree on every double here.
+export function seatToss(seat, seats, arc, w) {
+  const theta = placeTheta(seat, seats, arc);
+  if (theta === null) return null;
+  const { s, c } = seatTrig(theta);
+  const R = ringRadius(w);
+  const r1 = R * RING_SPOT;
+  const r0 = r1 + TOSS_BACK;
+  return { theta, x: r0 * s, z: r0 * c, tx: c, tz: -s, ax: r1 * s, az: r1 * c };
+}
+
+// The aim factors spawnDie reads for a toss (the AIM_ZERO shape): the box is
+// centred on the spot and square in world units.
+export function tossAim(toss, w, d) {
+  if (!toss) return AIM_ZERO;
+  return { x: toss.ax, z: toss.az, kx: TOSS_BOX, kz: (TOSS_BOX * w) / d,
+    k: TOSS_SPEED, own: 0, spin: PLACE_AIM.spin, h: TOSS_H };
 }
 
 // ---------------------------------------------------------------------------
