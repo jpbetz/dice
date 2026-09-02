@@ -1,0 +1,160 @@
+# dice.yaml — the declaration of the dice table.
+#
+# Every value here is a shipped default. Every leaf is optional: delete a
+# line and the code's default stands. No leaf is a boolean: a two-state
+# value is an enum with two named states. Developer mode reads this file,
+# shows its leaves as dials, and Save rewrites ONLY the lines whose values
+# changed — comments, order and blank lines stay as you wrote them.
+# Labels, ranges, defaults and the look/film class of each dial: js/tune.js.
+
+app:
+  title: Dice Table
+  mode: development        # development | production  (DICE_MODE overrides at deploy)
+  version: 1               # bumped in the commit that renames or removes a key
+
+table:
+  scale: 2.5               # the one dial for table size (Joe 2026-09-01)
+  ceilingY: 22             # the roof plane the walls close under
+
+light:
+  lamp:
+    y: 24                  # pool ~27 at the felt over a 13.75 table
+    z: 1.5                 # over the felt, nudged to the front
+    angle: 0.85            # widened 0.5 -> 0.85 for the round table (Joe 2026-09-02)
+    penumbra: 0.75
+    intensity: 2.8
+    color: "#ffe8c4"
+  room:                    # levels while the mood is on
+    hemi: 0.1
+    key: 1.7
+    rim: 0.4
+  fog:
+    near: 15
+    far: 46
+  motes:                   # dust in the lamp cone (Joe 2026-08-15: "this looks good")
+    state: "on"            # "on" | "off"  (quoted: a bare on/off is a YAML boolean, which the reader refuses)
+    count: 200
+    size: 0.19
+    peak: 0.07
+    spread: 1.15
+    rMax: 12
+    yMin: 1.2
+    yMax: 10               # not the full shaft: high motes read as a night sky
+    fall: 0.35
+    wander: 0.28
+    twinkleHz: 0.11
+  breath:                  # the declare beat, told in light; fractions of the shipped room
+    state: "on"            # "on" | "off"  (quoted: a bare on/off is a YAML boolean, which the reader refuses)
+    dur: 0.6               # seconds, each way
+    hemiDrop: 0.65         # the ambient falls furthest — it is what "closing in" is
+    rimDrop: 0.75
+    keyDrop: 0.45          # the key stays halfway: dice must not go unreadable
+    lampLift: 0.12         # the pool comes UP, so it reads as focus not failure
+    angleNarrow: 0.3
+    depth: 1               # how far this cloth takes the beat; a theme pushes its own
+  tower:                   # the socketed tower's lantern rake and ember
+    rakeIntensity: 2.4
+    rakeColor: "#ffd9a0"
+    rakeX: -10             # eye: side
+    rakeY: 5.5             # eye: height
+    rakeOut: 7.5           # eye: z0 + out
+    rakeAngle: 0.62
+    rakePenumbra: 0.6
+    emberIntensity: 14
+    emberDist: 8
+    breathDepth: 0.22
+    breathHz: 0.11
+  life:                    # the fae venue's fireflies, wisps and moot (js/faelife.js)
+    count: 260             # in-frame density, not total
+    size: 0.5              # 0.2 was two device pixels; 0.5 reads as drifting specks
+    peak: 0.42             # ~0.17 luma, under the tertiary ceiling of 0.25
+    blinkPow: 4            # dark ~3/4 of the cycle
+    blinkHz: 0.22          # a flash every 3–8 s
+    wander: 0.45
+    wispCount: 4           # one lead + three followers; a fifth would be a swarm
+    wispSize: 1.15
+    leadPeak: 0.95         # ~0.40 luma, inside secondary
+    wispPeak: 0.38
+    wispLoopSec: 78        # one lap; slow enough to be a route, not a track
+    wispLampRange: 5.5
+    wispLampGain: 2.2      # first dial to move if Joe finds it loud
+    nearArcU: 0.3          # overridden by the venue
+    leanGain: 0.35
+    leanDwell: 0.55        # must stay < 1 or the route reverses
+    dimGain: 0.3           # what survives while the film runs
+    flareGain: 0.8         # the crit beat, on wisps
+    moot:
+      lapHz: 0.085         # a word goes round the ring in ~12 s
+      quiet: 0.85
+      visit: 0.45
+      nearIn: 1.2          # standing in it, not passing near it
+      nearOut: 3
+      dimGain: 0.55
+      flareGain: 0.5
+      flareLap: 3
+
+camera:
+  framing:
+    prefer: dice           # dice | table — what the fit favours when both cannot be held
+    floor: 1               # the eye never comes closer than the zoom says
+    gain: 1.15
+
+throw:
+  physics:
+    gravity: -110          # slow motion by arithmetic; the tempo curve is the fix, not this
+    solverIterations: 14
+    floor: { friction: 0.6, restitution: 0.15 }
+    dice: { friction: 0.4, restitution: 0.2 }
+    wall: { friction: 0.2, restitution: 0.5 }
+    damping: { linear: 0.01, angular: 0.01 }
+  dampgate:                # felt damping only while a die is slow; gate 0 is off
+    gate: 4
+    slowLinear: 0.1
+    slowAngular: 0.14
+  sleep:                   # what dice.js already sets, not cannon's defaults
+    speed: 0.4
+    time: 0.35
+  spawn:
+    axis: clamp            # width | own | clamp — clamp shipped 2026-08-14, own measured and refused
+    pad: 4.4               # the total clearance the clamp reserves
+    per: 2.6               # the spacing the spread wants
+  nudge:
+    budget: 3
+    lift: 7                # a vertical hurl
+    spread: 4
+    spin: 14
+    cockedDot: 0.6         # ~53°: lets a die rest against its neighbour
+    cockedDotD4: 0.7
+    pileScale: 1.05        # tidy on (Joe 2026-08-11); 0 is off
+    pileSpread: 12
+  aim:                     # the seat's aim (js/places.js PLACE_AIM)
+    state: "on"            # "on" | "off"  (quoted: a bare on/off is a YAML boolean, which the reader refuses)
+    speed: 0.5
+    h: 0.45                # a low hand
+    box: 0.25              # the fraction of the run the box is cut to
+    corner: "on"           # "on" | "off" — a lane sets the box against its corner (quoted: a bare on/off is a YAML boolean)
+    own: "on"              # "on" | "off" — the seat throws along its own axis (quoted: a bare on/off is a YAML boolean)
+    spin: 1
+  settle:
+    mode: displacement     # velocity | displacement — displacement shipped 2026-08-11
+    eps: 0.02              # a fraction of a die width
+  target: 0.4              # the throw aims at the middle ±target/2 of the table
+
+pace:
+  tempo:                   # the projector's curve; never the bake
+    k: 1
+    flight: 0.8            # the tumble, a touch slower than raw
+    settle: 25             # the tail is effectively skipped
+    rampS: 2               # film seconds; the glide that hides the cut
+    anchorSpeed: 8         # where tumbling ends, in units/s
+  ceremony:                # read once at boot
+    declareS: 1.35         # declaration dwell incl. the commit dock
+    hitstopS: 0.11
+    budgetS: 1.6           # post-settle ceiling
+    dismissMs: 7000        # the flow-to-collected clock
+  clear:
+    sinkS: 0.3             # how long a cleared die takes to leave
+
+sound:
+  click:
+    mode: film             # film | wall — film is invariant to the tempo curve

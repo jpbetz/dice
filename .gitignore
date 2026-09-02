@@ -24,5 +24,9 @@ tools/out/
 
 # Local deployment settings (make init) — billing/project ids stay local
 deploy/config.mk
+
+# GET /js/tunables.js is generated from dice.yaml by server.js, in memory
+# (docs/DEVMODE.md). It is never on disk; a stray build of it must not commit.
+js/tunables.js
 armed-suite-main.js.bak
 shots/

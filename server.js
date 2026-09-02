@@ -60,6 +60,9 @@ import { PLACE_MAX, seatStamp, seatValid } from './js/places.js';
 // never judges it — see handleTable — so it imports the parser and nothing
 // else, which is also what keeps the regex in one file.
 import { parseStamp } from './js/schema.js';
+// The declaration's reader (docs/DEVMODE.md). The same file the browser and
+// the tests use, so the tree this process serves is the tree the panel patches.
+import { parseYaml, YamlError } from './js/yaml.js';
 
 const PORT = Number(process.env.PORT) || 8123;
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -4020,6 +4023,7 @@ const MIME = {
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
   '.txt': 'text/plain; charset=utf-8',
+  '.yaml': 'text/yaml; charset=utf-8',
 };
 
 // /vendor/ is the frozen third-party tree (three.js, cannon-es) — CLAUDE.md
@@ -4089,7 +4093,10 @@ function isVendor(absPath) {
 // 404 rather than 403, because "forbidden" would confirm the file exists.
 const APP_DIRS = ['js', 'css', 'vendor', 'models', 'tests/e2e/fixtures']
   .map((rel) => path.join(ROOT, ...rel.split('/')));
-const APP_FILES = new Set(['index.html', 'lab.html', 'chrome-lab.html']
+// dice.yaml rides the same list: the declaration is part of the app (it is
+// what /js/tunables.js is generated from, below), and a browser or a curl
+// reading it verbatim discloses nothing the generated module did not.
+const APP_FILES = new Set(['index.html', 'lab.html', 'chrome-lab.html', 'dice.yaml', 'tools/devshell.html']
   .map((rel) => path.join(ROOT, rel)));
 
 // Rides the RESOLVED absolute path, never the URL — the same reason isVendor
@@ -4120,6 +4127,12 @@ async function serveStatic(req, res, url) {
   }
   const file = safeResolve(url.pathname);
   if (!file) return sendError(res, 403, 'forbidden', 'forbidden');
+  // The served module's gate rides the RESOLVED path, like isVendor and
+  // isAppPath, not the URL: the literal `/js/tunables.js` match in the router
+  // is the fast path, and `/js//tunables.js` or `/js/%74unables.js` resolve to
+  // the same file on disk — which must never stream (measured 2026-09-02: both
+  // spellings served a stray file's bytes before this line).
+  if (file === TUNABLES_ON_DISK) return serveTunables(req, res);
   if (!isAppPath(file)) return sendError(res, 404, 'not found', 'not_found');
 
   let stat;
@@ -4205,6 +4218,171 @@ function streamFile(req, res, file, stat) {
 }
 
 // ---------------------------------------------------------------------------
+// The served module — GET /js/tunables.js, generated from dice.yaml
+// ---------------------------------------------------------------------------
+//
+// dice.yaml at the repo root is THE DECLARATION OF THE APP (docs/DEVMODE.md):
+// every system constant developer mode can move is a leaf in it, and every
+// leaf is optional because js/tune.js carries the default. The client needs
+// that tree before any module evaluates — js/tune.js imports it at module
+// scope, and ~85 consumers read the live tree during their own evaluation —
+// so it cannot be a fetch (that would put a top-level await ahead of the whole
+// module graph, one serial round trip on every boot including the harness's
+// hundreds). It also cannot be a generated file on disk: Joe's rule for the
+// declaration was "so long as I don't have to see [a generated file]", and a
+// file that exists is a file that gets committed.
+//
+// So this process serves the module FROM MEMORY. The file is parsed once at
+// boot and again whenever its mtime changes (a hand edit is live on the next
+// reload, no restart), and /js/tunables.js is answered here, BEFORE the static
+// path, so a stray real js/tunables.js on disk can never win over the file the
+// declaration actually says. The body is two exports: DECLARED, the parsed
+// tree, and SOURCE, the file's own text, which is what the panel's Save
+// patches line by line so `git diff dice.yaml` stays the review.
+//
+// THE PRODUCTION SWITCH lives here too. `app.mode` in the file is
+// `development` or `production`; DICE_MODE in the environment overrides it in
+// the served tree only — never in the file — so production can be flipped
+// with one `--update-env-vars` and no commit, and back the same way. A
+// DICE_MODE that is neither word is a boot failure, not a fallback: an env
+// typo that silently lands on `development` would ship the developer door to
+// the public table.
+//
+// A parse error at boot exits 1 with `dice.yaml:<line>: <message>` — the
+// declaration is checked in, so a file that does not parse is a broken
+// checkout, and limping on the last good tree there is a tree that does not
+// exist. A parse error on a RE-READ keeps the last good tree and logs one line
+// per distinct error (an editor mid-keystroke saves a broken file many times;
+// the log should say so once), because the table that is already up must not
+// go dark because someone is typing. An absent file is the limit of "every
+// leaf is optional": an empty declaration, no exit, one line at boot.
+//
+// Same headers as the rest of js/: `no-cache` so the browser revalidates, and
+// an ETag over the served BYTES (the streamFile scheme, same hash, same length)
+// so an edit is a new tag and a restart is not. Nothing here logs whether the
+// door is open, or which mode is being served: mode is not a log line.
+
+const DICE_YAML = path.join(ROOT, 'dice.yaml');
+// Where a stray real js/tunables.js would sit; serveStatic refuses to stream it
+// under ANY URL spelling that resolves here (see the gate after safeResolve).
+const TUNABLES_ON_DISK = path.join(ROOT, 'js', 'tunables.js');
+const DICE_MODE = (() => {
+  const raw = String(process.env.DICE_MODE ?? '').trim();
+  if (raw === '') return null;
+  if (raw === 'development' || raw === 'production') return raw;
+  process.stderr.write(`DICE_MODE must be "development" or "production" (got ${JSON.stringify(raw)})\n`);
+  process.exit(1);
+})();
+
+// The one cache: the file as last successfully read, and the module built from
+// it. `body` and `etag` are derived once per successful read, not per request.
+let declaration = null;  // { text, tree, mtimeMs, size, body, etag }
+let lastYamlError = '';  // the last re-read failure logged, so it logs once
+
+function tunablesBody(tree, text) {
+  let served = tree;
+  if (DICE_MODE) {
+    // Override in a copy: `tree` stays the file's own truth. structuredClone
+    // rather than a spread so a nested `app` is not shared with the original.
+    served = structuredClone(tree);
+    if (!served.app || typeof served.app !== 'object' || Array.isArray(served.app)) served.app = {};
+    served.app.mode = DICE_MODE;
+  }
+  return '// GENERATED from dice.yaml by server.js — never on disk, never committed.\n'
+    + `export const DECLARED = ${JSON.stringify(served)};\n`
+    + `export const SOURCE = ${JSON.stringify(text)};\n`;
+}
+
+const etagOf = (body) => `"${crypto.createHash('sha1').update(body).digest('base64url').slice(0, 27)}"`;
+
+function readDeclaration(stat) {
+  const text = fs.readFileSync(DICE_YAML, 'utf8');
+  const { tree } = parseYaml(text);           // throws YamlError with .line
+  const body = tunablesBody(tree, text);
+  return { text, tree, mtimeMs: stat.mtimeMs, size: stat.size, body, etag: etagOf(body) };
+}
+
+// Boot. Runs during module evaluation so the tree exists before the first
+// request, which is also why a broken file exits here rather than answering
+// 500 later: the server that would have answered is the one that did not start.
+(() => {
+  let stat;
+  try {
+    stat = fs.statSync(DICE_YAML);
+  } catch {
+    log('dice.yaml: not found — serving an empty declaration');
+    const body = tunablesBody({}, '');
+    declaration = { text: '', tree: {}, mtimeMs: 0, size: -1, body, etag: etagOf(body) };
+    return;
+  }
+  try {
+    declaration = readDeclaration(stat);
+  } catch (err) {
+    const line = err instanceof YamlError ? err.line : 0;
+    process.stderr.write(`dice.yaml:${line}: ${err && err.message}\n`);
+    process.exit(1);
+  }
+})();
+
+// Re-read on mtime change. A stat per request is the price of "a hand edit is
+// live on the next reload"; it is one syscall on a route the page asks for
+// once per boot, and it is what lets the file be edited under a running
+// server with no watcher, no restart and no generated file.
+function refreshDeclaration() {
+  let stat;
+  try {
+    stat = fs.statSync(DICE_YAML);
+  } catch {
+    return; // the file went away under us: the last good tree stands
+  }
+  if (declaration && stat.mtimeMs === declaration.mtimeMs && stat.size === declaration.size) return;
+  // A zero-length file under a server that has a real declaration is an editor
+  // mid-save (truncate, then write): not an edit to an empty declaration but
+  // the instant between two states of a non-empty one. Keep the last good tree
+  // and do NOT remember this stat, so the completed write — same mtime tick or
+  // not — is read on the next request. The same rule as a file that went
+  // away: a deliberate emptying reads as "no declaration", and no declaration
+  // means the last one stands.
+  if (stat.size === 0 && declaration && declaration.text !== '') return;
+  try {
+    declaration = readDeclaration(stat);
+    lastYamlError = '';
+  } catch (err) {
+    const line = err instanceof YamlError ? err.line : 0;
+    const key = `dice.yaml:${line}: ${err && err.message}`;
+    if (key !== lastYamlError) {
+      lastYamlError = key;
+      log(`${key} — keeping the last good declaration`);
+    }
+    // Remember the broken file's stat so the same bytes are not re-parsed on
+    // every request; the next real edit changes mtime or size and is retried.
+    declaration.mtimeMs = stat.mtimeMs;
+    declaration.size = stat.size;
+  }
+}
+
+function serveTunables(req, res) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    return sendError(res, 405, 'method not allowed', 'method_not_allowed');
+  }
+  refreshDeclaration();
+  const { body, etag } = declaration;
+  const inm = req.headers['if-none-match'];
+  if (inm && inm.split(',').some((t) => t.trim() === etag || t.trim() === `W/${etag}`)) {
+    res.writeHead(304, { ETag: etag, 'Cache-Control': 'no-cache' });
+    return res.end();
+  }
+  res.writeHead(200, {
+    'Content-Type': 'text/javascript; charset=utf-8',
+    'Content-Length': Buffer.byteLength(body),
+    ETag: etag,
+    'Cache-Control': 'no-cache',
+  });
+  if (req.method === 'HEAD') return res.end();
+  res.end(body);
+}
+
+// ---------------------------------------------------------------------------
 // Server
 // ---------------------------------------------------------------------------
 
@@ -4247,6 +4425,9 @@ const server = http.createServer((req, res) => {
     if (route === '/api/table' && req.method === 'GET') return handleTableInfo(req, res, url);
     if (route === '/api/split' && req.method === 'POST') return handleSplit(req, res);
     if (route.startsWith('/api/')) return sendError(res, 404, 'no such endpoint', 'not_found');
+    // Before the static path, on purpose: the module is built from dice.yaml
+    // in memory, and a real js/tunables.js on disk must never be the answer.
+    if (route === '/js/tunables.js') return serveTunables(req, res);
     return serveStatic(req, res, url);
   };
 

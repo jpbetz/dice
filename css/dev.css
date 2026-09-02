@@ -1,0 +1,363 @@
+/*
+Copyright 2026 The Dice Table Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+/* DEVELOPER MODE (docs/DEVMODE.md §7). Injected when the door opens and
+   removed when it shuts, so the unpressed tab loads none of it. Every colour
+   and size is a token from css/style.css's :root — the panel is dressed like
+   the settings column it stands beside, not like the unthemed register it
+   replaces. The one number that is its own: z-index 34, below --z-modal (40)
+   so Settings still disables it honestly, above the peek card (30). */
+
+#dev-panel {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  bottom: 8px;
+  width: 320px;
+  z-index: 34;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface-card);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  box-shadow: var(--lift-deep);
+  color: var(--ivory);
+  font: 12px/1.4 var(--font-ui);
+  user-select: none;
+  pointer-events: auto;
+}
+#dev-panel[hidden], .dev-glyph[hidden], #dev-panel [hidden] { display: none !important; }
+
+/* ---- the folded corner glyph -------------------------------------------- */
+.dev-glyph {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 34;
+  font: 600 var(--label-sm)/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  background: var(--surface-card);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+  box-shadow: var(--lift-card);
+}
+.dev-glyph:hover, .dev-glyph:focus-visible { color: var(--ivory); }
+
+/* ---- head / bar / find --------------------------------------------------- */
+.dev-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--hair);
+  flex: none;
+}
+.dev-title {
+  font: 600 var(--label-sm)/1 var(--font-mono);
+  letter-spacing: var(--label-sm-track);
+  color: var(--gold);
+}
+.dev-film {
+  font: var(--label-sm)/1 var(--font-mono);
+  letter-spacing: 0.1em;
+  color: var(--amber);
+}
+.dev-fold { margin-left: auto; }
+
+.dev-barslot { padding: 6px 10px 0; flex: none; }
+.dev-secbar.seg { flex-wrap: wrap; }
+.dev-secbar.seg button { flex: 1 0 auto; min-width: 52px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; }
+
+#dev-panel .dev-find { margin: 6px 10px 0; width: calc(100% - 20px); font-size: 12px; padding: 5px 8px; }
+
+.dev-statusslot { padding: 0 10px; flex: none; min-height: 0; }
+.dev-status {
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  font: 11px/1.35 var(--font-mono);
+  color: var(--ivory);
+  background: var(--sw-fill);
+  border: 1px solid var(--hair);
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+.dev-status-warn { border-color: rgba(217, 164, 65, 0.45); color: var(--amber); }
+.dev-status-error { border-color: rgba(226, 73, 59, 0.5); color: var(--red); }
+
+/* ---- body / sections ------------------------------------------------------ */
+.dev-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 10px 8px;
+  scrollbar-width: thin;
+}
+.dev-section { border-bottom: 1px solid var(--hair); padding: 4px 0 6px; }
+.dev-section:last-child { border-bottom: 0; }
+.dev-sec-head { display: flex; align-items: center; gap: 6px; }
+.dev-sec-toggle {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: 600 var(--label-sm)/1 var(--font-mono);
+  letter-spacing: var(--label-sm-track);
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+.dev-sec-toggle::before { content: '▸'; font-size: 9px; opacity: 0.6; }
+.dev-section.is-open .dev-sec-toggle::before { content: '▾'; }
+.dev-sec-toggle:hover, .dev-sec-toggle:focus-visible { color: var(--ivory); }
+.dev-section.is-changed .dev-sec-toggle { color: var(--ivory); }
+.dev-sec-count { font-weight: 400; letter-spacing: 0.06em; text-transform: none; color: var(--gold-bright); }
+.dev-sec-reset { flex: none; }
+.dev-section.is-locked .dev-sec-toggle { color: var(--amber); }
+
+.dev-subhead {
+  margin: 6px 0 2px;
+  font: 11px/1.2 var(--font-mono);
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  opacity: var(--dim-rest);
+}
+
+/* ---- rows ----------------------------------------------------------------- */
+.dev-row {
+  display: grid;
+  grid-template-columns: minmax(0, 108px) minmax(0, 1fr) 60px 18px;
+  align-items: center;
+  gap: 0 6px;
+  min-height: 26px;
+  padding: 1px 0;
+  border-radius: 6px;
+}
+.dev-row:hover, .dev-row:focus-within { background: var(--sw-fill); }
+.dev-row-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  padding-left: 10px;
+  position: relative;
+  cursor: default;
+}
+.dev-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dev-row.is-changed .dev-row-label { color: var(--ivory); }
+/* THE GUTTER MARK — one 5px spot before the name says where this leaf
+   stands against the file: a faint hollow ring means the file omits it (the
+   code's default stands), a filled gold dot means it is changed. The word
+   "default" costs a third of the label column and most rows wear it, so it
+   shows on hover or focus and the ring carries it the rest of the time. */
+.dev-row.is-default .dev-row-label::before,
+.dev-row.is-changed .dev-row-label::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  border: 1px solid var(--muted);
+  opacity: var(--dim-off);
+}
+.dev-row.is-changed .dev-row-label::before {
+  border-color: var(--gold-bright);
+  background: var(--gold-bright);
+  opacity: 1;
+}
+.dev-mark { flex: none; font-size: 10px; line-height: 1; }
+.dev-mark-reload { color: var(--muted); }
+.dev-mark-lock { color: var(--amber); cursor: help; }
+.dev-mark-default { display: none; font: 9px/1 var(--font-mono); letter-spacing: 0.08em; color: var(--muted); opacity: var(--dim-rest); }
+.dev-row:hover .dev-mark-default:not([hidden]), .dev-row:focus-within .dev-mark-default:not([hidden]) { display: inline; }
+.dev-badge {
+  flex: none;
+  font: 9px/1 var(--font-mono);
+  letter-spacing: 0.1em;
+  padding: 2px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--dial-ring);
+  color: var(--dial-ink);
+  background: var(--dial-fill);
+}
+.dev-row-ctl { display: flex; align-items: center; min-width: 0; gap: 4px; }
+.dev-row-val { display: flex; justify-content: flex-end; min-width: 0; }
+.dev-row.is-enum .dev-row-ctl, .dev-row.is-stepper .dev-row-ctl, .dev-row.is-cast .dev-row-ctl { grid-column: 2 / 4; }
+.dev-row.is-text .dev-row-val, .dev-row.is-static .dev-row-val { grid-column: 2 / 4; }
+.dev-row.is-enum .dev-row-val, .dev-row.is-stepper .dev-row-val, .dev-row.is-text .dev-row-ctl, .dev-row.is-static .dev-row-ctl { display: none; }
+/* a shown-only value (app.mode): mono like a field, but no well and no cursor */
+.dev-static {
+  font: 13px/1.2 var(--font-mono);
+  color: var(--muted);
+  padding: 3px 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+.dev-row.is-locked .dev-row-ctl, .dev-row.is-locked .dev-row-val { opacity: var(--dim-off); }
+
+/* the revert glyph: present while changed, visible on hover or focus */
+.dev-revert {
+  width: 18px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s;
+}
+.dev-row:hover .dev-revert, .dev-row:focus-within .dev-revert, .dev-revert:focus-visible, .dev-revert.is-inline { opacity: 1; }
+.dev-revert:hover { color: var(--gold-bright); }
+
+/* the controls — values in mono, tabular */
+.dev-range {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+.dev-num, .dev-text, .dev-hex {
+  width: 100%;
+  min-width: 0;
+  font: 13px/1.2 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ivory);
+  background: var(--well);
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  padding: 3px 5px;
+  user-select: text;
+  -moz-appearance: textfield;
+}
+.dev-num::-webkit-outer-spin-button, .dev-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.dev-text.is-string { text-align: left; }
+.dev-hex { font-size: 12px; padding-left: 3px; padding-right: 3px; letter-spacing: -0.02em; }
+.dev-num:focus-visible, .dev-text:focus-visible, .dev-hex:focus-visible, .dev-find:focus-visible, .dev-paste:focus-visible {
+  outline: none;
+  border-color: var(--on-ring);
+}
+.dev-color {
+  width: 34px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  background: var(--well);
+  cursor: pointer;
+}
+.dev-stepper { width: 100%; }
+.dev-stepper .dev-num { border: 0; background: none; text-align: center; flex: 1; }
+.dev-step.dev-btn { width: 24px; height: 24px; padding: 0; border: 0; background: none; border-radius: 0; font-size: 14px; }
+#dev-panel .dev-seg { width: 100%; }
+#dev-panel .dev-seg button { min-width: 0; overflow: hidden; text-overflow: ellipsis; padding: 4px 3px; }
+#dev-panel .dev-seg button:focus-visible { box-shadow: inset 0 0 0 1px var(--on-ring); outline: none; }
+.dev-seg.is-disabled { opacity: var(--dim-off); }
+
+/* ---- buttons -------------------------------------------------------------- */
+.dev-btn {
+  font: 11px/1.2 var(--font-ui);
+  padding: 5px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--hair);
+  background: var(--sw-fill);
+  color: var(--ivory);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.dev-btn:hover:not(:disabled) { background: var(--on-fill); border-color: var(--on-ring); }
+.dev-btn:focus-visible { outline: none; border-color: var(--on-ring); box-shadow: 0 0 0 1px var(--on-ring); }
+.dev-btn:disabled { opacity: var(--dim-off); cursor: default; }
+.dev-btn-primary { border-color: var(--dial-ring); background: var(--dial-fill); color: var(--dial-ink); }
+.dev-btn-danger { color: var(--red); }
+.dev-btn-danger:hover:not(:disabled) { background: var(--red-soft); border-color: rgba(226, 73, 59, 0.4); }
+.dev-verbs { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; }
+.dev-verbs .dev-btn { flex: 1 1 auto; }
+
+/* ---- cast ----------------------------------------------------------------- */
+.dev-seatctl { justify-content: space-between; }
+.dev-seat {
+  flex: 1;
+  text-align: center;
+  font: 12px/1.2 var(--font-mono);
+  color: var(--ivory);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- file ----------------------------------------------------------------- */
+.dev-diff { list-style: none; margin: 2px 0 4px; padding: 0; font: 11px/1.35 var(--font-mono); user-select: text; }
+.dev-diff-empty { color: var(--muted); opacity: var(--dim-rest); padding: 4px 0; }
+.dev-diff-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto 18px;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--hair);
+}
+.dev-diff-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ivory); }
+.dev-diff-vals { display: flex; gap: 4px; font-variant-numeric: tabular-nums; }
+.dev-diff-shipped { color: var(--muted); }
+.dev-diff-arrow { color: var(--muted); opacity: var(--dim-off); }
+.dev-diff-live { color: var(--gold-bright); }
+.dev-diff-cls { font-size: 9px; letter-spacing: 0.1em; color: var(--muted); }
+.dev-diff-row.is-film .dev-diff-cls { color: var(--amber); }
+#dev-panel .dev-paste { font: 11px/1.35 var(--font-mono); resize: vertical; min-height: 56px; }
+.dev-preview-list { list-style: none; margin: 4px 0; padding: 0; font: 11px/1.35 var(--font-mono); user-select: text; }
+.dev-preview-row { display: flex; gap: 8px; align-items: baseline; padding: 1px 0; }
+.dev-preview-row.is-refused .dev-diff-path { color: var(--muted); text-decoration: line-through; }
+.dev-preview-reason { color: var(--amber); margin-left: auto; font-size: 10px; }
+
+/* ---- footer --------------------------------------------------------------- */
+.dev-foot {
+  flex: none;
+  padding: 6px 10px 8px;
+  border-top: 1px solid var(--hair);
+  font: 11px/1.4 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.dev-foot-line { display: flex; gap: 10px; justify-content: space-between; }
+.dev-foot .dev-verbs { padding-top: 6px; }
+
+/* ---- narrow: the panel spans the width; js/devmode.js starts it folded on
+   the same query, and a deliberate unfold sticks -------------------------- */
+@media (max-width: 639px) {
+  #dev-panel { left: 8px; width: auto; top: auto; max-height: 70vh; }
+}
