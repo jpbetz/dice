@@ -1813,6 +1813,37 @@ function updateMatFogFloor() {
   matFogFloor = far + MAT_FOG_MARGIN;
 }
 
+// RE-TAKE THE FLOOR AND, IF IT MOVED, THE FOG WITH IT — the one shape both
+// writers of the floor's inputs use. The floor is a function of the EYE
+// (camFogEye) and of the STANDING CARDS (placeRows), and until 2026-09-01 only
+// the eye's writer (applyFramingPose) called it: a places flush that stood or
+// removed a card without moving THIS viewer's eye left the floor at the value
+// the last reframe computed. Measured (S3 verify, demo door, seat 0, 1600×900
+// medium): dial 1 → 2..8, eye parked at [0, 10.4, 6], live floor 16.5277
+// against a derived 16.6078 at every N — the back card's 0.08 past the corner
+// never reached the fog until a zoom round-trip moved the eye and it snapped
+// to 18.8063 = derived. On the rectangle that is 0.08 inside MAT_FOG_MARGIN's
+// 1.5 and nothing is fogged; on the ring rank 0's θ is RING_BASE at every N,
+// so a seat-0 viewer's orbit NEVER changes when N does, and the diagonal cards
+// stand 1.85–2.16 past the corner — larger than the margin. That is exactly
+// the path that would put a name in fog at S4, and G8 is the gate this clause
+// exists to hold. So the cards' writer (placardRebuild, placardRelay) calls
+// this too.
+//
+// `before !== matFogFloor` is the same exact guard applyFramingPose has: the
+// floor and the live scene.fog must never disagree, so both are re-taken or
+// neither (an inner tolerance was a latent flake there, see that comment).
+// applyMoodLights re-derives every light from the CURRENT beat, so re-applying
+// it is idempotent in everything but the fog it is asked to move. A floor that
+// moves mid-film (placeWashFire can build the rig mid-roll) is a fog plane
+// stepping OUTWARD past a card — render-only, never a camera move; ruling ①'s
+// gate is on the orbit, which this never touches.
+function fogFloorSync() {
+  const before = matFogFloor;
+  updateMatFogFloor();
+  if (moodReady && before !== matFogFloor) applyMoodLights();
+}
+
 function updateShadowFrustum() {
   keyLight.shadow.camera.left = -TABLE_W / 2 - 4;
   keyLight.shadow.camera.right = TABLE_W / 2 + 4;
@@ -25439,6 +25470,14 @@ function placardRebuild() {
   }
   placardRig.update(rows);
   placardBuilt = placardQueued;
+  // THE FOG FLOOR IS TAKEN OVER THESE CARDS (updateMatFogFloor, DESIGN-RING
+  // §7.5), so the arrangement's writer re-takes it: a card that stands or
+  // leaves while this viewer's eye stays put has no reframe to ride, and the
+  // floor went stale here until 2026-09-01 (fogFloorSync's comment has the
+  // numbers). Reached on every path that changes the standing set — the
+  // gated flush, the ungated leave, the wash's mid-roll rig build — because
+  // the fog is render-only and belongs with the cards, not with the orbit.
+  fogFloorSync();
   // THE DEMO OVERLAY RIDES THE CARDS' OWN FLUSH (js/demo.js). It is derived
   // from the mat, the tower and the dial exactly as the anchors are, so it
   // re-derives where they do — behind the roll boundary, never mid-tumble.
@@ -25461,6 +25500,13 @@ function placardRelay() {
   // the boot (the roster state below is declared far down the file).
   if (!placardRig) return;
   placardRig.update(placeRows());
+  // The cards moved with the walls, so the floor taken over them is re-taken
+  // here as well. Usually a no-op: both extent writers run updateShadowFrustum
+  // (which re-takes the floor over the LIVE anchors) and a reframe that moves
+  // the eye before reaching here — but the relay is the cards' writer and the
+  // fog rides the cards, so it does not rely on that order (exact guard: a
+  // floor that did not move re-applies nothing).
+  fogFloorSync();
   // The tower is the one extent writer that moves a viewer's own AZIMUTH
   // (a back station is pulled round to a flank while a tower is socketed,
   // js/places.js TOWER_FLANKS), and it reaches here through the same
@@ -28973,9 +29019,7 @@ function applyFramingPose(pose, animate) {
     // CAM_EYE.full, which is a triple, and the two have to be the same shape or
     // the boot path and the framed path read different things.
     camFogEye = [pose.pos.x, pose.pos.y, pose.pos.z];
-    const before = matFogFloor;
-    updateMatFogFloor();
-    if (moodReady && before !== matFogFloor) applyMoodLights();
+    fogFloorSync();
   }
   if (!animate || prefersReducedMotion()) {
     camEase = null;

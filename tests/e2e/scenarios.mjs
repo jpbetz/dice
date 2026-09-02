@@ -21860,6 +21860,7 @@ export const scenarios = [
       assert.equal(await t.eval(`!!document.getElementById('demo-panel')`), true,
         'and the dev panel is there to turn');
 
+      let fogMargin = null;
       for (let n = 0; n <= 8; n++) {
         const info = await t.dbg(`demoDeal(${n})`);
         assert.equal(info.n, n, `the dial stands ${n}`);
@@ -21871,6 +21872,35 @@ export const scenarios = [
           'and every card carries the name the deal gave that station');
         assert.deepEqual(p.stations.map((s) => s.color), info.players.map((q) => q.color));
         assert.equal(p.on, n > 0, 'an empty table is a legal setting, and reports itself as one');
+        // THE FOG FLOOR FOLLOWS THE CARDS, NOT ONLY THE EYE (js/main.js
+        // fogFloorSync, DESIGN-RING §7.5 / G8). The dial is the one path that
+        // stands and removes cards WITHOUT moving this viewer's eye — seat 0's
+        // orbit is 0 at every N, and no-die-sits-in-fog only ever reaches a
+        // chair through simulatePlaceView, which always reframes — so this is
+        // where a floor that rides only reframes goes stale. Measured before the
+        // fix: live 16.5277 at N=2..8 against a derived 16.6078 (the back card's
+        // 0.08 past the corner), eye parked at [0, 10.4, 6]. Derived here from
+        // the LIVE eye, so a later retreat that does move the eye keeps the
+        // claim rather than the digit.
+        const bp = JSON.parse(await t.eval('JSON.stringify(window.__diceDebug.breathProbe())'));
+        const eye = (await t.dbg('framingInfo()')).eye;
+        let far = 0;
+        for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+          far = Math.max(far, Math.hypot(sx * bp.tableW / 2 - eye[0], eye[1], sz * bp.tableD / 2 - eye[2]));
+        }
+        const cornerFloor = far;
+        for (const [x, y, z] of bp.fogAnchors) far = Math.max(far, Math.hypot(x - eye[0], eye[1] - y, z - eye[2]));
+        assert.equal(bp.fogAnchors.length, n, `the floor was taken over all ${n} standing cards`);
+        if (fogMargin === null) fogMargin = bp.matFogFloor - far;
+        assert.ok(Math.abs((bp.matFogFloor - far) - fogMargin) < 1e-6,
+          `N=${n}: the live floor is the furthest corner OR card from the live eye ${JSON.stringify(eye)} plus `
+          + `one margin (${bp.matFogFloor.toFixed(4)} vs ${(far + fogMargin).toFixed(4)}) — a stale floor reads the last reframe's`);
+        assert.ok(bp.fogNear >= bp.matFogFloor - 1e-9,
+          `N=${n}: the live fog starts past the floor (${bp.fogNear.toFixed(4)} vs ${bp.matFogFloor.toFixed(4)})`);
+        if (n >= 2) {
+          assert.ok(far > cornerFloor + 0.05,
+            `N=${n}: the leg has teeth — a card stands past the mat's corner from this eye (${(far - cornerFloor).toFixed(3)})`);
+        }
       }
       const eight = await t.dbg('places()');
       assert.deepEqual(eight.stations.slice(0, 4).map((s) => s.station),
