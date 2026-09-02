@@ -1,6 +1,6 @@
 # Developer mode
 
-*Status: PROPOSAL, revision 2 (2026-09-02), for Joe's review before the
+*Status: PROPOSAL, revision 3 (2026-09-02), for Joe's review before the
 build. Nothing here is built. Binding authority is [GOALPOST.md](GOALPOST.md);
 every other rule this design touches is guidance, and §2 says which ones it
 sets aside.*
@@ -14,11 +14,14 @@ exportable to a config file … possible for me to actually overwrite a file
 in the repo with that file … one option to turn off demo mode in production
 … the ability to define dice sets or mats or other assets."*
 
-*Revision 2, on Joe's feedback: "a strong preference toward .yaml … make it
-a declaration of the app … a root object with fields … goal is STRUCTURE …
-happy to have the yaml be a build-time input that generates whatever you
-want, so long as I don't have to see it … we do need to be able to extract
-it."*
+*Revision 2: "a strong preference toward .yaml … make it a declaration of
+the app … goal is STRUCTURE … so long as I don't have to see [a generated
+file] … we do need to be able to extract it."*
+
+*Revision 3: "I don't need `?demo=1` once this is implemented … allow
+fields to be optional if there is a sane default … avoid boolean values
+(always use enums, e.g. `mode: development` or `mode: production`, not
+multiple boolean fields)."*
 
 ## 1. The pitch
 
@@ -27,57 +30,64 @@ structured document that says what the table is. Its top-level fields are
 the app's nouns, `app`, `table`, `light`, `camera`, `throw`, `pace`,
 `sound`, `cards`, `sets`, `felts`, `towers`, `venues`, and every system
 constant developer mode can move is a leaf somewhere under one of them.
-Comments are welcome; the file is meant to be read.
+Every leaf is optional: a leaf you leave out takes the default the code
+carries. No leaf is a boolean: a two-state value is an enum with two named
+states. Comments are welcome; the file is meant to be read.
 
 Press `` ` `` on any table and a panel folds out of the right edge with
 those leaves as dials, grouped the way the file is. Drag one and the scene
 moves. The panel diffs your dials against the declaration, and **Save**
-rewrites `dice.yaml` touching only the lines whose values changed, so
+rewrites `dice.yaml` touching only the lines whose values changed, adding a
+line only for a leaf you changed that the file did not yet name, so
 `git diff dice.yaml` is the review and `git commit` is the ship. Nothing
 generated is ever on disk: the server parses the declaration at boot and
 serves the client the module it needs, in memory.
 
 The same panel is where the demo cast (fake players, region overlay, throw
 from any seat) now lives, and where dice sets and mats get defined as rows
-under `sets:` and `felts:` in the same file. `app.devmode` in the
-declaration, plus an env override at deploy time, is the production off
-switch, left on for now.
+under `sets:` and `felts:` in the same file. `app.mode: development` in
+the declaration, overridable by `DICE_MODE=production` at deploy time, is
+the production switch, left on development for now.
 
 Five separate developer doors exist today (`?demo=1`, `lab.html`,
 `chrome-lab.html`, `TOWERLAB` inside main.js, and ~250 `__diceDebug`
-console hooks). Developer mode becomes the one door; the others fold into
-it over three phases or are retired.
+console hooks). Developer mode becomes the one door; `?demo=1` is removed
+in phase 1, and the others fold in over three phases or are retired.
 
 ## 2. Assumptions challenged
 
 | Inherited assumption | Decision |
 |---|---|
 | **Demo is solo-only** (demo.js header, TESTING.md, argued as a GOALPOST 2 law). | **Replaced by a rule per dial, not per door.** GOALPOST 2 forbids forking the shared film; GOALPOST 7 says framing and pacing may differ per viewer. So each dial is classed **look** (per-viewer: light, fog, camera, pacing, chrome) or **film** (feeds the shared bake: physics, toss, spawn, table geometry). Look dials work at any table. Film dials work while you are the only seat, and lock when a second viewer arrives. |
-| **Every plain visit mints a room**, so a solo-only shortcut would refuse on the very tab Joe has open (main.js:159). | Handled by the rule above: a room of one is a table of one. `?demo=1` remains the room-less bench for the harness. |
-| **Constants are `const`s beside their consumer** (~120 frozen primitives across 9 files). | The *value* moves to `dice.yaml`; the *reason* moves to a comment beside it in the file, or to the dial's `why`. Week one moves the fifteen tune objects that already have re-apply functions (zero consumer edits) plus a few named consts. The rest move one per commit when wanted, not by inventory. |
-| **The server injects nothing into the client.** | **Set aside.** The server already owns static serving; it now also serves one generated module built from `dice.yaml`. That is what lets the declaration be YAML with no build step and no generated file on disk, and gives the production off switch an env override. |
+| **Every plain visit mints a room**, so a solo-only shortcut would refuse on the very tab Joe has open (main.js:159). | Handled by the rule above: a room of one is a table of one. |
+| **`?demo=1` must survive** because the harness and the tools/steps scripts ride it. | **Dropped** (Joe, revision 3). The harness boots an ordinary tab and calls `__diceDebug.devOpen()` then `devDeal(n)`; a room of one is all the bench needs. The URL then carries no dev state at all, and the room-mint suppression in the ROOM iife goes with it. |
+| **Constants are `const`s beside their consumer** (~120 frozen primitives across 9 files). | The *value* moves to the declaration and its *default* to the dial's entry in code; the *reason* moves to a comment beside the value, or to the dial's `why`. Week one moves the fifteen tune objects that already have re-apply functions (zero consumer edits) plus a few named consts. The rest move one per commit when wanted, not by inventory. |
+| **A config file lists every value.** | **Set aside** (Joe, revision 3). Every leaf is optional; the code carries the default. The first commit still writes a full file, because a declaration you can read is the point, but any line may be deleted and the table still stands. |
+| **Booleans are values.** | **Set aside** (Joe, revision 3). No leaf is a boolean. `devmode: true` becomes `mode: development`; `preferDice: true` becomes `prefer: dice`. The reader refuses `true`, `false`, `yes`, `no` as scalars, with a line number. |
+| **The server injects nothing into the client.** | **Set aside.** The server already owns static serving; it now also serves one generated module built from `dice.yaml`. That is what lets the declaration be YAML with no build step and no generated file on disk, and gives the production switch an env override. |
 | **Zero-dep, no build step.** | Kept. YAML needs a reader, so `js/yaml.js` is a small first-party parser and line-patching writer for the subset this file uses (maps, lists, scalars, comments). No npm package. |
-| **The URL carries no user state.** | Kept. The key sets a tab-local boolean; nothing stored, mirrored or stripped; no new param. |
+| **The URL carries no user state.** | Kept, and strengthened: with `?demo=1` gone there is no dev param at all. The key sets a tab-local boolean; nothing stored, mirrored or stripped. |
 | **The demo panel is inline styles, no stylesheet.** | Set aside. `css/dev.css` is injected when the door opens and removed when it shuts; the unpressed tab still loads nothing. |
 | **The felt owns zero standing chrome on the right.** | Set aside while open, as an **overlay, not a column**. A rail that resizes the felt makes you judge a frame no player has (GOALPOST 8). Fold hides the panel entirely with values held. |
 | **Repo writes are a main-session act.** | Set aside narrowly: Download plus a one-line Node tool in phase 1; an env-armed loopback route on the local server in phase 2. |
-| **`DEMO_LIGHT_DIALS`, `DEMO_LIGHT_BASE`, `demoLight`, the inline panel.** | Hard drop. They were the prototype of this. |
-| **Revision 1's `js/tunables.js` and `js/devflag.js`.** | Dropped. The declaration is YAML; the generated module is never on disk; the off switch is a field of the declaration. |
+| **`DEMO_LIGHT_DIALS`, `DEMO_LIGHT_BASE`, `demoLight`, `resolveDemo`, the inline panel.** | Hard drop. They were the prototype of this. |
 
 ## 3. The declaration
 
 ```yaml
 # dice.yaml — the declaration of the dice table.
 #
-# Every value here is a shipped default. Developer mode reads this file,
+# Every value here is a shipped default. Every leaf is optional: delete a
+# line and the code's default stands. No leaf is a boolean: a two-state
+# value is an enum with two named states. Developer mode reads this file,
 # shows its leaves as dials, and Save rewrites ONLY the lines whose values
 # changed — comments, order and blank lines stay as you wrote them.
-# Labels, ranges and the look/film class of each dial live in js/tune.js.
+# Labels, ranges, defaults and the look/film class of each dial: js/tune.js.
 
 app:
   title: Dice Table
   favicon: 🎲
-  devmode: true            # the production off switch (DICE_DEVMODE=off overrides at deploy)
+  mode: development        # development | production  (DICE_MODE overrides at deploy)
 
 table:
   scale: 2.5               # the one dial for table size (Joe 2026-09-01)
@@ -113,7 +123,7 @@ light:
 camera:
   framing:
     spot: 0.35             # disc around each seat's spot the fit must hold
-    preferDice: true
+    prefer: dice           # dice | table — what the fit favours when both cannot be held
   zoom:
     near:  { eye: 14, fov: 42 }
     table: { eye: 22, fov: 42 }
@@ -146,32 +156,52 @@ sets:                      # dice sets authored as data (shipped sets stay in th
     text: "#ffd9a0"
     accent: "#ff7a30"
     feel: { rough: 0.35, metal: 0.1 }
-    geo:  { bevel: 0.09, profile: round }
+    geo:  { bevel: 0.09, profile: round }     # round | crisp
     sound: { body: chime, weight: 0.6 }
 
 felts:
   house.moss:
     name: Moss
-    cloth: felt
+    cloth: felt            # felt | velvet | leather | …  (the painters in FELT_CLOTHS)
     feltBase: "#1f3a22"
     sceneBg: "#0c120d"
     breath: 0.9
-
-towers: {}                 # phase 3: cosmetic rows over towerRegisterGlb
-venues: {}                 # phase 3
 ```
 
 (Names and numbers above are illustrative; the first commit writes the
 real file from the shipped values. Sections are the app's nouns; a leaf's
-place in the tree is its meaning, so `light.lamp.y` needs no other label.)
+place in the tree is its meaning, so `light.lamp.y` needs no other label.
+`towers:` and `venues:` arrive in phase 3 and are simply absent until then,
+which is what optional means.)
+
+### Optional leaves, defaults, enums
+
+- **Every leaf is optional.** The dial tree in `js/tune.js` carries each
+  leaf's default; the live tree is `defaults ⊕ file`. A leaf absent from
+  the file shows in the panel like any other, with a faint *default* mark.
+  When you change one, Save inserts the line under its section, in the
+  tree's order, two-space indented, and from then on it is a line like any
+  other. A whole absent section (`towers:`) is inserted the same way.
+- **The file is the authority, the code is the fallback.** After a Save the
+  file says 30 and the code still says 24; that is intended. The code's
+  number is what stands if you delete the line, nothing more. A dial entry
+  with no default fails the drift test; a leaf in the file with no dial
+  entry is a typed value with no slider (exported, diffed, reset).
+- **No booleans.** A two-state value is an enum whose states say what
+  they mean: `mode: development | production`, `prefer: dice | table`,
+  `profile: round | crisp`. An enum dial declares its `options`, the panel
+  draws a segmented control, and `tuneSet` refuses a value outside the
+  list. The reader refuses `true`, `false`, `yes`, `no`; the drift test
+  refuses a boolean default.
 
 **The YAML subset**, read and written by `js/yaml.js`: block maps, block
 lists, flow maps and lists on one line (`{ a: 1, b: 2 }`, `[1, 2]`), plain
-and quoted scalars (number, string, boolean, null), `#` comments, blank
-lines, two-space indent. Not supported, and refused with a line number:
-anchors, tags, multi-document, block scalars (`|`, `>`), tabs. This is a
-few hundred lines and a unit test, not a YAML library. The reader records
-the line and column of every scalar so the writer can patch in place.
+and quoted scalars (number, string, null), `#` comments, blank lines,
+two-space indent. Refused with a line number: booleans, anchors, tags,
+multi-document, block scalars (`|`, `>`), tabs. This is a few hundred lines
+and a unit test, not a YAML library. The reader records the line and column
+of every scalar so the writer can patch in place, and the line after each
+section's last child so it can insert.
 
 ## 4. Structure
 
@@ -180,15 +210,15 @@ the line and column of every scalar so the writer can patch in place.
 | Path | Role |
 |---|---|
 | `dice.yaml` | **New, checked in, hand-editable.** The declaration. The file Save rewrites. |
-| `js/yaml.js` | **New, Node-pure.** `parseYaml(text)` → `{ tree, spans }` (a span per scalar: line, column, raw text); `patchYaml(text, spans, changes)` → text with only the changed scalar lines rewritten; `emitYaml(tree)` for a fresh subtree (a new set or felt row). Shared by browser, server and tests. |
-| `js/tune.js` | **New, Node-pure.** `SHIPPED`, `T` (the live tree), `DIALS` (metadata mirroring the tree), `bindDial`, `tuneSet / tuneDiff / tuneReset`. No DOM, no three, no cannon. |
-| `js/tunables.js` | **Generated, never on disk.** `GET /js/tunables.js` is served by `server.js` from `dice.yaml` as `export const TUNABLES = {…};`, ETag from the YAML's hash, re-read when the file's mtime changes locally. Added to `.gitignore` so a stray build can never commit it. |
+| `js/yaml.js` | **New, Node-pure.** `parseYaml(text)` → `{ tree, spans }`; `patchYaml(text, spans, changes)` → text with only changed scalar lines rewritten and absent leaves inserted; `emitYaml(tree)` for a fresh subtree. Shared by browser, server and tests. |
+| `js/tune.js` | **New, Node-pure.** `DIALS` (metadata and defaults, mirroring the tree), `SHIPPED` (defaults ⊕ file), `T` (the live tree), `bindDial`, `tuneSet / tuneDiff / tuneReset`. No DOM, no three, no cannon. |
+| `js/tunables.js` | **Generated, never on disk.** `GET /js/tunables.js` is served by `server.js` from `dice.yaml` as `export const DECLARED = {…};`, ETag from the YAML's hash, re-read when the file's mtime changes locally. Added to `.gitignore` so a stray build can never commit it. |
 | `js/devmode.js` | **New.** The panel. Dynamic `import()` only when the door opens. |
 | `css/dev.css` | **New.** Panel styles on the existing tokens. Injected on open, removed on shut. |
-| `tools/dice-apply.mjs` | **New.** `node tools/dice-apply.mjs ~/Downloads/dice.yaml` validates against the shipped key set, patches the checkout's `dice.yaml` line by line, writes atomically, prints the diff summary. Shared validator with the phase-2 route. |
-| `js/main.js` | Tune objects aliased into `T`; `bindDial` beside each re-apply; `const DEMO` becomes `devState`; backtick in the global key switch; hooks. |
-| `js/demo.js` | `resolveDemo` returns a mode; the cast and sweep logic are unchanged. |
-| `server.js` | Parses `dice.yaml` at boot; serves the generated module; honours `DICE_DEVMODE=off`. Phase 2: `POST /api/dev/write`, mounted only under `DICE_DEV_WRITE=1`. |
+| `tools/dice-apply.mjs` | **New.** `node tools/dice-apply.mjs ~/Downloads/dice.yaml` validates against the dial tree, patches the checkout's `dice.yaml` line by line, writes atomically, prints the diff summary. Shared validator with the phase-2 route. |
+| `js/main.js` | Tune objects aliased into `T`; `bindDial` beside each re-apply; `const DEMO` and the `?demo=` read and the room-mint suppression removed; `devState`; backtick in the global key switch; hooks. |
+| `js/demo.js` | `resolveDemo` removed; `dealDemo` and the arrival sweep stay as the cast's logic. |
+| `server.js` | Parses `dice.yaml` at boot; serves the generated module; honours `DICE_MODE`. Phase 2: `POST /api/dev/write`, mounted only under `DICE_DEV_WRITE=1`. |
 
 ### Loading
 
@@ -196,15 +226,16 @@ the line and column of every scalar so the writer can patch in place.
 whenever its mtime changes (locally, a hand edit is live on the next
 reload). It serves `GET /js/tunables.js` as a module whose body is the
 parsed tree as JSON, with the same `no-cache` plus content-hash ETag the
-other `js/` files get. `js/tune.js` imports that module, so the whole
-client module graph waits on nothing: no fetch, no top-level await (there
-is none in the codebase today and this adds none), no race with the ~85
-module-evaluation consumers. Node tests never touch the server: they read
-`dice.yaml` with `fs` and build `T` through the same `js/tune.js`.
+other `js/` files get. `js/tune.js` imports that module and merges it over
+the defaults, so the whole client module graph waits on nothing: no fetch,
+no top-level await (there is none in the codebase today and this adds
+none), no race with the ~85 module-evaluation consumers. Node tests never
+touch the server: they read `dice.yaml` with `fs` and build `T` through
+the same `js/tune.js`.
 
 Why not have the client fetch `dice.yaml` itself: it would need top-level
 await before every module evaluates, adding one serial round trip to every
-boot including the harness's hundreds, and the production off switch would
+boot including the harness's hundreds, and the production switch would
 have no place to be overridden. The server already owns static serving.
 
 ### The door
@@ -220,68 +251,73 @@ have no place to be overridden. The server already owns static serving.
 - **Shut** (a button) resets every dial to shipped, clears the cast, removes
   the stylesheet. After Shut the tab measures identical to a tab that never
   opened the door; that is the `dev-door-shut` test.
-- **`?demo=1`** still works: it boots developer mode with the panel folded
-  and the harness cast dealt, room-less, exactly as today's demo tab.
+- **The harness door** is the hook: `__diceDebug.devOpen()` after an
+  ordinary boot, then `devDeal(n)` for the cast. `ctx.demoTab` in
+  harness.mjs becomes `ctx.devTab`, which does exactly that. The
+  tools/steps scripts (`place-view`, `ring-look`, `place-card`) move to it
+  in the same commit. No URL param.
 - **Cheat sheet:** the `?` overlay gains one row, `` ` `` developer mode,
-  hidden when the switch is off.
+  hidden in production mode.
 
 ### The film lock
 
-`devState = { mode: 'off' | 'on', filmLocked: bool }`. Film dials and the
-cast are live when `placeRows().length <= 1` or the tab is room-less. When
-a second seat appears in the roster, film values reset to shipped, the cast
+`devState = { panel: 'shut' | 'open' | 'folded', film: 'live' | 'locked' }`.
+Film dials and the cast are live when `placeRows().length <= 1`. When a
+second seat appears in the roster, film values reset to shipped, the cast
 is cleared, and the rows show ▲ with one line: *a second viewer is here;
 film values are shared.* When the seat leaves, the rows unlock. Look dials
 never lock.
 
-### The production off switch
+### The production switch
 
-`app.devmode` in `dice.yaml`, and `DICE_DEVMODE=off` in the environment.
-The server applies the env override when it serves the generated module,
-so production can be turned off with one `--update-env-vars` and no
-commit, and turned back on the same way. `false` means both doors return
-off, `devmode.js` is never imported, and every mutating `dev*` / `tune*`
-hook returns null. `app.devmode` is **not a dial**: no panel control writes
-it, and the line-patching Save only rewrites lines a dial changed, so a
-Save from a running dev session can never flip it. It is a lock, not a
-boundary: `__diceDebug.moodTune` stays on the console as it does today,
-and that is enough because developer mode can only affect the tab that
-opened it. Phase 3 also drops `js/devmode.js` and `css/dev.css` from the
-production upload so it is *absent*, not just off.
+`app.mode` in `dice.yaml`, `development` or `production`, and `DICE_MODE`
+in the environment. The server applies the env override when it serves the
+generated module, so production can be switched with one
+`--update-env-vars` and no commit, and back the same way. In production
+mode the key does nothing, `devmode.js` is never imported, and every
+mutating `dev*` / `tune*` hook returns null. `app.mode` is **not a dial**:
+no panel control writes it, and the line-patching Save only rewrites lines
+a dial changed, so a Save from a running dev session can never flip it. It
+is a lock, not a boundary: `__diceDebug.moodTune` stays on the console as
+it does today, and that is enough because developer mode can only affect
+the tab that opened it. Phase 3 also drops `js/devmode.js` and
+`css/dev.css` from the production upload so it is *absent*, not just off.
 
 ## 5. The tunables registry
 
-Values and metadata are kept apart. **Values** are `dice.yaml`. **Metadata**
-(label, range, step, class, when it lands, why) is `DIALS` in `js/tune.js`,
+Values are `dice.yaml`. Metadata and defaults are `DIALS` in `js/tune.js`,
 a tree of the same shape as the declaration, so a leaf and its dial sit at
 the same path in both:
 
 ```js
 // js/tune.js
-const look = (label, range, read, why = '') => ({ label, range, cls: 'look', read, why });
-const film = (label, range, read, why = '') => ({ label, range, cls: 'film', read, why });
+const look = (label, def, range, read, why = '') => ({ label, def, range, cls: 'look', read, why });
+const film = (label, def, range, read, why = '') => ({ label, def, range, cls: 'film', read, why });
+const pick = (label, def, options, cls, read, why = '') => ({ label, def, options, cls, read, why });
 
 export const DIALS = {
+  app: { mode: pick('mode', 'development', ['development', 'production'], 'look', 'reload') },
   table: {
-    scale: film('table scale', [1, 4, 0.05], 'apply', 'the one dial for table size'),
-    seats: { spot: film('target', [0.2, 0.9, 0.01], 'roll'), tossHeight: film('toss height', [0, 2, 0.05], 'roll') },
+    scale: film('table scale', 2.5, [1, 4, 0.05], 'apply', 'the one dial for table size'),
+    seats: { spot: film('target', 0.5, [0.2, 0.9, 0.01], 'roll'),
+             tossHeight: film('toss height', 0.3, [0, 2, 0.05], 'roll') },
   },
   light: {
-    lamp: { y: look('lamp height', [5, 80, 0.5], 'apply'), angle: look('lamp cone', [0.2, 1.4, 0.01], 'apply'),
-            color: look('lamp colour', null, 'apply') },                    // string '#…' → colour input
-    room: { hemi: look('room light', [0, 1, 0.01], 'apply') },
-    fog:  { far: look('fog far', [10, 120, 1], 'apply') },
+    lamp: { y: look('lamp height', 24, [5, 80, 0.5], 'apply'),
+            angle: look('lamp cone', 0.85, [0.2, 1.4, 0.01], 'apply'),
+            color: look('lamp colour', '#ffe8c4', null, 'apply') },          // '#…' string → colour input
+    room: { hemi: look('room light', 0.1, [0, 1, 0.01], 'apply') },
+    fog:  { far: look('fog far', 46, [10, 120, 1], 'apply') },
   },
-  camera: { framing: { preferDice: look('prefer dice', null, 'frame') } }, // boolean → switch
-  throw:  { physics: { gravity: film('gravity', [-300, -20, 1], 'apply') } },
-  pace:   { tempo: { k: look('tempo', [0.25, 4, 0.05], 'frame', 'playback speed, never the bake') },
-            ceremony: { declareS: look('declare dwell', [0, 4, 0.05], 'reload', 'read once at boot') } },
+  camera: { framing: { prefer: pick('prefer', 'dice', ['dice', 'table'], 'look', 'frame') } },
+  throw:  { physics: { gravity: film('gravity', -110, [-300, -20, 1], 'apply') } },
+  pace:   { tempo: { k: look('tempo', 1, [0.25, 4, 0.05], 'frame', 'playback speed, never the bake') },
+            ceremony: { declareS: look('declare dwell', 1.35, [0, 4, 0.05], 'reload', 'read once at boot') } },
 };
 ```
 
-- A leaf in the declaration with no dial entry is still exported, diffed
-  and reset; it just has no slider. A dial entry with no leaf fails the
-  drift test.
+- `def` is the default that stands when the file omits the leaf. `SHIPPED`
+  is `defaults ⊕ DECLARED`; `T` starts as a clone of it.
 - `cls` is **look** or **film** (§4). `tuneSet` refuses a film write while
   the film is locked.
 - `read` says when a value lands: `frame` (read every tick, live for
@@ -290,13 +326,14 @@ export const DIALS = {
   *Save & reload* is the verb).
 - Ranges are the slider's, not the law's: the number field beside every
   slider takes any finite value, because "the range was wrong" is a thing
-  developer mode exists to discover. Type is the law.
+  developer mode exists to discover. Type is the law, and for an enum the
+  option list is the law.
 
 ```js
 // js/tune.js
-import { TUNABLES } from './tunables.js';          // the generated module (in the browser)
-export const SHIPPED = deepFreeze(structuredClone(TUNABLES));
-export const T = structuredClone(TUNABLES);         // the live tree every consumer reads
+import { DECLARED } from './tunables.js';          // the generated module (in the browser)
+export const SHIPPED = deepFreeze(merge(defaultsOf(DIALS), DECLARED));
+export const T = structuredClone(SHIPPED);          // the live tree every consumer reads
 const binders = new Map();                          // 'light.lamp.*' | 'table.scale' → fn
 export function bindDial(pattern, apply) { binders.set(pattern, apply); }
 
@@ -304,9 +341,10 @@ export function tuneSet(patch) {                    // THE writer: panel, hooks 
   const ran = new Set(), refused = [], pending = [];
   for (const [path, v] of Object.entries(patch)) {  // path = 'light.lamp.y'
     const spec = dialAt(path);
-    if (!leafExists(SHIPPED, path))              { refused.push([path, 'unknown']); continue; }
-    if (spec?.cls === 'film' && filmLocked())    { refused.push([path, 'film']);    continue; }
-    if (typeof v !== typeof leaf(SHIPPED, path)) { refused.push([path, 'type']);    continue; }
+    if (!leafExists(SHIPPED, path))                    { refused.push([path, 'unknown']); continue; }
+    if (spec?.cls === 'film' && filmLocked())          { refused.push([path, 'film']);    continue; }
+    if (typeof v !== typeof leaf(SHIPPED, path))       { refused.push([path, 'type']);    continue; }
+    if (spec?.options && !spec.options.includes(v))    { refused.push([path, 'option']);  continue; }
     setLeaf(T, path, v);
     const fn = binderFor(path);                   // exact, then a.b.* then a.* then *
     if (fn && !ran.has(fn)) { ran.add(fn); fn(path, v); }
@@ -326,7 +364,8 @@ fifteen objects, about ninety leaves, zero consumer edits, and every
 existing `__diceDebug.set*` hook keeps working because the object identity
 is preserved. Where the declaration's shape is nicer than the object's
 (`light.lamp.y` rather than `MOOD.tune.lampY`), the alias is a one-line
-view: `tune: view(T.light, { lampY: 'lamp.y', hemi: 'room.hemi', … })`.
+view. Any boolean these objects hold today (`FRAMING.preferDice`) becomes an
+enum at the same time, at its read sites.
 
 ```js
 const MOOD = { on: true, lamp: null, base: {…}, tune: T.light.lampFlat };   // was a literal
@@ -367,8 +406,7 @@ from the parsed tree on both sides, so one edit moves the client's toss and
 the server's stamp together. Phase 1 leaves them as constants.
 
 **Not in the tree, on purpose:** `FIXED_DT`, the RNG, `AIM_ZERO`,
-`PLACE_MAX` and `MAX_PHYSICAL_DICE` (wire limits), copy strings,
-enumerations.
+`PLACE_MAX` and `MAX_PHYSICAL_DICE` (wire limits), copy strings.
 
 **Venues:** the fae venue `Object.assign`s the mood tune wholesale at
 moonrise and restores it on exit. Phase 1: while a venue is active, `light`
@@ -379,21 +417,23 @@ composed through `tuneSet`.
 ## 6. Export, diff, and the repo round trip
 
 **Save rewrites only what changed.** `parseYaml` records a span for every
-scalar (line, column, raw text). `patchYaml(text, spans, changes)` replaces
-the raw text of each changed scalar on its own line and leaves every other
-byte alone: comments, blank lines, key order, quoting style. So the export
-of an unchanged tree is the file itself, byte for byte (a unit test), and
-after a dial moves `git diff dice.yaml` is exactly the lines that moved,
-with their comments still beside them. A new row (a set, a felt) is emitted
-with `emitYaml` and appended under its section, two-space indented.
+scalar (line, column, raw text) and an insertion point for every map.
+`patchYaml(text, spans, changes)` replaces the raw text of each changed
+scalar on its own line, inserts a line for a changed leaf the file did not
+name, and leaves every other byte alone: comments, blank lines, key order,
+quoting style. So the export of an unchanged tree is the file itself, byte
+for byte (a unit test), and after a dial moves `git diff dice.yaml` is
+exactly the lines that moved or arrived, with their comments still beside
+them. A new row (a set, a felt) is emitted with `emitYaml` and appended
+under its section.
 
 **Three ways out of the browser:**
 
 1. **Download** (phase 1): the patched file, then
    `node tools/dice-apply.mjs ~/Downloads/dice.yaml` validates it against
-   the checkout's key set, re-patches the checkout's own file (so a comment
-   you added locally in the meantime survives), writes atomically and
-   prints the diff summary.
+   the dial tree, re-patches the checkout's own file (so a comment you
+   added locally in the meantime survives), writes atomically and prints
+   the diff summary.
 2. **Save** (phase 2): `POST /api/dev/write { file: 'dice.yaml', changes: { 'light.lamp.y': 30 } }`.
    The client posts the *changes*; the server patches its own copy of the
    file with the same `patchYaml`. Nothing posted is ever written verbatim.
@@ -408,10 +448,11 @@ with `emitYaml` and appended under its section, two-space indented.
 `path · shipped → live · class` with per-row revert, per-section reset and
 reset-all, and below it the line diff of the patched file.
 
-**Versioning.** `app.version` is an integer. A patch of another version is
-offered as a download before it is dropped, never silently. Bumping it is
-a deliberate act in the commit that renames or removes a key; unknown paths
-in a patch are dropped per path with one console line each.
+**Versioning.** `app.version` is an integer, optional, default 1. A patch
+of another version is offered as a download before it is dropped, never
+silently. Bumping it is a deliberate act in the commit that renames or
+removes a key; unknown paths in a patch are dropped per path with one
+console line each.
 
 **No localStorage draft in phase 1.** Three critics found it the most
 complex piece and the least needed: it leaks across e2e scenarios on one
@@ -445,6 +486,10 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
 │                                                     │   far      ━━━●━━  46 ││
 │                                                     │ ▸ breath  ▸ motes     ││
 │                                                     │───────────────────────││
+│                                                     │ CAMERA                ││
+│                                                     │ framing               ││
+│                                                     │   prefer  [dice|table]││
+│                                                     │───────────────────────││
 │                                                     │ THROW · film ▲ locked ││
 │                                                     │ physics               ││
 │                                                     │   gravity ━━━●━━ -110 ││
@@ -463,11 +508,12 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
   sub-headings are its nested maps, so the panel *is* the file, drawn.
   **Find** filters by label or path; a hundred dials need it more than tabs
   do.
-- **Rows** are generated from the tree and `DIALS`: number → range plus a
-  typeable value; `#rrggbb` → colour input; boolean → switch; a string with
-  an `options` list in its dial → segmented control; a leaf with no dial →
-  a plain typeable value. A changed row gets a dot and a hover revert; film
-  rows ▲ when locked; reload rows ⟳ with a stepper.
+- **Rows** are generated from the dial tree: number → range plus a
+  typeable value; `#rrggbb` → colour input; enum → segmented control; a
+  leaf with no dial → a plain typeable value. A changed row gets a dot and
+  a hover revert; a leaf the file omits gets a faint *default* mark; film
+  rows ▲ when locked; reload rows ⟳ with a stepper. There is no switch
+  control, because there is no boolean.
 - **Cast** is today's demo rows verbatim: players 0–8, reshuffle, sit
   prev/next, show regions, throw from seat, throw from every seat.
 - **Footer:** the judged viewport and DPR (so a screenshot says what it
@@ -484,19 +530,19 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
 
 | Capability | What it does | Phase | Size |
 |---|---|---|---|
-| `dice.yaml` + `js/yaml.js` | the declaration; parser with spans, line-patching writer, emitter; unit tests | 1 | M |
-| Served module | `GET /js/tunables.js` generated from the declaration; mtime re-read; `DICE_DEVMODE` override | 1 | S |
-| `js/tune.js` | `SHIPPED`/`T`, `DIALS` tree, `bindDial`, `tuneSet/Diff/Reset` | 1 | M |
+| `dice.yaml` + `js/yaml.js` | the declaration; parser with spans and insertion points, line-patching writer, emitter; unit tests | 1 | M |
+| Served module | `GET /js/tunables.js` generated from the declaration; mtime re-read; `DICE_MODE` override | 1 | S |
+| `js/tune.js` | dial tree with defaults, `SHIPPED`/`T`, `bindDial`, `tuneSet/Diff/Reset`, enum and type refusals | 1 | M |
 | Key door, fold, Shut | backtick on any tab; fold holds values; Shut resets and removes | 1 | S |
 | Film lock | film dials and cast live at a table of one; reset and lock when a second seat appears | 1 | S |
-| `?demo=1` alias | boots dev mode folded, room-less, harness cast dealt | 1 | S |
-| `app.devmode` off switch | field plus env override; hides the cheat-sheet row; never a dial | 1 | S |
-| Fifteen tune objects bound | light, camera, throw, pace sections; ~90 leaves; zero consumer edits | 1 | M |
+| `?demo=1` removed | the harness and tools/steps move to `devOpen()` + `devDeal(n)`; the room-mint suppression goes | 1 | S |
+| `app.mode` switch | `development | production`, env override; hides the cheat-sheet row; never a dial | 1 | S |
+| Fifteen tune objects bound | light, camera, throw, pace sections; ~90 leaves; zero consumer edits; their booleans become enums | 1 | M |
 | `table.scale` + a few named consts | preset rewrite through `applyZoom`; reload-class rows | 1 | S |
 | Panel + stylesheet | overlay, sections from the tree, find, generated rows, Cast, File, footer | 1 | M |
 | Diff, revert, reset, Download, Copy, Paste | the loop without a server route | 1 | S |
 | `tools/dice-apply.mjs` | validate, patch, atomic write, diff summary | 1 | S |
-| Hooks | `tuneGet()`, `tuneDiff()`, `devInfo()` zero-arg; `tuneSet(p)`, `tuneExport()`, `devOpen()`, `devClose()`, `devFold(b)` | 1 | S |
+| Hooks | `tuneGet()`, `tuneDiff()`, `devInfo()` zero-arg; `tuneSet(p)`, `tuneExport()`, `devOpen()`, `devClose()`, `devFold(b)`, `devDeal(n)` | 1 | S |
 | Save route | `POST /api/dev/write`; env-armed, loopback, same-origin, one file, atomic | 2 | M |
 | Server reads `table.seats` | `places.js` takes toss and card values from the declaration on both sides | 2 | M |
 | Sound, Post, Cards sections | `voices.js` reads `T` at event time; bloom uniform; placard geometry | 2 | M |
@@ -524,10 +570,13 @@ The rule: **an asset is a row under `sets:`, `felts:`, `towers:` or
 `venues:` in the declaration; the app resolves ids at use time; the editor
 writes the row, calls the kind's cache-bust and re-apply, and Save appends
 it.** Code-only stays code-only, and the panel says so ("a new cloth is a
-painter function; see FELT_CLOTHS").
+painter function; see FELT_CLOTHS"). A row's fields are optional the same
+way a dial is: a set with only `body` and `text` is a legal set, and the
+recipe's defaults fill the rest. A row's two-state fields are enums
+(`profile: round | crisp`), never flags.
 
 - **Merge before the id lists are computed.** `themes.js` merges
-  `TUNABLES.sets` into `SETS` before `SET_IDS` is built (today `registerSet`
+  `DECLARED.sets` into `SETS` before `SET_IDS` is built (today `registerSet`
   runs after, and a critic found a registered set invisible in the picker
   and rejected on the wire). `main.js` merges `felts` before the swatches
   render. The server parses the same file, so it accepts a new id on the
@@ -561,9 +610,9 @@ painter function; see FELT_CLOTHS").
   through `composeRoll` from a chosen seed, never chosen faces, and is
   stamped *bench* in the log. Proof: a unit test walks every leaf path
   against a denylist (`rng`, `values`, `face`, `seed`, `fixedDt`).
-- **Nothing durable in the URL** (GOALPOST 4). Proof: `dev-key-door`
-  asserts `location.search` and localStorage unchanged after open, fold,
-  shut.
+- **Nothing in the URL** (GOALPOST 4). Proof: `dev-key-door` asserts
+  `location.search` and localStorage unchanged after open, fold, shut, and
+  a `?demo=1` visit behaves exactly like a plain visit.
 - **Nothing modal** (GOALPOST 5). The panel never enters the modal stack.
 - **The write route cannot be used against Joe.** Changes in, patch out;
   env-armed; loopback; same-origin; one allowlisted file; atomic. Proof: a
@@ -573,17 +622,24 @@ painter function; see FELT_CLOTHS").
   the checkout.
 - **The unpressed tab is the tab it was.** No stylesheet, module, scene
   object or draw call until the door opens. Proof: `dev-door-shut` (today's
-  `demo-door-shut`, extended with an open-dial-shut leg) deep-equals
-  framing, places, placard budget, bodies, extents and draw count, and
-  `feltPoses` after one seeded throw.
-- **The off switch is real, and its proof fires.** A second server started
-  with `DICE_DEVMODE=off` boots `?demo=1` and asserts no panel,
-  `devOpen() === null`, cheat-sheet row hidden; a second leg starts one
-  from a scratch copy whose `dice.yaml` says `devmode: false`.
+  `demo-door-shut`, re-pinned): a never-opened tab and an
+  open-dial-shut tab deep-equal on framing, places, placard budget,
+  bodies, extents and draw count, and on `feltPoses` after one seeded
+  throw.
+- **The switch is real, and its proof fires.** A second server started
+  with `DICE_MODE=production` boots a tab, presses the key through
+  `devOpen()`, and asserts null, no panel, cheat-sheet row hidden; a second
+  leg starts one from a scratch copy whose `dice.yaml` says
+  `mode: production`.
 - **The declaration round-trips.** `patchYaml(text, spans, {}) === text`
-  for the checked-in file, and for every scalar in it, patching a new value
-  and re-parsing yields the new value with every other leaf and every
-  comment line unchanged.
+  for the checked-in file; for every scalar in it, patching a new value and
+  re-parsing yields the new value with every other leaf and every comment
+  line unchanged; and for every leaf the file omits, patching it inserts
+  exactly one line under the right map.
+- **No boolean, no missing default.** The unit test walks the dial tree:
+  every entry has a `def` of the leaf's type, no `def` is a boolean, every
+  enum's `def` is in its `options`, and the checked-in file contains no
+  boolean scalar.
 - **Goldens move only when a film value ships.** A film-class change is
   visible in `git diff dice.yaml`, and the commit that ships it re-records
   the one-seed-one-film golden and says why.
@@ -592,27 +648,31 @@ painter function; see FELT_CLOTHS").
 
 **Phase 1, the loop exists.** Five commits, each green alone:
 
-1. `js/yaml.js` with its unit tests (parse, spans, patch, emit, refusals).
+1. `js/yaml.js` with its unit tests (parse, spans, insertion points,
+   patch, insert, emit, refusals including booleans).
 2. `dice.yaml` written from the shipped values; the served module;
-   `js/tune.js`; the fifteen tune objects aliased and bound; `table.scale`
-   and a few reload-class consts; `tests/tune.test.mjs` (drift, denylist,
-   round trip).
-3. The door: `resolveDemo` modes, `devState`, backtick, fold, Shut, film
-   lock, `?demo=1` folded, `app.devmode` and the env override, hooks,
-   cheat-sheet row.
+   `js/tune.js` with the dial tree and defaults; the fifteen tune objects
+   aliased and bound, their booleans turned to enums; `table.scale` and a
+   few reload-class consts; `tests/tune.test.mjs` (drift, defaults, no
+   booleans, denylist, round trip).
+3. The door: `devState`, backtick, fold, Shut, film lock, `app.mode` and
+   the env override, hooks including `devOpen`/`devDeal`; `?demo=1`,
+   `resolveDemo` and the room-mint suppression removed; `ctx.demoTab` →
+   `ctx.devTab`; tools/steps moved; cheat-sheet row.
 4. `js/devmode.js` + `css/dev.css`: sections from the tree, find, generated
    rows, Cast moved in, the inline panel deleted, File with diff, Download,
    Copy, Paste.
 5. `tools/dice-apply.mjs` and the scenarios `dev-door-shut`,
-   `dev-key-door`, `dev-room-look`, `dev-off-switch`, `dev-export-roundtrip`.
+   `dev-key-door`, `dev-room-look`, `dev-mode-production`,
+   `dev-export-roundtrip`.
 
-*Proves it:* `dev-export-roundtrip` boots `?demo=1`, sets lamp height and
-table scale, asserts the lamp moved and the extents widened at the roll
-boundary, and asserts the exported text equals `patchYaml` of the checked-
-in file with the same two changes under Node. And Joe's own moment: on the
-8123 preview, press `` ` ``, widen the lamp, fold, look at exactly the
-player's frame, unfold, Download, run the apply tool, and `git diff
-dice.yaml` is two lines with their comments intact.
+*Proves it:* `dev-export-roundtrip` boots a tab, opens through `devOpen()`,
+sets lamp height and table scale, asserts the lamp moved and the extents
+widened at the roll boundary, and asserts the exported text equals
+`patchYaml` of the checked-in file with the same two changes under Node.
+And Joe's own moment: on the 8123 preview, press `` ` ``, widen the lamp,
+fold, look at exactly the player's frame, unfold, Download, run the apply
+tool, and `git diff dice.yaml` is two lines with their comments intact.
 
 **Phase 2, the loop closes into the repo and into tests.** The Save route;
 `places.js` reading `table.seats` on both sides; sound, post and cards
@@ -635,23 +695,20 @@ is in the menu and rolls at a real table after restart) and
 **Not covered, on purpose:** device emulation (CDP pins a phone); multi-
 client film proofs from one tab; interpretation systems (code, by CUJ12); a
 new cloth painter or tower mesh (forge and code); full YAML (anchors, block
-scalars, tags).
+scalars, tags, booleans).
 
 ## 12. Open questions for Joe
 
 1. Film dials at a table of one, locked and reset when a second viewer
-   arrives: is that the right line, or should film dials be room-less
-   (`?demo=1`) only?
+   arrives: is that the right line?
 2. Shut resets to shipped and Fold keeps values. Or should Shut keep them
    too, leaving Reset as the only reset?
 3. Will you run 8123 with `DICE_DEV_WRITE=1` so Save writes `dice.yaml`
    directly (phase 2), or is Download + the apply tool the loop you want?
 4. Which film values move in phase 1 (table scale, gravity, toss height and
    speed are the candidates)? Each ships with a re-recorded poses golden.
-5. Is the top-level shape in §3 the structure you want (`app`, `table`,
-   `light`, `camera`, `throw`, `pace`, `sound`, `cards`, `sets`, `felts`,
-   `towers`, `venues`), and is `light.lamp.y` the right grain, or do you
-   want it flatter?
+5. Is the top-level shape in §3 the structure you want, and is
+   `light.lamp.y` the right grain, or do you want it flatter?
 6. Should the shipped dice sets and felts migrate into `dice.yaml` (phase
    3), making it the whole catalogue, or stay in code with the declaration
    holding only house additions?
