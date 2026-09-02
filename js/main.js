@@ -16687,8 +16687,8 @@ window.__diceDebug = {
     // foot-left, foot-right, ridge-right — so a point at (s across, t down the
     // slope) is one bilinear step, and the NAME's own box is the centred
     // (row.ink.w x row.ink.h) share of it. The atlas row may be printed
-    // mirrored or flipped for the reader (READ_TURN), which moves a CENTRED
-    // box by nothing at all, so the same s/t serve every station.
+    // mirrored or flipped for the reader (places.js readTurn), which moves a
+    // CENTRED box by nothing at all, so the same s/t serve every station.
     const iw = row.ink ? row.ink.w : 0;
     const ih = row.ink ? row.ink.h : 0;
     const lerp3 = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
@@ -28805,21 +28805,24 @@ function applyFramingPose(pose, animate) {
   // position ease carries the rest.
   camOrbit = pose.orbit !== undefined ? pose.orbit : camOrbit;
   // THE NAMES TURN WITH THE FRAME, here and nowhere else (§7.63). Every
-  // placard's printing is a quarter turn of its atlas row keyed on the
-  // station's azimuth RELATIVE TO THE READER, and the reader is wherever this
-  // cut just put the eye — so the printing and the orbit can never disagree
-  // by a frame, and a phone whose ladder turns the table finds the names
-  // turned with it. The OBJECTS do not move (a head card yawed toward another
-  // edge stands inside its wall); it is a UV rewrite, and a no-op when the
-  // quarter has not changed, which is every reframe but the cut itself.
+  // placard's printing is a quarter turn of its atlas row, but WHICH turn is
+  // decided by a predicate on the card's azimuth RELATIVE TO THE READER
+  // (js/places.js readTurn) rather than by a table of four quarters — the
+  // chairs sit on a ring, so that relative angle is any real number. The
+  // reader is wherever this cut just put the eye, so the printing and the
+  // orbit can never disagree by a frame, and a phone whose ladder turns the
+  // table finds the names turned with it. The OBJECTS do not move (a card
+  // yawed off its own ray leans inside its wall); it is a UV rewrite, and a
+  // no-op when the orbit has not changed, which is every reframe but the cut
+  // itself.
   // …AND THE DEMO OVERLAY'S STATION NUMERALS TURN WITH THEM (js/demo.js).
   // Found by LOOKING at the seat-3 frame: the digits are painted on the
   // ground in world orientation, so from the opposite chair they stand on
   // their heads — and an upside-down 6 is a 9, which is the one way a station
   // index can be actively WRONG rather than merely awkward. Rebuilt on the
-  // quarter CHANGING (setReader's own return, false on every reframe but the
-  // cut), so it costs nothing on an ease and cannot drift a frame behind the
-  // names it is keyed to.
+  // reader angle CHANGING (setReader's own return, false on every reframe but
+  // the cut), so it costs nothing on an ease and cannot drift a frame behind
+  // the names it is keyed to.
   if (placardRig && placardRig.setReader(camOrbit) && DEMO) demoOverlaySync();
   // THE FOG LEARNS WHERE THE EYE IS GOING, here and nowhere else — once per
   // pose, from the pose's DESTINATION, which is what keeps the plane from

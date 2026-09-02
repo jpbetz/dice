@@ -67,7 +67,7 @@ limitations under the License.
 // than hoped for.
 
 import * as THREE from 'three';
-import { PLACE_MAX, PLACARD_W, PLACARD_D } from './places.js';
+import { PLACE_MAX, PLACARD_W, PLACARD_D, readTurn } from './places.js';
 
 // ---------------------------------------------------------------------------
 // The form (world units) — see docs/UX.md §7.63 for where these come from.
@@ -147,25 +147,25 @@ const FACE_Y0 = RIDGE_Y - FACE_S * TENT_RISE;         // 0.3944 — where the fo
 const BEAD_W_MINE = BASE_W - 2 * CHAMFER; // YOUR card's bead runs the full base
 const BEAD_W_OTHER = 0.80;                // everybody else's is a centred pip
 
-// WHICH WAY UP THE PRINTING GOES, per station azimuth RELATIVE TO THE READER
-// (keyed on `(station azim − reader orbit)` in quarter turns; see setReader).
-// Each row is [+z panel, −z panel] and each entry is [mirror across the card's
-// width, flip the row end-over-end] — a quarter turn of the atlas row in
-// texture space, which is all it takes to hand a shallow tent card's name to
-// the person looking at it. See _writePlacard for why the OBJECT must not
-// turn instead.
+// WHICH WAY UP THE PRINTING GOES is no longer a table of four quarter turns.
+// It is `readTurn(azim, readerAzim)` in js/places.js — a PREDICATE on the
+// continuous relative angle, because the chairs sit on a RING now and (azim −
+// reader) is any real number: at N=5 two different chairs round to the same
+// quarter, and a table keyed on quarters hands one of them the other's
+// printing. The predicate returns the same pair of rows the table did — each
+// row [mirror across the card's width, flip the row end-over-end], the pair
+// ordered [+z panel, −z panel] — so the atlas work below is unchanged: a
+// quarter turn of the row in texture space, which is all it takes to hand a
+// shallow tent card's name to the person looking at it. See _writePlacard for
+// why the OBJECT must not turn instead, and setReader for the reader angle it
+// is asked against.
 //
-// The chair the reader sits at (relative 0) and the one opposite (π) land
-// exactly on the reader's up-vector. The two to either side are a quarter
-// turn off it either way — a card at your elbow is read side-on, as it is at
-// a real table — so their entries pick the pair that reads bottom-to-top
-// rather than top-to-bottom.
-const READ_TURN = Object.freeze({
-  0: [[false, false], [true, true]],    // front      — azim 0
-  1: [[false, false], [true, true]],    // right head — azim π/2
-  2: [[true, true], [false, false]],    // back       — azim π
-  3: [[true, true], [false, false]],    // left head  — azim 3π/2
-});
+// The reader angle itself is stored in RADIANS and compared to this epsilon —
+// NOT bucketed. Any bucket wider than 22.5° is illegal: eight chairs is the
+// most the table seats, so two chairs can be 45° apart, and a bucket that
+// merges them prints one chair's card for the other. READER_EPS is only what
+// keeps setReader an EDGE (the orbit cuts, never eases).
+const READER_EPS = 1e-6;
 
 // 24 quads a placard: 6 base (a truncated pyramid — the chamfer IS the bevel),
 // 7 per card panel (printed face, unprinted foot, the hidden inner face, four
@@ -269,10 +269,10 @@ export class PlacardRig {
     this.rows = [];                 // one per station, null when nobody sits there
     this.occupied = 0;
     this.shown = true;              // the placardShow() override
-    // The reader's azimuth in quarter turns (0 front, 1 right head, 2 back,
-    // 3 left head) — the orbit the frame was last cut to. Every name is
-    // printed for it (READ_TURN); main.js sets it where the orbit cuts.
-    this.readerQ = 0;
+    // The reader's azimuth in RADIANS, normalised to [0, 2π) — the orbit the
+    // frame was last cut to. Every name is printed for it (readTurn); main.js
+    // sets it where the orbit cuts.
+    this.readerAzim = 0;
     this.wash = { active: false, t: 0, dur: 0, place: null, x: 0, y: 0, z: 0, color: null };
   }
 
@@ -540,21 +540,31 @@ export class PlacardRig {
     // arrives at the reader upside down. Measured by looking: the first build
     // of this rig put four of eight names on their heads.
     //
-    // The object itself must NOT be turned to fix that. Every placard's whole
-    // licence is that it stands OUTBOARD of a physics wall (js/places.js), and
-    // a head card yawed to face the front stands 0.38 units INSIDE its wall at
-    // medium, where a die can reach it. So the CARD keeps its station's
-    // azimuth and only the PRINTING turns — a quarter turn of the atlas row,
-    // per panel, in texture space, costing nothing and moving nothing.
+    // The object itself must NOT be turned to fix that, and on the ring the
+    // refusal is stronger, not weaker: every placard's whole licence is that
+    // it stands OUTBOARD of a physics wall (js/places.js seatAnchor), and a
+    // card yawed away from its own ray leans back inside that wall, where a
+    // die can reach it — the shipped head card measured 0.38 units inside at
+    // medium. Every ring card faces the table centre BY CONSTRUCTION. So the
+    // CARD keeps its seat's azimuth and only the PRINTING turns — a quarter
+    // turn of the atlas row, per panel, in texture space, costing nothing and
+    // moving nothing.
     //
-    // The reader is wherever the frame was last cut to (`readerQ`, set by
+    // WHICH way is decided by a predicate on the CONTINUOUS relative angle,
+    // never by a bucket: `readTurn(azim, readerAzim)` (js/places.js §1.9) asks
+    // whether the +z panel's text-up still projects to screen-up for a reader
+    // at `readerAzim`, i.e. cos(azim − readerAzim) > 0, with the edge-on case
+    // (cos ≈ 0) taking the head treatment the old quarter-turn table gave it.
+    // The reader is wherever the frame was last cut to (`readerAzim`, set by
     // main.js's applyFramingPose — the per-viewer orbit of §7.63, or the
     // ladder's quarter turn on top of it). The card at the reader's own chair
-    // and the one opposite land on their up-vector exactly; the two at their
-    // elbows are a quarter turn off it whichever way they are printed, which
-    // is how a card at your elbow reads at a real table too.
-    const q = ((Math.round(azim / (Math.PI / 2)) - this.readerQ) % 4 + 4) % 4;
-    const turn = READ_TURN[q];
+    // and the one opposite land on their up-vector exactly; a card at their
+    // elbow is read side-on whichever way it is printed, which is how a card
+    // at your elbow reads at a real table too. Residual tilt on the visible
+    // panel is wrap(θ_card − φ) into (−90°, 90°] — at N=3 it is 0/∓60°, at
+    // N=6 0/±60°/∓60°/0, at N=8 0/±45°/±90°/∓45°/0: never worse than the
+    // shipped head treatment, and there is no de-tilt dial.
+    const turn = readTurn(azim, this.readerAzim);
 
     let o = slot * VERTS * 3;
     let uo = slot * VERTS * 2;
@@ -766,19 +776,25 @@ export class PlacardRig {
   }
 
   // THE READER MOVED — turn every name toward them (§7.63). `orbit` is the
-  // camera orbit the frame was just cut to; quantised to the quarter turn,
-  // and a no-op when the quarter has not changed, which is every reframe but
-  // the cut itself. A UV rewrite over the standing rows: no atlas repaint, no
-  // allocation, no object moved — the printing turns, the placards stand.
+  // camera orbit the frame was just cut to, kept CONTINUOUS: on the ring a
+  // viewer sits at 2πk/N, and any bucket wider than 22.5° is illegal — at N=5
+  // the chairs at 144° and 216° round to the same quarter, so a quantised
+  // reader would leave the names printed for the chair you left. The only
+  // rounding left is READER_EPS, which exists so this stays an EDGE: the orbit
+  // CUTS and never eases (applyFramingPose), so an unchanged pose returns
+  // false on every reframe but the cut itself — which is what main.js's demo
+  // overlay resync is keyed to. A UV rewrite over the standing rows: no atlas
+  // repaint, no allocation, no object moved — the printing turns, the placards
+  // stand.
   setReader(orbit) {
-    const q = ((Math.round((orbit || 0) / (Math.PI / 2)) % 4) + 4) % 4;
-    if (q === this.readerQ) return false;
-    this.readerQ = q;
+    const a = ((orbit || 0) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+    if (Math.abs(a - this.readerAzim) < READER_EPS) return false;
+    this.readerAzim = a;
     this._rewrite();
     return true;
   }
 
-  readerOrbit() { return this.readerQ * (Math.PI / 2); }
+  readerOrbit() { return this.readerAzim; }
 
   // Re-emit every station's geometry from the rows already standing — same
   // anchors, same seating, same names — for a change that touches only how
