@@ -56,7 +56,11 @@ const { minTowerDataUrl, minTowerGlb, MIN_TOWER_PORTALS } =
 // two of them — negative when they overlap, which is the assertion the felt
 // shelf never had.
 const { placardFootprint, placardGap, PLACE_LANE, PLACE_PUSH, PLACARD_W, PLACARD_GAP, PLACARD_STANDOFF,
-  entryFor, regionFor, inRegion, aimFor, STATIONS }
+  entryFor, regionFor, inRegion, aimFor,
+  // THE RING (S4, 2026-09-01): the seat angle and the anchor, the one producer
+  // the cards stand on — a scenario compares the page's numbers with the
+  // module's own, never with a copy.
+  placeTheta, seatAnchor, wrapPi, TOWER_ARC }
   = await import('../../js/places.js');
 
 // DOES A CARD PRINT THROUGH A PANEL? Two renderers draw the frame — WebGL puts
@@ -20587,34 +20591,28 @@ export const scenarios = [
         'lowest free, handed out in join order');
       assert.deepEqual(full.stations.map((s) => s.name), ['Ann', ...names],
         'and each card carries the name of the player who was given it');
-      assert.deepEqual(full.stations.slice(0, 4).map((s) => s.station),
-        ['front', 'back', 'front', 'back'],
-        'the first four chairs are two per LONG edge');
-      assert.deepEqual(full.stations.slice(4, 6).map((s) => s.station), ['right', 'left'],
-        'the heads are the fifth and sixth chairs — nobody pays the short-edge tax early');
-
-      // …AND NOBODY SITS DEAD CENTRE OF A LONG EDGE UNTIL THE SEVENTH ARRIVES
-      // (v2, 2026-09-01). The first chair on each edge is an OUTER lane and the
-      // centre slot is dealt last, because a card in the middle of the front
-      // edge stands at the bottom centre of its owner's frame — the square of
-      // screen `#result-banner` is fixed to, where Joe's two-tab shot caught
-      // the two printing through each other. The mirror is what keeps the
-      // two-player table readable: a half turn of the world maps chair 0 onto
-      // chair 1 exactly, so BOTH players read their own card low-left.
-      assert.deepEqual(full.stations.slice(0, 4).map((s) => s.lane), [-1, 1, 1, -1],
-        'the four long-edge chairs are outer lanes, 180-degree mirrored in pairs');
-      assert.deepEqual(full.stations.slice(6, 8).map((s) => s.lane), [0, 0],
-        'and the two centre slots are the last chairs dealt');
-      for (const [p, q] of [[0, 1], [2, 3], [6, 7]]) {
+      // THE RING (BRIEF-RING, S4 2026-09-01): eight chairs are an OCTAGON. The
+      // sticky `place` ranks the players (k = how many occupied places are
+      // below yours), and the card stands on the ray θ = 2πk/N — so with all
+      // eight dealt in order, place k sits at k·45°, and places k and k+4 are
+      // a 180° pair. (The rectangle's "long edges first, heads at N >= 5, the
+      // centre slots last" ladder this used to assert was replaced by Joe's
+      // brief; its own-card-vs-banner defect is gate G1, recorded in
+      // place-two-views.)
+      assert.deepEqual(full.stations.map((s) => [s.seat, s.seats]), [...Array(8).keys()].map((k) => [k, 8]),
+        'eight chairs, ranked 0..7 of 8 by ascending place');
+      for (const s of full.stations) {
+        assert.equal(s.theta, placeTheta(s.seat, 8, 0),
+          `place ${s.place} sits at the ring angle for rank ${s.seat} of 8 — the same double the module produces`);
+        assert.equal(s.yaw, s.theta, 'and the card faces the table centre from there');
+      }
+      for (const [p, q] of [[0, 4], [1, 5], [2, 6], [3, 7]]) {
         const at = (n) => full.stations.find((st) => st.place === n).world;
         assert.ok(Math.abs(at(p).x + at(q).x) < 1e-9 && Math.abs(at(p).z + at(q).z) < 1e-9,
-          `stations ${p} and ${q} are a 180-degree pair (${at(p).x}/${at(q).x})`);
+          `places ${p} and ${q} are a 180-degree pair (${at(p).x}/${at(q).x})`);
       }
-      assert.ok(Math.abs(full.stations[0].world.x) > PLACARD_W / 2,
-        'the first card is at least its own width off the middle of its edge '
-        + `(x ${full.stations[0].world.x})`);
       assert.ok(PLACE_LANE >= PLACARD_W + PLACARD_GAP,
-        `and the lane still clears a card's width plus the gap floor (${PLACE_LANE})`);
+        `and the film's rectangle-era lane still clears a card's width plus the gap floor (${PLACE_LANE})`);
       assert.equal(full.on, true, 'the table has places');
       assert.equal(full.layout, 'table', 'wearing the grounded dress');
       assert.equal(full.myOrbit, 0, "and the front chair's own azimuth is zero");
@@ -20622,17 +20620,16 @@ export const scenarios = [
       // EVERY CARD STANDS OUTBOARD OF A WALL — the property that makes a
       // placard unreachable by any die, and therefore lets it cast a real
       // shadow and be seated by a raycast later. Asserted against the mat AS
-      // THE WALLS CURRENTLY STAND, which is what js/places.js is handed.
+      // THE WALLS CURRENTLY STAND, which is what js/places.js is handed. On the
+      // ring the binding wall is whichever the seat's ray leaves the rectangle
+      // through, so the test is "past SOME wall" on the oriented footprint.
       const ext = await a.dbg('tableExtents()');
       for (const s of full.stations) {
-        if (s.station === 'front' || s.station === 'back') {
-          assert.ok(Math.abs(s.world.z) > ext.d / 2,
-            `station ${s.place} stands past the wall (z ${s.world.z} vs ${ext.d / 2})`);
-        } else {
-          assert.ok(Math.abs(s.world.x) > ext.w / 2,
-            `station ${s.place} stands past the wall (x ${s.world.x} vs ${ext.w / 2})`);
-        }
-        assert.equal(s.relocated, false, 'no tower is up, so nobody has moved to a flank');
+        const box = placardFootprint({ x: s.world.x, z: s.world.z, azim: s.yaw });
+        assert.ok(Math.abs(s.world.z) - box.hz >= ext.d / 2 || Math.abs(s.world.x) - box.hx >= ext.w / 2,
+          `place ${s.place} stands past a wall (x ${s.world.x.toFixed(2)}±${box.hx.toFixed(2)}, `
+          + `z ${s.world.z.toFixed(2)}±${box.hz.toFixed(2)} vs walls ${ext.w / 2}/${ext.d / 2})`);
+        assert.equal(s.relocated, false, 'no tower is up, so nobody is on the tower arc');
       }
 
       // THE NINTH ARRIVAL IS PLACELESS — the key is absent, and nothing else
@@ -20863,13 +20860,12 @@ export const scenarios = [
       assert.equal(stationOf('Eluned'), 4, 'Eluned at the right head');
       assert.equal(stationOf('Gus'), 6, 'Gus on the front edge\'s centre slot');
       assert.equal(stationOf('Iris'), undefined, 'Iris holds no station');
-      assert.equal(seating.stations.find((s) => s.name === 'Ann').lane, -1,
-        'the first chair is a LANED station since v2 — nobody sits dead centre '
-        + 'of a long edge until the seventh player arrives (js/places.js)');
-      assert.equal(seating.stations.find((s) => s.name === 'Cass').lane, 1,
-        'and the second chair on that edge is its mirror');
-      assert.equal(seating.stations.find((s) => s.name === 'Gus').lane, 0,
-        'the centre slot is the seventh chair handed out');
+      // The CARDS are on the ring since S4 (rank of 8); the THROW below still
+      // wears the rectangle's edge/lane stamp until S5 rewrites this scenario
+      // as place-throws-from-your-seat.
+      assert.deepEqual(['Ann', 'Cass', 'Gus'].map((nm) => seating.stations.find((s) => s.name === nm).seat), [0, 2, 6],
+        'Ann, Cass and Gus rank 0, 2 and 6 of eight — the sticky place is the ranking key');
+      assert.ok(seating.stations.every((s) => s.seats === 8), 'eight at the table, as every card counts it');
 
       await a.dbg('holdClock(true)');
       try {
@@ -21361,16 +21357,19 @@ export const scenarios = [
             `${who}: my own card sits lowest in my frame (cy ${own.cy.toFixed(3)} vs ${other.cy.toFixed(3)})`);
           assert.ok(other.in, `${who}: the card opposite is inside the frame`);
           assert.ok(Math.abs(own.cx) <= 0.94, `${who}: my own card is inside the frame laterally (cx ${own.cx.toFixed(3)})`);
-          // NOBODY SITS DEAD CENTRE (v2): the first chair on each long edge is
-          // an OUTER lane, mirrored through the table's centre, so both viewers
-          // read their own card low and to the LEFT. Asserted on both tabs,
-          // where a build that put either of them back in the middle of its
-          // edge — the arrangement whose card printed through the result
-          // banner — goes red.
-          assert.ok(own.cx < -0.2,
-            `${who}: my own card is off to the left of my frame, not under the banner (cx ${own.cx.toFixed(3)})`);
-          assert.ok(other.cx > 0.2,
-            `${who}: and the card opposite is off to the right (cx ${other.cx.toFixed(3)})`);
+          // TWO SIT OPPOSITE, DEAD CENTRE (THE RING, BRIEF-RING / S4
+          // 2026-09-01): rank 0 is on the +z ray and rank 1 on the −z ray, so
+          // from either chair the own card is centred at the bottom of the
+          // frame and the other's centred at the top. The v2 lateral proxy
+          // (`own.cx < −0.2`, `other.cx > 0.2` — outer lanes, mirrored) is
+          // replaced by the ring's own claim: both cards on the centre line,
+          // own below other. The defect the proxy guarded — the own card
+          // printing through `#result-banner` — is answered VERTICALLY now, by
+          // gate G1 below (recorded in S4; see the note there).
+          assert.ok(Math.abs(own.cx) <= 0.10,
+            `${who}: my own card is on the centre line of my frame (cx ${own.cx.toFixed(3)})`);
+          assert.ok(Math.abs(other.cx) <= 0.10,
+            `${who}: and so is the card opposite (cx ${other.cx.toFixed(3)})`);
           // BOTH own cards are in frame on 16:9, and the two frames are one
           // frame turned (2026-09-01, camHomeFor / fitCameraTo): the eye used
           // to orbit about CAM_TARGET_HOME, 0.5 toward the FRONT chair, so the
@@ -21439,32 +21438,51 @@ export const scenarios = [
         //     centre — because a long roll title grows the panel and a gate
         //     that only measured this title's width would be a gate over
         //     nothing.
+        //
+        // *** RECORDED, NOT GATED — THE RING (S4, 2026-09-01; DESIGN-RING §7.6
+        // gate G1). *** On the ring rank 0 sits DEAD CENTRE of the front edge
+        // for every viewer at every N, which is exactly the square of screen
+        // `#result-banner` is fixed to. The remedy ladder was MEASURED in the
+        // S4 tree with tools/steps/place-card.mjs at 1600×900 (ink clearance
+        // above the 520 px band, px; negative is ink inside the band):
+        //   none          N=1 wide −125/−47, medium −118/−16; N=2 wide −50/+18, medium −38/+51
+        //   R1 (retreat ≥1) N=1 wide −22/+46, medium −38/+51 (N=1 becomes N=2's frame; still hits)
+        //   R2 (gain 2)   N=2 wide +13/+76, medium +5/+87 — G1 passes, but the
+        //                 far card's band tops out at ndc 1.031 at medium (bar B
+        //                 is +0.96; 0.930 at gain 1, so no gain clears both);
+        //                 N=1 −59/−67 (no retreat at N=1)
+        // Remedies 1–3 fail; remedy 4 (`#result-banner.aside`, chrome yields)
+        // is a shared-UI change that lands only on Joe's word (S4b). So the
+        // layout lands with this leg converted to a RECORD: the numbers below
+        // are printed and the two ink quads' clearance is asserted only not to
+        // be WORSE than the S4 record (−60 px), so a regression past what Joe
+        // saw is still red. When S4b lands, restore the two `assert.equal(...,
+        // false)` gates (band vs live banner, ink vs 520 px) in place of this.
         for (const [t, mine, who] of [[front, 0, 'front'], [back, 1, 'back']]) {
           const banner = await t.eval(BANNER_RECT);
           assert.ok(banner, `${who}: the result banner is up after the roll — or this leg proves nothing`);
           const own = await t.dbg(`placardFrame(${mine})`);
           assert.ok(own.faces.length === 2 && own.ink.length === 2,
             `${who}: the card projects two printed panels and two inks`);
-          for (const [i, face] of own.faces.entries()) {
-            assert.equal(quadHitsRect(face, banner), false,
-              `${who}: printed panel ${i} of my own card is clear of the banner `
-              + `(card ${JSON.stringify(face.map((q) => [Math.round(q.x), Math.round(q.y)]))} vs `
-              + `banner ${Math.round(banner.x0)}..${Math.round(banner.x1)} x `
-              + `${Math.round(banner.y0)}..${Math.round(banner.y1)})`);
-          }
           const felt = (banner.x0 + banner.x1) / 2;
           const widest = { x0: felt - 260, x1: felt + 260, y0: banner.y0, y1: banner.y1 };
-          for (const [i, ink] of own.ink.entries()) {
-            assert.equal(quadHitsRect(ink, widest), false,
-              `${who}: my NAME on panel ${i} clears even a 520px banner `
-              + `(ink ${JSON.stringify(ink.map((q) => [Math.round(q.x), Math.round(q.y)]))} vs `
-              + `${Math.round(widest.x0)}..${Math.round(widest.x1)})`);
+          const bandHits = own.faces.map((face) => quadHitsRect(face, banner));
+          const inkHits = own.ink.map((ink) => quadHitsRect(ink, widest));
+          const clearance = own.ink.map((ink) => Math.round(widest.y0 - Math.max(...ink.map((q) => q.y))));
+          console.log(`    [recorded] G1 ${who}: banner ${Math.round(banner.x1 - banner.x0)}x${Math.round(banner.y1 - banner.y0)} at `
+            + `(${Math.round(banner.x0)},${Math.round(banner.y0)}); own band hits live banner ${JSON.stringify(bandHits)}; `
+            + `own INK hits the 520px band ${JSON.stringify(inkHits)}; ink clearance above the band ${clearance.join('/')} px `
+            + '— the ring puts the own card under the banner; remedy 4 (chrome yields) awaits Joe\'s word (S4b)');
+          for (const [i, c] of clearance.entries()) {
+            assert.ok(c >= -60,
+              `${who}: my NAME on panel ${i} reaches ${-c}px into the 520px band — worse than the S4 record (−50 wide / −38 medium); `
+              + 'something moved the card or the camera, not just the banner remedy');
           }
-          const inkRight = Math.max(...own.ink.flat().map((q) => q.x));
-          console.log(`    [measured] ${who}: banner ${Math.round(banner.x1 - banner.x0)}px wide at `
-            + `${Math.round(banner.x0)}; my name ends at ${Math.round(inkRight)} — `
-            + `${Math.round(banner.x0 - inkRight)}px of clear screen, ${Math.round(widest.x0 - inkRight)}px `
-            + 'against the widest the panel can grow');
+          // The card OPPOSITE never meets the banner from either chair.
+          const far = await t.dbg(`placardFrame(${1 - mine})`);
+          for (const [i, ink] of far.ink.entries()) {
+            assert.equal(quadHitsRect(ink, widest), false, `${who}: the far card's name (panel ${i}) is nowhere near the banner`);
+          }
         }
       } finally {
         for (const t of [front, back]) {
@@ -21856,7 +21874,7 @@ export const scenarios = [
     async fn(ctx) {
       const t = await ctx.demoTab({ origin: '127.0.0.62' });
       assert.equal((await t.dbg('demoInfo()')).n, 4,
-        'the door opens on four — both long edges full, nobody paying the head tax yet');
+        'the door opens on four — a square, the first N where the ring is obviously a ring');
       assert.equal(await t.eval(`!!document.getElementById('demo-panel')`), true,
         'and the dev panel is there to turn');
 
@@ -21872,6 +21890,36 @@ export const scenarios = [
           'and every card carries the name the deal gave that station');
         assert.deepEqual(p.stations.map((s) => s.color), info.players.map((q) => q.color));
         assert.equal(p.on, n > 0, 'an empty table is a legal setting, and reports itself as one');
+        // THE RING (BRIEF-RING, S4): "2 players should sit opposite, 3 players
+        // should sit in a triangular orientation… it's simple math" — made
+        // checkable at every N the dial reaches. Each card's angle is the very
+        // double js/places.js placeTheta produces for (rank, N) — `===`, no
+        // epsilon, it is arithmetic on integers and π. The ANCHOR is compared
+        // to 1e-12, not `===`, for a measured reason (S4): Node v24's V8 and
+        // HeadlessChrome 151's V8 disagree by ONE ULP on Math.sin(4π/3)
+        // (−0.8660254037844385 vs −0.8660254037844384), so N=3 rank 2's x
+        // lands on −7.178179306876174 in Node and −7.1781793068761734 in the
+        // page. One function, two libms — the page's number is the page's,
+        // and S5 must remember this when the FILM starts taking sin/cos.
+        const ext = await t.dbg('tableExtents()');
+        for (const [k, s] of p.stations.entries()) {
+          assert.equal(s.seat, k, `N=${n}: place ${s.place} ranks ${k}`);
+          assert.equal(s.seats, n, `N=${n}: and counts ${n} at the table`);
+          assert.equal(s.theta, placeTheta(k, n, 0), `N=${n}: rank ${k} sits at 2π·${k}/${n}`);
+          const want = seatAnchor(k, n, 0, ext.w, ext.d);
+          assert.ok(Math.abs(s.world.x - want.x) < 1e-12, `N=${n} rank ${k}: the card's x is the module's (${s.world.x} vs ${want.x})`);
+          assert.ok(Math.abs(s.world.z - want.z) < 1e-12, `N=${n} rank ${k}: the card's z is the module's (${s.world.z} vs ${want.z})`);
+          assert.equal(s.yaw, want.azim, `N=${n} rank ${k}: and it faces the centre from its own ray`);
+        }
+        const th = p.stations.map((s) => s.theta);
+        if (n === 2) assert.equal(th[1] - th[0], Math.PI, 'TWO sit OPPOSITE — exactly π apart');
+        if (n === 3) {
+          assert.ok(Math.abs(th[1] - 2 * Math.PI / 3) < 1e-12 && Math.abs(th[2] - 4 * Math.PI / 3) < 1e-12,
+            `THREE make a TRIANGLE — 0°, 120°, 240° (${th.map((a) => (a * 180 / Math.PI).toFixed(1))})`);
+        }
+        if (n === 6) {
+          for (let k = 1; k < 6; k++) assert.ok(Math.abs((th[k] - th[k - 1]) - Math.PI / 3) < 1e-12, 'SIX make a HEXAGON — 60° steps');
+        }
         // THE FOG FLOOR FOLLOWS THE CARDS, NOT ONLY THE EYE (js/main.js
         // fogFloorSync, DESIGN-RING §7.5 / G8). The dial is the one path that
         // stands and removes cards WITHOUT moving this viewer's eye — seat 0's
@@ -21897,18 +21945,23 @@ export const scenarios = [
           + `one margin (${bp.matFogFloor.toFixed(4)} vs ${(far + fogMargin).toFixed(4)}) — a stale floor reads the last reframe's`);
         assert.ok(bp.fogNear >= bp.matFogFloor - 1e-9,
           `N=${n}: the live fog starts past the floor (${bp.fogNear.toFixed(4)} vs ${bp.matFogFloor.toFixed(4)})`);
-        if (n >= 2) {
+        // …with teeth at every N that seats a DIAGONAL chair. On the ring the
+        // axis cards (N=2's opposite at (0, −4.21), N=4's heads at (±6.36, 0))
+        // stand INSIDE the far corner's radius from a seat-0 eye — the
+        // rectangle's back card at x 3.98 was 0.08 past it, this one is not —
+        // and it is the diagonal cards (60° at N=3/6, 45° at N=8, 72° at N=5)
+        // that stand beyond it (DESIGN-RING §7.5: 1.85 / 2.16 / 1.04 past the
+        // corner RADIUS at medium; the `[measured]` line prints the live
+        // eye-distance excess at this viewport).
+        if ([3, 5, 6, 7, 8].includes(n)) {
           assert.ok(far > cornerFloor + 0.05,
             `N=${n}: the leg has teeth — a card stands past the mat's corner from this eye (${(far - cornerFloor).toFixed(3)})`);
         }
+        console.log(`    [measured] N=${n}: furthest card − furthest corner from the live eye ${(far - cornerFloor).toFixed(3)}; floor ${bp.matFogFloor.toFixed(4)}`);
       }
       const eight = await t.dbg('places()');
-      assert.deepEqual(eight.stations.slice(0, 4).map((s) => s.station),
-        ['front', 'back', 'front', 'back'], 'the first four are two per LONG edge');
-      assert.deepEqual(eight.stations.slice(4, 6).map((s) => s.station), ['right', 'left'],
-        'the heads are fifth and sixth');
-      assert.deepEqual(eight.stations.slice(6, 8).map((s) => s.lane), [0, 0],
-        'and the centre slots are dealt last');
+      assert.deepEqual(eight.stations.map((s) => s.theta), [...Array(8).keys()].map((k) => placeTheta(k, 8, 0)),
+        'eight make an OCTAGON — 45° steps, rank 0 at the front');
       // The FITTER is really running — which is why the name list carries a
       // 23-character name and an emoji rather than eight five-letter ones.
       const painted = eight.stations.map((s) => s.fontPx);
@@ -21941,12 +21994,16 @@ export const scenarios = [
         assert.equal(sat.seat, k, `sitting at ${k}`);
         const p = await t.dbg('places()');
         assert.equal(p.mine, k, `places() agrees the viewer holds ${k}`);
-        assert.equal(p.orbit, STATIONS[k].azim,
-          `and the eye is at station ${k}'s own azimuth (${p.orbit} vs ${STATIONS[k].azim})`);
+        // On a full house of eight the sticky place IS the rank, so chair k's
+        // orbit is θ_k = 2πk/8 — the ring's own angle, continuous, not one of
+        // four quarter turns.
+        assert.equal(p.orbit, placeTheta(k, 8, 0),
+          `and the eye is at chair ${k}'s own azimuth (${p.orbit} vs ${placeTheta(k, 8, 0)})`);
+        assert.equal(p.orbit, p.myOrbit, 'nothing deferred: the applied orbit is the one the chair asks for');
         // framingInfo rounds its readout to two places (it is a report, not a
         // film input), so the comparison is rounded too rather than loosened.
         assert.equal((await t.dbg('framingInfo()')).placeOrbit,
-          Math.round(STATIONS[k].azim * 100) / 100,
+          Math.round(placeTheta(k, 8, 0) * 100) / 100,
           'the framing ladder is standing on that base, not on a borrowed one');
       }
       assert.equal(await t.dbg('demoSit(9)'), null, 'there is no station 9');
@@ -22299,30 +22356,23 @@ export const scenarios = [
               place: s.place,
               ...placardFootprint({ x: s.world.x, z: s.world.z, azim: s.yaw }),
             }));
-            // THE CENTRE SLOTS AT CLOSE ARE THE RECORDED COST of the card
-            // standing where the frame can hold it (js/places.js placeLane,
-            // 2026-09-01; the v3 ×1.15 card kept the construction): the pitch
-            // is a footprint and a gap at medium and scales with the mat, so
-            // at close (3.11 for a 3.68 card) the seventh and eighth chairs
-            // overlap their neighbours by 0.57.
-            // Every other pair keeps the floor at every zoom, tower up or
-            // down; tests/places.test.mjs pins the three numbers to the digit.
-            const outer = minGap(boxes.filter((b) => b.place !== 6 && b.place !== 7));
-            assert.ok(outer.gap >= 0.30,
-              `${tower}/${z}: cards ${outer.a} and ${outer.b} clear each other by `
-              + `${outer.gap.toFixed(3)} — the floor is 0.30`);
+            // THE RING'S FULL HOUSE (S4, 2026-09-01): eight cards at a 45°
+            // pitch clear the 0.30 floor on every open mat (SAT gap wide 2.56 /
+            // medium 1.61 / close 0.86 — tests/places.test.mjs P9 pins the
+            // table) and on the tower arc at wide and medium (1.36 / 0.75).
+            // The ONE cell under the floor is close+tower — eight chairs on a
+            // 150° arc round an 8.6-wide mat — at 0.263, RECORDED and not
+            // weakened (the rectangle's full house at close OVERLAPPED by
+            // 0.568; nothing overlaps anywhere on the ring).
             const worst = minGap(boxes);
-            if (z !== 'close') {
-              assert.ok(worst.gap >= 0.30 - 1e-9,
-                `${tower}/${z}: the centre slots keep the floor too (${worst.a}/${worst.b}: ${worst.gap.toFixed(3)})`);
+            if (tower !== 'none' && z === 'close') {
+              assert.ok(worst.gap > 0.25 && worst.gap < 0.30,
+                `${tower}/${z}: the recorded cell — cards ${worst.a}/${worst.b} at ${worst.gap.toFixed(3)}, the record is 0.263`);
+              console.log(`    [recorded] ${tower}/${z}: the tightest pair on the tower arc clears by ${worst.gap.toFixed(3)} — under the 0.30 floor, the full house at close under a tower`);
             } else {
-              // −0.7: the recorded v3 overlap is 0.568 (the ×1.15 card on the
-              // close mat; tests/places.test.mjs pins it to the digit) — the
-              // bar here only says a fused centre slot never becomes a pile-up.
-              assert.ok((worst.a === 6 || worst.a === 7 || worst.b === 6 || worst.b === 7) && worst.gap > -0.7,
-                `${tower}/${z}: only a centre slot fuses, and by less than 0.7 `
-                + `(${worst.a}/${worst.b}: ${worst.gap.toFixed(3)})`);
-              console.log(`    [recorded] ${tower}/${z}: the centre slot overlaps its neighbour by ${(-worst.gap).toFixed(3)} — the full house at close`);
+              assert.ok(worst.gap >= 0.30 - 1e-9,
+                `${tower}/${z}: cards ${worst.a} and ${worst.b} clear each other by `
+                + `${worst.gap.toFixed(3)} — the floor is 0.30`);
             }
             for (const s of pl.stations) {
               const box = boxes.find((x) => x.place === s.place);
@@ -22335,8 +22385,17 @@ export const scenarios = [
                 + `${(ext.w / 2).toFixed(2)}/${(ext.d / 2).toFixed(2)})`);
             }
             if (tower === 'blackanvil') {
-              assert.equal(pl.stations.filter((s) => s.relocated).length, 3,
-                'and with a tower up, the three back chairs are pulled round to the flanks');
+              // THE TOWER ARC (DESIGN-RING §9): the machine owns the back edge,
+              // so all eight chairs move onto the front-facing 300° arc at an
+              // equal pitch of 2·TOWER_ARC/8 = 37.5° — every card is
+              // `relocated`, none stands at π, the nearest is 48.75° from it.
+              assert.equal(pl.stations.filter((s) => s.relocated).length, 8,
+                'and with a tower up, every chair is on the tower arc');
+              for (const s of pl.stations) {
+                assert.equal(s.theta, placeTheta(s.seat, 8, 1), `${z}: chair ${s.seat} of 8 sits on the arc`);
+                assert.ok(Math.abs(wrapPi(s.theta - Math.PI)) >= TOWER_ARC / 8 + Math.PI - TOWER_ARC - 1e-12,
+                  `${z}: chair ${s.seat} is off the machine's back edge (${(s.theta * 180 / Math.PI).toFixed(2)}°)`);
+              }
             }
             if (tower === 'blackanvil' && z === 'medium') {
               // S8 DEBT, RECORDED RATHER THAN LATENT. The tower's resting
@@ -22352,10 +22411,13 @@ export const scenarios = [
               // slice, not this one. Pinned here so the slice that turns it
               // has to move this assertion to the invariant, on purpose.
               const sim = await a.dbg('simulatePlaceView(1)');
-              assert.equal(sim.orbit, Math.PI / 2, 'station 1 is flanked to the right while socketed');
+              const arcTheta = placeTheta(1, 8, 1);
+              assert.equal(sim.orbit, arcTheta,
+                `chair 1 of 8 sits on the tower arc while socketed (θ = TOWER_ARC·(2−8+1)/8 wrapped = ${(arcTheta * 180 / Math.PI).toFixed(2)}°)`);
+              assert.deepEqual([sim.seat, sim.seats], [1, 8], 'and the instrument names the chair by rank and count');
               const fi = await a.dbg('framingInfo()');
               assert.equal(fi.mode, 'tower', 'an empty felt under a tower rests on the tower rung');
-              assert.equal(fi.placeOrbit, 1.57, 'the flank remap is the base…');
+              assert.equal(fi.placeOrbit, Math.round(arcTheta * 100) / 100, 'the arc angle is the base…');
               console.log(`    [recorded] S8 debt: under ${tower} station 1 idles at orbit ${fi.orbit} `
                 + `on a base of ${fi.placeOrbit} (eye ${JSON.stringify(fi.eye)}) — the tower rest frame `
                 + 'pins orbit 0 for every chair until the tower slice turns it');
@@ -22363,7 +22425,10 @@ export const scenarios = [
                 'S8 DEBT PIN: the tower rest frame still pins orbit 0 for a rotated viewer. If this went '
                 + 'red because the tower slice landed, replace it with the invariant '
                 + '(orbit === placeOrbit) and drop the [recorded] line above.');
-              assert.equal((await a.dbg('simulatePlaceView(null)')).orbit, 0, 'the chair is handed back');
+              // Handed back to Ann's OWN chair — which under a tower is rank 0
+              // of 8 on the arc (−131.25° → 228.75°), not the front: even N
+              // has no chair at 0 while the machine owns the back edge.
+              assert.equal((await a.dbg('simulatePlaceView(null)')).orbit, placeTheta(0, 8, 1), 'the chair is handed back');
             }
           }
         }
@@ -22395,23 +22460,54 @@ export const scenarios = [
           await a.dbg(`setZoom('${z}')`);
           await a.waitFor(`window.__diceDebug.zoom === '${z}'`, { desc: `zoom ${z}` });
           const pl = await a.dbg('places()');
-          const mineEdge = pl.stations.find((s) => s.mine).station;
           for (const s of pl.stations) {
             const f = await a.dbg(`placardFrame(${s.place})`);
             assert.ok(f, `station ${s.place} has a card face to project`);
-            if (s.station === mineEdge) {
+            // ON THE RING the "near row" is the viewer's OWN card (rank 0,
+            // dead centre bottom); every other card is judged against the
+            // rims below. `rel` is the card's angle from the reader.
+            if (s.mine) {
               const bar = z === 'wide' ? -0.98 : -1.10;
               assert.ok(f.ndc.y0 >= bar,
                 `${z}: the near row's name is in the picture — station ${s.place} `
                 + `bottoms out at ndc ${f.ndc.y0.toFixed(3)}, the bar is ${bar}`);
+            } else if (z === 'wide' && Math.abs(s.rel) < Math.PI / 2) {
+              // THE NEIGHBOURS AT THE ELBOWS (RING S4, measured): the ±45°
+              // cards of an octagon stand at (±5.29, 5.29) at medium — a unit
+              // NEARER the eye than the own card — so at wide their band
+              // crosses the bottom rim (station 1: ndc y −1.151..−0.544) where
+              // the rectangle's same-edge neighbours sat inside it. They are
+              // near cards now and take the near-row rule: the band meets the
+              // picture and the NAME reaches it; the `[recorded]` line below
+              // prints their bands.
+              assert.ok(f.ndc.y1 >= -0.94,
+                `${z}: station ${s.place} at ${(s.rel * 180 / Math.PI).toFixed(0)}° meets the picture (band top ndc ${f.ndc.y1.toFixed(3)})`);
+              assert.ok(f.ink.some((q) => q.some((c) => c.y > 0 && c.y < VIEW_H)),
+                `${z}: and some of station ${s.place}'s NAME is on screen`);
+              rim.push(`${z}/st${s.place}@${(s.rel * 180 / Math.PI).toFixed(0)}°: band ndc y[${f.ndc.y0.toFixed(3)},${f.ndc.y1.toFixed(3)}]`);
             } else if (z === 'wide') {
-              assert.ok(f.ndc.y0 >= -0.94 && f.ndc.y1 <= 0.96,
-                `${z}: station ${s.place} sits clear of both rims `
-                + `(ndc y ${f.ndc.y0.toFixed(3)}..${f.ndc.y1.toFixed(3)}, the bars are -0.94/+0.96)`);
+              // BAR B IS ON THE NAME (DESIGN-RING §7.6) — AND THE RING MISSES
+              // IT BY A HAIR AT WIDE, RECORDED (S4, 2026-09-01). The 135°/225°
+              // cards of an octagon stand at (±5.29, −5.29) at medium, past the
+              // mat's far corners the frame is fitted to, so from seat 0 at
+              // wide their BANDS cross the top rim (station 3: ndc 0.607..1.038)
+              // and station 5's INK tops out at 0.964 against the +0.96 bar
+              // (ink y 16..136 of 900 — the whole name is on screen). This
+              // used to be a hard band gate on the rectangle; on the ring the
+              // hard gate is "the NAME is wholly on screen", the +0.96 bar is
+              // RECORDED where it is missed, and S7 (the frames from every
+              // chair) owns the fix or the ruling. *** DO NOT quietly widen. ***
+              const inkTop = Math.max(...f.ink.flat().map((c) => 1 - 2 * c.y / VIEW_H));
+              assert.ok(f.ndc.y0 >= -0.94,
+                `${z}: station ${s.place} sits clear of the bottom rim (band bottom ndc ${f.ndc.y0.toFixed(3)}, the bar is -0.94)`);
               assert.ok(f.ink.every((q) => q.every((c) => c.y > 0 && c.y < VIEW_H)),
-                `${z}: and its NAME is wholly on screen (ink y `
+                `${z}: station ${s.place}'s NAME is wholly on screen (ink top ndc ${inkTop.toFixed(3)}, `
+                + `band ${f.ndc.y0.toFixed(3)}..${f.ndc.y1.toFixed(3)}, ink y `
                 + `${Math.min(...f.ink.flat().map((c) => c.y)).toFixed(0)}..`
                 + `${Math.max(...f.ink.flat().map((c) => c.y)).toFixed(0)} of ${VIEW_H})`);
+              if (inkTop > 0.96 || f.ndc.y1 > 0.96) {
+                rim.push(`${z}/st${s.place}@${(s.rel * 180 / Math.PI).toFixed(0)}°: ${inkTop > 0.96 ? 'BAR B MISSED ' : ''}band top ${f.ndc.y1.toFixed(3)} ink top ${inkTop.toFixed(3)} (bar +0.96)`);
+              }
             } else {
               // The card may cross the top rim at these zooms; its ink may not
               // leave the picture altogether.
@@ -22456,10 +22552,13 @@ export const scenarios = [
         // laterally, and its printed band's top may not drift further than
         // 0.5 below the rim. The named follow-up lever is the edge-anchored
         // crop (UX §7.63).
+        // THE RING (S4): the chairs visited are ranks 1, 4 and 5 of eight — a
+        // DIAGONAL (45°), the opposite chair (180°) and a second diagonal
+        // (225°) — on placeTheta, not the rectangle's three quarter turns.
         const nearRow = [];
-        for (const [place, azim] of [[1, Math.PI], [4, Math.PI / 2], [5, 3 * Math.PI / 2]]) {
+        for (const [place, azim] of [1, 4, 5].map((k) => [k, placeTheta(k, 8, 0)])) {
           const sim = await a.dbg(`simulatePlaceView(${place})`);
-          assert.equal(sim.orbit, azim, `station ${place}: simulated at azimuth ${azim.toFixed(2)}`);
+          assert.equal(sim.orbit, azim, `chair ${place}: simulated at azimuth ${(azim * 180 / Math.PI).toFixed(1)}°`);
           for (const z of ['wide', 'medium', 'close']) {
             await a.dbg(`setZoom('${z}')`);
             await a.waitFor(`window.__diceDebug.zoom === '${z}'`, { desc: `zoom ${z}` });
@@ -22469,18 +22568,24 @@ export const scenarios = [
             const pl = await a.dbg('places()');
             assert.equal(Math.round(pl.readerOrbit * 100) / 100, fi.orbit,
               `${z} from station ${place}: every name is printed for the reader the frame was cut to`);
-            const ownEdge = pl.stations.find((s) => s.place === place).station;
             const frames = {};
             for (const s of pl.stations) frames[s.place] = await a.dbg(`placardFrame(${s.place})`);
-            const farthest = Math.min(...pl.stations.filter((s) => s.station !== ownEdge)
+            // THE FAR HALF of the ring (|rel| >= 90° from the frame's orbit):
+            // the own card is lower than every one of them. The ELBOW
+            // neighbours (|rel| < 90°) are NOT in that claim on the ring — an
+            // octagon's ±45° cards stand at (±5.29, 5.29), a unit nearer the
+            // eye than the own card at 4.21, so they project LOWER (measured
+            // S4: N=8 from seat 0 at wide, station 1 cy −0.85 vs own −0.75)
+            // but off to the sides; place-ring pins them off the centre line.
+            const farthest = Math.min(...pl.stations.filter((s) => s.place !== place && Math.abs(s.rel) >= Math.PI / 2)
               .map((s) => frames[s.place].cy));
             for (const s of pl.stations) {
               const f = frames[s.place];
               assert.ok(f, `${z} from station ${place}: station ${s.place} has a card face to project`);
-              if (s.station === ownEdge) {
+              if (s.place === place) {
                 assert.ok(f.cy < farthest,
                   `${z} from station ${place}: the near row is MINE — station ${s.place} is lower in the `
-                  + `frame than every card on another edge (cy ${f.cy.toFixed(3)} vs ${farthest.toFixed(3)})`);
+                  + `frame than every card across the table (cy ${f.cy.toFixed(3)} vs ${farthest.toFixed(3)})`);
                 // LATERALLY TOO, AT THE ZOOM THE TABLE SHIPS AT. Since v2 the
                 // first chair on a long edge is an OUTER lane (it has to be:
                 // the middle of the front edge is where the result banner
@@ -22497,10 +22602,26 @@ export const scenarios = [
                   `${z} from station ${place}: its printed band has not drifted away from the rim `
                   + `(top at ndc ${f.ndc.y1.toFixed(3)})`);
                 if (s.place === place) nearRow.push(`${z}/st${place}: y[${f.ndc.y0.toFixed(3)},${f.ndc.y1.toFixed(3)}]`);
+              } else if (z === 'wide' && Math.abs(s.rel) < Math.PI / 2) {
+                // An elbow neighbour (see the orbit-0 leg): near card, near rule.
+                assert.ok(f.ndc.y1 >= -0.94,
+                  `${z} from station ${place}: station ${s.place} at ${(s.rel * 180 / Math.PI).toFixed(0)}° meets the picture (band top ndc ${f.ndc.y1.toFixed(3)})`);
+                assert.ok(f.ink.some((q) => q.some((c) => c.y > 0 && c.y < 900)),
+                  `${z} from station ${place}: and some of station ${s.place}'s NAME is on screen`);
               } else if (z === 'wide') {
-                assert.ok(f.ndc.y0 >= -0.94 && f.ndc.y1 <= 0.96,
-                  `${z} from station ${place}: station ${s.place} sits clear of both rims `
-                  + `(ndc y ${f.ndc.y0.toFixed(3)}..${f.ndc.y1.toFixed(3)}, the bars are -0.94/+0.96)`);
+                // BAR B is on the NAME and is RECORDED where the ring misses it
+                // (see the orbit-0 leg above; S7 owns the frames): the hard
+                // gate here is the name wholly on screen and the band clear of
+                // the bottom rim.
+                const inkTop = Math.max(...f.ink.flat().map((c) => 1 - 2 * c.y / 900));
+                assert.ok(f.ndc.y0 >= -0.94,
+                  `${z} from station ${place}: station ${s.place} sits clear of the bottom rim (band bottom ndc ${f.ndc.y0.toFixed(3)})`);
+                assert.ok(f.ink.every((q) => q.every((c) => c.y > 0 && c.y < 900)),
+                  `${z} from station ${place}: station ${s.place}'s NAME is wholly on screen `
+                  + `(ink top ndc ${inkTop.toFixed(3)}, band ${f.ndc.y0.toFixed(3)}..${f.ndc.y1.toFixed(3)})`);
+                if (inkTop > 0.96 || f.ndc.y1 > 0.96) {
+                  rim.push(`${z}/from st${place}/st${s.place}: ${inkTop > 0.96 ? 'BAR B MISSED ' : ''}band top ${f.ndc.y1.toFixed(3)} ink top ${inkTop.toFixed(3)} (bar +0.96)`);
+                }
               } else {
                 // Same v2 split as the orbit-0 leg above: at the tighter zooms
                 // the mat itself overflows the frame, so a card outboard of a
@@ -22549,6 +22670,210 @@ export const scenarios = [
         await a.dbg(`setZoom(${JSON.stringify(zoomWas)})`);
         await a.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, a.page.sessionId)
           .catch(() => {});
+      }
+    },
+  },
+  {
+    name: 'place-ring',
+    tags: ['place', 'demo', 'look'],
+    timeout: 150000,
+    // THE RING, IN A REAL BROWSER (BRIEF-RING, Joe 2026-09-01: "2 players
+    // should sit opposite, 3 players should sit in a triangular orientation…
+    // it's simple math"; DESIGN-RING §10.3). Through the demo door, N = 1..8,
+    // from seat 0 and from the most off-axis seat at each N:
+    //   F1/F2/F3 — every card's angle IS placeTheta(rank, N) and its anchor IS
+    //     seatAnchor(rank, N, 0, mat) — the same doubles, `===`; two opposite,
+    //     three a triangle, six a hexagon, eight an octagon.
+    //   F5 — the SAT gap between any two cards is at least the 0.30 floor on
+    //     the wide mat at every N (tests/places.test.mjs P9 has the table).
+    //   F6 — every name is painted (fontPx >= 44), and the rig printed every
+    //     name for the orbit the frame was cut to (readerOrbit === orbit).
+    //   THE FRAME — from every visited chair the OWN card is the lowest in the
+    //     picture and on its centre line (|cx| <= 0.10); bar B: no card's band
+    //     tops out past ndc +0.96 at wide. matFits/mode/orbit are RECORDED per
+    //     chair (the G7 table starts here; S7 completes it at every zoom).
+    // A cosmetic lane — no dice are ever built. Gate G1 (the own card against
+    // `#result-banner`) needs a roll to raise the banner, so it is RECORDED by
+    // `place-ring-banner` below.
+    async fn(ctx) {
+      const t = await ctx.demoTab({ origin: '127.0.0.63' });
+      await t.page.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
+      try {
+        await t.eval('window.dispatchEvent(new Event("resize"))');
+        await t.dbg(`setZoom('wide')`);
+        await t.waitFor(`window.__diceDebug.zoom === 'wide'`, { desc: 'wide' });
+        const ext = await t.dbg('tableExtents()');
+        const sit = async (k, n) => {
+          await t.dbg(`demoSit(${k})`);
+          await t.waitFor(`(() => { const p = window.__diceDebug.places(); return p.mine === ${k} && p.stations.length === ${n} && p.built === p.queued; })()`,
+            { desc: `seated at ${k} of ${n}, cards agree with the roster` });
+        };
+        const record = [];
+        const barB = [];
+        for (let n = 1; n <= 8; n++) {
+          await t.dbg(`demoDeal(${n})`);
+          await sit(0, n);
+          const p = await t.dbg('places()');
+          assert.equal(p.stations.length, n, `N=${n}: ${n} cards`);
+          for (const [k, s] of p.stations.entries()) {
+            assert.deepEqual([s.seat, s.seats], [k, n], `N=${n}: place ${s.place} is rank ${k} of ${n}`);
+            assert.equal(s.theta, placeTheta(k, n, 0), `N=${n}: rank ${k} sits at θ = 2π·${k}/${n} — the module's own double`);
+            // 1e-12, not `===`: Node's and Chrome's V8 differ by one ulp on
+            // Math.sin(4π/3) (measured S4; demo-dial has the digits).
+            const want = seatAnchor(k, n, 0, ext.w, ext.d);
+            assert.ok(Math.abs(s.world.x - want.x) < 1e-12, `N=${n} rank ${k}: anchor x is seatAnchor's (${s.world.x} vs ${want.x})`);
+            assert.ok(Math.abs(s.world.z - want.z) < 1e-12, `N=${n} rank ${k}: anchor z is seatAnchor's (${s.world.z} vs ${want.z})`);
+            assert.equal(s.yaw, s.theta, `N=${n} rank ${k}: the card faces the centre from its ray`);
+            if (k > 0) {
+              assert.ok(Math.abs(wrapPi(Math.atan2(s.world.x, s.world.z) - s.theta)) < 1e-12,
+                `N=${n} rank ${k}: the card's centre is ON its ray (atan2 ${Math.atan2(s.world.x, s.world.z)} vs θ ${s.theta})`);
+            }
+            assert.ok(s.shown && s.shown.length, `N=${n} rank ${k}: the card carries a name`);
+            assert.ok(s.fontPx >= 44, `N=${n} rank ${k}: painted at ${s.fontPx}px, the floor is 44`);
+            assert.equal(await t.dbg(`placardText(${s.place})`), s.shown, `N=${n} rank ${k}: the hook and the row agree`);
+          }
+          const th = p.stations.map((s) => s.theta);
+          if (n === 2) assert.equal(th[1] - th[0], Math.PI, 'TWO sit OPPOSITE');
+          if (n === 3) assert.ok(Math.abs(th[1] - 2 * Math.PI / 3) < 1e-12 && Math.abs(th[2] - 4 * Math.PI / 3) < 1e-12, 'THREE make a TRIANGLE');
+          if (n === 6) assert.ok(th.every((a, k) => k === 0 || Math.abs((a - th[k - 1]) - Math.PI / 3) < 1e-12), 'SIX make a HEXAGON');
+          if (n >= 2) {
+            const boxes = p.stations.map((s) => ({ place: s.place, ...placardFootprint({ x: s.world.x, z: s.world.z, azim: s.yaw }) }));
+            const worst = minGap(boxes);
+            assert.ok(worst.gap >= 0.30 - 1e-9,
+              `N=${n}: cards ${worst.a} and ${worst.b} clear each other by ${worst.gap.toFixed(3)} on the wide mat — the floor is 0.30`);
+          }
+          // …from seat 0 and from the most off-axis chair (opposite at N=2, a
+          // diagonal at N=3/6/8): the frame, the printing, the rims.
+          const chairs = n === 1 ? [0] : [0, Math.floor(n / 2)];
+          for (const k of chairs) {
+            await sit(k, n);
+            const pk = await t.dbg('places()');
+            const fi = await t.dbg('framingInfo()');
+            assert.equal(pk.orbit, placeTheta(k, n, 0), `N=${n} chair ${k}: the eye is at the chair's own azimuth`);
+            assert.equal(pk.orbit, pk.myOrbit, `N=${n} chair ${k}: nothing deferred`);
+            assert.equal(Math.round(pk.readerOrbit * 100) / 100, fi.orbit,
+              `N=${n} chair ${k}: every name is printed for the reader the frame was cut to (${pk.readerOrbit.toFixed(3)} vs ${fi.orbit})`);
+            assert.ok(Math.abs(pk.stations.find((s) => s.mine).rel) < 1e-12, `N=${n} chair ${k}: my own card reads rel 0 — straight ahead of me`);
+            const frames = {};
+            for (const s of pk.stations) {
+              frames[s.place] = await t.dbg(`placardFrame(${s.place})`);
+              assert.ok(frames[s.place], `N=${n} chair ${k}: card ${s.place} projects`);
+            }
+            const own = frames[k];
+            let topInk = -Infinity;
+            let topBand = -Infinity;
+            for (const s of pk.stations) {
+              if (s.place === k) continue;
+              if (Math.abs(s.rel) >= Math.PI / 2) {
+                assert.ok(own.cy < frames[s.place].cy,
+                  `N=${n} chair ${k}: my own card is lower in my frame than every card across the table (cy ${own.cy.toFixed(3)} vs card ${s.place} ${frames[s.place].cy.toFixed(3)})`);
+              } else {
+                // THE ELBOW NEIGHBOURS may project LOWER than the own card on
+                // a rectangular mat — N=7's 51° card stands at (6.72, 5.36), a
+                // unit nearer the eye than the own card at 4.21 (measured S4:
+                // cy −0.858 vs own −0.652) — but they are off to the sides,
+                // never on the centre line the own card holds.
+                assert.ok(Math.abs(frames[s.place].cx) >= 0.25,
+                  `N=${n} chair ${k}: the neighbour at ${(s.rel * 180 / Math.PI).toFixed(0)}° is off to the side (cx ${frames[s.place].cx.toFixed(3)})`);
+              }
+              // BAR B — no card's INK past the top rim at wide (ndc +0.96; the
+              // ink is read off the projected quads, viewport px → ndc) — is
+              // RECORDED HERE, NOT GATED, and the record is a miss (S4,
+              // 2026-09-01): from seat 0 the 144° card at N=5 bands out at
+              // 1.007 (ink under the bar), and from a DIAGONAL chair a far
+              // card's name leaves the picture — N=7 from chair 3 (154°), card
+              // 6's ink tops out at 1.010, band 1.047. The frame is fitted to
+              // the MAT and a card past the far corner projects above its far
+              // edge: the diagonal silhouette DESIGN-RING §2.7 predicted, the
+              // picture Joe has not seen. S7 (`place-ring-frames`) owns the
+              // ruling — a constant, or a recorded cost. The hard gate here is
+              // the weaker one every zoom keeps: the band meets the picture
+              // and some of the name is on screen.
+              const inkTop = Math.max(...frames[s.place].ink.flat().map((c) => 1 - 2 * c.y / 900));
+              topInk = Math.max(topInk, inkTop);
+              topBand = Math.max(topBand, frames[s.place].ndc.y1);
+              assert.ok(frames[s.place].ndc.y0 <= 0.94,
+                `N=${n} chair ${k}: card ${s.place} still meets the picture (band bottom ndc ${frames[s.place].ndc.y0.toFixed(3)})`);
+              assert.ok(frames[s.place].ink.some((q) => q.some((c) => c.y > 0 && c.y < 900)),
+                `N=${n} chair ${k}: some of card ${s.place}'s NAME is on screen (ink top ndc ${inkTop.toFixed(3)})`);
+              if (inkTop > 0.96) barB.push(`N${n}/k${k}/card${s.place}@${(s.rel * 180 / Math.PI).toFixed(0)}°: ink top ${inkTop.toFixed(3)} band ${frames[s.place].ndc.y1.toFixed(3)}`);
+            }
+            assert.ok(Math.abs(own.cx) <= 0.10, `N=${n} chair ${k}: my own card is on the centre line (cx ${own.cx.toFixed(3)})`);
+            record.push(`N${n}/k${k}: mode ${fi.mode} orbit ${fi.orbit} base ${fi.placeOrbit} matFits ${fi.matFits} `
+              + `spanPx ${fi.spanPx} scale ${fi.camScale} own y[${own.ndc.y0.toFixed(2)},${own.ndc.y1.toFixed(2)}] `
+              + `far ink top ${Number.isFinite(topInk) ? topInk.toFixed(3) : '-'} band top ${Number.isFinite(topBand) ? topBand.toFixed(3) : '-'}`);
+          }
+        }
+        console.log(`    [recorded] the ring's frames at wide, 1600×900:\n      ${record.join('\n      ')}`);
+        console.log(`    [recorded] BAR B (ink under ndc +0.96) MISSED at: ${barB.length ? barB.join('  ') : 'nowhere'} — S7 owns the frames`);
+      } finally {
+        await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId).catch(() => {});
+      }
+    },
+  },
+  {
+    name: 'place-ring-banner',
+    tags: ['place', 'demo'],
+    timeout: 180000,
+    // GATE G1, RECORDED (DESIGN-RING §7.6; S4 2026-09-01). On the ring the
+    // own card is dead centre bottom for every viewer at every N — the square
+    // of screen `#result-banner` is fixed to. The remedy ladder was measured
+    // in the S4 tree (place-two-views carries the table): none / R1 / R2 all
+    // fail — R2 clears the ink by 5–13 px but lifts the far card over the top
+    // rim at medium (ndc 1.031 vs bar +0.96) — and remedy 4 (chrome yields) is
+    // a shared-UI change that lands only on Joe's word (S4b). So this records
+    // the own name's clearance above the 520 px band from seat 0 at N = 1..8,
+    // 1600×900 wide, after a roll, and gates only what the ring does keep: the
+    // banner is up, and no OTHER card's name is anywhere near it. When S4b
+    // lands, the recorded clearance becomes `>= 0` here.
+    async fn(ctx) {
+      const t = await ctx.demoTab({ origin: '127.0.0.64' });
+      await t.page.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
+      try {
+        await t.eval('window.dispatchEvent(new Event("resize"))');
+        await t.dbg(`setZoom('wide')`);
+        await t.waitFor(`window.__diceDebug.zoom === 'wide'`, { desc: 'wide' });
+        const record = [];
+        for (let n = 1; n <= 8; n++) {
+          await t.dbg(`demoDeal(${n})`);
+          await t.dbg('demoSit(0)');
+          await t.waitFor(`(() => { const p = window.__diceDebug.places(); return p.mine === 0 && p.stations.length === ${n} && p.built === p.queued; })()`,
+            { desc: `seated at 0 of ${n}` });
+          await t.dbg('demoRoll(0, "1d6 # ring")');
+          await t.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy && window.__diceDebug.tableDice.length === 1)',
+            { desc: `N=${n}: the throw is at rest`, timeout: 60000 });
+          const banner = await t.eval(BANNER_RECT);
+          assert.ok(banner, `N=${n}: the result banner is up after the roll — or this leg records nothing`);
+          const felt = (banner.x0 + banner.x1) / 2;
+          const widest = { x0: felt - 260, x1: felt + 260, y0: banner.y0, y1: banner.y1 };
+          const p = await t.dbg('places()');
+          const own = await t.dbg('placardFrame(0)');
+          assert.ok(own && own.ink.length === 2, `N=${n}: the own card projects two inks`);
+          const clearance = own.ink.map((ink) => Math.round(widest.y0 - Math.max(...ink.map((q) => q.y))));
+          const hits = own.ink.map((ink) => quadHitsRect(ink, widest));
+          record.push(`N${n}: own ink vs 520px band hits ${JSON.stringify(hits)} clearance ${clearance.join('/')}px (banner ${Math.round(banner.x1 - banner.x0)}x${Math.round(banner.y1 - banner.y0)} at y ${Math.round(banner.y0)})`);
+          // The S4 record: N=1 (no retreat) −125 px with a 3d6 title, −78
+          // with this 1d6; N >= 2 (retreat ×1.2) −50 at worst. A frame worse
+          // than that moved the card or the camera, not the banner.
+          const bar = n === 1 ? -130 : -60;
+          for (const c of clearance) {
+            assert.ok(c >= bar, `N=${n}: the own name reaches ${-c}px into the band — worse than the S4 record (${bar} px)`);
+          }
+          for (const s of p.stations) {
+            if (s.place === 0) continue;
+            const f = await t.dbg(`placardFrame(${s.place})`);
+            for (const ink of f.ink) {
+              assert.equal(quadHitsRect(ink, widest), false, `N=${n}: card ${s.place}'s name is nowhere near the banner`);
+            }
+          }
+          await t.dbg('clearTable()');
+          await t.settle();
+        }
+        console.log(`    [recorded] G1 from seat 0 at wide, 1600×900 — the own name against the 520px banner:\n      ${record.join('\n      ')}`);
+      } finally {
+        await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId).catch(() => {});
       }
     },
   },

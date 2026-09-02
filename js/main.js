@@ -31,7 +31,7 @@ import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
 // file reads the stamps back (the rollspec.js precedent). The film half only:
 // laneSpread (the lane yields to the pool), aimFor (a translated aim box),
 // and AIM_ZERO (the shared frozen zero every unstamped roll aims through).
-import { laneSpread, aimFor, regionFor, AIM_ZERO, placeAnchor, STATIONS,
+import { laneSpread, aimFor, regionFor, AIM_ZERO, seatAnchor, wrapPi,
   entryFor, seatTrig } from './places.js';
 // THE DEMO DOOR (js/demo.js — read its header for the law): a dev instrument
 // for looking at a full table in ONE TAB. Solo-only, param-only, and every
@@ -16695,30 +16695,39 @@ window.__diceDebug = {
   // cards would wear ('table', the grounded kit; the venue kits arrive with the
   // venue dress slice). `world` comes from js/places.js against the mat AS THE
   // WALLS CURRENTLY STAND — this zoom, this tower — so it already carries the
-  // tower's flank relocation. `shown` is the string actually painted on the
+  // tower's arc. `shown` is the string actually painted on the
   // card and `fontPx` the size it was fitted at (>= 44 by law); `yaw` is the
-  // card's own world rotation about Y, which is its STATION's azimuth — the
-  // object never turns (a head card yawed to face another edge stands inside
-  // its wall). What turns toward the reader is the PRINTING: `readerOrbit` is
+  // card's own world rotation about Y, which is its SEAT's azimuth θ — the
+  // object never turns (a card yawed to face the reader stands inside its
+  // wall). What turns toward the reader is the PRINTING: `readerOrbit` is
   // the azimuth the rig last turned every name for, which is the orbit the
-  // frame was cut to. `myOrbit` is the azimuth this viewer's station ASKS for
+  // frame was cut to. `myOrbit` is the azimuth this viewer's seat ASKS for
   // and `orbit` the placeOrbit actually applied; they differ only while the
   // cut is deferred behind a roll (the tryFlushRoomChanges rule).
   // `queued` counts the roster events that have asked for a restanding and
   // `built` the one the standing arrangement was made from; equal means the
   // cards agree with the roster.
+  //
+  // THE RING (S4, 2026-09-01): each station carries its `seat` (rank k among
+  // the occupied places, ascending sticky `place`), `seats` (N), `theta`
+  // (= yaw, the double placeTheta produced) and `rel` — θ relative to the
+  // reader's orbit, wrapped into [-π, π), so a scenario can group cards by
+  // angle (nearest, opposite, at the elbow) without re-deriving one. The
+  // rectangle-era `station` (edge name) and `lane` fields are gone: a ring has
+  // no rows.
   places() {
-    const towerUp = towerOn();
     const rows = placeRows();
     const mineRow = rows.find((r) => r.mine) || null;
     const mine = mineRow ? mineRow.place : null;
+    const readerOrbit = placardRig ? placardRig.readerOrbit() : 0;
     const stations = rows.map((r) => {
-      const st = STATIONS[r.place];
       const painted = placardRig ? placardRig.rowAt(r.place) : null;
       return {
         place: r.place,
-        station: st.edge,
-        lane: st.lane,
+        seat: r.seat,
+        seats: r.seats,
+        theta: r.theta,
+        rel: wrapPi(r.anchor.azim - readerOrbit),
         playerId: r.playerId,
         name: r.name,
         shown: painted ? painted.shown : null,
@@ -16731,12 +16740,11 @@ window.__diceDebug = {
         mine: r.mine,
       };
     });
-    const myAnchor = mine === null ? null : placeAnchor(mine, TABLE_W, TABLE_D, towerUp);
     return {
       on: stations.length > 0,
       layout: stations.length ? 'table' : 'none',
       mine,
-      myOrbit: myAnchor ? myAnchor.azim : 0,
+      myOrbit: mineRow ? mineRow.anchor.azim : 0,
       orbit: placeOrbit,
       readerOrbit: placardRig ? placardRig.readerOrbit() : 0,
       queued: placardQueued,
@@ -16903,13 +16911,21 @@ window.__diceDebug = {
   },
   // LOOK AT THE TABLE FROM SOMEBODY ELSE'S CHAIR, without being them. Render
   // only, and STRICTLY an instrument: it sets THIS tab's `placeOrbit` to
-  // station n's azimuth and runs the SHIPPED framing ladder, the lamp and the
-  // printing from there — the exact frame a viewer seated at n gets — and
-  // hands the real orbit back on `simulatePlaceView(null)`. No roster write,
-  // no place, nothing another client could see, and nothing any film reads.
-  // It is the look pass's only route to the six- and eight-place pictures,
-  // since three concurrent tabs is the harness ceiling. (For an angle nobody
-  // is sitting at, simulateOrbit below.)
+  // the azimuth of the chair holding place n and runs the SHIPPED framing
+  // ladder, the lamp and the printing from there — the exact frame a viewer
+  // seated there gets — and hands the real orbit back on
+  // `simulatePlaceView(null)`. No roster write, no place, nothing another
+  // client could see, and nothing any film reads. It is the look pass's only
+  // route to the six- and eight-place pictures, since three concurrent tabs
+  // is the harness ceiling. (For an angle nobody is sitting at, simulateOrbit
+  // below.)
+  //
+  // ON THE RING `n` is the sticky PLACE and the lookup is LIVE (placeRows):
+  // the chair's azimuth is a function of its rank among the occupied places
+  // and their count, so an unoccupied place has no azimuth — null, where the
+  // rectangle's table answered for every station. (On a table dealt through
+  // the ladder, places 0..N−1, place and rank coincide.) The answer carries
+  // `seat`/`seats` so the reader can tell which chair of how many it is.
   //
   // It is the one writer of placeOrbit besides the places flush, and the
   // flush knows it: a roster change that lands mid-simulation updates the
@@ -16923,12 +16939,13 @@ window.__diceDebug = {
       }
       return { place: null, orbit: placeOrbit };
     }
-    const a = placeAnchor(n, TABLE_W, TABLE_D, towerOn());
-    if (!a) return null;
+    const row = placeRows().find((r) => r.place === n);
+    if (!row) return null;
+    const a = row.anchor;
     if (!simulatedPlaceView) simulatedPlaceView = { orbit: placeOrbit };
     placeOrbit = a.azim;
     placeOrbitApply();
-    return { place: n, orbit: a.azim, world: { x: a.x, y: a.y, z: a.z } };
+    return { place: n, seat: row.seat, seats: row.seats, orbit: a.azim, world: { x: a.x, y: a.y, z: a.z } };
   },
   // LOOK AT THE TABLE FROM AN ANGLE, without anybody sitting there. The same
   // instrument as simulatePlaceView with the roster taken out of it: parks
@@ -25419,17 +25436,39 @@ function placeMineId() {
   return net ? net.playerId : null;
 }
 
+// THE RING (BRIEF-RING, DESIGN-RING §8 — S4, 2026-09-01). This is the ONE
+// threading site: the occupied places are ranked by their sticky `place`
+// ascending, `seats` is how many there are, `seat` is the rank, and the card
+// stands at `seatAnchor(seat, seats, arc, TABLE_W, TABLE_D)` — on its own ray
+// at θ = 2π·seat/seats (or the tower arc). So the cards RE-SPACE when N
+// changes, and they do it here, behind the flush (placardRebuild is reached
+// only through tryFlushPlaces / placardRelay / the wash's rig build), never
+// while dice are in the air. Every reader — the rig, the overlay, the wash,
+// the orbit sync, `places()` — takes `{seat, seats, arc, theta, anchor}` off
+// these rows and re-derives nothing. `arc` is the LIVE towerOn() (display
+// state, allowed to be wrong for a frame); the FILM reads `roll.arc` from
+// S5 on — state that split beside both.
 function placeRows() {
   const roster = placeRoster();
-  const towerUp = towerOn();
+  const arc = towerOn() ? 1 : 0;
   const mineId = placeMineId();
-  const rows = [];
+  const held = [];
   for (const p of roster) {
     if (!p || !Number.isInteger(p.place)) continue;      // the +N fold sits nowhere
-    const anchor = placeAnchor(p.place, TABLE_W, TABLE_D, towerUp);
+    held.push(p);
+  }
+  held.sort((a, b) => a.place - b.place);
+  const seats = held.length;
+  const rows = [];
+  for (const [seat, p] of held.entries()) {
+    const anchor = seatAnchor(seat, seats, arc, TABLE_W, TABLE_D);
     if (!anchor) continue;
     rows.push({
       place: p.place,
+      seat,
+      seats,
+      arc,
+      theta: anchor.azim,
       playerId: p.id,
       name: p.name || '',
       color: p.color || null,
@@ -25437,7 +25476,6 @@ function placeRows() {
       anchor,
     });
   }
-  rows.sort((a, b) => a.place - b.place);
   return rows;
 }
 
@@ -25447,13 +25485,13 @@ function placeRows() {
 // (In demo it is the chair the dial is sitting in — see placeMineId; the eye
 // then follows through the SHIPPED placeOrbitSync, so the seat switcher is
 // the real per-viewer orientation path and not a camera of its own.)
+// ON THE RING it is placeRows()' own `mine` row, not a second derivation: the
+// azimuth is a function of the rank AND the count, so it can only be read off
+// the ranked list — and `anchor.azim` here is the very double placeOrbitSync
+// compares with `===`.
 function myPlaceRow() {
-  const mineId = placeMineId();
-  if (!mineId) return null;
-  const me = placeRoster().find((p) => p && p.id === mineId);
-  if (!me || !Number.isInteger(me.place)) return null;
-  const anchor = placeAnchor(me.place, TABLE_W, TABLE_D, towerOn());
-  return anchor ? { place: me.place, anchor } : null;
+  if (!placeMineId()) return null;
+  return placeRows().find((r) => r.mine) || null;
 }
 
 // The rig is LAZY: a solo table, an offline table and a table whose server has
@@ -25595,8 +25633,11 @@ function placeWashFor(roll) {
   // door's cast lights its own cards without a second branch here.
   const p = placeRoster().find((q) => q && q.id === roll.playerId);
   if (!p || !Number.isInteger(p.place)) return null;
-  const a = placeAnchor(p.place, TABLE_W, TABLE_D, towerOn());
-  if (!a) return null;
+  // The CARD, as it stands right now on the ring (placeRows — rank and count
+  // included), which is what the wash sits under; never the edge.
+  const row = placeRows().find((r) => r.place === p.place);
+  if (!row) return null;
+  const a = row.anchor;
   return { place: p.place, x: a.x, z: a.z, color: roll.color || p.color || null };
 }
 

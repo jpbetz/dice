@@ -50,7 +50,7 @@ export default async function run(stage, [outDir = 'tools/shots/place', w = '160
 
   console.log('# station  name / painted / fontPx / world');
   for (const s of (await a.dbg('places()')).stations) {
-    console.log(`  ${s.place} ${s.station.padEnd(5)} ${JSON.stringify(s.name).padEnd(26)}`
+    console.log(`  ${s.place} k${s.seat}/${s.seats} ${JSON.stringify(s.name).padEnd(26)}`
       + ` ${JSON.stringify(s.shown).padEnd(26)} ${String(s.fontPx).padStart(2)}`
       + ` (${s.world.x.toFixed(2)}, ${s.world.y.toFixed(3)}, ${s.world.z.toFixed(2)})`
       + ` yaw ${s.yaw.toFixed(2)}${s.mine ? '  *mine' : ''}`);
@@ -65,7 +65,7 @@ export default async function run(stage, [outDir = 'tools/shots/place', w = '160
     const rows = [];
     for (const s of pl.stations) {
       const f = await a.dbg(`placardFrame(${s.place})`);
-      rows.push(`${s.place}${s.mine ? '*' : ' '}${s.station.padEnd(5)}`
+      rows.push(`${s.place}${s.mine ? '*' : ' '}@${(s.theta * 180 / Math.PI).toFixed(0)}°`
         + ` y[${f.ndc.y0.toFixed(3)},${f.ndc.y1.toFixed(3)}]`
         + ` x[${f.ndc.x0.toFixed(3)},${f.ndc.x1.toFixed(3)}]`);
     }

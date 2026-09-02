@@ -80,12 +80,11 @@ export const PLACE_MAX = 8;
 //
 // FILM STATE: spawnDie multiplies this into the pool's line (laneSpread), so
 // it is a constant of the seed's determinism class and does not move with the
-// picture — where the CARD stands is placeLane(w) below, a share of the mat:
-// 5.10 at wide, 3.98 at medium, 3.11 at close. The throw still comes in over
-// the card's own face at every zoom: a lone die's line sits at 5.16 / 4.2 /
-// 3.0 (the PUSHED lane below; laneSpread caps it at the room the mat has),
-// within 0.7 of the card's centre and inside its 1.73 half-width; a handful's
-// line yields toward the middle as it always did.
+// picture. RECTANGLE-ERA (RING, S4 2026-09-01): live only inside laneSpread,
+// which the ring never calls with a slot — where the CARD stands is
+// seatAnchor below (on the seat's own ray), no longer a lane share of the mat
+// (placeLane / PLACE_LANE_SHARE were deleted in S4; their measured record is in
+// ROADMAP row 14 and UX §7.63).
 export const PLACE_LANE = 4.30;
 
 // V3, THE PUSH (Joe, 2026-09-01, on the deployed 7f93c05: "the players should
@@ -99,8 +98,8 @@ export const PLACE_LANE = 4.30;
 // the rests (the room cap and the F1 pitch floor keep the last word — at
 // medium and close the wall room already binds and the laned table is
 // bit-identical; the push shows where there is room to spend it). The CARD
-// does not move with this dial: placeLane(w) is the picture's own share and
-// scaled with the v3 card instead. THE THROW ITSELF reaches the pushed
+// does not move with this dial: seatAnchor stands it on its ray outboard of
+// the rim, independent of the push. THE THROW ITSELF reaches the pushed
 // centre through PLACE_AIM.box (v3.1): the aim box is anchored in the
 // region's wall corner, which the push never moves, so the box's SIZE is
 // what places its centre — 0.25 stands the aim at ×1.21 of the v2 aim,
@@ -130,64 +129,6 @@ export const PLACARD_STANDOFF = 0.86;
 export const PLACARD_W = 3.68;
 export const PLACARD_D = 1.52;
 
-// WHERE THE CARD STANDS ALONG ITS EDGE, as a share of the mat's width — one
-// card's footprint plus the gap floor on the medium mat (3.50 of 11), 4.49 at
-// wide, 2.74 at close.
-//
-// A SHARE AFTER ALL — and the reason the absolute lane was wrong is the reason
-// the v1 share was wrong, seen from the other side. The three zoom presets are
-// SIMILAR pictures (eye height and distance are both a fixed share of the
-// mat's width, js/main.js ZOOM_PRESETS) and the mat fills the frame's width to
-// ndc 0.96 at each of them, so both bounds on the card scale with the mat:
-// the frame's edge, and `#result-banner` — fixed DOM, the same 520 px at
-// every zoom, which is the same share of the frame. An absolute 4.30 sat
-// between them at wide and OUTSIDE the frame at medium and close: measured
-// 2026-09-01 on the live page (1600 × 900, the v2 verification's D3), the own
-// name's ink began 61 px left of the canvas at medium ("ront") and 310 px at
-// close, from both long-edge chairs.
-//
-// THE NUMBER IS INSIDE A MEASURED WINDOW, AND THE WINDOW IS NARROW. The card
-// does not scale with the mat, so on a small one its ridge stands relatively
-// nearer the eye and the bounds tighten. At 1600 × 900 (canvas 1284 wide
-// beside the panel), for a name the length of "Front" (~1.8 units of ink):
-//   · WIDE — the printed BAND clears a 520 px banner (place-two-views' hard
-//     gate, the shipped default zoom) only from 4.46 up; the name is whole
-//     to 5.2. Shares 0.316–0.33.
-//   · MEDIUM — the name is whole to 3.76 and clears the widest banner from
-//     3.16. Shares 0.287–0.342.
-//   · CLOSE — the name is whole to 2.52 and clears the widest banner from
-//     2.62: the two do not meet. A 1.8 name, a 2.3 banner and their margins
-//     do not fit a frame 6.9 units wide at that depth.
-// 0.318 — a footprint and a gap at medium, the pitch three cards need to
-// stand apart — was inside the first two windows and took close's cost on
-// the outer side (v2's measured record: name clear of the canvas edge by
-// 47 px at medium, of the widest banner by 77 / 57 / 33 px at the three
-// zooms, the band by 13 px at wide, close's first letter −24 px to the rim).
-// (The v1 share failed because it was a share of a 2.00-wide card's OWN gap;
-// this is a share of the picture.) tools/steps/place-card.mjs reads these
-// numbers off the live page. V3 (2026-09-01) keeps the same construction —
-// a footprint and a gap of pitch at medium — and the footprint grew ×1.15
-// with the card, so the share is 0.362 now: 5.10 at wide, 3.98 at medium,
-// 3.11 at close; the v3 measured record beside the shipped gates is in the
-// scenario text (place-two-views, placard-look) and ROADMAP row 14.
-//
-// WHAT IT COSTS, recorded: the full house at close. Three cards need 3.98 of
-// pitch to stand a gap apart; wide (5.10) and medium (3.98, exactly) have it,
-// and at close (3.11 of pitch for a 3.68 card) the centre slot — the seventh
-// chair, dealt last for exactly this — OVERLAPS its neighbours by 0.57.
-// tests/places.test.mjs pins the six outer and head stations at the 0.30
-// floor on every mat, the centre slots at wide and medium, and the close
-// number to the digit. The alternative — the 3.98 floor at every zoom — keeps
-// seven cards apart at close by cutting every two-player table's own name
-// there, which is the defect the v2 share fixed; so the rare table pays, and
-// pays at the one zoom whose picture crops by design. Recorded, not gated —
-// the gates are the shipped default's, and the two chairs' own names at
-// medium.
-export const PLACE_LANE_SHARE = (PLACARD_W + PLACARD_GAP) / 11;   // 11: the medium mat — a footprint and a gap of pitch there
-export function placeLane(w) {
-  return PLACE_LANE_SHARE * w;
-}
-
 // The spawn line's pitch floor under a lane. A lane may compress a pool's
 // line toward the roller's side, but never below a real pitch — see
 // laneSpread, and the F1 fix it exists for.
@@ -207,12 +148,15 @@ export const PITCH_MIN = 2.0;
 // slot along that edge. `azim` is the viewer's own orbit when they sit here,
 // quantised to the four quarter-turns camOrbit already ships.
 //
-// The stations are ABSOLUTE: placeAnchor is pure in (place, mat, tower) and
-// not in N, not in join order, not in the client's `players` array (which has
-// a documented ghost-seat divergence, IMMERSION.md:1367-1382). The server
-// decides WHO occupies a station; every client agrees WHERE a station is by
-// construction. Nobody is ever renumbered, so the placard never lies: dice
-// always enter where the roller's placard actually stands.
+// RECTANGLE-ERA, STAMP HALF ONLY (RING S4, 2026-09-01): the table below is now
+// read by entryFor alone — the FILM's edge/lane stamp, which S5 replaces with
+// the ring stamp — and by the demo overlay until S6. WHERE THE CARD STANDS is
+// seatAnchor (the ring section below), a function of the seat's RANK among the
+// occupied places and their COUNT, so the cards re-space when N changes; the
+// "absolute stations, nobody's card moves" law this comment used to state was
+// replaced by BRIEF-RING (Joe: "2 players should sit opposite, 3 players
+// should sit in a triangular orientation"). `place` stays the sticky ranking
+// key the server hands out.
 //
 // NOBODY SITS DEAD CENTRE OF A LONG EDGE UNTIL SEVEN PEOPLE ARE HERE, and
 // that is a v2 correction with a measured cause (2026-09-01). Station 0 used
@@ -247,7 +191,7 @@ export const STATIONS = Object.freeze([
 //
 // Split across BOTH flanks so one side does not crowd, and EACH BACK CHAIR
 // GOES TO THE FLANK IT ALREADY SAT NEAREST (v2, 2026-09-01: the lanes moved,
-// so the remap moved with them — station 1 stands at x +placeLane(w) and goes
+// so the remap moved with them — station 1 stood at x +placeLane(w) and goes
 // right, station 3 at −placeLane(w) and goes left, and the centre chair 7
 // takes the far slot on the right). WHILE SOCKETED THE ENTRY IS NOT A PER-PLAYER READ: stations 1
 // and 7 land on entry side 3, which the RIGHT HEAD (station 4, lane 0, not
@@ -293,58 +237,6 @@ export function entryFor(place, towerUp = false) {
 // ---------------------------------------------------------------------------
 // Anchors — the world half
 // ---------------------------------------------------------------------------
-
-// WHERE A STATION'S PLACARD STANDS, in world units, on the ground.
-//
-// Pure in (place, w, d, towerUp) — `w` is the mat's playable width (TABLE_W)
-// and `d` its playable DEPTH AS THE WALLS CURRENTLY STAND (TABLE_D), not the
-// base layer. That is the one correction this file makes to the design it was
-// built from: the design read the depth off MAT_DEPTH.base so that "nothing
-// slides when the mat deepens", on the belief that a socketed tower's +4.5
-// lands wholly behind the table. It does not. TABLE_D is a SUM of layers and
-// the walls are placed at ±TABLE_D/2 (js/main.js:3238-3243, and
-// towerMatDepth's own `walls.front.position.set(0, 0, TABLE_D / 2)`), so
-// socketing a tower moves the FRONT wall forward by half the extra as well.
-// A front card pinned to the base depth would then stand 1.53 units INSIDE
-// the wall at medium: dice could reach it, slide through it, and the
-// outboard-of-the-wall property that licenses depthWrite and the seating
-// raycast would be false exactly when a tower is up. The card stands where
-// the dice stop, at every mat state, and that invariant outranks the
-// convenience of a card that never moves.
-//
-// Returns { x, y, z, azim, relocated } — y is the ground plane; js/placard.js
-// raycasts the venue's own surface from here (the `surfaceUnder` pattern) so a
-// fae ground at 0.02–0.035 never buries the base. null for a non-place.
-export function placeAnchor(place, w, d, towerUp = false) {
-  if (!Number.isInteger(place) || place < 0 || place >= PLACE_MAX) return null;
-  const flank = towerUp ? TOWER_FLANKS[place] : null;
-  if (flank) {
-    return {
-      x: flank.flank * (w / 2 + PLACARD_STANDOFF),
-      y: 0,
-      z: -flank.slot * PLACE_LANE,
-      azim: flank.azim,
-      relocated: true,
-    };
-  }
-  const st = STATIONS[place];
-  if (st.edge === 'front' || st.edge === 'back') {
-    return {
-      x: st.lane * placeLane(w),
-      y: 0,
-      z: (st.side === 0 ? 1 : -1) * (d / 2 + PLACARD_STANDOFF),
-      azim: st.azim,
-      relocated: false,
-    };
-  }
-  return {
-    x: (st.side === 3 ? 1 : -1) * (w / 2 + PLACARD_STANDOFF),
-    y: 0,
-    z: 0,
-    azim: st.azim,
-    relocated: false,
-  };
-}
 
 // The card's footprint on the ground, ORIENTED (RING, 2026-09-01): the OBB
 // (hw, hd about the two ground axes ax, az) for the separating-axis gap below,
@@ -824,14 +716,36 @@ function cardHz(theta) { const { s, c } = seatTrig(theta); return (PLACARD_W / 2
 //       today's 4.21 / 6.36 / 5.16 / 7.91 / 3.46 / 5.16 to the bit at the quarter turns.
 // Pure in (seat, seats, arc, w, d). Takes the LIVE TABLE_D (matExtra 4.5 under
 // a tower deepens the mat, and the rim moves at EVERY θ now, so the trap
-// placeAnchor's comment records is worse under a ring, not better).
+// below is worse under a ring, not better).
+//
+// `w` is the mat's playable width (TABLE_W) and `d` its playable DEPTH AS THE
+// WALLS CURRENTLY STAND (TABLE_D), not the base layer. That is the one
+// correction this file makes to the design it was built from: the design read
+// the depth off MAT_DEPTH.base so that "nothing slides when the mat deepens",
+// on the belief that a socketed tower's +4.5 lands wholly behind the table. It
+// does not. TABLE_D is a SUM of layers and the walls are placed at ±TABLE_D/2
+// (js/main.js:3238-3243, and towerMatDepth's own
+// `walls.front.position.set(0, 0, TABLE_D / 2)`), so socketing a tower moves
+// the FRONT wall forward by half the extra as well. A front card pinned to the
+// base depth would then stand 1.53 units INSIDE the wall at medium: dice could
+// reach it, slide through it, and the outboard-of-the-wall property that
+// licenses depthWrite and the seating raycast would be false exactly when a
+// tower is up. The card stands where the dice stop, at every mat state, and
+// that invariant outranks the convenience of a card that never moves.
+//
+// Returns { x, y, z, azim, seat, seats, arc, r, relocated } — y is the ground
+// plane; js/placard.js raycasts the venue's own surface from here (the
+// `surfaceUnder` pattern) so a fae ground at 0.02–0.035 never buries the base.
+// null for an invalid stamp.
 //
 // THE PARENTHESES ARE LOAD-BEARING (S1, measured): PLACARD_CLEAR is the double
 // 0.09999999999999998, and `half + hx + CLEAR` lands one ulp off today's
 // `half + PLACARD_STANDOFF` in 9 of the 12 quarter-turn cells (wide 5.16 →
 // 5.159999999999999, medium heads 6.36 → 6.359999999999999). `hx + CLEAR` is
 // 0.86 to the bit at every quarter turn, so `half + (hx + CLEAR)` IS the
-// shipped sum — all 12 cells bit-equal placeAnchor's. Written once, this way.
+// shipped sum — all 12 cells bit-equal the rectangle's placeAnchor (deleted in
+// S4; P5 now pins the literal expression `half + PLACARD_STANDOFF`). Written
+// once, this way.
 export function seatAnchor(seat, seats, arc, w, d) {
   const theta = placeTheta(seat, seats, arc);
   if (theta === null) return null;

@@ -25,10 +25,11 @@ limitations under the License.
 
 import assert from 'node:assert/strict';
 import {
-  PLACE_MAX, PLACE_LANE, PLACE_PUSH, PLACE_LANE_SHARE, PITCH_MIN, PLACARD_STANDOFF, PLACARD_W, PLACARD_D, PLACARD_GAP,
+  PLACE_MAX, PLACE_LANE, PLACE_PUSH, PITCH_MIN, PLACARD_STANDOFF, PLACARD_W, PLACARD_D, PLACARD_GAP,
   STATIONS, PLACE_AIM, AIM_ZERO,
-  entryFor, placeLane, placeAnchor, placardFootprint, placardGap, laneSpread, aimFor, regionFor, inRegion,
-  // THE RING (S1, 2026-09-01) — landed beside the rectangle, called by nothing yet.
+  entryFor, placardFootprint, placardGap, laneSpread, aimFor, regionFor, inRegion,
+  // THE RING (S1, 2026-09-01; the cards stand on it since S4 — placeAnchor,
+  // placeLane and PLACE_LANE_SHARE are gone, seatAnchor is the one producer).
   AIM_HULL, RING_BASE, TOWER_ARC, PLACARD_CLEAR, SPAWN_IN, DIE_W, TURN_NONE, TURN_HALF,
   seatTrig, rayRect, slabSpan, wrapPi, seatValid, seatStamp, placeTheta, seatAnchor,
   spawnMid, laneAndChord, sideFor, wedgeFor, inWedge, seatAim, readTurn,
@@ -90,35 +91,13 @@ t('the ladder fills the long edges first — heads at index >= 4', () => {
   assert.deepEqual(heads.map(([, i]) => i), [4, 5], 'the two heads are 4 and 5');
 });
 
-t('a fresh table of two sits opposing, and NEITHER of them dead centre', () => {
-  // v2, 2026-09-01. The first two chairs used to be the middles of the two
-  // long edges, which put each viewer's own card at the bottom centre of their
-  // own frame — the square of screen the result banner is fixed to. They are
-  // outer lanes now, mirrored through the table's centre, so a half turn of
-  // the world still maps one chair onto the other exactly: both players read
-  // their own card low-left and the other player's high-right.
-  const { w, d } = ZOOMS.medium;
-  const a = placeAnchor(0, w, d), b = placeAnchor(1, w, d);
-  assert.equal(a.x, -placeLane(w), 'the front chair takes the left third of its edge');
-  assert.equal(b.x, placeLane(w), 'the back chair is its 180-degree mirror');
-  assert.equal(a.z, -b.z);
-  assert.ok(a.z > 0, 'place 0 is the near edge');
-  assert.ok(Math.abs(a.x) > 0 && Math.abs(b.x) > 0,
-    'and nobody sits dead centre of a long edge until a seventh player arrives');
-  assert.equal(STATIONS[6].lane, 0, 'station 6 is the front edge\'s centre slot');
-  assert.equal(STATIONS[7].lane, 0, 'station 7 the back edge\'s');
-});
-
-t('a fresh table of four is two per long edge, 180-degree symmetric', () => {
-  const { w, d } = ZOOMS.medium;
-  const at = (p) => placeAnchor(p, w, d);
-  assert.deepEqual(STATIONS.slice(0, 4).map((s) => s.edge), ['front', 'back', 'front', 'back']);
-  for (const [p, q] of [[0, 1], [2, 3]]) {
-    const a = at(p), b = at(q);
-    assert.ok(Math.abs(a.x + b.x) < 1e-12 && Math.abs(a.z + b.z) < 1e-12,
-      `places ${p} and ${q} are a 180-degree pair`);
-  }
-});
+// "A fresh table of two sits opposing" is ring P2 below (theta differs by
+// exactly pi, anchors exact negatives) and "four is two per long edge" is P5.
+// The "NEITHER of them dead centre" half of the old v2 pin is DELETED on
+// purpose: on the ring rank 0 sits dead centre of the front edge for every
+// viewer at every N, and the defect that half guarded — the own card printing
+// through `#result-banner` — is gate G1 (DESIGN-RING §7.6), measured on the
+// live frame in place-two-views and place-ring, not on a lane number here.
 
 // --- entry: the film half ---------------------------------------------------
 
@@ -137,7 +116,6 @@ t('entryFor is total over (place 0-7 x towerUp)', () => {
 t('a non-place is stampless, never a guess', () => {
   for (const bad of [null, undefined, -1, 8, 40, 1.5, '2', NaN, {}]) {
     assert.equal(entryFor(bad), null, `${String(bad)} is not a place`);
-    assert.equal(placeAnchor(bad, 11, 6.7), null, `${String(bad)} has no anchor`);
   }
 });
 
@@ -156,16 +134,11 @@ t('a socketed tower moves the back stations to the flanks, both of them', () => 
   assert.deepEqual(entryFor(3, true), { entry: 2, lane: 0 });
   assert.deepEqual(entryFor(1, true), { entry: 3, lane: 0 });
   assert.deepEqual(entryFor(7, true), { entry: 3, lane: 0 });
-  const flanks = [1, 3, 7].map((p) => placeAnchor(p, 11, 11.2, true));
-  assert.ok(flanks.every((a) => a.relocated), 'a flanked card knows it moved');
-  assert.ok(flanks.filter((a) => a.x < 0).length === 1
-    && flanks.filter((a) => a.x > 0).length === 2, 'split across BOTH flanks');
+  // (The CARDS' side of this — where a chair stands while a tower is up — is
+  // the ring's arc rule now, P12 below; the stamp half stays until S5.)
   for (const p of [0, 2, 6, 4, 5]) {
     assert.deepEqual(entryFor(p, true), entryFor(p, false), `place ${p} is untouched by a tower`);
-    assert.equal(placeAnchor(p, 11, 11.2, true).relocated, false);
   }
-  assert.notEqual(placeAnchor(1, 11, 11.2, true).azim, Math.PI,
-    'azim pi is forbidden while socketed — the pit backstop is un-skinned');
 });
 
 t('under a tower the entry is not a per-player read: three stations share side 3, two share side 2', () => {
@@ -185,163 +158,22 @@ t('under a tower the entry is not a per-player read: three stations share side 3
   assert.equal(new Set([0, 1, 2, 3, 4, 5, 6, 7].map((p) => JSON.stringify(entryFor(p, false)))).size, 8);
 });
 
-t("a station's azim turns the viewer onto its own entry edge", () => {
-  // The trig mirror of three.js's applyAxisAngle(Y_AXIS, camOrbit) at
-  // js/main.js:26807: (x, z) -> (x cos + z sin, -x sin + z cos). The eye rides
-  // +z, so rotating it by azim must land it on the outward normal of the edge
-  // this station's dice come in over. Camera and film can never disagree.
-  const normal = { 0: [0, 1], 1: [0, -1], 2: [-1, 0], 3: [1, 0] };
-  for (const towerUp of [false, true]) {
-    for (let p = 0; p < PLACE_MAX; p++) {
-      const a = placeAnchor(p, 11, towerUp ? 11.2 : 6.7, towerUp);
-      const eye = [Math.sin(a.azim), Math.cos(a.azim)];
-      const want = normal[entryFor(p, towerUp).entry];
-      assert.ok(Math.hypot(eye[0] - want[0], eye[1] - want[1]) < 1e-12,
-        `place ${p} (tower ${towerUp}) looks along its entry edge`);
-    }
-  }
-});
-
-// --- anchors: the world half ------------------------------------------------
-
-const anchorsOf = (mat) => {
-  const out = [];
-  for (let p = 0; p < PLACE_MAX; p++) {
-    const a = placeAnchor(p, mat.w, mat.d, mat.towerUp);
-    out.push({ p, a, box: placardFootprint(a) });
-  }
-  return out;
-};
-
-t('every card stands outboard of a wall, by 0.10 of clear ground', () => {
-  // The walls are at +-TABLE_W/2 and +-TABLE_D/2 (js/main.js:3238-3243). No die
-  // can reach a card, which is what makes depthWrite, a real shadow and the
-  // seating raycast all legal at once — IMMERSION law 8's surfaceUnder trap is
-  // void BY GEOMETRY.
-  for (const mat of MATS) {
-    for (const { p, box } of anchorsOf(mat)) {
-      const outX = Math.abs(box.x) - box.hx - mat.w / 2;
-      const outZ = Math.abs(box.z) - box.hz - mat.d / 2;
-      assert.ok(Math.max(outX, outZ) >= 0.0999,
-        `${mat.id} place ${p}: inboard edge is ${Math.max(outX, outZ).toFixed(3)} past the wall`);
-    }
-  }
-});
-
-t('no two cards come within 0.30 of each other — any station, any mat — except the centre slots on a small mat', () => {
-  // THE FULL HOUSE AT CLOSE IS THE RECORDED COST of the card standing where
-  // the frame can hold it (placeLane, 2026-09-01; re-pinned for the v3 ×1.15
-  // card): three cards need 3.98 of pitch to stand a gap apart; wide (5.10)
-  // and medium (3.98, by construction) have it and close (3.11) does not.
-  // The six outer and head stations keep the floor on every mat; the two
-  // centre slots — the seventh and eighth chairs, dealt last for exactly
-  // this — stand 1.42 clear at wide, exactly the 0.30 floor at medium, and
-  // overlap their neighbours by 0.57 at close. Pinned to the digit so a
-  // change to any of the three is a change somebody made on purpose.
-  // Under a tower the back centre slot (7) is on a flank, the second card
-  // down a row pitched at the film's raw PLACE_LANE (4.30 along z — the card
-  // row, NOT pushed; PLACE_PUSH moves throws, not cards), so at wide the
-  // flank pair's 0.62 is the number and not the front row's 1.42; at the
-  // other two zooms the front centre slot is still the worst.
-  const CENTRE = new Set([6, 7]);
-  const want = { wide: 1.422, 'wide+tower': 0.62, medium: 0.30, 'medium+tower': 0.30, close: -0.568, 'close+tower': -0.568 };
-  for (const mat of MATS) {
-    const all = anchorsOf(mat);
-    let centreWorst = Infinity;
-    for (let i = 0; i < all.length; i++) {
-      for (let j = i + 1; j < all.length; j++) {
-        const gap = placardGap(all[i].box, all[j].box);
-        const centre = CENTRE.has(all[i].p) || CENTRE.has(all[j].p);
-        if (centre) centreWorst = Math.min(centreWorst, gap);
-        else {
-          assert.ok(gap >= 0.30,
-            `${mat.id}: places ${all[i].p} and ${all[j].p} are ${gap.toFixed(3)} apart`);
-        }
-      }
-    }
-    assert.ok(Math.abs(centreWorst - want[mat.id]) < 5e-3,
-      `${mat.id}: the centre slot's worst clearance is ${centreWorst.toFixed(3)} (recorded ${want[mat.id]})`);
-  }
-});
-
-t('every card is inside the shadow frustum', () => {
-  // updateShadowFrustum (js/main.js:1629-1634): +-(TABLE_W/2 + 4) by
-  // +-(TABLE_D/2 + 6). A card outside it is a card with no shadow.
-  for (const mat of MATS) {
-    for (const { p, box } of anchorsOf(mat)) {
-      assert.ok(Math.abs(box.x) + box.hx <= mat.w / 2 + 4, `${mat.id} place ${p} in x`);
-      assert.ok(Math.abs(box.z) + box.hz <= mat.d / 2 + 6, `${mat.id} place ${p} in z`);
-    }
-  }
-});
-
-t('no flank card lands inside a tower volume', () => {
-  // towerVolumes (js/main.js:11508-11620) resolved at the classic portal spec,
-  // where every delta is x - x = +0.0. Envelopes as boxes in the ground plane;
-  // the shaft and the aim box are the bore, which is a cylinder about in.x.
-  const S = 1.25;                         // TOWER_S
-  for (const mat of MATS.filter((m) => m.towerUp)) {
-    const z0 = -mat.d / 2;
-    const vols = {
-      socket: { x: 0, z: z0 - 2.0 * S, hx: 5.2 * S / 2, hz: 4.4 * S / 2 },
-      apron:  { x: 0, z: z0 - 1.284 * S, hx: 3.8 * S / 2, hz: 5.85 * S / 2 },
-      shaft:  { x: 0, z: z0 - 1.6 * S, hx: 1.7 * S, hz: 1.7 * S },
-      aim:    { x: 0, z: z0 - 1.6 * S, hx: 0.8 * S / 2, hz: 0.8 * S / 2 },
-      cowl:   { x: 0, z: z0 + 0.05 * S, hx: 4.2 * S / 2, hz: 0.3 * S / 2 },
-      hood:   { x: 0, z: z0 + 0.5 * S, hx: 4.6 * S / 2, hz: 1.0 * S / 2 },
-      lip:    { x: 0, z: z0 + 2.8, hx: 4.8 / 2, hz: 2.2 / 2 },
-    };
-    for (const { p, box } of anchorsOf(mat)) {
-      for (const [name, v] of Object.entries(vols)) {
-        const clear = Math.max(Math.abs(box.x - v.x) - box.hx - v.hx,
-          Math.abs(box.z - v.z) - box.hz - v.hz);
-        assert.ok(clear > 0, `${mat.id} place ${p} clears the ${name} (${clear.toFixed(3)})`);
-      }
-    }
-  }
-});
-
-t('the anchor arithmetic is the design table, to the digit', () => {
-  // RE-AUTHORED WITH THE CARD (v2, 2026-09-01; v3 same day, ×1.15): the
-  // standoff is 0.86 for a footprint 1.52 deep, so front/back z = +-5.16
-  // wide / +-4.21 medium / +-3.46 close; heads x = +-7.91 / +-6.36 / +-5.16;
-  // lanes at x in {0, +-placeLane(w)} — a footprint and a gap of pitch on
-  // the medium mat (3.98) and that share of the others, 5.10 at wide, 3.11
-  // at close, so the card's centre stands at the same point of a frame the
-  // mat fills at every zoom.
-  const want = { wide: [5.16, 7.91, 5.102], medium: [4.21, 6.36, 3.98], close: [3.46, 5.16, 3.112] };
-  for (const [id, [edgeZ, headX, lane]] of Object.entries(want)) {
-    const { w, d } = ZOOMS[id];
-    assert.ok(Math.abs(placeAnchor(0, w, d).z - edgeZ) < 5e-3, `${id} front z`);
-    assert.ok(Math.abs(placeAnchor(1, w, d).z + edgeZ) < 5e-3, `${id} back z`);
-    assert.ok(Math.abs(placeAnchor(4, w, d).x - headX) < 5e-3, `${id} right head x`);
-    assert.ok(Math.abs(placeAnchor(5, w, d).x + headX) < 5e-3, `${id} left head x`);
-    assert.ok(Math.abs(placeAnchor(0, w, d).x + lane) < 5e-3, `${id} front-left lane (${placeAnchor(0, w, d).x})`);
-    assert.ok(Math.abs(placeAnchor(2, w, d).x - lane) < 5e-3, `${id} front-right lane`);
-    assert.ok(Math.abs(placeAnchor(0, w, d).x + placeLane(w)) < 1e-12, `${id} is placeLane(w) exactly`);
-    assert.equal(placeAnchor(6, w, d).x, 0, `${id} front-centre lane`);
-    assert.equal(placeAnchor(0, w, d).y, 0, 'a card stands on the ground');
-  }
-  assert.ok(Math.abs(placeLane(ZOOMS.medium.w) - (PLACARD_W + PLACARD_GAP)) < 1e-9,
-    'on the medium mat the card\'s pitch is exactly a footprint and a gap');
-  assert.ok(Math.abs(PLACE_LANE_SHARE - 0.362) < 1e-3, `the share is 0.362 of the mat (${PLACE_LANE_SHARE})`);
-  assert.ok(Math.abs(placeLane(ZOOMS.wide.w) - PLACE_LANE * PLACE_PUSH) < 0.25,
-    `and on the wide mat the card stands within a quarter unit of the film\'s pushed lane (${placeLane(ZOOMS.wide.w)} vs ${PLACE_LANE * PLACE_PUSH})`);
+t('the card\'s constants are the design\'s, to the digit', () => {
+  // RE-AUTHORED WITH THE CARD (v2, 2026-09-01; v3 same day, x1.15). The
+  // anchor DIGIT TABLE itself — front/back z = +-5.16 wide / +-4.21 medium /
+  // +-3.46 close; heads x = +-7.91 / +-6.36 / +-5.16 — lives in ring P5 below
+  // since S4, pinned as the literal expression `half + PLACARD_STANDOFF`. The
+  // lane share (placeLane, 0.362 of the mat) is gone with the rectangle.
   assert.ok(Math.abs((PLACARD_STANDOFF - PLACARD_D / 2) - 0.10) < 1e-12,
     'the standoff leaves exactly 0.10 of clear ground inboard');
   assert.equal(PLACARD_W, 3.68);
   assert.equal(PLACARD_D, 1.52);
   assert.equal(PLACE_PUSH, 1.2, 'the v3 push is the 20% Joe asked for, once');
-  // THE PITCH: the film's lane clears a card's footprint plus the gap floor,
-  // and so does the card's pitch on the wide and medium mats; at close it
-  // does not — the recorded full-house cost, pinned to the digit in the gap
-  // test above.
+  // THE PITCH: the film's lane clears a card's footprint plus the gap floor
+  // (rectangle-era, laneSpread's unstamped path only).
   assert.ok(PLACE_LANE >= PLACARD_W + PLACARD_GAP,
     `the lane clears a card's width plus the gap floor (${PLACE_LANE} vs `
     + `${PLACARD_W} + ${PLACARD_GAP})`);
-  assert.ok(placeLane(ZOOMS.wide.w) >= PLACARD_W + PLACARD_GAP, 'three cards stand a gap apart on the wide mat');
-  assert.ok(placeLane(ZOOMS.medium.w) >= PLACARD_W + PLACARD_GAP - 1e-9, 'and on the medium one');
-  assert.ok(placeLane(ZOOMS.close.w) < PLACARD_W, 'and overlap at close — the recorded cost, not an accident');
   assert.equal(PLACARD_GAP, 0.30);
 });
 
@@ -818,20 +650,27 @@ t('ring P4: six make a hexagon — 60-degree steps, mirrored pairs', () => {
   assert.ok(Math.abs(A[1].r - 8.289) < 5e-3, 'R alternates 4.21 / 8.29 because the MAT is 1.64:1, not because the ring is not a ring');
 });
 
-t('ring P5: the axis seats of N=2 and N=4 are today\'s stations, to the bit, on every mat', () => {
-  // seatAnchor(0,2)/(1,2)/(1,4)/(3,4) against placeAnchor(6)/(7)/(4)/(5): the
-  // two functions exist side by side in S1, so the claim is checked as an
-  // identity of doubles, not of digits. The parenthesisation in seatAnchor
-  // (`half + (hx + CLEAR)`) is what makes the heads land on `half + 0.86`.
+t('ring P5: the axis seats of N=2 and N=4 are the rectangle\'s stations, to the bit, on every mat', () => {
+  // S1 checked seatAnchor(0,2)/(1,2)/(1,4)/(3,4) against placeAnchor(6)/(7)/
+  // (4)/(5) as an identity of doubles while both existed. placeAnchor is gone
+  // (S4), so the claim is pinned as the LITERAL EXPRESSION it computed —
+  // `+-(d / 2 + PLACARD_STANDOFF)` on the long edges, `+-(w / 2 +
+  // PLACARD_STANDOFF)` at the heads, the other coordinate the double 0 — with
+  // `===`, not a tolerance. The parenthesisation in seatAnchor (`half + (hx +
+  // CLEAR)`) is what makes these land on `half + 0.86`.
   for (const mat of MATS.filter((m) => !m.towerUp)) {
-    for (const [k, N, p] of [[0, 2, 6], [1, 2, 7], [1, 4, 4], [3, 4, 5]]) {
-      const s = seatAnchor(k, N, 0, mat.w, mat.d);
-      const o = placeAnchor(p, mat.w, mat.d);
-      assert.equal(s.x, o.x, `${mat.id} seat ${k}/${N} x === station ${p} x (${s.x} vs ${o.x})`);
-      assert.equal(s.z, o.z, `${mat.id} seat ${k}/${N} z === station ${p} z (${s.z} vs ${o.z})`);
-      assert.equal(s.azim, o.azim, `${mat.id} seat ${k}/${N} azim`);
-      assert.equal(s.y, 0);
-      assert.equal(s.relocated, false);
+    const front = { x: 0, z: mat.d / 2 + PLACARD_STANDOFF, azim: 0 };
+    const back = { x: 0, z: -(mat.d / 2 + PLACARD_STANDOFF), azim: Math.PI };
+    const right = { x: mat.w / 2 + PLACARD_STANDOFF, z: 0, azim: Math.PI / 2 };
+    const left = { x: -(mat.w / 2 + PLACARD_STANDOFF), z: 0, azim: 3 * Math.PI / 2 };
+    for (const [k, N, o, who] of [[0, 2, front, 'front'], [1, 2, back, 'back'], [1, 4, right, 'right head'], [3, 4, left, 'left head'],
+      [0, 4, front, 'front'], [2, 4, back, 'back']]) {
+      const a = seatAnchor(k, N, 0, mat.w, mat.d);
+      assert.equal(a.x, o.x, `${mat.id} seat ${k}/${N} x === the ${who} station's (${a.x} vs ${o.x})`);
+      assert.equal(a.z, o.z, `${mat.id} seat ${k}/${N} z === the ${who} station's (${a.z} vs ${o.z})`);
+      assert.equal(a.azim, o.azim, `${mat.id} seat ${k}/${N} azim`);
+      assert.equal(a.y, 0);
+      assert.equal(a.relocated, false);
     }
   }
   // The digit table, for the reader: front/back z and head x per mat.
