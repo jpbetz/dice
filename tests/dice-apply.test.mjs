@@ -106,7 +106,7 @@ t('validate: unknown, wrong type, option, through a dial, map-not-leaf — one l
     'table:',
     '  scale:',
     '    label: x',                // through a dial
-    '  seats: 4',                  // no dial (phase 2)
+    '  legs: 4',                   // no dial
     'camera:',
     '  framing: 2',                // a map in the tree
     '',
@@ -117,7 +117,7 @@ t('validate: unknown, wrong type, option, through a dial, map-not-leaf — one l
     'light.lamp.q: no dial at this path',
     'light.motes.state: expected one of enabled | disabled, got sometimes',
     'table.scale.label: passes through the dial at table.scale',
-    'table.seats: no dial at this path',
+    'table.legs: no dial at this path',
     'camera.framing: a map in the dial tree, not a leaf',
   ]);
 });

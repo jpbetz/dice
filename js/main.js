@@ -33,7 +33,7 @@ import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
 // stands, AIM_ZERO for the shared frozen zero every unstamped roll aims through.
 import { laneSpread, aimFor, regionFor, AIM_ZERO, seatAnchor, wrapPi,
   entryFor, seatTrig, seatValid, seatStamp, seatToss, tossAim, ringRadius,
-  TOSS_PER, SPOT_R, RING_SPOT, PLACARD_STANDOFF, PLACARD_D, PLACARD_W, PLACE_AIM } from './places.js';
+  SPOT_R, PLACARD_STANDOFF, PLACARD_D, PLACARD_W, PLACE_AIM, SEAT_TOSS } from './places.js';
 // THE CAST (js/demo.js — read its header for the law): a dev instrument for
 // looking at a full table in ONE TAB, a section of DEVELOPER MODE since
 // 2026-09-02 (docs/DEVMODE.md). Every line of it in this file is behind
@@ -167,6 +167,18 @@ const placeAimSync = () => Object.assign(PLACE_AIM, {
 });
 placeAimSync();
 tune.bind('throw.aim.*', placeAimSync);
+// THE RING TOSS, the same way (js/places.js SEAT_TOSS; dice.yaml table.seats;
+// Joe 2026-09-02: "aim at the target always, but have the ability to throw
+// from further back"). The spot moves the frame and the overlay as well as
+// the throw, so a dial re-syncs both; the throw itself reads the object at
+// the next roll.
+const seatTossSync = () => {
+  Object.assign(SEAT_TOSS, T.table.seats);
+  if (typeof demoOverlaySync === 'function' && devOn()) demoOverlaySync();
+  if (typeof applyCameraFraming === 'function') applyCameraFraming(false);
+};
+Object.assign(SEAT_TOSS, T.table.seats);
+tune.bind('table.seats.*', seatTossSync);
 
 // DEVELOPER MODE'S STATE (docs/DEVMODE.md §4 — "the door"). Tab-local and
 // nothing else: no store, no mirror, no URL param. `?demo=1` was the first
@@ -6853,8 +6865,8 @@ function playRoll(roll, rethrow = null) {
   // one there.
   let laneWorld = 0;
   let spreadOverride = null;
-  // A toss lines its dice up tighter than a hurl (js/places.js TOSS_PER).
-  if (ring) spreadOverride = Math.min(TABLE_W - SPAWN.pad, throwCount * TOSS_PER);
+  // A toss lines its dice up tighter than a hurl (js/places.js SEAT_TOSS.per).
+  if (ring) spreadOverride = Math.min(TABLE_W - SPAWN.pad, throwCount * SEAT_TOSS.per);
   if (laneSlot) {
     const pool = rethrow
       ? rethrow.thrown.map((di) => types[di]).filter((t) => DIE_DEFS[t]) : types;
@@ -28985,7 +28997,7 @@ function matSquarePoints() {
   // CARDS (the table's true edge), not the walls; unplaced tables fit the mat.
   const h = placeRows().length >= 3
     ? ringRadius(TABLE_W) + PLACARD_STANDOFF + PLACARD_D / 2
-    : ringRadius(TABLE_W) * (RING_SPOT + FRAME_SPOT);
+    : ringRadius(TABLE_W) * (SEAT_TOSS.spot + FRAME_SPOT);
   const pts = [];
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {

@@ -15,6 +15,13 @@ app:
 table:
   scale: 2.5               # the one dial for table size (Joe 2026-09-01)
   ceilingY: 22             # the roof plane the walls close under
+  seats:                   # the ring toss: aimed at the spot always, released behind it
+    spot: 0.5              # the target, as a share of the radius from centre toward the chair
+    back: 0.4              # release point behind the spot, along the chair's ray (table units)
+    height: 0.3            # release height, a share of the hurl's 6–10 unit spawn
+    speed: 0.12            # release speed, a share of the hurl's 14–22 units/s — a drop, not a throw
+    box: 0.15              # scatter box around the spot, a share of the throw target box
+    per: 1.5               # pool pitch, units between dice on the release line
 
 light:
   lamp:

@@ -251,6 +251,18 @@ export const DIALS = {
     scale: film('table scale', 2.5, [1, 4, 0.05], 'apply',
       'the one dial for table size (Joe 2026-09-01) — TABLE_SCALE; a bigger table IS smaller dice'),
     ceilingY: film('ceiling', 22, [8, 60, 1], 'reload', 'the roof plane the walls close under'),
+    // places.js SEAT_TOSS — the ring toss. Aimed at the spot always; `back`
+    // moves the release point away from it, so `height` and `speed` rise with
+    // it or the dice land short (Joe 2026-09-02: "aim at the target always,
+    // but have the ability to throw from further back").
+    seats: {
+      spot: film('target', 0.5, [0.1, 0.95, 0.01], 'roll', 'the spot, as a share of the radius from centre toward the chair'),
+      back: film('release back', 0.4, [0, 8, 0.05], 'roll', 'the release point behind the spot, along the chair\'s ray, in table units'),
+      height: film('release height', 0.3, [0.05, 2, 0.05], 'roll', 'a share of the hurl\'s 6–10 unit spawn height'),
+      speed: film('release speed', 0.12, [0.02, 1.2, 0.01], 'roll', 'a share of the hurl\'s 14–22 units/s'),
+      box: film('scatter', 0.15, [0, 1, 0.01], 'roll', 'the scatter box around the spot, a share of the throw target box'),
+      per: film('pool pitch', 1.5, [0.5, 4, 0.05], 'roll', 'units between dice on the line (the hurl uses spawn.per)'),
+    },
   },
   light: {
     // MOOD.tune (main.js) — the lamp and the room, lampY → lamp.y etc.
@@ -403,7 +415,7 @@ export const DIALS = {
     aim: {
       state: pick('aim', 'enabled', ENABLED, 'film', 'roll'),
       speed: film('aim speed', 0.5, [0, 2, 0.05], 'roll'),
-      h: film('aim height', 0.45, [0, 3, 0.05], 'roll', 'a low hand'),
+      h: film('aim height', 0.45, [0, 3, 0.05], 'roll', 'a low hand — the rectangle-era hurl only; the ring toss reads table.seats.height'),
       box: film('aim box', 0.25, [0, 1, 0.01], 'roll', 'the fraction of the run the box is cut to'),
       corner: pick('aim corner', 'enabled', ENABLED, 'film', 'roll', 'enabled: a lane sets the box against its corner'),
       own: pick('aim own', 'enabled', ENABLED, 'film', 'roll', 'enabled: the seat throws along its own axis'),

@@ -790,13 +790,23 @@ export function ringRadius(w) {
 // Measured 2026-09-01 (tools/steps/ring-look.mjs prints each pool's centroid
 // against its spot): a die thrown from the rim at 0.35 of the hurl crossed the
 // spot and kept going; the drop is what lands.
-export const RING_SPOT = 0.5;
+//
+// THE TOSS IS A DIAL SET (2026-09-02, Joe: "aim at the target always, but have
+// the ability to throw from further back"). SEAT_TOSS is the one mutable object
+// the toss reads, in the shape dice.yaml's `table.seats` declares; main.js
+// copies the tree into it at boot and on every dial (the PLACE_AIM pattern —
+// this file is imported by server.js and must not import tune.js). The
+// velocity always points at the spot, so `back` alone lands short: `height`
+// and `speed` rise with it. The consts below are the SHIPPED values, read by
+// the unit rows and by nothing that moves.
+export const SEAT_TOSS = { spot: 0.5, back: 0.4, height: 0.3, speed: 0.12, box: 0.15, per: 1.5 };
+export const RING_SPOT = SEAT_TOSS.spot;
 export const SPOT_R = 0.22;     // the spot's drawn radius (overlay) and the frame's unit, as a share of the table's radius
-export const TOSS_BACK = 0.4;
-export const TOSS_H = 0.3;
-export const TOSS_PER = 1.5;    // the pool line's pitch for a toss (the hurl's is SPAWN.per 2.6)
-export const TOSS_SPEED = 0.12;
-export const TOSS_BOX = 0.15;   // the scatter box around the spot, as a share of the shipped THROW_TARGET box
+export const TOSS_BACK = SEAT_TOSS.back;
+export const TOSS_H = SEAT_TOSS.height;
+export const TOSS_PER = SEAT_TOSS.per;    // the pool line's pitch for a toss (the hurl's is SPAWN.per 2.6)
+export const TOSS_SPEED = SEAT_TOSS.speed;
+export const TOSS_BOX = SEAT_TOSS.box;   // the scatter box around the spot, as a share of the shipped THROW_TARGET box
 
 // The toss for a stamped roll: {theta, x, z (spawn line midpoint), tx, tz (the
 // line's direction — the tangent), ax, az (the spot)}. null for a bad stamp.
@@ -807,8 +817,8 @@ export function seatToss(seat, seats, arc, w) {
   if (theta === null) return null;
   const { s, c } = seatTrig(theta);
   const R = ringRadius(w);
-  const r1 = R * RING_SPOT;
-  const r0 = r1 + TOSS_BACK;
+  const r1 = R * SEAT_TOSS.spot;
+  const r0 = r1 + SEAT_TOSS.back;
   return { theta, x: r0 * s, z: r0 * c, tx: c, tz: -s, ax: r1 * s, az: r1 * c };
 }
 
@@ -816,8 +826,8 @@ export function seatToss(seat, seats, arc, w) {
 // centred on the spot and square in world units.
 export function tossAim(toss, w, d) {
   if (!toss) return AIM_ZERO;
-  return { x: toss.ax, z: toss.az, kx: TOSS_BOX, kz: (TOSS_BOX * w) / d,
-    k: TOSS_SPEED, own: 0, spin: PLACE_AIM.spin, h: TOSS_H };
+  return { x: toss.ax, z: toss.az, kx: SEAT_TOSS.box, kz: (SEAT_TOSS.box * w) / d,
+    k: SEAT_TOSS.speed, own: 0, spin: PLACE_AIM.spin, h: SEAT_TOSS.height };
 }
 
 // ---------------------------------------------------------------------------
