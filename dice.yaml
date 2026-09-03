@@ -161,6 +161,18 @@ pace:
   clear:
     sinkS: 0.3             # how long a cleared die takes to leave
 
-sound:
+sound:                     # look all the way down: what you hear off the film is yours
+  master: 0.7              # the whole table's level; every voice is a fraction of it
+  impact:
+    gain: 0.06             # the DEFAULT contact body's level (felt) — most sounds this app makes
   click:
     mode: film             # film | wall — film is invariant to the tempo curve
+
+post:
+  bloom:
+    threshold: 0.9         # linear pre-tonemap luminance a glow-flagged mesh must clear
+
+cards:                     # the name card's footprint; the rig is baked at boot, so these are ⟳
+  standoff: 0.86           # the card centre outboard of the rim (standoff − depth/2 is the clear ground)
+  width: 3.68              # across the chair's ray
+  depth: 1.52              # along the chair's ray

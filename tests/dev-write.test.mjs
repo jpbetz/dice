@@ -446,6 +446,62 @@ await t('isLoopback recognises loopback and nothing else', () => {
       assert.equal(mod.SOURCE, yamlNow(), 'and SOURCE is the saved text, which is what the next Save patches');
     });
 
+    // ---- an asset row is a lawful write, and the WIRE learns it at once -----
+    //
+    // docs/DEVMODE.md §9 (phase C4). A `felts:` row has no dial — its law is
+    // the section's row shape in js/tune.js — and the route's validator is
+    // js/dice-apply-core.js, shared with `tools/dice-apply.mjs`, so a felt
+    // authored in the panel lands by exactly the path a dial does.
+    //
+    // THE SECOND HALF IS THE ONE THAT WAS BROKEN (found running the e2e
+    // roundtrip, 2026-09-02): a Save ADOPTS the tree it just parsed rather
+    // than re-reading the file, so the felt id was in the served module and
+    // still 400'd at /api/settings until some later, unrelated edit — a house
+    // felt that worked alone and failed the moment anybody else was at the
+    // table, which is exactly the failure the three hand-kept lists exist to
+    // prevent. Every assignment to `declaration` now goes through one setter.
+    await t('a felts row saves like a dial, and the server accepts the id on the wire immediately', async () => {
+      const r = await post(base, {
+        file: 'dice.yaml',
+        changes: {
+          'felts.house-moss.name': 'Moss', 'felts.house-moss.cloth': 'silt',
+          'felts.house-moss.feltBase': '#1f3a22', 'felts.house-moss.sceneBg': '#0c120d',
+        },
+      });
+      assert.equal(r.status, 200, JSON.stringify(r.data));
+      assert.equal(r.data.changes.length, 4);
+      const tree = parseYaml(yamlNow()).tree;
+      assert.deepEqual(tree.felts, {
+        'house-moss': { name: 'Moss', cloth: 'silt', feltBase: '#1f3a22', sceneBg: '#0c120d' },
+      }, 'the section the file never had was created under the root');
+      assert.equal(tree.light.lamp.y, 30, 'and the dials written before it are untouched');
+
+      const join = await fetch(`${base}/api/join`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room: 'dev-write-felts', name: 'Alice' }),
+      }).then((res) => res.json());
+      const setFelt = (felt) => fetch(`${base}/api/settings`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room: 'dev-write-felts', playerId: join.playerId, settings: { felt } }),
+      });
+      const ok = await setFelt('house-moss');
+      assert.equal(ok.status, 200, 'the id the Save just created is accepted with no reload of anything');
+      assert.equal((await ok.json()).settings.felt, 'house-moss');
+      assert.equal((await setFelt('chartreuse')).status, 400, 'and one nobody declared is still refused');
+    });
+
+    await t('a felts row with a field that is not a field is refused by name', async () => {
+      const before = yamlNow();
+      const r = await post(base, { file: 'dice.yaml', changes: { 'felts.house-ash.sheen': 0.5 } });
+      assert.equal(r.status, 400);
+      assert.equal(r.data.reason, 'refused');
+      assert.match(r.data.problems.join(' '), /no felts field named "sheen"/);
+      const bad = await post(base, { file: 'dice.yaml', changes: { 'sets.house-ember.label': 'Ember' } });
+      assert.equal(bad.status, 400, '…and a section this build cannot declare rows in says so');
+      assert.match(bad.data.problems.join(' '), /not declarable in this build/);
+      assert.equal(yamlNow(), before, 'nothing written either time');
+    });
+
     await t('a second write reads the first\'s text: the earlier change survives', async () => {
       const r = await post(base, { file: 'dice.yaml', changes: { 'light.lamp.y': 30, 'light.room.hemi': 0.5 } });
       assert.equal(r.status, 200);

@@ -223,9 +223,15 @@ function fakeTune({ dials = DIALS, declared = DECLARED } = {}) {
       }
       return { diff: tune.diff(), refused, pending };
     },
+    // `extraDiff` is the one thing this fake has that the contract does not: a
+    // way for a test to stand a diff entry the leaf walk cannot produce — an
+    // ASSET ROW added or removed, which is a leaf of one tree and not the
+    // other (js/tune.js `diff` walks both).
+    extraDiff: [],
     diff: () => leaves(SHIPPED).map((path) => ({ path: path.join('.'), shipped: getLeaf(SHIPPED, path), live: getLeaf(T, path) }))
       .filter((d) => d.shipped !== d.live)
-      .map((d) => { const dl = tune.dialAt(d.path); return { ...d, cls: dl ? dl.cls : 'look', read: dl ? dl.read : 'apply', declared: hasLeaf(declared, d.path) }; }),
+      .map((d) => { const dl = tune.dialAt(d.path); return { ...d, cls: dl ? dl.cls : 'look', read: dl ? dl.read : 'apply', declared: hasLeaf(declared, d.path) }; })
+      .concat(tune.extraDiff),
     reset(scope = 'all') {
       const patch = {};
       for (const path of leaves(SHIPPED)) {
@@ -1009,6 +1015,102 @@ t('file: Reset all, paste preview lists refusals, Apply merges, Shut calls back'
     assert.equal(byClass(root, 'dev-foot-perf').textContent, '41 fps · 120 calls');
     panel.unmount();
     assert.equal(root.parentNode, null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// the felts section (phase C4) — the first ASSET editor, and the two things
+// the C4 review found it saying that were not true.
+// ---------------------------------------------------------------------------
+
+// The row shape, to the contract's shape and not imported — same discipline as
+// the fake Tune above (js/tune.js ASSET_ROWS.felts is the real one).
+const FELT_FIELDS = {
+  name: look('name', 'House felt', null, 'apply'),
+  cloth: pick('cloth', 'felt', ['felt', 'silt', 'oak'], 'look', 'apply'),
+  feltBase: look('felt base', '#1c1c24', null, 'apply'),
+  breath: look('breath depth', 1, [0, 2, 0.05], 'apply'),
+};
+const FELT_ROW_DEF = { name: 'House felt', cloth: 'felt', feltBase: '#1c1c24', breath: 1 };
+
+function fakeFelts(rows) {
+  const cat = rows.map((r) => ({ ...FELT_ROW_DEF, shipped: false, inFile: false, current: false, ...r }));
+  const log = [];
+  const at = (id) => cat.find((f) => f.id === id) || null;
+  return {
+    log,
+    cat,
+    fields: () => FELT_FIELDS,
+    list: () => cat.map((f) => ({ ...f })),
+    add: (id, row) => {
+      cat.push({ ...FELT_ROW_DEF, shipped: false, inFile: false, current: false, id, ...row });
+      log.push(`add(${id})`);
+      return { id, refused: [], felts: cat };
+    },
+    set: (id, patch) => { Object.assign(at(id), patch); log.push(`set(${id})`); return { id, refused: [], felts: cat }; },
+    remove: (id) => { cat.splice(cat.indexOf(at(id)), 1); log.push(`remove(${id})`); return { id, refused: [], felts: cat }; },
+    apply: (id) => { for (const f of cat) f.current = f.id === id; log.push(`apply(${id})`); return { felt: id, felts: cat }; },
+  };
+}
+
+// `· N changed` MEANS CHANGED. The section reused the dial chrome's count and
+// fed it the number of HOUSE ROWS, so a panel opened against a dice.yaml that
+// declares one unedited felt read "FELTS · 1 changed" and wore the changed
+// mark while devInfo().changed was 0 and the file section's diff was empty
+// (the C4 review, 2026-09-03).
+t('felts: the count is what the FILE would gain, lose or amend — not the house-row tally', () => {
+  const felts = fakeFelts([
+    { id: 'obsidian', name: 'Obsidian', shipped: true },
+    { id: 'house-moss', name: 'Moss', inFile: true, current: true },
+  ]);
+  const { root, tune, panel } = fresh({ felts });
+  const sec = root.find((n) => n.classList.contains('dev-section') && n.dataset.section === 'felts');
+  assert.ok(sec, 'the section is there when a felts api is given');
+  const count = byClass(sec, 'dev-sec-count');
+  assert.equal(count.textContent, '', 'a declared row nobody has touched is not a change');
+  assert.equal(sec.classList.contains('is-changed'), false);
+  const note = byClass(sec, 'dev-clockout').textContent;
+  assert.match(note, /house-moss · declared in dice\.yaml/);
+  assert.match(note, /\n1 house felt · 1 shipped/, 'the catalogue tally moved to the note, which has words for it');
+
+  // One row edited and one row minted this session: two rows in the diff, two
+  // in the count — the same arithmetic the file section does.
+  tune.extraDiff = [
+    { path: 'felts.house-moss.name', shipped: 'Moss', live: 'Bog', cls: 'look', read: 'apply', declared: true },
+    { path: 'felts.house-ash.name', shipped: undefined, live: 'Ash', cls: 'look', read: 'apply', declared: false },
+    { path: 'felts.house-ash.cloth', shipped: undefined, live: 'oak', cls: 'look', read: 'apply', declared: false },
+  ];
+  panel.repaint();
+  assert.equal(count.textContent, '· 2 changed', 'two rows, not three leaves and not two house rows');
+  assert.equal(sec.classList.contains('is-changed'), true);
+  panel.unmount();
+});
+
+// THE PREVIEW READS BOTH TREES, because Apply does. `tune.set` was widened to
+// take a write into a row minted THIS session — that is how the felt editor
+// moves a slider — and the preview still asked only SHIPPED, so it said "no
+// such dial" about a field it then wrote (the C4 review, 2026-09-03).
+t('file: the paste preview judges a session row\'s field the way Apply will', () => {
+  const parsed = {
+    'felts.house-ash.name': 'Ashen',      // a row this session minted: T has it
+    'felts.house-moss.name': 'Bog',       // a row that was REMOVED: SHIPPED has it, T does not
+    'felts.house-never.name': 'X',        // no such row anywhere
+    'light.lamp.y': 40,
+  };
+  const { root, tune, panel } = fresh({ verbs: { parsePatch: () => parsed } });
+  tune.SHIPPED.felts = { 'house-moss': { ...FELT_ROW_DEF, name: 'Moss' } };
+  tune.T.felts = { 'house-ash': { ...FELT_ROW_DEF, name: 'Ash' } };
+  const file = root.find((n) => n.classList.contains('dev-section') && n.dataset.section === 'file');
+  byClass(file, 'dev-paste').value = 'anything';
+  click(byText(file, 'Preview'));
+  return Promise.resolve().then(() => Promise.resolve()).then(() => {
+    const rowsP = allClass(file, 'dev-preview-row');
+    assert.deepEqual(rowsP.map((r) => r.classList.contains('is-refused')), [false, true, true, false]);
+    assert.deepEqual(rowsP.slice(1, 3).map((r) => byClass(r, 'dev-preview-reason').textContent),
+      ['that row is not there — revert it whole, or Reset all', 'no such dial'],
+      'a removed row and a row that never existed are different refusals');
+    assert.match(byClass(file, 'dev-preview').textContent, /2 would apply · 2 refused/);
+    panel.unmount();
   });
 });
 

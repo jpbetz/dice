@@ -209,6 +209,37 @@ t('a leaf the checkout omits is inserted under its map and reported (absent)', (
   assert.ok(yamlOf(dir).includes('\n    z: 2\n'), 'one inserted line under lamp');
 });
 
+t('a felts row rides the same loop: the section is created, and a bad field is one line', () => {
+  // THE ASSET HALF OF THE LOOP (docs/DEVMODE.md §9, phase C4). A row under
+  // `felts:` has no dial in the dial tree — its law is the section's ROW
+  // SHAPE (js/tune.js ASSET_ROWS) — and this tool and the armed Save route
+  // share one validator, so a felt authored in the panel and downloaded lands
+  // in the checkout by exactly the path a dial does.
+  const dir = tree();
+  const dl = given(dir, `${FILE}felts:\n  house-moss:\n    name: Moss\n    cloth: silt\n`);
+  const r = run(dir, [dl]);
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(r.out.split('\n').slice(0, 2),
+    ['felts.house-moss.name: (absent) → Moss', 'felts.house-moss.cloth: (absent) → silt']);
+  const after = parseYaml(yamlOf(dir)).tree;
+  assert.deepEqual(after.felts, { 'house-moss': { name: 'Moss', cloth: 'silt' } });
+  assert.ok(yamlOf(dir).startsWith(FILE), 'appended under a new section; not a byte of the rest moved');
+
+  // …and the row shape is the law for a value, exactly as a dial is
+  const bad = tree();
+  // The id is QUOTED here on purpose: an UNQUOTED dotted key never reaches
+  // the validator at all — js/yaml.js refuses it at its line, which is the
+  // older and blunter half of the same rule. Quoted, it parses, and then the
+  // id rule is what turns it away.
+  const dl2 = given(bad, `${FILE}felts:\n  house-moss:\n    cloth: linen\n  "house.ash":\n    name: Ash\n`);
+  const r2 = run(bad, [dl2]);
+  assert.equal(r2.code, 2, r2.out);
+  assert.match(r2.err, /felts\.house-moss\.cloth: expected one of felt \| silt \| oak, got linen/);
+  assert.match(r2.err, /"house\.ash" is not a legal felts id \(.*no dot\)/);
+  assert.match(r2.err, /2 problems; nothing written/);
+  assert.equal(yamlOf(bad), FILE, 'and nothing was written');
+});
+
 t('an unknown leaf: exit 2, one line, nothing written', () => {
   const dir = tree();
   const dl = given(dir, patchYaml(FILE, { 'light.lamp.y': 30 }).replace('    z: 1.5', '    zz: 1.5'));

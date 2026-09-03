@@ -57,9 +57,10 @@ limitations under the License.
 // the wrong type and every set() on it would be refused with no message. A
 // null at a dial (`y:` with nothing after it) is ABSENT, not a value: the
 // default stands, which is what "every leaf is optional" means. Keys
-// containing a dot are dropped the same way until phase 3 puts asset ids
-// under `sets:`/`felts:` — every path in this module is also a dotted
-// string, and a dot inside a key would make it ambiguous. A boolean
+// containing a dot are dropped the same way — every path in this module is
+// also a dotted string, and a dot inside a key would make it ambiguous; the
+// asset ids that arrived with `felts:` (ASSET_ID_RE) carry the same rule and
+// say more about why beside it. A boolean
 // anywhere still throws: the YAML reader refuses booleans at parse, so one
 // can only arrive from code, and that is a programming error.
 //
@@ -227,6 +228,109 @@ export const FORBIDDEN_LEAF = /(^|[^a-z])(rng|value|values|face|faces|seed|fixed
 // door; the reason is 'static'. The list is exported so devmode.js draws
 // the same leaves static that this refuses, from one source.
 export const STATIC_PATHS = Object.freeze(['app.mode']);
+
+// ---------------------------------------------------------------------------
+// ASSET SECTIONS (docs/DEVMODE.md §9, phase C4) — the second kind of thing a
+// declaration holds.
+// ---------------------------------------------------------------------------
+//
+// A DIAL IS A LEAF AT A FIXED PATH; AN ASSET IS A ROW AT AN ID YOU CHOOSE.
+// `light.lamp.y` is one number the app has always had; `felts.house-moss` is
+// a felt that did not exist until somebody wrote it down. The dial tree
+// cannot carry the second — there is no path to put a dial at — so an asset
+// section is declared by its ROW SHAPE instead: `ASSET_ROWS[section]` is a
+// map of dials, one per field, and every row in that section is those fields.
+// Everything else follows from that one move: `dialAt` resolves
+// `felts.<id>.cloth` to the row's `cloth` dial, so `set` type-checks and
+// enum-checks an asset field exactly as it checks a dial; the declaration is
+// reconciled at birth the same way; and js/dice-apply-core.js's validator —
+// the one both the apply tool and the armed Save route run — accepts an asset
+// leaf without a second idea of what a legal value is.
+//
+// NO DOT IN AN ID, and that is a narrowing of the design sketch (DEVMODE §3
+// wrote `house.moss`). Every path in this module, in `changes()`, in the
+// panel's rows and in what the Save route posts is a DOTTED STRING, so an id
+// with a dot in it stops being one path and becomes two readings of one
+// string — and the flat `{ path: value }` map the route was built around has
+// nowhere to say which was meant. js/yaml.js is ready for the day this is
+// lifted (`formatKey` quotes a dotted key and `readKey` refuses an unquoted
+// one), and the day is when `sets:` arrives, because a dice-set id genuinely
+// carries dots today (`emberforge.blackanvil`). Until then a house felt is
+// `house-moss` and a dotted id is refused with its path, which is the only
+// honest answer a build that cannot round-trip it can give.
+export const ASSET_SECTIONS = Object.freeze(['sets', 'felts', 'towers', 'venues']);
+// A row id: lower-case, digits, `-` and `_`, 32 characters. The house prefix
+// (`house-`) is a CONVENTION and not enforced here — what actually protects a
+// shipped row is the collision check at the merge site (js/main.js
+// `feltThemesSync`, where the shipped row stands and one console line says so),
+// because that is the only place that knows what is shipped.
+export const ASSET_ID_RE = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+export const ASSET_ID_WHY = 'lower-case letters, digits, "-" and "_", 32 characters, no dot';
+
+// THE FELT ROW — js/main.js's `FELT_THEMES` row, field for field, as dials.
+// `mottle` and `breath` are absent from most shipped rows and mean 1 there
+// (main.js: "absent means 1, the shipped beat"), so 1 is the default here and
+// a row that says nothing about them gets the shipped behaviour.
+//
+// `cloth` NAMES A PAINTER AND THE PAINTERS ARE CODE (DEVMODE §9: "Code-only
+// stays code-only"). The options are the three in main.js's FELT_CLOTHS; a
+// fourth cloth is a function somebody writes, and then a line here.
+const FELT_ROW = Object.freeze({
+  name: look('name', 'House felt', null, 'apply', 'what the swatch is called in the picker'),
+  cloth: pick('cloth', 'felt', ['felt', 'silt', 'oak'], 'look', 'apply',
+    'the painter this mat is made of — main.js FELT_CLOTHS; a new one is code, not a row'),
+  feltBase: look('felt base', '#1c1c24', null, 'apply', 'the cloth\'s own colour, and the seed its grain is drawn from'),
+  // `scene bg`, not `scene background`: the label column is 320px of mono and
+  // the long form measured as "scene back…", which is the half that says
+  // nothing. The sentence lives in the tooltip, where there is room for it.
+  sceneBg: look('scene bg', '#0f0f13', null, 'apply', 'the room behind the table, and the fog\'s colour'),
+  breath: look('breath depth', 1, [0, 2, 0.05], 'apply',
+    'how far this cloth takes the declare beat — a darker cloth has less light to lose, so it must lose more of it'),
+  mottle: look('mottle', 1, [0, 2, 0.05], 'apply', 'how unevenly the nap catches the light; a raked bed wants less'),
+});
+
+// section → the row's dials, or null for a section this build cannot yet
+// declare rows in. Absent is not the same as empty: `sets`, `towers` and
+// `venues` are named here so a row under one of them is refused with the
+// reason it actually has (phase 3, not "no such section").
+export const ASSET_ROWS = Object.freeze({
+  sets: null,
+  felts: FELT_ROW,
+  towers: null,
+  venues: null,
+});
+
+// A fresh row of a section's defaults — what an editor's Clone starts from
+// and what `addRow` fills the fields a caller left out with.
+export function assetRowDefaults(section) {
+  const fields = ASSET_ROWS[section];
+  if (!fields) return null;
+  const out = {};
+  for (const [k, d] of Object.entries(fields)) out[k] = Array.isArray(d.def) ? d.def.slice() : d.def;
+  return out;
+}
+
+// The dial for one leaf of an asset row, or a STRING saying why there is
+// none — the same two-shaped answer js/dice-apply-core.js's `dialFor` gives,
+// so that file can hand an asset path straight here.
+export function assetDialFor(path) {
+  const p = toPath(path);
+  const [section, id, field] = p;
+  if (!ASSET_SECTIONS.includes(section)) return 'no dial at this path';
+  const fields = ASSET_ROWS[section];
+  if (!fields) return `\`${section}:\` rows are not declarable in this build (docs/DEVMODE.md §9, phase 3)`;
+  if (id === undefined) return `\`${section}:\` is a map of rows; name one`;
+  if (!ASSET_ID_RE.test(String(id))) return `${JSON.stringify(String(id))} is not a legal ${section} id (${ASSET_ID_WHY})`;
+  if (field === undefined) return `${section}.${id} is a row of fields; name one`;
+  // Four segments and up is almost always a DOTTED ID read as extra levels
+  // (`felts.house.moss.cloth`), so the message names that rather than only
+  // the depth — it is the mistake this path is here to explain.
+  if (p.length > 3) return `${section} rows are one level deep: ${JSON.stringify(`${id}.${field}`)} `
+    + `reads as a row and a field, and an id may not contain a dot (${ASSET_ID_WHY})`;
+  const d = fields[field];
+  return isDial(d) ? d : `no ${section} field named ${JSON.stringify(String(field))} `
+    + `(${Object.keys(fields).join(', ')})`;
+}
 
 // ---------------------------------------------------------------------------
 // THE DIAL TREE (phase 1). Shape = docs/DEVMODE.md §3. Ranges are the
@@ -451,11 +555,63 @@ export const DIALS = {
     },
   },
   sound: {
+    // THE TWO LEVELS THE TABLE ACTUALLY HAS (phase C5). Sound is LOOK all the
+    // way down — the film is a bake of poses and contacts, and what a viewer
+    // hears off it is theirs (GOALPOST 7). A locked table's dev tab may still
+    // turn itself down.
+    //
+    // js/voices.js MASTER_GAIN — the single gain every source in the graph
+    // passes through, and the mute point. Everything in docs/AUDIO.md's mix
+    // plan is a fraction of it, so this is the one number that moves the whole
+    // table at once; the dBFS arithmetic in tests/voices.test.mjs is written
+    // against the 0.7 js/voices.js still owns.
+    master: look('master', 0.7, [0, 1, 0.01], 'apply',
+      'the whole table\'s level — every voice is a fraction of it (js/voices.js MASTER_GAIN)'),
+    // IMPACT_VOICES.felt.gainScale — the DEFAULT body's level, which is to say
+    // the level of most sounds this app makes: `felt` is IMPACT_DEFAULT_BODY,
+    // every unthemed die resolves to it, and since 2026-08-18 both fae venues
+    // do too. Not the whole family: the other seven bodies are authored
+    // AGAINST this one (bell's 0.041 is solved from chime's 0.045), so a dial
+    // over all eight would silently unsolve them.
+    impact: {
+      gain: look('impact gain', 0.06, [0, 0.2, 0.002], 'roll',
+        'the default contact body\'s level (js/voices.js IMPACT_VOICES.felt.gainScale); read at every contact'),
+    },
     // CLICKGATE — which clock gates the impact clicks.
     click: {
       mode: pick('click gate', 'film', ['film', 'wall'], 'look', 'apply',
         'film is invariant to the tempo curve; wall is the pre-curve gate'),
     },
+  },
+  post: {
+    // js/post.js BLOOM_THRESHOLD, on LINEAR pre-tonemap luminance. LOOK, and
+    // that is the whole reason it may be a dial at all: a venue authors its
+    // emissive tiers against this number (fae grammar rule 3, "authored to the
+    // threshold, because there is no post-hoc dial") — so turning it down is
+    // how you SEE what a tier is doing, and turning it up is not a way to
+    // publish a different table. Nothing on the wire reads it.
+    bloom: {
+      threshold: look('bloom threshold', 0.9, [0, 3, 0.01], 'apply',
+        'linear pre-tonemap luminance a glow-flagged mesh must clear to burn'),
+    },
+  },
+  // js/places.js PLACARD — the name card's footprint (docs/UX.md §7.63).
+  //
+  // FILM, and not because a card touches a die: it cannot, by the standoff's
+  // own construction. It is film because `placardFootprint`, `placardGap` and
+  // `seatAnchor` are the SHARED geometry two clients must agree on double for
+  // double (js/places.js: "two clients must agree on every double here") — one
+  // tab whose cards are 15% wider is one tab whose ring is not the ring
+  // everybody else is looking at.
+  //
+  // RELOAD, every one of them: js/placard.js bakes one instanced rig at boot
+  // and the anchors are computed from these numbers at every flush. Moving a
+  // dial marks the row ⟳ and the next boot wears it.
+  cards: {
+    standoff: film('card standoff', 0.86, [0.2, 4, 0.01], 'reload',
+      'the card centre outboard of the rim; standoff − depth/2 is the clear ground no die can cross'),
+    width: film('card width', 3.68, [1, 8, 0.01], 'reload', 'across the chair\'s ray'),
+    depth: film('card depth', 1.52, [0.4, 4, 0.01], 'reload', 'along the chair\'s ray'),
   },
 };
 
@@ -533,7 +689,16 @@ function reconcile(decl, dials, prefix, refuse) {
   for (const [k, v] of Object.entries(decl)) {
     const p = prefix.concat(k), path = p.join('.');
     if (k.includes('.')) {
-      refuse(path, 'key', `key ${JSON.stringify(k)} under ${prefix.length ? prefix.join('.') : 'the root'} contains a dot; dotted keys are not supported until phase 3, so it is dropped`);
+      refuse(path, 'key', `key ${JSON.stringify(k)} under ${prefix.length ? prefix.join('.') : 'the root'} contains a dot; every path here is a dotted string, so a dotted key cannot be addressed and it is dropped`);
+      continue;
+    }
+    // AN ASSET SECTION IS CHECKED BY ITS ROW SHAPE, not by the dial tree —
+    // there is no dial at `felts.house-moss.cloth` to walk to, only a row
+    // whose `cloth` field is one. Only at the root: `felts` deeper in the
+    // tree would be an ordinary map.
+    if (!prefix.length && ASSET_SECTIONS.includes(k)) {
+      const rows = reconcileRows(k, v, refuse);
+      if (rows) out[k] = rows;
       continue;
     }
     const d = isPlain(dials) ? dials[k] : undefined;
@@ -559,6 +724,61 @@ function reconcile(decl, dials, prefix, refuse) {
     } else {
       out[k] = cloneVal(v);
     }
+  }
+  return out;
+}
+
+// One asset section of the declaration against its row shape: every row is
+// filled out to the whole shape (a field the file omits gets the row
+// default, exactly as an omitted dial gets its own), and a bad id, a bad
+// field or a bad value is dropped by NAME with the default standing. Returns
+// the reconciled section, or null when the section itself is refused —
+// dropping a section wholesale rather than half of it, because half a
+// catalogue is the harder thing to notice.
+function reconcileRows(section, decl, refuse) {
+  const fields = ASSET_ROWS[section];
+  if (!fields) {
+    refuse(section, 'section', `\`${section}:\` rows are not declarable in this build (docs/DEVMODE.md §9, phase 3); the whole section is dropped`);
+    return null;
+  }
+  if (decl === null) return null;                       // absent, like a null at a dial
+  if (!isPlain(decl)) {
+    refuse(section, 'shape', `expected a map of rows, got ${JSON.stringify(decl)}; the section is dropped`);
+    return null;
+  }
+  const out = {};
+  for (const [id, row] of Object.entries(decl)) {
+    const at = `${section}.${id}`;
+    if (!ASSET_ID_RE.test(id)) {
+      refuse(at, 'key', `${JSON.stringify(id)} is not a legal ${section} id (${ASSET_ID_WHY}); the row is dropped`);
+      continue;
+    }
+    if (row === null) continue;
+    if (!isPlain(row)) {
+      refuse(at, 'shape', `expected a map of fields, got ${JSON.stringify(row)}; the row is dropped`);
+      continue;
+    }
+    const built = assetRowDefaults(section);
+    for (const [k, v] of Object.entries(row)) {
+      const d = fields[k];
+      if (!isDial(d)) {
+        refuse(`${at}.${k}`, 'unknown', `no ${section} field named ${JSON.stringify(k)} (${Object.keys(fields).join(', ')}); it is dropped`);
+        continue;
+      }
+      if (v === null) continue;
+      const want = typeOf(d.def);
+      if (isPlain(v)) { refuse(`${at}.${k}`, 'shape', `expected ${want}, got a map; the default stands`); continue; }
+      if (typeOf(v) !== want || (want === 'number' && !Number.isFinite(v))) {
+        refuse(`${at}.${k}`, 'type', `expected ${want}, got ${JSON.stringify(v)}; the default stands`);
+        continue;
+      }
+      if (d.options && !d.options.includes(v)) {
+        refuse(`${at}.${k}`, 'option', `expected one of ${d.options.join('|')}, got ${JSON.stringify(v)}; the default stands`);
+        continue;
+      }
+      built[k] = v;
+    }
+    out[id] = built;
   }
   return out;
 }
@@ -591,7 +811,16 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
 
   function dialAt(path) {
     const d = getLeaf(dials, path);
-    return isDial(d) ? d : null;
+    if (isDial(d)) return d;
+    // An asset row's field has no place in the dial tree; its dial is the
+    // section's row shape (ASSET_ROWS). Only when the dial tree does not
+    // itself own the section name, so a `dials` a caller passed in wins.
+    const p = toPath(path);
+    if (p.length > 1 && ASSET_SECTIONS.includes(p[0]) && !(isPlain(dials) && Object.hasOwn(dials, p[0]))) {
+      const a = assetDialFor(p);
+      if (isDial(a)) return a;
+    }
+    return null;
   }
 
   function get(path) { return getLeaf(T, path); }
@@ -620,7 +849,7 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
   }
 
   // THE writer, in two passes. First every accepted leaf lands in T
-  // (refusals, in order: unknown, static, film, type, option);
+  // (refusals, in order: unknown, row, static, film, type, option);
   // reload-class leaves no binder covers are reported as pending. Then
   // each distinct binder runs ONCE, after the whole patch is in T, as
   // fn(firstPath, firstValue, covered) where covered is every [path, value]
@@ -636,11 +865,30 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
     const runs = new Map();                       // fn → Map(key → { p, v, before })
     for (const [p, v] of entries) {
       const key = p.join('.');
-      if (!hasLeaf(SHIPPED, p)) { refused.push([key, 'unknown']); continue; }
+      // WHAT A LEAF IS, once rows exist: SHIPPED names every dial and every
+      // row the FILE declares, and T additionally holds the rows added since
+      // (`addRow`). A write into a row this session minted is not 'unknown' —
+      // it is how the felt editor moves a slider — so its type is read from T
+      // where SHIPPED has nothing to say.
+      const inShipped = hasLeaf(SHIPPED, p);
+      if (!inShipped && !hasLeaf(T, p)) { refused.push([key, 'unknown']); continue; }
+      // …AND A ROW THAT IS GONE IS GONE (found by the C4 review, 2026-09-03).
+      // SHIPPED still names every leaf of a row the FILE declares after
+      // `removeRow` took it out of T, so `hasLeaf(SHIPPED, p)` alone let one
+      // leaf write mint a row back — one field of the removed row and five
+      // guessed from FELT_ROW_DEFAULTS, a felt called Moss wearing obsidian's
+      // colours, while `exportChanges` still said the row was gone. That is
+      // exactly the half-built felt the comment below `diff` says must be
+      // impossible. The row is the unit: put it back whole (`reset` at the
+      // row's path) or leave it out.
+      if (p.length > 2 && ASSET_SECTIONS.includes(p[0]) && !isPlain(getLeaf(T, [p[0], p[1]]))) {
+        refused.push([key, 'row']);
+        continue;
+      }
       if (STATIC_PATHS.includes(key)) { refused.push([key, 'static']); continue; }
       const spec = dialAt(p);
       if (spec && spec.cls === 'film' && filmLocked) { refused.push([key, 'film']); continue; }
-      if (!typeFits(getLeaf(SHIPPED, p), v)) { refused.push([key, 'type']); continue; }
+      if (!typeFits(inShipped ? getLeaf(SHIPPED, p) : getLeaf(T, p), v)) { refused.push([key, 'type']); continue; }
       if (spec && spec.options && !spec.options.includes(v)) { refused.push([key, 'option']); continue; }
       const before = getLeaf(T, p);
       const moved = !same(before, v);
@@ -670,19 +918,138 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
 
   function set(patch, opts = {}) { return apply(entriesOf(patch), opts); }
 
+  // THE DIFF WALKS BOTH TREES, NOT ONE (phase C4). Until rows existed every
+  // leaf of T was a leaf of SHIPPED and the file's own leaves were the whole
+  // question. A row added this session is a leaf T has and SHIPPED does not
+  // (`shipped: undefined`), and a row REMOVED is the mirror of it
+  // (`live: undefined`) — which is exactly what `changes()` hands patchYaml
+  // to insert a row's lines or take them out again.
+  function entryFor(p, shipped, live) {
+    const spec = dialAt(p);
+    return {
+      path: p.join('.'), shipped, live,
+      cls: spec ? spec.cls : null, read: spec ? spec.read : null,
+      declared: hasLeaf(declared, p),
+    };
+  }
+
   function diff() {
     const out = [];
+    const seen = new Set();
     for (const p of leaves(SHIPPED)) {
-      const shipped = getLeaf(SHIPPED, p), live = getLeaf(T, p);
+      const key = p.join('.');
+      seen.add(key);
+      const shipped = getLeaf(SHIPPED, p);
+      const live = hasLeaf(T, p) ? getLeaf(T, p) : undefined;
       if (same(shipped, live)) continue;
-      const spec = dialAt(p);
-      out.push({
-        path: p.join('.'), shipped, live,
-        cls: spec ? spec.cls : null, read: spec ? spec.read : null,
-        declared: hasLeaf(declared, p),
-      });
+      out.push(entryFor(p, shipped, live));
+    }
+    for (const p of leaves(T)) {
+      if (seen.has(p.join('.'))) continue;
+      out.push(entryFor(p, undefined, getLeaf(T, p)));
     }
     return out;
+  }
+
+  // ---- asset rows ---------------------------------------------------------
+  //
+  // A row lands or leaves WHOLE. There is no per-leaf `set` that can create
+  // one — `apply` refuses a path neither tree has — because a half-built felt
+  // is a felt the merge site would have to guess the rest of, and guessing is
+  // how a catalogue grows rows nobody wrote.
+  const rowFire = (section) => {
+    const fn = binderFor([section, '']);
+    if (!fn) return;
+    const live = getLeaf(T, [section]);
+    try { fn(section, live, [[section, live]]); } catch (e) {
+      // No rollback, unlike a dial's binder: a structural change has no
+      // single previous value to put back, and the tree is already right —
+      // it is the re-apply that failed, and the console is where that goes.
+      if (typeof console !== 'undefined' && console.error) console.error(`tune: rows binder for ${section} threw:`, e);
+    }
+  };
+
+  const result = (refused = []) => ({ diff: diff(), refused, pending: [] });
+
+  function addRow(section, id, row = {}) {
+    if (!ASSET_SECTIONS.includes(section)) return result([[String(section), 'unknown']]);
+    const fields = ASSET_ROWS[section];
+    if (!fields) return result([[String(section), 'section']]);
+    if (typeof id !== 'string' || !ASSET_ID_RE.test(id)) return result([[`${section}.${id}`, 'id']]);
+    if (row !== undefined && row !== null && !isPlain(row)) return result([[`${section}.${id}`, 'type']]);
+    const refused = [];
+    const built = assetRowDefaults(section);
+    for (const [k, v] of Object.entries(row || {})) {
+      const d = fields[k];
+      const at = `${section}.${id}.${k}`;
+      if (!isDial(d)) { refused.push([at, 'unknown']); continue; }
+      if (v === null) continue;                       // absent: the default stands
+      if (typeof v === 'boolean' || !typeFits(d.def, v)) { refused.push([at, 'type']); continue; }
+      if (d.options && !d.options.includes(v)) { refused.push([at, 'option']); continue; }
+      built[k] = v;
+    }
+    if (!isPlain(T[section])) T[section] = {};
+    T[section][id] = built;
+    rowFire(section);
+    return result(refused);
+  }
+
+  function removeRow(section, id) {
+    if (!ASSET_SECTIONS.includes(section) || !isPlain(T[section])
+      || !Object.prototype.hasOwnProperty.call(T[section], id)) {
+      return result([[`${section}.${id}`, 'unknown']]);
+    }
+    delete T[section][id];
+    rowFire(section);
+    return result();
+  }
+
+  // Every row of a section as it now stands, cloned — the merge site reads
+  // this rather than reaching into T, so nothing outside can write a row.
+  function rowsOf(section) {
+    const live = getLeaf(T, [section]);
+    return isPlain(live) ? deepClone(live) : {};
+  }
+
+  // Whether the FILE declares this row — a shipped row in the asset sense,
+  // which reset restores rather than removes.
+  function rowIsDeclared(section, id) { return isPlain(getLeaf(SHIPPED, [section, id])); }
+
+  // The structural half of `reset`: put every asset section (or the one
+  // section, or the one row) back to what the file says, adding what was
+  // removed and dropping what was added. Returns the sections that moved, so
+  // the caller fires their binders after the leaf patch has landed too.
+  // A SCOPE DEEPER THAN A ROW IS NOT A ROW SCOPE (found by the C4 review,
+  // 2026-09-03): `prefix[1]` was read without asking how long the prefix was,
+  // so `reset('felts.house-moss.name')` reverted all six of the row's fields,
+  // and `reset('felts.house-ash.name')` on a session row DELETED the row. The
+  // panel never reached it (its revert glyph goes through `tune.set`), but
+  // `tuneReset(path)` is a published hook and CONTRACTS says reset takes a
+  // path. One field is a leaf: the leaf pass below already does it right.
+  function resetRows(prefix) {
+    const moved = new Set();
+    if (prefix.length > 2) return moved;
+    for (const s of ASSET_SECTIONS) {
+      if (prefix.length && prefix[0] !== s) continue;
+      if (prefix.length > 1) {
+        const id = prefix[1];
+        const want = getLeaf(SHIPPED, [s, id]);
+        const have = getLeaf(T, [s, id]);
+        if (same(want, have)) continue;
+        if (want === undefined) { if (isPlain(T[s])) delete T[s][id]; } else {
+          if (!isPlain(T[s])) T[s] = {};
+          T[s][id] = deepClone(want);
+        }
+        moved.add(s);
+        continue;
+      }
+      const want = Object.prototype.hasOwnProperty.call(SHIPPED, s) ? SHIPPED[s] : undefined;
+      const have = Object.prototype.hasOwnProperty.call(T, s) ? T[s] : undefined;
+      if (same(want, have)) continue;
+      if (want === undefined) delete T[s]; else T[s] = deepClone(want);
+      moved.add(s);
+    }
+    return moved;
   }
 
   function changes() {
@@ -693,10 +1060,26 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
 
   function reset(scope = 'all') {
     let root = SHIPPED, prefix = [];
+    if (scope !== 'all') prefix = toPath(scope);
+    // Rows first, and structurally: an added row is not a leaf reset can put
+    // back, it is a row reset must take away. Their binders run last, after
+    // the leaf patch, so a merge site that reads both sees one settled tree.
+    const rowsMoved = resetRows(prefix);
     if (scope !== 'all') {
-      prefix = toPath(scope);
       root = getLeaf(SHIPPED, prefix);
-      if (root === undefined) return { diff: diff(), refused: [[dotted(prefix), 'unknown']], pending: [] };
+      if (root === undefined) {
+        // A scope that named only rows (`reset('felts')` with no felts in the
+        // file) is not an unknown scope — it just did its whole work above.
+        if (rowsMoved.size) { for (const s of rowsMoved) rowFire(s); return result(); }
+        // A field of a row this session MINTED has no shipped value to go back
+        // to; the row is what there is to take away, and `removeRow` is the
+        // verb for that. Refusing by name beats reverting a field to a default
+        // the file never said.
+        if (prefix.length > 2 && ASSET_SECTIONS.includes(prefix[0]) && hasLeaf(T, prefix)) {
+          return { diff: diff(), refused: [[dotted(prefix), 'row']], pending: [] };
+        }
+        return { diff: diff(), refused: [[dotted(prefix), 'unknown']], pending: [] };
+      }
     }
     const paths = isPlain(root) ? leaves(root, prefix) : [prefix];
     const entries = [];
@@ -704,19 +1087,49 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
       const shipped = getLeaf(SHIPPED, p);
       if (!same(shipped, getLeaf(T, p))) entries.push([p, shipped]);
     }
-    return apply(entries, { filmLocked: false });
+    const r = apply(entries, { filmLocked: false });
+    for (const s of rowsMoved) rowFire(s);
+    return rowsMoved.size ? { ...r, diff: diff() } : r;
+  }
+
+  // WHAT THE FILE IS PATCHED WITH, which is `changes()` with one difference:
+  // a row that was REMOVED leaves as a ROW, not as six absent leaves. Taking
+  // its leaves out one at a time is what patchYaml's own "the map's last
+  // child left" rule turns into `house-moss: {}` — an empty row that the
+  // reader then fills back out with the row defaults on the next boot, so
+  // Remove followed by Save followed by reload would hand the row back. One
+  // change at the row's path takes its lines out and leaves nothing behind.
+  //
+  // The Save ROUTE still posts `changes()`, and a removal cannot travel that
+  // way at all: `undefined` does not survive JSON, so a removed row is a
+  // Download-and-apply job until the route learns to carry one (phase 3).
+  function exportChanges() {
+    const out = {};
+    const gone = new Set();
+    for (const d of diff()) {
+      const p = toPath(d.path);
+      if (d.live === undefined && p.length > 2 && ASSET_SECTIONS.includes(p[0])) {
+        const row = `${p[0]}.${p[1]}`;
+        if (!gone.has(row)) { gone.add(row); out[row] = undefined; }
+        continue;
+      }
+      out[d.path] = d.live;
+    }
+    return out;
   }
 
   function exportYaml() {
     if (!source) throw new Error('exportYaml: no source text to patch');
-    return patchYaml(source, changes());
+    return patchYaml(source, exportChanges());
   }
 
   // The "Copy patch" fragment. Nothing changed is an empty fragment (which
-  // parses to an empty map), not a root-level `{}`.
+  // parses to an empty map), not a root-level `{}`. A removed row is not in
+  // it: a fragment says what to SET, and there is no way to write "this row
+  // is gone" in one — Download carries a removal, a copied patch does not.
   function patchText() {
     const tree = {};
-    for (const [k, v] of Object.entries(changes())) setLeaf(tree, k, v);
+    for (const [k, v] of Object.entries(changes())) if (v !== undefined) setLeaf(tree, k, v);
     return Object.keys(tree).length ? emitYaml(tree) : '';
   }
 
@@ -726,10 +1139,15 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
     return apply(entries, opts);
   }
 
-  function sections() { return Object.keys(SHIPPED); }
+  // THE DIAL SECTIONS ONLY. An asset section in SHIPPED (a `felts:` the file
+  // declares) is not a section of rows the panel can draw from a dial tree —
+  // it gets a bespoke editor instead (js/devmode.js `felts`), and two panel
+  // sections of one name would collide in its section map.
+  function sections() { return Object.keys(SHIPPED).filter((k) => !ASSET_SECTIONS.includes(k)); }
 
   return {
     SHIPPED, T, refusals, dialAt, get, set, diff, reset, bind, binderFor,
     changes, exportYaml, patchText, applyPatchText, sections,
+    addRow, removeRow, rowsOf, rowIsDeclared,
   };
 }

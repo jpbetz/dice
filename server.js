@@ -67,6 +67,12 @@ import { parseYaml, YamlError } from './js/yaml.js';
 // module tools/dice-apply.mjs runs, so the tool and the route agree on what a
 // legal change is, byte for byte, rather than agreeing by coincidence.
 import { applyChanges } from './js/dice-apply-core.js';
+// WHAT A LEGAL ASSET ROW ID IS — the ONE regex, not a fourth copy of it. The
+// browser drops a row whose id fails this before it ever reaches the picker
+// (js/tune.js `reconcileRows`), so a wire allowlist that did not apply the
+// same law would accept a room felt no client on earth could resolve. Node-pure
+// like the rest of the chain; dice-apply-core.js already pulls it in.
+import { ASSET_ID_RE } from './js/tune.js';
 
 const PORT = Number(process.env.PORT) || 8123;
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -319,6 +325,37 @@ const DIE_TYPES = Object.keys(DIE_MAX);
 const FELT_THEMES = ['emerald', 'crimson', 'midnight', 'slate', 'walnut',
   'obsidian', 'ocean', 'plum', 'sand', 'silt', 'taproom'];
 
+// …AND THE FELTS THE DECLARATION ADDS (docs/DEVMODE.md §9, phase C4). A row
+// under `felts:` in dice.yaml is a felt this deployment has that the code
+// does not, and the id has to be accepted on the wire or it "works solo and
+// silently fails at a shared table" — which is the exact failure
+// tests/felt-ids.test.mjs exists to catch between the three hand-kept lists.
+// Refilled by `readDeclaration`, so the mtime re-read that makes a dial live
+// makes a felt id live too, no restart. The array literal above is the
+// SHIPPED list and stays a literal: that test regex-scrapes it.
+//
+// AND IT WIDENS BY THE CLIENT'S LAW, NOT BY THE FILE'S (found by the C4
+// review, 2026-09-03). The browser drops a declared row whose id is not
+// `ASSET_ID_RE` — `HouseUpper`, `house.dot` — before the picker ever sees it
+// (js/tune.js `reconcileRows`, and a dotted key never survives `reconcile` at
+// all), so widening this list with EVERY key under `felts:` inverted the very
+// bug tests/felt-ids.test.mjs exists to catch: not "works solo, fails on the
+// wire" but "accepted on the wire, resolvable by nobody" — one viewer sets the
+// room to `HouseUpper` and every table keeps its old cloth with no swatch
+// pressed and nothing said. It was reachable by the first thing a person is
+// likely to type, because DEVMODE §3's own example was `house.moss`. Same
+// regex, same answer, both ends.
+const DECLARED_FELTS = new Set();
+const feltIds = () => (DECLARED_FELTS.size ? FELT_THEMES.concat([...DECLARED_FELTS]) : FELT_THEMES);
+function syncDeclaredFelts(tree) {
+  DECLARED_FELTS.clear();
+  const rows = tree && tree.felts;
+  if (!rows || typeof rows !== 'object' || Array.isArray(rows)) return;
+  for (const id of Object.keys(rows)) {
+    if (ASSET_ID_RE.test(id) && !FELT_THEMES.includes(id)) DECLARED_FELTS.add(id);
+  }
+}
+
 // Interpretation systems (GOALS.md goal 6, docs/ROADMAP.md §2): which profile
 // in js/meanings.js reads a roll's numbers — 'soul-deal' (the meaning chart),
 // 'dnd' (natural-20/1 crits, no chart), 'none' (numbers only). The server
@@ -438,7 +475,8 @@ function normalizeExperiences(raw) {
 const SETTING_SPECS = {
   felt: {
     default: 'obsidian',
-    validate: (v) => typeof v === 'string' && FELT_THEMES.includes(v),
+    // `feltIds()`, not the literal: the declaration's own rows count too.
+    validate: (v) => typeof v === 'string' && feltIds().includes(v),
   },
   // The room's interpretation system. Room-wide rather than personal on
   // purpose: it decides what a roll MEANS, and goal 8's one shared truth says
@@ -4309,6 +4347,19 @@ function readDeclaration(stat) {
   return { text, tree, mtimeMs: stat.mtimeMs, size: stat.size, body, etag: etagOf(body) };
 }
 
+// THE ONE PLACE `declaration` IS ASSIGNED, so what the file says and what the
+// wire accepts can never disagree. `syncDeclaredFelts` is the second reader of
+// the tree (the first is the served module), and it was a separate call inside
+// readDeclaration for about an hour: the Save route adopts a tree it parsed
+// itself (adoptDeclaration) and never went through that function, so a felt
+// saved from the panel was in the served module and 400'd on the wire until
+// the next unrelated edit. Assign through here and that hole cannot reopen.
+function setDeclaration(next) {
+  declaration = next;
+  syncDeclaredFelts(next && next.tree);
+  return next;
+}
+
 // Boot. Runs during module evaluation so the tree exists before the first
 // request, which is also why a broken file exits here rather than answering
 // 500 later: the server that would have answered is the one that did not start.
@@ -4319,11 +4370,11 @@ function readDeclaration(stat) {
   } catch {
     log('dice.yaml: not found — serving an empty declaration');
     const body = tunablesBody({}, '');
-    declaration = { text: '', tree: {}, mtimeMs: 0, size: -1, body, etag: etagOf(body) };
+    setDeclaration({ text: '', tree: {}, mtimeMs: 0, size: -1, body, etag: etagOf(body) });
     return;
   }
   try {
-    declaration = readDeclaration(stat);
+    setDeclaration(readDeclaration(stat));
   } catch (err) {
     const line = err instanceof YamlError ? err.line : 0;
     process.stderr.write(`dice.yaml:${line}: ${err && err.message}\n`);
@@ -4352,7 +4403,7 @@ function refreshDeclaration() {
   // means the last one stands.
   if (stat.size === 0 && declaration && declaration.text !== '') return;
   try {
-    declaration = readDeclaration(stat);
+    setDeclaration(readDeclaration(stat));
     lastYamlError = '';
   } catch (err) {
     const line = err instanceof YamlError ? err.line : 0;
@@ -4523,7 +4574,7 @@ function adoptDeclaration(text) {
   try {
     const { tree } = parseYaml(text);
     const body = tunablesBody(tree, text);
-    declaration = { text, tree, mtimeMs: stat.mtimeMs, size: stat.size, body, etag: etagOf(body) };
+    setDeclaration({ text, tree, mtimeMs: stat.mtimeMs, size: stat.size, body, etag: etagOf(body) });
     lastYamlError = '';
     return true;
   } catch {

@@ -31,7 +31,7 @@ import assert from 'node:assert/strict';
 // asserting is that the refusal NAMES the legal systems, not which ones
 // they happen to be today.
 import { SYSTEM_IDS } from '../js/meanings.js';
-import { exportYaml, parsePortable, planImport, profileToImport } from '../js/portable.js';
+import { exportYaml, parsePortable, planImport, profileToImport, declareFelts } from '../js/portable.js';
 import { STAMP as SCHEMA_STAMP, EPOCH, MAJOR } from '../js/schema.js';
 
 let n = 0;
@@ -607,6 +607,32 @@ t('an unknown felt refuses by line — a silent fallback is a table nobody prepa
   assert.equal(parsed.ok, false);
   assert.equal(parsed.line, 3);
   assert.ok(parsed.error.includes('felt'), parsed.error);
+});
+
+t('…but a felt the DECLARATION adds is not unknown, once main.js has said so', () => {
+  // docs/DEVMODE.md §9 (phase C4): a `felts:` row in dice.yaml is a felt this
+  // deployment has and this module's hand-kept literal does not. The ids come
+  // from the served /js/tunables.js, which does not exist on disk — so js/main.js
+  // hands them down through `declareFelts` rather than this file importing
+  // anything. Under Node (here) nobody calls it, and the literal is the whole
+  // list, which is exactly the state the test above measures.
+  const rack = ['table:', "  felt: 'house-moss'"].join('\n');
+  assert.equal(parsePortable(rack).ok, false, 'undeclared: refused at its line');
+  declareFelts(['house-moss']);
+  try {
+    const parsed = parsePortable(rack);
+    assert.equal(parsed.ok, true, parsed.error);
+    assert.deepEqual(parsed.table, { felt: 'house-moss' });
+    // …and the shipped enum is not widened past what was declared
+    assert.equal(parsePortable(['table:', "  felt: 'house-ash'"].join('\n')).ok, false);
+    // a declared id that shadows a shipped one changes nothing: the list is
+    // a union, and `obsidian` was always in it
+    declareFelts(['obsidian', 'house-moss']);
+    assert.equal(parsePortable(rack).ok, true);
+  } finally {
+    declareFelts([]);
+  }
+  assert.equal(parsePortable(rack).ok, false, 'and cleared again, it is unknown again');
 });
 
 refuses("table:\n  system: 'gurps'\n", 'system', 'an unknown system refuses');

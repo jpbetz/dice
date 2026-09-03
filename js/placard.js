@@ -68,7 +68,7 @@ limitations under the License.
 // than hoped for.
 
 import * as THREE from 'three';
-import { PLACE_MAX, PLACARD_W, PLACARD_D, readTurn } from './places.js';
+import { PLACE_MAX, PLACARD, readTurn } from './places.js';
 
 // ---------------------------------------------------------------------------
 // The form (world units) — see docs/UX.md §7.63 for where these come from.
@@ -115,8 +115,16 @@ import { PLACE_MAX, PLACARD_W, PLACARD_D, readTurn } from './places.js';
 // and 2.34 / 4.03 after: the card you read from ACROSS THE TABLE, the one that
 // carries somebody else's name, is nearly FIVE times the face it was, and your
 // own is three.
-const BASE_W = PLACARD_W;                 // 3.68 — the footprint js/places.js
-const BASE_D = PLACARD_D;                 // 1.52   asserts gaps against
+// THE FOOTPRINT IS READ AT BUILD TIME, NOT AT MODULE LOAD (2026-09-03,
+// dice.yaml `cards`). `PLACARD` in js/places.js is the one mutable object the
+// declaration writes, and js/main.js copies the tree into it in its own module
+// body — which runs AFTER this file has evaluated, because main.js imports it.
+// A `const BASE_W = PLACARD.w` here would therefore capture 3.68 forever and
+// the dial would move every footprint the layout computes while the rig it is
+// supposed to describe stayed the size it shipped. Functions, read where they
+// are used; the rig is baked once at boot, which is why `cards.*` is a ⟳ row.
+const baseW = () => PLACARD.w;            // 3.68 — the footprint js/places.js
+const baseD = () => PLACARD.d;            // 1.52   asserts gaps against
 const BASE_H = 0.14;
 const CHAMFER = 0.06;                     // the seam that makes it an object
 const CARD_W = 3.45;                      // v3: 3.00 × 1.15
@@ -145,7 +153,7 @@ const RIDGE_Y = BASE_H + TENT_RISE;                   // 2.0851
 const FACE_H = 1.725;                                 // printed band, along the slope — CARD_W / 2, the 1:2 the atlas row keeps
 const FACE_S = FACE_H / CARD_SLOPE;                   // 0.8333 of the slope, from the ridge
 const FACE_Y0 = RIDGE_Y - FACE_S * TENT_RISE;         // 0.3944 — where the foot begins
-const BEAD_W_MINE = BASE_W - 2 * CHAMFER; // YOUR card's bead runs the full base
+const beadWMine = () => baseW() - 2 * CHAMFER; // YOUR card's bead runs the full base
 const BEAD_W_OTHER = 0.80;                // everybody else's is a centred pip
 
 // WHICH WAY UP THE PRINTING GOES is no longer a table of four quarter turns.
@@ -605,7 +613,7 @@ export class PlacardRig {
     };
 
     // -- the holder: a truncated pyramid, so the chamfer IS the bevel -------
-    const bw = BASE_W / 2, bd = BASE_D / 2;
+    const bw = baseW() / 2, bd = baseD() / 2;
     const tw = bw - CHAMFER, td = bd - CHAMFER;
     const B = [P(-bw, 0, bd), P(bw, 0, bd), P(bw, 0, -bd), P(-bw, 0, -bd)];
     const T = [P(-tw, BASE_H, td), P(tw, BASE_H, td), P(tw, BASE_H, -td), P(-tw, BASE_H, -td)];
@@ -663,7 +671,7 @@ export class PlacardRig {
     // the eye meets it at a grazing 12°, so a bead painted there was invisible
     // in every frame of the first look pass. On the bevel it is the lit gold
     // rim the eye already goes to.
-    const hw = (rec.mine ? BEAD_W_MINE : BEAD_W_OTHER) / 2;
+    const hw = (rec.mine ? beadWMine() : BEAD_W_OTHER) / 2;
     const bn = Math.hypot(CHAMFER, BASE_H);
     const lift = 0.004;
     const dy = (CHAMFER / bn) * lift, dz = (BASE_H / bn) * lift;
@@ -928,6 +936,14 @@ export class PlacardRig {
         pxPerUnit: CARD_PX / CARD_W, pxPerUnitDown: ROW_PX / FACE_H,
         fontMax: FONT_MAX, fontMin: FONT_MIN,
       },
+      // …AND THE HOLDER'S FOOTPRINT, for the same reason `face` is here: it is
+      // the declaration's now (dice.yaml `cards` → js/places.js PLACARD), and
+      // a size that can be declared needs a gate rather than a comment.
+      // Reported LIVE, and that is exact rather than approximate: `cards.*` is
+      // a ⟳ row with no binder — js/main.js copies the tree into PLACARD once
+      // at boot, above this module's first build, and nothing moves it after —
+      // so the number here is the number in the buffer until the next reload.
+      base: { w: baseW(), d: baseD(), h: BASE_H },
       materials: this.built ? 1 : 0,
       textures: this.built ? 3 : 0,
       occupied: this.occupied,

@@ -121,23 +121,37 @@ export const PLACE_PUSH = 1.2;
 // is derived from — one number, one place, so the two can never drift.
 export const PLACARD_GAP = 0.30;
 
-// The placard's centre, OUTBOARD of the wall plane. The footprint is 1.52
-// deep, so the inboard edge stands 0.10 past the plane where dice stop: no die
-// can ever reach a placard, which is what makes depthWrite, a real shadow, and
-// a raycast seating pass all legal at once (IMMERSION law 8's `surfaceUnder`
-// trap is void BY GEOMETRY, not by care).
-export const PLACARD_STANDOFF = 0.86;
-
-// The card's footprint on the ground (docs/UX.md §7.63; js/placard.js builds
-// the rig to these numbers — 3.68 × 1.52 × 2.09 ridge, a 3.45 × 2.07 card face
-// at 20° off vertical; V3 2026-09-01, the v2 form × 1.15 on every axis —
-// Joe: "the name plaquards should be slightly bigger overall (… make the
-// plaquards 15% bigger or something)"). They live here because the
-// outboard-of-the-wall property above is a fact about the LAYOUT, and a
-// layout invariant may not be asserted against a number that lives somewhere
-// else.
-export const PLACARD_W = 3.68;
-export const PLACARD_D = 1.52;
+// THE CARD'S FOOTPRINT, AND IT IS A DIAL SET NOW (2026-09-03, dice.yaml
+// `cards`; the SEAT_TOSS pattern, further down this file, is the precedent
+// and the reason this shape rather than three `let`s).
+//
+//   standoff  the centre, OUTBOARD of the wall plane. The footprint is 1.52
+//             deep, so the inboard edge stands 0.10 past the plane where dice
+//             stop: no die can ever reach a placard, which is what makes
+//             depthWrite, a real shadow and a raycast seating pass all legal
+//             at once (IMMERSION law 8's `surfaceUnder` trap is void BY
+//             GEOMETRY, not by care).
+//   w, d      the footprint on the ground (docs/UX.md §7.63; js/placard.js
+//             builds the rig to these numbers — 3.68 × 1.52 × 2.09 ridge, a
+//             3.45 × 2.07 card face at 20° off vertical; V3 2026-09-01, the v2
+//             form × 1.15 on every axis — Joe: "the name plaquards should be
+//             slightly bigger overall (… make the plaquards 15% bigger or
+//             something)").
+//
+// They live in THIS file because the outboard-of-the-wall property above is a
+// fact about the LAYOUT, and a layout invariant may not be asserted against a
+// number that lives somewhere else.
+//
+// ONE MUTABLE OBJECT, copied into by js/main.js at boot from the declaration —
+// this file is imported by server.js and must not import js/tune.js, exactly
+// as with PLACE_AIM and SEAT_TOSS. Every read that MOVES goes through it.
+// The three consts below it are the SHIPPED numbers, kept because the unit
+// rows and tests/places.test.mjs assert the layout against them and a test
+// that read the live object would pass at any size.
+export const PLACARD = { standoff: 0.86, w: 3.68, d: 1.52 };
+export const PLACARD_STANDOFF = PLACARD.standoff;
+export const PLACARD_W = PLACARD.w;
+export const PLACARD_D = PLACARD.d;
 
 // The spawn line's pitch floor under a lane. A lane may compress a pool's
 // line toward the roller's side, but never below a real pitch — see
@@ -258,7 +272,7 @@ export function placardFootprint(anchor) {
   const { s, c } = seatTrig(anchor.azim);
   return {
     x: anchor.x, z: anchor.z, azim: anchor.azim,
-    hw: PLACARD_W / 2, hd: PLACARD_D / 2,          // the OBB, for the SAT
+    hw: PLACARD.w / 2, hd: PLACARD.d / 2,          // the OBB, for the SAT
     ax: { x: c, z: -s }, az: { x: s, z: c },       // the card's two ground axes
     hx: cardHx(anchor.azim), hz: cardHz(anchor.azim), // the AABB, correct at EVERY angle now
   };
@@ -583,6 +597,10 @@ export const TOWER_ARC = (5 * Math.PI) / 6;
 
 // The card's clear ground past the wall plane — the same 0.10 PLACARD_STANDOFF
 // always left, now derived once and applied along whichever axis binds.
+// SHIPPED, like the two consts it is built from: it is the number the layout
+// rows assert 0.10 against, and nothing that moves reads it. The live clear
+// ground is `PLACARD.standoff − PLACARD.d / 2`, which is what seatAnchor
+// stands the card at by construction.
 export const PLACARD_CLEAR = PLACARD_STANDOFF - PLACARD_D / 2;
 
 // The shared copy of spawnDie's literal 2.2 — how far inboard of its wall a
@@ -709,8 +727,8 @@ export function placeTheta(seat, seats, arc = 0) {
 
 // The card's AABB half-extents at azimuth θ (PLACARD_W across local x,
 // PLACARD_D along local z; local +z is the azimuth ray).
-function cardHx(theta) { const { s, c } = seatTrig(theta); return (PLACARD_W / 2) * Math.abs(c) + (PLACARD_D / 2) * Math.abs(s); }
-function cardHz(theta) { const { s, c } = seatTrig(theta); return (PLACARD_W / 2) * Math.abs(s) + (PLACARD_D / 2) * Math.abs(c); }
+function cardHx(theta) { const { s, c } = seatTrig(theta); return (PLACARD.w / 2) * Math.abs(c) + (PLACARD.d / 2) * Math.abs(s); }
+function cardHz(theta) { const { s, c } = seatTrig(theta); return (PLACARD.w / 2) * Math.abs(s) + (PLACARD.d / 2) * Math.abs(c); }
 
 // THE CHAIR. The card's centre is where the ray at θ leaves the rectangle GROWN
 // by the card's own oriented footprint plus PLACARD_CLEAR. Three things this buys:
@@ -764,7 +782,7 @@ export function seatAnchor(seat, seats, arc, w, d) {
   // orientation, not around a rectangular table"). The card stands on the
   // ring at RING_R(w) + PLACARD_STANDOFF, on its own ray, facing the centre.
   // `d` is accepted and ignored: a circle has one radius.
-  const t = ringRadius(w) + PLACARD_STANDOFF;
+  const t = ringRadius(w) + PLACARD.standoff;
   return { x: t * s, y: 0, z: t * c, azim: theta, seat, seats, arc, r: t, relocated: arc === 1 };
 }
 

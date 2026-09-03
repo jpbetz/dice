@@ -525,6 +525,85 @@ await t('a bad DICE_MODE loses to nothing: it exits even with a good file', asyn
   }
 }
 
+// ---- the declaration's own felts are accepted ON THE WIRE -------------------
+//
+// docs/DEVMODE.md §9 (phase C4): "The server parses the same file, so it
+// accepts a new id on the wire after a restart, and after the mtime re-read
+// in phase 2." Without this half a house felt works solo and is 400'd at a
+// shared table — which is precisely the failure tests/felt-ids.test.mjs
+// exists to keep the three hand-kept lists from producing.
+{
+  // …and two ids the BROWSER will never resolve, declared beside the good one.
+  // `reconcileRows` drops a row whose id fails ASSET_ID_RE and `reconcile`
+  // drops a dotted key before that, so neither reaches the picker — and a wire
+  // allowlist widened by every key under `felts:` would accept a room felt no
+  // client can wear (the C4 review, 2026-09-03). The dotted one is quoted
+  // because js/yaml.js refuses an unquoted dotted key outright.
+  const withFelts = `${FIXTURE}\nfelts:\n  house-moss:\n    name: Moss\n    cloth: silt\n`
+    + `  HouseUpper:\n    name: Upper\n  "house.dot":\n    name: Dotted\n`;
+  const dir = makeTree(withFelts);
+  trees.push(dir);
+  const port = await freePort();
+  const proc = await startServer(dir, port);
+  const base = `http://127.0.0.1:${port}`;
+  const post = async (route, body) => {
+    const res = await fetch(`${base}${route}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  };
+  try {
+    const room = 'felts-wire';
+    const j = await post('/api/join', { room, name: 'Alice' });
+    assert.equal(j.status, 200, `join: ${j.status}`);
+    const { playerId } = j.body;
+
+    await t('a felt the declaration adds is accepted where the code has no row', async () => {
+      const s = await post('/api/settings', { room, playerId, settings: { felt: 'house-moss' } });
+      assert.equal(s.status, 200, `settings: ${s.status} ${JSON.stringify(s.body)}`);
+      assert.equal(s.body.settings.felt, 'house-moss', 'and it is the room\'s felt now');
+    });
+
+    await t('…and one it does not is still refused', async () => {
+      const s = await post('/api/settings', { room, playerId, settings: { felt: 'chartreuse' } });
+      assert.equal(s.status, 400, 'an unknown felt is a 400, not a silent fallback');
+      const back = await post('/api/settings', { room, playerId, settings: { felt: 'ocean' } });
+      assert.equal(back.body.settings.felt, 'ocean', 'a shipped id still works');
+    });
+
+    // THE INVERSE OF THIS FILE'S OWN FAILURE, and the one the C4 review found:
+    // not "works solo, refused on the wire" but "accepted on the wire,
+    // resolvable by nobody". A row whose id the browser drops must not become a
+    // room felt, or one viewer setting it leaves every table wearing its old
+    // cloth with no swatch pressed and nothing said.
+    await t('a declared id the browser could never resolve is NOT accepted', async () => {
+      for (const bad of ['HouseUpper', 'house.dot']) {
+        const s = await post('/api/settings', { room, playerId, settings: { felt: bad } });
+        assert.equal(s.status, 400, `${bad} is not a legal asset id, so it is not a legal room felt`);
+      }
+      const ok = await post('/api/settings', { room, playerId, settings: { felt: 'house-moss' } });
+      assert.equal(ok.status, 200, 'and the legal row declared beside them still works');
+    });
+
+    await t('an edit to the file adds an id without a restart — the mtime re-read carries it', async () => {
+      const before = await post('/api/settings', { room, playerId, settings: { felt: 'house-ash' } });
+      assert.equal(before.status, 400, 'not declared yet');
+      await edit(dir, `${withFelts}  house-ash:\n    name: Ash\n`);
+      // The re-read happens on the served module's own request, which is the
+      // one thing that touches the file — so ask for it, as a reloading tab
+      // would, and only then is the id live.
+      await getModule(base);
+      const after = await post('/api/settings', { room, playerId, settings: { felt: 'house-ash' } });
+      assert.equal(after.status, 200, `after the edit: ${after.status} ${JSON.stringify(after.body)}`);
+      assert.equal(after.body.settings.felt, 'house-ash');
+    });
+
+    assertNoModeInLog(proc);
+  } finally {
+    await stopServer(proc);
+  }
+}
+
 for (const dir of trees) rmSync(dir, { recursive: true, force: true });
 
 if (failed === 0) console.log(`tunables-serve.test: ${n} passed`);

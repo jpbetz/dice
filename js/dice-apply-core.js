@@ -36,7 +36,9 @@ limitations under the License.
 // and both are themselves Node-pure (no DOM, no three, no cannon).
 
 import { parseYaml, patchYaml, formatScalar, YamlError } from './yaml.js';
-import { DIALS, STATIC_PATHS, isDial, leaves, getLeaf, toPath } from './tune.js';
+import {
+  DIALS, STATIC_PATHS, ASSET_SECTIONS, assetDialFor, isDial, leaves, getLeaf, toPath,
+} from './tune.js';
 
 export const isPlain = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
 export const dotted = (p) => (Array.isArray(p) ? p.join('.') : String(p));
@@ -47,6 +49,17 @@ const typeOf = (v) => (v === null ? 'null' : Array.isArray(v) ? 'list' : typeof 
 // leaf of it) and at a map where the file put a scalar.
 export function dialFor(dials, path) {
   const parts = toPath(path);
+  // AN ASSET ROW HAS NO PLACE IN THE DIAL TREE (docs/DEVMODE.md §9, phase
+  // C4): `felts.house-moss.cloth` is a leaf of a ROW, and what says whether
+  // it is legal is the section's row shape. One answer shape, so everything
+  // downstream — validate, validateChanges, the tool's report, the armed
+  // route's refusal — reads it without knowing which kind it asked about.
+  // Skipped if a caller's own `dials` happens to own the section name, so
+  // the dial tree always wins where the two could disagree.
+  if (parts.length && ASSET_SECTIONS.includes(parts[0])
+    && !(isPlain(dials) && Object.prototype.hasOwnProperty.call(dials, parts[0]))) {
+    return assetDialFor(parts);
+  }
   let node = dials;
   for (let i = 0; i < parts.length; i++) {
     if (isDial(node)) return `passes through the dial at ${dotted(parts.slice(0, i))}`;

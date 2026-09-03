@@ -22179,6 +22179,21 @@ export const scenarios = [
 
       const opened = await t.dbg('devOpen()');
       assert.equal(opened.panel, 'open', 'the door opened');
+
+      // A TABLE OF ONE STANDS NO CARD, AND SO DRAWS NONE — the state developer
+      // mode is IN the moment the door opens, before anybody is dealt. The
+      // layer rides placardRebuild's own gate (`rows.length >= 2 ? rows : []`,
+      // Joe 2026-09-02: "Single player doesn't need a name tag"); until the C3
+      // review it iterated the roster instead and drew a purple rectangle for
+      // a card that does not exist, which is the one thing a layer whose whole
+      // licence is "every mark is a function the film calls" may not do.
+      const alone = await t.dbg("demoRegions('framing')");
+      assert.equal(alone.framing.spots.length, 1, 'alone: your own seat keeps its frame disc');
+      assert.equal(alone.framing.cards.length, 0, 'alone: and NOT ONE card footprint — no card stands');
+      assert.ok(alone.framing.lamp && alone.framing.lamp.drawn > 0, 'alone: the pool is in the frame and drawn');
+      assert.equal(alone.objects, 4, 'four kinds drawn: hull, disc, lamp, walls — the cards draw nothing at all');
+      await t.dbg("demoRegions('disabled')");
+
       await t.dbg('devDeal(4)');
       await t.waitFor('window.__diceDebug.places().stations.length === 5', { desc: 'the viewer and four' });
       await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
@@ -22259,7 +22274,27 @@ export const scenarios = [
       const moved = (await t.dbg('demoInfo()')).overlay.framing;
       assert.equal(moved.lamp.at[1], 40, 'the lamp dial moved the cone without anybody asking for a rebuild');
       assert.ok(moved.lamp.bounds.x1 - moved.lamp.bounds.x0 > w0, 'a higher lamp throws a wider pool');
+
+      // …AND A POOL THE ROOM CANNOT HOLD IS SAID, NOT DRAWN (the C3 review,
+      // 2026-09-02). Measured at dials INSIDE their declared ranges (y 45,
+      // angle 1.4 — js/tune.js allows [5, 80] and [0.1, 1.5]) the ring spans
+      // some ±266 against a ±17.6 room: hundreds of table-widths of line, in
+      // no frame this camera takes. So the mark is bounded to twice the room
+      // and nothing of it is drawn — but it must NOT answer null, which is the
+      // word for a cone that never reaches the felt at all. `fit` is the
+      // distinction the old null-or-ring answer could not make.
+      await t.dbg("tuneSet({'light.lamp.y': 45, 'light.lamp.angle': 1.4})");
+      const huge = (await t.dbg('demoInfo()')).overlay;
+      assert.ok(huge.framing.lamp, 'a pool wider than the room is still a pool, and still reported');
+      assert.equal(huge.framing.lamp.fit, 'covers', 'and it says the whole felt is inside it');
+      assert.equal(huge.framing.lamp.drawn, 0, 'so there is no edge in this room to draw');
+      assert.ok(huge.framing.lamp.spread > 10 * huge.framing.lamp.room,
+        `…it is ${Math.round(huge.framing.lamp.spread)} across a ${Math.round(huge.framing.lamp.room)} room`);
+      assert.equal(huge.objects, 4, 'four kinds drawn, not five: the lamp draws nothing');
       await t.dbg("tuneReset('all')");
+      const backAgain = (await t.dbg('demoInfo()')).overlay.framing;
+      assert.ok(backAgain.lamp.drawn > 0 && backAgain.lamp.fit !== 'covers',
+        'and the shipped pool comes back, bounded to the room it lights');
 
       // BOTH PICTURES AT ONCE: the framing five plus the regions layer's ring
       // and three marks a chair.
@@ -26510,7 +26545,8 @@ export const scenarios = [
       const t = await ctx.newTable({ origin: '127.0.0.61', name: 'Tuner' });
       const file = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'dice.yaml'), 'utf8');
       const info = await t.dbg('tuneInfo()');
-      assert.deepEqual(info.sections, ['app', 'table', 'light', 'camera', 'throw', 'pace', 'sound'],
+      assert.deepEqual(info.sections,
+        ['app', 'table', 'light', 'camera', 'throw', 'pace', 'sound', 'post', 'cards'],
         'the sections are the declaration\'s top-level keys, in file order');
       assert.ok(info.leaves > 100, `the phase-1 tree has its leaves (${info.leaves})`);
       assert.equal(info.changed, 0, 'a fresh tab has changed nothing');
@@ -26972,6 +27008,273 @@ export const scenarios = [
     },
   },
   {
+    name: 'dev-felt-roundtrip',
+    tags: ['dev', 'look'],
+    timeout: 120000,
+    // THE FIRST ASSET AUTHORED ON THE TABLE (docs/DEVMODE.md §9, phase 2).
+    // Every dial before this moved a number the app already had. A felt is a
+    // ROW the app did not have — a name, a cloth, two colours and two scalars
+    // — so this is the scenario that proves the whole route rather than one
+    // more slider: mint it in the tab, wear it (the CLOTH really repaints,
+    // which is the cache-bust nobody would notice was missing), save it into
+    // a scratch checkout's own dice.yaml through the armed route, and boot a
+    // FRESH TAB from that server where the felt is simply one of the felts —
+    // in `devFelts()`, in the swatch picker, and accepted by the server on the
+    // wire, which is the half that decides whether a house felt works at a
+    // shared table or only alone.
+    //
+    // The scratch tree is dev-write-route's: server.js and dice.yaml copied
+    // (they are what gets written), everything the page loads symlinked, and
+    // the checkout read before and after to prove it never moved.
+    async fn(ctx) {
+      const dir = mkdtempSync(join(SCRATCH_BASE, 'dev-felt-'));
+      const original = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
+      cpSync(join(ROOT, 'server.js'), join(dir, 'server.js'));
+      writeFileSync(join(dir, 'dice.yaml'), original);
+      for (const name of ['js', 'css', 'vendor', 'models', 'index.html']) {
+        symlinkSync(join(ROOT, name), join(dir, name));
+      }
+      const port = await freePort();
+      const server = await startServer(port, {
+        root: dir,
+        env: { DICE_DEV_WRITE: '1', DICE_DEV_ROOT: dir },
+      });
+      // THE CLOTH ITSELF, not the row that describes it: 25 samples off the
+      // felt TILE, averaged. The grain is noise on top of the base colour, so
+      // the mean carries the hue and nothing else has to be exact — and green
+      // minus blue is the one number that separates a moss felt (#1f3a22, +24)
+      // from obsidian (#1c1c24, −8) without pinning a pixel.
+      const feltMean = async (tab) => JSON.parse(await tab.eval(`JSON.stringify((() => {
+        const d = window.__diceDebug;
+        const acc = [0, 0, 0];
+        let n = 0;
+        for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
+          const p = d.feltPixel(i * 0.9 - 2, j * 0.9 - 2) || [0, 0, 0, 0];
+          acc[0] += p[0]; acc[1] += p[1]; acc[2] += p[2];
+          n++;
+        }
+        return acc.map((v) => Math.round(v / n));
+      })())`));
+      const hue = (m) => m[1] - m[2];
+      try {
+        const open = async (origin, room) => {
+          const page = await ctx.browser.newPage();
+          await page.addInitScript('window.__diceTestMode = true;');
+          await page.addInitScript(`try { localStorage.setItem('dice.schema.v1','2');`
+            + ` localStorage.setItem('dice.name.v1','Moss'); } catch {}`);
+          const url = `http://${origin}:${port}/?room=${encodeURIComponent(room)}`;
+          await page.navigate(url);
+          const tab = new Table(page, url);
+          ctx.tables.push(tab);
+          await tab.waitFor('!!window.__diceDebug && window.__diceDebug.netReady', { desc: `the tab at ${origin} is up`, timeout: 30000 });
+          assert.equal(await tab.eval('window.__diceDebug.netReady.then((r) => r && r.online)'), true, `online at ${origin}`);
+          await tab.dbg('sim(60)');
+          return tab;
+        };
+
+        const t = await open('127.0.0.74', ctx.room);
+
+        // A NEVER-OPENED TAB ANSWERS THE READOUT AND REFUSES EVERY WRITER —
+        // the negative half, first, as every dev scenario takes it.
+        const shipped = await t.dbg('devFelts()');
+        assert.equal(shipped.length, 11, 'the eleven js/main.js ships, and not one more');
+        assert.ok(shipped.every((f) => f.shipped && !f.inFile), 'all of them from code, none from the file');
+        assert.equal(shipped.find((f) => f.current).id, 'obsidian', 'and the table is on the default');
+        assert.equal(await t.dbg(`devFeltAdd('house-moss', {})`), null, 'the door is shut: no row is minted');
+        assert.equal(await t.dbg(`devFeltApply('walnut')`), null, '…and nothing is applied');
+
+        assert.equal((await t.dbg('devOpen()')).panel, 'open');
+        await t.waitFor(`document.querySelector('#dev-panel .dev-saveroute')?.hidden === false`,
+          { desc: 'the panel heard back that the route is armed' });
+
+        // ---- mint the row -------------------------------------------------
+        const before = await feltMean(t);
+        assert.ok(hue(before) < 0, `obsidian reads blue-of-green (${before.join(',')})`);
+
+        const add = await t.dbg(`devFeltAdd('house-moss', { name: 'Moss', cloth: 'felt', feltBase: '#1f3a22', sceneBg: '#0c120d', breath: 0.9 })`);
+        assert.deepEqual(add.refused, [], 'a legal row lands whole');
+        const moss = add.felts.find((f) => f.id === 'house-moss');
+        assert.ok(moss, 'and it is in the catalogue beside the shipped eleven');
+        assert.equal(moss.shipped, false, 'it is not shipped');
+        assert.equal(moss.inFile, false, '…nor in the file yet — Save is what puts it there');
+        assert.equal(moss.mottle, 1, 'and the field it said nothing about took the row default');
+
+        // A SHIPPED ID IS NOT THE EDITOR'S TO REDEFINE: `taproom` in the file
+        // cannot quietly become a different mat than the one a golden and
+        // eleven months of screenshots mean.
+        assert.deepEqual((await t.dbg(`devFeltAdd('obsidian', { name: 'Not obsidian' })`)).refused,
+          [['felts.obsidian', 'shipped']]);
+        assert.deepEqual((await t.dbg(`devFeltAdd('House.Moss', {})`)).refused,
+          [['felts.House.Moss', 'id']], 'and a dotted id is not an id');
+        assert.deepEqual((await t.dbg(`devFeltAdd('house-ash', { cloth: 'linen', nope: 1 })`)).refused,
+          [['felts.house-ash.cloth', 'option'], ['felts.house-ash.nope', 'unknown']],
+          'a field that is not a field, and a cloth that is not a painter, are named one by one');
+        assert.deepEqual((await t.dbg(`devFeltRemove('house-ash')`)).refused, []);
+        assert.equal((await t.dbg('devFelts()')).length, 12, 'one row added, and only one');
+
+        // …AND IT DOES NOT GROW A CHIP IN THE PLAYER'S PICKER (the C4 review,
+        // 2026-09-03). Every chip's click is `selectFelt`, which POSTs the ROOM
+        // setting — the exact route `devFeltApply` was narrowed away from,
+        // reachable in two clicks around the gate. Online the server refuses an
+        // id no dice.yaml declares and the settings note reads "couldn't reach
+        // the table", which is a false cause. A row this session invented gets
+        // its chip when it is SAVED, and not before.
+        const chips = () => t.eval(`[...document.querySelectorAll('#felt-swatches .felt-swatch')].map((b) => b.dataset.felt)`);
+        assert.equal((await chips()).length, 11, 'a session row is not a felt the picker may offer');
+        assert.equal(await t.eval(`!!document.querySelector('#felt-swatches .felt-swatch[data-felt="house-moss"]')`),
+          false, 'and there is no chip to click');
+
+        // ---- wear it -------------------------------------------------------
+        const applied = await t.dbg(`devFeltApply('house-moss')`);
+        assert.equal(applied.felt, 'house-moss');
+        assert.equal((await t.dbg('felt')).feltBase, '#1f3a22', 'the table says it is wearing the row');
+        const worn = await feltMean(t);
+        assert.ok(hue(worn) > 15,
+          `and the CLOTH itself repainted moss-green (${worn.join(',')} against ${before.join(',')})`);
+
+        // THE CACHE BUST, which is the one thing here nobody would notice was
+        // missing: the tile cache is keyed by cloth and colour and exists so a
+        // theme returned to is byte-identical, so an EDITED row whose canvas
+        // was kept would repaint itself straight back to the colour it had.
+        assert.deepEqual((await t.dbg(`devFeltSet('house-moss', { feltBase: '#5a1f2a' })`)).refused, []);
+        const edited = await feltMean(t);
+        assert.ok(edited[0] > worn[0] + 20 && hue(edited) < 0,
+          `an edit to the live row repaints the cloth wine-dark (${edited.join(',')})`);
+        await t.dbg(`devFeltSet('house-moss', { feltBase: '#1f3a22' })`);
+        assert.deepEqual(await feltMean(t), worn, 'and back is byte-identical — the grain is seeded by the colour');
+
+        // ---- the panel's own section ---------------------------------------
+        await t.waitFor(`!!document.querySelector('#dev-panel select.dev-feltpick option[value="house-moss"]')`,
+          { desc: 'the panel section shows the new row' });
+        assert.equal(await t.eval(`document.querySelectorAll('#dev-panel select.dev-feltpick option').length`), 12);
+        // WHICH ROW THE FORM EDITS follows the felt on the TABLE until somebody
+        // makes a choice of their own. The panel opened on obsidian, and a
+        // `devFeltApply` from the console moved it — that is the row you are
+        // about to reach for. Once picked by hand it is the picker's, so a
+        // form is never re-pointed out from under a typist mid-edit.
+        const picked = `document.querySelector('#dev-panel select.dev-feltpick')`;
+        const clothCtl = `document.querySelector('#dev-panel .dev-row[data-path="felts.cloth"]')`;
+        const nameIn = `document.querySelector('#dev-panel .dev-row[data-path="felts.name"] input')`;
+        assert.equal(await t.eval(`${picked}.value`), 'house-moss', 'the form followed the felt onto the table');
+        assert.equal(await t.eval(`${nameIn}.value`), 'Moss');
+        assert.equal(await t.eval(`document.querySelector('#dev-panel .dev-row[data-path="felts.feltBase"] .dev-hex').value`), '#1f3a22');
+        assert.equal(await t.eval(`${clothCtl}.classList.contains('is-locked')`), false, 'a house row is editable');
+        // A shipped row is drawn read-only, from one place: the row itself.
+        const pickRow = (id) => t.eval(`(() => { const s = ${picked};`
+          + ` s.value = ${JSON.stringify(id)}; s.dispatchEvent(new Event('change')); })()`);
+        await pickRow('obsidian');
+        assert.equal(await t.eval(`${clothCtl}.classList.contains('is-locked')`), true,
+          'a shipped felt cannot be edited here — it lives in js/main.js');
+        assert.equal(await t.eval(`${nameIn}.value`), 'Obsidian', 'the form re-points at the row the picker names');
+        // …and having been picked by hand, it STAYS picked: a felt applied from
+        // the console now leaves the choice alone.
+        await t.dbg(`devFeltApply('house-moss')`);
+        await t.dbg('sim(2)');
+        assert.equal(await t.eval(`${picked}.value`), 'obsidian', 'a choice made by hand is not moved');
+        // …and Clone is how you get an editable copy of a shipped row.
+        await t.eval(`[...document.querySelectorAll('#dev-panel .dev-btn')].find((b) => b.textContent === 'Clone').click()`);
+        await t.waitFor(`!!document.querySelector('#dev-panel select.dev-feltpick option[value="house-obsidian"]')`,
+          { desc: 'Clone minted a house copy of the shipped row' });
+        const cloned = (await t.dbg('devFelts()')).find((f) => f.id === 'house-obsidian');
+        assert.equal(cloned.feltBase, '#1c1c24', 'the clone carries the shipped row\'s own colour');
+        assert.equal(cloned.shipped, false, 'and is editable, which the original was not');
+        assert.equal(await t.eval(`${clothCtl}.classList.contains('is-locked')`), false);
+        // Remove takes it away again; the catalogue is back to twelve.
+        assert.deepEqual((await t.dbg(`devFeltRemove('house-obsidian')`)).refused, []);
+        assert.equal((await t.dbg('devFelts()')).length, 12);
+
+        // ---- the file ------------------------------------------------------
+        const exported = await t.dbg('tuneExport()');
+        assert.match(exported, /\nfelts:\n {2}house-moss:\n/, 'the export grew the section the file never had');
+        assert.match(exported, /\n {4}feltBase: "#1f3a22"\n/);
+        assert.match(exported, /\n {4}breath: 0\.9\n/);
+        assert.ok(exported.startsWith(original), 'appended; not one byte of the dials moved');
+
+        await t.eval(`document.querySelector('#dev-panel .dev-saveroute').click()`);
+        await t.waitFor(`document.querySelector('#dev-panel .dev-statusslot')?.textContent.includes('saved 6 changes')`,
+          { desc: 'the route wrote the row\'s six leaves' });
+        const saved = readFileSync(join(dir, 'dice.yaml'), 'utf8');
+        assert.equal(saved, exported, 'and the server patched its own file to exactly what the tab would have downloaded');
+        assert.equal(readFileSync(join(ROOT, 'dice.yaml'), 'utf8'), original, 'the CHECKOUT was never touched');
+
+        // ---- a fresh tab, where it is simply one of the felts ---------------
+        const fresh = await open('127.0.0.75', `${ctx.room}-fresh`);
+        const list = await fresh.dbg('devFelts()');
+        assert.equal(list.length, 12, 'twelve felts on a tab that never opened the door');
+        const row = list.find((f) => f.id === 'house-moss');
+        assert.equal(row.inFile, true, 'the file declares it now');
+        assert.equal(row.shipped, false, '…and it is still not code');
+        assert.equal(row.name, 'Moss');
+        assert.equal((await fresh.dbg('devInfo()')).changed, 0,
+          'and it reads as SHIPPED — the file is the declaration, not a diff');
+        assert.equal(await fresh.eval(`document.querySelectorAll('#felt-swatches .felt-swatch').length`), 12,
+          'the settings picker drew a twelfth swatch without anybody opening the panel');
+        assert.equal(await fresh.eval(`document.querySelector('#felt-swatches .felt-swatch[data-felt="house-moss"] span:last-child').textContent`), 'Moss');
+        // …and applying it from the panel wore it here too, which is the
+        // difference between "the picker offers it" and "this tab invented it".
+        assert.equal(await fresh.eval(`document.querySelector('#felt-swatches .felt-swatch[data-felt="house-moss"]').getAttribute('aria-pressed')`),
+          'false', 'nothing is pressed yet — the room is still on the default');
+
+        // ---- REMOVING A DECLARED ROW, and what the route can and cannot say -
+        //
+        // Three answers the C4 review found the panel getting wrong at once.
+        // A row that is gone is GONE: `apply` used to accept a leaf write into
+        // it (SHIPPED still names every leaf of a declared row) and mint five
+        // fields out of the row defaults — a felt called Moss wearing
+        // obsidian's colours, while the export said the row was gone. And a
+        // Save taken right after a Remove printed "saved 0 changes … reload the
+        // tab to boot on them" over a removal the route had silently dropped:
+        // `undefined` does not survive JSON, so the route received `{}`.
+        assert.equal((await fresh.dbg('devOpen()')).panel, 'open');
+        await fresh.waitFor(`document.querySelector('#dev-panel .dev-saveroute')?.hidden === false`,
+          { desc: 'the fresh tab heard back that the route is armed' });
+        assert.deepEqual((await fresh.dbg(`devFeltRemove('house-moss')`)).refused, []);
+        assert.equal((await fresh.dbg('devFelts()')).length, 11, 'the catalogue is back to the shipped eleven');
+        assert.deepEqual((await fresh.dbg(`devFeltSet('house-moss', { name: 'Bog' })`)).refused,
+          [['felts.house-moss.name', 'row']], 'one field cannot put a removed row back — it lands or leaves whole');
+        assert.equal((await fresh.dbg('devFelts()')).find((f) => f.id === 'house-moss'), undefined,
+          'and nothing was minted behind the refusal');
+        assert.ok(!/house-moss/.test(await fresh.dbg('tuneExport()')),
+          'so the live tree and the export still agree');
+
+        await fresh.eval(`document.querySelector('#dev-panel .dev-saveroute').click()`);
+        await fresh.waitFor(`document.querySelector('#dev-panel .dev-statusslot')?.textContent.includes('cannot carry a removal')`,
+          { desc: 'the status line says what the route could not do' });
+        const line = await fresh.eval(`document.querySelector('#dev-panel .dev-statusslot').textContent`);
+        assert.match(line, /1 row removed \(felts\.house-moss\)/, 'named, not counted in the abstract');
+        assert.equal(await fresh.eval(`!!document.querySelector('#dev-panel .dev-status-warn')`), true,
+          'and it is a warning, not the success it used to read as');
+        assert.ok(/house-moss/.test(readFileSync(join(dir, 'dice.yaml'), 'utf8')),
+          'the row really is still in the file — which is exactly why the line had to say so');
+
+        // Reverting it puts the FILE's row back whole, every field of it.
+        await fresh.dbg(`tuneReset('felts.house-moss')`);
+        const back = (await fresh.dbg('devFelts()')).find((f) => f.id === 'house-moss');
+        assert.equal(back.breath, 0.9, 'the declaration\'s own row, not a guess at it');
+        assert.equal(back.inFile, true);
+        assert.equal((await fresh.dbg('devInfo()')).changed, 0, 'and the tab reads as shipped again');
+        await fresh.dbg('devClose()');
+
+        // THE HALF THAT DECIDES WHETHER A HOUSE FELT WORKS AT A TABLE. The felt
+        // is ROOM state, so the server has to accept the id on the wire or it
+        // works solo and is 400'd the moment anybody else is here — which is
+        // the exact failure tests/felt-ids.test.mjs keeps the three hand-kept
+        // lists from producing. server.js reads the same file.
+        assert.equal(await fresh.dbg(`setFelt('house-moss')`), true);
+        await fresh.waitFor(`window.__diceDebug.felt.id === 'house-moss'`,
+          { desc: 'the server accepted the declared id and echoed it back' });
+        assert.equal((await fresh.dbg('settings')).felt, 'house-moss');
+        assert.ok(hue(await feltMean(fresh)) > 15, 'and the fresh tab is wearing moss');
+
+        assert.deepEqual(t.page.consoleErrors, []);
+        assert.deepEqual(fresh.page.consoleErrors, []);
+      } finally {
+        if (server.exitCode === null) server.kill('SIGTERM');
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  },
+  {
     name: 'dev-shell-loads',
     tags: ['dev'],
     timeout: 60000,
@@ -27404,6 +27707,217 @@ export const scenarios = [
       assert.match(await t.eval(`document.querySelector('#dev-panel .dev-about').textContent`),
         /nothing live/, 'and the line says so');
       assert.deepEqual(t.page.consoleErrors, []);
+    },
+  },
+  {
+    name: 'dev-sound-post',
+    tags: ['dev'],
+    timeout: 150000,
+    // THE THREE SMALL SECTIONS (docs/DEVMODE.md §8, phase 2 — C5): `sound`,
+    // `post`, `cards`. They are small in dials and not in what they prove,
+    // because between them they are the three ways a declaration can reach a
+    // running table, and each one is asserted ON THE THING IT MOVES rather
+    // than on the tree that was asked to move it:
+    //
+    //   · sound.master     → the GainNode's own `gain.value`, read off the
+    //                        live graph (audioGraphInfo), including the leg
+    //                        that catches a second writer: mute and unmute
+    //                        must come back to the DIAL, not to the shipped
+    //                        0.7 the mute switch used to restore;
+    //   · sound.impact.gain→ the registry row `impactPresetOf` resolves, read
+    //                        through `impactPresetFor`/`impactVoicingFor` so
+    //                        a scenario that re-derived the fallback itself
+    //                        could not stay green with the binder unwired;
+    //   · post.bloom.
+    //     threshold        → the `uThresh` UNIFORM, read off the material
+    //                        (postInfo), not off the tree that set it;
+    //   · cards.*          → a ⟳ row, so the claim is the OPPOSITE shape: the
+    //                        dial must NOT move the live table, must be
+    //                        reported as pending, must survive Save, and must
+    //                        be worn by the next boot — measured on the card
+    //                        ring's own radius and on the rig's own footprint.
+    //
+    // The `cards` leg needs a reload, so it runs against a scratch checkout
+    // with the armed write route (dev-write-route's tree, dev-felt-roundtrip's
+    // `open`), and the checkout is read afterwards to prove it never moved.
+    async fn(ctx) {
+      // ---- sound and post, on an ordinary dev tab -------------------------
+      const t = await ctx.devTab({ origin: '127.0.0.76', players: 0, name: 'Sound' });
+      // A never-opened tab's numbers are the shipped ones, and the negative
+      // half first as every dev scenario takes it: nothing here has moved.
+      assert.equal((await t.dbg('postInfo()')).bloomThreshold, 0.9,
+        'the uniform boots at the declaration\'s own threshold');
+      assert.equal((await t.dbg('impactPresetFor()')).gainScale, 0.06);
+      assert.equal((await t.dbg('audioTune()')).defaultBody, 'felt',
+        'the body this dial moves is still the default one');
+
+      // THE GRAPH IS BUILT BY A ROLL and the context stays SUSPENDED until a
+      // real gesture (audio-graph pins both). The dial has to work in that
+      // state — a ramp scheduled on a stopped clock never arrives — which is
+      // why applyMasterGain sets the value outright there.
+      await t.roll('4d6');
+      await t.settle();
+      let g = await t.dbg('audioGraphInfo()');
+      assert.equal(g.masterBuilt, true, 'a roll built the master');
+      assert.equal(g.ctxState, 'suspended', 'and nobody has touched the page');
+      // A TOLERANCE, AND IT IS NOT SLOPPINESS: an AudioParam's `value` is a
+      // float32, so the 0.7 this graph was handed reads back 0.699999988. Every
+      // gain comparison below carries the same 0.002, which is far tighter than
+      // any of the moves it is judging and far looser than a float32 round trip.
+      assert.ok(Math.abs(g.masterGain - 0.7) < 0.002,
+        `the node opened at the declaration's master (${g.masterGain})`);
+
+      await t.dbg(`tuneSet({'sound.master': 0.35})`);
+      await t.waitFor('Math.abs(window.__diceDebug.audioGraphInfo().masterGain - 0.35) < 0.002',
+        { desc: 'the dial reached the gain node' });
+
+      // THE MUTE SWITCH AND THE DIAL ARE ONE WRITER. This is the leg that
+      // fails if `setSound` keeps its own copy of the number: it silences to
+      // zero and comes back to whatever the dial says, never to 0.7.
+      await t.dbg('setSoundOn(false)');
+      await t.waitFor('window.__diceDebug.audioGraphInfo().masterGain < 0.001',
+        { desc: 'mute still takes the master to zero' });
+      await t.dbg('setSoundOn(true)');
+      await t.waitFor('Math.abs(window.__diceDebug.audioGraphInfo().masterGain - 0.35) < 0.002',
+        { desc: 'and unmute comes back to the DIAL, not to the shipped 0.7' });
+
+      // THE DEFAULT CONTACT BODY'S LEVEL, through the resolver.
+      // Strength 2 is under the soft tier, which is fine: the tier moves the
+      // TIMBRE and never the level. The claim is a RATIO rather than a number
+      // so it says nothing about the venue's ground trim, which multiplies the
+      // same gain and is not this dial's business.
+      const voice0 = await t.dbg('impactVoicingFor(2)');
+      await t.dbg(`tuneSet({'sound.impact.gain': 0.02})`);
+      assert.equal((await t.dbg('impactPresetFor()')).gainScale, 0.02,
+        'the registry row impactPresetOf resolves is the row the dial wrote');
+      const voice1 = await t.dbg('impactVoicingFor(2)');
+      assert.ok(voice0.gain > 0 && Math.abs(voice1.gain * 3 - voice0.gain) < 1e-9,
+        `the voicing came down by exactly the third the dial moved (${voice0.gain} → ${voice1.gain})`);
+      assert.equal((await t.dbg('audioTune()')).impactGain, 0.02);
+
+      // THE BLOOM THRESHOLD, off the uniform.
+      await t.dbg(`tuneSet({'post.bloom.threshold': 0.25})`);
+      assert.equal((await t.dbg('postInfo()')).bloomThreshold, 0.25,
+        'the uThresh uniform the threshold pass runs');
+
+      // ALL THREE ARE LOOK — what a viewer hears and how bright a glow reads
+      // are that viewer's (GOALPOST 7), so none of them is refused at a table
+      // that is sharing a film.
+      const diff = await t.dbg('tuneDiff()');
+      for (const path of ['sound.master', 'sound.impact.gain', 'post.bloom.threshold']) {
+        const row = diff.find((r) => r.path === path);
+        assert.ok(row, `${path} shows in the diff`);
+        assert.equal(row.cls, 'look', `${path} is a look row`);
+      }
+
+      // …AND SHUT PUTS EVERY ONE OF THEM BACK, which is the property the whole
+      // door rests on: a tab that opened measures like a tab that never did.
+      await t.dbg('devClose()');
+      await t.waitFor('Math.abs(window.__diceDebug.audioGraphInfo().masterGain - 0.7) < 0.002',
+        { desc: 'Shut restored the master' });
+      assert.equal((await t.dbg('impactPresetFor()')).gainScale, 0.06, 'and the impact body');
+      assert.equal((await t.dbg('postInfo()')).bloomThreshold, 0.9, 'and the uniform');
+      assert.deepEqual(t.page.consoleErrors, []);
+
+      // ---- cards: the ⟳ row, and the reload it promises -------------------
+      const dir = mkdtempSync(join(SCRATCH_BASE, 'dev-cards-'));
+      const original = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
+      cpSync(join(ROOT, 'server.js'), join(dir, 'server.js'));
+      writeFileSync(join(dir, 'dice.yaml'), original);
+      for (const name of ['js', 'css', 'vendor', 'models', 'index.html']) {
+        symlinkSync(join(ROOT, name), join(dir, name));
+      }
+      const port = await freePort();
+      const server = await startServer(port, {
+        root: dir,
+        env: { DICE_DEV_WRITE: '1', DICE_DEV_ROOT: dir },
+      });
+      try {
+        const open = async (origin, room) => {
+          const page = await ctx.browser.newPage();
+          await page.addInitScript('window.__diceTestMode = true;');
+          await page.addInitScript(`try { localStorage.setItem('dice.schema.v1','2');`
+            + ` localStorage.setItem('dice.name.v1','Card'); } catch {}`);
+          const url = `http://${origin}:${port}/?room=${encodeURIComponent(room)}`;
+          await page.navigate(url);
+          const tab = new Table(page, url);
+          ctx.tables.push(tab);
+          await tab.waitFor('!!window.__diceDebug && window.__diceDebug.netReady',
+            { desc: `the tab at ${origin} is up`, timeout: 30000 });
+          await tab.dbg('sim(60)');
+          assert.equal((await tab.dbg('devOpen()')).panel, 'open');
+          await tab.dbg('devDeal(4)');
+          await tab.waitFor('window.__diceDebug.places().stations.length === 5',
+            { desc: 'the viewer and four' });
+          await tab.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
+            { desc: 'the cards stood' });
+          return tab;
+        };
+        // The card ring's radius and the rig's own footprint — the two halves
+        // `cards` owns. The radius is js/places.js `seatAnchor`; the footprint
+        // is the pad js/placard.js writes into the buffer.
+        const ring = async (tab) => {
+          const st = (await tab.dbg('places()')).stations;
+          const rs = st.map((s) => Math.hypot(s.world.x, s.world.z));
+          for (const r of rs) {
+            assert.ok(Math.abs(r - rs[0]) < 1e-9, `every card is on one ring (${rs.join(', ')})`);
+          }
+          return { r: rs[0], w: (await tab.dbg('tableExtents()')).w };
+        };
+        const pad = async (tab) => (await tab.dbg('placardBudget()')).base;
+
+        const a = await open('127.0.0.77', ctx.room);
+        const r0 = await ring(a);
+        assert.ok(Math.abs(r0.r - (ringRadius(r0.w) + PLACARD_STANDOFF)) < 1e-9,
+          `the cards stand at the rim plus the shipped standoff (${r0.r})`);
+        assert.deepEqual(await pad(a), { w: PLACARD_W, d: 1.52, h: 0.14 },
+          'and the pad in the buffer is the shipped footprint');
+
+        // A ⟳ ROW DOES NOT MOVE THE TABLE, and that is the claim, not a
+        // shortcoming: the rig is baked once at boot and the anchors are
+        // computed from these numbers at every flush, so a live half-change
+        // would be a ring of cards the size of neither declaration. The panel
+        // is told instead — `pending`, the ⟳ mark, and Save & reload.
+        const moved = await a.dbg(`tuneSet({'cards.standoff': 1.6, 'cards.width': 4.6, 'cards.depth': 2})`);
+        assert.deepEqual(moved.refused, [], 'a table of one may move a film dial');
+        assert.deepEqual(moved.pending.sort(), ['cards.depth', 'cards.standoff', 'cards.width'],
+          'all three are reload rows, and the panel is told so');
+        await a.dbg('sim(30)');
+        assert.deepEqual(await ring(a), r0, 'the ring did not move under the live table');
+        assert.deepEqual(await pad(a), { w: PLACARD_W, d: 1.52, h: 0.14 }, 'nor did the pad');
+        const row = (await a.dbg('tuneDiff()')).find((q) => q.path === 'cards.width');
+        assert.equal(row.cls, 'film', 'the cards are FILM — two clients must agree on the ring');
+        assert.equal(row.read, 'reload', 'and they are read at boot');
+
+        // ---- Save, and the next boot wears it ------------------------------
+        await a.waitFor(`document.querySelector('#dev-panel .dev-saveroute')?.hidden === false`,
+          { desc: 'the panel heard back that the route is armed' });
+        const exported = await a.dbg('tuneExport()');
+        await a.eval(`document.querySelector('#dev-panel .dev-saveroute').click()`);
+        await a.waitFor(`document.querySelector('#dev-panel .dev-statusslot')?.textContent.includes('saved 3 changes')`,
+          { desc: 'the route wrote the three leaves' });
+        assert.equal(readFileSync(join(dir, 'dice.yaml'), 'utf8'), exported,
+          'the server patched its own file to what the tab would have downloaded');
+        assert.equal(readFileSync(join(ROOT, 'dice.yaml'), 'utf8'), original,
+          'the CHECKOUT was never touched');
+
+        const b = await open('127.0.0.78', `${ctx.room}-cards`);
+        assert.equal((await b.dbg('devInfo()')).changed, 0,
+          'the fresh tab reads as SHIPPED — the file is the declaration, not a diff');
+        const r1 = await ring(b);
+        assert.ok(Math.abs(r1.r - (ringRadius(r1.w) + 1.6)) < 1e-9,
+          `the ring stands at the DECLARED standoff (${r1.r} against ${r0.r})`);
+        assert.ok(r1.r > r0.r + 0.7, 'which is visibly further out than the shipped one');
+        assert.deepEqual(await pad(b), { w: 4.6, d: 2, h: 0.14 },
+          'and js/placard.js baked the pad to the declared footprint — a const captured at '
+          + 'module load would have kept 3.68 here while the layout moved around it');
+
+        assert.deepEqual(a.page.consoleErrors, []);
+        assert.deepEqual(b.page.consoleErrors, []);
+      } finally {
+        if (server.exitCode === null) server.kill('SIGTERM');
+        rmSync(dir, { recursive: true, force: true });
+      }
     },
   },
 ];

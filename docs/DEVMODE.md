@@ -155,7 +155,7 @@ sound:
   impact: { gain: 0.9, spread: 0.2 }
 
 sets:                      # dice sets authored as data (shipped sets stay in themes.js for now)
-  house.ember:
+  house-ember:
     label: Ember
     body: "#4a1d12"
     text: "#ffd9a0"
@@ -165,16 +165,34 @@ sets:                      # dice sets authored as data (shipped sets stay in th
     sound: { body: chime, weight: 0.6 }
 
 felts:
-  house.moss:
+  house-moss:
     name: Moss
-    cloth: felt            # felt | velvet | leather | …  (the painters in FELT_CLOTHS)
+    cloth: felt            # felt | silt | oak  (the painters in FELT_CLOTHS)
     feltBase: "#1f3a22"
     sceneBg: "#0c120d"
     breath: 0.9
+    mottle: 1
 ```
 
+**A row id carries no dot** (`house-moss`, not `house.moss` — a narrowing
+taken in phase 2, and the example above used to read the other way).
+Every path in `js/tune.js`, in `tune.changes()`, on a panel row and in what
+the Save route posts is a DOTTED STRING, so an id with a dot in it stops
+being one path and becomes two readings of one string, and the flat
+`{ path: value }` map the route was built around has nowhere to say which
+was meant. `js/yaml.js` is ready for the day this is lifted (`formatKey`
+quotes a dotted key; `readKey` refuses an unquoted one), and the day is
+when `sets:` arrives, because a dice-set id genuinely carries dots today
+(`emberforge.blackanvil`). Until then `ASSET_ID_RE` is the law and a dotted
+id is refused with its path.
+
 (Names and numbers above are illustrative; the first commit writes the
-real file from the shipped values. Sections are the app's nouns; a leaf's
+real file from the shipped values. Two the sketch got wrong and the file
+gets right: `cards:` is a section of its own, not `table.cards` — a name
+card belongs to the ring of chairs, not to the mat, and it is the one
+section every leaf of which is ⟳ — and `sound.impact` carries `gain`
+alone, because the seven contact bodies beside the default one are
+authored against its number and a dial over all eight would unsolve them. Sections are the app's nouns; a leaf's
 place in the tree is its meaning, so `light.lamp.y` needs no other label.
 `towers:` and `venues:` arrive in phase 3 and are simply absent until then,
 which is what optional means.)
@@ -529,7 +547,8 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
 │                                                     ┌─ DEV ──────── ` fold ─┐│
 │                                                     │ table light camera    ││
 │                                                     │ throw pace sound      ││
-│                                                     │ cast sets felts file  ││
+│                                                     │ cast felts clock ab   ││
+│                                                     │ file                  ││
 │                                                     │ find a dial ________  ││
 │                                                     │───────────────────────││
 │                                                     │ LIGHT · 3 changed  ↺  ││
@@ -620,12 +639,18 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
   each point ticked, the convex loop closed round them, a cross at the centre
   the fit aims at), the **frame disc** per seat (`ringRadius × FRAME_SPOT` —
   wider than the toss spot, deliberately: the spot is where dice are aimed,
-  the disc is where they may roll and stay in shot), every card's
-  **footprint** (js/places.js `placardFootprint`, the same OBB `placardGap`
-  separates two cards with), the **lamp's cone** where it meets the felt
-  (taken off `MOOD.lamp` itself — breath-narrowed, orbit-swung — so it is the
-  lamp lighting the table, not the one the file asked for; nothing is drawn
-  for a cone that never reaches the felt), and the **four walls** as lines,
+  the disc is where they may roll and stay in shot), the **footprint** of
+  every card that STANDS (js/places.js `placardFootprint`, the same OBB
+  `placardGap` separates two cards with — and a table of one stands none, so
+  it draws none: the layer rides `placardRebuild`'s own gate rather than the
+  roster), the **lamp's cone** where it meets the felt (taken off `MOOD.lamp`
+  itself — breath-narrowed, orbit-swung — so it is the lamp lighting the
+  table, not the one the file asked for; nothing is drawn for a cone that
+  never reaches the felt, nor for one so wide the pool swallows the room —
+  the shipped lamp's pool is already wider than the felt, and at the ends of
+  its own ranges it is hundreds of table-widths across, so the mark is bounded
+  to twice the room and `framing.lamp.fit` says which of `inside`, `clipped`,
+  `covers` and `missed` this is), and the **four walls** as lines,
   read off the physics bodies, so a socketed tower's shifted back wall reads
   as the shifted wall it is. `all` draws both.
 
@@ -668,7 +693,7 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
 | Hooks | `tuneGet()`, `tuneDiff()`, `devInfo()` zero-arg; `tuneSet(p)`, `tuneExport()`, `devOpen()`, `devClose()`, `devFold(b)`, `devDeal(n)` | 1 | S |
 | Save route | `POST /api/dev/write`; env-armed, loopback, same-origin, one file, atomic | 2 · **built** | M |
 | Server reads `table.seats` | `places.js` takes toss and card values from the declaration on both sides | 2 | M |
-| Sound, Post, Cards sections | `voices.js` reads `T` at event time; bloom uniform; placard geometry | 2 | M |
+| Sound, Post, Cards sections | `sound.master` on the master GainNode and `sound.impact.gain` on the default contact body (both look; `voices.js` keeps the shipped numbers); `post.bloom.threshold` on the `uThresh` uniform; `cards.standoff/width/depth` on `places.js` PLACARD, film and ⟳ — the rig is baked at boot | 2 · **built** | M |
 | HUD | fps ring, `renderAudit` calls and tris, bodies, settle time | 2 · **built** | S |
 | Clock | freeze, step one frame, scrub the running film's keyframes | 2 · **built** | S |
 | Seeded bench and replay | throw with a chosen seed (labelled *bench* in the log; values still through `composeRoll`); replay the last seed | 2 · **built** | S |
@@ -677,7 +702,7 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
 | Rebuild choke points | `rebuildFloor()`, `rebuildDice()`; promote reload rows to live | 3 | M |
 | Presets | named patches under `presets:` in the declaration, applied like a paste | 3 | S |
 | Venue light as a layer | `venues.<id>.light` composed through `tuneSet`; until then the Save verb drops the rows `venueLightPatch()` names while a venue holds them (`devWriteSave`, js/main.js) | 3 | M |
-| `felts:` editor | felt row form; live on the felt; Save appends the row | 2 | M |
+| `felts:` editor | felt row form; live on the felt; Save appends the row | 2 · **built** | M |
 | `sets:` editor | the lab's set builder moved onto the live felt; full recipe | 3 | L |
 | Shipped catalogue migrates | `themes.js` sets and `FELT_THEMES` rows move into the declaration, one kind per commit | 3 | M |
 | Towers and venues rows | cosmetic rows over `towerRegisterGlb` and `VENUES`; meshes stay forge bakes | 3 | L |
@@ -704,15 +729,77 @@ recipe's defaults fill the rest. A row's two-state fields are enums
   and rejected on the wire). `main.js` merges `felts` before the swatches
   render. The server parses the same file, so it accepts a new id on the
   wire after a restart, and after the mtime re-read in phase 2. Ids carry a
-  house prefix so a custom row never shadows a shipped one.
+  house prefix so a custom row never shadows a shipped one — and where one
+  does anyway, the SHIPPED row stands and a console line names it, because
+  `taproom` in a file may not quietly become a different mat than the
+  `taproom` a golden and eleven months of screenshots mean.
+
+  The second half of "the server parses the same file" is easy to half-ship
+  and was: a Save ADOPTS the tree it just parsed rather than re-reading the
+  file, so for about an hour a felt saved from the panel was in the served
+  module and still 400'd at `/api/settings` until some later, unrelated edit
+  — a house felt that worked alone and failed the moment anybody else sat
+  down. Every assignment to `declaration` now goes through one setter.
 - **Dice set.** The recipe is already pure data (themes.js:36-135). Editor
   = the lab's set builder moved into a sets section on the live felt: every
   change, debounced, runs `registerSet` → `bustDie` → `bustArt` (new) →
   reskin standing dice. Code-only: a new pattern, particle or decal kind,
   voice body, die type.
-- **Mat.** A colour row over an existing cloth: two colour pickers, breath
-  and mottle sliders, a cloth select; apply = bust the felt tile +
-  `applyFeltTheme` + re-render swatches. Code-only: a new cloth.
+- **Mat** (phase 2, **built**). A colour row over an existing cloth: two
+  colour pickers, breath and mottle sliders, a cloth select; apply = bust the
+  felt tile + `applyFeltTheme` + re-render swatches. Code-only: a new cloth.
+  What shipped, and the four places it touches:
+  - `js/tune.js` grew `ASSET_SECTIONS`, `ASSET_ROWS` (a section's ROW SHAPE,
+    as dials — so `felts.<id>.cloth` type-checks and enum-checks through the
+    same `tune.set` a dial does), `ASSET_ID_RE`, and `addRow` / `removeRow` /
+    `rowsOf` / `rowIsDeclared`. A row lands and leaves WHOLE: there is no
+    per-leaf write that can create one, because a half-built felt is a felt
+    the merge site would have to guess the rest of. `diff()` walks SHIPPED ∪
+    T, so an added row reads `shipped: undefined` and a removed one
+    `live: undefined`. `sections()` hides asset sections from the dial bar —
+    the panel draws them bespoke, and two sections of one name would collide.
+  - `js/dice-apply-core.js`'s `dialFor` resolves an asset path through the row
+    shape, so the apply TOOL and the armed Save ROUTE accept a felt row with
+    no second idea of what a legal value is.
+  - `js/main.js` `feltThemesSync()` merges `T.felts` into `FELT_THEMES` before
+    the first `renderFeltSwatches`, busts exactly the tile-cache keys that
+    left or changed (never one a shipped row is using), hands the ids down to
+    `js/portable.js` (`declareFelts`), refuses a collision with a shipped id
+    with one console line, and falls the table back when the felt it is
+    wearing is removed. `server.js` does its half from the tree it parsed
+    (`DECLARED_FELTS`, refilled by the one `setDeclaration`) — **filtered by
+    `ASSET_ID_RE`, the same law the browser drops a row by**, or the wire
+    would accept a room felt no client can resolve (the C4 review,
+    2026-09-03: the inverse of `tests/felt-ids.test.mjs`'s failure).
+    The PLAYER's swatch picker draws only rows the catalogue can defend —
+    shipped ids and ids the FILE declares — because a chip's click is
+    `selectFelt`, which POSTs the room setting; a row minted this session
+    reaches the table through the panel's Apply and through Save + reload.
+  - the panel's `felts` section: a picker over every felt, a form built from
+    the row shape, Clone / Apply to table / Remove, and a 140 ms debounce on a
+    dragged field (a felt apply redraws a 1024px tile, the gloss map and the
+    whole mottle attribute — sixty of those a second is not a slider).
+  Two things a reader should not have to discover: **Apply to table is
+  LOCAL** (it wears the felt on this tab and never sends the room setting —
+  a felt only this checkout declares is one nobody else could resolve, and
+  Save + reload is how it becomes the table's felt for real), and **the Save
+  route cannot carry a REMOVAL** (`changes()` speaks in leaves and
+  `undefined` does not survive JSON; Download + `tools/dice-apply.mjs` does
+  carry one, and `exportYaml` takes the row's lines out as a row rather than
+  leaf by leaf, or the reader would fill the empty row back out with
+  defaults) — and **the status line says so at the moment of the Save**,
+  naming the rows it could not carry and reading as a warning, because §10's
+  rule is that the line at the moment of the act must say what happened (the
+  C4 review, 2026-09-03: it read "saved 0 changes … reload the tab to boot on
+  them" over a silently dropped removal). The Paste box cannot MINT a row
+  either, for the same reason nothing else can write one leaf at a time:
+  `felts.<id>.cloth` for an id neither tree has is refused `unknown`, and for
+  a row that was REMOVED it is refused `row` — one field may not put back
+  half of a row, or `feltThemesSync` would guess the other five out of the
+  row defaults. A field of a row this session minted DOES land (that is how
+  the editor's own sliders write), and the preview says so, because the
+  preview must list exactly what Apply will do. Clone is the verb that makes
+  a row; paste moves the fields of one that exists.
 - **Tower / venue** (phase 3). `towerRegisterGlb(id, url, opts)` already
   mints a row at runtime; the row is the cosmetic half only. The mesh stays
   a forge bake; portals stay in the GLB.
@@ -836,8 +923,14 @@ and B differing on lamp height give identical `feltPoses` while the lamp moves;
 differing on floor friction give different poses on the same seed —  at 0.05
 rather than 0.95, because a friction ABOVE the shipped 0.6 was MEASURED to bake
 an identical film, the dice never sliding far enough for the extra grip to
-bite); `dev-felt-roundtrip` (a felt authored on the felt, saved to a scratch
-root, shows in a fresh tab's picker).
+bite); `dev-felt-roundtrip` (a felt minted in the tab and WORN — the mean of
+25 samples off the tile itself, not the row that describes it, so the cache
+bust is proved rather than assumed — the panel's own picker locking a shipped
+row and unlocking a house one, Clone, Save through the armed route into a
+scratch checkout, and a FRESH tab there where the felt is simply one of the
+felts: in `devFelts()`, in the settings swatch picker, and accepted by the
+server on the wire, which is the half that decides whether a house felt works
+at a shared table or only alone).
 
 **Phase 3, assets in depth, and shape.** Sets editor with the full recipe;
 the shipped catalogue migrating into the declaration; tower and venue rows;

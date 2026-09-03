@@ -51,6 +51,16 @@ limitations under the License.
 // place a person types, like the find filter and the paste box), and every
 // other number on those three sections is asked of the bench each repaint.
 //
+// `felts` (optional, phase 2): the first ASSET editor — `{ fields, list, add,
+// set, remove, apply }`. Given one, the panel grows a `felts` section: a
+// picker over every felt this build has (the ones it ships and the ones the
+// declaration adds), a form over the row's own fields, Clone / Apply to table
+// / Remove. A SHIPPED row is drawn read-only, because a row that lives in
+// main.js is not one this file can write; Clone is how you get an editable
+// copy of it. The panel holds no felt state either — which row the form is
+// editing is a choice, like the visible section, and every value in the form
+// is asked of `list()` on the repaint beat.
+//
 // `info` (optional): `{ declared, venue, venueLight }` — `declared` is the
 // tree the file names (a leaf absent from it wears the faint "default"
 // mark); `venue` is the id of a venue holding the light, or null (light rows
@@ -65,7 +75,7 @@ import {
   rowRange, rowStepper, rowColor, rowEnum, rowText, rowStatic,
   find, diffList, status, stopKeys, fmtNum,
 } from './devui.js';
-import { STATIC_PATHS } from './tune.js';
+import { ASSET_SECTIONS, STATIC_PATHS } from './tune.js';
 
 export const DEV_PANEL_ID = 'dev-panel';
 // Drawn, never written (DEVMODE §4). The list is tune.js's, not a copy: the
@@ -113,15 +123,38 @@ function stringOf(v) {
 // Reasons in the words a person reads on the status line.
 const REASON = {
   unknown: 'no such dial',
+  static: 'not a dial: set it in dice.yaml or DICE_MODE',
   film: 'film values are shared — a second viewer is here',
   type: 'wrong type',
   option: 'not one of the options',
   binder: 'the re-apply hook threw — value put back (see console)',
+  // …and the three an ASSET row can be refused for (js/tune.js addRow).
+  shipped: 'that row lives in the code, not the file — Clone it to author one',
+  id: 'not a legal id: lower-case letters, digits, "-" and "_", no dot',
+  section: 'this build cannot declare rows in that section yet',
+  // A row lands or leaves WHOLE (js/tune.js): one field of a row that is not
+  // there cannot put it back, and one field of a row this session minted has
+  // no shipped value to go back to.
+  row: 'that row is not there — revert it whole, or Reset all',
 };
+
+// Is this dotted path a FIELD of an asset row (`felts.house-moss.name`)? The
+// row, not the field, is the unit a reset moves.
+const assetRowOf = (dotted) => {
+  const p = String(dotted).split('.');
+  return p.length > 2 && ASSET_SECTIONS.includes(p[0]) ? `${p[0]}.${p[1]}` : null;
+};
+
+// HOW LONG A DRAGGED FELT FIELD WAITS BEFORE IT REPAINTS THE CLOTH. A felt
+// apply is not a light dial: it redraws a 1024px tile, the gloss map and the
+// whole mottle attribute, so a slider dragged at 60 Hz would ask for sixty of
+// them a second. 140 ms is the brief's number and it reads as live — the
+// commit (mouse-up, Enter, a colour picked) never waits.
+export const FELT_LIVE_MS = 140;
 
 export function mount({
   host = document.body, tune, dials = null, mode = 'development', film = 'live',
-  cast = null, bench = null, verbs = {}, onFold = null, onShut = null, info = null,
+  cast = null, bench = null, felts = null, verbs = {}, onFold = null, onShut = null, info = null,
 } = {}) {
   if (mode === 'production') throw new Error('developer mode is off in production');
   if (!tune || !tune.SHIPPED || typeof tune.set !== 'function') throw new Error('mount needs a Tune');
@@ -143,6 +176,7 @@ export function mount({
   // holds none of its state either: every readout here is asked of it on the
   // repaint beat. Absent (null) is a legal panel: the devshell mounts one.
   let benchApi = bench || null;
+  const feltsApi = felts || null;
   // Reload-class paths a PANEL write found covered by a binder (the tune
   // reported the change without listing it pending). Only consulted when the
   // tune has no `binderFor`; with one, coverage is asked of the tune itself.
@@ -215,11 +249,23 @@ export function mount({
     const venue = info && info.venue ? String(info.venue) : '';
     const venueLight = venue && isMap(info.venueLight) ? info.venueLight : null;
     const patch = {};
+    const rowScopes = new Set();
     let held = 0;
     for (const d of diff) {
       const p = dotted(d.path);
       if (READ_ONLY_PATHS.includes(p)) continue;
       if (scope !== 'all' && p !== scope && !p.startsWith(scope + '.')) continue;
+      // A ROW GOES BACK WHOLE, THROUGH `tune.reset` (the C4 review,
+      // 2026-09-03). A row that was REMOVED, or one this session ADDED, is a
+      // structural difference — six leaves in the diff, and a leaf patch of
+      // them would either be refused ('row') or, before tune.js learned to
+      // refuse it, mint half a felt. `tune.reset('felts.<id>')` is the one
+      // verb that puts the file's row back or takes the session's row away,
+      // so the revert glyph on any of its six fields lands there.
+      if ((d.live === undefined || d.shipped === undefined) && assetRowOf(p)) {
+        rowScopes.add(assetRowOf(p));
+        continue;
+      }
       if (venue && p.startsWith('light.')) {
         if (!venueLight) { held++; continue; }
         if (p in venueLight) {
@@ -229,11 +275,15 @@ export function mount({
       }
       patch[p] = d.shipped;
     }
+    for (const rowScope of rowScopes) {
+      try { tune.reset(rowScope); } catch (e) { showStatus(e.message, 'error'); }
+    }
     const written = Object.keys(patch);
     let r = null;
     if (written.length) {
       try { r = tune.set(patch, { filmLocked }); } catch (e) { showStatus(e.message, 'error'); }
     }
+    if (!r && rowScopes.size) r = { diff: tune.diff(), refused: [], pending: [] };
     settle(r, written);
     if (held) showStatus(`light: ${held} held by the ${venue} venue — leave it to reset them`, 'warn');
     panel.repaint();
@@ -329,7 +379,7 @@ export function mount({
 
   const sectionNames = [...tune.sections()];
   const barNames = () => [...sectionNames, ...(castApi ? ['cast'] : []),
-    ...(benchApi ? ['clock', 'ab'] : []), 'file'];
+    ...(feltsApi ? ['felts'] : []), ...(benchApi ? ['clock', 'ab'] : []), 'file'];
   let bar = null;
   const barSlot = el('div', { class: 'dev-barslot' });
   const rebuildBar = () => {
@@ -541,6 +591,187 @@ export function mount({
     };
   };
 
+  // ---- felts: the first asset editor ---------------------------------------
+  //
+  // A DIAL SECTION IS DRAWN FROM THE TREE; THIS ONE IS DRAWN FROM A LIST. The
+  // difference is the whole point of an asset: there is no path `felts.*.name`
+  // in the dial tree to hang a row on, because the id in the middle is the
+  // thing being authored. So the form is built ONCE from the row's shape
+  // (`fields()` — the same dials js/tune.js type-checks a write against) and
+  // re-pointed at whichever row the picker names.
+  let feltsRec = null;
+  const buildFelts = () => {
+    if (!feltsApi) return;
+    const sec = section('felts', { count: 0, onReset: null, open: true });
+    const fields = (typeof feltsApi.fields === 'function' && feltsApi.fields()) || {};
+    // WHICH ROW THE FORM EDITS follows the felt on the TABLE until somebody
+    // makes a choice of their own, and then it is theirs. Both halves matter:
+    // a `devFeltAdd` + `devFeltApply` from the console (or an Apply from this
+    // section) should leave the form on the felt you are looking at — that is
+    // the row you are about to reach for — and a form re-pointed out from
+    // under a typist mid-edit is the worse failure of the two. `touched` is
+    // the whole of that rule.
+    let pickId = null;
+    let touched = false;
+    let pickSig = '';             // the catalogue as the <option> list last drew it
+    let liveTimer = null;
+
+    const picker = el('select', { class: 'tin dev-feltpick', 'aria-label': 'felt row' });
+    const pickRow = el('div', { class: 'dev-row is-cast', dataset: { path: 'felts.row' } }, [
+      el('span', {
+        class: 'dev-row-label',
+        title: 'felts.row — every felt this build has: the eleven main.js ships and every row `felts:` in dice.yaml declares. A shipped row is read-only; Clone gives you a copy that is not',
+      }, [el('span', { class: 'dev-row-name', text: 'row' })]),
+      el('div', { class: 'dev-row-ctl' }, [picker]),
+    ]);
+    picker.addEventListener('change', () => { pickId = picker.value || null; touched = true; panel.repaint(); });
+
+    const report = (r, verb) => {
+      if (!r) {
+        showStatus(`${verb}: refused${filmLocked ? ` — ${filmReason || REASON.film}` : ''}`, 'warn');
+        return false;
+      }
+      for (const [p, why] of r.refused || []) showStatus(`${p}: ${REASON[why] || why}`, 'warn');
+      return true;
+    };
+
+    // A dragged slider writes on a trailing timer; every other commit writes
+    // now. Both go through the same door, so a drag released mid-wait lands
+    // once and not twice.
+    const writeField = (key, v, live) => {
+      if (!pickId) return;
+      const id = pickId;
+      if (liveTimer) { clearTimeout(liveTimer); liveTimer = null; }
+      const send = () => {
+        liveTimer = null;
+        report(feltsApi.set(id, { [key]: v }), 'felts');
+        panel.repaint();
+      };
+      if (live) liveTimer = setTimeout(send, FELT_LIVE_MS); else send();
+    };
+
+    // One row per field of the row shape, chosen by the field's own dial —
+    // the same rule buildRow uses for a dial leaf, over a shape instead of a
+    // tree.
+    const fieldRows = [];
+    for (const [key, dial] of Object.entries(fields)) {
+      if (!isMap(dial) || !('def' in dial)) continue;
+      const why = `felts.<id>.${key}${dial.why ? ` — ${dial.why}` : ''}`;
+      const now = (v) => writeField(key, v, false);
+      let row;
+      if (Array.isArray(dial.options)) row = rowEnum({ label: dial.label, value: dial.def, options: dial.options, onCommit: now, why });
+      else if (typeof dial.def === 'string' && dial.def.startsWith('#')) row = rowColor({ label: dial.label, value: dial.def, onCommit: now, why });
+      else if (typeof dial.def === 'number' && Array.isArray(dial.range)) {
+        row = rowRange({ label: dial.label, value: dial.def, range: dial.range, onInput: (v) => writeField(key, v, true), onCommit: now, why });
+      } else row = rowText({ label: dial.label, value: dial.def, onCommit: now, why });
+      row.root.dataset.path = `felts.${key}`;
+      fieldRows.push({ key, row });
+    }
+
+    const cloneBtn = button('Clone', () => {
+      const row = rowById(pickId);
+      const stem = String((row && row.id) || 'felt').replace(/^house-/, '');
+      const taken = new Set(listRows().map((f) => f.id));
+      let id = `house-${stem}`;
+      for (let n = 2; taken.has(id); n++) id = `house-${stem}-${n}`;
+      const seed = row ? { name: `${row.name} (house)`, cloth: row.cloth, feltBase: row.feltBase, sceneBg: row.sceneBg, breath: row.breath, mottle: row.mottle } : {};
+      if (!report(feltsApi.add(id, seed), 'clone')) return;
+      pickId = id;
+      touched = true;             // Clone just made this row; it is the choice
+      showStatus(`cloned ${id} — edit it, Apply it, then Save writes the row into dice.yaml`, 'info');
+      panel.repaint();
+    }, { kind: 'primary', title: 'copy this felt into a house row you can edit' });
+
+    const applyBtn = button('Apply to table', () => {
+      const id = pickId;
+      if (!report(feltsApi.apply(id), 'apply')) return;
+      showStatus(`the table is wearing ${id}`, 'info');
+      panel.repaint();
+    }, { title: 'wear this felt on THIS tab — it is not sent to the table, because a felt only this checkout declares is one nobody else could resolve' });
+
+    const removeBtn = button('Remove', () => {
+      const id = pickId;
+      if (!report(feltsApi.remove(id), 'remove')) return;
+      pickId = null;
+      showStatus(`removed ${id}`, 'info');
+      panel.repaint();
+    }, { kind: 'danger', title: 'drop this row (Download carries the removal; the Save route does not — DEVMODE §9)' });
+
+    const note = el('div', { class: 'dev-clockout' });
+    sec.body.append(pickRow, el('div', { class: 'dev-verbs' }, [cloneBtn]),
+      ...fieldRows.map((f) => f.row.root),
+      el('div', { class: 'dev-verbs' }, [applyBtn, removeBtn]), note);
+
+    let cache = [];
+    const listRows = () => cache;
+    const rowById = (id) => cache.find((f) => f.id === id) || null;
+
+    const rec = {
+      sec, rows: fieldRows.map((f) => ({ row: f.row, dotted: `felts.${f.key}`, section: 'felts' })),
+      subs: [], kind: 'felts', name: 'felts',
+      sync() {
+        try { cache = feltsApi.list() || []; } catch { cache = []; }
+        const onTable = (cache.find((f) => f.current) || cache[0] || {}).id || null;
+        // untouched: follow the table. Touched: keep the choice, unless the
+        // row it named has been removed out from under it.
+        if (!touched || !pickId || !rowById(pickId)) pickId = onTable;
+        const sig = cache.map((f) => [f.id, f.name, f.shipped ? 's' : 'h'].join('|')).join('/');
+        if (sig !== pickSig) {
+          pickSig = sig;
+          picker.replaceChildren(...cache.map((f) => el('option', {
+            value: f.id, text: f.shipped ? f.name : `${f.name} · house`,
+          })));
+        }
+        picker.value = pickId || '';
+        const row = rowById(pickId);
+        // A SHIPPED ROW IS READ-ONLY, and so is every row while the film is
+        // locked — a second viewer at this table cannot resolve a felt only
+        // this checkout declares, so nothing here may move the cloth.
+        const editable = !!row && !row.shipped && !filmLocked;
+        for (const f of fieldRows) {
+          if (row && row[f.key] !== undefined) f.row.setValue(row[f.key]);
+          f.row.setState({ locked: !editable, changed: !!row && !row.shipped });
+          f.row.setLockReason(!row ? 'no row picked'
+            : filmLocked ? (filmReason || REASON.film)
+              : row.shipped ? 'a shipped felt lives in js/main.js — Clone it to edit' : '');
+        }
+        cloneBtn.disabled = !row || filmLocked;
+        applyBtn.disabled = !row || filmLocked || row.current;
+        removeBtn.disabled = !row || row.shipped || filmLocked;
+        // `· n changed` MEANS CHANGED, and a house row is not by itself a
+        // change (the C4 review, 2026-09-03). The section reused the dial
+        // chrome's count and fed it the number of HOUSE ROWS, so a panel
+        // opened against a dice.yaml declaring one unedited felt read
+        // "FELTS · 1 changed" and wore the changed mark while `devInfo().changed`
+        // was 0 and the file section's diff was empty. What is changed here is
+        // what the FILE would gain, lose or amend: a row added this session, a
+        // row removed, and a declared row whose fields have moved — which is
+        // one row per distinct id in the diff, and the same arithmetic the file
+        // section does. The house-row count is a fact about the catalogue and
+        // it moves to the note, which has room to say what it means.
+        const touchedRows = new Set();
+        let dl = [];
+        try { dl = tune.diff() || []; } catch { dl = []; }
+        for (const d of dl) {
+          const p = String(d.path).split('.');
+          if (p[0] === 'felts' && p.length > 2) touchedRows.add(p[1]);
+        }
+        sec.setCount(touchedRows.size);
+        const house = cache.filter((f) => !f.shipped).length;
+        note.textContent = (!row ? 'no felts'
+          : row.shipped
+            ? `${row.id} · shipped in js/main.js — read only. Clone it to author a house felt.`
+            : `${row.id} · ${row.inFile ? 'declared in dice.yaml' : 'added this session — Save writes the row'}`
+              + `${row.current ? ' · on the table' : ''}`)
+          + `\n${house} house felt${house === 1 ? '' : 's'} · ${cache.length - house} shipped`;
+      },
+      stop() { if (liveTimer) { clearTimeout(liveTimer); liveTimer = null; } },
+    };
+    feltsRec = rec;
+    secs.set('felts', rec);
+    body.append(sec.root);
+  };
+
   // ---- the clock -----------------------------------------------------------
   let clockRec = null;
   const buildClock = () => {
@@ -645,6 +876,7 @@ export function mount({
   // Clock and A/B sit between the cast and the file, and the file stays last
   // however often the cast is rebuilt (setCast re-appends its section).
   const tailOrder = () => {
+    if (feltsRec) body.append(feltsRec.sec.root);
     if (clockRec) body.append(clockRec.sec.root);
     if (abRec) body.append(abRec.sec.root);
     if (fileRec) body.append(fileRec.sec.root);
@@ -727,9 +959,21 @@ export function mount({
     flatten(tree, []);
     return flat;
   };
+  // THE PREVIEW READS BOTH TREES, because Apply does (the C4 review,
+  // 2026-09-03). `tune.set` was widened to take a write into a row minted THIS
+  // session — that is how the felt editor moves a slider — so a preview that
+  // asked only SHIPPED said "no such dial" about a field Apply then wrote.
+  // An instrument that warns about a write it goes on to perform is worse than
+  // one that says nothing, and the contract three lines above ("so the preview
+  // lists exactly what Apply will do") is the promise it broke.
   const judge = (path, v) => {
-    const have = leafIn(tune.SHIPPED, path);
+    let have = leafIn(tune.SHIPPED, path);
+    if (!have.has) have = leafIn(tune.T, path);
     if (!have.has) return 'unknown';
+    // …and a field of a row that is not in T either — a removed row's — is
+    // refused by `apply` with its own reason, which the preview must say too.
+    const row = assetRowOf(dotted(path));
+    if (row && !isMap(leafIn(tune.T, row).value)) return 'row';
     const dial = dialAt(path);
     if (dial && dial.cls === 'film' && filmLocked) return 'film';
     if (typeof v !== typeof have.value) return 'type';
@@ -799,10 +1043,20 @@ export function mount({
     }
     const n = Array.isArray(s.changes) ? s.changes.length : 0;
     const held = Array.isArray(s.held) ? s.held.length : 0;
+    // WHAT THE ROUTE COULD NOT CARRY (the C4 review, 2026-09-03). A removed
+    // asset row leaves `changes()` as `undefined`s, JSON drops them, and the
+    // route honestly reports that it wrote nothing — so a Save taken right
+    // after a Remove printed success over a refusal nobody had been told
+    // about. Refuse-or-warn is a choice; saying nothing is not (DEVMODE §10).
+    const dropped = Array.isArray(s.dropped) ? s.dropped : [];
     const file = s.file || (armed && armed.file) || 'dice.yaml';
     showStatus(`saved ${n} change${n === 1 ? '' : 's'} to ${file}`
       + (held ? ` · ${held} light row${held === 1 ? '' : 's'} held by the venue` : '')
-      + ' — reload the tab to boot on them', held ? 'warn' : 'info');
+      + ' — reload the tab to boot on them'
+      + (dropped.length
+        ? `\n· ${dropped.length} row${dropped.length === 1 ? '' : 's'} removed (${dropped.join(', ')})`
+          + ' — the route cannot carry a removal; use Download + tools/dice-apply.mjs'
+        : ''), (held || dropped.length) ? 'warn' : 'info');
   };
   const runSaveRoute = () => {
     if (!armed) { showStatus('save: no armed write route — Download instead', 'warn'); return; }
@@ -1012,6 +1266,7 @@ export function mount({
       }
       if (castRec && castRec.sync) castRec.sync();
       if (castRec && castRec.bench) castRec.bench.sync();
+      if (feltsRec) feltsRec.sync();
       if (clockRec) {
         clockRec.sync();
         if (clockRec.bench) clockRec.bench.sync();
@@ -1052,6 +1307,7 @@ export function mount({
     },
     unmount() {
       if (statusTimer) clearTimeout(statusTimer);
+      if (feltsRec && feltsRec.stop) feltsRec.stop();
       if (onResize && typeof window !== 'undefined') window.removeEventListener('resize', onResize);
       root.remove();
       glyph.remove();
@@ -1071,6 +1327,7 @@ export function mount({
 
   castApi = cast || null;
   buildCast();
+  buildFelts();
   buildBench();
   rebuildBar();
   showSections();

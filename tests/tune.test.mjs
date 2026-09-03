@@ -51,8 +51,14 @@ import { dirname, join } from 'node:path';
 import {
   DIALS, look, film, pick, isDial, defaultsOf, merge, leaves, getLeaf, setLeaf, hasLeaf,
   alias, FORBIDDEN_LEAF, STATIC_PATHS, createTune,
+  ASSET_SECTIONS, ASSET_ROWS, ASSET_ID_RE, assetRowDefaults, assetDialFor,
 } from '../js/tune.js';
 import { parseYaml } from '../js/yaml.js';
+// The two Node-pure modules whose numbers the C5 dials copy. Neither imports
+// three or cannon (js/places.js is imported by server.js; js/voices.js is the
+// audio DATA), so both can be read here.
+import { MASTER_GAIN, IMPACT_VOICES, IMPACT_DEFAULT_BODY } from '../js/voices.js';
+import { PLACARD, PLACARD_STANDOFF, PLACARD_W, PLACARD_D } from '../js/places.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const YAML_PATH = join(ROOT, 'dice.yaml');
@@ -155,7 +161,7 @@ t('no dial path matches FORBIDDEN_LEAF, and the regex bites what it should', () 
 
 t('the shipped tree has the phase-1 shape and every two-state value is an enabled|disabled enum', () => {
   const d = defaultsOf(DIALS);
-  assert.deepEqual(Object.keys(d), ['app', 'table', 'light', 'camera', 'throw', 'pace', 'sound']);
+  assert.deepEqual(Object.keys(d), ['app', 'table', 'light', 'camera', 'throw', 'pace', 'sound', 'post', 'cards']);
   assert.equal(d.app.mode, 'development');
   assert.equal(d.table.scale, 2.5);
   assert.equal(d.light.lamp.y, 24);
@@ -179,6 +185,30 @@ t('the shipped tree has the phase-1 shape and every two-state value is an enable
   assert.deepEqual(DIALS.sound.click.mode.options, ['film', 'wall']);
   // no leaf in the tree is undefined or an object masquerading as a dial
   for (const p of leaves(d)) assert.ok(['number', 'string'].includes(typeof getLeaf(d, p)), dotted(p));
+});
+
+// THE DEFAULT IS A SECOND COPY OF A NUMBER SOMEBODY ELSE OWNS, and the drift
+// test above only pins dice.yaml against js/tune.js — both halves of the same
+// declaration. Where the source module is Node-pure the third copy can be
+// pinned too, and then a value moved in its own file cannot leave the panel
+// showing "default" beside a number that is no longer the shipped one. (C5,
+// 2026-09-03. js/post.js's BLOOM_THRESHOLD is NOT here: it imports three, so
+// this file cannot reach it — `dev-sound-post` pins the uniform against the
+// tree in the browser instead, which is the same claim measured later.)
+t('C5 defaults are the source modules own numbers, not a second opinion', () => {
+  assert.equal(DIALS.sound.master.def, MASTER_GAIN,
+    'sound.master must be js/voices.js MASTER_GAIN');
+  assert.equal(DIALS.sound.impact.gain.def, IMPACT_VOICES[IMPACT_DEFAULT_BODY].gainScale,
+    'sound.impact.gain must be the DEFAULT body\'s gainScale, whichever body that is');
+  assert.deepEqual(
+    { standoff: DIALS.cards.standoff.def, w: DIALS.cards.width.def, d: DIALS.cards.depth.def },
+    { standoff: PLACARD.standoff, w: PLACARD.w, d: PLACARD.d },
+    'cards.* must be js/places.js PLACARD');
+  // …and the shipped consts js/places.js still exports for the unit rows are
+  // the same numbers, so a reader who imports either one is reading the mat
+  // this build ships.
+  assert.deepEqual([PLACARD_STANDOFF, PLACARD_W, PLACARD_D],
+    [PLACARD.standoff, PLACARD.w, PLACARD.d]);
 });
 
 t('merge is deep, over wins, arrays replace, inputs untouched', () => {
@@ -302,9 +332,17 @@ t('createTune checks the declaration against the dials: null is absent, a wrong 
   assert.deepEqual(t.SHIPPED.light.lamp, { y: 24, color: '#ffe8c4' });
   t = one({ light: 'dim' }, 'light', 'shape', /light: expected a map, got "dim"/);
   assert.equal(t.SHIPPED.light.fog.far, 46);
-  // a key with a dot in it is dropped until phase 3
-  t = one({ sets: { 'house.ember': { label: 'Ember' } } }, 'sets.house.ember', 'key', /key "house\.ember" under sets contains a dot/);
-  assert.deepEqual(t.SHIPPED.sets, {});
+  // AN ASSET SECTION THIS BUILD CANNOT DECLARE ROWS IN is dropped WHOLE and
+  // says why (docs/DEVMODE.md §9: `sets:` is phase 3). It used to fall
+  // through to the dotted-key rule below and name the dot, which is a true
+  // sentence about the wrong problem — the id could have been spotless and
+  // the row still would not have landed.
+  t = one({ sets: { 'house.ember': { label: 'Ember' } } }, 'sets', 'section', /`sets:` rows are not declarable/);
+  assert.ok(!('sets' in t.SHIPPED), 'and no half-section is left in the tree');
+  // …while `felts:` IS declarable, so a dotted id meets the id rule instead
+  t = one({ felts: { 'house.moss': { name: 'Moss' } } }, 'felts.house.moss', 'key', /"house\.moss" is not a legal felts id/);
+  assert.deepEqual(t.SHIPPED.felts, {}, 'the section stands; the one bad row is gone');
+  // a key with a dot in it is dropped everywhere else too
   t = one({ 'a.b': 1 }, 'a.b', 'key', /key "a\.b" under the root contains a dot/);
   assert.ok(!('a.b' in t.SHIPPED));
   // several drops in one file: every one is listed, in file order, and the good leaves beside them still land
@@ -627,6 +665,210 @@ t('exportYaml without a source throws', () => {
   assert.throws(() => mini().exportYaml(), /source/);
 });
 
+// ---------------------------------------------------------------------------
+// Asset rows (docs/DEVMODE.md §9, phase C4): `felts:` is the first section
+// where the DECLARATION authors a thing the code does not have.
+// ---------------------------------------------------------------------------
+
+t('the row shape is a map of dials, and assetDialFor answers a dial or says why not', () => {
+  assert.deepEqual([...ASSET_SECTIONS], ['sets', 'felts', 'towers', 'venues']);
+  assert.ok(Object.isFrozen(ASSET_SECTIONS));
+  for (const [k, d] of Object.entries(ASSET_ROWS.felts)) {
+    assert.ok(isDial(d), `felts.${k} is a dial`);
+    assert.equal(d.cls, 'look', 'a felt is per-viewer chrome, never the bake');
+    assert.ok(!FORBIDDEN_LEAF.test(`felts.${k}`), `felts.${k} reaches nothing it may not`);
+  }
+  assert.deepEqual(assetRowDefaults('felts'), {
+    name: 'House felt', cloth: 'felt', feltBase: '#1c1c24', sceneBg: '#0f0f13', breath: 1, mottle: 1,
+  });
+  assert.equal(assetRowDefaults('sets'), null, 'a section with no row shape has no defaults');
+  assert.equal(assetDialFor('felts.house-moss.cloth'), ASSET_ROWS.felts.cloth);
+  assert.equal(assetDialFor(['felts', 'house-moss', 'breath']), ASSET_ROWS.felts.breath);
+  assert.match(assetDialFor('sets.house-ember.label'), /not declarable in this build/);
+  assert.match(assetDialFor('felts.HOUSE.cloth'), /not a legal felts id/);
+  assert.match(assetDialFor('felts.house-moss.nope'), /no felts field named "nope"/);
+  assert.match(assetDialFor('felts.house-moss'), /is a row of fields/);
+  assert.match(assetDialFor('felts'), /is a map of rows/);
+  // A DOTTED ID READS AS A ROW AND A FIELD, and the message says so rather
+  // than only "too deep" — that is the mistake this branch exists to explain.
+  assert.match(assetDialFor('felts.house.moss.cloth'), /an id may not contain a dot/);
+  assert.equal(assetDialFor('light.lamp.y'), 'no dial at this path');
+  assert.ok(ASSET_ID_RE.test('house-moss') && ASSET_ID_RE.test('house_moss2'));
+  for (const bad of ['house.moss', 'House', '-moss', '', 'x'.repeat(33)]) {
+    assert.ok(!ASSET_ID_RE.test(bad), `${JSON.stringify(bad)} is not an id`);
+  }
+});
+
+t('addRow / removeRow: a row lands whole, counts as its leaves, and reset puts the section back', () => {
+  const tune = mini();
+  assert.deepEqual(tune.rowsOf('felts'), {}, 'nothing declared, no rows');
+  assert.deepEqual(tune.sections().filter((s) => ASSET_SECTIONS.includes(s)), [],
+    'an asset section is never a dial section: the panel draws it bespoke');
+
+  const r = tune.addRow('felts', 'house-moss', { name: 'Moss', cloth: 'silt', feltBase: '#1f3a22' });
+  assert.deepEqual(r.refused, []);
+  assert.deepEqual(tune.rowsOf('felts'), {
+    'house-moss': { name: 'Moss', cloth: 'silt', feltBase: '#1f3a22', sceneBg: '#0f0f13', breath: 1, mottle: 1 },
+  }, 'the fields the caller left out take the row defaults');
+  assert.deepEqual(tune.changes(), {
+    'felts.house-moss.name': 'Moss', 'felts.house-moss.cloth': 'silt', 'felts.house-moss.feltBase': '#1f3a22',
+    'felts.house-moss.sceneBg': '#0f0f13', 'felts.house-moss.breath': 1, 'felts.house-moss.mottle': 1,
+  }, 'every leaf of the row counts as a change');
+  const added = tune.diff().filter((d) => d.path.startsWith('felts.'));
+  assert.equal(added.length, 6);
+  assert.deepEqual([...new Set(added.map((d) => d.shipped))], [undefined], 'the file said none of it');
+  assert.deepEqual([...new Set(added.map((d) => d.cls))], ['look'], 'and each leaf wears its row dial');
+
+  // a write into a minted row is not 'unknown' — it is how the editor works
+  assert.deepEqual(tune.set({ 'felts.house-moss.breath': 0.8 }).refused, []);
+  assert.equal(tune.get('felts.house-moss.breath'), 0.8);
+  assert.deepEqual(tune.set({ 'felts.house-moss.cloth': 'linen' }).refused, [['felts.house-moss.cloth', 'option']]);
+  assert.deepEqual(tune.set({ 'felts.house-moss.name': 4 }).refused, [['felts.house-moss.name', 'type']]);
+  assert.deepEqual(tune.set({ 'felts.other.name': 'x' }).refused, [['felts.other.name', 'unknown']]);
+
+  // the refusals of addRow itself
+  assert.deepEqual(tune.addRow('paints', 'x', {}).refused, [['paints', 'unknown']]);
+  assert.deepEqual(tune.addRow('sets', 'house-ember', {}).refused, [['sets', 'section']]);
+  assert.deepEqual(tune.addRow('felts', 'house.moss', {}).refused, [['felts.house.moss', 'id']]);
+  assert.deepEqual(tune.addRow('felts', 'HOUSE', {}).refused, [['felts.HOUSE', 'id']]);
+  assert.deepEqual(tune.addRow('felts', 'house-x', 7).refused, [['felts.house-x', 'type']]);
+  assert.deepEqual(tune.addRow('felts', 'house-x', { nope: 1, cloth: 'birch', breath: 'deep' }).refused,
+    [['felts.house-x.nope', 'unknown'], ['felts.house-x.cloth', 'option'], ['felts.house-x.breath', 'type']]);
+  assert.equal(tune.rowsOf('felts')['house-x'].cloth, 'felt', 'the row still lands, on its defaults');
+  assert.deepEqual(tune.removeRow('felts', 'house-x').refused, []);
+  assert.deepEqual(tune.removeRow('felts', 'house-x').refused, [['felts.house-x', 'unknown']]);
+
+  tune.reset('all');
+  assert.deepEqual(tune.rowsOf('felts'), {}, 'reset takes an added row away — there is nothing to reset it TO');
+  assert.deepEqual(tune.changes(), {});
+});
+
+t('a declared row is a SHIPPED row: reset restores it, remove reports it gone, export takes its lines out', () => {
+  const src = 'light:\n  lamp:\n    y: 24\nfelts:\n  house-moss:\n    name: Moss   # the first house felt\n    cloth: silt\n';
+  const tune = mini(parseYaml(src).tree, src);
+  assert.deepEqual(tune.SHIPPED.felts['house-moss'], {
+    name: 'Moss', cloth: 'silt', feltBase: '#1c1c24', sceneBg: '#0f0f13', breath: 1, mottle: 1,
+  }, 'the file names two fields; the row shape fills the rest');
+  assert.ok(tune.rowIsDeclared('felts', 'house-moss'));
+  assert.ok(!tune.rowIsDeclared('felts', 'house-ash'));
+  assert.deepEqual(tune.changes(), {}, 'a declared row is not a change');
+  assert.equal(tune.exportYaml(), src, 'and patching nothing is byte-identical');
+
+  tune.set({ 'felts.house-moss.cloth': 'oak' });
+  assert.equal(tune.exportYaml(),
+    'light:\n  lamp:\n    y: 24\nfelts:\n  house-moss:\n    name: Moss   # the first house felt\n    cloth: oak\n',
+    'one field moves one line and the comment survives');
+  tune.reset('felts');
+  assert.equal(tune.get('felts.house-moss.cloth'), 'silt');
+
+  // REMOVED: the row's LINES come out, not its leaves one at a time. Taking
+  // the leaves out leaves `house-moss: {}` behind — patchYaml's own "the
+  // map's last child left" rule — and the reader then fills that empty row
+  // back out with the row defaults, so Remove + Save + reload would hand the
+  // row straight back.
+  tune.removeRow('felts', 'house-moss');
+  assert.deepEqual(Object.values(tune.changes()), [undefined, undefined, undefined, undefined, undefined, undefined],
+    'changes() still speaks in leaves — which is why the route cannot carry a removal');
+  const gone = tune.exportYaml();
+  assert.deepEqual(parseYaml(gone).tree.felts, {}, 'the row is gone and the section is empty, not a stub row');
+  assert.ok(!/house-moss/.test(gone), 'no orphan key left behind');
+  assert.equal(tune.patchText(), '', 'and a copied patch says nothing about a removal');
+  tune.reset('all');
+  assert.ok(tune.rowIsDeclared('felts', 'house-moss'));
+  assert.equal(tune.get('felts.house-moss.cloth'), 'silt', 'reset puts a declared row back whole');
+  assert.equal(tune.exportYaml(), src);
+});
+
+// A ROW THAT IS GONE STAYS GONE UNTIL SOMETHING PUTS IT BACK WHOLE (the C4
+// review, 2026-09-03). `apply` asked `hasLeaf(SHIPPED, p)`, and SHIPPED still
+// names every leaf of a row the FILE declares after `removeRow` took it out of
+// T — so one leaf write minted the row again with five fields guessed from the
+// row defaults, while `exportChanges` went on saying the row was gone. The
+// module's own comment ("a half-built felt is a felt the merge site would have
+// to guess the rest of, and guessing is how a catalogue grows rows nobody
+// wrote") is the rule this pins.
+t('a leaf write into a REMOVED row is refused, and does not mint half a felt', () => {
+  const src = 'light:\n  lamp:\n    y: 24\nfelts:\n  house-moss:\n    name: Moss\n    cloth: silt\n    breath: 0.9\n';
+  const tune = mini(parseYaml(src).tree, src);
+  tune.removeRow('felts', 'house-moss');
+  assert.deepEqual(tune.rowsOf('felts'), {}, 'the row is out of T');
+
+  const r = tune.set({ 'felts.house-moss.name': 'Bog' });
+  assert.deepEqual(r.refused, [['felts.house-moss.name', 'row']],
+    'refused by its own reason, not accepted because SHIPPED still names the leaf');
+  assert.deepEqual(tune.rowsOf('felts'), {}, 'and nothing was minted');
+  assert.ok(!/house-moss/.test(tune.exportYaml()),
+    'so the live tree and the export still agree that the row is gone');
+
+  // …and the same write into a row NOBODY ever had is still 'unknown': the two
+  // refusals mean different things and the panel words them differently.
+  assert.deepEqual(tune.set({ 'felts.house-never.name': 'X' }).refused,
+    [['felts.house-never.name', 'unknown']]);
+
+  // The row is put back WHOLE, which is what reset at the row's path does.
+  tune.reset('felts.house-moss');
+  assert.equal(tune.get('felts.house-moss.breath'), 0.9, 'the file\'s own row, every field of it');
+  assert.deepEqual(tune.set({ 'felts.house-moss.name': 'Bog' }).refused, [],
+    'and once it is back, a field write lands as it always did');
+});
+
+// `resetRows` read `prefix[1]` without asking how long the prefix was, so a
+// reset at a path DEEPER than a row was treated as a row scope: one field
+// reverted all six, and one field of a session row deleted the row. The panel
+// never reached it (its revert glyph goes through `tune.set`), but
+// `tuneReset(path)` is a published hook (the C4 review, 2026-09-03).
+t('reset at a path deeper than a row moves that field and no other', () => {
+  const src = 'light:\n  lamp:\n    y: 24\nfelts:\n  house-moss:\n    name: Moss\n    breath: 0.9\n';
+  const tune = mini(parseYaml(src).tree, src);
+  tune.set({ 'felts.house-moss.name': 'Bog', 'felts.house-moss.breath': 0.2 });
+  assert.deepEqual(tune.changes(), { 'felts.house-moss.name': 'Bog', 'felts.house-moss.breath': 0.2 });
+
+  tune.reset('felts.house-moss.name');
+  assert.deepEqual(tune.changes(), { 'felts.house-moss.breath': 0.2 },
+    'the one field went back; the row\'s other edit stands');
+  assert.equal(tune.get('felts.house-moss.name'), 'Moss');
+
+  // A session row has no shipped field to go back TO, so the field is refused
+  // by name rather than the whole row being deleted under the caller.
+  tune.addRow('felts', 'house-ash', { name: 'Ash' });
+  const r = tune.reset('felts.house-ash.name');
+  assert.deepEqual(r.refused, [['felts.house-ash.name', 'row']]);
+  assert.deepEqual(Object.keys(tune.rowsOf('felts')).sort(), ['house-ash', 'house-moss'],
+    'and the row this session minted is still there');
+  assert.equal(tune.get('felts.house-ash.name'), 'Ash');
+  // The row scope is still the row scope, and still takes it away whole.
+  tune.reset('felts.house-ash');
+  assert.deepEqual(Object.keys(tune.rowsOf('felts')), ['house-moss']);
+});
+
+t('one `felts.*` binder covers both kinds of change: a field write and a row landing or leaving', () => {
+  const tune = mini();
+  const seen = [];
+  // The binder main.js registers ignores its arguments and re-reads the tree
+  // (feltThemesSync), which is what lets ONE binder serve both — a leaf write
+  // hands it (path, value) as every dial binder is handed, and a structural
+  // change hands it the SECTION, because a row landing has no leaf to name.
+  tune.bind('felts.*', (path, value) => seen.push([path, tune.rowsOf('felts'), value]));
+  tune.addRow('felts', 'house-moss', { name: 'Moss' });
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0][0], 'felts', 'a row landing names the section');
+  assert.deepEqual(Object.keys(seen[0][1]), ['house-moss'], 'and the tree already holds the row');
+  assert.deepEqual(Object.keys(seen[0][2]), ['house-moss'], '…which is also what it is handed');
+
+  tune.set({ 'felts.house-moss.name': 'Bog', 'felts.house-moss.breath': 0.8 });
+  assert.equal(seen.length, 2, 'a two-leaf patch runs it once');
+  assert.equal(seen[1][0], 'felts.house-moss.name', 'a field write names the first leaf, as any dial write does');
+  assert.equal(seen[1][1]['house-moss'].breath, 0.8, 'and the WHOLE patch is in the tree before it runs');
+
+  tune.removeRow('felts', 'house-moss');
+  assert.equal(seen.at(-1)[0], 'felts');
+  assert.deepEqual(seen.at(-1)[1], {});
+  tune.addRow('felts', 'house-ash', {});
+  tune.reset('all');
+  assert.deepEqual(seen.at(-1)[1], {}, 'and reset runs it after the section is put back');
+  assert.equal(seen.length, 5);
+});
+
 // ===========================================================================
 // Block 2 — js/yaml.js and the checked-in dice.yaml
 // ===========================================================================
@@ -656,7 +898,7 @@ t('dice.yaml is the full declaration: every leaf has a dial and equals its defau
   for (const p of dials) assert.ok(fileLeaves.includes(p), `dial ${p} is not in dice.yaml`);
   assert.deepEqual(fileLeaves, dials, 'and in the same order (the panel is the file, drawn)');
   assert.equal(tree.app.mode, 'development');
-  assert.deepEqual(Object.keys(tree), ['app', 'table', 'light', 'camera', 'throw', 'pace', 'sound']);
+  assert.deepEqual(Object.keys(tree), ['app', 'table', 'light', 'camera', 'throw', 'pace', 'sound', 'post', 'cards']);
 });
 
 t('createTune over the real file: SHIPPED equals the defaults, nothing differs', () => {

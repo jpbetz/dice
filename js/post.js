@@ -222,6 +222,27 @@ export class PostStack {
     this.lastBloomSources = 0;
   }
 
+  // THE THRESHOLD, AS A DIAL (2026-09-03, dice.yaml `post.bloom.threshold`).
+  // There was deliberately "no post-hoc dial" (fae grammar rule 3): a venue
+  // authors its emissive tiers AGAINST this number, so a build that let a
+  // ROOM turn it down would be a build where a tier means something different
+  // per table. This is not that. It is a developer-mode look control on one
+  // tab — it never reaches the wire, never reaches storage, and Shut puts it
+  // back — and its use is to SEE what a tier is doing by walking the
+  // threshold past it. The authoring rule is unchanged: 0.9 is still the
+  // number a venue is authored to, and it is still declared here.
+  //
+  // The uniform is the only state; the next frame's threshold pass reads it.
+  // A non-finite argument is refused rather than written, because NaN in a
+  // uniform is a black screen with no error anywhere.
+  setBloomThreshold(v) {
+    if (!Number.isFinite(v)) return this.matThresh.uniforms.uThresh.value;
+    this.matThresh.uniforms.uThresh.value = v;
+    return v;
+  }
+
+  bloomThreshold() { return this.matThresh.uniforms.uThresh.value; }
+
   setSize(w, h) {
     this.w = Math.max(w | 0, 8);
     this.h = Math.max(h | 0, 8);

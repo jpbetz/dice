@@ -198,6 +198,30 @@ const TOWER_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
 // is free text (capped, never enumerated).
 const TABLE_KEYS = { name: null, felt: FELT_THEMES, system: SYSTEMS, zoom: ZOOMS, tower: TOWER_ID };
 
+// THE ONE ENUM HERE THAT GROWS AFTER THE FILE WAS WRITTEN (docs/DEVMODE.md
+// §9, phase C4). A `felts:` row in the declaration is a felt this deployment
+// has and this module's literal does not, and a rack carrying it would be
+// refused at its own line — "these felts would be dropped to the default on
+// export/import", which is the failure tests/felt-ids.test.mjs names.
+//
+// HANDED DOWN, NOT IMPORTED. The ids come from the served /js/tunables.js,
+// which is generated and never on disk — and this file is loaded under NODE
+// by tests/portable.test.mjs, where importing it would fail outright. So
+// js/main.js, which already has the merged catalogue, calls this once at boot
+// and again whenever a row is added or dropped. A caller that never calls it
+// (the tests, the lobby) gets exactly the list the literal above spells out.
+const declaredFelts = new Set();
+export function declareFelts(ids) {
+  declaredFelts.clear();
+  for (const id of Array.isArray(ids) ? ids : []) {
+    if (typeof id === 'string' && id && !FELT_THEMES.includes(id)) declaredFelts.add(id);
+  }
+}
+function allowedFor(key) {
+  if (key !== 'felt' || !declaredFelts.size) return TABLE_KEYS[key];
+  return FELT_THEMES.concat([...declaredFelts]);
+}
+
 const BARE_KEY_RE = /^[A-Za-z0-9][A-Za-z0-9 _-]*$/;
 
 function quote(s) {
@@ -537,7 +561,7 @@ export function parsePortable(text) {
       tableSeen.add(key);
       const sv = readScalar(m[2].trim());
       if (!sv || sv.rest.trim() !== '') return fail(lineNo, `expected one value after "${key}:"`);
-      const allowed = TABLE_KEYS[key];
+      const allowed = allowedFor(key);
       let value = sv.value;
       if (Array.isArray(allowed)) {
         if (!allowed.includes(value)) {
