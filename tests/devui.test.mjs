@@ -252,7 +252,7 @@ function fakeTune({ dials = DIALS, declared = DECLARED } = {}) {
 }
 
 function fakeCast() {
-  let rows = [], seat = null;
+  let rows = [], seat = null, overlay = 'disabled';
   const log = [];
   return {
     log,
@@ -261,9 +261,58 @@ function fakeCast() {
     deal: (n) => { rows = ['Ada', 'Bo', 'Cy', 'Dee', 'Eve', 'Fen', 'Gus', 'Hal'].slice(0, n); seat = rows.length ? 0 : null; log.push(`deal(${n})`); },
     sit: (k) => { seat = k; log.push(`sit(${k})`); },
     reshuffle: () => log.push('reshuffle()'),
-    regions: (s) => log.push(`regions(${s})`),
+    // The overlay's state lives in the app (js/main.js demoOverlayState), and
+    // the row reads it back — so this fake holds it the way main.js does.
+    overlay: (s) => { overlay = s; log.push(`overlay(${s})`); },
+    overlayState: () => overlay,
     roll: (k) => log.push(`roll(${k})`),
     rollAll: () => log.push('rollAll()'),
+  };
+}
+
+// A bench to the phase-2 shape (js/main.js devBenchApi): the panel must stand
+// on the verbs alone, so this one only records what it was asked and answers
+// what it was told to answer.
+function fakeBench({ film = false } = {}) {
+  const log = [];
+  const state = {
+    clock: { state: 'running', live: false, frame: 0, frames: 0, time: 0 },
+    ab: { a: null, b: null, live: null, film, replayed: false },
+    last: null,
+    locked: false,
+    seed: 4242,
+  };
+  return {
+    log, state,
+    pool: '3d6',
+    hud: () => ({ fps: 60, calls: 12, tris: 3400, bodies: 7, settle: 2.5 }),
+    clock: () => state.clock,
+    freeze: (s) => { log.push(`freeze(${s})`); state.clock.state = s; return state.clock; },
+    step: () => { log.push('step()'); state.clock.frame++; return state.clock; },
+    scrub: (f) => { log.push(`scrub(${f})`); return { ...state.clock, scrub: f }; },
+    bench: (seed) => {
+      log.push(`bench(${JSON.stringify(seed)})`);
+      if (state.locked) return null;
+      const s = seed === '' ? state.seed : Number(seed);
+      state.last = { seed: s, frames: 180, settleS: 3, bench: true, dice: ['d6'] };
+      return { seed: s, notation: '3d6 # bench', label: 'bench', place: 0, via: 'local' };
+    },
+    replay: () => {
+      log.push('replay()');
+      if (state.locked || !state.last) return null;
+      return { seed: state.last.seed, notation: '3d6 # bench', label: 'bench', place: 0, via: 'local' };
+    },
+    last: () => state.last,
+    hold: (k) => { log.push(`hold(${k})`); state.ab[k] = { changed: 2 }; state.ab.live = k; return state.ab; },
+    apply: (k) => { log.push(`apply(${k})`); if (!state.ab[k]) return null; state.ab.live = k; return state.ab; },
+    flip: () => {
+      log.push('flip()');
+      if (!state.ab.a || !state.ab.b) return null;
+      state.ab.live = state.ab.live === 'a' ? 'b' : 'a';
+      state.ab.replayed = state.ab.film;
+      return state.ab;
+    },
+    ab: () => state.ab,
   };
 }
 
@@ -867,8 +916,16 @@ t('the cast section drives the cast object and reads it back', () => {
   assert.equal(byClass(sec, 'dev-seat').textContent, '1 · Bo');
   click(byText(sec, '◀')); click(byText(sec, '◀'));
   assert.equal(cast.log.at(-1), 'sit(2)', 'wraps below zero');
-  click(byClass(rowFor(sec, 'cast.regions'), 'dev-seg').buttons[0]);
-  assert.equal(cast.log.at(-1), 'regions(enabled)');
+  // The overlay row is one enum of four, in the order the panel offers them:
+  // disabled | regions | framing | all. It drives the cast AND reads it back,
+  // so a state set anywhere else shows here.
+  const ovSeg = byClass(rowFor(sec, 'cast.overlay'), 'dev-seg');
+  assert.deepEqual(ovSeg.buttons.map((b) => b.textContent), ['disabled', 'regions', 'framing', 'all']);
+  click(ovSeg.buttons[2]);
+  assert.equal(cast.log.at(-1), 'overlay(framing)');
+  cast.overlay('all');
+  panel.repaint();
+  assert.equal(ovSeg.getValue(), 'all', 'the row follows the app, not the last click');
   click(byText(sec, 'throw 3d6 from seat'));
   assert.equal(cast.log.at(-1), 'roll(2)');
   click(byText(sec, 'throw from every seat'));
@@ -964,6 +1021,15 @@ t('a light reset under a venue lands on the venue\'s light, and is refused with 
   tune.set(venueLight);                                             // the venue Object.assigns at moonrise
   tune.set({ 'light.lamp.y': 40, 'light.lamp.penumbra': 0.9, 'throw.physics.gravity': -80 });   // then the dials move
   panel.repaint();
+  // THE BADGE SAYS WHAT IS HELD, ROW BY ROW (the C1 review, 2026-09-02): a
+  // glade holds the lamp, the room and the fog — never the motes — and a row
+  // that saves and resets like any other must not wear a badge saying it is
+  // somebody else's.
+  const badged = (p) => byClass(rowFor(root, p), 'dev-badge-venue').hidden === false;
+  assert.equal(badged('light.lamp.y'), true, 'a row the venue holds wears the badge');
+  assert.equal(badged('light.room.hemi'), true);
+  assert.equal(badged('light.lamp.penumbra'), false,
+    'a light row no venue holds does not — not even in the lamp\'s own map (in the real tree: light.motes.*)');
   const light = root.find((s) => s.classList.contains('dev-section') && s.dataset.section === 'light');
   click(byClass(light, 'dev-sec-reset'));
   assert.equal(tune.T.light.lamp.y, 22, 'the lamp went back to the VENUE\'s height, not the file\'s');
@@ -989,6 +1055,141 @@ t('a light reset under a venue lands on the venue\'s light, and is refused with 
   assert.equal(two.tune.T.light.lamp.y, 40, 'held');
   assert.equal(two.tune.T.light.room.hemi, 0.5, 'held');
   assert.match(byClass(two.root, 'dev-statusslot').textContent, /light: 2 held by the foxfire venue/);
+});
+
+// ---------------------------------------------------------------------------
+// the bench (phase 2): clock, seeded throw, A/B
+// ---------------------------------------------------------------------------
+
+t('no bench: the panel is exactly the panel phase 1 shipped', () => {
+  const { root } = fresh({ cast: fakeCast() });
+  const names = byClass(root, 'dev-secbar').buttons.map((b) => b.textContent);
+  assert.ok(!names.includes('clock') && !names.includes('ab'), `no clock/ab section: ${names}`);
+  assert.equal(byClass(root, 'dev-seed'), null, 'and no seed box');
+});
+
+t('the clock section drives freeze, step and scrub, and hides scrub with no film', () => {
+  const bench = fakeBench();
+  const { root, panel } = fresh({ cast: fakeCast(), bench });
+  const names = byClass(root, 'dev-secbar').buttons.map((b) => b.textContent);
+  assert.deepEqual(names.slice(-3), ['clock', 'ab', 'file'], `clock and ab land before file: ${names}`);
+  const sec = root.find((s) => s.classList.contains('dev-section') && s.dataset.section === 'clock');
+  const step = byText(sec, 'step one frame');
+  assert.equal(step.disabled, true, 'a running clock has nothing to step');
+  assert.equal(rowFor(sec, 'clock.scrub').hidden, true, 'no film: no scrub');
+  click(byClass(rowFor(sec, 'clock.freeze'), 'dev-seg').buttons[1]);
+  assert.equal(bench.log.at(-1), 'freeze(frozen)');
+  assert.equal(step.disabled, false, 'frozen: the step button wakes');
+  click(step);
+  assert.equal(bench.log.at(-1), 'step()');
+
+  // a film arrives: the scrub row appears and is re-ranged to ITS keyframes
+  Object.assign(bench.state.clock, { live: true, frame: 30, frames: 181, time: 0.5 });
+  panel.repaint();
+  const scrubRow = rowFor(sec, 'clock.scrub');
+  assert.equal(scrubRow.hidden, false, 'a film on the felt: the scrub row shows');
+  const slider = byClass(scrubRow, 'dev-range');
+  assert.equal(slider.max, '180', 're-ranged to this film\'s last keyframe');
+  assert.equal(slider.value, '30', 'and parked at the frame the film is on');
+  slider.value = '90';
+  fire(slider, 'input');
+  assert.equal(bench.log.at(-1), 'scrub(90)');
+  assert.match(byClass(sec, 'dev-clockout').textContent, /frame 30 \/ 180/);
+});
+
+t('the folded glyph says frozen, and the footer carries the HUD', () => {
+  const bench = fakeBench();
+  const { panel, tune } = fresh({ cast: fakeCast(), bench });
+  panel.setFooter(bench.hud());
+  const foot = byClass(panel.root, 'dev-foot');
+  assert.match(byClass(foot, 'dev-foot-perf').textContent, /60 fps · 12 calls/);
+  assert.match(byClass(foot, 'dev-foot-hud').textContent, /3400 tris · 7 bodies · settle 2.5s/);
+  assert.equal(panel.glyph.textContent, 'DEV', 'nothing changed, nothing frozen');
+  tune.set({ 'light.lamp.y': 40 });
+  panel.repaint();
+  assert.equal(panel.glyph.textContent, 'DEV · 1 changed');
+  bench.state.clock.state = 'frozen';
+  panel.repaint();
+  assert.equal(panel.glyph.textContent, 'DEV · 1 changed · frozen', 'a folded frozen table says so');
+});
+
+t('the bench rows throw a seed, report it back into the box, and lock with the film', () => {
+  const bench = fakeBench();
+  const { root, panel } = fresh({ cast: fakeCast(), bench });
+  const castSec = root.find((s) => s.classList.contains('dev-section') && s.dataset.section === 'cast');
+  const seed = byClass(castSec, 'dev-seed');
+  assert.ok(seed, 'the seed box rides the cast section');
+  const throwBtn = byText(castSec, 'Throw 3d6');
+  const replayBtn = byText(castSec, 'Replay');
+  assert.equal(replayBtn.disabled, true, 'nothing thrown yet: nothing to replay');
+  click(throwBtn);
+  assert.equal(bench.log.at(-1), 'bench("")', 'a blank box asks for a fresh seed');
+  assert.equal(seed.value, '4242', 'and the seed it drew comes back into the box');
+  panel.repaint();
+  assert.equal(replayBtn.disabled, false);
+  assert.match(byClass(castSec, 'dev-clockout').textContent, /last: seed 4242 · 180 frames · settle 3s · bench/);
+  seed.value = 'moss';
+  key(seed, 'Enter');
+  assert.equal(bench.log.at(-1), 'bench("moss")', 'Enter in the box throws');
+  click(replayBtn);
+  assert.equal(bench.log.at(-1), 'replay()');
+  // the film lock is the bench's lock too
+  panel.setFilm('locked', 'a second viewer is here');
+  assert.equal(throwBtn.disabled, true, 'a seeded throw is refused while the film is shared');
+  assert.equal(replayBtn.disabled, true);
+  panel.setFilm('live');
+  assert.equal(throwBtn.disabled, false);
+});
+
+t('A/B holds two patches, says which is live, and flips on x', () => {
+  const bench = fakeBench({ film: true });
+  const { root, panel } = fresh({ cast: fakeCast(), bench });
+  const sec = root.find((s) => s.classList.contains('dev-section') && s.dataset.section === 'ab');
+  const out = byClass(sec, 'dev-about');
+  assert.equal(byText(sec, 'A').disabled, true, 'nothing held: nothing to put on');
+  assert.equal(byText(sec, 'flip · x').disabled, true);
+  assert.match(out.textContent, /hold both slots to flip/);
+  click(byText(sec, 'Hold A'));
+  assert.equal(bench.log.at(-1), 'hold(a)');
+  click(byText(sec, 'Hold B'));
+  panel.repaint();
+  assert.match(out.textContent, /A 2 changed · B 2 changed · live B/);
+  assert.match(out.textContent, /flip replays the last seed/, 'they differ on a film value');
+  assert.equal(byText(sec, 'flip · x').disabled, false);
+
+  // the key, from inside the panel
+  const ev = key(root, 'x');
+  assert.equal(ev.defaultPrevented, true, 'the panel took the key');
+  assert.equal(bench.log.at(-1), 'flip()');
+  panel.repaint();
+  assert.match(out.textContent, /live A/);
+  assert.match(out.textContent, /last flip replayed/);
+
+  // …but never out of a field where x is a letter
+  const seed = byClass(root, 'dev-seed');
+  const n = bench.log.length;
+  key(seed, 'x');
+  assert.equal(bench.log.length, n, 'typing x in the seed box is typing');
+
+  // look-only slots keep the poses, and the line says so before the flip
+  bench.state.ab.film = false;
+  bench.state.ab.replayed = false;
+  panel.repaint();
+  assert.match(out.textContent, /flip keeps the poses \(look values only\)/);
+  click(byText(sec, 'A'));
+  assert.equal(bench.log.at(-1), 'apply(a)');
+});
+
+t('with no cast the bench rows ride the clock section, and a cast does not mint a second set', () => {
+  const bench = fakeBench();
+  const { root, panel } = fresh({ bench });
+  const clockSec = root.find((s) => s.classList.contains('dev-section') && s.dataset.section === 'clock');
+  assert.ok(byClass(clockSec, 'dev-seed'), 'the seed box found a home');
+  assert.equal(allClass(root, 'dev-seed').length, 1);
+  panel.setCast(fakeCast());
+  assert.equal(allClass(root, 'dev-seed').length, 1, 'still exactly one seed box');
+  panel.setCast(null);
+  assert.equal(allClass(root, 'dev-seed').length, 1);
 });
 
 t('the panel never reaches for location, storage or the network', async () => {

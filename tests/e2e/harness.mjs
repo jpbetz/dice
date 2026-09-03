@@ -61,8 +61,15 @@ const SETUP_TTL_MS = 4000;
 // one cannot be — `DICE_MODE=production`, which server.js reads once at boot
 // (dev-mode-production) — starts a SECOND one on its own free port for the
 // length of the scenario, and kills it in a finally.
-export async function startServer(port, { env = {} } = {}) {
-  const proc = spawn(process.execPath, [join(ROOT, 'server.js')], {
+//
+// `root` names the tree the child is started FROM (default: the checkout).
+// server.js takes its ROOT from its own path, so a child started from a
+// scratch tree serves that tree's files and, for developer mode's armed Save
+// route, WRITES that tree's dice.yaml — which is how `dev-write-route` proves
+// a real save without a test ever writing into the checkout (P4's rule about
+// the live table, applied to the repo).
+export async function startServer(port, { env = {}, root = ROOT } = {}) {
+  const proc = spawn(process.execPath, [join(root, 'server.js')], {
     env: { ...process.env, PORT: String(port), DICE_SETUP_TTL_MS: String(SETUP_TTL_MS), ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

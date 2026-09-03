@@ -1,8 +1,10 @@
 # Developer mode
 
-*Status: phase 1 landed (2026-09-02). Revision 3 is the design as built: the
-primitives, the wiring, the door, the apply tool and the proving scenarios
-(§11 commits 1–5; `node tests/e2e/run.mjs --only dev`). Binding authority is
+*Status: phase 1 landed, phase 2 landing (2026-09-02) — the Save route (§6)
+and the bench: HUD, clock, seeded throw, replay and A/B (§7, §8). Revision 3
+is the design as built: the primitives, the wiring, the door, the apply tool
+and the proving scenarios (§11; `node tests/e2e/run.mjs --only dev`).
+Binding authority is
 [GOALPOST.md](GOALPOST.md); every other rule this design touches is guidance,
 and §2 says which ones it sets aside.*
 
@@ -439,12 +441,62 @@ under its section.
    the dial tree, re-patches the checkout's own file (so a comment you
    added locally in the meantime survives), writes atomically and prints
    the diff summary.
-2. **Save** (phase 2): `POST /api/dev/write { file: 'dice.yaml', changes: { 'light.lamp.y': 30 } }`.
+2. **Save** — *built, 2026-09-02 (phase C1)*:
+   `POST /api/dev/write { file: 'dice.yaml', changes: { 'light.lamp.y': 30 } }`.
    The client posts the *changes*; the server patches its own copy of the
    file with the same `patchYaml`. Nothing posted is ever written verbatim.
-   Mounted only under `DICE_DEV_WRITE=1` (which `make deploy` never sets),
-   loopback only, same-origin only, `file` in an allowlist of one, atomic
-   rename. Unarmed, the button relabels itself *Download*.
+   Mounted only under `DICE_DEV_WRITE=1` (which `make deploy` never sets —
+   DEPLOY.md), and unarmed the two paths are **not mounted at all**: they
+   fall through to the ordinary `/api/` 404, so an unarmed server does not
+   even admit the route exists. Armed, `GET /api/dev/status` answers
+   `{ armed: true, file: 'dice.yaml' }` and the panel's primary verb becomes
+   *Save*; unarmed it stays *Download*, and Download stays available under
+   Save either way.
+
+   Every one of these is required, and a failure is a 403 carrying one word:
+   the **socket** address is loopback (`loopback` — a header could be a
+   client's opinion, and this is the one door where that must not open it),
+   the POST's `Origin` is this server's own **and the `Host` it names is
+   itself a loopback name** (`origin`, which also refuses a POST with no
+   Origin at all — and the second half is what refuses a DNS-rebinding page,
+   whose `Host` and `Origin` agree on a foreign name pointing at 127.0.0.1
+   and so satisfied equality alone until the C1 review caught it),
+   `Sec-Fetch-Site` is `same-origin` when sent
+   (`site`), and `Content-Type` is `application/json` (`type`, so a
+   cross-origin form's `text/plain` is never a body this reads). A body over
+   1 MiB is a 413 (`large`) before it is buffered. `file` is checked against
+   a frozen allowlist of one; the write lands under `DICE_DEV_ROOT` (the
+   directory `server.js` lives in unless the environment names another,
+   which is how the tests get a scratch tree); every path is validated
+   against the dial tree by the same `js/dice-apply-core.js` that
+   `tools/dice-apply.mjs` runs, and `app.mode` and every other static path
+   are refused by name with a 400. The write is atomic (sibling temp file,
+   then rename) and answers `{ ok, bytes, sha1, changes: [{path, from, to}] }`.
+   The served `js/tunables.js` is re-read on mtime — and the bytes that
+   landed are adopted immediately, so a reload in the same millisecond still
+   boots on them — which the answer's `note` says out loud, because a dial's
+   *value* is on the next boot, not on this frame.
+
+   Two refusals live on the client side of the verb: **a venue's light is not
+   this tab's to save** (while `FAECONCEPT.on` holds the light, `MOOD.tune`
+   carries the glade's moon and a Save would write the venue's sky into the
+   table's lamp — so the rows `venueLightPatch()` names, and only those, are
+   dropped from the patch and the panel says how many rows were held; a light
+   row no venue holds, such as `light.motes.*`, saves as any other row does),
+   and the film lock is upstream of all of it because a locked film leaf was
+   never allowed to change.
+
+   The one log line a write makes is `bytes` and `sha1` — never the text,
+   never a path beyond the allowlisted filename.
+
+   Proofs: `tests/dev-write.test.mjs` (unarmed 404s, the four conditions one
+   wrong thing at a time, the rebinding shape through raw `node:http`, the
+   allowlist, `app.mode`, unknown paths, wrong types, enums, two writes at
+   once, `isLoopback` as a predicate) and the `dev-write-route` scenario (the
+   panel's Save clicked through the DOM against a scratch tree, exactly two
+   lines moved with their comments, a fresh tab from that server booting on
+   them, and a leg under a raised venue where the held light rows are dropped
+   while a motes row and a pace row still land).
 3. **Copy patch** (phase 1): clipboard, changes only, as a YAML fragment
    (`light: { lamp: { y: 30 } }`), for a phone, another tab, or a commit
    message. **Paste patch** previews then merges, never replaces.
@@ -520,11 +572,76 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
   rows ▲ when locked; reload rows ⟳ with a stepper. There is no switch
   control, because there is no boolean.
 - **Cast** is today's demo rows verbatim: players 0–8, reshuffle, sit
-  prev/next, regions (`enabled | disabled`), throw from seat, throw from
-  every seat.
+  prev/next, **overlay** (`disabled | regions | framing | all` — phase 2,
+  built; one enum, because "regions on, framing off" and its opposite are the
+  two questions actually asked and a pair of switches would have offered four
+  states to answer two of them), throw from seat, throw from
+  every seat — and, under them, the **bench** (phase 2, built): a seed box, a
+  Throw and a Replay. A blank box draws a fresh seed and then SHOWS it, so the
+  next press is a repeat rather than a second stranger; a word is hashed, so
+  `moss` is a seed you can write down. Replay rethrows the last seed under the
+  dials as they now stand, with the whole roll rebuilt from its SPEC — pool,
+  mods, dc and the `# comment` — and not from the log label; a bench throw
+  comes back face for face, any other roll as the same film with fresh faces
+  (§10).
+- **Clock** (phase 2, built) — `freeze: running | frozen`, a step button that
+  advances exactly one baked frame **while frozen** (`devStep()` refuses on a
+  running clock, as the button has always been disabled there: stepping a
+  clock that is already advancing puts the film one frame ahead of where the
+  clock says it is), and a scrub over the running film's keyframes. It is a **look**-class instrument and it is deliberately NOT
+  behind the film lock: the film is baked and playback is per viewer
+  (GOALPOST 7), so a frozen projector here cannot desync anybody. Fold keeps
+  the freeze and the corner glyph reads `DEV · frozen`; Shut releases it — and
+  releases only a freeze the panel itself asked for, because
+  `__diceDebug.holdClock` is the scenarios' own and predates this by months.
+  The scrub moves the projector rather than previewing over it (posing the
+  meshes alone was tried: the next tick painted over it, held clock and all),
+  and it walks the impact cursor past what it skipped WITHOUT voicing it — the
+  drain is a one-way cursor by construction and a scrub that re-stamped a
+  landing would be a picture of something that never happened.
+- **A/B** (phase 2, built) — two slots, `Hold A` / `Hold B` capturing
+  `tune.changes()` **minus the light a venue holds** (the glade's moon shows
+  in `tuneDiff` while it stands, and a slot that captured it would write the
+  sky onto the table's own lamp when applied — the same drop Save makes),
+  `A` / `B` putting one on, and `x` inside the panel flipping between them. The flip replays the last seed **exactly when** the
+  two patches differ on a film-class path: a felt that re-threw itself under a
+  lamp change would be a picture of two different things at once, and a lamp
+  comparison whose dice moved is not a comparison. One status line says which
+  slot is live, what the next flip will do, and whether the last one replayed
+  — and "live" is a MEASUREMENT, not a memory: dial one slider off a slot and
+  the line stops naming it, because the panel's only remembered state must
+  never tell a story about the tree.
+- **Overlay** (phase 2, built) — the cast's row, grown from two states to
+  four. `regions` is the layer that shipped with the cast: each occupied
+  station's landing region, aim box, spawn line and number, in its own hue.
+  `framing` is the second picture, and it answers the other question — not
+  *where may a die land* but *what is the camera obliged to hold, and what is
+  the room doing to it*: the **fit hull** (`framingPoints()`'s own point set,
+  each point ticked, the convex loop closed round them, a cross at the centre
+  the fit aims at), the **frame disc** per seat (`ringRadius × FRAME_SPOT` —
+  wider than the toss spot, deliberately: the spot is where dice are aimed,
+  the disc is where they may roll and stay in shot), every card's
+  **footprint** (js/places.js `placardFootprint`, the same OBB `placardGap`
+  separates two cards with), the **lamp's cone** where it meets the felt
+  (taken off `MOOD.lamp` itself — breath-narrowed, orbit-swung — so it is the
+  lamp lighting the table, not the one the file asked for; nothing is drawn
+  for a cone that never reaches the felt), and the **four walls** as lines,
+  read off the physics bodies, so a socketed tower's shifted back wall reads
+  as the shifted wall it is. `all` draws both.
+
+  Every mark is a function the film itself calls; none is a second copy of
+  the arithmetic, which is the only property that makes the picture worth
+  trusting. It is **render-only**: one `LineSegments` per kind (five draw
+  calls however many chairs stand), `depthWrite: false`, renderOrder 9, zero
+  bodies, and `disabled` is no geometry at all rather than `visible = false`.
+  It is rebuilt wholesale on the flush the cards ride and on the `table.*`,
+  `light.lamp.*` and `camera.*` binders, so a dial moves the picture with
+  nobody asking. `dev-framing-overlay` holds all of it against the film's own
+  answers.
 - **Footer:** the judged viewport and DPR (so a screenshot says what it
-  measured), fps and draw calls (phase 2), changed and pending counts, the
-  verbs.
+  measured), then the HUD — fps and draw calls on one line, triangles, physics
+  bodies and the last film's settle seconds on the next (phase 2, built) —
+  then the changed and pending counts, then the verbs.
 - **Sync:** the panel holds no state. It repaints from `T` after every
   `tuneSet` and once per animation tick while open, so console
   `moodTune(...)` writes and slider writes converge without wrapping hooks.
@@ -549,17 +666,17 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
 | Diff, revert, reset, Download, Copy, Paste | the loop without a server route | 1 | S |
 | `tools/dice-apply.mjs` | validate, patch, atomic write, diff summary | 1 | S |
 | Hooks | `tuneGet()`, `tuneDiff()`, `devInfo()` zero-arg; `tuneSet(p)`, `tuneExport()`, `devOpen()`, `devClose()`, `devFold(b)`, `devDeal(n)` | 1 | S |
-| Save route | `POST /api/dev/write`; env-armed, loopback, same-origin, one file, atomic | 2 | M |
+| Save route | `POST /api/dev/write`; env-armed, loopback, same-origin, one file, atomic | 2 · **built** | M |
 | Server reads `table.seats` | `places.js` takes toss and card values from the declaration on both sides | 2 | M |
 | Sound, Post, Cards sections | `voices.js` reads `T` at event time; bloom uniform; placard geometry | 2 | M |
-| HUD | fps ring, `renderAudit` calls and tris, bodies, settle time | 2 | S |
-| Clock | freeze, step N frames, scrub the last roll's keyframes | 2 | S |
-| Seeded bench and replay | throw with a chosen seed (labelled *bench* in the log; values still through `composeRoll`); replay the last seed | 2 | S |
-| A/B slots | hold two patches, flip on a key, replay the last seed when a film key differs | 2 | S |
-| Framing overlay | the fit hull, spots, placard frames, lamp cone, walls, drawn from the film's own functions | 2 | M |
-| Rebuild choke points | `rebuildFloor()`, `rebuildDice()`; promote reload rows to live | 2 | M |
-| Presets | named patches under `presets:` in the declaration, applied like a paste | 2 | S |
-| Venue light as a layer | `venues.<id>.light` composed through `tuneSet` | 2 | M |
+| HUD | fps ring, `renderAudit` calls and tris, bodies, settle time | 2 · **built** | S |
+| Clock | freeze, step one frame, scrub the running film's keyframes | 2 · **built** | S |
+| Seeded bench and replay | throw with a chosen seed (labelled *bench* in the log; values still through `composeRoll`); replay the last seed | 2 · **built** | S |
+| A/B slots | hold two patches, flip on `x`, replay the last seed when a film key differs | 2 · **built** | S |
+| Framing overlay | the fit hull, spots, placard frames, lamp cone, walls, drawn from the film's own functions | 2 · **built** | M |
+| Rebuild choke points | `rebuildFloor()`, `rebuildDice()`; promote reload rows to live | 3 | M |
+| Presets | named patches under `presets:` in the declaration, applied like a paste | 3 | S |
+| Venue light as a layer | `venues.<id>.light` composed through `tuneSet`; until then the Save verb drops the rows `venueLightPatch()` names while a venue holds them (`devWriteSave`, js/main.js) | 3 | M |
 | `felts:` editor | felt row form; live on the felt; Save appends the row | 2 | M |
 | `sets:` editor | the lab's set builder moved onto the live felt; full recipe | 3 | L |
 | Shipped catalogue migrates | `themes.js` sets and `FELT_THEMES` rows move into the declaration, one kind per commit | 3 | M |
@@ -606,7 +723,11 @@ recipe's defaults fill the rest. A row's two-state fields are enums
 ## 10. Honesty and safety
 
 - **Nothing on the wire** (GOALPOST 2). `tuneSet` never calls `net`; no
-  dial, cast row, bench roll or A/B slot leaves the tab. Film writes are
+  dial, cast row, bench roll or A/B slot leaves the tab — with one exception,
+  named here because this is the section a reader checks the claim in: an
+  *armed* Save posts the changed dials to the loopback dev-only route on this
+  same origin (§6), which exists only under `DICE_DEV_WRITE=1`. Never through
+  `js/net.js`, never to a room, never to another viewer. Film writes are
   refused while a second seat is present, and reset when one arrives. Proof:
   `dev-room-look`: a two-browser room, the second browser opens the panel,
   a gravity write is refused, a lamp write takes, and after a roll both
@@ -614,8 +735,21 @@ recipe's defaults fill the rest. A row's two-state fields are enums
 - **No rigged values** (GOALPOST 2). No dial reaches face correction, the
   RNG, the server parse or reveal framing. The seeded bench draws values
   through `composeRoll` from a chosen seed, never chosen faces, and is
-  stamped *bench* in the log. Proof: a unit test walks every leaf path
-  against a denylist (`rng`, `values`, `face`, `seed`, `fixedDt`).
+  stamped *bench* in the log: one number feeds `mulberry32` at BOTH ends — the
+  composer's rng and the physics bake — so the same seed is the same faces and
+  the same poses, and there is no way to name a face from anywhere in the
+  panel. It is also LOCAL, because the server draws its own seed and a bench
+  throw that reached it would be a bench that lied about the one number it
+  exists to hold fixed.
+  **The both-ends promise is the BENCH's, not every roll's** (measured, the C2
+  review 2026-09-02): a roll the server drew took its values from the server's
+  rng, and only its FILM seed is knowable in this tab — so Replay of one is
+  the same throw with fresh faces, right for judging a film dial and wrong for
+  reading a total. `devBenchInfo().last.bench` says which kind the last film
+  was, and the panel's last-film line says it in words. Proof: a unit test walks every leaf path against a
+  denylist (`rng`, `values`, `face`, `seed`, `fixedDt`), and `dev-bench` throws
+  one seed twice, a second seed once, and reads the room's log from a SECOND
+  browser to find it empty.
 - **Nothing in the URL** (GOALPOST 4). Proof: `dev-key-door` asserts
   `location.search` and localStorage unchanged after open, fold, shut, and
   a `?demo=1` visit behaves exactly like a plain visit.
@@ -624,8 +758,13 @@ recipe's defaults fill the rest. A row's two-state fields are enums
   env-armed; loopback; same-origin; one allowlisted file; atomic. Proof: a
   spawned-server test under a scratch `DICE_DEV_ROOT`: unarmed → 404;
   armed → the re-parsed file deep-equals; refuses `../`, a foreign origin,
-  a non-allowlisted file, a non-loopback address. No test ever writes into
-  the checkout.
+  a non-allowlisted file, and a request whose `Host` and `Origin` agree on a
+  foreign name that resolves to loopback (the DNS-rebinding shape, posted
+  with raw `node:http` because `fetch` will not set `Host`). The
+  loopback condition itself rides the SOCKET, so no request a test can make
+  can be non-loopback: it is proven as the predicate `isLoopback` instead,
+  exported from `server.js` and walked over an address table. No test ever
+  writes into the checkout.
 - **The unpressed tab is the tab it was.** No stylesheet, module, scene
   object or draw call until the door opens. Proof: `dev-door-shut` (today's
   `demo-door-shut`, re-pinned): a never-opened tab and an
@@ -685,10 +824,20 @@ tool, and `git diff dice.yaml` is two lines with their comments intact.
 sections; clock, bench, replay, A/B, HUD; framing overlay; rebuild choke
 points; presets; venue light as a layer; the felts editor.
 
-*Proves it:* `dev-write-route`; `dev-ab-same-seed` (A and B differing on
-lamp height give identical `feltPoses`; differing on floor friction give
-different poses on the same seed); `dev-felt-roundtrip` (a felt authored on
-the felt, saved to a scratch root, shows in a fresh tab's picker).
+*Proves it:* `dev-write-route`; `dev-hud` (every footer number against an
+independent witness, and fps still reporting under a frozen projector);
+`dev-clock` (freeze holding the felt across half a second of WALL time with a
+film in flight, one step advancing exactly one keyframe, the scrub moving the
+projector and the next step continuing from it); `dev-bench` (the same seed
+twice giving the same poses AND the same faces, a different seed giving
+neither, the row labelled `bench`, and a second browser at the same room whose
+log is empty — the proof that nothing reached the wire); `dev-ab-same-seed` (A
+and B differing on lamp height give identical `feltPoses` while the lamp moves;
+differing on floor friction give different poses on the same seed —  at 0.05
+rather than 0.95, because a friction ABOVE the shipped 0.6 was MEASURED to bake
+an identical film, the dice never sliding far enough for the extra grip to
+bite); `dev-felt-roundtrip` (a felt authored on the felt, saved to a scratch
+root, shows in a fresh tab's picker).
 
 **Phase 3, assets in depth, and shape.** Sets editor with the full recipe;
 the shipped catalogue migrating into the declaration; tower and venue rows;

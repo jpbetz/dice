@@ -22,7 +22,7 @@ limitations under the License.
 // fits). If a scenario needs app state a script can't reach, add a hook to
 // window.__diceDebug rather than scraping fragile DOM.
 
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -22111,7 +22111,7 @@ export const scenarios = [
       await t.dbg("setZoom('medium')");
       await t.waitFor("window.__diceDebug.zoom === 'medium'", { desc: 'the medium table' });
       await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued', { desc: 'the cards stood at medium' });
-      await t.dbg("demoRegions('enabled')");
+      await t.dbg("demoRegions('regions')");
       const check = async (label) => {
         const ext = await t.dbg('tableExtents()');
         const ov = await t.dbg('demoInfo().overlay');
@@ -22134,9 +22134,158 @@ export const scenarios = [
       await t.dbg("demoRegions('disabled')");
       const off = await t.dbg('demoInfo().overlay');
       assert.equal(off.on, false, 'off: no overlay');
+      assert.equal(off.state, 'disabled', 'off: and it says so');
       assert.equal(off.stations.length, 0, 'off: nothing drawn');
-      assert.equal((await t.dbg('demoRegions(true)')).on, true, 'a boolean is accepted too');
-      assert.equal((await t.dbg('demoRegions(false)')).on, false);
+      // The first door's words still mean what they meant: `true`/`enabled`
+      // was the regions layer, which was all there was (js/main.js
+      // demoOverlayWord). A word that is NOT a state refuses rather than
+      // quietly turning the picture off.
+      assert.equal((await t.dbg('demoRegions(true)')).state, 'regions', 'a boolean is accepted too');
+      assert.equal((await t.dbg("demoRegions('enabled')")).state, 'regions', 'and so is the old word');
+      assert.equal((await t.dbg('demoRegions(false)')).state, 'disabled');
+      assert.equal(await t.dbg("demoRegions('sideways')"), null, 'a word that is not a state is refused');
+      assert.equal((await t.dbg('demoInfo()')).overlay.state, 'disabled', '…and it changed nothing');
+    },
+  },
+  {
+    name: 'dev-framing-overlay',
+    tags: ['dev', 'look'],
+    timeout: 90000,
+    // THE FRAMING LAYER DRAWS THE FILM'S OWN FUNCTIONS (js/main.js
+    // demoFramingBuild; docs/DEVMODE.md §8). The regions layer answers "where
+    // may a die land"; this one answers "what is the camera obliged to hold,
+    // and what is the room doing to it" — and the whole reason it is worth
+    // looking at is that every mark in it comes back out of a function the
+    // app itself calls. So the scenario compares, mark for mark:
+    //
+    //   · the HULL against `fitProbe().pts` — the very point set the fit
+    //     scans, in its own order (fitProbe rounds x/z to a tenth, so the
+    //     comparison rounds the drawn points the same way and then wants
+    //     them EQUAL, not close);
+    //   · the CARDS against js/places.js `placardFootprint` computed here in
+    //     Node from the anchors `places()` reports;
+    //   · the WALLS against `wallPositions()`, the physics bodies themselves.
+    //
+    // And the two properties the overlay's licence rests on: it adds NO body,
+    // and off is nothing at all — after Shut the tab draws the frame a tab
+    // that never opened the door draws, to the call.
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.66', name: 'Dev' });
+      await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
+        { desc: 'the table stood' });
+      await t.dbg('sim(240)');
+      const virginCalls = (await t.dbg('renderAudit()')).calls;
+      const virginBodies = await t.dbg('worldBodies()');
+
+      const opened = await t.dbg('devOpen()');
+      assert.equal(opened.panel, 'open', 'the door opened');
+      await t.dbg('devDeal(4)');
+      await t.waitFor('window.__diceDebug.places().stations.length === 5', { desc: 'the viewer and four' });
+      await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
+        { desc: 'the cards stood' });
+      const dealtBodies = await t.dbg('worldBodies()');
+
+      const ov = await t.dbg("demoRegions('framing')");
+      assert.equal(ov.state, 'framing', 'the overlay is in the framing state');
+      assert.equal(ov.on, true, 'and it is up');
+      // FIVE KINDS, FIVE OBJECTS, however many chairs stand: hull, discs,
+      // cards, lamp, walls — one LineSegments each.
+      assert.equal(ov.objects, 5, 'five kinds, one draw call each');
+      assert.equal(ov.stations.length, 0, 'the framing layer draws no station marks');
+      assert.equal(ov.bodies, 0, 'and it says it adds no body');
+      assert.deepEqual(await t.dbg('worldBodies()'), dealtBodies,
+        'the world is the world: the overlay added not one body');
+
+      // THE HULL IS framingPoints(), IN ITS OWN ORDER.
+      const probe = await t.dbg('fitProbe()');
+      assert.equal(ov.framing.hull.length, probe.n,
+        `every point the fit scans is drawn (${ov.framing.hull.length} vs ${probe.n})`);
+      const round = (v) => Math.round(v * 10) / 10;
+      for (let i = 0; i < probe.pts.length; i++) {
+        const [x, z] = ov.framing.hull[i];
+        assert.ok(Math.abs(round(x) - probe.pts[i][0]) < 1e-6 && Math.abs(round(z) - probe.pts[i][1]) < 1e-6,
+          `hull point ${i} is the fit's own (${round(x)}, ${round(z)} vs ${probe.pts[i][0]}, ${probe.pts[i][1]})`);
+      }
+      assert.ok(ov.framing.hullLoop.length >= 3 && ov.framing.hullLoop.length <= ov.framing.hull.length,
+        'the closed loop is a hull of those points, not a second point set');
+      assert.ok(ov.framing.centre, 'and the cross the fit aims at is drawn');
+      // fitProbe left the eye where its scan stopped; the ladder puts it back.
+      await t.dbg('setFraming({})');
+
+      // THE CARDS ARE js/places.js's OWN OBB.
+      const stations = (await t.dbg('places()')).stations;
+      assert.equal(ov.framing.cards.length, stations.length, 'one rectangle per card');
+      for (const card of ov.framing.cards) {
+        const st = stations.find((q) => q.place === card.place);
+        assert.ok(st, `card ${card.place} is a station`);
+        const fp = placardFootprint({ x: st.world.x, z: st.world.z, azim: st.yaw });
+        const want = [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([sw, sd]) => [
+          fp.x + fp.ax.x * fp.hw * sw + fp.az.x * fp.hd * sd,
+          fp.z + fp.ax.z * fp.hw * sw + fp.az.z * fp.hd * sd,
+        ]);
+        for (let i = 0; i < 4; i++) {
+          // 1e-9, not `===`: Node's libm and the page's disagree by an ulp on
+          // the sin/cos of an azimuth (the S4 measurement dev-roll-from-seat
+          // records at length). The page's number is the page's.
+          assert.ok(Math.abs(card.corners[i][0] - want[i][0]) < 1e-9 && Math.abs(card.corners[i][1] - want[i][1]) < 1e-9,
+            `card ${card.place} corner ${i}: ${JSON.stringify(card.corners[i])} vs ${JSON.stringify(want[i])}`);
+        }
+      }
+
+      // THE WALLS ARE THE BODIES.
+      const wp = await t.dbg('wallPositions()');
+      assert.deepEqual(ov.framing.walls, { x0: wp.left.x, x1: wp.right.x, z0: wp.back.z, z1: wp.front.z },
+        'the four wall lines are the physics planes themselves');
+
+      // THE DISCS ARE FRAME_SPOT OF THE TABLE'S RADIUS, one per seat.
+      const ext = await t.dbg('tableExtents()');
+      assert.equal(ov.framing.spots.length, stations.length, 'one frame disc per seat');
+      for (const sp of ov.framing.spots) {
+        const st = stations.find((q) => q.place === sp.place);
+        const toss = seatToss(st.seat, st.seats, 0, ext.w);
+        assert.ok(Math.abs(sp.x - toss.ax) < 1e-9 && Math.abs(sp.z - toss.az) < 1e-9,
+          `seat ${sp.seat}'s disc is centred on the film's own spot`);
+        assert.ok(sp.r > ringRadius(ext.w) * SPOT_R,
+          'the frame disc is WIDER than the toss spot — the spot is where dice are aimed, the disc is where they may roll');
+      }
+
+      // THE LAMP CONE IS THE LAMP'S, and a lamp dial re-derives it with no
+      // second ask: `tune.bind('light.lamp.*')` re-syncs the overlay.
+      const lamp0 = await t.dbg('lampInfo()');
+      assert.ok(ov.framing.lamp, 'the cone reaches the felt');
+      assert.equal(ov.framing.lamp.at[1], lamp0.position[1], 'drawn from the lamp that is lighting the table');
+      const w0 = ov.framing.lamp.bounds.x1 - ov.framing.lamp.bounds.x0;
+      await t.dbg("tuneSet({'light.lamp.y': 40})");
+      const moved = (await t.dbg('demoInfo()')).overlay.framing;
+      assert.equal(moved.lamp.at[1], 40, 'the lamp dial moved the cone without anybody asking for a rebuild');
+      assert.ok(moved.lamp.bounds.x1 - moved.lamp.bounds.x0 > w0, 'a higher lamp throws a wider pool');
+      await t.dbg("tuneReset('all')");
+
+      // BOTH PICTURES AT ONCE: the framing five plus the regions layer's ring
+      // and three marks a chair.
+      const all = await t.dbg("demoRegions('all')");
+      assert.equal(all.state, 'all');
+      assert.equal(all.stations.length, 5, 'every chair keeps its station marks');
+      assert.equal(all.objects, 5 + 1 + 3 * 5, 'the framing five, the table ring, and three marks a chair');
+      assert.ok(all.framing, 'and the framing numbers are still reported');
+
+      // OFF IS NOTHING.
+      const off = await t.dbg("demoRegions('disabled')");
+      assert.equal(off.objects, 0, 'disabled: not one object');
+      assert.equal(off.framing, null, 'disabled: and nothing to report');
+      assert.equal(off.on, false);
+
+      // …AND SO IS SHUT, to the draw call.
+      await t.dbg("demoRegions('all')");
+      assert.equal((await t.dbg('devClose()')).panel, 'shut', 'Shut');
+      await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
+        { desc: 'the cards restood' });
+      await t.dbg('sim(240)');
+      assert.deepEqual(await t.dbg('worldBodies()'), virginBodies, 'the world came back');
+      const after = (await t.dbg('renderAudit()')).calls;
+      assert.equal(after, virginCalls,
+        `after Shut the frame costs what a never-opened tab's costs (${after} vs ${virginCalls})`);
+      assert.equal((await t.dbg('demoInfo()')).overlay.state, 'disabled', 'and the overlay is back at disabled');
     },
   },
   {
@@ -22296,6 +22445,37 @@ export const scenarios = [
       await t.dbg('sim(10)');
       assert.equal((await t.dbg('lampInfo()')).position[1], 24, 'the venue\'s exit lands on the FILE\'s lamp, not the dial it rode in on');
       assert.equal((await t.dbg('devInfo()')).changed, 0, 'no leaf differs: identical to a never-opened tab');
+
+      // AN A/B SLOT HELD UNDER THE SKY IS NOT THE SKY (found by the C2
+      // review, 2026-09-02). `tune.changes()` under the glade names the nine
+      // rows the venue holds, so Hold captured the moon as though a developer
+      // had dialled it — the panel read "A 9 changed" for nine dials nobody
+      // had touched — and putting that slot on back at the table wrote the
+      // glade's lamp height onto the table's own while the status line called
+      // it live. Save has always dropped those rows; Hold does now.
+      assert.equal((await t.dbg('devOpen()')).panel, 'open');
+      await t.dbg("setVenue('moonrise')");
+      await t.waitFor("window.__diceDebug.venue === 'moonrise'", { desc: 'under the sky once more' });
+      await t.dbg('sim(10)');
+      assert.ok((await t.dbg('devInfo()')).changed >= 9,
+        `the venue still reads as changed leaves (${(await t.dbg('devInfo()')).changed})`);
+      assert.deepEqual((await t.dbg(`devHold('a')`)).a, { changed: 0 },
+        'but slot A holds nothing: the venue\'s light is not the developer\'s dial');
+      // …and a light row NO venue holds is held exactly as before.
+      await t.dbg(`tuneSet({'light.motes.size': 0.3})`);
+      assert.deepEqual((await t.dbg(`devHold('b')`)).b, { changed: 1 },
+        'a row outside the venue\'s hold is captured normally');
+      assert.equal((await t.dbg('devAbInfo()')).live, 'b',
+        'and the live measurement judges the tree on the same terms it held it on');
+      await t.dbg("setVenue('table')");
+      await t.waitFor("window.__diceDebug.venue === 'table'", { desc: 'back at the table once more' });
+      await t.dbg('sim(10)');
+      assert.equal((await t.dbg(`devSlot('a')`)).live, 'a', 'slot A goes on');
+      await t.dbg('sim(10)');
+      assert.equal((await t.dbg('lampInfo()')).position[1], 24,
+        'and the table keeps its OWN lamp — the glade\'s 22 never rode in on the slot');
+      assert.equal((await t.dbg('devInfo()')).changed, 0, 'nothing the venue held came with it');
+      assert.equal((await t.dbg('devClose()')).panel, 'shut');
       assert.deepEqual(t.page.consoleErrors, []);
     },
   },
@@ -26611,6 +26791,7 @@ export const scenarios = [
         cpSync(join(ROOT, 'tools', 'dice-apply.mjs'), join(dir, 'tools', 'dice-apply.mjs'));
         cpSync(join(ROOT, 'js', 'yaml.js'), join(dir, 'js', 'yaml.js'));
         cpSync(join(ROOT, 'js', 'tune.js'), join(dir, 'js', 'tune.js'));
+        cpSync(join(ROOT, 'js', 'dice-apply-core.js'), join(dir, 'js', 'dice-apply-core.js'));
         writeFileSync(join(dir, 'dice.yaml'), file);
         writeFileSync(join(dir, 'download.yaml'), exported);
         const tool = join(dir, 'tools', 'dice-apply.mjs');
@@ -26638,6 +26819,159 @@ export const scenarios = [
     },
   },
   {
+    name: 'dev-write-route',
+    tags: ['dev'],
+    timeout: 120000,
+    // SAVE — THE ARMED WRITE ROUTE (docs/DEVMODE.md §6, phase 2). Phase 1's
+    // loop ended in a Downloads folder; this is Joe's own sentence closed
+    // ("possible for me to actually overwrite a file in the repo with that
+    // file"). A server started `DICE_DEV_WRITE=1` FROM A SCRATCH TREE — never
+    // the checkout, which this scenario reads before and after to prove it
+    // never moved — a tab there, two dials turned, and the panel's primary
+    // verb clicked THROUGH THE DOM, because "the button says Save" is the
+    // claim and a hook would not have made it.
+    //
+    // The proof is three-legged: the scratch dice.yaml differs from the
+    // original on exactly the two lines those dials own (so the line patch
+    // and its comments survived a real round trip through HTTP), the panel
+    // says how many changes landed, and a FRESH TAB from that same server
+    // boots with the saved values — which is the whole point of a file the
+    // server re-reads rather than a value held in a tab.
+    async fn(ctx) {
+      // The scratch tree: server.js and dice.yaml are copies (they are what
+      // gets written and read), everything the page loads is a symlink to the
+      // checkout's own — server.js resolves paths under its own directory, so
+      // the served app is byte-identical to the suite's without copying 6 MB
+      // of vendor and models per run.
+      const dir = mkdtempSync(join(SCRATCH_BASE, 'dev-write-'));
+      const original = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
+      cpSync(join(ROOT, 'server.js'), join(dir, 'server.js'));
+      writeFileSync(join(dir, 'dice.yaml'), original);
+      for (const name of ['js', 'css', 'vendor', 'models', 'index.html']) {
+        symlinkSync(join(ROOT, name), join(dir, name));
+      }
+      const scratchYaml = () => readFileSync(join(dir, 'dice.yaml'), 'utf8');
+      const port = await freePort();
+      const server = await startServer(port, {
+        root: dir,
+        env: { DICE_DEV_WRITE: '1', DICE_DEV_ROOT: dir },
+      });
+      try {
+        const open = async (origin, room) => {
+          const page = await ctx.browser.newPage();
+          await page.addInitScript('window.__diceTestMode = true;');
+          await page.addInitScript(`try { localStorage.setItem('dice.schema.v1','2');`
+            + ` localStorage.setItem('dice.name.v1','Save'); } catch {}`);
+          const url = `http://${origin}:${port}/?room=${encodeURIComponent(room)}`;
+          await page.navigate(url);
+          const tab = new Table(page, url);
+          ctx.tables.push(tab);
+          await tab.waitFor('!!window.__diceDebug && window.__diceDebug.netReady', { desc: `the tab at ${origin} is up`, timeout: 30000 });
+          assert.equal(await tab.eval('window.__diceDebug.netReady.then((r) => r && r.online)'), true, `online at ${origin}`);
+          await tab.dbg('sim(60)');
+          return tab;
+        };
+
+        const t = await open('127.0.0.70', ctx.room);
+        assert.equal((await t.dbg('devOpen()')).panel, 'open');
+
+        // The panel asks the server once, on mount. Armed, the primary verb
+        // becomes Save; Download stays, demoted, one click away.
+        await t.waitFor(`document.querySelector('#dev-panel .dev-saveroute')?.hidden === false`,
+          { desc: 'the panel heard back that the route is armed' });
+        assert.equal(await t.eval(`document.querySelector('#dev-panel .dev-saveroute').textContent`), 'Save',
+          'the primary verb is labelled Save');
+        assert.equal(await t.eval(`document.querySelector('#dev-panel .dev-saveroute').classList.contains('dev-btn-primary')`), true);
+        const download = `[...document.querySelectorAll('#dev-panel .dev-verbs .dev-btn')].find((b) => b.textContent === 'Download')`;
+        assert.equal(await t.eval(`!!(${download})`), true, 'Download is still there, under Save');
+        assert.equal(await t.eval(`(${download}).classList.contains('dev-btn-primary')`), false, 'but no longer the primary');
+        // ONE primary verb (the C1 review, 2026-09-02): `Save & reload` is the
+        // same act with a reload after it, and two amber buttons whose labels
+        // differ by two words read as two Saves. It follows in plain dress.
+        assert.equal(await t.eval(`document.querySelector('#dev-panel .dev-save').classList.contains('dev-btn-primary')`), false,
+          'and Save & reload is not a second amber verb beside Save');
+        assert.match(await t.eval(`document.querySelector('#dev-panel .dev-save').title`), /save dice\.yaml, then reload/,
+          'its title says what it does when the route is armed, not "export"');
+
+        const set = await t.dbg(`tuneSet({'light.lamp.y': 31, 'light.lamp.intensity': 3.4})`);
+        assert.deepEqual(set.refused, [], 'a table of one: both look dials take');
+        assert.equal((await t.dbg('devInfo()')).changed, 2);
+        assert.equal(scratchYaml(), original, 'nothing is written until Save is clicked');
+
+        await t.eval(`document.querySelector('#dev-panel .dev-saveroute').click()`);
+        await t.waitFor(`document.querySelector('#dev-panel .dev-statusslot')?.textContent.includes('saved 2 changes')`,
+          { desc: 'the panel reports the change count the server answered with' });
+
+        const saved = scratchYaml();
+        assert.notEqual(saved, original, 'the scratch declaration moved');
+        const a = original.split('\n'), b = saved.split('\n');
+        assert.equal(a.length, b.length, 'no line added or removed');
+        const moved = a.map((l, i) => (l === b[i] ? null : i + 1)).filter(Boolean);
+        assert.equal(moved.length, 2, `exactly the two lines those dials own (${moved.join(', ')})`);
+        assert.ok(b[moved[0] - 1].includes('y: 31') && b[moved[0] - 1].includes('# pool ~27'),
+          'the lamp height moved and kept its comment');
+        assert.ok(b[moved[1] - 1].includes('intensity: 3.4'), 'and so did its intensity');
+        assert.equal(readFileSync(join(ROOT, 'dice.yaml'), 'utf8'), original,
+          'and the CHECKOUT was never touched');
+
+        // The reason a file is the transport: a tab that boots after the Save
+        // boots on it. Its own room, so this stays a table of one and the
+        // film lock is not what is being measured here.
+        const fresh = await open('127.0.0.71', `${ctx.room}-fresh`);
+        assert.equal(await fresh.dbg(`tuneGet('light.lamp.y')`), 31, 'a fresh tab boots on the saved lamp height');
+        assert.equal(await fresh.dbg(`tuneGet('light.lamp.intensity')`), 3.4);
+        assert.equal((await fresh.dbg('devInfo()')).changed, 0,
+          'and reads them as SHIPPED — the file is the declaration, not a diff');
+        assert.equal((await fresh.dbg('lampInfo()')).position[1], 31, 'the lamp really is up there');
+        assert.equal(await fresh.eval('location.search'), `?room=${encodeURIComponent(`${ctx.room}-fresh`)}`,
+          'and nothing about developer mode reached the URL');
+
+        // ---- THE VENUE'S LIGHT IS NOT THIS TAB'S TO SAVE ------------------
+        //
+        // (DEVMODE §6; the C1 review, 2026-09-02, which found this refusal
+        // unproven and too wide.) A glade Object.assigns the mood at moonrise,
+        // so while it stands `tuneDiff()` reads the venue's moon as a change —
+        // and a Save then would write the venue's sky into the table's lamp.
+        // The rows `venueLightPatch()` names are dropped; a light row NO venue
+        // holds (`light.motes.*`) is not, which is the half the first cut got
+        // wrong by dropping the whole `light.` prefix.
+        await t.dbg(`setVenue('moonrise')`);
+        await t.waitFor(`(window.__diceDebug.sim(2), window.__diceDebug.venue === 'moonrise')`,
+          { desc: 'the glade is the room' });
+        assert.equal(await t.dbg(`tuneGet('light.lamp.y')`), 22, 'the venue holds the lamp at its own height');
+        const vset = await t.dbg(`tuneSet({'light.motes.count': 150, 'pace.tempo.k': 1.2})`);
+        assert.deepEqual(vset.refused, [], 'a motes row and a pace row are nobody else\'s');
+
+        await t.eval(`document.querySelector('#dev-panel .dev-saveroute').click()`);
+        await t.waitFor(`document.querySelector('#dev-panel .dev-statusslot')?.textContent.includes('held by the venue')`,
+          { desc: 'the panel says how many rows the venue held back' });
+        const note = await t.eval(`document.querySelector('#dev-panel .dev-statusslot').textContent`);
+        assert.ok(/saved 2 changes/.test(note), `exactly the two rows nobody holds landed (${note})`);
+        const heldN = Number(/(\d+) light rows? held by the venue/.exec(note)[1]);
+        assert.ok(heldN >= 1, `and the moon's own rows were held (${note})`);
+
+        const withVenue = scratchYaml();
+        const c = saved.split('\n'), d = withVenue.split('\n');
+        const moved2 = c.map((l, i) => (l === d[i] ? null : i + 1)).filter(Boolean);
+        assert.equal(moved2.length, 2, `two lines moved, not the venue's ten (${moved2.join(', ')})`);
+        assert.ok(d[moved2[0] - 1].includes('count: 150'), 'the motes row saved like any other row');
+        assert.ok(d[moved2[1] - 1].includes('k: 1.2'), 'and so did the pace row');
+        assert.ok(d.some((l) => /^ {4}y: 31 /.test(l)),
+          'while the lamp height in the file is still the one the table saved, not the moon\'s 22');
+
+        await t.dbg(`setVenue('table')`);
+        await t.waitFor(`(window.__diceDebug.sim(2), window.__diceDebug.venue === 'table')`,
+          { desc: 'home again' });
+
+        assert.deepEqual(t.page.consoleErrors, []);
+        assert.deepEqual(fresh.page.consoleErrors, []);
+      } finally {
+        if (server.exitCode === null) server.kill('SIGTERM');
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  },
+  {
     name: 'dev-shell-loads',
     tags: ['dev'],
     timeout: 60000,
@@ -26661,10 +26995,15 @@ export const scenarios = [
       assert.deepEqual(t.page.consoleErrors, [], 'no console error');
       const want = dialLeaves(defaultsOf(DIALS)).map((p) => p.join('.')).sort();
       const all = await t.eval(`[...document.querySelectorAll('#dev-panel .dev-row[data-path]')].map((e) => e.dataset.path).sort()`);
-      // The cast section's two dial-shaped rows (players, regions) carry a
-      // `cast.` path so the find filter can reach them; they are not leaves.
-      const rows = all.filter((p) => !p.startsWith('cast.'));
-      assert.deepEqual(all.filter((p) => p.startsWith('cast.')), ['cast.players', 'cast.regions'], 'the cast\'s own two rows, and no other stranger');
+      // The instrument sections' dial-shaped rows (the cast's players and
+      // regions, the clock's freeze and scrub, the bench's seed) carry their
+      // section's own prefix so the find filter can reach them; they are not
+      // leaves of the declaration and never appear in dice.yaml.
+      const INSTRUMENT = /^(cast|clock|bench)\./;
+      const rows = all.filter((p) => !INSTRUMENT.test(p));
+      assert.deepEqual(all.filter((p) => INSTRUMENT.test(p)).sort(),
+        ['bench.seed', 'cast.overlay', 'cast.players', 'clock.freeze', 'clock.scrub'],
+        'the instruments\' own rows, and no other stranger');
       assert.equal(rows.length, want.length, `one row per phase-1 leaf (${rows.length} vs ${want.length})`);
       assert.deepEqual(rows, want, 'and they are the dial tree\'s leaves, exactly');
       // A declared leaf and an omitted one both stand as rows; the omitted
@@ -26681,6 +27020,390 @@ export const scenarios = [
       // page's: the shell declares no icon, and index.html's is inline.)
       const bad = t.responses.filter((r) => r.status >= 400 && !r.url.endsWith('/favicon.ico'));
       assert.deepEqual(bad, [], 'nothing the page asked for 404ed');
+    },
+  },
+  {
+    name: 'dev-hud',
+    tags: ['dev'],
+    timeout: 90000,
+    // THE HUD IS READ OFF THE ENGINE, NOT OFF A PROMISE (docs/DEVMODE.md §8,
+    // phase 2). Every number in the footer has an independent witness in this
+    // scenario: `calls` and `tris` against renderAudit(), `bodies` against
+    // worldBodies(), `settle` against the baked film's own duration, and fps
+    // against the fact that the tab is drawing at all.
+    //
+    // fps is the WALL clock on purpose, and the second half of this proves it:
+    // with the projector frozen the readout must still be a frame rate, because
+    // "how fast is this tab drawing" is a question about the machine, and a
+    // frozen picture that reported 0 fps would read as a hang.
+    async fn(ctx) {
+      const t = await ctx.devTab({ origin: '127.0.0.68', players: 0, name: 'Hud' });
+      await t.dbg('sim(60)');
+      const cold = await t.dbg('devHud()');
+      assert.equal(cold.settle, null, 'nothing thrown yet: no settle time to report');
+      assert.equal(cold.seed, null, 'and no seed');
+
+      await t.waitFor('window.__diceDebug.devHud().fps > 0',
+        { desc: 'the fps ring fills from the rAF clock' });
+      let hud = await t.dbg('devHud()');
+      assert.ok(hud.fps > 1 && hud.fps < 400, `a plausible frame rate (${hud.fps})`);
+      const audit = await t.dbg('renderAudit()');
+      assert.equal(hud.calls, audit.calls, 'draw calls are renderAudit\'s own counter');
+      assert.equal(hud.tris, audit.triangles, 'and so are triangles');
+      assert.ok(hud.tris > 0, `the frame draws something (${hud.tris} tris)`);
+      assert.equal(hud.bodies, (await t.dbg('worldBodies()')).count, 'bodies are cannon\'s own count');
+
+      // A film: the settle time is the BAKED duration, so it is the same number
+      // on every client at that seed and no stopwatch is involved.
+      const thrown = await t.dbg('devBench(4242)');
+      assert.equal(thrown.seed, 4242);
+      await t.settle();
+      hud = await t.dbg('devHud()');
+      assert.equal(hud.seed, 4242, 'the HUD names the seed it last played');
+      assert.ok(hud.settle > 0.1 && hud.settle < 30, `a plausible settle time (${hud.settle}s)`);
+      assert.ok(hud.frames > 1, `and the film's frame count (${hud.frames})`);
+      const film = await t.dbg('devBenchInfo()');
+      assert.equal(hud.settle, film.last.settleS, 'the same number the bench remembers');
+      assert.equal(film.last.bench, true, 'and it knows the throw came off the bench');
+
+      // The footer says all of it, in the window it measured.
+      const foot = await t.eval(`(() => {
+        const f = document.querySelector('#dev-panel .dev-foot');
+        return { perf: f.querySelector('.dev-foot-perf').textContent,
+                 hud: f.querySelector('.dev-foot-hud').textContent,
+                 vp: f.querySelector('.dev-foot-viewport').textContent };
+      })()`);
+      assert.match(foot.perf, /\d+ fps · \d+ calls/, `the footer's perf line (${foot.perf})`);
+      assert.match(foot.hud, /tris · \d+ bodies · settle [\d.]+s/, `and its HUD line (${foot.hud})`);
+      assert.match(foot.vp, /^\d+×\d+ @\d/, `and the viewport it judged (${foot.vp})`);
+
+      // FROZEN, THE MACHINE IS STILL DRAWING. Shut empties the ring (it is one
+      // of the things `devBenchClear` puts back), so every sample counted after
+      // the freeze below was taken under it — without that, this leg would pass
+      // on the frames the tab drew a moment ago.
+      await t.dbg('devClose()');
+      await t.dbg('devOpen()');
+      await t.dbg(`devClock('frozen')`);
+      assert.equal((await t.dbg('devClockInfo()')).state, 'frozen');
+      await t.waitFor('window.__diceDebug.devHud().fps > 0',
+        { desc: 'a frozen projector still reports the frame rate of the tab drawing it' });
+      assert.deepEqual(t.page.consoleErrors, []);
+    },
+  },
+  {
+    name: 'dev-clock',
+    tags: ['dev'],
+    timeout: 90000,
+    // THE CLOCK IS AN INSTRUMENT FOR LOOKING AT ONE FRAME (DEVMODE §8). Three
+    // claims, each measured against `feltPoses` — the quantised mesh poses,
+    // which is what a person is actually looking at:
+    //
+    //   FREEZE HOLDS. Half a second of wall time passes with a film in flight
+    //     and nothing on the felt moves. (Wall time, not sim() beats: the thing
+    //     being tested is that the rAF loop stopped advancing the projector,
+    //     and a scenario that only refrained from calling sim() would prove
+    //     nothing at all.)
+    //   STEP ADVANCES EXACTLY ONE. Not "some", not "about one": the film's own
+    //     frame index goes up by one and the poses move with it.
+    //   SCRUB MOVES THE PROJECTOR. Posing the dice alone was the first cut and
+    //     the very next frozen tick painted over it (stepPlayback re-poses from
+    //     `roll.time` even on a dt of zero), so the scrub writes the clock: the
+    //     pose survives a quarter second of frozen wall time, and the next step
+    //     continues from where the scrub left it rather than from where the
+    //     film had got to. What it does NOT do is re-fire the roll — the impact
+    //     cursor is walked past what was skipped without voicing it, because a
+    //     scrub that re-stamped a landing would be a picture of something that
+    //     never happened (js/main.js devScrub says it at length).
+    //
+    // And STEP IS FOR A PARKED PROJECTOR: the hook refuses on a running clock,
+    // exactly as the panel's button is disabled there.
+    async fn(ctx) {
+      const t = await ctx.devTab({ origin: '127.0.0.69', players: 0, name: 'Clock' });
+      await t.settle();
+      const poses = () => t.eval(`JSON.stringify(window.__diceDebug.feltPoses()
+        .map((d) => [d.i, d.pos, d.quat]))`);
+
+      assert.deepEqual(await t.dbg('devClockInfo()'), { state: 'running', live: false, frame: 0, frames: 0, time: 0 },
+        'no film: nothing to scrub through');
+      // STEP REFUSES WHILE THE CLOCK RUNS (found by the C2 review,
+      // 2026-09-02): the first cut ran a whole extra tick on a running tab and
+      // answered as though it had stepped, which put the film one frame ahead
+      // of the clock reporting it. The panel's button was disabled there all
+      // along; the hook now says the same thing.
+      assert.equal(await t.dbg('devStep()'), null, 'the step hook refuses on a running clock');
+      await t.dbg(`devClock('frozen')`);
+      assert.notEqual(await t.dbg('devStep()'), null, 'frozen, it answers — even with no film to step');
+      await t.dbg(`devClock('running')`);
+
+      await t.dbg('devBench(31337)');
+      const froze = await t.dbg(`devClock('frozen')`);
+      assert.equal(froze.state, 'frozen');
+      assert.equal(froze.live, true, 'a film is running');
+      assert.ok(froze.frames > 10, `and it has keyframes (${froze.frames})`);
+
+      // ① freeze holds, across half a second of the wall clock.
+      const p0 = await poses();
+      const c0 = await t.dbg('devClockInfo()');
+      await new Promise((r) => setTimeout(r, 500));
+      assert.equal(await poses(), p0, 'frozen: 500 ms of wall time moved no die');
+      assert.equal((await t.dbg('devClockInfo()')).frame, c0.frame, 'and the projector did not advance');
+
+      // ② one step is one frame.
+      const c1 = await t.dbg('devStep()');
+      assert.equal(c1.frame, c0.frame + 1, `step advanced exactly one keyframe (${c0.frame} → ${c1.frame})`);
+      const p1 = await poses();
+      assert.notEqual(p1, p0, 'and the felt moved with it');
+
+      // ③ scrub moves the projector, and the step after it continues from
+      // where the scrub left it — not from where the film had got to.
+      const far = Math.max(c1.frame + 5, Math.floor(c1.frames * 0.8));
+      const s = await t.dbg(`devScrub(${far})`);
+      assert.equal(s.scrub, far, 'scrubbed to the asked-for frame');
+      assert.equal(s.frame, far, 'and the projector went with it');
+      const p2 = await poses();
+      assert.notEqual(p2, p1, 'the picture moved');
+      await new Promise((r) => setTimeout(r, 250));
+      assert.equal(await poses(), p2, 'and it STAYS there — a frozen tick re-poses from the clock the scrub set');
+      const c2 = await t.dbg('devStep()');
+      assert.equal(c2.frame, far + 1, 'the next step continues from the scrub');
+
+      // ④ running resumes: the rAF clock drains the film again.
+      await t.dbg(`devClock('running')`);
+      assert.equal((await t.dbg('devClockInfo()')).state, 'running');
+      await t.waitFor(`!window.__diceDebug.devClockInfo().live`,
+        { desc: 'the film runs to its end once the clock is released' });
+      await t.settle();
+      const settled = await poses();
+      assert.notEqual(settled, p2, 'the dice are where the film left them, not where the scrub left them');
+
+      // Shut releases the freeze; fold keeps it (DEVMODE §8).
+      await t.dbg(`devClock('frozen')`);
+      await t.dbg('devFold(true)');
+      assert.equal((await t.dbg('devClockInfo()')).state, 'frozen', 'fold keeps the freeze');
+      assert.match(await t.eval(`document.getElementById('dev-glyph').textContent`), /frozen/,
+        'and the corner glyph says so, because a frozen table folded away must not read as a broken one');
+      await t.dbg('devClose()');
+      assert.equal((await t.dbg('devClockInfo()')).state, 'running', 'Shut releases it');
+      assert.deepEqual(t.page.consoleErrors, []);
+    },
+  },
+  {
+    name: 'dev-bench',
+    tags: ['dev'],
+    timeout: 120000,
+    // ONE SEED, ONE FILM, AND NOTHING ON THE WIRE (DEVMODE §8, §10).
+    //
+    //   the same seed twice is the same throw — the same faces AND the same
+    //     poses, because the seed feeds composeRoll at one end and the physics
+    //     bake at the other, and NOTHING here names a face (GOALPOST 2);
+    //   a different seed is a different throw, so the first claim is not the
+    //     vacuous "two rolls of 3d6 look alike";
+    //   the row says `bench`, by the path a typed `# comment` takes;
+    //   and the server never heard about any of it — proved from a SECOND
+    //     browser joined to the same room, whose log is the room's log.
+    async fn(ctx) {
+      const t = await ctx.devTab({ origin: '127.0.0.70', players: 0, name: 'Bench' });
+      await t.settle();
+      // rollId is minted per throw and is deliberately NOT part of the claim:
+      // two films of one seed are the same DICE AT THE SAME POSES, which is
+      // what feltPoses answers once its per-throw identity is set aside.
+      const poses = () => t.eval(`JSON.stringify(window.__diceDebug.feltPoses()
+        .map((d) => [d.i, d.type, d.pos, d.quat]))`);
+
+      const one = await t.dbg('devBench(4242)');
+      assert.equal(one.seed, 4242, 'the bench threw the seed it was handed');
+      assert.equal(one.via, 'local', 'and it threw it locally');
+      assert.equal(one.label, 'bench');
+      await t.settle();
+      const p1 = await poses();
+      const top1 = await t.logTop();
+      assert.match(top1, /bench/, `the log row is labelled bench (${top1})`);
+
+      const two = await t.dbg('devBench(4242)');
+      assert.equal(two.seed, 4242);
+      await t.settle();
+      assert.equal(await poses(), p1, 'the same seed baked the same film, pose for pose');
+      assert.equal(await t.logTop(), top1, 'and drew the same faces — the values ride the seed too');
+
+      await t.dbg('devBench(4243)');
+      await t.settle();
+      assert.notEqual(await poses(), p1, 'a different seed is a different throw');
+      const other = await t.logTop();
+
+      // REPLAY rethrows the LAST seed, whatever drew it.
+      const back = await t.dbg('devReplay()');
+      assert.equal(back.seed, 4243, 'replay took the last seed');
+      await t.settle();
+      assert.equal(await t.logTop(), other, 'and played it again');
+
+      // …AND IT REPLAYS THE WHOLE ROLL, not just the pool. A bench throw with
+      // a dc must come back with its dc: the first cut rebuilt the string from
+      // the LABEL alone, and `3d6 dc12 # bench` came back as a bare `3d6`
+      // whose verdict had quietly gone.
+      const dc = await t.dbg(`devBench(9001, '3d6 dc12')`);
+      assert.equal(dc.notation, '3d6 dc12 # bench', 'the bench wrote the comment onto the roll it was given');
+      assert.equal(dc.dc, 12, 'and THREW the dc, rather than only writing it into the string');
+      await t.settle();
+      const dcTop = await t.logTop();
+      const again = await t.dbg('devReplay()');
+      assert.equal(again.seed, 9001);
+      assert.equal(again.notation, '3d6 dc12 # bench', 'replay asked for the same roll, dc and all');
+      await t.settle();
+      assert.equal(await t.logTop(), dcTop, 'and got the same row back');
+
+      // A COMMENT IS A NAME, NOT THE ROLL (found by the C2 review,
+      // 2026-09-02 — and the reason the dc leg above passed while every
+      // COMMENTED roll quietly lost its mods). A label is the bare comment
+      // whenever a roll carried one, so rebuilding the replay string from the
+      // label threw `4d6kh3 # attack` back as `4d6 # attack` — the keep gone,
+      // the verdict with it. The string comes off the SPEC now; this is what
+      // that buys, measured on the throw and not only on the string.
+      const keep = await t.dbg(`devBench(555, '4d6kh3 dc14 # attack')`);
+      assert.equal(keep.notation, '4d6kh3 dc14 # attack', 'the bench threw the whole roll');
+      await t.settle();
+      const keepTop = await t.logTop();
+      const film = await t.dbg('devBenchInfo()');
+      assert.deepEqual(film.last.mods, { keep: { mode: 'kh', n: 3 } }, 'the bench remembers the mods it threw');
+      assert.equal(film.last.dc, 14, 'and the dc');
+      assert.equal(film.last.label, 'attack', 'the label is only the comment — which is the whole trap');
+      assert.equal(film.last.text, '4d6kh3 dc14 # attack', 'and the replay string is rebuilt from the spec');
+      const rerun = await t.dbg('devReplay()');
+      assert.equal(rerun.seed, 555, 'replay took that seed');
+      assert.equal(rerun.notation, '4d6kh3 dc14 # attack', 'and asked for the whole roll again');
+      assert.deepEqual((await t.dbg('lastRequestedRoll')).mods, { keep: { mode: 'kh', n: 3 } },
+        'the keep reached the THROW, not just the string');
+      assert.equal((await t.dbg('lastRequestedRoll')).dc, 14, 'and so did the dc');
+      await t.settle();
+      assert.equal(await t.logTop(), keepTop, 'so the row comes back whole: same dice, same keep, same verdict');
+
+      // …and the case that changed the DICE THEMSELVES: `2d20kh1` is how a
+      // person writes advantage, the reader canonicalises it to `1d20 adv`,
+      // and the label-rebuilt string threw one plain d20 with the advantage
+      // dropped — a replay of a roll the bench claimed to be repeating.
+      await t.dbg(`devBench(606, '2d20kh1 # adv')`);
+      await t.settle();
+      const adv = await t.dbg('devBenchInfo()');
+      assert.deepEqual(adv.last.mods, { adv: 'adv' }, 'advantage is a mod on the roll');
+      assert.equal(adv.last.text, '1d20 adv # adv', 'and it survives into the replay string');
+      const advBack = await t.dbg('devReplay()');
+      assert.equal(advBack.notation, '1d20 adv # adv', 'so the replay is still an advantaged roll');
+      assert.deepEqual((await t.dbg('lastRequestedRoll')).mods, { adv: 'adv' },
+        'thrown WITH advantage, not as one plain d20');
+      await t.settle();
+
+      // NOTHING REACHED THE SERVER. A second browser at the same room replays
+      // the ROOM's log at join; every bench throw and replay above would be a
+      // row here if one of them had touched the wire.
+      const b = await ctx.newTable({ origin: '127.0.0.71', name: 'Watcher' });
+      await b.waitOnline();
+      await b.settle();
+      assert.equal(await b.logCount(), 0, 'the room\'s own log is empty: not one bench throw was on the wire');
+      // …and now that a second seat is here, the bench is refused, as every
+      // other film instrument is (DEVMODE §4, the film lock).
+      await t.waitFor(`window.__diceDebug.devInfo().film === 'locked'`, { desc: 'the film locks on the second seat' });
+      assert.equal(await t.dbg('devBench(4242)'), null, 'a seeded throw is refused while the film is shared');
+      assert.equal(await t.dbg('devReplay()'), null, 'and so is a replay');
+      assert.equal(await b.logCount(), 0, 'still nothing on the wire');
+      assert.deepEqual(t.page.consoleErrors, []);
+    },
+  },
+  {
+    name: 'dev-ab-same-seed',
+    tags: ['dev'],
+    timeout: 120000,
+    // A/B IS THE WHOLE POINT OF A DIAL YOU CAN TURN (DEVMODE §8): two held
+    // patches and one key, and the flip replays the last seed EXACTLY when the
+    // two disagree about the film.
+    //
+    //   look only (light.lamp.y): the flip does not replay, the poses are
+    //     untouched, and the lamp moved — which is the comparison a person
+    //     wanted, since a felt that re-threw itself under a lamp change would
+    //     be a picture of two different things at once;
+    //   film (throw.physics.floor.friction): the flip DOES replay, on the same
+    //     seed, and the poses differ — same dice, different table.
+    async fn(ctx) {
+      const t = await ctx.devTab({ origin: '127.0.0.72', players: 0, name: 'AB' });
+      await t.settle();
+      const poses = () => t.eval(`JSON.stringify(window.__diceDebug.feltPoses()
+        .map((d) => [d.i, d.pos, d.quat]))`);
+      const lampY = async () => (await t.dbg('lampInfo()')).position[1];
+
+      await t.dbg('devBench(777)');
+      await t.settle();
+      const p0 = await poses();
+
+      // ---- look only ----------------------------------------------------
+      await t.dbg(`tuneSet({'light.lamp.y': 40})`);
+      let ab = await t.dbg(`devHold('a')`);
+      assert.deepEqual(ab.a, { changed: 1 }, 'slot A holds one changed leaf');
+      await t.dbg(`tuneReset('all')`);
+      ab = await t.dbg(`devHold('b')`);
+      assert.deepEqual(ab.b, { changed: 0 }, 'slot B holds the shipped table');
+      assert.equal(ab.film, false, 'the two differ on a LOOK path only');
+      assert.equal(await lampY(), 24, 'and B is what the table is wearing');
+
+      const flipA = await t.dbg('devFlip()');
+      assert.equal(flipA.live, 'a', 'the flip put A on');
+      assert.equal(flipA.replayed, false, 'and did not replay: look values keep the poses');
+      assert.equal(await lampY(), 40, 'the lamp moved');
+      assert.equal(await poses(), p0, 'and not one die did');
+
+      const flipB = await t.dbg('devFlip()');
+      assert.equal(flipB.live, 'b');
+      assert.equal(flipB.replayed, false);
+      assert.equal(await lampY(), 24, 'the lamp came back');
+      assert.equal(await poses(), p0, 'the felt was never disturbed');
+
+      // ---- film ----------------------------------------------------------
+      // 0.05, not the 0.95 this leg was first written with. MEASURED at seed
+      // 777 on this pool, poses quantised to 1e-3, each run from a cleared
+      // felt: friction 1.2, 0.95, 0.6 (shipped) and 0.3 all bake the SAME
+      // film, pose for pose — a 3d6 aimed into its region never slides far
+      // enough for grip in that band to bite — and 0.05 is where it starts to.
+      // So the band is the fact, not a direction: the first note here said
+      // "above the shipped 0.6", which would have led the next person to
+      // expect 0.3 to move the picture (the C2 review measured it; it does
+      // not). Anything needing a film-class dial for an A/B leg should either
+      // use 0.05 or measure its own band first.
+      await t.dbg(`tuneSet({'throw.physics.floor.friction': 0.05})`);
+      await t.dbg(`devHold('a')`);
+      await t.dbg(`tuneReset('all')`);
+      await t.dbg(`devHold('b')`);
+      ab = await t.dbg('devAbInfo()');
+      assert.equal(ab.film, true, 'now the two differ on a FILM path');
+
+      const filmA = await t.dbg('devFlip()');
+      assert.equal(filmA.live, 'a');
+      assert.equal(filmA.replayed, true, 'a film difference replays the last seed');
+      await t.settle();
+      assert.equal((await t.dbg('devHud()')).seed, 777, 'on the SAME seed — a new draw would prove nothing');
+      assert.equal(await t.dbg(`tuneGet('throw.physics.floor.friction')`), 0.05, 'under A\'s friction');
+      const pA = await poses();
+
+      const filmB = await t.dbg('devFlip()');
+      assert.equal(filmB.live, 'b');
+      assert.equal(filmB.replayed, true);
+      await t.settle();
+      assert.equal((await t.dbg('devHud()')).seed, 777, 'still seed 777');
+      assert.equal(await t.dbg(`tuneGet('throw.physics.floor.friction')`), 0.6, 'under the shipped friction');
+      const pB = await poses();
+      assert.notEqual(pA, pB, 'same dice, different table: the poses differ');
+
+      // The panel's own status line names the live slot and what the flip did.
+      const line = await t.eval(`document.querySelector('#dev-panel .dev-about').textContent`);
+      assert.match(line, /live B/, `the A/B line says which slot is live (${JSON.stringify(line)})`);
+      assert.match(line, /last flip replayed/, 'and that the flip replayed');
+      assert.match(line, /flip replays the last seed/, 'and what the next one will do');
+
+      // LIVE IS A MEASUREMENT. One slider off B and the table is neither
+      // slot; the line must stop claiming one, or it is the panel's one piece
+      // of remembered state telling a story about the tree.
+      await t.dbg(`tuneSet({'light.lamp.y': 33})`);
+      assert.equal((await t.dbg('devAbInfo()')).live, null, 'dialled away from B: no slot is live');
+      await t.dbg('sim(10)');
+      assert.match(await t.eval(`document.querySelector('#dev-panel .dev-about').textContent`),
+        /nothing live/, 'and the line says so');
+      assert.deepEqual(t.page.consoleErrors, []);
     },
   },
 ];

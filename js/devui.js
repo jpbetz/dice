@@ -191,7 +191,9 @@ export function subhead(title) {
 //   isDefault → a faint "default" — the file omits this leaf
 //   locked    → ▲ with the lock reason as tooltip; the control is disabled
 //   reload    → ⟳ after the name — read once at boot; Save & reload applies
-//   venue     → a `venue` badge — a venue is holding this section
+//   venue     → a `venue` badge — a venue is holding THIS ROW (the C1 review,
+//               2026-09-02: the panel used to badge the whole light section,
+//               which claimed rows no venue holds and Save writes normally)
 function makeRow({ label, why, kind, controls, ctl, val, focusable, revertable = true }) {
   const id = nextId('dev-row');
   const name = el('span', { class: 'dev-row-name', text: label });
@@ -288,6 +290,16 @@ export function rowRange({ label, value, range, onInput, onCommit, why }) {
   slider.addEventListener('change', () => { if (onCommit) onCommit(Number(slider.value)); });
   const row = makeRow({ label, why, kind: 'range', controls: [slider, num], ctl: [slider], val: [num], focusable: slider });
   row.setValue = (v) => { slider.value = String(v); num.set(v); };
+  // A RANGE THAT IS NOT A DIAL'S (developer mode phase 2): the clock's scrub
+  // runs over the LAST ROLL's keyframes, and every roll has a different number
+  // of them, so its row is re-ranged on the beat rather than rebuilt. The
+  // slider's own value is left where it is — re-ranging is not a write.
+  row.setRange = (r) => {
+    const [lo, hi, st] = Array.isArray(r) && r.length >= 2 ? r : [min, max, step];
+    slider.min = String(lo);
+    slider.max = String(hi);
+    slider.step = String(st ?? 'any');
+  };
   return row;
 }
 

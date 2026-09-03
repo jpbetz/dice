@@ -336,3 +336,24 @@ added locally after the download survives and `git diff dice.yaml` is exactly
 the lines that moved. Prints `path: old → new` per change and a count; writes
 atomically. `tests/dice-apply.test.mjs` runs it only ever against a scratch
 copy of the tree.
+
+The computation itself lives in `js/dice-apply-core.js`, because the panel's
+**Save** runs exactly the same one (below).
+
+## Save straight into the checkout (developer mode)
+
+```bash
+DICE_DEV_WRITE=1 node server.js       # …then press ` and click Save
+```
+
+Started that way — and only that way — the local server mounts
+`GET /api/dev/status` and `POST /api/dev/write`, and the panel's primary verb
+becomes **Save** instead of **Download**: it posts the changed dials and the
+server patches its own `dice.yaml`, so the round trip through a Downloads
+folder disappears and `git diff dice.yaml` is still the whole review
+([docs/DEVMODE.md](../docs/DEVMODE.md) §6). Loopback only, same-origin only,
+one allowlisted file, atomic rename, and every path validated against the dial
+tree by the same core the tool above runs. `DICE_DEV_ROOT=DIR` writes into
+another checkout instead (the tests point it at a scratch tree). Without the
+variable the routes are not mounted at all — which is every deploy
+([docs/DEPLOY.md](../docs/DEPLOY.md)).

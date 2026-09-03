@@ -42,6 +42,15 @@ limitations under the License.
 // verb was download-then-`location.reload()`; this file keeps the stronger
 // rule and reports "downloaded — reload to apply" instead.
 //
+// `bench` (optional, phase 2): the instruments — `{ hud, clock, freeze, step,
+// scrub, bench, replay, last, hold, apply, flip, ab, pool }`. Given one, the
+// panel grows a `clock` section (freeze / step / scrub), a `bench` group in the
+// cast section (seed / Throw / Replay) and an `ab` section (two held patches
+// and the `x` flip). Given none, the panel is exactly the panel phase 1
+// shipped. The panel keeps no bench state either: the seed BOX is its own (a
+// place a person types, like the find filter and the paste box), and every
+// other number on those three sections is asked of the bench each repaint.
+//
 // `info` (optional): `{ declared, venue, venueLight }` — `declared` is the
 // tree the file names (a leaf absent from it wears the faint "default"
 // mark); `venue` is the id of a venue holding the light, or null (light rows
@@ -69,6 +78,10 @@ export const DEV_NARROW_QUERY = '(max-width: 639px)';
 export const STATUS_MS = 3000;
 export const CAST_MAX = 8;
 export const CAST_POOL = '3d6';
+// THE OVERLAY'S FOUR STATES, in the order they are offered: off, then each
+// picture, then both — so the row reads left to right as "less to more" and
+// the first button is always the one that puts the felt back.
+export const OVERLAY_STATES = Object.freeze(['disabled', 'regions', 'framing', 'all']);
 
 const isMap = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const toPath = (p) => (Array.isArray(p) ? p : String(p).split('.'));
@@ -108,7 +121,7 @@ const REASON = {
 
 export function mount({
   host = document.body, tune, dials = null, mode = 'development', film = 'live',
-  cast = null, verbs = {}, onFold = null, onShut = null, info = null,
+  cast = null, bench = null, verbs = {}, onFold = null, onShut = null, info = null,
 } = {}) {
   if (mode === 'production') throw new Error('developer mode is off in production');
   if (!tune || !tune.SHIPPED || typeof tune.set !== 'function') throw new Error('mount needs a Tune');
@@ -121,15 +134,24 @@ export function mount({
   let filmLocked = film === 'locked';
   let filmReason = filmLocked ? REASON.film : '';
   let folded = false;
+  let frozen = false;              // the clock, as of the last repaint — the glyph says so
   let filter = '';
   let active = null;               // the visible section name
   let castApi = null;
+  // THE BENCH (docs/DEVMODE.md §8, phase 2) — the clock, the seeded throw and
+  // the A/B slots. One verbs object, exactly as the cast is, and the panel
+  // holds none of its state either: every readout here is asked of it on the
+  // repaint beat. Absent (null) is a legal panel: the devshell mounts one.
+  let benchApi = bench || null;
   // Reload-class paths a PANEL write found covered by a binder (the tune
   // reported the change without listing it pending). Only consulted when the
   // tune has no `binderFor`; with one, coverage is asked of the tune itself.
   const bound = new Set();
   let pending = [];                // derived on repaint: changed, reload-class, unbound
-  const footer = { viewport: null, dpr: null, fps: null, calls: null };
+  // The footer's last readings. `fps`/`calls`/`tris`/`bodies`/`settle` are the
+  // HUD (DEVMODE §8, phase 2), pushed in by the caller once per animate tick.
+  const footer = { viewport: null, dpr: null, fps: null, calls: null, tris: null, bodies: null, settle: null };
+  const FOOTER_KEYS = ['viewport', 'dpr', 'fps', 'calls', 'tris', 'bodies', 'settle'];
   let statusTimer = null;
   let diffSig = '';
 
@@ -306,7 +328,8 @@ export function mount({
   const head = el('header', { class: 'dev-head' }, [el('span', { class: 'dev-title', text: 'DEV' }), filmBadge, foldBtn]);
 
   const sectionNames = [...tune.sections()];
-  const barNames = () => [...sectionNames, ...(castApi ? ['cast'] : []), 'file'];
+  const barNames = () => [...sectionNames, ...(castApi ? ['cast'] : []),
+    ...(benchApi ? ['clock', 'ab'] : []), 'file'];
   let bar = null;
   const barSlot = el('div', { class: 'dev-barslot' });
   const rebuildBar = () => {
@@ -353,9 +376,16 @@ export function mount({
     if (s === null || s === undefined) return null;
     return typeof s === 'object' ? { place: s.place, name: s.name } : { place: s, name: null };
   };
+  // A cast that cannot say what its overlay is doing starts the row at
+  // `disabled`, which is what the app's own state starts at.
+  const castOverlay = () => {
+    if (!castApi || typeof castApi.overlayState !== 'function') return OVERLAY_STATES[0];
+    const s = String(castApi.overlayState());
+    return OVERLAY_STATES.includes(s) ? s : OVERLAY_STATES[0];
+  };
   const buildCast = () => {
     if (castRec) { castRec.sec.root.remove(); castRec = null; secs.delete('cast'); }
-    if (!castApi) return;
+    if (!castApi) { benchHome(); return; }
     const sec = section('cast', { count: 0, onReset: null, open: true });
     const rec = { sec, rows: [], subs: [], kind: 'cast', name: 'cast', controls: [], sync: null };
     const call = (fn, ...args) => {
@@ -390,27 +420,38 @@ export function mount({
       el('span', { class: 'dev-row-label' }, [el('span', { class: 'dev-row-name', text: 'seat' })]),
       el('div', { class: 'dev-row-ctl dev-seatctl' }, [prev, seatOut, next]),
     ]);
-    // regions enabled|disabled (never on|off: a state is never a boolean word)
-    const regions = rowEnum({
-      label: 'regions', value: 'disabled', options: ['enabled', 'disabled'],
-      onCommit: (v) => call(() => castApi.regions(v)), why: 'cast.regions — draw the landing regions and aim boxes',
+    // THE OVERLAY, one enum of four (never on|off: a state is never a boolean
+    // word, and two switches would have offered four states to answer two
+    // questions). `regions` is the cast's landing marks; `framing` is what the
+    // camera is holding and what the room is doing to it; `all` is both.
+    const overlay = rowEnum({
+      label: 'overlay', value: castOverlay(), options: OVERLAY_STATES,
+      onCommit: (v) => call(() => castApi.overlay(v)),
+      why: 'cast.overlay — disabled | regions (landing marks) | framing (fit hull, discs, cards, lamp, walls) | all',
     });
-    regions.root.dataset.path = 'cast.regions';
+    overlay.root.dataset.path = 'cast.overlay';
+    // Four words do not fit the control column at 320px (css/dev.css says
+    // what was measured); this row alone stacks its control under its label.
+    overlay.root.classList.add('is-stacked');
     const throwOne = button(`throw ${CAST_POOL} from seat`, () => call(() => {
       const cur = castSeat();
       castApi.roll(cur ? cur.place : 0);
     }));
     const throwAll = button('throw from every seat', () => call(() => castApi.rollAll()));
     const verbsRow = (children) => el('div', { class: 'dev-verbs' }, children);
-    sec.body.append(players.root, verbsRow([reshuffle]), seatRow, regions.root, verbsRow([throwOne, throwAll]));
+    sec.body.append(players.root, verbsRow([reshuffle]), seatRow, overlay.root, verbsRow([throwOne, throwAll]));
     rec.controls = [reshuffle, prev, next, throwOne, throwAll];
     rec.rows = [
       { row: players, dotted: 'cast.players', section: 'cast' },
-      { row: regions, dotted: 'cast.regions', section: 'cast' },
+      { row: overlay, dotted: 'cast.overlay', section: 'cast' },
     ];
     rec.sync = () => {
       const n = castCount();
       players.setValue(n);
+      // The overlay's state lives in the app, not in this row: a
+      // `demoRegions('all')` from the console, and Shut's own reset to
+      // `disabled`, must both show here.
+      overlay.setValue(castOverlay());
       const cur = castSeat();
       seatOut.textContent = cur ? (cur.name ? `${cur.place} · ${cur.name}` : `seat ${cur.place}`) : '—';
       const locked = filmLocked;
@@ -422,14 +463,219 @@ export function mount({
       for (const r of rec.rows) { r.row.setState({ locked }); r.row.setLockReason(locked ? filmReason : ''); }
       sec.root.classList.toggle('is-locked', locked);
     };
+    // THE BENCH RIDES THE CAST SECTION (the brief: "in the cast section"),
+    // because a seeded throw is a throw from a chair and the chair is chosen
+    // two rows above it.
+    rec.bench = (benchApi && !(clockRec && clockRec.bench)) ? buildBenchRows(sec.body) : null;
     castRec = rec;
     secs.set('cast', rec);
     body.append(sec.root);
-    // keep file last
+    tailOrder();
+  };
+
+  // ---- the bench: seed, Throw, Replay --------------------------------------
+  //
+  // The seed box is the panel's own state — like the find filter and the paste
+  // box, and unlike every dial — so nothing repaints it out from under a
+  // typist. What the panel DOES write into it is the seed a throw actually
+  // used, so a blank box that drew a fresh number leaves that number on screen
+  // and the next press is a repeat rather than a second stranger.
+  const buildBenchRows = (container) => {
+    const seedBox = el('input', {
+      // The box is one narrow column; a longer placeholder is a truncated one
+      // (measured on the shell at 320px), and the full sentence lives in the
+      // label's tooltip and in the Throw button's.
+      type: 'text', class: 'tin dev-seed', placeholder: 'blank = fresh',
+      spellcheck: 'false', autocomplete: 'off', 'aria-label': 'bench seed',
+    });
+    const seedRow = el('div', { class: 'dev-row is-cast', dataset: { path: 'bench.seed' } }, [
+      el('span', { class: 'dev-row-label', title: 'bench.seed — one number decides the faces AND the film. Blank draws a fresh one and shows it; a word is hashed, so `moss` is a seed you can write down' },
+        [el('span', { class: 'dev-row-name', text: 'seed' })]),
+      el('div', { class: 'dev-row-ctl' }, [seedBox]),
+    ]);
+    const report = (r, verb) => {
+      if (!r) {
+        showStatus(`${verb}: refused${filmLocked ? ` — ${filmReason || REASON.film}` : ''}`, 'warn');
+        return;
+      }
+      seedBox.value = String(r.seed);
+      showStatus(`${verb}: ${r.label || r.notation} · seed ${r.seed}`, 'info');
+      panel.repaint();
+    };
+    const doThrow = () => {
+      let r = null;
+      try { r = benchApi.bench(seedBox.value); } catch (e) { showStatus(`bench: ${e.message}`, 'error'); return; }
+      report(r, 'bench');
+    };
+    const doReplay = () => {
+      let r = null;
+      try { r = benchApi.replay(); } catch (e) { showStatus(`replay: ${e.message}`, 'error'); return; }
+      if (!r && !filmLocked) { showStatus('replay: no film to replay yet', 'warn'); return; }
+      report(r, 'replay');
+    };
+    seedBox.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doThrow(); } });
+    const throwBtn = button(`Throw ${benchApi.pool || CAST_POOL}`, doThrow, { kind: 'primary', title: 'throw that seed down the shipped path — local, never the wire' });
+    const replayBtn = button('Replay', doReplay, { title: 'rethrow the last seed with the dials as they now stand — a bench throw comes back face for face; any other roll comes back as the same film with fresh faces, because only its film seed is knowable here' });
+    const lastOut = el('div', { class: 'dev-clockout' });
+    container.append(subhead('bench'), seedRow, el('div', { class: 'dev-verbs' }, [throwBtn, replayBtn]), lastOut);
+    return {
+      sync() {
+        let last = null;
+        try { last = benchApi.last(); } catch { last = null; }
+        throwBtn.disabled = filmLocked;
+        replayBtn.disabled = filmLocked || !last;
+        // WHAT THE SEED PROMISES, AND FOR WHICH FILM (the C2 review,
+        // 2026-09-02). A bench throw's seed feeds mulberry32 at both ends, so
+        // Replay brings the same faces back with the same poses. A roll the
+        // server drew took its values from the server's rng and only its FILM
+        // seed is knowable here — so `seed N` on that line would otherwise
+        // promise a repeat it cannot make, and a developer flipping A/B after
+        // an ordinary roll would be comparing two pictures whose dice read
+        // different numbers. The second line says so rather than letting the
+        // first imply otherwise.
+        lastOut.textContent = last
+          ? `last: seed ${last.seed} · ${last.frames} frames · settle ${last.settleS}s${last.bench ? ' · bench' : ''}`
+            + (last.bench ? '' : '\nnot a bench throw: replay repeats the film, not the faces')
+          : 'no film thrown yet';
+      },
+    };
+  };
+
+  // ---- the clock -----------------------------------------------------------
+  let clockRec = null;
+  const buildClock = () => {
+    const sec = section('clock', { count: 0, onReset: null, open: true });
+    const freeze = rowEnum({
+      label: 'freeze', value: 'running', options: ['running', 'frozen'],
+      onCommit: (v) => { benchApi.freeze(v); panel.repaint(); },
+      why: 'clock.freeze — hold THIS tab\'s projector. The film is baked and playback is per viewer, so nothing here reaches another table',
+    });
+    freeze.root.dataset.path = 'clock.freeze';
+    const stepBtn = button('step one frame', () => { benchApi.step(); panel.repaint(); },
+      { title: 'advance the projector exactly one baked frame' });
+    const scrub = rowRange({
+      label: 'scrub', value: 0, range: [0, 1, 1],
+      onInput: (v) => benchApi.scrub(v),
+      onCommit: (v) => benchApi.scrub(v),
+      why: 'clock.scrub — move the projector to a baked keyframe. Freeze first, or the running clock walks away from it; a scrubbed passage plays silent, because the impact drain is a one-way cursor',
+    });
+    scrub.root.dataset.path = 'clock.scrub';
+    const out = el('div', { class: 'dev-clockout' });
+    sec.body.append(freeze.root, el('div', { class: 'dev-verbs' }, [stepBtn]), scrub.root, out);
+    const rec = {
+      sec, rows: [], subs: [], kind: 'clock', name: 'clock',
+      sync() {
+        let c = null;
+        try { c = benchApi.clock(); } catch { c = null; }
+        if (!c) return;
+        freeze.setValue(c.state);
+        stepBtn.disabled = c.state !== 'frozen';
+        scrub.root.hidden = !c.live;
+        if (c.live) {
+          scrub.setRange([0, Math.max(1, c.frames - 1), 1]);
+          scrub.setValue(c.frame);
+        }
+        out.textContent = c.live
+          ? `frame ${c.frame} / ${c.frames - 1} · ${c.time.toFixed(2)}s of film`
+          : 'no film running';
+      },
+    };
+    clockRec = rec;
+    secs.set('clock', rec);
+    body.append(sec.root);
+  };
+
+  // ---- A/B -----------------------------------------------------------------
+  let abRec = null;
+  const doHold = (slot) => {
+    const r = benchApi.hold(slot);
+    if (!r) { showStatus(`hold ${slot.toUpperCase()}: refused`, 'warn'); return; }
+    showStatus(`held ${slot.toUpperCase()}: ${(r[slot] || {}).changed || 0} changed`, 'info');
+    panel.repaint();
+  };
+  const doSlot = (slot) => {
+    const r = benchApi.apply(slot);
+    if (!r) { showStatus(`${slot.toUpperCase()}: nothing held there yet`, 'warn'); return; }
+    // A slot put on by hand never replays — the flip is the verb that decides
+    // whether the poses should move, and pressing A twice must not re-throw.
+    showStatus(`${slot.toUpperCase()} is live · ${(r[slot] || {}).changed || 0} changed`, 'info');
+    panel.repaint();
+  };
+  const doFlip = () => {
+    const r = benchApi.flip();
+    if (!r) { showStatus('flip: hold both A and B first', 'warn'); return; }
+    showStatus(`flip → ${String(r.live || '').toUpperCase()}${r.replayed ? ' · replayed the last seed' : ' · poses kept'}`, 'info');
+    panel.repaint();
+  };
+  const buildAb = () => {
+    const sec = section('ab', { count: 0, onReset: null, open: true });
+    const holdA = button('Hold A', () => doHold('a'), { title: 'capture the current changes as slot A' });
+    const holdB = button('Hold B', () => doHold('b'), { title: 'capture the current changes as slot B' });
+    const useA = button('A', () => doSlot('a'), { title: 'put slot A on' });
+    const useB = button('B', () => doSlot('b'), { title: 'put slot B on' });
+    const flipBtn = button('flip · x', () => doFlip(), { kind: 'primary', title: 'swap the live slot; replays the last seed when the two differ on a film value' });
+    const out = el('div', { class: 'dev-about' });
+    sec.body.append(
+      el('div', { class: 'dev-verbs' }, [holdA, holdB]),
+      el('div', { class: 'dev-verbs' }, [useA, useB, flipBtn]),
+      out,
+    );
+    const rec = {
+      sec, rows: [], subs: [], kind: 'ab', name: 'ab',
+      sync() {
+        let a = null;
+        try { a = benchApi.ab(); } catch { a = null; }
+        if (!a) return;
+        useA.disabled = !a.a;
+        useB.disabled = !a.b;
+        flipBtn.disabled = !(a.a && a.b);
+        const slot = (k) => (a[k] ? `${k.toUpperCase()} ${a[k].changed} changed` : `${k.toUpperCase()} —`);
+        const live = a.live ? `live ${a.live.toUpperCase()}` : 'nothing live';
+        const willFlip = (a.a && a.b)
+          ? (a.film ? 'flip replays the last seed (they differ on a film value)' : 'flip keeps the poses (look values only)')
+          : 'hold both slots to flip between them';
+        out.textContent = `${slot('a')} · ${slot('b')} · ${live}\n${willFlip}${a.replayed ? ' · last flip replayed' : ''}`;
+      },
+    };
+    abRec = rec;
+    secs.set('ab', rec);
+    body.append(sec.root);
+  };
+
+  // Clock and A/B sit between the cast and the file, and the file stays last
+  // however often the cast is rebuilt (setCast re-appends its section).
+  const tailOrder = () => {
+    if (clockRec) body.append(clockRec.sec.root);
+    if (abRec) body.append(abRec.sec.root);
     if (fileRec) body.append(fileRec.sec.root);
   };
 
+  // With no cast section to ride — the devshell mounts one such panel, and so
+  // does `setCast(null)` — the bench rows ride the clock's. Once they live
+  // there they stay there, so a cast dealt back in cannot mint a second set.
+  const benchHome = () => {
+    if (benchApi && clockRec && !clockRec.bench) clockRec.bench = buildBenchRows(clockRec.sec.body);
+  };
+
+  const buildBench = () => {
+    if (!benchApi) return;
+    buildClock();
+    buildAb();
+    if (!castApi) benchHome();
+    tailOrder();
+  };
+
   // ---- file ---------------------------------------------------------------
+  //
+  // THE PRIMARY VERB IS WHATEVER THE SERVER ALLOWS (docs/DEVMODE.md §6,
+  // phase 2). On a local server started `DICE_DEV_WRITE=1 node server.js`
+  // the panel's primary verb is **Save**, which patches the checkout's own
+  // dice.yaml; on every other server — which is every deploy — there is no
+  // such route and the primary verb is **Download**, exactly as phase 1 left
+  // it. The panel asks once, on mount, through `verbs.status()`; it never
+  // fetches anything itself (GOALPOST 2, 4: nothing here touches the
+  // network, `location` or `localStorage`).
+  let armed = null;                // { file } once verbs.status() says armed
   let fileRec = null;
   const buildFile = () => {
     const sec = section('file', { count: 0, onReset: null, open: true });
@@ -443,14 +689,23 @@ export function mount({
     const saveBtn = button('Save & reload', () => saveReload(), { kind: 'primary', title: 'reload-class values changed: export, then reload the tab' });
     saveBtn.classList.add('dev-save');
     saveBtn.hidden = true;
+    // Save leads and Download follows it; unarmed, Save is not in the picture
+    // at all and Download is the primary. Keeping Download under Save is the
+    // brief's own rule — the file you can hand to another checkout stays one
+    // click away even where the route works.
+    const saveRouteBtn = button('Save', () => runSaveRoute(), { kind: 'primary', title: 'patch the checkout\'s own dice.yaml' });
+    saveRouteBtn.classList.add('dev-saveroute');
+    saveRouteBtn.hidden = true;
+    const downloadBtn = button('Download', () => runVerb('download'), { kind: 'primary', title: 'download the patched dice.yaml' });
     const verbsA = el('div', { class: 'dev-verbs' }, [
-      button('Download', () => runVerb('download'), { title: 'download the patched dice.yaml' }),
+      saveRouteBtn,
+      downloadBtn,
       button('Copy patch', () => runVerb('copyPatch'), { title: 'copy the changed leaves as a yaml fragment' }),
       button('Reset all', () => resetScope('all'), { kind: 'danger' }),
     ]);
     const verbsB = el('div', { class: 'dev-verbs' }, [previewBtn, applyBtn, saveBtn]);
     sec.body.append(diffSlot, verbsA, subhead('paste patch'), paste, preview, verbsB);
-    fileRec = { sec, rows: [], subs: [], kind: 'file', name: 'file', diffSlot, paste, preview, saveBtn };
+    fileRec = { sec, rows: [], subs: [], kind: 'file', name: 'file', diffSlot, paste, preview, saveBtn, saveRouteBtn, downloadBtn };
     secs.set('file', fileRec);
     body.append(sec.root);
   };
@@ -528,6 +783,59 @@ export function mount({
       else showStatus(`${name}: done`, 'info');
     } catch (e) { showStatus(`${name}: ${e.message}`, 'error'); }
   };
+  // SAVE — the armed write route (DEVMODE §6). The panel hands the caller the
+  // CHANGES, never text: `verbs.save(tune.changes())` does the one fetch this
+  // feature makes, and what comes back is reported here as it arrived. A
+  // refusal's reason is printed VERBATIM and untranslated — the whole value of
+  // a one-word refusal (`loopback`, `origin`, `site`, `type`, `large`) is that
+  // it is the server's own word and not this file's guess at what it meant.
+  const reportSave = (s) => {
+    if (!s) { showStatus('save: refused', 'error'); return; }
+    if (s.ok === false || s.error) {
+      const detail = [s.reason, s.detail, ...(Array.isArray(s.problems) ? s.problems : [])]
+        .filter((x) => x !== undefined && x !== null && x !== '').join(' · ');
+      showStatus(`save refused: ${detail || 'refused'}`, 'error');
+      return;
+    }
+    const n = Array.isArray(s.changes) ? s.changes.length : 0;
+    const held = Array.isArray(s.held) ? s.held.length : 0;
+    const file = s.file || (armed && armed.file) || 'dice.yaml';
+    showStatus(`saved ${n} change${n === 1 ? '' : 's'} to ${file}`
+      + (held ? ` · ${held} light row${held === 1 ? '' : 's'} held by the venue` : '')
+      + ' — reload the tab to boot on them', held ? 'warn' : 'info');
+  };
+  const runSaveRoute = () => {
+    if (!armed) { showStatus('save: no armed write route — Download instead', 'warn'); return; }
+    if (typeof verbs.save !== 'function') { showStatus('save: not wired', 'warn'); return; }
+    let r;
+    try { r = verbs.save(tune.changes()); } catch (e) { showStatus(`save: ${e.message}`, 'error'); return; }
+    Promise.resolve(r).then(reportSave, (e) => showStatus(`save: ${e.message}`, 'error'));
+  };
+  // Asked once, on mount. A server with no route answers "not armed" (a 404
+  // is not an error here, it is the answer), and the panel stays exactly the
+  // panel phase 1 shipped.
+  const askArmed = () => {
+    if (typeof verbs.status !== 'function') return;
+    let r;
+    try { r = verbs.status(); } catch { return; }
+    Promise.resolve(r).then((s) => {
+      if (!s || !s.armed || !fileRec) return;
+      armed = { file: s.file || 'dice.yaml' };
+      fileRec.saveRouteBtn.hidden = false;
+      fileRec.saveRouteBtn.title = `patch ${armed.file} in the checkout`;
+      fileRec.downloadBtn.classList.remove('dev-btn-primary');
+      fileRec.downloadBtn.classList.add('dev-btn-plain');
+      // ONE PRIMARY VERB (the C1 review, 2026-09-02). Armed, `Save & reload`
+      // is amber beside `Save`, and two amber buttons whose labels differ by
+      // two words read as two primaries. Save leads; the reload verb is the
+      // same act with a reload after it, so it follows in plain dress — and
+      // its title stops promising an export, because armed it takes the route.
+      fileRec.saveBtn.classList.remove('dev-btn-primary');
+      fileRec.saveBtn.classList.add('dev-btn-plain');
+      fileRec.saveBtn.title = `reload-class values changed: save ${armed.file}, then reload the tab`;
+    }, () => { /* not armed, and that is an answer */ });
+  };
+
   const saveReload = () => {
     if (typeof verbs.saveReload === 'function') { runVerb('saveReload'); return; }
     // With no download verb either, runVerb's "not wired" warning stands;
@@ -538,13 +846,16 @@ export function mount({
   };
 
   buildFile();
+  askArmed();
 
   // ---- footer -------------------------------------------------------------
   const footViewport = el('span', { class: 'dev-foot-viewport' });
   const footPerf = el('span', { class: 'dev-foot-perf' });
+  const footHud = el('span', { class: 'dev-foot-hud' });
   const footCounts = el('span', { class: 'dev-foot-counts' });
   const foot = el('footer', { class: 'dev-foot' }, [
     el('div', { class: 'dev-foot-line' }, [footViewport, footPerf]),
+    el('div', { class: 'dev-foot-line' }, [footHud]),
     el('div', { class: 'dev-foot-line' }, [footCounts]),
     el('div', { class: 'dev-verbs' }, [
       button('Copy', () => runVerb('copyPatch'), { title: 'copy the patch' }),
@@ -565,6 +876,16 @@ export function mount({
   // the other listeners on this same node, so the order is immaterial.
   root.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { e.preventDefault(); panel.fold(true); if (onFold) onFold(true); }
+    // THE FLIP KEY (the brief: `x`, only while the panel is open and focused
+    // inside it). It is a PANEL key and never an app key — stopKeys below
+    // stops the walk to the document, so `x` here can never reach the felt's
+    // handlers and `x` on the felt can never reach this. Not while a field has
+    // focus: the seed box and the paste box are places `x` is a letter.
+    if (!benchApi || e.key !== 'x' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    const tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    e.preventDefault();
+    doFlip();
   });
   stopKeys(root);
 
@@ -594,6 +915,9 @@ export function mount({
     }
   };
 
+  // Big counts read better abbreviated: 42100 triangles is a shape, 42.1k is a
+  // number you can hold beside another one.
+  const brief = (n) => (n >= 100000 ? `${Math.round(n / 1000)}k` : n >= 10000 ? `${(n / 1000).toFixed(1)}k` : String(n));
   const paintFooter = () => {
     const changed = [...rows.values()].filter((e) => e.row.root.classList.contains('is-changed')).length;
     const vp = footer.viewport || null;
@@ -602,8 +926,23 @@ export function mount({
     if (footer.fps !== null && footer.fps !== undefined) perf.push(`${Math.round(footer.fps)} fps`);
     if (footer.calls !== null && footer.calls !== undefined) perf.push(`${footer.calls} calls`);
     footPerf.textContent = perf.join(' · ');
+    // THE HUD LINE (DEVMODE §8): what the frame costs and what the last film
+    // took. Each part appears only once the caller has pushed it, so a panel
+    // mounted without a bench keeps the footer phase 1 shipped.
+    const hud = [];
+    if (footer.tris !== null && footer.tris !== undefined) hud.push(`${brief(footer.tris)} tris`);
+    if (footer.bodies !== null && footer.bodies !== undefined) hud.push(`${footer.bodies} bodies`);
+    if (footer.settle !== null && footer.settle !== undefined) hud.push(`settle ${footer.settle}s`);
+    footHud.textContent = hud.join(' · ');
     footCounts.textContent = `${changed} changed · ${pending.length} reload`;
-    glyph.textContent = changed ? `DEV · ${changed} changed` : 'DEV';
+    // THE FOLDED GLYPH CARRIES THE FREEZE (the brief: fold keeps the frozen
+    // clock, Shut clears it). A table folded away and not moving must never be
+    // mistaken for a table that broke, so the one word the corner has room for
+    // is the one that explains it.
+    const marks = [];
+    if (changed) marks.push(`${changed} changed`);
+    if (frozen) marks.push('frozen');
+    glyph.textContent = marks.length ? `DEV · ${marks.join(' · ')}` : 'DEV';
     fileRec.saveBtn.hidden = pending.length === 0;
   };
 
@@ -631,6 +970,16 @@ export function mount({
       for (const p of [...bound]) if (!changed.has(p)) bound.delete(p);
       const declared = info && isMap(info.declared) ? info.declared : null;
       const venue = info && info.venue ? String(info.venue) : '';
+      // THE BADGE IS PER ROW, NOT PER SECTION (the C1 review, 2026-09-02).
+      // A glade holds the lamp, the room levels and the fog; it holds nothing
+      // in `light.motes.*`, `light.tower.*`, `light.life.*` or
+      // `light.breath.*` — those reset to the file and Save writes them like
+      // any other row, so a `venue` badge on them told a developer their
+      // change was somebody else's. `venueLight` is the one list of what is
+      // held; a caller that names a venue without one is the defensive case
+      // resetScope already holds the whole section for, and it is badged the
+      // same way.
+      const venueHeld = venue && isMap(info.venueLight) ? info.venueLight : null;
       const counts = new Map();
       for (const entry of rows.values()) {
         let v;
@@ -644,7 +993,10 @@ export function mount({
           : (declared ? !leafIn(declared, entry.path).has : false);
         const locked = entry.cls === 'film' && filmLocked;
         entry.row.setState({
-          changed: isChanged, isDefault, locked, venue: !!venue && entry.section === 'light',
+          changed: isChanged,
+          isDefault,
+          locked,
+          venue: !!venue && entry.section === 'light' && (!venueHeld || entry.dotted in venueHeld),
         });
         entry.row.setLockReason(locked ? filmReason : '');
       }
@@ -659,6 +1011,18 @@ export function mount({
         fileRec.sec.setCount(changed.size);
       }
       if (castRec && castRec.sync) castRec.sync();
+      if (castRec && castRec.bench) castRec.bench.sync();
+      if (clockRec) {
+        clockRec.sync();
+        if (clockRec.bench) clockRec.bench.sync();
+      }
+      if (abRec) abRec.sync();
+      // Asked of the bench rather than remembered: `holdClock(true)` from the
+      // console freezes the same clock this section drives, and the glyph must
+      // say `frozen` for that too.
+      if (benchApi) {
+        try { frozen = benchApi.clock().state === 'frozen'; } catch { frozen = false; }
+      }
       filmBadge.hidden = !filmLocked;
       filmBadge.title = filmReason;
       paintFooter();
@@ -683,7 +1047,7 @@ export function mount({
       panel.repaint();
     },
     setFooter(patch = {}) {
-      for (const k of ['viewport', 'dpr', 'fps', 'calls']) if (k in patch) footer[k] = patch[k];
+      for (const k of FOOTER_KEYS) if (k in patch) footer[k] = patch[k];
       paintFooter();
     },
     unmount() {
@@ -707,6 +1071,7 @@ export function mount({
 
   castApi = cast || null;
   buildCast();
+  buildBench();
   rebuildBar();
   showSections();
   host.append(root, glyph);

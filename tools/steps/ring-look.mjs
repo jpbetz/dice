@@ -33,9 +33,11 @@ export default async function run(stage,
   await stage.ctx.browser.send('Emulation.setDeviceMetricsOverride',
     { width: Number(w), height: Number(h), deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
   await t.eval('window.dispatchEvent(new Event("resize"))');
-  // The overlay starts DISABLED (the panel's regions row and the door agree);
-  // this step's measurement is pool-against-spot, so it is switched on here.
-  await t.dbg("demoRegions('enabled')");
+  // The overlay starts DISABLED (the panel's overlay row and the door agree);
+  // this step's measurement is pool-against-spot, so the REGIONS layer is
+  // switched on here — not `all`, which would put the framing hull over the
+  // very spots this step is looking at.
+  await t.dbg("demoRegions('regions')");
   const shot = async (name) => {
     await new Promise((r) => setTimeout(r, 400));
     await stage.shot(t, `${outDir}/${name}.png`);

@@ -33,7 +33,10 @@ import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
 // stands, AIM_ZERO for the shared frozen zero every unstamped roll aims through.
 import { laneSpread, aimFor, regionFor, AIM_ZERO, seatAnchor, wrapPi,
   entryFor, seatTrig, seatValid, seatStamp, seatToss, tossAim, ringRadius,
-  SPOT_R, PLACARD_STANDOFF, PLACARD_D, PLACARD_W, PLACE_AIM, SEAT_TOSS } from './places.js';
+  SPOT_R, PLACARD_STANDOFF, PLACARD_D, PLACARD_W, PLACE_AIM, SEAT_TOSS,
+  // …and the card's own ground box, which the framing overlay draws rather
+  // than re-deriving (the same OBB placardGap separates two cards with).
+  placardFootprint } from './places.js';
 // THE CAST (js/demo.js — read its header for the law): a dev instrument for
 // looking at a full table in ONE TAB, a section of DEVELOPER MODE since
 // 2026-09-02 (docs/DEVMODE.md). Every line of it in this file is behind
@@ -194,6 +197,15 @@ tune.bind('table.seats.*', seatTossSync);
 const devState = { panel: 'shut', film: 'live' };
 const devOn = () => devState.panel !== 'shut';
 let devPanel = null;       // the mounted js/devmode.js panel while the door is open
+
+// THE HUD'S FRAME RING (docs/DEVMODE.md §8, phase 2) lives HERE, beside the
+// state it belongs to, rather than 14k lines down with the rest of the bench:
+// animate() is called during module evaluation, and a `const` declared below
+// it would be in its temporal dead zone on the very first frame. Sixty samples
+// of the rAF delta, filled only while the panel is open and unfolded, so a
+// tab that never pressed the key never even records a number.
+const DEV_FPS_N = 60;
+const devFps = { dt: new Float64Array(DEV_FPS_N), n: 0, at: 0 };
 
 // ONE IIFE for both, because the mint can fail and the failure has to be able
 // to choose the lobby: mintRoomKey throws rather than fall back to Math.random
@@ -2004,7 +2016,11 @@ const MOTE_SEED = 0x5eed0a1e;
 // motes' cone follows the lamp's, always (applyMood's own rule); the room
 // and the fog are lights only, so a drag on those costs four intensities and
 // one Fog, never a 200-point rebuild.
-tune.bind('light.lamp.*', () => applyMood());
+// …and the framing overlay draws the lamp's own cone where it lands on the
+// felt, so a lamp dial re-derives it (docs/DEVMODE.md §8). `demoOverlaySync`
+// is a hoisted declaration 25k lines down and refuses on every tab without
+// the door, so this costs a `devState.panel` read on the tabs that have none.
+tune.bind('light.lamp.*', () => { applyMood(); demoOverlaySync(); });
 tune.bind('light.motes.*', () => applyMood());
 tune.bind('light.room.*', () => applyMoodLights());
 tune.bind('light.fog.*', () => applyMoodLights());
@@ -7853,6 +7869,14 @@ function playRoll(roll, rethrow = null) {
     done: false,
   };
 
+  // DEVELOPER MODE'S BENCH REMEMBERS THE LAST FILM (docs/DEVMODE.md §8, phase
+  // 2), off the roll that was just baked rather than off the request that
+  // asked for it: Replay must be able to rethrow a roll the SERVER drew, and
+  // the seed of one of those is only knowable here. Recorded behind `devOn()`
+  // only — a tab that never opened the door remembers nothing, which is the
+  // standard `dev-door-shut` holds every other piece of this to.
+  if (devOn()) devNoteFilm(currentRoll, types);
+
   // The room breathes in. Ducking at the START of the roll and recovering at
   // the last settle means the recovery does the narrative work: the room
   // coming back is the clearest signal the app has that a throw is over.
@@ -7946,16 +7970,39 @@ function rollDice(types, label, opts = {}) {
   // SOLO IS A TABLE FOR ONE (2026-09-01): with no roster the film tosses as
   // seat 0 of 1 — onto the spot in front of the one player — which is lawful
   // because solo has no second viewer to disagree with.
+  // THE BENCH THROWS FROM THE VIEWER'S OWN CHAIR, AND STILL LOCALLY (developer
+  // mode phase 2, docs/DEVMODE.md §8 "seeded bench"). A cast chair is a row in
+  // `demoRows`; the viewer's own is not, and a seeded throw from it must not
+  // reach the server — its whole point is that the same seed bakes the same
+  // film twice under two sets of dials, which a server-drawn seed cannot
+  // promise. So when `demoPlace` names a place that is REAL rather than cast,
+  // the stamp is made here from the same seatStamp the server would call, over
+  // the same occupied places; seatStamp answers null for a place nobody holds,
+  // and the solo fallback below stands in that case exactly as it always did.
+  const ownPlace = !seat && devOn() && Number.isInteger(opts.demoPlace)
+    ? seatStamp(placeRoster().map((r) => r.place), opts.demoPlace, towerOn()) : null;
   const stamp = seat
     ? seatStamp(placeRoster().map((r) => r.place), seat.place, towerOn())
-    : ((devOn() && demoRows.length) || !SOLO_TOSS ? null : { seat: 0, seats: 1, arc: towerOn() ? 1 : 0 });
-  const arriving = stamp ? { playerId: seat ? seat.id : null, place: seat ? seat.place : null, ...stamp } : null;
+    : (ownPlace
+      || ((devOn() && demoRows.length) || !SOLO_TOSS ? null : { seat: 0, seats: 1, arc: towerOn() ? 1 : 0 }));
+  const stampedPlace = seat ? seat.place : (ownPlace ? opts.demoPlace : null);
+  const arriving = stamp ? { playerId: seat ? seat.id : null, place: stampedPlace, ...stamp } : null;
   // §7.7 arrival beat, mirrored locally: the new roll's execution collects
   // everything this session still has on the felt (evictions sink first) —
   // or, for a stamped cast throw, only its OWN chair's rolls and the
   // placeless ones, which is the server's rule.
-  soloAutoCollect(seat ? arriving : null);   // solo keeps its own sweep (everything)
-  const composed = composeRoll(types, opts.mods || null, Math.random);
+  soloAutoCollect(stampedPlace !== null ? arriving : null);   // solo keeps its own sweep (everything)
+  // THE BENCH'S SEED DRAWS THE VALUES TOO, AND DRAWS THEM THROUGH composeRoll
+  // (GOALPOST 2; DEVMODE §10, "no rigged values"). `opts.seed` is set by
+  // nothing but developer mode's bench, and what it buys is that ONE number
+  // decides the whole throw: the faces come out of `mulberry32(seed ^ k)` fed
+  // to the shipped composer — never from a chosen face, and nothing here can
+  // name one — and the film comes out of `mulberry32(seed)` in playRoll. Two
+  // streams of one seed, so the same seed under two sets of dials is the same
+  // dice landing differently, which is the whole instrument. Unseeded, this is
+  // `Math.random` and the line below is the line it always was.
+  const rollRng = Number.isInteger(opts.seed) ? mulberry32(((opts.seed >>> 0) ^ 0x5bf03635) >>> 0) : Math.random;
+  const composed = composeRoll(types, opts.mods || null, rollRng);
   const spec = { dice: [...types], mods: opts.mods || null };
   if (opts.sources) spec.sources = [...opts.sources]; // 2b-⑤ attribution
   // Reroll provenance (B3), the same substantiation the server does,
@@ -7988,10 +8035,12 @@ function rollDice(types, label, opts = {}) {
     // `sets` sent beside a bag. One key, in its original slot: a duplicate key
     // in an object literal is legal JS that silently keeps the last one.
     sets: spec.mods && spec.mods.bag
-      ? drawBag(spec.mods.bag, spec.dice.length, Math.random)
+      ? drawBag(spec.mods.bag, spec.dice.length, rollRng)
       : (Array.isArray(opts.sets) && opts.sets.some(Boolean)
         ? opts.sets.map((s2) => s2 || null) : null),
-    seed: randomSeed(),
+    // …and the FILM's seed is the bench's own number, so a replay under new
+    // dials is the same throw and not merely a similar one.
+    seed: Number.isInteger(opts.seed) ? (opts.seed >>> 0) : randomSeed(),
     label: label || formula(types),
     // MECHANICS M2: solo authors its own budget, exactly as executeRoll does
     // online — the first throw is a throw, so `used` starts at 1. Absent on
@@ -8017,6 +8066,13 @@ function rollDice(types, label, opts = {}) {
     // region — through the SHIPPED playRoll, not through a demo of it.
     ...(seat ? { playerId: seat.id, playerName: seat.name, color: seat.color } : {}),
     ...(stamp ? { seat: stamp.seat, seats: stamp.seats, arc: stamp.arc } : {}),
+    // THE BENCH'S OWN STRING, present-or-absent like every optional field
+    // above. A solo payload has never carried a notation and this does not
+    // start: it rides ONLY a bench throw, whose entire purpose is to be
+    // repeatable, so Replay gets back `3d6 dc12 # bench` rather than a `3d6`
+    // that lost both its dc and its name. An ordinary solo roll's payload is
+    // byte for byte the one `place-seeds-unchanged` pins.
+    ...(opts.bench === true && typeof opts.notation === 'string' ? { notation: opts.notation } : {}),
   });
 }
 
@@ -11939,7 +11995,17 @@ function animate() {
   // and unfolded (docs/DEVMODE.md §7 — "the panel holds no state"), so a
   // console moodTune() and a slider write converge without either wrapping
   // the other. A string compare per leaf; nothing while the door is shut.
-  if (devPanel && devState.panel === 'open') devPanel.repaint();
+  //
+  // …AND THE HUD IS READ ON THE SAME BEAT (phase 2). The fps ring samples the
+  // rAF delta — the WALL clock, deliberately, because fps is a question about
+  // the machine and not about the film, so a held clock reads the frame rate
+  // of a tab that is drawing a frozen picture rather than zero. Everything
+  // else in the readout is a live count off three.js and cannon.
+  if (devPanel && devState.panel === 'open') {
+    devFpsSample(dt);
+    devPanel.repaint();
+    devPanel.setFooter(devHud());
+  }
 }
 animate();
 
@@ -17150,6 +17216,28 @@ window.__diceDebug = {
   devClose(_opts) { return devClose(_opts); },
   devFold(on) { return devFold(on); },
   devDeal(n) { return devOn() ? demoDealPlayers(n) : null; },
+  // THE BENCH (DEVMODE §8, phase 2). Four readouts that answer on any tab —
+  // `devHud()` (fps, calls, tris, bodies, the last film's settle seconds),
+  // `devClockInfo()`, `devBenchInfo()`, `devAbInfo()` — and the instruments,
+  // every one of which answers null on a tab whose door is shut, so P7's
+  // zero-arg sweep runs them all and changes nothing:
+  //   devClock('running'|'frozen'), devStep() one film frame, devScrub(frame)
+  //   a pose preview, devBench(seed, notation?) a seeded LOCAL throw,
+  //   devReplay() the last seed under the current dials, devHold('a'|'b'),
+  //   devSlot('a'|'b') to apply one, devFlip() to swap and (only when the two
+  //   slots differ on a film path) replay.
+  devHud() { return devHud(); },
+  devClockInfo() { return devClockInfo(); },
+  devClock(state) { return devClock(state); },
+  devStep() { return devStep(); },
+  devScrub(frame) { return devScrub(frame); },
+  devBench(seed, notation) { return devBench(seed, notation); },
+  devBenchInfo() { return devBenchInfo(); },
+  devReplay() { return devReplay(); },
+  devHold(slot) { return devHold(slot); },
+  devSlot(slot) { return devSlotApply(slot); },
+  devFlip() { return devFlip(); },
+  devAbInfo() { return devAbInfo(); },
   // THE CAST (js/demo.js), as this tab stands it. A REPORT, and the FIRST
   // thing every `dev`-tagged scenario reads — because the claim that matters
   // most about this feature is the negative one, and `on: false` on a tab
@@ -17185,10 +17273,16 @@ window.__diceDebug = {
   demoRollAll(notation) {
     return demoRollEveryone(notation);
   },
-  // THE REGION OVERLAY: 'enabled' | 'disabled' (a boolean is accepted too;
-  // no argument re-derives). null with the door shut.
+  // THE OVERLAY: 'disabled' | 'regions' | 'framing' | 'all' (no argument
+  // re-derives; `true`/`false` are the first door's booleans and still mean
+  // regions/disabled). null with the door shut, and null for a word that is
+  // not a state — a typo must not quietly turn the picture off.
+  //
+  // Still named `demoRegions` because it is the cast's own row and every step
+  // and scenario that drives it says so; the STATE it takes grew, the door
+  // did not move.
   demoRegions(state) {
-    return demoOverlayApply(state === undefined ? undefined : (state === 'enabled' || state === true));
+    return demoOverlayApply(state);
   },
   // SIT AT CHAIR k. Sticky, unlike simulatePlaceView below: it writes the
   // dial, so a places flush restores this chair rather than handing the eye
@@ -25621,7 +25715,14 @@ function rewriteZoomPresets(scale) {
   }
 }
 rewriteZoomPresets(TABLE_SCALE);
-tune.bind('table.scale', () => { rewriteZoomPresets(T.table.scale); queueZoom(currentZoom); });
+tune.bind('table.scale', () => {
+  rewriteZoomPresets(T.table.scale);
+  queueZoom(currentZoom);
+  // The overlay draws the WALLS and the hull, and a queued zoom may wait for a
+  // quiet table — so it is re-derived here against the mat as it stands, and
+  // again at the flush applyZoom takes when the zoom finally lands.
+  demoOverlaySync();
+});
 
 // pendingZoom is declared at module top with ZOOM_LEVELS (TDZ — see there).
 let currentZoom = DEFAULT_ZOOM;
@@ -26092,6 +26193,10 @@ async function devOpen(_opts) {
   devFilmSync();
   devPanel = mod.mount({
     tune, dials: DIALS, mode: T.app.mode, film: devState.film, cast: devCastApi(),
+    // THE BENCH (phase 2): the clock, the seeded throw and the A/B slots. One
+    // object of verbs, exactly as the cast is — the panel draws the sections
+    // and holds none of their state.
+    bench: devBenchApi(),
     verbs: {
       // The ONE writer to disk, reused (ROADMAP §5): the patched declaration,
       // named for the file it is — `node tools/dice-apply.mjs ~/Downloads/dice.yaml`
@@ -26099,7 +26204,23 @@ async function devOpen(_opts) {
       download: () => portableDownload(tune.exportYaml(), 'dice.yaml'),
       copyPatch: () => navigator.clipboard.writeText(tune.patchText()),
       pastePatch: (text) => tune.applyPatchText(text, { filmLocked: devState.film === 'locked' }),
-      saveReload: () => { portableDownload(tune.exportYaml(), 'dice.yaml'); location.reload(); },
+      // SAVE (DEVMODE §6, phase 2). These two are the only `fetch` developer
+      // mode makes, and they reach a DEV-ONLY route on this same origin that
+      // exists only under `DICE_DEV_WRITE=1` — never a deploy, never `net.*`,
+      // never a room. Nothing about a dial reaches another viewer.
+      status: devWriteStatus,
+      save: devWriteSave,
+      saveReload: async () => {
+        if (devWriteArmed) {
+          const r = await devWriteSave();
+          if (!r || !r.ok) throw new Error(`save refused: ${(r && r.reason) || 'refused'}`);
+          location.reload();
+          return r;
+        }
+        portableDownload(tune.exportYaml(), 'dice.yaml');
+        location.reload();
+        return null;
+      },
     },
     onFold: (on) => { devState.panel = on ? 'folded' : 'open'; },
     onShut: () => devClose(),
@@ -26121,6 +26242,93 @@ async function devOpen(_opts) {
   window.addEventListener('resize', devResize);
   devResize();
   return devInfoValue();
+}
+
+// ---- Save: the armed write route ------------------------------------------
+//
+// WHY THIS EXISTS (Joe, 2026-09-02: "possible for me to actually overwrite a
+// file in the repo with that file"). Phase 1's loop was Download → run
+// `tools/dice-apply.mjs` → reload. With the local server started
+// `DICE_DEV_WRITE=1 node server.js`, Save closes it: the panel's primary verb
+// patches this checkout's own dice.yaml and `git diff` is the review.
+//
+// THESE TWO FUNCTIONS ARE THE ONLY `fetch` DEVELOPER MODE MAKES, and the
+// route they reach is a dev-only route on this same origin, mounted only when
+// the server was armed by hand (server.js's DEV_WRITE_ON block says what it
+// refuses and why). Nothing here goes through `js/net.js`, touches a room, or
+// says anything to another viewer: a dial is this tab's, and Save is this
+// checkout's (GOALPOST 2; DEVMODE §10, "Nothing on the wire").
+//
+// WHAT IS POSTED IS `tune.changes()` — dotted path → scalar — never text. The
+// server reads its own file and patches its own spans, so no byte this tab
+// chose can land in the checkout.
+const DEV_WRITE_STATUS_URL = '/api/dev/status';
+const DEV_WRITE_URL = '/api/dev/write';
+let devWriteArmed = false;   // what the last status() answered; drives Save & reload
+
+// Armed, or not — and "not" is the ordinary answer, not a failure: an
+// unarmed server has no such route, so its 404 (or a fetch that cannot even
+// be made) means Download stays the primary verb and nothing is logged.
+async function devWriteStatus() {
+  try {
+    const res = await fetch(DEV_WRITE_STATUS_URL, { credentials: 'same-origin', cache: 'no-store' });
+    if (!res.ok) { devWriteArmed = false; return { armed: false }; }
+    const body = await res.json();
+    devWriteArmed = !!(body && body.armed);
+    return devWriteArmed ? { armed: true, file: (body && body.file) || 'dice.yaml' } : { armed: false };
+  } catch {
+    devWriteArmed = false;
+    return { armed: false };
+  }
+}
+
+// THE VENUE'S LIGHT IS NOT THIS TAB'S TO SAVE (DEVMODE §5; the phase-3 item
+// "venue light as a layer" is where it becomes one). While a venue holds the
+// light, `MOOD.tune` carries the glade's moon and `tuneDiff()` shows it as a
+// change — so a Save taken at moonrise would write the venue's sky into the
+// table's lamp, and the file would be wrong for every tab that never entered
+// the venue. The rows the venue HOLDS are dropped, and the panel says how many
+// were held; every other row — light or not — saves normally.
+//
+// BY NAME, NOT BY PREFIX (found by the C1 review, 2026-09-02). The first cut
+// dropped every `light.*` leaf, which is a wider hold than any venue takes:
+// nothing in a glade holds `light.motes.*`, `light.tower.*`, `light.life.*` or
+// `light.breath.*`, so turning the motes off under the moon lost the change on
+// Save and the status line named the wrong cause. `venueLightPatch()` is the
+// one list of what a venue holds — the same list Shut and a light reset land
+// on — so the drop and the sentence now say the same thing.
+async function devWriteSave(changes) {
+  const patch = { ...(changes || tune.changes()) };
+  const held = [];
+  const venue = venueLightPatch();
+  if (venue) {
+    for (const p of Object.keys(venue)) if (p in patch) { held.push(p); delete patch[p]; }
+  }
+  let res;
+  try {
+    res = await fetch(DEV_WRITE_URL, {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file: 'dice.yaml', changes: patch }),
+    });
+  } catch (err) {
+    return { ok: false, reason: 'unreachable', detail: err && err.message, held };
+  }
+  let body = null;
+  try { body = await res.json(); } catch { /* a refusal with no body */ }
+  if (!res.ok || !body || body.ok !== true) {
+    return {
+      ok: false,
+      reason: (body && body.reason) || `http ${res.status}`,
+      detail: body && body.detail,
+      problems: body && body.problems,
+      held,
+    };
+  }
+  devWriteArmed = true;
+  return { ...body, held };
 }
 
 // FOLD: hidden entirely, every value held, one corner glyph reading
@@ -26160,10 +26368,14 @@ function devClose(_opts) {
   // run again, so the scene follows).
   const held = venueLightPatch();
   if (held) tune.set(held);
-  demoShowRegions = false;
+  demoOverlayState = 'disabled';
   demoSeat = null;
   demoDealPlayers(0);
   demoOverlayDispose();
+  // …and the bench with it: the freeze released (if the panel is what froze
+  // it), the fps ring emptied, the remembered film forgotten, both A/B slots
+  // dropped. Fold keeps every one of these; Shut is the door that undoes them.
+  devBenchClear();
   // THE RIG THE CAST BUILT goes with the cast: a placard rig allocates its
   // material and textures the first time a card stands and keeps them when
   // the cards go (a real table's comings and goings never pay twice), so a
@@ -26207,7 +26419,7 @@ function devFilmSync() {
   if (devState.film === 'locked' && was !== 'locked') {
     for (const d of tune.diff()) if (d.cls === 'film') tune.reset(d.path);
     if (devOn()) {
-      demoShowRegions = false;
+      demoOverlayState = 'disabled';
       demoSeat = null;
       demoDealPlayers(0);
       demoOverlayDispose();
@@ -26248,7 +26460,11 @@ function devCastApi() {
     sit: (k) => demoSitAt(k),
     sitStep: (d) => demoSeatStep(d),
     reshuffle: () => demoDealPlayers(demoRows.length),
-    regions: (state) => demoOverlayApply(state === 'enabled' || state === true),
+    // ONE ENUM, FOUR STATES (docs/DEVMODE.md §8): `disabled | regions |
+    // framing | all`. The panel's row reads `overlayState()` back so a hook
+    // call from the console and the row agree without the row owning the state.
+    overlay: (state) => demoOverlayApply(state),
+    overlayState: () => demoOverlayState,
     roll: (k) => demoRollFrom(k),
     rollAll: () => demoRollEveryone(),
   };
@@ -26256,6 +26472,499 @@ function devCastApi() {
 
 function devPanelSync() {
   if (devPanel) devPanel.repaint();
+}
+
+// ---- the bench: HUD, clock, seeded throws, A/B ----------------------------
+//
+// WHAT THIS IS FOR (docs/DEVMODE.md §8, phase 2). A dial you can turn is only
+// half an instrument: the other half is being able to turn it and see the SAME
+// throw again. Everything in this region exists so that a change to a film
+// value can be JUDGED — one seed, two sets of dials, two films, and the eye
+// deciding which is better against a picture that differs in nothing else.
+// (What a replay reproduces exactly is the FILM. The faces come back with it
+// only for a bench throw, whose seed drew them; devReplay says why at length.)
+//
+// THE FOUR PIECES:
+//   · the HUD — fps, draw calls, triangles, physics bodies and the last film's
+//     settle time, read live off three.js and cannon and pushed into the
+//     panel's footer once per animate tick while the door is open;
+//   · the CLOCK — freeze, step one film frame, scrub the baked keyframes. It
+//     is a LOOK-class instrument: the film is baked and playback is per viewer
+//     (GOALPOST 7), so freezing this tab cannot desync a shared table and it
+//     is deliberately NOT gated on the film lock. Shut releases it; fold keeps
+//     it, and the corner glyph says `DEV · frozen` so a frozen table folded
+//     away can never be mistaken for a broken one;
+//   · the BENCH — a seeded throw down the shipped path (requestRoll →
+//     rollDice → composeRoll → playRoll), labelled `bench` the way any
+//     `# comment` labels a row, and LOCAL: the server draws its own seed, so a
+//     bench throw that reached it would be a bench that lied about its seed;
+//   · A/B — two held patches, a key that flips between them, and a replay of
+//     the last seed when (and only when) the two differ on a FILM path, so a
+//     look comparison keeps the poses it was judging.
+//
+// Nothing here reaches `net.*`, the URL or storage (GOALPOST 2, 4).
+
+// ---- the HUD ---------------------------------------------------------------
+
+// One sample per rAF frame, sixty deep, ring-buffered. `dt` is the clamped
+// wall delta animate() already computed, so this costs one store per frame and
+// only while the panel is open and unfolded.
+function devFpsSample(dt) {
+  if (!(dt > 0)) return;               // the first frame, and a resumed tab
+  devFps.dt[devFps.at] = dt;
+  devFps.at = (devFps.at + 1) % DEV_FPS_N;
+  if (devFps.n < DEV_FPS_N) devFps.n++;
+}
+
+function devFpsClear() {
+  devFps.dt.fill(0);
+  devFps.n = 0;
+  devFps.at = 0;
+}
+
+// THE READOUT. Zero-arg and it never throws on any tab (P7's sweep calls it on
+// an ordinary one): every number here is a plain property read, and the ring
+// answers null rather than a division by zero before it has a sample.
+//
+// `calls` and `tris` come from renderer.info, which main.js keeps on manual
+// reset (one reset per FRAME, not per pass) precisely so a number read after
+// the frame is the whole frame's cost — see the renderAudit hook, which reads
+// the same counters and is the falsifiable version of this line.
+function devHud() {
+  const r = renderer.info.render;
+  let fps = null;
+  if (devFps.n) {
+    let sum = 0;
+    for (let i = 0; i < devFps.n; i++) sum += devFps.dt[i];
+    fps = sum > 0 ? Math.round((devFps.n / sum) * 10) / 10 : null;
+  }
+  return {
+    fps,
+    calls: r.calls,
+    tris: Math.round(r.triangles),
+    bodies: world.bodies.length,
+    // FILM seconds from the throw to the last die stopping — the baked
+    // duration, not a stopwatch on the projector, so a tempo dial cannot move
+    // it and two tabs at one seed read the same number.
+    settle: devLastFilm ? devLastFilm.settleS : null,
+    frames: devLastFilm ? devLastFilm.frames : null,
+    seed: devLastFilm ? devLastFilm.seed : null,
+  };
+}
+
+// ---- the clock -------------------------------------------------------------
+
+// Whether the DEV panel is the thing holding the clock. `__diceDebug.holdClock`
+// is the scenarios' own freeze and predates this by months, so Shut releases
+// only a freeze the panel itself asked for: a scenario that parked the world
+// and then opened and shut the door gets its world back parked.
+let devFroze = false;
+
+const DEV_CLOCK_STATES = Object.freeze(['running', 'frozen']);
+
+// running | frozen. Refused (null) for anything else and on a shut door;
+// NOT gated on the film lock — see the region header.
+function devClock(state) {
+  if (!devOn() || devProduction()) return null;
+  if (state !== undefined) {
+    if (!DEV_CLOCK_STATES.includes(state)) return null;
+    clockHeld = state === 'frozen';
+    devFroze = clockHeld;
+    devPanelSync();
+  }
+  return devClockInfo();
+}
+
+// ONE FILM FRAME, AND ONLY WHILE THE PROJECTOR IS PARKED. `tick(FIXED_DT, …)`
+// is the same call animate() makes, at the baked frame's own length and off
+// the tempo curve (realtime false), so the step advances the projector by
+// exactly one keyframe whatever `pace.tempo` is set to — which is what makes
+// "step advances exactly one keyframe" a claim a scenario can hold.
+//
+// REFUSED WHILE THE CLOCK RUNS (found by the C2 review, 2026-09-02). The
+// panel's button has been disabled unless the clock is frozen since the day it
+// was drawn, and the hook did not agree: on a running tab it ran a whole extra
+// tick — a render pass, stepSinking, stepResting, stepCamera and the zoom
+// flush with it — and left the film one frame ahead of where the clock said it
+// was. That is the opposite of what an instrument for looking at ONE frame is
+// for, so the hook now refuses the way every other refused mutator does, and
+// the rule is the one the button already showed: freeze first.
+function devStep() {
+  if (!devOn() || devProduction() || !clockHeld) return null;
+  tick(FIXED_DT, true, false);
+  devPanelSync();
+  return devClockInfo();
+}
+
+// SCRUB — the projector moved to a frame of the baked reel. It writes
+// `roll.time`, because anything less is not a scrub: posing the meshes alone
+// was tried and the very next tick painted over it, held clock and all
+// (stepPlayback re-poses from roll.time even on a dt of zero — measured
+// 2026-09-02, the first cut of dev-clock).
+//
+// WHAT IT DOES NOT DO IS RE-FIRE THE ROLL. The impact drain — clicks, bursts,
+// felt marks, the shock ring — is a ONE-WAY CURSOR by construction, and a
+// scrub that re-stamped the landing of a throw you are staring at would be a
+// picture of something that never happened. So scrubbing forward walks the
+// cursor past the events it skipped WITHOUT voicing them, and scrubbing
+// backward leaves it ahead, which is why a rewound passage plays silent. The
+// dice are the claim here; the sound of them is not.
+//
+// The meshes are posed here as well as by the next tick, so a hook that reads
+// the felt straight after a scrub reads the frame it asked for.
+function devScrub(frame) {
+  if (!devOn() || devProduction()) return null;
+  const roll = currentRoll;
+  if (!roll || roll.done || !roll.keyframes || !roll.keyframes.length) return null;
+  const n = Number(frame);
+  if (!Number.isFinite(n)) return null;
+  const f = Math.max(0, Math.min(roll.frames - 1, Math.round(n)));
+  const at = Math.min(f * FIXED_DT, roll.duration);
+  if (at > roll.time) {
+    while (roll.soundIdx < roll.sounds.length && roll.sounds[roll.soundIdx].time <= at) roll.soundIdx++;
+  }
+  roll.time = at;
+  for (let di = 0; di < roll.dice.length; di++) {
+    const kf = roll.keyframes[di];
+    const d = roll.dice[di];
+    if (!kf || !kf[f]) continue;
+    d.mesh.position.copy(kf[f].pos);
+    d.mesh.quaternion.copy(kf[f].quat).multiply(d.correction);
+  }
+  devPanelSync();
+  return { ...devClockInfo(), scrub: f };
+}
+
+// The clock's own report. Zero-arg, answers on any tab, and `live` is what the
+// panel hides the scrub row on: there is nothing to scrub through when no film
+// is running.
+function devClockInfo() {
+  const roll = currentRoll;
+  const live = !!(roll && !roll.done && roll.frames > 0);
+  return {
+    state: clockHeld ? 'frozen' : 'running',
+    live,
+    frame: live ? Math.min(roll.frames - 1, Math.max(0, Math.round(roll.time * 60))) : 0,
+    frames: live ? roll.frames : 0,
+    time: live ? Math.round(roll.time * 1000) / 1000 : 0,
+  };
+}
+
+// ---- the seeded bench ------------------------------------------------------
+
+const DEV_BENCH_LABEL = 'bench';
+// The last film this tab played, whoever drew it — the bench's own throw, a
+// cast chair's, or the server's answer to the viewer's ROLL button. Replay
+// rethrows THIS seed, which is what "replay the last throw under the new
+// dials" has to mean at a table where not every throw was the bench's.
+let devLastFilm = null;
+
+function devNoteFilm(roll, types) {
+  const dice = roll.spec && Array.isArray(roll.spec.dice) && roll.spec.dice.length ? roll.spec.dice : types;
+  const mods = (roll.spec && roll.spec.mods) || null;
+  const dc = Number.isInteger(roll.dc) ? roll.dc : null;
+  const label = typeof roll.label === 'string' ? roll.label : '';
+  // WHAT REPLAY WILL TYPE BACK IN — BUILT FROM THE SPEC (rewritten after the
+  // C2 review, 2026-09-02, which measured what the first cut actually did).
+  //
+  // The line that stood here claimed "a server roll carries the notation it
+  // was asked for", and that is simply false: server.js RE-PARSES the notation
+  // it is sent and stores the spec and the label, never echoing the text back,
+  // and rollDice attaches `notation` to nothing but a bench throw. So no
+  // ordinary roll ever reached playRoll with a string, the label was the only
+  // path every roll took, and a label is the bare COMMENT whenever a roll
+  // carried one — which is how `4d6kh3 # attack` came back as `4d6 # attack`
+  // and a replay of `2d20kh1 # adv` was thrown as one plain d20 with the
+  // advantage silently gone.
+  //
+  // THE SPEC IS THE ROLL. `canonicalNotation` is a fixed point of
+  // parseNotation, so rendering the pool, the mods and the dc back out and
+  // reading them in again is byte-identical — the whole roll survives by
+  // construction, and the label is asked ONE question: is it this roll's own
+  // canonical, or a name somebody wrote after a `#`? Nothing else about it
+  // can rewrite the throw. (Visibility and the moment do not ride a replay:
+  // the bench throws open, and re-hiding a `held` roll a developer is staring
+  // at would be a picture of something nobody asked for.)
+  const canon = canonicalNotation({ dice, mods }, { dc });
+  const comment = label && label !== canon ? label : null;
+  devLastFilm = {
+    seed: roll.seed >>> 0,
+    dice: [...dice],
+    // The mods and the dc as EVIDENCE, not as a second plan: `text` is what
+    // Replay throws, and these are what a scenario reads to prove the text
+    // carries them (dev-bench). Copied, because the spec outlives this record.
+    mods: mods ? JSON.parse(JSON.stringify(mods)) : null,
+    dc,
+    text: canonicalNotation({ dice, mods }, { dc, comment }),
+    label: label || null,
+    bench: label === DEV_BENCH_LABEL,
+    // The baked film's own length, rounded to the millisecond for a readout.
+    settleS: Math.round(roll.duration * 1000) / 1000,
+    frames: roll.frames,
+  };
+}
+
+// A SEED IS A NUMBER, and a person types words. An empty box draws a fresh
+// one (so Throw always throws), a number is that number, and anything else is
+// hashed — FNV-1a over the code units — so `moss` is a seed you can write down
+// and come back to. Never a face, never a value: what the seed feeds is
+// mulberry32, at both ends (rollDice).
+function devSeedOf(seed) {
+  if (seed === undefined || seed === null || seed === '') return randomSeed();
+  if (typeof seed === 'number') return Number.isFinite(seed) ? (seed >>> 0) : null;
+  const s = String(seed).trim();
+  if (!s) return randomSeed();
+  if (/^-?\d+$/.test(s)) return (Number(s) >>> 0);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+// THE THROW. `notation` defaults to the reference pool the whole overlay is
+// drawn for; the `# bench` comment is appended when the caller did not write a
+// comment of their own, and it becomes the log row's label by exactly the path
+// a typed `3d6 # tavern` takes — parseNotation's `comment`, handed to
+// requestRoll as the label. Refused (null) while the film is locked: a second
+// viewer is here and a seeded film is a film they did not agree to.
+function devBench(seed, notation) {
+  if (!devOn() || devProduction() || devState.film === 'locked') return null;
+  const s = devSeedOf(seed);
+  if (s === null) return null;
+  const asked = typeof notation === 'string' && notation.trim() ? notation.trim() : DEMO_POOL;
+  return devThrowSeeded(s, asked.includes('#') ? asked : `${asked} # ${DEV_BENCH_LABEL}`);
+}
+
+// REPLAY — the last seed, whatever drew it, with the dials as they now stand.
+//
+// WHAT COMES BACK DEPENDS ON WHO DREW THE ROLL (named after the C2 review,
+// 2026-09-02, which measured it: seed 1089386929 replayed to byte-identical
+// positions and different faces). A BENCH throw is one number at both ends —
+// `mulberry32(seed)` bakes the film and `mulberry32(seed ^ k)` feeds
+// composeRoll — so replaying it is the same dice showing the same faces under
+// the new dials. Any other roll drew its values from the server's rng (or
+// Math.random) and only its FILM seed was recorded here, so a replay of it is
+// the same throw with fresh faces: right for judging a film dial, which is
+// what the instrument is for, and wrong for reading a total. The panel's
+// last-film line says which kind the last one was, and
+// `devBenchInfo().last.bench` is the falsifiable version of that sentence.
+function devReplay() {
+  if (!devOn() || devProduction() || devState.film === 'locked') return null;
+  if (!devLastFilm) return null;
+  return devThrowSeeded(devLastFilm.seed, devLastFilm.text);
+}
+
+function devThrowSeeded(seed, text) {
+  const res = parseNotation(text);
+  if (!res.ok) return null;
+  // THE CHAIR THE VIEWER IS SITTING IN — a cast chair when one is dealt and
+  // sat in, else their own. Either way the throw is LOCAL (requestRoll's
+  // bench clause), and either way it is stamped: a cast chair by demoRows, an
+  // own chair by rollDice's `ownPlace` branch.
+  const place = demoSeatValue();
+  requestRoll(res.spec.dice, res.comment || res.canonical, {
+    notation: res.canonical,
+    mods: res.spec.mods || undefined,
+    // THE DC RIDES THE THROW, not only the string (found by the C2 review,
+    // 2026-09-02). `3d6 dc12 # bench` parsed its target and then dropped it
+    // on the floor: the roll was thrown with `dc: null` and the log row's
+    // verdict went with it, while the notation string beside it still said
+    // dc12. rollDice has always taken `opts.dc`; nothing was handing it one.
+    ...(Number.isInteger(res.dc) ? { dc: res.dc } : {}),
+    ...(Number.isInteger(place) ? { demoPlace: place } : {}),
+    bench: true,
+    seed,
+  });
+  devPanelSync();
+  return {
+    seed,
+    place: Number.isInteger(place) ? place : null,
+    notation: res.canonical,
+    dc: Number.isInteger(res.dc) ? res.dc : null,
+    label: res.comment || res.canonical,
+    via: 'local',
+  };
+}
+
+// The bench's own report — the seed box's current answer and what the last
+// film was. Zero-arg; answers on any tab.
+function devBenchInfo() {
+  return {
+    last: devLastFilm ? { ...devLastFilm, dice: [...devLastFilm.dice] } : null,
+    locked: devState.film === 'locked',
+  };
+}
+
+// ---- A/B -------------------------------------------------------------------
+//
+// Two held patches and one key. Hold A and Hold B capture `tune.changes()` —
+// the diff against the declaration, which is exactly what Save would write —
+// and A / B put one of them on. The put is `reset('all')` then `set(patch)`
+// rather than a diff of the two, because a slot means "the table looked like
+// THIS" and a leaf one slot moved and the other did not must come back to
+// shipped, not stay where the other slot left it.
+//
+// THE FLIP REPLAYS ONLY WHEN IT HAS TO. If the two patches differ on any
+// film-class path the poses are part of what you are comparing, so the last
+// seed is rethrown and the two films are the same dice under two rulesets. If
+// they differ only on look paths the felt must NOT move: the whole value of a
+// lamp comparison is that the dice stayed exactly where they were.
+const devSlots = { a: null, b: null };
+let devSlotLive = null;
+let devFlipReplayed = false;
+
+const devSlotKey = (slot) => {
+  const k = String(slot === undefined || slot === null ? '' : slot).trim().toLowerCase();
+  return k === 'a' || k === 'b' ? k : null;
+};
+
+// WHAT A SLOT MAY HOLD — the changed leaves MINUS whatever light a venue is
+// holding.
+//
+// THE SKY IS NOT A SLOT (found by the C2 review, 2026-09-02). Under a venue
+// `tune.changes()` names the nine rows the glade HOLDS — the venue
+// Object.assigns MOOD.tune, so tuneDiff reads them as leaves somebody turned —
+// and Hold captured them as the developer's own: the panel read "A 9 changed"
+// for nine dials nobody had touched, and putting that slot on back at the
+// table wrote the glade's moon (lamp y 22) onto the table's own lamp while the
+// status line called it live. Save drops these rows for the same reason
+// (devWriteSave) and devApplySlot re-applies the venue's light after its reset
+// for the same reason again; Hold is the third place in this region that has
+// to agree about what a venue holds, and now does.
+//
+// ONE FUNCTION, TWO CALLERS, so the hold and the "is this slot still live?"
+// measurement judge the tree on the same terms: a slot that dropped the sky
+// compared against a diff that kept it would read as "nothing live" the moment
+// a venue stood.
+function devSlotPatch() {
+  const patch = { ...tune.changes() };
+  const venue = venueLightPatch();
+  if (venue) for (const p of Object.keys(venue)) delete patch[p];
+  return patch;
+}
+
+function devHold(slot) {
+  if (!devOn() || devProduction()) return null;
+  const k = devSlotKey(slot);
+  if (!k) return null;
+  devSlots[k] = devSlotPatch();
+  // Holding the slot the table is already wearing makes it the live one; the
+  // other slot is now the thing you have not seen.
+  devSlotLive = k;
+  devFlipReplayed = false;
+  devPanelSync();
+  return devAbInfo();
+}
+
+// Put a held slot on. Null for an empty slot — there is nothing to apply, and
+// silently applying "nothing" would read as Reset all with another label.
+function devSlotApply(slot) {
+  if (!devOn() || devProduction()) return null;
+  const k = devSlotKey(slot);
+  if (!k || !devSlots[k]) return null;
+  devApplySlot(k);
+  devFlipReplayed = false;
+  return devAbInfo();
+}
+
+function devApplySlot(k) {
+  tune.reset('all');
+  // …except the light a venue holds, exactly as Shut restores it: a reset
+  // under the glade must land on the glade's moon and not on the table's lamp
+  // (venueLightPatch; devClose says why at length).
+  const held = venueLightPatch();
+  if (held) tune.set(held);
+  const patch = devSlots[k];
+  if (patch && Object.keys(patch).length) tune.set(patch, { filmLocked: devState.film === 'locked' });
+  devSlotLive = k;
+  devPanelSync();
+}
+
+// Do the two held patches disagree about a FILM leaf? Every path either slot
+// names, compared by value — a leaf one slot moved and the other left at
+// shipped counts, because that is a difference in the film too.
+function devSlotsDifferOnFilm() {
+  if (!devSlots.a || !devSlots.b) return false;
+  const paths = new Set([...Object.keys(devSlots.a), ...Object.keys(devSlots.b)]);
+  for (const p of paths) {
+    const av = devSlots.a[p];
+    const bv = devSlots.b[p];
+    if (av === bv) continue;
+    const dial = tune.dialAt(p);
+    if (dial && dial.cls === 'film') return true;
+  }
+  return false;
+}
+
+function devFlip() {
+  if (!devOn() || devProduction()) return null;
+  if (!devSlots.a || !devSlots.b) return null;
+  const next = devSlotLive === 'a' ? 'b' : 'a';
+  const film = devSlotsDifferOnFilm();
+  devApplySlot(next);
+  devFlipReplayed = film ? !!devReplay() : false;
+  devPanelSync();
+  return devAbInfo();
+}
+
+// Zero-arg; answers on any tab. `film` is what the panel's status line uses to
+// say whether the next flip will replay, before it does.
+//
+// `live` IS A MEASUREMENT, NOT A MEMORY: the slot last put on, but only while
+// the table is still wearing it. Drag one slider after a flip and the table is
+// neither A nor B any more, and a status line still claiming "live B" would be
+// the panel's one remaining piece of state telling a story about the tree.
+function devAbInfo() {
+  const shape = (k) => (devSlots[k] ? { changed: Object.keys(devSlots[k]).length } : null);
+  let live = null;
+  if (devSlotLive && devSlots[devSlotLive]) {
+    const now = devSlotPatch();
+    const want = devSlots[devSlotLive];
+    const keys = new Set([...Object.keys(now), ...Object.keys(want)]);
+    live = [...keys].every((p) => now[p] === want[p]) ? devSlotLive : null;
+  }
+  return {
+    a: shape('a'),
+    b: shape('b'),
+    live,
+    film: devSlotsDifferOnFilm(),
+    replayed: devFlipReplayed,
+  };
+}
+
+// Everything the bench holds, put back the way a never-opened tab holds it.
+// Called by Shut and by nothing else (fold keeps the freeze — DEVMODE §8).
+function devBenchClear() {
+  if (devFroze) clockHeld = false;
+  devFroze = false;
+  devFpsClear();
+  devLastFilm = null;
+  devSlots.a = null;
+  devSlots.b = null;
+  devSlotLive = null;
+  devFlipReplayed = false;
+}
+
+// What the panel's clock, bench and A/B sections drive — the same verbs the
+// hooks expose, and nothing the hooks do not.
+function devBenchApi() {
+  return {
+    hud: () => devHud(),
+    clock: () => devClockInfo(),
+    freeze: (state) => devClock(state),
+    step: () => devStep(),
+    scrub: (frame) => devScrub(frame),
+    bench: (seed, notation) => devBench(seed, notation),
+    replay: () => devReplay(),
+    last: () => devBenchInfo().last,
+    hold: (slot) => devHold(slot),
+    apply: (slot) => devSlotApply(slot),
+    flip: () => devFlip(),
+    ab: () => devAbInfo(),
+    pool: DEMO_POOL,
+  };
 }
 
 // ---- the cast -------------------------------------------------------------
@@ -26371,7 +27080,10 @@ function demoInfoValue() {
     n: demoRows.length,
     seat: demoSeatValue(),
     home: devHomePlace(),
-    regions: demoShowRegions,
+    // Kept as the boolean it always was — "are the cast's region marks up" —
+    // now that the overlay has four states; `overlay.state` below is the whole
+    // answer.
+    regions: demoDrawsRegions(),
     players: demoRows.map((r) => ({ place: r.place, name: r.name, color: r.color, id: r.id })),
     overlay: demoOverlayInfo(),
   };
@@ -26412,6 +27124,39 @@ function demoInfoValue() {
 // flush the cards ride (placardRebuild / placardRelay), so a zoom, a tower
 // socket and a turn of the dial all re-derive it against the mat as it now
 // stands rather than against the mat it was built for.
+//
+// AND SINCE 2026-09-02 IT IS TWO PICTURES, NOT ONE (docs/DEVMODE.md §8, the
+// framing overlay). `disabled | regions | framing | all` — one enum on one row,
+// because "regions on, framing off" and "framing on, regions off" are the two
+// questions actually asked and a pair of switches would have offered four
+// states to answer two of them. What FRAMING draws is the layer the REGIONS
+// layer has no way to show: not where a die may land, but what the CAMERA is
+// obliged to keep in shot and what the room is doing to it —
+//
+//   · the FIT HULL — framingPoints()' own point set, each point ticked, the
+//     convex loop round them closed, and a cross at `pts.centre`, which is the
+//     point framingFor aims the eye at. When a frame is too far back, this is
+//     the picture of why: some point nobody thought about is in the set.
+//   · the FRAME DISC per seat — `ringRadius(TABLE_W) * FRAME_SPOT`, the disc
+//     the frame keeps round every landing spot. Bigger than the toss spot the
+//     regions layer draws, and deliberately: the spot is where dice are AIMED,
+//     the disc is where they are allowed to roll and still be framed.
+//   · the PLACARD FOOTPRINTS — js/places.js `placardFootprint(anchor)`, the
+//     same OBB `placardGap` separates cards with, so a card standing in the
+//     felt's way is visible rather than inferred from a gap number.
+//   · the LAMP'S CONE where it meets the felt — taken from `MOOD.lamp`'s own
+//     position, target and angle (not from the dials: the breath narrows the
+//     angle and the viewer's orbit swings the position, and the picture must
+//     show the lamp that is lighting the table, not the one the file asked
+//     for). Null, drawn as nothing, for a cone that never reaches the felt.
+//   · the FOUR WALLS as lines at the felt, read off the physics bodies
+//     (`walls.*.position`), so a socketed tower's shifted back wall reads as
+//     the shifted wall it is.
+//
+// Every one of those is a function the film itself calls. The layer costs five
+// draw calls (one LineSegments per kind), zero bodies, and nothing at all when
+// the state is `disabled` — the same standard as the regions layer: off is no
+// geometry rather than `visible = false`.
 const DEMO_OVERLAY_Y = 0.05;   // clear of the fae venue's own ground (0.02) and its clearing detail (0.035)
 const DEMO_FILL_ALPHA = 0.11;
 const DEMO_LINE_ALPHA = 0.8;
@@ -26425,8 +27170,44 @@ const DEMO_TICK_CAP = 0.45;    // the end caps that make the spawn line read as 
 const DEMO_POOL = '3d6';
 const DEMO_POOL_TYPES = Object.freeze(['d6', 'd6', 'd6']);
 
-let demoShowRegions = false;   // the panel's regions row starts `disabled`; the two must agree
-let demoOverlay = null;     // { group, rows } — rebuilt wholesale, never patched
+// The framing layer's own dress. Five hues, one per kind, because five
+// overlapping loops in one colour is a picture of nothing. Looked at over a
+// full table with `all` up (tools/out/framing-look): the two loops that
+// coincide by construction — the frame DISC and the eight hull TICKS that
+// sample it — are deliberately the two most different of the five, so the
+// disc reads as a circle with points ON it rather than as one fat line; and
+// the cast's own station hues are saturated, so these five are pale and the
+// two layers do not fight when both are up.
+const DEMO_FRAME_Y = DEMO_OVERLAY_Y + 0.002;   // between the fills and the region lines (+0.004)
+const DEMO_FRAME_TICK = 0.18;                  // the ring drawn round each hull point
+const DEMO_FRAME_CROSS = 0.5;                  // the arms of the cross at the hull's centre
+const DEMO_FRAME_INK = Object.freeze({
+  hull:  { color: '#ffd08a', opacity: 0.85 },  // what the camera must keep
+  spot:  { color: '#7fd4ff', opacity: 0.7 },   // where dice may roll and stay framed
+  card:  { color: '#c9a0ff', opacity: 0.75 },  // where a card stands
+  lamp:  { color: '#fff2b0', opacity: 0.55 },  // where the light lands
+  wall:  { color: '#ff8f6a', opacity: 0.65 },  // where the physics stops
+});
+const DEMO_LAMP_SEGS = 96;
+
+// THE OVERLAY'S ONE STATE, and the panel's row is the same enum (js/devmode.js
+// `cast.overlay`). Never a boolean pair: `regions` and `framing` are two
+// pictures of one table and asking for both is `all`.
+const DEMO_OVERLAY_STATES = Object.freeze(['disabled', 'regions', 'framing', 'all']);
+let demoOverlayState = 'disabled';   // the panel's overlay row starts `disabled`; the two must agree
+let demoOverlay = null;     // { group, rows, framing } — rebuilt wholesale, never patched
+const demoDrawsRegions = () => demoOverlayState === 'regions' || demoOverlayState === 'all';
+const demoDrawsFraming = () => demoOverlayState === 'framing' || demoOverlayState === 'all';
+// WHAT THE OLD DOOR SAID. Phase 1 shipped one layer under one two-state row,
+// so `enabled`/`disabled` and `true`/`false` are what every step and scenario
+// written before today asks for; `enabled` is the regions layer, which is all
+// there was. Null for anything else — see demoOverlayApply.
+function demoOverlayWord(state) {
+  if (state === true || state === 'enabled') return 'regions';
+  if (state === false) return 'disabled';
+  const s = String(state);
+  return DEMO_OVERLAY_STATES.includes(s) ? s : null;
+}
 let demoDigits = null;      // ONE 8-cell atlas of station numerals, built once
 
 // The numerals, as one texture. Eight materials share it (each tinted to its
@@ -26508,12 +27289,25 @@ function demoOverlayDispose() {
 function demoOverlaySync() {
   if (!devOn()) return;
   demoOverlayDispose();
-  if (!demoShowRegions) return;
+  if (demoOverlayState === 'disabled') return;
   const rows = placeRows();
-  if (!rows.length) return;
-  const towerUp = towerOn();
   const group = new THREE.Group();
-  group.name = 'demoRegions';
+  group.name = 'demoOverlay';
+  // The framing layer stands with NO ROSTER (a lone tab still has walls, a
+  // lamp and a hull round its own spot), so it is built before the regions
+  // layer's `rows.length` gate rather than under it.
+  const framing = demoDrawsFraming() ? demoFramingBuild(group, rows) : null;
+  const out = demoDrawsRegions() && rows.length ? demoRegionsBuild(group, rows) : [];
+  if (!group.children.length) return;
+  scene.add(group);
+  demoOverlay = { group, rows: out, framing };
+}
+
+// THE REGIONS LAYER — the cast's own picture, unchanged since it shipped:
+// one ring for the table's edge, then four marks per occupied station in that
+// station's hue. Returns the rows the `demoInfo().overlay.stations` hook
+// hands a scenario to compare against js/places.js's own answers.
+function demoRegionsBuild(group, rows) {
   const atlas = demoDigitAtlas();
 
   // THE TABLE'S OWN EDGE FIRST: the ring the cards stand on, in a neutral
@@ -26595,16 +27389,194 @@ function demoOverlaySync() {
       spawn: { x: toss.x, z: toss.z, tx: toss.tx, tz: toss.tz },
     });
   }
-  scene.add(group);
-  demoOverlay = { group, rows: out };
+  return out;
+}
+
+// ---- the framing layer ----------------------------------------------------
+//
+// One LineSegments per kind, so five draw calls however many chairs stand and
+// a scenario counting objects is counting KINDS rather than seats. Every
+// number below comes back out through `demoInfo().overlay.framing`, which is
+// what makes "drawn from the film's own functions" a claim a test can fail:
+// `hull` is framingPoints()' set in its own order, `cards` are
+// js/places.js placardFootprint's own corners, `walls` are the physics
+// bodies' own positions.
+function demoFramingLines(group, segs, ink) {
+  if (!segs.length) return null;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3));
+  const obj = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
+    color: ink.color, transparent: true, opacity: ink.opacity,
+    depthWrite: false, fog: false,
+  }));
+  obj.renderOrder = 9;
+  group.add(obj);
+  return obj;
+}
+
+// A closed loop through a list of [x, z], as segments at height y.
+function demoLoopSegs(out, loop, y) {
+  for (let i = 0; i < loop.length; i++) {
+    const a = loop[i];
+    const b = loop[(i + 1) % loop.length];
+    out.push(a[0], y, a[1], b[0], y, b[1]);
+  }
+}
+
+// THE CONVEX LOOP round the fit's point set (monotone chain). The HULL is a
+// drawing decision, not a claim: what the fit actually reads is every point,
+// and every point is ticked. The loop is here because a scatter of 70 ticks
+// does not read as "this is what the camera is holding" and the boundary does.
+function demoHullLoop(pts) {
+  const p = pts.map((q) => [q.p.x, q.p.z]).sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+  if (p.length < 3) return p;
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = (src) => {
+    const h = [];
+    for (const q of src) {
+      while (h.length >= 2 && cross(h[h.length - 2], h[h.length - 1], q) <= 0) h.pop();
+      h.push(q);
+    }
+    h.pop();
+    return h;
+  };
+  return half(p).concat(half(p.slice().reverse()));
+}
+
+// WHERE THE LAMP'S CONE MEETS THE FELT. The apex, the axis and the half-angle
+// are read off the SpotLight itself (MOOD.lamp — breath-narrowed, orbit-swung),
+// and each of 96 rays round the cone is intersected with the felt plane. Null
+// when any ray misses it: a cone open to the horizon has no footprint, and
+// drawing the rays that do land would be a picture of a pool that is not there.
+function demoLampFootprint() {
+  const lamp = MOOD.lamp;
+  if (!lamp) return null;
+  const P = lamp.position;
+  const tgt = MOOD.lampTarget ? MOOD.lampTarget.position : null;
+  const d = new THREE.Vector3(tgt ? tgt.x - P.x : -P.x, tgt ? tgt.y - P.y : -P.y, tgt ? tgt.z - P.z : -P.z);
+  if (d.lengthSq() < 1e-9) return null;
+  d.normalize();
+  // Any unit vector not parallel to the axis gives the basis across it.
+  const u = new THREE.Vector3(Math.abs(d.y) > 0.9 ? 1 : 0, Math.abs(d.y) > 0.9 ? 0 : 1, 0);
+  u.crossVectors(u, d).normalize();
+  const v = new THREE.Vector3().crossVectors(d, u).normalize();
+  const ca = Math.cos(lamp.angle);
+  const sa = Math.sin(lamp.angle);
+  const r = new THREE.Vector3();
+  const ring = [];
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (let i = 0; i < DEMO_LAMP_SEGS; i++) {
+    const f = (2 * Math.PI * i) / DEMO_LAMP_SEGS;
+    r.copy(d).multiplyScalar(ca).addScaledVector(u, sa * Math.cos(f)).addScaledVector(v, sa * Math.sin(f));
+    if (r.y > -1e-6) return null;             // this ray never comes down
+    const t = (DEMO_FRAME_Y - P.y) / r.y;
+    if (!(t > 0)) return null;                // …or the felt is behind the lamp
+    const x = P.x + r.x * t;
+    const z = P.z + r.z * t;
+    ring.push([x, z]);
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+    z0 = Math.min(z0, z); z1 = Math.max(z1, z);
+  }
+  return {
+    ring,
+    at: [P.x, P.y, P.z],
+    angle: lamp.angle,
+    n: ring.length,
+    bounds: { x0, x1, z0, z1 },
+  };
+}
+
+function demoFramingBuild(group, rows) {
+  const y = DEMO_FRAME_Y;
+
+  // THE HULL — framingPoints()' own set, ticked and closed.
+  const pts = framingPoints();
+  const hullSegs = [];
+  for (const q of pts) demoCircleSegs(hullSegs, q.p.x, q.p.z, DEMO_FRAME_TICK, y, 10);
+  const loop = demoHullLoop(pts);
+  demoLoopSegs(hullSegs, loop, y);
+  const centre = pts.centre || null;
+  if (centre) {
+    const a = DEMO_FRAME_CROSS;
+    hullSegs.push(centre.x - a, y, centre.z, centre.x + a, y, centre.z,
+      centre.x, y, centre.z - a, centre.x, y, centre.z + a);
+  }
+  demoFramingLines(group, hullSegs, DEMO_FRAME_INK.hull);
+
+  // THE FRAME DISCS — one per seat, at FRAME_SPOT of the table's radius. With
+  // no roster the film tosses as seat 0 of 1, and framingPoints says so; this
+  // says the same thing rather than a second version of it.
+  const discR = ringRadius(TABLE_W) * FRAME_SPOT;
+  const seats = rows.length ? rows : [{ seat: 0, seats: 1, arc: towerOn() ? 1 : 0, place: null }];
+  const spotSegs = [];
+  const spots = [];
+  for (const r of seats) {
+    const toss = seatToss(r.seat, r.seats, r.arc, TABLE_W);
+    if (!toss) continue;
+    demoCircleSegs(spotSegs, toss.ax, toss.az, discR, y, 64);
+    spots.push({ place: r.place, seat: r.seat, x: toss.ax, z: toss.az, r: discR });
+  }
+  demoFramingLines(group, spotSegs, DEMO_FRAME_INK.spot);
+
+  // THE CARDS' FOOTPRINTS — js/places.js's OBB, the one placardGap separates.
+  const cardSegs = [];
+  const cards = [];
+  for (const r of rows) {
+    const fp = placardFootprint(r.anchor);
+    if (!fp) continue;
+    const corners = [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([sw, sd]) => [
+      fp.x + fp.ax.x * fp.hw * sw + fp.az.x * fp.hd * sd,
+      fp.z + fp.ax.z * fp.hw * sw + fp.az.z * fp.hd * sd,
+    ]);
+    demoLoopSegs(cardSegs, corners, y);
+    cards.push({ place: r.place, x: fp.x, z: fp.z, azim: fp.azim, corners });
+  }
+  demoFramingLines(group, cardSegs, DEMO_FRAME_INK.card);
+
+  // THE LAMP POOL.
+  const lamp = demoLampFootprint();
+  if (lamp) {
+    const segs = [];
+    demoLoopSegs(segs, lamp.ring, y);
+    demoFramingLines(group, segs, DEMO_FRAME_INK.lamp);
+  }
+
+  // THE WALLS, read off the bodies — a socketed tower has moved one of them.
+  const wall = {
+    x0: walls.left.position.x, x1: walls.right.position.x,
+    z0: walls.back.position.z, z1: walls.front.position.z,
+  };
+  const wallSegs = [];
+  demoRectSegs(wallSegs, wall.x0, wall.x1, wall.z0, wall.z1, y);
+  demoFramingLines(group, wallSegs, DEMO_FRAME_INK.wall);
+
+  return {
+    y,
+    hull: pts.map((q) => [q.p.x, q.p.z]),
+    hullLoop: loop,
+    centre: centre ? [centre.x, centre.z] : null,
+    spots,
+    cards,
+    lamp: lamp ? { at: lamp.at, angle: lamp.angle, n: lamp.n, bounds: lamp.bounds } : null,
+    walls: wall,
+  };
 }
 
 // The toggle. A rebuild rather than a `visible` flip, so "off" really is no
 // geometry, no material and no object in the scene — the same standard the
-// door itself is held to. Off is also the state Shut and the film lock leave it in.
-function demoOverlayApply(on) {
+// door itself is held to. Off is also the state Shut and the film lock leave
+// it in. `state` is one of DEMO_OVERLAY_STATES; the two booleans the first
+// door took (`true` was the regions layer, which was all there was) are still
+// accepted so `demoRegions(true)` in an old step means what it meant. A word
+// that is not a state changes nothing and answers null — a typo that silently
+// turned the overlay off would be a worse instrument than one that refuses.
+function demoOverlayApply(state) {
   if (!devOn()) return null;
-  if (on !== undefined) demoShowRegions = !!on;
+  if (state !== undefined) {
+    const want = demoOverlayWord(state);
+    if (want === null) return null;
+    demoOverlayState = want;
+  }
   demoOverlaySync();
   devPanelSync();
   return demoOverlayInfo();
@@ -26617,9 +27589,10 @@ function demoOverlayApply(on) {
 // directly, and reads `spawn.lane` and asserts it equal to the `laneWorld` a
 // real throw from that seat recorded in throwOrigin.
 function demoOverlayInfo() {
-  if (!devOn()) return { on: false, objects: 0, bodies: 0, y: 0, pool: null, stations: [] };
+  if (!devOn()) return { on: false, state: 'disabled', objects: 0, bodies: 0, y: 0, pool: null, stations: [], framing: null };
   return {
-    on: demoShowRegions && !!demoOverlay,
+    on: demoOverlayState !== 'disabled' && !!demoOverlay,
+    state: demoOverlayState,
     objects: demoOverlay ? demoOverlay.group.children.length : 0,
     // Stated rather than implied: the overlay adds no physics. Read from the
     // world, not from a promise in a comment.
@@ -26627,6 +27600,9 @@ function demoOverlayInfo() {
     y: DEMO_OVERLAY_Y,
     pool: DEMO_POOL,
     stations: demoOverlay ? demoOverlay.rows : [],
+    // The framing layer's own numbers (null unless it is drawn): every one of
+    // them is what a film function answered, for the scenario to compare.
+    framing: demoOverlay ? demoOverlay.framing : null,
   };
 }
 
@@ -29292,7 +30268,7 @@ function decidingOnScreen() {
 // read sites (no leaf is a boolean). setFraming still takes `{preferDice}`
 // and translates, so frame-look / frame-small keep their lines.
 const FRAMING = alias(T.camera.framing, { prefer: 'prefer', floor: 'floor', gain: 'gain' });
-tune.bind('camera.framing.*', () => applyCameraFraming(false));
+tune.bind('camera.framing.*', () => { applyCameraFraming(false); demoOverlaySync(); });
 
 // HOW GOOD IS THE FRAME THE CAMERA IS IN RIGHT NOW — dice kept, and how big a
 // world unit lands in CSS px. Read from the LIVE camera, never from what a
@@ -32143,7 +33119,12 @@ function requestRoll(types, label, opts = {}) {
   // for the server to stamp, and the film it bakes is this tab's own. It is
   // also not this player's history. The viewer's OWN rolls at the same table
   // keep going through the server exactly as they always have.
-  if (devOn() && Number.isInteger(opts.demoPlace)) {
+  // A SEEDED BENCH THROW IS LOCAL FOR THE SAME REASON AND ONE MORE (phase 2):
+  // the server draws its own seed, so a throw that reached it would come back
+  // with a film this tab did not ask for and the bench would be an instrument
+  // that lies about the one number it exists to hold fixed. `opts.bench` is
+  // set by nothing but devBench/devReplay, both of which are behind `devOn()`.
+  if (devOn() && (Number.isInteger(opts.demoPlace) || opts.bench === true)) {
     if (validateMods(types, opts.mods || null)) return;
     rollDice(types, label, { ...opts, faceDown: !!(vis && vis.mode === 'held') });
     return;

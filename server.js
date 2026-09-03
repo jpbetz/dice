@@ -63,6 +63,10 @@ import { parseStamp } from './js/schema.js';
 // The declaration's reader (docs/DEVMODE.md). The same file the browser and
 // the tests use, so the tree this process serves is the tree the panel patches.
 import { parseYaml, YamlError } from './js/yaml.js';
+// The armed Save route's whole computation (docs/DEVMODE.md §6). The same
+// module tools/dice-apply.mjs runs, so the tool and the route agree on what a
+// legal change is, byte for byte, rather than agreeing by coincidence.
+import { applyChanges } from './js/dice-apply-core.js';
 
 const PORT = Number(process.env.PORT) || 8123;
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -1057,10 +1061,13 @@ function sendError(res, status, message, code, opts) {
   sendJson(res, status, { error: message, code: code || 'error', ...extra }, rest);
 }
 
-// Read a JSON body, refusing anything over MAX_BODY. Oversized uploads are
-// answered with 400 (and the connection closed) rather than reset, so the
-// client sees a real status code.
-function readJsonBody(req) {
+// Read a JSON body, refusing anything over `max` (MAX_BODY unless a caller
+// says otherwise — the armed dev write route allows a larger one, because a
+// whole declaration's worth of changes is bigger than any table message).
+// Oversized uploads are answered with 400 (and the connection closed) rather
+// than reset, so the client sees a real status code; `oversize` on the result
+// is what lets a caller answer 413 instead.
+function readJsonBody(req, max = MAX_BODY) {
   return new Promise((resolve) => {
     const chunks = [];
     let size = 0;
@@ -1070,16 +1077,16 @@ function readJsonBody(req) {
     const tooLarge = () => {
       overflowed = true;
       chunks.length = 0;
-      finish({ ok: false, reason: 'body too large', close: true });
+      finish({ ok: false, reason: 'body too large', oversize: true, close: true });
     };
 
     const declared = Number(req.headers['content-length']);
-    if (Number.isFinite(declared) && declared > MAX_BODY) tooLarge();
+    if (Number.isFinite(declared) && declared > max) tooLarge();
 
     req.on('data', (chunk) => {
       if (overflowed) return;      // discard the rest, don't buffer it
       size += chunk.length;
-      if (size > MAX_BODY) { tooLarge(); return; }
+      if (size > max) { tooLarge(); return; }
       chunks.push(chunk);
     });
     req.on('aborted', () => finish({ ok: false, reason: 'aborted' }));
@@ -4383,6 +4390,207 @@ function serveTunables(req, res) {
 }
 
 // ---------------------------------------------------------------------------
+// DEVELOPER MODE'S SAVE — POST /api/dev/write, armed by DICE_DEV_WRITE=1
+// ---------------------------------------------------------------------------
+//
+// Phase 1 gave the panel a Download and `tools/dice-apply.mjs` to put the
+// download back into the checkout. This is the other half Joe asked for
+// (2026-09-02, revision 1: "possible for me to actually overwrite a file in
+// the repo with that file"): with the local server started as
+//
+//     DICE_DEV_WRITE=1 node server.js
+//
+// the panel's primary verb becomes **Save**, and Save patches this checkout's
+// own dice.yaml in place — no download, no second command, `git diff` is the
+// review. Unarmed, the two routes DO NOT EXIST: they are not mounted, so they
+// fall through to the ordinary `/api/` 404 and disclose nothing, and
+// `make deploy` never sets the variable (docs/DEPLOY.md).
+//
+// THE ROUTE CANNOT BE USED AGAINST JOE (DEVMODE §10). Every one of these is
+// required, and a failure is a 403 whose body carries one word:
+//
+//   loopback  the SOCKET's address is 127.0.0.0/8, ::1 or ::ffff:127.*. Not a
+//             header — x-forwarded-for is a client's opinion, and this is the
+//             one door where a client's opinion must not be able to open it.
+//   origin    the POST carries `Origin` and it is this server's own, AND the
+//             name it reached this door by is itself a loopback name
+//             (`localhost`, `127.*`, `[::1]`). A form on any other page is a
+//             cross-origin POST and the browser tells on it; a POST with no
+//             Origin at all is refused too, which is what keeps a bare
+//             `curl -d` from being the shape that writes. The second half is
+//             the one the C1 review caught (2026-09-02): comparing Origin
+//             against the request's OWN Host makes the pair self-consistent
+//             for free, so a DNS-REBINDING page — `rebound.example` resolving
+//             to 127.0.0.1, then posting with Host and Origin both saying
+//             `rebound.example` — satisfied the equality, held a genuinely
+//             loopback socket, and wrote. The panel is the only legitimate
+//             caller and it always arrives by a loopback name, so requiring
+//             the Host to BE one closes that shape without asking the
+//             process to know its own public name.
+//   site      `Sec-Fetch-Site` says `same-origin` when the browser sends it.
+//   type      `Content-Type` starts with application/json, so a form's
+//             text/plain (the one content type a cross-origin form can send
+//             without a preflight) is not a body this route ever reads.
+//
+// …and a body over 1 MiB is a 413 before it is buffered.
+//
+// THE SERVER NEVER WRITES POSTED TEXT. The client posts CHANGES — a flat map
+// of dotted path → scalar, exactly `tune.changes()` — and this reads the file
+// it already has, validates every path against the dial tree the way
+// tools/dice-apply.mjs does (one shared js/dice-apply-core.js, so "what a
+// legal change is" has one definition), refuses `app.mode` and every other
+// static path, and patches its OWN text span by span. So the worst a
+// compromised page could do is move a dial to another legal value — never
+// append a line, never write a byte it chose, never touch another file:
+// `file` is checked against a frozen allowlist of one, and the write lands
+// under DICE_DEV_ROOT (the directory server.js lives in unless the
+// environment names another, which is how the tests get a scratch tree).
+//
+// The write is atomic — a sibling temp file, then rename — so a crash
+// mid-write leaves the file it found. Afterwards the in-memory declaration is
+// adopted from the very bytes that landed rather than waiting on the mtime
+// re-read, so a tab that reloads in the same millisecond still boots on the
+// saved values. One log line, bytes and sha1; never the text, never a path.
+
+const DEV_WRITE_ON = process.env.DICE_DEV_WRITE === '1';
+const DEV_ROOT = path.resolve(process.env.DICE_DEV_ROOT || ROOT);
+// Frozen, and one entry. A second file is a second decision, taken in a
+// commit, not a body field.
+const DEV_FILES = Object.freeze(['dice.yaml']);
+const DEV_MAX_BODY = 1024 * 1024;
+
+// The socket's address, not a header. `::ffff:127.0.0.1` is how a v4 client
+// reaches a v6 listener; a zone id (`::1%lo0`) rides some platforms. Anything
+// this does not recognise is not loopback — the default is refusal.
+export function isLoopback(addr) {
+  if (typeof addr !== 'string' || !addr) return false;
+  let a = addr.trim().toLowerCase();
+  const zone = a.indexOf('%');
+  if (zone !== -1) a = a.slice(0, zone);
+  if (a.startsWith('[') && a.endsWith(']')) a = a.slice(1, -1);
+  if (a.startsWith('::ffff:')) a = a.slice(7);
+  if (a === '::1' || a === '0:0:0:0:0:0:0:1') return true;
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(a);
+  if (!m) return false;
+  const parts = m.slice(1).map(Number);
+  if (parts.some((n) => n > 255)) return false;
+  return parts[0] === 127;
+}
+
+// The one-word reason this request may not write, or null. `post` adds the
+// checks a GET cannot make (a same-origin GET carries no Origin header at
+// all, so requiring one there would refuse the honest case).
+function devRefusal(req, { post }) {
+  if (!isLoopback(req.socket && req.socket.remoteAddress)) return 'loopback';
+  const site = req.headers['sec-fetch-site'];
+  if (site !== undefined && site !== 'same-origin') return 'site';
+  if (!post) return null;
+  const host = req.headers.host;
+  // scheme+host+port as the request's own Host says. This process speaks
+  // http and is only ever reached over loopback, so http:// is the whole
+  // scheme question; a proxy in front of it is not a thing this door serves.
+  if (!host || req.headers.origin !== `http://${host}`) return 'origin';
+  // …and the Host is a LOOPBACK NAME. Equality alone only proves the request
+  // is self-consistent, which a rebinding page arranges for free (see the
+  // block above): both headers say `rebound.example`, the socket really is
+  // 127.0.0.1, and the door opens. The panel reaches this route as
+  // localhost / 127.* / [::1] and nothing else does, so a name this process
+  // cannot recognise as its own front door is not one it writes for.
+  // (Lowercased, and a root-form trailing dot dropped: `LOCALHOST.:8123` is
+  // the same front door typed differently, and the Origin equality above has
+  // already made the two headers agree on whichever spelling it was.)
+  const hostname = host.toLowerCase().replace(/:\d+$/, '').replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (hostname !== 'localhost' && !isLoopback(hostname)) return 'origin';
+  const type = String(req.headers['content-type'] || '').toLowerCase();
+  if (!type.startsWith('application/json')) return 'type';
+  return null;
+}
+
+function handleDevStatus(req, res) {
+  const why = devRefusal(req, { post: false });
+  if (why) return sendJson(res, 403, { ok: false, reason: why });
+  return sendJson(res, 200, { armed: true, file: DEV_FILES[0] });
+}
+
+// Adopt the bytes that just landed as the served declaration. refreshDeclaration
+// keys on mtime+size, and a write inside one mtime tick that happens to keep
+// the size (a dial 24 → 30) would otherwise not be noticed until the next
+// edit — the one race a Save must not have, since the whole promise is "the
+// next reload shows the saved values".
+function adoptDeclaration(text) {
+  let stat;
+  try { stat = fs.statSync(DICE_YAML); } catch { return false; }
+  try {
+    const { tree } = parseYaml(text);
+    const body = tunablesBody(tree, text);
+    declaration = { text, tree, mtimeMs: stat.mtimeMs, size: stat.size, body, etag: etagOf(body) };
+    lastYamlError = '';
+    return true;
+  } catch {
+    return false;   // cannot happen: the text we wrote is the text we parsed
+  }
+}
+
+let devWriteSeq = 0;
+
+async function handleDevWrite(req, res) {
+  const why = devRefusal(req, { post: true });
+  if (why) return sendJson(res, 403, { ok: false, reason: why });
+  const body = await readJsonBody(req, DEV_MAX_BODY);
+  if (!body.ok) {
+    if (body.oversize) return sendJson(res, 413, { ok: false, reason: 'large' }, { close: true });
+    return sendJson(res, 400, { ok: false, reason: 'body', detail: body.reason });
+  }
+  const { file, changes } = body.value;
+  if (typeof file !== 'string' || !DEV_FILES.includes(file)) {
+    return sendJson(res, 400, { ok: false, reason: 'file', detail: cutText(String(file), 120) });
+  }
+  if (!changes || typeof changes !== 'object' || Array.isArray(changes)) {
+    return sendJson(res, 400, { ok: false, reason: 'changes', detail: 'changes must be a map of dotted path to scalar' });
+  }
+  const target = path.join(DEV_ROOT, file);
+
+  let text;
+  try {
+    text = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : '';
+  } catch (err) {
+    return sendJson(res, 500, { ok: false, reason: 'read', detail: err && err.code });
+  }
+  // Read, validate, patch and write with no await between them: two Saves
+  // racing are two turns of the event loop, and the second one reads the
+  // first one's text. (The e2e proves it: both changes land.)
+  const plan = applyChanges(text, changes, { checkoutName: file });
+  if (plan.problems.length) {
+    return sendJson(res, 400, { ok: false, reason: 'refused', problems: plan.problems.map((p) => p.message) });
+  }
+  const out = plan.text;
+  const bytes = Buffer.byteLength(out);
+  const sha1 = crypto.createHash('sha1').update(out).digest('hex');
+  const tmp = `${target}.tmp-${process.pid}-${devWriteSeq++}`;
+  try {
+    fs.writeFileSync(tmp, out);
+    fs.renameSync(tmp, target);
+  } catch (err) {
+    try { fs.unlinkSync(tmp); } catch { /* never there */ }
+    return sendJson(res, 500, { ok: false, reason: 'write', detail: err && err.code });
+  }
+  const served = target === DICE_YAML ? adoptDeclaration(out) : false;
+  log(`dev write ${logField('file', file)} bytes=${bytes} sha1=${sha1}`);
+  return sendJson(res, 200, {
+    ok: true,
+    file,
+    bytes,
+    sha1,
+    changes: plan.changes.map((c) => ({ path: c.path.join('.'), from: c.absent ? null : c.from, to: c.to })),
+    served,
+    // The served module is generated from this file and re-read on mtime, so
+    // the values are on the next boot of a tab, not on this one's next frame.
+    note: served ? 'reload the tab: /js/tunables.js serves the saved declaration'
+      : 'written outside the served tree: this server still serves its own dice.yaml',
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Server
 // ---------------------------------------------------------------------------
 
@@ -4424,6 +4632,14 @@ const server = http.createServer((req, res) => {
     if (route === '/api/table' && req.method === 'POST') return handleTable(req, res);
     if (route === '/api/table' && req.method === 'GET') return handleTableInfo(req, res, url);
     if (route === '/api/split' && req.method === 'POST') return handleSplit(req, res);
+    // DEVELOPER MODE'S SAVE, mounted only when armed (see the block above the
+    // Server section). Unarmed — which is every deploy — the conditions are
+    // false, so both paths fall to the `/api/` 404 below and this server has
+    // no write route at all, not a disabled one.
+    if (DEV_WRITE_ON && route === '/api/dev/status' && (req.method === 'GET' || req.method === 'HEAD')) {
+      return handleDevStatus(req, res);
+    }
+    if (DEV_WRITE_ON && route === '/api/dev/write' && req.method === 'POST') return handleDevWrite(req, res);
     if (route.startsWith('/api/')) return sendError(res, 404, 'no such endpoint', 'not_found');
     // Before the static path, on purpose: the module is built from dice.yaml
     // in memory, and a real js/tunables.js on disk must never be the answer.

@@ -187,6 +187,15 @@ against `make -s print-sha` locally. Three answers that are not a plain sha:
 | `unknown` | The deploy did not go through this Makefile (or `git` was unavailable when it did). The service is running *something*; nothing on the box knows what. |
 | stale sha | The deploy did not take, or you are being served by an older revision. `gcloud run revisions list --service dice --region us-central1`. |
 
+**The deploy never sets `DICE_DEV_WRITE`** (2026-09-02). Developer mode's Save
+route (`POST /api/dev/write`, docs/DEVMODE.md §6) is mounted only when
+`DICE_DEV_WRITE=1` is in the environment, which is a thing you type on a
+laptop — `DICE_DEV_WRITE=1 node server.js` — and never a flag in `make
+deploy`'s `--update-env-vars`. Unarmed, the two paths are not mounted at all
+and answer the ordinary `/api/` 404; a deployed container also has nothing
+writable to write to. If you ever find yourself adding it to the flag set,
+that is the moment to stop: the route patches the checkout it is running in.
+
 `/health` is public and unauthenticated like every other door here (goal 10),
 and deliberately carries **counts only** — no room key, no player name, no roll,
 no log line, no address. A room key is the table's only access control, so an

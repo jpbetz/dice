@@ -16,10 +16,11 @@ limitations under the License.
 -->
 <!--
   DEVELOPER MODE — the shell (docs/DEVMODE.md §7). A standalone page that
-  mounts the panel over a dark placeholder, with a fake cast that logs its
-  calls, so the panel can be LOOKED AT before main.js integration and the
-  main session can take its screenshot. Served by the ordinary static path
-  at /tools/devshell.html. No scene, no engine, no network.
+  mounts the panel over a dark placeholder, with a fake cast and a fake bench
+  that log their calls, so the panel can be LOOKED AT before main.js
+  integration and the main session can take its screenshot. Served by the
+  ordinary static path at /tools/devshell.html. No scene, no engine, no
+  network — so the bench's numbers are DRESS, never measurements.
 
   window.__devShell = { panel, tune, calls } is the probe for the harness.
 -->
@@ -50,7 +51,7 @@ limitations under the License.
 <body>
 <div id="shell">
   <pre id="shell-log" aria-live="polite"></pre>
-  <div id="shell-note"><b>dev shell</b> — the panel over a placeholder. The cast and the verbs log here. Press <b>`</b> or Esc to fold; the corner glyph unfolds.</div>
+  <div id="shell-note"><b>dev shell</b> — the panel over a placeholder. The cast, the bench and the verbs log here. Press <b>`</b> or Esc to fold; the corner glyph unfolds.</div>
 </div>
 <script type="module">
   import { createTune } from '../js/tune.js';
@@ -86,7 +87,7 @@ limitations under the License.
   const cast = (() => {
     let rows = [];
     let seat = null;
-    let regions = 'disabled';
+    let overlay = 'disabled';
     const names = ['Ada', 'Bo', 'Cyrille', 'Dee', 'Étienne', 'Fen', 'Gudrun', 'Hal'];
     return {
       players: () => rows.length,
@@ -94,10 +95,50 @@ limitations under the License.
       deal: (n) => { rows = names.slice(0, n); seat = rows.length ? Math.min(seat ?? 0, rows.length - 1) : null; log(`deal(${n})`); },
       sit: (k) => { seat = k; log(`sit(${k})`); },
       reshuffle: () => { rows = rows.map((_, i) => names[(i + 3) % names.length]); log('reshuffle()'); },
-      regions: (state) => { regions = state; log(`regions(${state})`); },
+      overlay: (state) => { overlay = state; log(`overlay(${state})`); },
+      overlayState: () => overlay,
       roll: (k) => log(`roll(${k})`),
       rollAll: () => log('rollAll()'),
-      state: () => ({ rows, seat, regions }),
+      state: () => ({ rows, seat, overlay }),
+    };
+  })();
+
+  // The fake bench (phase 2): a clock that never runs a film, a seed box that
+  // logs what it was asked for, and two A/B slots that hold the real diff. No
+  // engine here, so nothing it says is a measurement — it is the DRESS of the
+  // clock, bench and A/B sections, which is what the shell exists to show.
+  const bench = (() => {
+    const clock = { state: 'running', live: false, frame: 0, frames: 0, time: 0 };
+    const ab = { a: null, b: null, live: null, film: false, replayed: false };
+    let last = null;
+    return {
+      pool: '3d6',
+      hud: () => ({ fps: 60, calls: 0, tris: 0, bodies: 0, settle: last ? last.settleS : null }),
+      clock: () => clock,
+      freeze: (s) => { clock.state = s; log(`freeze(${s})`); return clock; },
+      step: () => { clock.frame++; log('step()'); return clock; },
+      scrub: (f) => { log(`scrub(${f})`); return { ...clock, scrub: f }; },
+      bench: (seed) => {
+        const s = /^-?\d+$/.test(String(seed).trim()) ? Number(seed) : ((Date.now() * 2654435761) >>> 0);
+        last = { seed: s, frames: 180, settleS: 3, bench: true, dice: ['d6', 'd6', 'd6'] };
+        log(`bench(${JSON.stringify(seed)}) → seed ${s}`);
+        return { seed: s, notation: '3d6 # bench', label: 'bench', place: 0, via: 'local' };
+      },
+      replay: () => {
+        if (!last) return null;
+        log(`replay() → seed ${last.seed}`);
+        return { seed: last.seed, notation: '3d6 # bench', label: 'bench', place: 0, via: 'local' };
+      },
+      last: () => last,
+      hold: (k) => { ab[k] = { changed: Object.keys(tune.changes()).length }; ab.live = k; log(`hold(${k})`); return ab; },
+      apply: (k) => { if (!ab[k]) return null; ab.live = k; log(`apply(${k})`); return ab; },
+      flip: () => {
+        if (!ab.a || !ab.b) return null;
+        ab.live = ab.live === 'a' ? 'b' : 'a';
+        log(`flip() → ${ab.live}`);
+        return ab;
+      },
+      ab: () => ab,
     };
   })();
 
@@ -107,7 +148,7 @@ limitations under the License.
   };
 
   const panel = mount({
-    tune, cast, verbs,
+    tune, cast, bench, verbs,
     onFold: (on) => log(`fold(${on})`),
     onShut: () => { log('shut()'); tune.reset('all'); panel.repaint(); },
     info: { declared, venue: null },
@@ -124,7 +165,7 @@ limitations under the License.
     }
   });
 
-  window.__devShell = { panel, tune, calls, cast };
+  window.__devShell = { panel, tune, calls, cast, bench };
 </script>
 </body>
 </html>

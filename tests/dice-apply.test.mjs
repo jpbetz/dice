@@ -31,7 +31,7 @@ limitations under the License.
 //     atomic and leaves no temp file behind.
 //
 // Every run is against a SCRATCH COPY of the tree (the tool, js/yaml.js,
-// js/tune.js and dice.yaml), never the checkout — the tool's default root
+// js/tune.js, js/dice-apply-core.js and dice.yaml), never the checkout — the tool's default root
 // is the tree it lives in, so the copy is how that default is exercised;
 // `--root` is exercised too.
 
@@ -59,6 +59,7 @@ function makeTree(yaml = FILE) {
   cpSync(join(ROOT, 'tools', 'dice-apply.mjs'), join(dir, 'tools', 'dice-apply.mjs'));
   cpSync(join(ROOT, 'js', 'yaml.js'), join(dir, 'js', 'yaml.js'));
   cpSync(join(ROOT, 'js', 'tune.js'), join(dir, 'js', 'tune.js'));
+  cpSync(join(ROOT, 'js', 'dice-apply-core.js'), join(dir, 'js', 'dice-apply-core.js'));
   writeFileSync(join(dir, 'dice.yaml'), yaml);
   return dir;
 }
