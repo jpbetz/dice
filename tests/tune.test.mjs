@@ -23,8 +23,8 @@ limitations under the License.
 //     options, and no dial path reaches the RNG, the values, the faces,
 //     the seed or the clock (GOALPOST 2, the denylist);
 //   · dice.yaml IS the full phase-1 declaration: no boolean scalar, every
-//     leaf has a dial and equals its default, every dial is in the file
-//     (the drift test, in both directions);
+//     leaf has a dial and fits its type/options (the file is the authority;
+//     the code default is the fallback — dbee311 proved it)
 //   · createTune checks the declaration against the dials at birth: a
 //     null is absent (the default stands), and a wrong type, an enum value
 //     outside the options, a map at a dial or a scalar at a map, and a
@@ -885,26 +885,34 @@ t('dice.yaml has no boolean scalar, quoted or not, and parses', () => {
   for (const p of leaves(tree)) assert.notEqual(typeof getLeaf(tree, p), 'boolean', dotted(p));
 });
 
-t('dice.yaml is the full declaration: every leaf has a dial and equals its default, and every dial is in the file', () => {
+t('dice.yaml is the declaration, and the file is the authority: every leaf has a dial and fits it', () => {
+  // THE FILE WINS (docs/DEVMODE.md §3 "the file is the authority, the code is
+  // the fallback"). 2026-09-03: Joe dialed the toss on the live table, pressed
+  // Save and committed dice.yaml (dbee311, back 0.4 → 2.05, height 0.3 → 0.8)
+  // — and the first shape of this test, which pinned every leaf to its CODE
+  // default, went red on the owner's first real use of the loop. A default is
+  // what stands when a line is deleted, nothing more; the guard here is that
+  // every leaf the file names has a dial of the right TYPE (and option), and
+  // that the file's sections are the dial tree's, in order.
   const { tree } = parseYaml(text);
   const fileLeaves = leaves(tree).map(dotted);
-  const dials = dialPaths().map(dotted);
   for (const p of fileLeaves) {
     const d = getLeaf(DIALS, p);
     assert.ok(isDial(d), `dice.yaml names ${p} but js/tune.js has no dial for it`);
-    assert.deepEqual(getLeaf(tree, p), d.def, `${p}: file says ${JSON.stringify(getLeaf(tree, p))}, dial default is ${JSON.stringify(d.def)}`);
-    if (d.options) assert.ok(d.options.includes(getLeaf(tree, p)), `${p} outside its options`);
+    const v = getLeaf(tree, p);
+    assert.equal(typeof v, typeof d.def, `${p}: file says ${JSON.stringify(v)}, the dial is a ${typeof d.def}`);
+    if (d.options) assert.ok(d.options.includes(v), `${p} outside its options`);
   }
-  for (const p of dials) assert.ok(fileLeaves.includes(p), `dial ${p} is not in dice.yaml`);
-  assert.deepEqual(fileLeaves, dials, 'and in the same order (the panel is the file, drawn)');
   assert.equal(tree.app.mode, 'development');
+  assert.deepEqual(Object.keys(tree), Object.keys(DIALS).filter((k) => k in tree), 'sections in the dial tree\'s order');
   assert.deepEqual(Object.keys(tree), ['app', 'table', 'light', 'camera', 'throw', 'pace', 'sound', 'post', 'cards']);
 });
 
-t('createTune over the real file: SHIPPED equals the defaults, nothing differs', () => {
+t('createTune over the real file: SHIPPED is defaults ⊕ file with nothing refused, and nothing differs at birth', () => {
   const { tree } = parseYaml(text);
   const tune = createTune({ declared: tree, source: text });
-  assert.deepEqual(tune.SHIPPED, defaultsOf(DIALS));
+  assert.deepEqual(tune.SHIPPED, merge(defaultsOf(DIALS), tree));
+  assert.deepEqual(tune.refusals, [], 'every declared value fits its dial');
   assert.deepEqual(tune.diff(), []);
   assert.deepEqual(tune.sections(), Object.keys(DIALS));
   for (const p of leaves(tune.SHIPPED)) assert.ok(!FORBIDDEN_LEAF.test(dotted(p)), dotted(p));
