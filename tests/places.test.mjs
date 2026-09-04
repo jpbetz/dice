@@ -1279,12 +1279,16 @@ t('ring: the aim is a pure function of (seat, seats, arc, mat) — the pool neve
 
 // --- the printing: P6, P7 ----------------------------------------------------------
 
-t('ring P6: readTurn returns the old READ_TURN row on all 16 quarter pairs', () => {
-  // js/placard.js READ_TURN, inlined here: per station azim RELATIVE to the
-  // reader in quarter turns, [+z panel, -z panel], each [mirror, flip].
+t('ring P6: readTurn returns the quarter table on all 16 quarter pairs, elbows tops-outboard', () => {
+  // js/placard.js's old READ_TURN, inlined here: per station azim RELATIVE
+  // to the reader in quarter turns, [+z panel, -z panel], each [mirror,
+  // flip]. Row 1 (the right elbow) is the FAR pair since 2026-09-04: the old
+  // near pair printed that card upside down on its own tent (Joe: "some of
+  // the name plates have upside down names"); both elbows now print with
+  // their tops outboard, read with the head tilted toward each.
   const READ_TURN = {
     0: [[false, false], [true, true]],
-    1: [[false, false], [true, true]],
+    1: [[true, true], [false, false]],
     2: [[true, true], [false, false]],
     3: [[true, true], [false, false]],
   };
@@ -1304,7 +1308,7 @@ t('ring P7: at every (N, seat, reader seat) the printing reads upright — text-
   // A panel's unflipped text-up runs foot-to-ridge: azimuth (azim + pi) on the
   // +z panel, azim on the -z panel; TURN_HALF reverses it. Screen-up for a
   // reader at phi is (phi + pi). Edge-on (a quarter turn off) reads side-on,
-  // which is 0 — the head treatment, kept.
+  // which is 0 either way; the tent decides that case (tops outboard).
   const vec = (a) => [Math.sin(a), Math.cos(a)];
   for (const arc of [0, 1]) {
     for (const N of NS) {
@@ -1325,12 +1329,15 @@ t('ring P7: at every (N, seat, reader seat) the printing reads upright — text-
       }
     }
   }
-  // Edge-on: +sin takes the near pair, -sin the far (rows 1 and 3).
-  assert.deepEqual(readTurn(Math.PI / 2, 0), [TURN_NONE, TURN_HALF]);
+  // Edge-on: BOTH elbows take the far pair — tops outboard, upright on the
+  // tent (the right elbow's near pair stood its name on its head, 2026-09-04).
+  assert.deepEqual(readTurn(Math.PI / 2, 0), [TURN_HALF, TURN_NONE]);
   assert.deepEqual(readTurn(3 * Math.PI / 2, 0), [TURN_HALF, TURN_NONE]);
-  // Continuous: a hair past edge-on flips to the far pair.
+  assert.deepEqual(readTurn(-Math.PI / 2, 0), [TURN_HALF, TURN_NONE], 'the same elbow, unwrapped');
+  // Continuous on the near side: a hair short of edge-on is still the near pair.
   assert.deepEqual(readTurn(Math.PI / 2 + 1e-6, 0), [TURN_HALF, TURN_NONE]);
   assert.deepEqual(readTurn(Math.PI / 2 - 1e-6, 0), [TURN_NONE, TURN_HALF]);
+  assert.deepEqual(readTurn(3 * Math.PI / 2 + 1e-6, 0), [TURN_NONE, TURN_HALF]);
 });
 
 console.log(process.exitCode ? `${n} tests, FAILURES above` : `all ${n} places tests pass`);

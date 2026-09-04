@@ -1025,11 +1025,16 @@ export function seatAim(seat, seats, arc, w, d, throwTarget) {
 // panel. Ground-projected screen-up for a reader orbiting at φ is (φ + π). So the
 // +z panel reads upright iff cos(azim − φ) > 0, the −z panel iff < 0 — and the
 // panel FACING the reader is the +z one on exactly the same test. EDGE-ON
-// (cos ≈ 0) keeps the head treatment: +sin takes the near pair, −sin the far —
-// READ_TURN rows 1 and 3 verbatim. Returns [ +z panel turn, −z panel turn ].
+// (cos ≈ 0) takes the FAR pair on BOTH elbows, which prints every panel with
+// its tops OUTBOARD — upright on its own tent, the way a card at your elbow
+// stands at a real table: the left one is read with the head tilted left,
+// the right one tilted right. The old rule handed the +sin elbow the near
+// pair so both elbows read with the same tilt, and that put the right-hand
+// name on its head on its own card (Joe, 2026-09-04, at a table of four:
+// "some of the name plates have upside down names"). Screen-up cannot
+// choose here — text-up is ±90° from it either way — so the tent does.
+// Returns [ +z panel turn, −z panel turn ].
 export function readTurn(azim, readerAzim) {
-  const d = azim - readerAzim;
-  const c = Math.cos(d);
-  const near = c > 1e-9 || (Math.abs(c) <= 1e-9 && Math.sin(d) > 0);
-  return near ? [TURN_NONE, TURN_HALF] : [TURN_HALF, TURN_NONE];
+  const c = Math.cos(azim - readerAzim);
+  return c > 1e-9 ? [TURN_NONE, TURN_HALF] : [TURN_HALF, TURN_NONE];
 }

@@ -572,16 +572,18 @@ export class PlacardRig {
     // never by a bucket: `readTurn(azim, readerAzim)` (js/places.js §1.9) asks
     // whether the +z panel's text-up still projects to screen-up for a reader
     // at `readerAzim`, i.e. cos(azim − readerAzim) > 0, with the edge-on case
-    // (cos ≈ 0) taking the head treatment the old quarter-turn table gave it.
+    // (cos ≈ 0) printing tops-OUTBOARD on both elbows — upright on its own
+    // tent, read with the head tilted toward it (2026-09-04, Joe: the old
+    // same-tilt tiebreak stood the right elbow's name on its head).
     // The reader is wherever the frame was last cut to (`readerAzim`, set by
     // main.js's applyFramingPose — the per-viewer orbit of §7.63, or the
     // ladder's quarter turn on top of it). The card at the reader's own chair
     // and the one opposite land on their up-vector exactly; a card at their
     // elbow is read side-on whichever way it is printed, which is how a card
     // at your elbow reads at a real table too. Residual tilt on the visible
-    // panel is wrap(θ_card − φ) into (−90°, 90°] — at N=3 it is 0/∓60°, at
-    // N=6 0/±60°/∓60°/0, at N=8 0/±45°/±90°/∓45°/0: never worse than the
-    // shipped head treatment, and there is no de-tilt dial.
+    // panel is wrap(θ_card − φ) into [−90°, 90°] — at N=3 it is 0/∓60°, at
+    // N=6 0/±60°/∓60°/0, at N=8 0/±45°/±90°/∓45°/0 — and there is no de-tilt
+    // dial.
     const turn = readTurn(azim, this.readerAzim);
 
     let o = slot * VERTS * 3;
