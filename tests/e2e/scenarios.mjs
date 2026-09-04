@@ -22,7 +22,7 @@ limitations under the License.
 // fits). If a scenario needs app state a script can't reach, add a hook to
 // window.__diceDebug rather than scraping fragile DOM.
 
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -58,7 +58,7 @@ const { minTowerDataUrl, minTowerGlb, MIN_TOWER_PORTALS } =
 // two of them — negative when they overlap, which is the assertion the felt
 // shelf never had.
 const { placardFootprint, placardGap, PLACE_LANE, PLACE_PUSH, PLACARD_W, PLACARD_GAP, PLACARD_STANDOFF,
-  entryFor, regionFor, inRegion, aimFor, seatToss, ringRadius, SPOT_R,
+  entryFor, regionFor, inRegion, aimFor, seatToss, ringRadius, SPOT_R, SEAT_TOSS,
   // THE RING (S4, 2026-09-01): the seat angle and the anchor, the one producer
   // the cards stand on — a scenario compares the page's numbers with the
   // module's own, never with a copy.
@@ -69,7 +69,7 @@ const { placardFootprint, placardGap, PLACE_LANE, PLACE_PUSH, PLACARD_W, PLACARD
 // panel's export IS by computing the same patch in Node with the same
 // patchYaml, and `dev-shell-loads` counts the shell's rows against the dial
 // tree's own leaves — imported, not restated, for the same reason as above.
-const { patchYaml } = await import('../../js/yaml.js');
+const { patchYaml, parseYaml } = await import('../../js/yaml.js');
 const { DIALS, defaultsOf, leaves: dialLeaves } = await import('../../js/tune.js');
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Scratch trees for the apply tool — DICE_TEST_SCRATCH points them somewhere
@@ -10525,185 +10525,15 @@ export const scenarios = [
       await a.eval(`window.__diceDebug.closePopover()`);
     },
   },
-  {
-    name: 'lab-geo-bench',
-    tags: ['lab'],
-    timeout: 150000,
-    // The GEO BENCH + SET BUILDER (softer edges Tier 0): lab-only rows sweep
-    // the Level 3.5 geo space on otherwise-standard dice, and the builder
-    // rebuilds a live row from any recipe patch. Assertions ride
-    // __lab.geoStats (bevel/wear eat the bounding radius) and faceDump
-    // (source canvases), not screenshots. The lab is a raw page, not a
-    // table — adopt it into ctx.tables so closeAll and the page-exception
-    // collector still see it.
-    async fn(ctx) {
-      // ONE logged boot retry, same defense newTable carries: ~1–2% of
-      // fresh headless tabs come up broken (vendor double-evaluation),
-      // and the lab pushes ~2000 canvas textures through that boot.
-      const url = `http://localhost:${ctx.port}/lab.html`;
-      let t;
-      for (let attempt = 0; ; attempt++) {
-        const page = await ctx.browser.newPage();
-        await page.navigate(url);
-        t = new Table(page, url);
-        try {
-          await t.waitFor('!!(window.__lab && window.__lab.ready)', { desc: 'lab ready', timeout: 90000 });
-          if (attempt === 0 && page.errors.length) {
-            throw new Error(`page exception on load — ${String(page.errors[0]).slice(0, 120)}`);
-          }
-          break;
-        } catch (e) {
-          if (attempt > 0) { ctx.tables.push(t); throw e; }
-          console.log(`    (lab boot retry: ${String(e.message || e).slice(0, 100)})`);
-          await t.close().catch(() => {});
-        }
-      }
-      ctx.tables.push(t);
-
-      const rows = JSON.parse(await t.eval('JSON.stringify(window.__lab.rows)'));
-      const bench = JSON.parse(await t.eval('JSON.stringify(window.__lab.benchIds)'));
-      assert.equal(bench.length, 9, `the full bench sweep registered (got ${bench.length})`);
-      for (const id of [...bench, 'lab.builder']) {
-        assert.ok(rows.includes(id), `${id} seated in the grid`);
-      }
-      // lab-only ids must never leak into the published picker list
-      const published = JSON.parse(await t.eval(
-        `import('./js/themes.js').then((m) => JSON.stringify(m.SET_IDS))`));
-      assert.ok(!published.some((id) => id.startsWith('lab.')), 'SET_IDS stays free of lab rows');
-
-      // The bench's physical claims, post-§9c-Tier-2 (true fillet arcs):
-      // cut radii shrink as the bevel widens; a ROUND edge bulges back
-      // toward the sharp edge, so it sits ABOVE its cut twin but below
-      // the sharp corner; round radii still shrink with bevel.
-      const stats = JSON.parse(await t.eval('JSON.stringify(window.__lab.geoStats())'));
-      assert.ok(stats['lab.cut030'].r > stats['std'].r,
-        `narrow cut keeps more corner than std (${stats['lab.cut030'].r} vs ${stats['std'].r})`);
-      assert.ok(stats['lab.cut090'].r < stats['lab.cut030'].r,
-        `.090 cut trims past .030 (${stats['lab.cut090'].r} vs ${stats['lab.cut030'].r})`);
-      assert.ok(stats['lab.round090'].r > stats['lab.round130'].r,
-        `.130 fillet trims past .090 (${stats['lab.round090'].r} vs ${stats['lab.round130'].r})`);
-      // the d6's ACTUAL sharp-corner radius — the bound the fillet must
-      // stay inside is the base solid itself, not a loose percentage
-      // (the fillet review caught 1.05·std sitting ~1.2% OUTSIDE it)
-      const D6_SHARP = (1.35 / 2) * Math.sqrt(3);
-      assert.ok(stats['lab.round055'].r > stats['std'].r && stats['lab.round055'].r < D6_SHARP,
-        `the .055 fillet bulges past its cut twin, inside the sharp corner (${stats['lab.round055'].r} vs ${stats['std'].r}..${D6_SHARP.toFixed(4)})`);
-      assert.ok(stats['lab.round130'].r < D6_SHARP,
-        `the widest fillet stays inside the base solid (${stats['lab.round130'].r} < ${D6_SHARP.toFixed(4)})`);
-      assert.ok(stats['lab.round090'].r > stats['lab.cut090'].r,
-        `the .090 fillet bulges past its cut twin (${stats['lab.round090'].r} vs ${stats['lab.cut090'].r})`);
-      // material-only knobs leave the silhouette bit-identical: ink
-      // (selfink vs round090) and pillow/shading (pillow vs round090)
-      assert.ok(Math.abs(stats['lab.selfink'].r - stats['lab.round090'].r) < 1e-4,
-        `ink is material-only (${stats['lab.selfink'].r} vs ${stats['lab.round090'].r})`);
-      assert.ok(Math.abs(stats['lab.pillow'].r - stats['lab.round090'].r) < 1e-4,
-        `pillow is shading-only (${stats['lab.pillow'].r} vs ${stats['lab.round090'].r})`);
-      // (No cross-bevel wear ordering. The character rows must just sit
-      // below the tallest fillet, proving wear pulls inward.)
-      assert.ok(stats['lab.tumbled'].r < stats['lab.round055'].r,
-        `tumbled row trims below the .055 fillet (${stats['lab.tumbled'].r} vs ${stats['lab.round055'].r})`);
-      assert.ok(stats['lab.pocked'].r < stats['lab.round055'].r,
-        `pocked row trims below the .055 fillet (${stats['lab.pocked'].r} vs ${stats['lab.round055'].r})`);
-
-      // THE WATERTIGHT CLAIM (Joe found the hole, 2026-08-04): every render
-      // mesh must be a CLOSED surface — each directed edge paired by its
-      // reverse. The pre-fix bowtie stitch left 4 unpaired per die edge:
-      // one doubled band triangle + one pure-black HOLE on every beveled
-      // edge of every die.
-      const leakProbe = (only) => `JSON.stringify((() => {
-        const bad = [];
-        for (const row of window.__labRows) {
-          if (${only ? `row.id !== ${JSON.stringify(only)}` : 'false'}) continue;
-          row.meshes.forEach((c, i) => {
-            const pos = c.mesh.geometry.attributes.position;
-            const key = (j) => [0, 1, 2].map((k) => Math.round(pos.array[j * 3 + k] * 1000)).join(',');
-            const m = new Map();
-            for (let tI = 0; tI < pos.count; tI += 3) {
-              for (let e = 0; e < 3; e++) {
-                const a = key(tI + e), b = key(tI + (e + 1) % 3);
-                const rev = b + '|' + a;
-                if (m.get(rev)) m.set(rev, m.get(rev) - 1);
-                else { const fwd = a + '|' + b; m.set(fwd, (m.get(fwd) || 0) + 1); }
-              }
-            }
-            let un = 0;
-            for (const v of m.values()) un += Math.abs(v);
-            if (un) bad.push(row.id + '[' + i + ']=' + un);
-          });
-        }
-        return bad;
-      })())`;
-      const leaks = JSON.parse(await t.eval(leakProbe(null)));
-      assert.equal(leaks.length, 0, `every render mesh is watertight (leaks: ${leaks.join(' ')})`);
-
-      // Hero-die framing (the detail view): a die type or column index
-      const hero = await t.eval(`window.__lab.zoomDie('lab.round090', 'd6')`);
-      assert.equal(hero, true, 'zoomDie frames a bench die by type');
-      assert.equal(await t.eval(`window.__lab.zoomDie('lab.round090', 'd99')`), false,
-        'zoomDie rejects an unknown type');
-
-      // The builder: a geo patch reshapes the live row's render mesh…
-      // (wear + nicks on purpose: the displacement pass must keep the
-      // surface closed too — coincident vertices share the position hash)
-      const r0 = stats['lab.builder'].r;
-      await t.eval(`window.__lab.builderSet({ geo: { bevel: 0.12, profile: 'round', wear: 0.3, nicks: 2 } })`);
-      const s2 = JSON.parse(await t.eval('JSON.stringify(window.__lab.geoStats())'));
-      assert.ok(s2['lab.builder'].r < r0,
-        `builder bevel edit reshaped the mesh (${s2['lab.builder'].r} vs ${r0})`);
-      const builderLeaks = JSON.parse(await t.eval(leakProbe('lab.builder')));
-      assert.equal(builderLeaks.length, 0,
-        `the rebuilt worn builder row stays watertight (${builderLeaks.join(' ')})`);
-
-      // …a body-color patch reaches the freshly baked face canvases…
-      await t.eval(`window.__lab.builderSet({ stdColors: false, body: '#ff2222', text: '#ffffff' })`);
-      const dump = JSON.parse(await t.eval(`JSON.stringify(window.__lab.faceDump('lab.builder', 1))`));
-      const faces = dump.filter((f) => f.map);
-      assert.ok(faces.length >= 6, 'builder d6 faces carry canvas textures');
-      const avg = (i) => faces.reduce((s, f) => s + f.avg[i], 0) / faces.length;
-      assert.ok(avg(0) > avg(1) + 40, `red body reaches the face bakes (rgb ${avg(0).toFixed(0)},${avg(1).toFixed(0)},${avg(2).toFixed(0)})`);
-
-      // …and the assembled recipe carries both edits, themes.js-shaped.
-      const rec = JSON.parse(await t.eval('JSON.stringify(window.__lab.builderRecipe())'));
-      assert.equal(rec.geo.profile, 'round', 'recipe keeps the profile');
-      assert.equal(rec.geo.bevel, 0.12, 'recipe keeps the bevel');
-      assert.equal(rec.body, '#ff2222', 'recipe keeps the body color');
-      assert.ok(rec.feel && typeof rec.feel.rough === 'number', 'recipe carries feel');
-
-      // INK + TINT reach the live band material (read it directly — no
-      // screenshots): a low-ink bench row sits closer to its body color
-      // than the inked default; ink 0 IS the body; tint pulls toward it.
-      const bandHex = (id, di) => `window.__labRows.find((r) => r.id === ${JSON.stringify(id)})`
-        + `.meshes[${di}].mesh.material.at(-1).color.getHexString()`;
-      const lum = (h) => parseInt(h.slice(0, 2), 16) + parseInt(h.slice(2, 4), 16) + parseInt(h.slice(4, 6), 16);
-      const selfBand = await t.eval(bandHex('lab.selfink', 1));
-      const inkedBand = await t.eval(bandHex('lab.round090', 1));
-      assert.ok(lum(selfBand) > lum(inkedBand),
-        `ink .04 leaves the band lighter than the inked default (${selfBand} vs ${inkedBand})`);
-      await t.eval(`window.__lab.builderSet({ body: '#2e6f9e', geo: { ink: 0 } })`);
-      assert.equal(await t.eval(bandHex('lab.builder', 1)), '2e6f9e',
-        'ink 0 = fully self-colored band');
-      await t.eval(`window.__lab.builderSet({ geo: { ink: 0.5, tint: '#ff0000' } })`);
-      const tinted = await t.eval(bandHex('lab.builder', 1));
-      assert.ok(parseInt(tinted.slice(0, 2), 16) > 0x2e,
-        `tint pulls the band toward red (${tinted})`);
-
-      // SEGMENTS reshape the fillet: more arc strips, more vertices
-      await t.eval(`window.__lab.builderSet({ geo: { segments: 1 } })`);
-      const v1 = JSON.parse(await t.eval('JSON.stringify(window.__lab.geoStats())'))['lab.builder'].verts;
-      await t.eval(`window.__lab.builderSet({ geo: { segments: 5 } })`);
-      const v5 = JSON.parse(await t.eval('JSON.stringify(window.__lab.geoStats())'))['lab.builder'].verts;
-      assert.ok(v5 > v1, `segments grow the fillet mesh (${v5} > ${v1})`);
-
-      // A scripted profile flip keeps recipes omit-at-default: untouched
-      // ink snaps between profile defaults (explicitly patched ink wins).
-      await t.eval(`window.__lab.builderSet({ geo: { ink: 0.12, tint: '#000000' } })`);
-      await t.eval(`window.__lab.builderSet({ geo: { profile: 'cut' } })`);
-      const recCut = JSON.parse(await t.eval('JSON.stringify(window.__lab.builderRecipe())'));
-      assert.equal(recCut.geo.profile, undefined, 'cut is the default profile — omitted');
-      assert.equal(recCut.geo.ink, undefined,
-        `the flip snapped untouched ink to cut's default (got ${recCut.geo.ink})`);
-    },
-  },
+  // THE DICE LAB RETIRED HERE (2026-09-03, docs/DEVMODE.md §9 phase D3).
+  // `lab-geo-bench` (tag `lab`) was the only scenario that navigated to
+  // lab.html, and it went with the page: nine bench rows sweeping the §9c geo
+  // space, the set builder, the hero framing and the unpaired-directed-edge
+  // watertight probe over every render mesh on that page. The recipe knobs it
+  // existed to drive now live on the real felt in the panel's sets section
+  // (`dev-set-roundtrip`), which is a stronger place to drive them from; the
+  // MEASUREMENTS it made are not yet re-made anywhere, and DEVMODE §9 lists
+  // each one as owed rather than letting it go quiet.
   {
     name: 'zoom-syncs',
     tags: ['smoke', 'settings', 'zoom', 'cuj12'],
@@ -20843,6 +20673,16 @@ export const scenarios = [
       const b = await ctx.newTable({ origin: '127.0.0.62', name: 'Bob' });
       await a.waitFor('window.__diceDebug.places().stations.length === 2', { desc: 'both seated' });
       await a.dbg('holdClock(true)');
+      // THE TOSS IS A DIAL SET, AND THIS PROCESS HAS TO READ THE SAME ONE —
+      // the same sync `dev-regions` makes, for the same reason and the same
+      // 1.65. `seatToss` comes from js/places.js, whose SEAT_TOSS holds the
+      // SHIPPED numbers; the tab holds dice.yaml's, which js/main.js copies in
+      // at boot. Joe dialled `table.seats.back` 0.4 → 2.05 on the live table
+      // and saved it (dbee311), so the spawn line this scenario re-derived was
+      // a line nobody throws from. Restored in the `finally`: SEAT_TOSS is
+      // process state and the scenarios after this one import the same object.
+      const shippedToss = { ...SEAT_TOSS };
+      Object.assign(SEAT_TOSS, await a.dbg("tuneGet('table.seats')"));
       try {
         const ext = await a.dbg('tableExtents()');
         const rollAs = async (playerId, notation, count) => {
@@ -20877,6 +20717,7 @@ export const scenarios = [
         check(await rollAs(await a.playerId(), '3d6 # From my chair', 3), 0, 3, 'Ann');
         check(await rollAs(await b.playerId(), '3d6 # From the chair opposite', 3), 1, 3, 'Bob');
       } finally {
+        Object.assign(SEAT_TOSS, shippedToss);
         await a.dbg('holdClock(false)');
       }
     },
@@ -22112,6 +21953,17 @@ export const scenarios = [
       await t.waitFor("window.__diceDebug.zoom === 'medium'", { desc: 'the medium table' });
       await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued', { desc: 'the cards stood at medium' });
       await t.dbg("demoRegions('regions')");
+      // THE TOSS IS A DIAL SET, AND THIS PROCESS HAS TO READ THE SAME ONE.
+      // `seatToss` is imported from js/places.js, where SEAT_TOSS holds the
+      // SHIPPED numbers; the tab holds dice.yaml's, which js/main.js copies in
+      // at boot (js/places.js: "main.js copies the tree into it at boot and on
+      // every dial"). On 2026-09-03 Joe dialled the release point on the live
+      // table and saved — `table.seats.back` 0.4 → 2.05 (dbee311) — and this
+      // assertion started comparing the tab's spawn line against a spawn line
+      // nobody is using, off by exactly that 1.65. The declaration is the
+      // authority on both sides or the picture is not the film's.
+      const shippedToss = { ...SEAT_TOSS };
+      Object.assign(SEAT_TOSS, await t.dbg("tuneGet('table.seats')"));
       const check = async (label) => {
         const ext = await t.dbg('tableExtents()');
         const ov = await t.dbg('demoInfo().overlay');
@@ -22145,6 +21997,9 @@ export const scenarios = [
       assert.equal((await t.dbg('demoRegions(false)')).state, 'disabled');
       assert.equal(await t.dbg("demoRegions('sideways')"), null, 'a word that is not a state is refused');
       assert.equal((await t.dbg('demoInfo()')).overlay.state, 'disabled', '…and it changed nothing');
+      // Put the module's own numbers back: SEAT_TOSS is process state and the
+      // scenarios after this one import the same object.
+      Object.assign(SEAT_TOSS, shippedToss);
     },
   },
   {
@@ -26768,6 +26623,161 @@ export const scenarios = [
     },
   },
   {
+    name: 'dev-absent-in-prod',
+    tags: ['dev'],
+    timeout: 90000,
+    // THE SECOND ANSWER — ABSENT, NOT JUST OFF (docs/DEVMODE.md §4, phase D3).
+    // `dev-mode-production` above proves the FIRST one: `app.mode: production`
+    // and the door refuses. That answer is a value in a file, and a value can
+    // be edited by anyone who can reach the file. So `.gcloudignore` also
+    // withholds the bytes — `js/devmode.js`, `js/devui.js`, `css/dev.css` and
+    // `dev.html` are not uploaded — and the two answers are independent by
+    // construction.
+    //
+    // WHICH MEANS THE BUILD CAN DISAGREE WITH THE DECLARATION, and that is the
+    // case this scenario stands in: a tree with exactly those four files
+    // deleted and `DICE_MODE` UNSET, so the served declaration says
+    // `development`, the cheat sheet shows its dev row, the tab believes the
+    // door is there — and the panel is simply not in the build. Deleting the
+    // files rather than setting a flag is the point: this is the deploy's own
+    // shape, and nothing in the app is told about it in advance.
+    //
+    // THE POP-OUT PAGE IS THE FOURTH, and it is pinned here for the reason
+    // `lab.html` is pinned in tests/static-cache.test.mjs (the D5 review,
+    // 2026-09-03): the happy half of that file asserts /dev.html IS served
+    // locally, so a line re-added to the deployed upload would be invisible to
+    // every test in the suite. `.gcloudignore` withholds it; this is where
+    // that claim is measured.
+    //
+    // Four claims: the tab boots clean (a 404 on a module js/main.js imports
+    // dynamically must not become a page exception — `devToggle` does not
+    // await `devOpen`, so a rejection here would surface as an unhandled
+    // rejection on a keypress); `devOpen()` answers null and the real backtick
+    // key does nothing, twice, with ONE console line for the two of them
+    // (`devAbsent` latches, so a second press makes no second request); and
+    // `tuneSet` still moves the lamp, because the DECLARATION is what the app
+    // is configured by and the panel was only ever a way to turn its knobs.
+    async fn(ctx) {
+      // The scratch tree, `dev-write-route`'s shape with one difference: `js`
+      // and `css` are DIRECTORIES of per-file symlinks rather than symlinked
+      // directories, because three of their files have to be missing. Every
+      // other byte is the checkout's own.
+      const dir = mkdtempSync(join(SCRATCH_BASE, 'dev-absent-'));
+      // `dev.html` needs no exclusion in the loop below: only `vendor`,
+      // `models` and `index.html` are linked in from the root, so a page at
+      // the root is absent by construction — which is exactly what makes it
+      // worth ASSERTING here rather than assuming.
+      const DROPPED = ['js/devmode.js', 'js/devui.js', 'css/dev.css', 'dev.html'];
+      try {
+        cpSync(join(ROOT, 'server.js'), join(dir, 'server.js'));
+        writeFileSync(join(dir, 'dice.yaml'), readFileSync(join(ROOT, 'dice.yaml'), 'utf8'));
+        for (const name of ['vendor', 'models', 'index.html']) {
+          symlinkSync(join(ROOT, name), join(dir, name));
+        }
+        for (const tree of ['js', 'css']) {
+          mkdirSync(join(dir, tree));
+          for (const entry of readdirSync(join(ROOT, tree))) {
+            if (DROPPED.includes(`${tree}/${entry}`)) continue;
+            symlinkSync(join(ROOT, tree, entry), join(dir, tree, entry));
+          }
+        }
+        // The tree really is missing them, asserted here rather than assumed:
+        // every claim below is vacuous if the files are quietly still there.
+        for (const rel of DROPPED) {
+          assert.equal(existsSync(join(dir, rel)), false, `${rel} is not in this build`);
+        }
+        assert.equal(existsSync(join(dir, 'js', 'main.js')), true, 'but the app is');
+
+        const port = await freePort();
+        // DICE_MODE UNSET on purpose: the declaration's own `development`
+        // stands, so nothing but the absence of the files is being measured.
+        const server = await startServer(port, { root: dir });
+        try {
+          const page = await ctx.browser.newPage();
+          await page.addInitScript('window.__diceTestMode = true;');
+          await page.addInitScript(`try { localStorage.setItem('dice.schema.v1','2');`
+            + ` localStorage.setItem('dice.name.v1','Absent'); } catch {}`);
+          // THE ONE CONSOLE LINE IS PART OF THE CONTRACT, so it is caught
+          // rather than inferred: the harness only collects `console.error`
+          // (cdp.mjs), and this is deliberately a warn — nothing is wrong with
+          // a build that does not carry dev chrome. A spy installed before the
+          // app module is the only way to count it.
+          await page.addInitScript(`(() => { window.__devWarns = [];
+            const was = console.warn.bind(console);
+            console.warn = (...a) => { window.__devWarns.push(a.map(String).join(' ')); was(...a); };
+          })();`);
+          const url = `http://127.0.0.72:${port}/?room=${encodeURIComponent(ctx.room)}`;
+          await page.navigate(url);
+          const t = new Table(page, url);
+          ctx.tables.push(t);
+          await t.waitFor('!!window.__diceDebug && window.__diceDebug.netReady',
+            { desc: 'the tab boots without the panel', timeout: 30000 });
+          assert.equal(await t.eval('window.__diceDebug.netReady.then((r) => r && r.online)'), true,
+            'and is online: a missing panel is not a missing app');
+          await t.dbg('sim(60)');
+          assert.deepEqual(t.page.errors, [], 'no page exception at boot');
+          assert.deepEqual(t.page.consoleErrors, [], 'and no console error');
+
+          // The server really answers 404 for the three, through the page's
+          // own origin — the same fetch the dynamic import makes.
+          const codes = JSON.parse(await t.eval(`Promise.all(${JSON.stringify(DROPPED)}
+            .map((f) => fetch('/' + f).then((r) => r.status))).then(JSON.stringify)`));
+          assert.deepEqual(codes, [404, 404, 404, 404], 'the four files 404 on this origin');
+
+          // The tab believes it is in development — which is what makes this a
+          // test of the BUILD rather than a second test of `app.mode`.
+          assert.equal(await t.dbg(`tuneGet('app.mode')`), 'development');
+          assert.equal((await t.dbg('devInfo()')).mode, 'development');
+          assert.equal(await t.eval(`document.getElementById('kbd-dev-row').hidden`), false,
+            'the cheat sheet still offers the door');
+
+          // …and the door answers null anyway.
+          assert.equal(await t.dbg('devOpen()'), null, 'devOpen is null');
+          assert.equal((await t.dbg('devInfo()')).panel, 'shut',
+            'and the state did not stick on `open` while the import was in flight');
+          assert.equal(await t.eval(`!!document.getElementById('dev-panel')`), false, 'no panel');
+          assert.equal(await t.eval(`!!document.getElementById('dev-css')`), false,
+            'and no stylesheet either — the link is injected AFTER the import, not before');
+          assert.deepEqual(t.page.errors, [], 'the rejected import is caught, not thrown');
+
+          // The real key, twice. Nothing opens, and the line is not repeated.
+          const key = { key: '`', code: 'Backquote', windowsVirtualKeyCode: 192, nativeVirtualKeyCode: 192 };
+          for (let i = 0; i < 2; i++) {
+            await ctx.browser.send('Input.dispatchKeyEvent',
+              { type: 'keyDown', text: '`', unmodifiedText: '`', ...key }, page.sessionId);
+            await ctx.browser.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key }, page.sessionId);
+            await t.dbg('sim(30)');
+            assert.equal((await t.dbg('devInfo()')).panel, 'shut', `the key did nothing (press ${i + 1})`);
+            assert.equal(await t.eval(`!!document.getElementById('dev-panel')`), false, `no panel (press ${i + 1})`);
+          }
+          assert.deepEqual(t.page.errors, [],
+            'and no unhandled rejection from the keypress path, which does not await devOpen');
+          const warns = JSON.parse(await t.eval('JSON.stringify(window.__devWarns)'));
+          const mine = warns.filter((w) => /developer mode is not in this build/.test(w));
+          assert.equal(mine.length, 1,
+            `one line for the three calls, not three (${JSON.stringify(warns)})`);
+
+          // THE TREE IS NOT THE PANEL. Every dial still reads and writes: the
+          // declaration configures the app whether or not anything can draw a
+          // slider for it, and `tuneSet` is a hook, not a panel control.
+          assert.equal((await t.dbg('lampInfo()')).position[1], 24);
+          const set = await t.dbg(`tuneSet({'light.lamp.y': 33})`);
+          assert.deepEqual(set.refused, [], 'a table of one: the look dial takes');
+          assert.equal((await t.dbg('lampInfo()')).position[1], 33, 'and the lamp moved');
+          assert.equal((await t.dbg('devInfo()')).changed, 1, 'the diff counts it');
+          const reset = await t.dbg(`tuneReset('all')`);
+          assert.deepEqual(reset.diff, []);
+          assert.equal((await t.dbg('lampInfo()')).position[1], 24, 'the lamp is back');
+          assert.deepEqual(t.page.consoleErrors, []);
+        } finally {
+          if (server.exitCode === null) server.kill('SIGTERM');
+        }
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  },
+  {
     name: 'dev-export-roundtrip',
     tags: ['dev'],
     timeout: 120000,
@@ -27275,6 +27285,460 @@ export const scenarios = [
     },
   },
   {
+    name: 'dev-set-roundtrip',
+    tags: ['dev'],
+    timeout: 150000,
+    // THE SECOND ASSET, AND THE ONE THE APP IS ABOUT (docs/DEVMODE.md §9,
+    // phase D2). D1 moved the dice catalogue into `houses:` in dice.yaml so a
+    // recipe could be shown as knobs; this proves the other half — that
+    // turning one is VISIBLE, on the dice already standing on the felt, in the
+    // portraits the picker draws, and on the wire after a Save.
+    //
+    // NO `look` TAG, on purpose. The cosmetic lane's guard is main.js's own
+    // die counter and it fails a `look` scenario that pours so much as one
+    // die; this one throws six, because "the standing die changed colour" is
+    // not a claim that can be made without a standing die.
+    //
+    // The scratch tree is dev-felt-roundtrip's: server.js and dice.yaml
+    // copied (they are what gets written), everything the page loads
+    // symlinked, and the checkout read before and after to prove it never
+    // moved.
+    async fn(ctx) {
+      const dir = mkdtempSync(join(SCRATCH_BASE, 'dev-set-'));
+      const original = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
+      cpSync(join(ROOT, 'server.js'), join(dir, 'server.js'));
+      writeFileSync(join(dir, 'dice.yaml'), original);
+      for (const name of ['js', 'css', 'vendor', 'models', 'index.html']) {
+        symlinkSync(join(ROOT, name), join(dir, name));
+      }
+      const port = await freePort();
+      const server = await startServer(port, {
+        root: dir,
+        env: { DICE_DEV_WRITE: '1', DICE_DEV_ROOT: dir },
+      });
+      // THE CHAMFER BAND'S COLOUR, off the mesh on the felt. Every FACE of a
+      // die carries its body colour inside a baked texture, where no probe can
+      // reach it; the band is `Color(body).lerp(tint, ink)` on a plain
+      // material (js/dice.js buildDie), so it is the one number that is a
+      // function of the recipe AND a property of the object the player is
+      // looking at. Read back as [r, g, b] so a claim can be about hue.
+      const rgb = (hex) => [1, 3, 5].map((i) => parseInt(String(hex).slice(i, i + 2), 16));
+      try {
+        const open = async (origin, room) => {
+          const page = await ctx.browser.newPage();
+          await page.addInitScript('window.__diceTestMode = true;');
+          await page.addInitScript(`try { localStorage.setItem('dice.schema.v1','2');`
+            + ` localStorage.setItem('dice.name.v1','Ivy'); localStorage.removeItem('dice.diceset.v1'); } catch {}`);
+          const url = `http://${origin}:${port}/?room=${encodeURIComponent(room)}`;
+          await page.navigate(url);
+          const tab = new Table(page, url);
+          ctx.tables.push(tab);
+          await tab.waitFor('!!window.__diceDebug && window.__diceDebug.netReady', { desc: `the tab at ${origin} is up`, timeout: 30000 });
+          assert.equal(await tab.eval('window.__diceDebug.netReady.then((r) => r && r.online)'), true, `online at ${origin}`);
+          await tab.dbg('sim(60)');
+          return tab;
+        };
+
+        const t = await open('127.0.0.76', ctx.room);
+
+        // A NEVER-OPENED TAB ANSWERS THE READOUT AND REFUSES EVERY WRITER —
+        // the negative half first, as every dev scenario takes it.
+        const shut = await t.dbg('devSets()');
+        // Twenty-three, which is `tests/catalogue.test.mjs`'s pinned SET_IDS
+        // list under Node: what is claimed here is that the readout is the
+        // WHOLE catalogue and not the panel's idea of a slice of it, so the
+        // number moves with that test's and for the same reason.
+        assert.equal(shut.sets.length, 23, 'the whole catalogue is in the readout');
+        assert.equal(shut.current, 'std', 'and this viewer is on the table classics');
+        assert.equal(shut.standing.length, 0, 'nothing on the felt yet');
+        assert.ok(shut.sets.every((s) => s.inFile),
+          'every set is declared in dice.yaml — since D1 there is no such thing as a set that lives in code');
+        assert.equal(shut.sets.filter((s) => s.removable).length, 0,
+          '…and none of them is this editor\'s to remove');
+        assert.equal(await t.dbg(`devSetClone('classics.ivory')`), null, 'the door is shut: nothing is cloned');
+        assert.equal(await t.dbg(`devSetApply('classics.ivory')`), null, '…and nothing is worn');
+        assert.equal(await t.dbg(`devSetBench('classics.ivory')`), null, '…and nothing is thrown');
+
+        assert.equal((await t.dbg('devOpen()')).panel, 'open');
+        await t.waitFor(`document.querySelector('#dev-panel .dev-saveroute')?.hidden === false`,
+          { desc: 'the panel heard back that the route is armed' });
+
+        // ---- clone -----------------------------------------------------
+        const cloned = await t.dbg(`devSetClone('classics.ivory')`);
+        assert.deepEqual(cloned.refused, [], 'a legal clone lands whole');
+        assert.equal(cloned.id, 'house.ivory-2', 'into the `house` house, at <set>-2');
+        const mine = cloned.sets.find((s) => s.id === 'house.ivory-2');
+        assert.equal(mine.houseLabel, 'House', 'the house row was minted with it — a house needs a label to draw a header');
+        assert.equal(mine.label, 'Ivory (house)', 'and the copy says it is a copy');
+        assert.equal(mine.inFile, false, 'the file does not declare it yet — Save is what puts it there');
+        assert.equal(mine.removable, true, 'a row this editor made is one it may take away');
+        assert.equal(cloned.sets.find((s) => s.id === 'classics.ivory').removable, false,
+          '…while the shipped row it was copied from stays: a saved pool and another player\'s roll both resolve it');
+        assert.deepEqual((await t.dbg(`devSetRemove('classics.ivory')`)).refused,
+          [['houses.classics.dice.ivory', 'shipped']], 'and Remove says so by name rather than ignoring it');
+        assert.deepEqual((await t.dbg(`devSetClone('no.such')`)).refused, [['houses.no.such', 'unknown']]);
+        // A NAMED CLONE MAY NOT LAND ON A ROW THAT IS THERE (the D2 review,
+        // 2026-09-03). `tune.addRow` writes a row WHOLE, so the auto-numbering
+        // walk was the only thing between a second clone and somebody's
+        // unsaved edits: `devSetClone('classics.onyx', 'ivory-2')` used to
+        // answer `{id: 'house.ivory-2', refused: []}` and the ivory row was
+        // simply gone.
+        const collide = await t.dbg(`devSetClone('classics.onyx', 'ivory-2')`);
+        assert.equal(collide.id, null, 'a clone that would overwrite a row is not a clone');
+        assert.deepEqual(collide.refused, [['houses.house.dice.ivory-2', 'taken']], '…and it says which row');
+        assert.equal((await t.dbg('devSetRecipe("house.ivory-2")')).label, 'Ivory (house)',
+          'the row that was there is untouched');
+        // …and an id nothing could be called answers NO id, rather than
+        // naming a row that was never created (the panel points its form at
+        // whatever comes back).
+        const illegal = await t.dbg(`devSetClone('classics.ivory', 'has.dot')`);
+        assert.equal(illegal.id, null);
+        assert.deepEqual(illegal.refused, [['houses.house.dice.has.dot', 'id']]);
+
+        // ---- throw one of each -----------------------------------------
+        const thrown = await t.dbg(`devSetBench('house.ivory-2', 'ivy')`);
+        assert.equal(thrown.notation, '1d4+1d6+1d8+1d10+1d12+1d20 # bench',
+          'one of every type, which is what a recipe is judged on, down the bench path');
+        assert.equal(thrown.set, 'house.ivory-2');
+        await t.settle();
+        const standing = (await t.dbg('devSets()')).standing;
+        assert.equal(standing.length, 6, 'six dice on the felt');
+        assert.deepEqual(standing.map((d) => d.type), ['d4', 'd6', 'd8', 'd10', 'd12', 'd20']);
+        assert.ok(standing.every((d) => d.variant === 'house.ivory-2'),
+          `all six wearing the set (got: ${standing.map((d) => d.variant).join(',')})`);
+        assert.equal(await t.dbg('devSets().current'), 'std',
+          'and throwing one did NOT change what this viewer rolls in — looking is not choosing');
+        // The throw went nowhere near the wire (the bench's rule, C2), and it
+        // says so on the row: a LOCAL roll's id is minted `solo-…` here rather
+        // than by the server's crypto.randomUUID.
+        assert.equal(await t.logCount(), 1, 'one log row');
+        assert.match(await t.logTop(), /bench/, 'labelled bench');
+        assert.match(await t.rollId(), /^solo-/, 'and thrown locally, as a seeded throw must be');
+
+        // ---- the live edit ---------------------------------------------
+        const d6Edge = async () => (await t.dbg('devSets()')).standing.find((d) => d.type === 'd6').edge;
+        const before = await d6Edge();
+        const artBefore = await t.dbg(`dieArtFor('d6', 'house.ivory-2')`);
+        assert.ok(artBefore, 'the portrait bakery answered for the new set');
+        const [r0, g0, b0] = rgb(before);
+        assert.ok(r0 > 180 && g0 > 170 && b0 > 150, `ivory reads as ivory on the die itself (${before})`);
+
+        // …written as an ordinary dial, through `tuneSet`, because that is the
+        // path the panel's own sliders take and the one Save reads back.
+        assert.deepEqual((await t.dbg(`tuneSet({ 'houses.house.dice.ivory-2.body': '#ff0000' })`)).refused, []);
+        await t.waitFor(`(() => { const e = window.__diceDebug.devSets().standing.find((d) => d.type === 'd6').edge;`
+          + ` return e && parseInt(e.slice(1, 3), 16) > 150 && parseInt(e.slice(3, 5), 16) < 60; })()`,
+          { desc: 'the d6 already standing on the felt repainted red' });
+        const after = await d6Edge();
+        const [r1, g1, b1] = rgb(after);
+        assert.ok(r1 > 150 && g1 < 60 && b1 < 60,
+          `the STANDING die wears the new recipe (${after} was ${before})`);
+        assert.equal((await t.dbg('devSets()')).standing.filter((d) => rgb(d.edge)[1] < 60).length, 6,
+          'and so do all six of them, not just the one that was probed');
+        // THE PORTRAIT CACHE, which is the one thing here nobody would notice
+        // was missing: the bakery keys art by (variant, type) and warms a
+        // variant once, so an edited recipe whose art was kept would leave the
+        // picker showing a portrait of the die as it was.
+        const artAfter = await t.dbg(`dieArtFor('d6', 'house.ivory-2')`);
+        assert.ok(artAfter && artAfter !== artBefore, 'the portrait was re-baked with the recipe');
+
+        // ---- the cadence, the one live field that reached nothing --------
+        //
+        // DEVMODE §9's "what a live edit cannot reach" paragraph exists so
+        // that nobody has to find a thing like this out by accident, and it
+        // was wrong about `rest` in both directions (the D2 review,
+        // 2026-09-03): `initRest` captures `SETS[id].rest` ONCE at playRoll
+        // and `installCatalogue` builds fresh objects, so a standing die read
+        // the previous catalogue's cadence for as long as it stood. Measured
+        // then: a seaglass clone dialed from 0.0015 to 0.2 still swelled at
+        // 0.0015 while `devSetRecipe()` reported 0.2.
+        //
+        // The probe is the MAX |deltaY| over a window — `restInfo` reports the
+        // live mesh pose minus the frozen archive pose, and a sample taken at
+        // one instant can land on a zero crossing.
+        const swing = (frames) => t.eval(`(() => { const d = window.__diceDebug; let m = 0;`
+          + ` for (let i = 0; i < ${frames}; i++) { d.sim(1);`
+          + ` for (const r of d.restInfo()) m = Math.max(m, Math.abs(r.deltaY)); } return m; })()`);
+        const kinds = async () => (await t.dbg('restInfo()')).map((r) => r.kind);
+        assert.ok((await kinds()).every((k) => k === 'still'), 'ivory names no cadence: the six dice are still');
+        assert.ok(await swing(90) < 1e-6, '…and they do not move at all');
+        // A WHOLE BLOCK, ONE FIELD AT A TIME, which is how the panel writes
+        // it — and which used to divide by an absent period and put the die
+        // at NaN. A sparse field is its dial's default, because that is what
+        // the panel says it is showing.
+        assert.deepEqual((await t.dbg(`devSetSet('house.ivory-2', { 'rest.kind': 'swell' })`)).refused, []);
+        assert.deepEqual((await t.dbg('restInfo()')).map((r) => r.kind).filter((k) => k !== 'swell'), [],
+          'the dice ALREADY STANDING took the cadence — the whole of what this fix is');
+        const shipped = await swing(240);
+        assert.ok(shipped > 0.0005 && shipped < 0.003,
+          `a rest block naming only its kind swells at the dial's default, not at NaN (${shipped})`);
+        assert.deepEqual((await t.dbg(`devSetSet('house.ivory-2', { 'rest.yAmpM': 0.009, 'rest.yPeriodS': 1.2 })`)).refused, []);
+        const wide = await swing(180);
+        assert.ok(wide > 0.006, `and a dialed amplitude reaches them too (${wide})`);
+        // THE OTHER DIRECTION, which was equally dead: back to still, and the
+        // die is put back on its archive pose rather than left mid-swell.
+        assert.deepEqual((await t.dbg(`devSetSet('house.ivory-2', { 'rest.kind': 'still' })`)).refused, []);
+        assert.ok((await kinds()).every((k) => k === 'still'));
+        assert.ok(await swing(90) < 1e-6, 'a cadence dialed off stops, on the pose the archive names');
+
+        // ---- the panel's own section -------------------------------------
+        await t.eval(`document.querySelector('#dev-panel .dev-secbar button[data-value="sets"]').click()`);
+        await t.dbg('sim(2)');
+        const sets = `#dev-panel .dev-section[data-section="sets"]`;
+        assert.equal(await t.eval(`document.querySelector('${sets}').hidden`), false,
+          'the section bar grew a `sets` entry and it shows');
+        // WHICH SET THE FORM EDITS follows the row the editor last touched,
+        // then the one the viewer wears, then the first in the catalogue.
+        // The middle clause alone is the felts section's rule and it is not
+        // enough here: this viewer wears `std`, which is not a row under
+        // `houses:` at all, so a clone from the console would have left the
+        // form on the catalogue's first set while the felt showed the clone.
+        const pick = (which, v) => t.eval(`(() => { const s = document.querySelector('${sets} select.dev-${which}pick');`
+          + ` s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event('change')); })()`);
+        assert.equal(await t.eval(`document.querySelector('${sets} select.dev-housepick').value`), 'house');
+        assert.equal(await t.eval(`document.querySelector('${sets} select.dev-setpick').value`), 'house.ivory-2');
+        assert.equal(await t.eval(`document.querySelectorAll('${sets} select.dev-setpick option').length`), 1,
+          'and the set picker offers that house\'s sets and no others');
+        assert.equal(await t.eval(`document.querySelector('${sets} .dev-row[data-path="sets.body"] .dev-hex').value`), '#ff0000',
+          'the form is showing the value the console wrote');
+        // A choice made BY HAND is the picker's, and the house picker
+        // re-points the set picker at that house's own rows.
+        await pick('house', 'classics');
+        await t.dbg('sim(2)');
+        assert.equal(await t.eval(`document.querySelector('${sets} select.dev-setpick').value`), 'classics.ivory');
+        assert.equal(await t.eval(`document.querySelector('${sets} .dev-row[data-path="sets.body"] .dev-hex').value`), '#f3ead7',
+          'and the form re-points at the shipped row, which is editable like any other — every recipe lives in the file now');
+        await pick('set', 'classics.onyx');
+        await t.dbg('sim(2)');
+        const bodyRow = `${sets} .dev-row[data-path="sets.body"]`;
+        assert.equal(await t.eval(`document.querySelector('${bodyRow} .dev-hex').value`), '#141416');
+        // A DECLARED ROW'S FIELD GOES BACK FROM THE ROW'S OWN GLYPH. Every
+        // dial row's ↺ is bound once to a fixed path; a field here belongs to
+        // whichever set the picker names, so the binding is to the FIELD and
+        // the row is asked for at the click.
+        assert.deepEqual((await t.dbg(`tuneSet({ 'houses.classics.dice.onyx.body': '#00ff00' })`)).refused, []);
+        await t.waitFor(`document.querySelector('${bodyRow}')?.classList.contains('is-changed')`,
+          { desc: 'the shipped row\'s body reads as changed' });
+        assert.equal(await t.eval(`document.querySelector('${bodyRow} .dev-hex').value`), '#00ff00');
+        assert.equal(await t.eval(`document.querySelector('${bodyRow} .dev-revert').hidden`), false, 'and offers the glyph');
+        await t.eval(`document.querySelector('${bodyRow} .dev-revert').click()`);
+        await t.dbg('sim(4)');
+        assert.equal(await t.eval(`document.querySelector('${bodyRow} .dev-hex').value`), '#141416',
+          'which puts the FILE\'s value back, not the dial default');
+        assert.equal(await t.eval(`document.querySelector('${bodyRow}').classList.contains('is-changed')`), false);
+        await pick('house', 'house');
+        await t.dbg('sim(2)');
+        assert.equal(await t.eval(`document.querySelector('${sets} select.dev-setpick').value`), 'house.ivory-2');
+        // A SPARSE ROW'S ABSENT FIELD SHOWS THE CODE'S OWN FALLBACK, marked as
+        // a default: ivory names no `geo`, so what the panel shows for its
+        // bevel is what the die is already doing (js/dice.js STD_EDGE).
+        assert.equal(await t.eval(`document.querySelector('${sets} .dev-row[data-path="sets.geo.bevel"]').classList.contains('is-default')`), true);
+        assert.equal(await t.eval(`document.querySelector('${sets} .dev-row[data-path="sets.body"]').classList.contains('is-default')`), false,
+          '…while a field the row does carry is not a default');
+        // THE FACE TABLE IS DRAWN ONLY WHERE IT IS READ (dice.js applies it on
+        // a d6 wearing `glyph: faces`), so six pickers over a digit set would
+        // be six controls with no effect.
+        const face0 = `${sets} .dev-row[data-path="sets.faces.0"]`;
+        assert.equal(await t.eval(`document.querySelector('${face0}').hidden`), true, 'no face pickers over a digit set');
+        assert.deepEqual((await t.dbg(`devSetSet('house.ivory-2', { glyph: 'faces' })`)).refused, []);
+        await t.waitFor(`document.querySelector('${face0}')?.hidden === false`, { desc: 'the face pickers appear with the glyph' });
+        assert.equal(await t.eval(`document.querySelectorAll('${sets} .dev-row[data-path^="sets.faces."]').length`), 6);
+        assert.deepEqual((await t.dbg(`devSetSet('house.ivory-2', { faces: ['bolt', '2', '3', '4', '5', 'claw'] })`)).refused, []);
+        await t.waitFor(`document.querySelector('${face0} select')?.value === 'bolt'`,
+          { desc: 'the first face picker shows the entry the table names' });
+        assert.equal(await t.eval(`document.querySelectorAll('${face0} select option').length`), 12,
+          'six digits and six drawn symbols — a select, because twelve segmented cells in 145px read as one letter each');
+        assert.deepEqual((await t.dbg(`devSetSet('house.ivory-2', { faces: ['1', '2', '3'] })`)).refused,
+          [['houses.house.dice.ivory-2.faces', 'range']], 'a table of three is not a d6');
+        // …and back to digits, so the row that gets saved is the plain one.
+        await t.dbg(`tuneReset('houses.house.dice.ivory-2')`);
+        await t.waitFor(`document.querySelector('${sets} select.dev-setpick').value === ''`
+          + ` || !window.__diceDebug.devSets().sets.some((s) => s.id === 'house.ivory-2')`,
+          { desc: 'reverting a row this session minted takes the whole row away' });
+        assert.equal((await t.dbg('devSets()')).sets.find((s) => s.id === 'house.ivory-2'), undefined);
+
+        // ---- and again, this time to keep ---------------------------------
+        assert.equal((await t.dbg(`devSetClone('classics.ivory')`)).id, 'house.ivory-2');
+        assert.deepEqual((await t.dbg(`devSetSet('house.ivory-2', { body: '#ff0000', 'feel.metal': 0.4 })`)).refused, []);
+        assert.equal((await t.dbg('devSetRecipe("house.ivory-2")')).feel.metal, 0.4);
+
+        // ---- Use at table waits for the FILE --------------------------------
+        //
+        // THE ONE THING IN THIS EDITOR THAT CAN BREAK THE ROLL BUTTON (the D2
+        // review, 2026-09-03). `SETS[id]` says this TAB can draw the set; what
+        // `diceSet` needs is that the SERVER can resolve it, and the server
+        // resolves a rolled set out of dice.yaml (`readSetField` →
+        // `unknown_set`). A clone wears perfectly on the felt and 400s every
+        // roll from the moment it is worn — a page banner reading `unknown
+        // dice set: house.ivory-2` and an empty console were the whole of the
+        // evidence. So the row has to be IN THE FILE first, and Save is the
+        // one move that puts it there.
+        const early = await t.dbg(`devSetApply('house.ivory-2')`);
+        assert.deepEqual(early.refused, [['houses.house.dice.ivory-2', 'unsaved']],
+          'a row the file does not declare is refused BY NAME — not null, which is the gate\'s answer');
+        assert.equal(await t.dbg('diceSet'), 'std', '…and the viewer keeps the set they had');
+        // The form is pointed at the row BY HAND, because the pickers have
+        // been used in this scenario and a picked row is the picker's from
+        // then on (see the section's three-clause rule).
+        await pick('house', 'house');
+        await t.dbg('sim(2)');
+        assert.equal(await t.eval(`document.querySelector('${sets} select.dev-setpick').value`), 'house.ivory-2');
+        const useBtn = `#dev-panel .dev-section[data-section="sets"] .dev-verbs button[title]`;
+        assert.equal(await t.eval(`[...document.querySelectorAll('${useBtn}')]`
+          + `.find((b) => b.textContent === 'Use at table').disabled`), true,
+          'and the panel draws it held rather than letting somebody find out by clicking');
+        assert.equal(await t.eval(`[...document.querySelectorAll('${useBtn}')]`
+          + `.find((b) => b.textContent === 'Use at table').title`),
+          'Save the row first — the server only accepts a set dice.yaml declares');
+        // AND THE PLAYER'S OWN CHIP IS THE SAME DOOR, so it takes the same
+        // clause: an unsaved row is not offered in the settings picker either,
+        // beside the two rules already there about where a set may be PICKED.
+        await t.eval(`document.querySelector('#diceset-picker .set-select').click()`);
+        await t.waitFor(`!!document.querySelector('.set-menu')`, { desc: 'the settings picker opened' });
+        assert.equal(await t.eval(`!!document.querySelector('.set-menu .set-swatch[data-set="house.ivory-2"]')`), false,
+          'a set only this session has takes no chip — picking it there would 400 exactly as Use at table would');
+        assert.equal(await t.eval(`!!document.querySelector('.set-menu .set-swatch[data-set="classics.ivory"]')`), true,
+          '…while everything the file declares is offered as it always was');
+        await t.eval(`document.querySelector('.set-menu').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+        await t.dbg('sim(2)');
+
+        // THE PROOF THAT THE GATE IS THE RIGHT ONE: the roll button still
+        // works. This is the exact call that came back 400 `unknown_set`
+        // before, with the log frozen at its one bench row.
+        await t.roll('1d6 # unsaved');
+        assert.equal(await t.logCount(), 2, 'the roll landed');
+        assert.doesNotMatch(await t.rollId(), /^(solo|demo)-/, '…through the server, which is where the refusal used to come from');
+
+        // WHAT SAVE WOULD WRITE, said in the corner too. The footer used to
+        // count DIAL ROWS wearing the changed mark, which was the whole diff
+        // before asset rows existed and is not now: a cloned set is ninety
+        // leaves the file does not have, and the glyph read `0 changed` beside
+        // a file section that read the truth.
+        const counts = await t.eval(`document.querySelector('#dev-panel .dev-foot-counts').textContent`);
+        assert.match(counts, /^\d+ changed/, `the footer counts something (${counts})`);
+        assert.equal(Number(counts.match(/^(\d+)/)[1]), (await t.dbg('devInfo()')).changed,
+          'and it is the same number devInfo() and the file section give');
+
+        // ---- the file ------------------------------------------------------
+        const exported = await t.dbg('tuneExport()');
+        assert.match(exported, /\n {2}house:\n/, 'the export grew the house the editor authors into');
+        assert.match(exported, /\n {6}ivory-2:\n/, '…with the set under its `dice:` collection');
+        assert.match(exported, /\n {8}body: "#ff0000"\n/);
+        assert.ok(exported.startsWith(original.slice(0, original.indexOf('\nhouses:'))),
+          'and not one byte above `houses:` moved');
+
+        await t.eval(`document.querySelector('#dev-panel .dev-saveroute').click()`);
+        await t.waitFor(`document.querySelector('#dev-panel .dev-statusslot')?.textContent.includes('saved')`,
+          { desc: 'the route wrote the row' });
+        const saved = readFileSync(join(dir, 'dice.yaml'), 'utf8');
+        assert.equal(saved, exported, 'the server patched its own file to exactly what the tab would have downloaded');
+        assert.equal(readFileSync(join(ROOT, 'dice.yaml'), 'utf8'), original, 'the CHECKOUT was never touched');
+
+        // ---- …and Save is what lifts the gate, in THIS tab -----------------
+        //
+        // The route re-reads the file it just wrote (`setDeclaration`), so the
+        // set is on the wire from the moment Save answers ok — while this
+        // tab's `SHIPPED` is a boot snapshot and will not know until a reload.
+        // A gate that asked SHIPPED alone would refuse the set you just saved.
+        await t.dbg('sim(2)');
+        assert.equal((await t.dbg('devSets()')).sets.find((s) => s.id === 'house.ivory-2').inFile, true,
+          'the file declares it now, with no reload');
+        assert.equal(await t.eval(`[...document.querySelectorAll('${useBtn}')]`
+          + `.find((b) => b.textContent === 'Use at table').disabled`), false, '…and the button un-greys');
+        assert.deepEqual((await t.dbg(`devSetApply('house.ivory-2')`)).refused, []);
+        assert.equal(await t.dbg('diceSet'), 'house.ivory-2', 'the ordinary setDiceSet path, so the picker and the wire agree');
+        await t.roll('1d6 # authored');
+        assert.equal(await t.logCount(), 3);
+        assert.doesNotMatch(await t.rollId(), /^(solo|demo)-/, 'and the server took the set it was saved');
+        assert.ok((await t.dbg('tableDiceInfo()')).some((d) => d.variant === 'house.ivory-2'),
+          '…and echoed back a die wearing it');
+
+        // …AND THE CHOICE MAY NOT OUTLIVE THE ROW. `diceSet` rides every roll
+        // this tab throws, so a row removed (or reset away by Shut) while the
+        // viewer was wearing it would leave the roll button 400ing again —
+        // the same failure from the other end.
+        assert.deepEqual((await t.dbg(`devSetRemove('house.ivory-2')`)).refused, []);
+        assert.equal(await t.dbg('diceSet'), 'std', 'the table went back to the classics with the row');
+        assert.equal((await t.dbg('devSets()')).sets.find((s) => s.house === 'house'), undefined,
+          '…and the emptied house went with its last set, so the export grows no `house:` block with nothing under it');
+        // Cloned again: the TREE row is new, the FILE's row is not, so this
+        // one may be worn straight away — the gate is about the id the server
+        // resolves, not about who typed the recipe.
+        assert.equal((await t.dbg(`devSetClone('classics.ivory')`)).id, 'house.ivory-2');
+        assert.deepEqual((await t.dbg(`devSetSet('house.ivory-2', { body: '#ff0000', 'feel.metal': 0.4 })`)).refused, []);
+        assert.deepEqual((await t.dbg(`devSetApply('house.ivory-2')`)).refused, []);
+        assert.equal(await t.dbg('diceSet'), 'house.ivory-2');
+
+        // ---- a fresh tab, where it is simply one of the sets ----------------
+        const fresh = await open('127.0.0.77', `${ctx.room}-fresh`);
+        const list = (await fresh.dbg('devSets()')).sets;
+        const row = list.find((s) => s.id === 'house.ivory-2');
+        assert.ok(row, 'the set is in the catalogue of a tab that never opened the door');
+        assert.equal(row.inFile, true, 'the file declares it now');
+        assert.equal(row.label, 'Ivory (house)');
+        assert.equal((await fresh.dbg('devInfo()')).changed, 0,
+          'and it reads as SHIPPED — the file is the declaration, not a diff');
+        // THE PICKER: a set the file declares takes a chip like any other,
+        // under its house's header, with no panel anywhere.
+        await fresh.eval(`document.querySelector('#diceset-picker .set-select').click()`);
+        await fresh.waitFor(`!!document.querySelector('.set-menu .set-swatch[data-set="house.ivory-2"]')`,
+          { desc: 'the settings picker offers it' });
+        assert.equal(await fresh.eval(`document.querySelector('.set-menu .set-swatch[data-set="house.ivory-2"] span:last-child').textContent`),
+          'Ivory (house)');
+        assert.equal(await fresh.eval(`[...document.querySelectorAll('.set-house-head')].some((h) => h.textContent === 'House')`),
+          true, 'under the house it was authored into');
+        await fresh.eval(`document.querySelector('.set-menu .set-swatch[data-set="house.ivory-2"]').click()`);
+        await fresh.waitFor(`window.__diceDebug.diceSet === 'house.ivory-2'`, { desc: 'picked from the ordinary chip' });
+
+        // THE HALF THAT DECIDES WHETHER AN AUTHORED SET WORKS AT A TABLE: the
+        // roll rides the id to the server, which refuses one no dice.yaml
+        // declares (`unknown_set`, server.js readSetField). The server read
+        // the same file this tab was saved into, so the roll lands.
+        await fresh.roll('1d6 # authored');
+        // A SERVER roll id (crypto.randomUUID), not a local `solo-…` one: the
+        // roll really went to the server carrying `set: 'house.ivory-2'`, and
+        // came back. `roll()` waits for the log to grow, so a 400 here would
+        // not be a wrong value — it would be this line timing out.
+        assert.doesNotMatch(await fresh.rollId(), /^(solo|demo)-/, 'the roll went through the server');
+        assert.ok((await fresh.dbg('tableDiceInfo()')).some((d) => d.variant === 'house.ivory-2'),
+          'and the die it echoed back is wearing the authored set');
+
+        // ---- and what a second viewer holds --------------------------------
+        //
+        // NOT THE WHOLE SECTION, which is where this editor's gate differs
+        // from the felts editor's, and the difference is a claim worth
+        // pinning. A felt is ROOM state, so every verb of that editor is
+        // refused the moment somebody else is at the table. A RECIPE is
+        // playback — two clients with different dice.yaml files already draw
+        // the same roll in different materials — so what is held here is only
+        // the two verbs that would put an invented set in front of another
+        // viewer, plus the one field of a recipe that is a READING both tabs
+        // have to agree on.
+        const second = await open('127.0.0.78', ctx.room);
+        await t.waitFor(`(window.__diceDebug.sim(30), window.__diceDebug.devInfo().film === 'locked')`,
+          { desc: 'a second seat locks the film on the first tab' });
+        assert.equal(await t.dbg(`devSetBench('house.ivory-2')`), null, 'no seeded throw at a shared table');
+        assert.equal(await t.dbg(`devSetApply('classics.onyx')`), null, '…and no set is put on the wire');
+        assert.deepEqual((await t.dbg(`devSetSet('house.ivory-2', { 'feel.rough': 0.2 })`)).refused, [],
+          'but a look field still moves: a recipe is this viewer\'s projector, not the film');
+        assert.deepEqual((await t.dbg(`devSetSet('house.ivory-2', { glyph: 'faces' })`)).refused, []);
+        assert.deepEqual((await t.dbg(`devSetSet('house.ivory-2', { faces: ['bolt', '2', '3', '4', '5', '6'] })`)).refused,
+          [['houses.house.dice.ivory-2.faces', 'film']],
+          'while the face table is held — one tab whose `claw` face is a 5 is a tab looking at a different roll');
+        await t.dbg('sim(4)');
+        assert.equal(await t.eval(`document.querySelector('${sets} .dev-row[data-path="sets.faces.0"] select').disabled`), true,
+          'and the panel draws it locked rather than letting somebody find out by clicking');
+
+        assert.deepEqual(t.page.consoleErrors, []);
+        assert.deepEqual(fresh.page.consoleErrors, []);
+        assert.deepEqual(second.page.consoleErrors, []);
+      } finally {
+        if (server.exitCode === null) server.kill('SIGTERM');
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  },
+  {
     name: 'dev-shell-loads',
     tags: ['dev'],
     timeout: 60000,
@@ -27731,11 +28195,12 @@ export const scenarios = [
     //   · post.bloom.
     //     threshold        → the `uThresh` UNIFORM, read off the material
     //                        (postInfo), not off the tree that set it;
-    //   · cards.*          → a ⟳ row, so the claim is the OPPOSITE shape: the
-    //                        dial must NOT move the live table, must be
-    //                        reported as pending, must survive Save, and must
-    //                        be worn by the next boot — measured on the card
-    //                        ring's own radius and on the rig's own footprint.
+    //   · cards.*          → the DECLARATION's own round trip: the dial moves
+    //                        the live ring at the placard flush (phase D4 —
+    //                        `dev-cards-live` holds the flush itself), Save
+    //                        writes it, and the NEXT BOOT wears it, measured
+    //                        on the card ring's own radius and on the rig's
+    //                        own footprint.
     //
     // The `cards` leg needs a reload, so it runs against a scratch checkout
     // with the armed write route (dev-write-route's tree, dev-felt-roundtrip's
@@ -27873,21 +28338,27 @@ export const scenarios = [
         assert.deepEqual(await pad(a), { w: PLACARD_W, d: 1.52, h: 0.14 },
           'and the pad in the buffer is the shipped footprint');
 
-        // A ⟳ ROW DOES NOT MOVE THE TABLE, and that is the claim, not a
-        // shortcoming: the rig is baked once at boot and the anchors are
-        // computed from these numbers at every flush, so a live half-change
-        // would be a ring of cards the size of neither declaration. The panel
-        // is told instead — `pending`, the ⟳ mark, and Save & reload.
+        // THE ROW MOVED THE LIVE TABLE (phase D4, 2026-09-03). This leg used
+        // to assert the opposite — "a ⟳ row does not move the table, and that
+        // is the claim, not a shortcoming" — which was true of C5's build and
+        // is the debt DEVMODE §8 booked as "rebuild choke points". It is paid:
+        // js/main.js `rebuildPlacards` disposes the rig and re-stands it at
+        // the placard flush, so the assertion moved with the design rather
+        // than being loosened. What is UNCHANGED is everything the ring is
+        // for: the cards are still film, they still stand on one ring, and the
+        // file is still what the next tab boots on.
         const moved = await a.dbg(`tuneSet({'cards.standoff': 1.6, 'cards.width': 4.6, 'cards.depth': 2})`);
         assert.deepEqual(moved.refused, [], 'a table of one may move a film dial');
-        assert.deepEqual(moved.pending.sort(), ['cards.depth', 'cards.standoff', 'cards.width'],
-          'all three are reload rows, and the panel is told so');
+        assert.deepEqual(moved.pending, [], 'and nothing is owed to a reload any more');
         await a.dbg('sim(30)');
-        assert.deepEqual(await ring(a), r0, 'the ring did not move under the live table');
-        assert.deepEqual(await pad(a), { w: PLACARD_W, d: 1.52, h: 0.14 }, 'nor did the pad');
+        const rLive = await ring(a);
+        assert.ok(Math.abs(rLive.r - (ringRadius(rLive.w) + 1.6)) < 1e-9,
+          `the ring stands at the new standoff without a reload (${rLive.r} against ${r0.r})`);
+        assert.deepEqual(await pad(a), { w: 4.6, d: 2, h: 0.14 },
+          'and the rig was re-baked to the new footprint in place');
         const row = (await a.dbg('tuneDiff()')).find((q) => q.path === 'cards.width');
         assert.equal(row.cls, 'film', 'the cards are FILM — two clients must agree on the ring');
-        assert.equal(row.read, 'reload', 'and they are read at boot');
+        assert.equal(row.read, 'apply', 'and they land at the placard flush');
 
         // ---- Save, and the next boot wears it ------------------------------
         await a.waitFor(`document.querySelector('#dev-panel .dev-saveroute')?.hidden === false`,
@@ -27918,6 +28389,829 @@ export const scenarios = [
         if (server.exitCode === null) server.kill('SIGTERM');
         rmSync(dir, { recursive: true, force: true });
       }
+    },
+  },
+  {
+    name: 'dev-presets',
+    tags: ['dev'],
+    timeout: 120000,
+    // NAMED PATCHES IN THE DECLARATION (docs/DEVMODE.md §8, phase D4). The A/B
+    // slots hold two patches for as long as the tab is open; a preset is the
+    // same capture WRITTEN DOWN, so "the light I liked on Tuesday" survives a
+    // reload, a Shut and a commit.
+    //
+    // What this holds, in the order it holds it:
+    //   · the door is the gate — every writer answers null before it opens;
+    //   · a preset of NOTHING is refused by name, because `changes()` speaks
+    //     in leaves and an empty row is one Save could never write down;
+    //   · Hold captures the dials as they stand, and Apply puts them back ON
+    //     THE SCENE — the lamp's own SpotLight and the world's own gravity,
+    //     not the tree that was asked to move them;
+    //   · the row is a CHANGE: it is in `tuneExport()` under `presets:`, and
+    //     Remove takes it out again;
+    //   · and Apply is a PASTE, so at a table of two the look rows land and
+    //     the film rows come back refused BY NAME. That last leg is the one
+    //     the feature could most easily get wrong in the direction that
+    //     matters (GOALPOST 2: no forked film).
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.91', name: 'Preset' });
+      await t.settle();
+
+      // The negative half first, as every dev scenario takes it.
+      assert.deepEqual(await t.dbg('devPresets()'), [], 'nothing is declared, so there are no presets');
+      assert.equal(await t.dbg(`devPresetHold('dusk')`), null, 'the door is shut: nothing is held');
+      assert.equal(await t.dbg(`devPresetApply('dusk')`), null, '…and nothing is applied');
+
+      assert.equal((await t.dbg('devOpen()')).panel, 'open');
+
+      // A PRESET OF NOTHING IS NOT A PRESET.
+      assert.deepEqual((await t.dbg(`devPresetHold('dusk')`)).refused, [['presets.dusk', 'empty']]);
+      assert.deepEqual(await t.dbg('devPresets()'), [], 'and no row was minted');
+
+      // ---- hold ----------------------------------------------------------
+      await t.dbg(`tuneSet({'light.lamp.y': 40, 'light.fog.far': 70, 'throw.physics.gravity': -60})`);
+      // WHAT HOLD PROMISES IS WHAT HOLD WRITES (the D4 review, 2026-09-03).
+      // The button counted the top-level SECTIONS of the capture and the note
+      // beside a held row counts its LEAVES, so three moved dials in two
+      // sections offered "2 changed rows" and then said "3 rows" the moment
+      // you pressed it. Everywhere else in the panel a row is a leaf.
+      const promised = `#dev-panel .dev-section[data-section="presets"] .dev-clockout`;
+      assert.match(await t.eval(`document.querySelector('${promised}').textContent`),
+        /Hold would write 3 changed rows down/, 'three leaves in two sections is three rows');
+      const held = await t.dbg(`devPresetHold('dusk')`);
+      assert.deepEqual(held.refused, []);
+      assert.deepEqual(held.presets, [{
+        name: 'dusk', inFile: false, leaves: 3, film: 1,
+        paths: [['light.lamp.y', 40], ['light.fog.far', 70], ['throw.physics.gravity', -60]],
+      }], 'the three dials it was holding, and it knows one of them is film');
+      assert.deepEqual((await t.dbg(`devPresetHold('DUSK')`)).refused, [['presets.DUSK', 'id']],
+        'an id is lower-case, digits, "-" and "_", exactly as a felt id is');
+
+      // ---- apply, ON THE SCENE -------------------------------------------
+      // BY SECTION, not `tuneReset('all')`: Reset all takes away every row this
+      // session added, the preset among them (js/tune.js `resetRows` — "an
+      // added row is not a leaf reset can put back, it is a row reset must take
+      // away"). Which is right, and is exactly why a preset has to be SAVED to
+      // outlive the tab.
+      await t.dbg(`tuneReset('light')`);
+      await t.dbg(`tuneReset('throw')`);
+      assert.equal((await t.dbg('lampInfo()')).position[1], 24, 'the lamp went back to the declaration');
+      assert.equal((await t.dbg('physicsInfo()')).gravity[1], -110);
+      const applied = await t.dbg(`devPresetApply('dusk')`);
+      assert.deepEqual(applied.refused, []);
+      assert.equal(applied.applied, 3);
+      assert.equal((await t.dbg('lampInfo()')).position[1], 40, 'the SpotLight moved, not just the tree');
+      assert.equal((await t.dbg('physicsInfo()')).gravity[1], -60, 'and cannon\'s own gravity');
+      assert.deepEqual((await t.dbg(`devPresetApply('nope')`)).refused, [['presets.nope', 'unknown']]);
+
+      // ---- the panel's own section ---------------------------------------
+      const sel = `#dev-panel .dev-section[data-section="presets"]`;
+      assert.equal(await t.eval(`document.querySelectorAll('${sel}').length`), 1,
+        'the panel drew a presets section');
+      assert.deepEqual(
+        JSON.parse(await t.eval(`JSON.stringify([...document.querySelectorAll('${sel} select option')].map((o) => o.value))`)),
+        ['dusk']);
+      assert.match(await t.eval(`document.querySelector('${sel} .dev-clockout').textContent`),
+        /dusk · held this session/);
+
+      // ---- the row is what the FILE would gain ----------------------------
+      const exported = await t.dbg('tuneExport()');
+      const back = parseYaml(exported).tree;
+      assert.deepEqual(back.presets, {
+        dusk: { light: { lamp: { y: 40 }, fog: { far: 70 } }, throw: { physics: { gravity: -60 } } },
+      }, 'the export carries the row as a nested subtree of dial paths');
+      // …and everything else the file said is still byte-identical: a preset
+      // is an INSERT, not a rewrite.
+      const original = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
+      assert.ok(exported.startsWith(original.slice(0, original.indexOf('\nlight:'))),
+        'the head of the declaration is untouched');
+
+      // ---- and Remove takes it out ---------------------------------------
+      assert.deepEqual((await t.dbg(`devPresetRemove('dusk')`)).refused, []);
+      assert.deepEqual(await t.dbg('devPresets()'), []);
+      // The checked-in file declares no `presets:` at all, so taking the one
+      // held row away leaves NO section behind — there was never one to empty
+      // out. (A file that DID declare a preset keeps `presets: {}` after its
+      // last row leaves, which is `exportChanges`' shape and the felts
+      // editor's too; `tests/tune.test.mjs` holds that half.)
+      assert.equal(parseYaml(await t.dbg('tuneExport()')).tree.presets, undefined,
+        'the row leaves whole, and takes its section with it');
+
+      // ---- a second viewer: APPLY IS A PASTE ------------------------------
+      await t.dbg(`tuneReset('light')`);
+      await t.dbg(`tuneReset('throw')`);
+      await t.dbg(`tuneSet({'light.lamp.y': 40, 'throw.physics.gravity': -60})`);
+      assert.deepEqual((await t.dbg(`devPresetHold('dusk')`)).refused, []);
+      const b = await ctx.newTable({ origin: '127.0.0.92', name: 'Second' });
+      await b.settle();
+      await t.waitFor(`window.__diceDebug.devInfo().film === 'locked'`,
+        { desc: 'the film locked when the second seat arrived' });
+      // The lock RESET the film dials it found changed; the preset ROW is not
+      // a live film value and keeps its leaf (js/tune.js refuses a row reset
+      // with reason 'row'), which is what makes the leg below meaningful.
+      assert.equal((await t.dbg('physicsInfo()')).gravity[1], -110, 'gravity went back when the seat arrived');
+      assert.equal((await t.dbg('devPresets()'))[0].leaves, 2, 'and the preset still holds both rows');
+      const locked = await t.dbg(`devPresetApply('dusk')`);
+      assert.deepEqual(locked.refused, [['throw.physics.gravity', 'film']],
+        'the film row is refused by name at a shared table');
+      assert.equal(locked.applied, 1);
+      assert.equal((await t.dbg('lampInfo()')).position[1], 40, 'the look row landed anyway — light is per viewer');
+      assert.equal((await t.dbg('physicsInfo()')).gravity[1], -110, 'and nothing reached the bake');
+      assert.deepEqual(t.page.consoleErrors, []);
+      assert.deepEqual(b.page.consoleErrors, []);
+    },
+  },
+  {
+    name: 'dev-phone-sheet',
+    tags: ['dev'],
+    timeout: 120000,
+    // THE PANEL ON A PHONE (docs/DEVMODE.md §7 "Phone", phase D5). Until now
+    // the honest phone loop was *dial on the desktop → Save → reload on the
+    // phone*, and the panel's own answer to a narrow window was one line of
+    // CSS that let it span the width. This is the real one: a bottom SHEET,
+    // folded by default, with steppers where the sliders were.
+    //
+    // Measured at 390×844 with a COARSE POINTER, and the pointer is not
+    // decoration: `(pointer: coarse)` is half the query, so a touchscreen at
+    // any width gets the same panel — and headless at rest is `pointer: none`,
+    // which means every coarse rule in this app is OFF unless a scenario asks.
+    //
+    // FIVE CLAIMS, and the last is the one the feature is for:
+    //   · the sheet renders where a sheet goes — the bottom edge, full width,
+    //     under half the screen;
+    //   · it starts FOLDED, and the corner glyph unfolds it under a real tap
+    //     (`el.click()` would prove nothing about a control a thumb has to
+    //     reach — `seat-picker-reach` is the scenario that taught this);
+    //   · every row clears the 44px touch floor;
+    //   · a range dial is a STEPPER, and pressing + moves the leaf;
+    //   · THE FELT ABOVE IT IS UNTOUCHED. The panel is an overlay, not a rail
+    //     (DEVMODE §2: a rail that resizes the felt makes you judge a frame no
+    //     player has), so the canvas is the same rectangle before the door
+    //     opens and after the sheet is up.
+    async fn(ctx) {
+      // `tableTab` rather than `ctx.devTab`, because the metrics and the
+      // coarse pointer have to be set BEFORE the first navigation (bootTab's
+      // own note says why) and because the door here is pressed by hand.
+      const t = await tableTab(ctx, {
+        origin: '127.0.0.95',
+        seed: { 'dice.name.v1': 'Thumb' },
+        device: { w: 390, h: 844 },
+        coarse: true,
+      });
+      try {
+        await t.waitOnline();
+        await t.dbg('sim(60)');
+        const canvasBox = () => t.eval(`(() => {
+          const c = document.querySelector('canvas');
+          const r = c.getBoundingClientRect();
+          return JSON.stringify({ x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) });
+        })()`).then(JSON.parse);
+        const before = await canvasBox();
+        assert.ok(before.w > 200 && before.h > 800,
+          `the felt runs the height of the phone (${JSON.stringify(before)})`);
+
+        // ---- folded, with one thing to press ------------------------------
+        const info = await t.dbg('devOpen()');
+        assert.equal(info.panel, 'folded', 'a phone starts folded: the first thing it shows is the table');
+        const shown = () => t.eval(`(() => {
+          const p = document.getElementById('dev-panel');
+          const g = document.getElementById('dev-glyph');
+          const box = (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }; };
+          return JSON.stringify({
+            panel: !p.hidden, glyph: !g.hidden, phone: p.classList.contains('dev-phone'),
+            p: box(p), g: box(g), view: { w: innerWidth, h: innerHeight },
+          });
+        })()`).then(JSON.parse);
+        const cold = await shown();
+        assert.equal(cold.panel, false, 'the sheet is away');
+        assert.equal(cold.glyph, true, 'and the corner glyph is the one control');
+        assert.deepEqual(cold.view, { w: 390, h: 844 }, 'measuring at the phone the sheet is designed for');
+
+        // ---- a real tap on the glyph --------------------------------------
+        await realTap(t, cold.g.x + cold.g.w / 2, cold.g.y + cold.g.h / 2);
+        await t.waitFor(`document.getElementById('dev-panel').hidden === false`,
+          { desc: 'a thumb on the glyph unfolds the sheet' });
+        const up = await shown();
+        assert.equal(up.phone, true, 'the panel read the query as a phone');
+        assert.equal(up.p.x, 0, `the sheet spans the width (x ${up.p.x})`);
+        assert.equal(up.p.w, 390, `…all of it (w ${up.p.w})`);
+        assert.ok(up.p.y + up.p.h >= 843, `it sits on the bottom edge (bottom ${up.p.y + up.p.h})`);
+        assert.ok(up.p.h <= Math.round(844 * 0.45) + 2,
+          `and it is 45dvh, not a column: ${up.p.h}px of 844`);
+        assert.ok(up.p.y > 844 / 2, `so more than half the felt is still in view (top ${up.p.y})`);
+
+        // ---- the 44px floor, on every row that is drawn -------------------
+        // The find filter is what makes them all visible at once: the sheet
+        // shows one section at a time, and a floor asserted on one section is
+        // a floor asserted on a tenth of the rows.
+        await t.eval(`(() => {
+          const f = document.querySelector('#dev-panel .dev-find');
+          f.value = 'lamp';
+          f.dispatchEvent(new Event('input', { bubbles: true }));
+        })()`);
+        const rows = JSON.parse(await t.eval(`JSON.stringify(
+          [...document.querySelectorAll('#dev-panel .dev-row')]
+            .filter((e) => e.offsetParent !== null)
+            .map((e) => [e.dataset.path || e.className, Math.round(e.getBoundingClientRect().height)]))`));
+        assert.ok(rows.length >= 3, `the filter left rows to measure (${rows.length})`);
+        const short = rows.filter(([, h]) => h < 44);
+        assert.deepEqual(short, [], `every row clears the touch floor (${JSON.stringify(short)})`);
+
+        // ---- a slider is not a control a fingertip can hit ----------------
+        const lamp = `#dev-panel .dev-row[data-path="light.lamp.y"]`;
+        assert.equal(await t.eval(`document.querySelector('${lamp}').classList.contains('is-stepper')`), true,
+          'the lamp height is a stepper here, not a slider');
+        assert.equal(await t.eval(`document.querySelectorAll('#dev-panel input[type="range"]').length`), 0,
+          'and there is no slider anywhere in the sheet');
+        // Scrolled into the sheet first: a real tap lands on whatever is at
+        // the point, so a control below the sheet's own scroller is a control
+        // no thumb could have pressed either.
+        const plus = JSON.parse(await t.eval(`(() => {
+          const b = [...document.querySelectorAll('${lamp} .dev-step')].at(-1);
+          b.scrollIntoView({ block: 'center' });
+          const r = b.getBoundingClientRect();
+          const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+          return JSON.stringify({
+            cx: r.x + r.width / 2, cy: r.y + r.height / 2,
+            w: Math.round(r.width), h: Math.round(r.height),
+            hit: top === b || b.contains(top),
+          });
+        })()`));
+        assert.equal(plus.hit, true, `the + is the topmost thing at its own centre (${JSON.stringify(plus)})`);
+        assert.ok(plus.w >= 44 && plus.h >= 44, `the + is a target (${plus.w}×${plus.h})`);
+        const was = await t.dbg(`tuneGet('light.lamp.y')`);
+        await realTap(t, plus.cx, plus.cy);
+        await t.waitFor(`window.__diceDebug.tuneGet('light.lamp.y') === ${was + 0.5}`,
+          { desc: 'a thumb on + moves the leaf by the dial\'s own step' });
+        assert.equal((await t.dbg('lampInfo()')).position[1], was + 0.5, 'and the SpotLight moved with it');
+
+        // ---- the felt above the sheet is untouched ------------------------
+        assert.deepEqual(await canvasBox(), before,
+          'the panel is an overlay: the frame being judged is the frame a player has');
+
+        // ---- and it folds back --------------------------------------------
+        const fold = JSON.parse(await t.eval(`(() => {
+          const b = [...document.querySelectorAll('#dev-panel .dev-head button')].at(-1);
+          const r = b.getBoundingClientRect();
+          return JSON.stringify({ cx: r.x + r.width / 2, cy: r.y + r.height / 2, text: b.textContent });
+        })()`));
+        assert.match(fold.text, /fold/);
+        await realTap(t, fold.cx, fold.cy);
+        await t.waitFor(`document.getElementById('dev-panel').hidden === true`,
+          { desc: 'and folds away again' });
+        assert.equal((await t.dbg('devInfo()')).panel, 'folded');
+        assert.equal(await t.dbg(`tuneGet('light.lamp.y')`), was + 0.5, 'a fold keeps the values');
+        assert.deepEqual(t.page.consoleErrors, []);
+      } finally {
+        await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId).catch(() => {});
+        await t.emulateCoarsePointer(false).catch(() => {});
+      }
+    },
+  },
+  {
+    name: 'dev-recorder',
+    tags: ['dev'],
+    timeout: 120000,
+    // THE RECORDER (docs/DEVMODE.md §8, phase D5). The dials are how a look is
+    // FOUND; `tools/steps/*.mjs` is how it is looked at again next week, on the
+    // same seed, by somebody who was not there. This writes the transcription.
+    //
+    // THE ONE THING IT MUST NOT BE is a second write route. A step is CODE, and
+    // the armed route (§6) is safe precisely because it writes one file and
+    // validates every byte of it against the dial tree — so the step goes out
+    // as a DOWNLOAD, and this scenario watches the tab's own fetches to say so.
+    //
+    // What it holds:
+    //   · the door is the gate — `devRecord` answers null before it opens;
+    //   · it is a LISTENER, not a wrapper: a `tuneSet` from the console is in
+    //     the step, which is the whole reason it is armed on `tune.watch`;
+    //   · three ops come back in the order they happened, the throw with its
+    //     seed (a recorded throw without one films something else every time);
+    //   · the emitted text carries them in that order AND PARSES as JavaScript,
+    //     checked by node itself on the bytes the panel would have downloaded;
+    //   · nothing was posted to /api/dev/write.
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.96', name: 'Reel' });
+      await t.settle();
+      // Every url this tab fetches, so the "never the write route" claim is
+      // measured rather than read off the design.
+      await t.eval(`(() => {
+        window.__posts = [];
+        const real = window.fetch.bind(window);
+        window.fetch = (u, opts) => { window.__posts.push(String(u && u.url ? u.url : u)); return real(u, opts); };
+      })()`);
+
+      assert.equal(await t.dbg(`devRecord('start')`), null, 'the door is shut: nothing records');
+      assert.deepEqual((await t.dbg('devRecording()')).ops, [], 'and the readout answers on a shut door');
+
+      assert.equal((await t.dbg('devOpen()')).panel, 'open');
+      assert.equal(await t.dbg(`devRecord('sideways')`), null, 'a word that is not a state changes nothing');
+      assert.equal((await t.dbg('devRecording()')).state, 'idle');
+
+      // ---- three ops ------------------------------------------------------
+      assert.equal((await t.dbg(`devRecord('start')`)).state, 'recording');
+      await t.dbg(`tuneSet({'light.lamp.y': 40, 'light.fog.far': 70})`);
+      await t.dbg('devDeal(2)');
+      await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
+        { desc: 'the cast stood' });
+      await t.dbg(`devBench(4242, '3d6')`);
+      await t.settle();
+      assert.equal((await t.dbg(`devRecord('stop')`)).state, 'idle');
+
+      const reel = await t.dbg('devRecording()');
+      assert.equal(reel.full, false);
+      assert.deepEqual(reel.ops.map((o) => o.op), ['set', 'deal', 'throw'],
+        `three ops, in the order they happened (${JSON.stringify(reel.ops)})`);
+      assert.deepEqual(reel.ops[0].patch, { 'light.lamp.y': 40, 'light.fog.far': 70 },
+        'the console write is in the step: the recorder listens to the TREE, not to the panel');
+      assert.equal(reel.ops[1].n, 2);
+      assert.equal(reel.ops[2].seed, 4242, 'and the throw kept its seed');
+      assert.match(reel.ops[2].notation, /3d6/);
+
+      // A dial turned after Stop is not in the reel.
+      await t.dbg(`tuneSet({'light.room.hemi': 0.4})`);
+      assert.equal((await t.dbg('devRecording()')).ops.length, 3, 'Stop stopped it');
+
+      // ---- the step ------------------------------------------------------
+      const text = await t.dbg(`devStepText('dusk look')`);
+      assert.ok(text.startsWith('/*\nCopyright 2026 The Dice Table Authors'),
+        'the Apache header every first-party file carries');
+      const at = (re) => text.search(re);
+      const marks = [
+        /devTab\(/,
+        /tuneSet\(\{"light\.lamp\.y":40,"light\.fog\.far":70\}\)/,
+        /demoDeal\(2\)/,
+        /devBench\(4242, "3d6 # bench"\)/,
+      ].map(at);
+      assert.ok(marks.every((i) => i > 0), `every op reached the step (${JSON.stringify(marks)})`);
+      assert.deepEqual(marks, [...marks].sort((a, b) => a - b), 'in the order they were recorded');
+      assert.equal((text.match(/await shot\(/g) || []).length, 3, 'a frame after each act');
+
+      // IT PARSES, checked by node on the bytes themselves — a skeleton
+      // nobody can run is not a skeleton.
+      const dir = mkdtempSync(join(SCRATCH_BASE, 'dev-step-'));
+      try {
+        const file = join(dir, 'dusk-look.mjs');
+        writeFileSync(file, text);
+        const check = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
+        assert.equal(check.status, 0, `the emitted step parses as JavaScript (${check.stderr})`);
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+
+      // ---- the panel says the same thing ----------------------------------
+      const sec = `#dev-panel .dev-section[data-section="file"]`;
+      assert.match(await t.eval(`document.querySelector('${sec} .dev-about').textContent`),
+        /3 ops recorded/, 'the file section counts what the hook counts');
+      const buttons = JSON.parse(await t.eval(
+        `JSON.stringify([...document.querySelectorAll('${sec} button')].map((b) => b.textContent))`));
+      for (const want of ['Record', 'Download step', 'Pop out']) {
+        assert.ok(buttons.includes(want), `the file section offers ${want} (${JSON.stringify(buttons)})`);
+      }
+
+      // ---- A STEP IS CODE, SO IT NEVER TAKES THE WRITE ROUTE ---------------
+      const posts = JSON.parse(await t.eval('JSON.stringify(window.__posts)'));
+      assert.deepEqual(posts.filter((u) => /\/api\/dev\/write/.test(u)), [],
+        `nothing was posted to the write route (${JSON.stringify(posts)})`);
+
+      // ---- A SETS-EDITING SESSION COMES OUT AS A STEP THAT REPLAYS IT -----
+      //
+      // The D5 review's finding, and the reason `row` and `note` exist. A
+      // clone is not a `tuneSet` — `tune.set` refuses a field of a row that is
+      // not there ('row': js/tune.js, the row is the unit) — so a reel that
+      // ignored the clone had to drop every recipe edit that followed with it,
+      // and the whole of a session spent authoring a dice set emitted a step
+      // that reproduced none of it. The clone is written down WHOLE now, and
+      // the edits ride along behind it because the row will be there.
+      assert.equal((await t.dbg(`devRecord('start')`)).state, 'recording');
+      const clone = await t.dbg(`devSetClone('classics.ivory', 'ivory-probe')`);
+      assert.equal(clone.id, 'house.ivory-probe', `the clone landed (${JSON.stringify(clone.refused)})`);
+      assert.deepEqual((await t.dbg(`tuneSet({'houses.house.dice.ivory-probe.body': '#ff0000'})`)).refused, [],
+        'and a field of the row it just built is an ordinary write');
+      await t.dbg(`devRecord('stop')`);
+      const sets = await t.dbg('devRecording()');
+      // TWO rows, because a clone into the `house` house mints the house first
+      // (js/main.js devSetClone: `houses:` is sparse, so an empty row would
+      // leave the picker drawing an `undefined` header) — and a step that
+      // rebuilt the set without its house would be refused at the door it
+      // needs, so both are ops.
+      assert.deepEqual(sets.ops.map((o) => o.op), ['row', 'row', 'set'],
+        `the clone is two ops, and the edit is not a note (${JSON.stringify(sets.ops.map((o) => o.op))})`);
+      assert.equal(sets.ops[0].where, 'houses');
+      assert.equal(sets.ops[0].id, 'house', 'the house the set is going into, first');
+      assert.equal(sets.ops[1].where, 'houses.house.dice');
+      assert.equal(sets.ops[1].id, 'ivory-probe');
+      assert.equal(sets.ops[1].row.body, '#f3ead7',
+        'the row as it landed — the recipe the step rebuilds, not the set it was copied from');
+      const setStep = await t.dbg(`devStepText('sets')`);
+      const setMarks = [
+        /devRowAdd\("houses", "house", \{/,
+        /devRowAdd\("houses\.house\.dice", "ivory-probe", \{/,
+        /tuneSet\(\{"houses\.house\.dice\.ivory-probe\.body":"#ff0000"\}\)/,
+      ].map((re) => setStep.search(re));
+      assert.ok(setMarks.every((i) => i > 0), `the step rebuilds the row and then edits it (${JSON.stringify(setMarks)})`);
+      assert.deepEqual(setMarks, [...setMarks].sort((a, b) => a - b), 'in that order');
+      assert.ok(!/Nothing was recorded/.test(setStep));
+
+      // …AND WHAT IT STILL CANNOT CARRY, SAID OUT LOUD. A row that was there
+      // before Record was pressed and that dice.yaml has never heard of is a
+      // row no step can rebuild, so its fields come back as a note NAMING them
+      // rather than as a write the replay would be refused for.
+      assert.equal((await t.dbg(`devRecord('start')`)).state, 'recording');
+      await t.dbg(`tuneSet({'houses.house.dice.ivory-probe.text': '#00ff00'})`);
+      await t.dbg(`devRecord('stop')`);
+      const noted = await t.dbg('devRecording()');
+      assert.deepEqual(noted.ops.map((o) => o.op), ['note'],
+        `the write could not be carried (${JSON.stringify(noted.ops)})`);
+      assert.match(noted.ops[0].text, /houses\.house\.dice\.ivory-probe\.text/);
+      const noteStep = await t.dbg(`devStepText('noted')`);
+      assert.match(noteStep, /\/\/ note · .*houses\.house\.dice\.ivory-probe\.text/,
+        'and the note reaches the file, which is the only place it can be read');
+      assert.ok(!/Nothing was recorded/.test(noteStep),
+        'a reel of notes is not an empty reel: it says what it could not replay');
+      assert.match(noteStep, /Nothing here could be replayed/);
+
+      // ---- Shut ends the session, and the reel with it ---------------------
+      await t.dbg('devClose()');
+      assert.deepEqual((await t.dbg('devRecording()')).ops, [],
+        'a Shut is "this tab never opened the door", and a recording is a session');
+      assert.equal(await t.dbg(`devStepText('dusk look')`), null);
+      assert.deepEqual(t.page.consoleErrors, []);
+    },
+  },
+  {
+    name: 'dev-popout',
+    tags: ['dev'],
+    timeout: 240000,
+    // THE PANEL IN ITS OWN WINDOW (docs/DEVMODE.md §8, phase D5). At 320px over
+    // the felt the panel is honest and, on a second monitor, twenty rows you
+    // have to scroll. `dev.html` mounts THE SAME js/devmode.js panel over a
+    // MIRROR of the table tab's tune, on a `BroadcastChannel` — origin-scoped
+    // by construction, so it is not a network, reaches no other viewer and
+    // cannot leave this browser (GOALPOST 2, 4).
+    //
+    // THE TABLE TAB IS THE ONLY WRITER, and that is the claim this scenario is
+    // for. Everything else follows from it: one tune in the world, so a value
+    // can never be two things at once, and closing either window is one side of
+    // a channel going quiet.
+    //
+    // The second window is opened by CDP rather than by pressing Pop out.
+    // `window.open` from a page under CDP makes a target the harness would then
+    // have to adopt, and what is being tested is the CHANNEL, not Chrome's
+    // window manager — so the button is asserted to be there and the page is
+    // driven directly, at the same origin, which is the condition the channel
+    // actually has.
+    async fn(ctx) {
+      const origin = '127.0.0.97';
+      const t = await ctx.devTab({ origin, players: 0, name: 'Two' });
+      await t.settle();
+      assert.equal(await t.eval(
+        `[...document.querySelectorAll('#dev-panel .dev-section[data-section="file"] button')]`
+        + `.some((b) => b.textContent === 'Pop out')`), true, 'the table offers the second window');
+
+      // AT THE SIZE THE BUTTON ACTUALLY OPENS, read off the tab rather than
+      // copied into the test (the D5 review, 2026-09-03): the shipped
+      // configuration and the tested one cannot drift apart if the scenario
+      // asks `devPopout`'s own numbers for them.
+      const size = (await t.dbg('devInfo()')).popout;
+      assert.ok(size && size.w > 0 && size.h > 0, `the button publishes its window size (${JSON.stringify(size)})`);
+      const pop = await bootTab(ctx, {
+        origin,
+        path: '/dev.html',
+        device: { w: size.w, h: size.h },
+        readyExpr: '!!(window.__devPopout && window.__devPopout.state().mounted)',
+        readyDesc: 'the pop-out found the table and mounted the panel',
+      });
+
+      const state = () => pop.eval('JSON.stringify(window.__devPopout.state())').then(JSON.parse);
+      const cold = await state();
+      assert.equal(cold.linked, true, 'linked to the table tab');
+      assert.ok(cold.rows > 50, `and it drew the declaration's rows (${cold.rows})`);
+      assert.equal(await pop.eval(`document.querySelectorAll('#dev-panel .dev-section').length > 5`), true,
+        'one section per top-level key of the file, as in the table tab');
+      assert.equal(cold.table, (await t.dbg('devSnapshot()')).table, 'and to THAT table by name');
+
+      // ---- IT IS A WINDOW, NOT A PHONE ------------------------------------
+      //
+      // Pop out used to open at 420px, which is inside css/dev.css's phone
+      // query, so the second-monitor panel arrived in the sheet dress: every
+      // slider replaced by a stepper, the panel a grid, and the section bar
+      // `nowrap` with the `file` section — the diff, Save, the paste box, the
+      // reason the window exists — clipped off its right edge behind a scroll
+      // with no visible affordance. The sheet's reason is the felt it covers,
+      // and this window has none.
+      const dress = JSON.parse(await pop.eval(`(() => {
+        const p = document.getElementById('dev-panel');
+        const bar = p.querySelector('.dev-secbar');
+        const file = [...bar.querySelectorAll('button')].find((b) => b.textContent.trim() === 'file');
+        const br = bar.getBoundingClientRect(); const fr = file.getBoundingClientRect();
+        return JSON.stringify({
+          phoneClass: p.classList.contains('dev-phone'),
+          display: getComputedStyle(p).display,
+          sliders: p.querySelectorAll('input[type="range"]').length,
+          // ONE NAMED RANGE DIAL, not a count: a reload-class row is drawn as
+          // a stepper on the desktop too, so the claim is about the row the
+          // sheet would have changed.
+          lamp: [...p.querySelector('.dev-row[data-path="light.lamp.y"]').classList].sort().join(' '),
+          barScroll: bar.scrollWidth - bar.clientWidth,
+          fileOverflow: Math.round(fr.right - br.right),
+          w: p.getBoundingClientRect().width,
+        });
+      })()`));
+      assert.equal(dress.phoneClass, false, `no sheet dress in a window (${JSON.stringify(dress)})`);
+      assert.equal(dress.display, 'flex', 'the column, not the sheet\'s grid');
+      assert.ok(dress.sliders > 0, `a range dial is a slider here (${dress.sliders} sliders)`);
+      assert.match(dress.lamp, /\bis-range\b/, `the lamp row is a slider (${dress.lamp})`);
+      assert.ok(!/\bis-stepper\b/.test(dress.lamp), 'and not a thumb-sized stepper');
+      assert.ok(dress.barScroll <= 1, `the section bar is not a hidden side-scroller (${dress.barScroll}px over)`);
+      assert.ok(dress.fileOverflow <= 1, `and \`file\` is on screen (${dress.fileOverflow}px past the bar's edge)`);
+
+      // ---- A WRITE FROM THE POP-OUT MOVES THE TABLE'S OWN LAMP ------------
+      assert.equal((await t.dbg('lampInfo()')).position[1], 24, 'the lamp stands at the shipped height');
+      const r = await pop.eval(`window.__devPopout.set({'light.lamp.y': 41}).then(JSON.stringify)`).then(JSON.parse);
+      assert.deepEqual(r.refused, [], 'the table accepted it');
+      await t.waitFor(`window.__diceDebug.tuneGet('light.lamp.y') === 41`,
+        { desc: 'the table tab took the write' });
+      assert.equal((await t.dbg('lampInfo()')).position[1], 41,
+        'and it reached the SpotLight, not just the tree — the binder ran in the tab that owns the scene');
+      // …and it came back the other way, which is what makes the pop-out a
+      // mirror rather than a second panel guessing.
+      await pop.waitFor(`window.__devPopout.snapshot().T.light.lamp.y === 41`,
+        { desc: 'the snapshot carried the new value back' });
+      assert.equal(await pop.eval(
+        `document.querySelector('#dev-panel .dev-row[data-path="light.lamp.y"]').classList.contains('is-changed')`),
+      true, 'the row wears the changed mark in the second window too');
+
+      // A REFUSAL IS THE TABLE'S, BY NAME. The mirror judges nothing: it asks.
+      const bad = await pop.eval(`window.__devPopout.set({'throw.rng': 1}).then(JSON.stringify)`).then(JSON.parse);
+      assert.deepEqual(bad.refused, [['throw.rng', 'unknown']],
+        'the pop-out has no opinion about a path; the tune that owns the tree has');
+
+      // ---- AND THE TABLE'S OWN WRITES REACH THE POP-OUT -------------------
+      await t.dbg(`tuneSet({'light.fog.far': 66})`);
+      await pop.waitFor(`window.__devPopout.snapshot().T.light.fog.far === 66`,
+        { desc: 'a dial turned at the table shows in the second window' });
+      await pop.waitFor(`window.__devPopout.state().changed === 2`,
+        { desc: 'and the diff it draws is the table\'s diff' });
+
+      // ---- TWO TABLES ON ONE ORIGIN, AND ONLY ONE OF THEM IS STEERED ------
+      //
+      // A `BroadcastChannel` is origin-scoped, and an origin is not a tab: two
+      // table tabs is the ordinary local two-player test, and before the D5
+      // review both of them heard every message this window sent. One `set`
+      // moved BOTH lamps, and the mirror then sampled the two trees alternately
+      // at about 1 Hz — every row and the changed count flickering between two
+      // felts, with nothing on screen to say which one was being dialled. The
+      // pop-out latches the first table it hears; the other stays quiet.
+      const second = await ctx.devTab({ origin, players: 0, name: 'Also' });
+      await second.settle();
+      const idA = (await t.dbg('devSnapshot()')).table;
+      const idB = (await second.dbg('devSnapshot()')).table;
+      assert.notEqual(idA, idB, 'two tabs, two names on the channel');
+      assert.equal((await state()).table, idA, 'and the pop-out is still on the one it latched');
+
+      const bWas = (await second.dbg('lampInfo()')).position[1];
+      const two = await pop.eval(`window.__devPopout.set({'light.lamp.y': 37}).then(JSON.stringify)`).then(JSON.parse);
+      assert.deepEqual(two.refused, [], 'the latched table took it');
+      await t.waitFor(`window.__diceDebug.tuneGet('light.lamp.y') === 37`, { desc: 'the latched table moved' });
+      await second.dbg('sim(60)');
+      assert.equal((await second.dbg('lampInfo()')).position[1], bWas,
+        'and the OTHER table did not: a write reaches the tab it was addressed to and no other');
+      assert.equal(await second.dbg(`tuneGet('light.lamp.y')`), 24, 'its tree never heard the patch');
+
+      // …and the mirror does not oscillate between the two trees. The table
+      // that was not latched is dialled on its own; eight samples across two
+      // beats of the snapshot heartbeat all read the LATCHED table's value.
+      await second.dbg(`tuneSet({'light.fog.far': 88})`);
+      const samples = JSON.parse(await pop.eval(`(async () => {
+        const out = [];
+        for (let i = 0; i < 8; i++) {
+          out.push(window.__devPopout.snapshot().T.light.fog.far);
+          await new Promise((r) => setTimeout(r, 300));
+        }
+        return JSON.stringify(out);
+      })()`));
+      assert.deepEqual(samples, Array(8).fill(66),
+        `the mirror holds ONE tree over 2.4s (${JSON.stringify(samples)})`);
+
+      // The second table leaves, so the legs below measure a pop-out with one
+      // table in the world — and its door goes first, or the pop-out would
+      // simply re-home onto it when the first one shuts.
+      await second.dbg('devClose()');
+      const j = ctx.tables.indexOf(second);
+      if (j >= 0) ctx.tables.splice(j, 1);
+      await second.close();
+      await t.dbg('sim(30)');
+
+      // ---- AND IT IS A WINDOW EVEN AT A PHONE'S SIZE ----------------------
+      //
+      // The exemption itself, measured at the most phone-like configuration
+      // there is: 390×844 with a COARSE pointer, which is the half of the
+      // query a width cannot fake. A pop-out is never a sheet, because a sheet
+      // is a thing you lay over a felt.
+      const tiny = await bootTab(ctx, {
+        origin,
+        path: '/dev.html',
+        device: { w: 390, h: 844 },
+        coarse: true,
+        readyExpr: '!!(window.__devPopout && window.__devPopout.state().mounted)',
+        readyDesc: 'a pop-out at a phone\'s size',
+      });
+      const tinyDress = JSON.parse(await tiny.eval(`(() => {
+        const p = document.getElementById('dev-panel');
+        const bar = p.querySelector('.dev-secbar');
+        const file = [...bar.querySelectorAll('button')].find((b) => b.textContent.trim() === 'file');
+        const br = bar.getBoundingClientRect(); const fr = file.getBoundingClientRect();
+        return JSON.stringify({
+          phoneClass: p.classList.contains('dev-phone'),
+          display: getComputedStyle(p).display,
+          sliders: p.querySelectorAll('input[type="range"]').length,
+          barScroll: bar.scrollWidth - bar.clientWidth,
+          fileOverflow: Math.round(fr.right - br.right),
+          w: Math.round(p.getBoundingClientRect().width),
+        });
+      })()`));
+      assert.equal(tinyDress.phoneClass, false, `still a window (${JSON.stringify(tinyDress)})`);
+      assert.equal(tinyDress.display, 'flex', 'and not the sheet\'s grid');
+      assert.ok(tinyDress.sliders > 0, 'with sliders, not steppers');
+      // The stylesheet's half, measured where the media query actually
+      // applies: the bar wraps instead of scrolling, so `file` is on screen at
+      // 390px too.
+      assert.ok(tinyDress.barScroll <= 1, `the bar wraps rather than scrolling (${tinyDress.barScroll}px over)`);
+      assert.ok(tinyDress.fileOverflow <= 1, `and \`file\` is on screen (${tinyDress.fileOverflow}px past the edge)`);
+      const k = ctx.tables.indexOf(tiny);
+      if (k >= 0) ctx.tables.splice(k, 1);
+      await tiny.close();
+
+      // ---- CLOSING EITHER SIDE IS SAFE ------------------------------------
+      // The table's door first: the pop-out must say the table is gone rather
+      // than go on drawing a tree nobody is holding.
+      await t.dbg('devClose()');
+      await pop.waitFor(`window.__devPopout.state().linked === false`,
+        { desc: 'the pop-out notices the door shut', timeout: 20000 });
+      assert.match(await pop.eval(`document.getElementById('link-state').textContent`), /no table tab/);
+      assert.deepEqual(pop.page.errors, [], 'and nothing threw when the other side went away');
+      assert.deepEqual(pop.page.consoleErrors, []);
+
+      // …AND A ROW MAY NOT GO ON SHOWING A VALUE NOBODY IS HOLDING. The
+      // optimistic local write is what makes a dragged row keep up with the
+      // finger dragging it, and it is only honest because the table's next
+      // snapshot overwrites the whole tree a beat later. With the table gone
+      // no snapshot is coming — measured before the D5 review: the table's
+      // lamp at 24, the row reading 39 for ever, and the only correction a
+      // note eight seconds later at the top of the window.
+      const held = await pop.eval(`window.__devPopout.mirror.get('light.lamp.y')`);
+      const dead = await pop.eval(`(() => {
+        const r = window.__devPopout.mirror.set({ 'light.lamp.y': 39 });
+        return JSON.stringify({ refused: r.refused, mirror: window.__devPopout.mirror.get('light.lamp.y') });
+      })()`).then(JSON.parse);
+      assert.deepEqual(dead.refused, [['light.lamp.y', 'gone']],
+        'the mirror refuses the write by name rather than pretending it landed');
+      assert.equal(dead.mirror, held, 'and the tree it draws still says what the table last said');
+      assert.equal(await pop.eval(`window.__devPopout.state().locked`), true,
+        'the panel is locked while there is no table: the rows say so before they are dragged');
+
+      // …then the pop-out. The table goes on being a table.
+      const i = ctx.tables.indexOf(pop);
+      if (i >= 0) ctx.tables.splice(i, 1);
+      await pop.close();
+      assert.equal((await t.dbg('devOpen()')).panel, 'open', 'the door opens again with nobody listening');
+      const alone = await t.dbg(`tuneSet({'light.lamp.y': 33})`);
+      assert.deepEqual(alone.refused, []);
+      assert.equal((await t.dbg('lampInfo()')).position[1], 33);
+      await t.dbg('sim(60)');
+      assert.deepEqual(t.page.errors, []);
+      assert.deepEqual(t.page.consoleErrors, []);
+    },
+  },
+  {
+    name: 'dev-cards-live',
+    tags: ['dev', 'place'],
+    timeout: 120000,
+    // THE CARD'S FOOTPRINT, LIVE (docs/DEVMODE.md §8 "rebuild choke points",
+    // phase D4). C5 shipped `cards.*` as ⟳ rows and said so out loud: "the rig
+    // is baked at boot; do NOT try to rebuild it live in this job". This is
+    // the job. `dev-sound-post` holds the declaration's round trip (Save, then
+    // a fresh tab wearing it); what is held HERE is the three things the live
+    // rebuild has to get right and could plausibly get wrong:
+    //
+    //   · the ring and the rig's own baked pad both move, at the flush;
+    //   · the flush is the ROLL BOUNDARY — a dial turned with dice in the air
+    //     changes nothing until they land (IMMERSION ruling ①, and the same
+    //     defer the zoom and the tower take), because re-cutting the geometry
+    //     two viewers must agree on mid-film is exactly what that rule is for;
+    //   · the geometry law holds: `standoff − depth/2` is the clear ground
+    //     that licenses the card's depthWrite, its real shadow and the seating
+    //     raycast, and a typed value that would put a card inside the rim is
+    //     refused with the reason 'geometry' rather than drawn.
+    async fn(ctx) {
+      const t = await ctx.devTab({ origin: '127.0.0.93', players: 4, name: 'Card' });
+      await t.waitFor('window.__diceDebug.places().stations.length === 5',
+        { desc: 'the viewer and four' });
+      await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
+        { desc: 'the cards stood' });
+      const pad = async () => (await t.dbg('placardBudget()')).base;
+      const ringR = async () => {
+        const st = (await t.dbg('places()')).stations;
+        const rs = st.map((s) => Math.hypot(s.world.x, s.world.z));
+        for (const r of rs) assert.ok(Math.abs(r - rs[0]) < 1e-9, `one ring (${rs.join(', ')})`);
+        return rs[0];
+      };
+      const w = (await t.dbg('tableExtents()')).w;
+      assert.deepEqual(await pad(), { w: PLACARD_W, d: 1.52, h: 0.14 }, 'the shipped footprint');
+      const r0 = await ringR();
+      assert.ok(Math.abs(r0 - (ringRadius(w) + PLACARD_STANDOFF)) < 1e-9);
+
+      // ---- the geometry law ----------------------------------------------
+      // The sliders cannot reach an illegal pair (js/tune.js clamps their
+      // ranges so the worst pair they offer is exactly 0 of clear ground); the
+      // typed field can, and this is where it is stopped.
+      const bad = await t.dbg(`tuneSet({'cards.depth': 3.9})`);
+      assert.deepEqual(bad.refused, [['cards.depth', 'geometry']],
+        'a card deep enough to reach past the rim is refused, not drawn');
+      assert.equal(await t.dbg(`tuneGet('cards.depth')`), 1.52, 'and the value never moved');
+      assert.deepEqual((await t.dbg(`tuneSet({'cards.depth': 3.9, 'cards.standoff': 2.2})`)).refused, [],
+        'the same depth WITH the standoff that clears it is a legal pair');
+      await t.dbg(`tuneReset('cards')`);
+      await t.dbg('sim(30)');
+      assert.deepEqual(await pad(), { w: PLACARD_W, d: 1.52, h: 0.14 }, 'and reset put the pad back');
+
+      // ---- the live move --------------------------------------------------
+      const moved = await t.dbg(`tuneSet({'cards.standoff': 1.5, 'cards.width': 4.6, 'cards.depth': 1.2})`);
+      assert.deepEqual(moved.refused, []);
+      assert.deepEqual(moved.pending, [], 'an apply row owes nothing to a reload');
+      await t.dbg('sim(30)');
+      assert.deepEqual(await pad(), { w: 4.6, d: 1.2, h: 0.14 },
+        'the rig was disposed and re-baked to the new footprint');
+      const r1 = await ringR();
+      assert.ok(Math.abs(r1 - (ringRadius(w) + 1.5)) < 1e-9,
+        `and the ring stands at the new standoff (${r1} against ${r0})`);
+      assert.equal((await t.dbg('placardBudget()')).occupied, 5, 'with every card still standing');
+
+      // ---- the roll boundary ----------------------------------------------
+      // A dial turned mid-film changes nothing until the dice land. Held with
+      // the clock frozen, so what is being measured is the GATE and not a race
+      // between CDP round trips and rAF.
+      await t.dbg('holdClock(true)');
+      await t.dbg(`commandRoll('4d6')`);
+      await t.dbg('sim(30)');
+      assert.equal(await t.dbg('busy'), true, 'a film is in flight');
+      const mid = await t.dbg(`tuneSet({'cards.width': 6})`);
+      assert.deepEqual(mid.refused, [], 'the write lands in the tree at once');
+      // ONE EVAL, and no `sim` between the write and the read: the clock is
+      // held so the film cannot advance on its own (P6), and the two numbers
+      // have to be read from the same moment or the claim is about a race
+      // rather than about the gate. `base` is the footprint IN THE BUFFER
+      // (js/placard.js `this.pad`), not the live `PLACARD` the binder has
+      // already moved — which is the whole reason that field exists.
+      const midProbe = JSON.parse(await t.eval(`JSON.stringify({
+        busy: window.__diceDebug.busy,
+        w: window.__diceDebug.placardBudget().base.w,
+        tree: window.__diceDebug.tuneGet('cards.width'),
+      })`));
+      assert.equal(midProbe.busy, true, 'the film is still in flight');
+      assert.equal(midProbe.tree, 6, 'the tree took the write');
+      assert.equal(midProbe.w, 4.6, 'and the rig is untouched while dice are in the air');
+
+      // ---- and a QUEUED ZOOM survives a dial turned under it ---------------
+      // The same boundary carries the zoom, and `table.scale` re-queues one so
+      // applyZoom runs again against the rewritten presets — on `pendingZoom
+      // || currentZoom` (js/main.js), because re-queueing `currentZoom` there
+      // overwrites a zoom a PLAYER asked for mid-roll with the level the table
+      // is still on. That swallow was the loose end D4 was given, and nothing
+      // in the suite could see it go back (the D4 review, 2026-09-03): this
+      // scenario already holds the clock with dice in the air, which is the
+      // one moment it happens in, so it is held here.
+      const wasZoom = await t.dbg('zoom');
+      await t.dbg(`setZoom('close')`);
+      await t.waitFor(`window.__diceDebug.pendingZoom === 'close'`,
+        { desc: 'the zoom queued behind the film' });
+      // ONE EVAL again: the write and both reads at one moment, or the claim is
+      // about a race and not about the queue.
+      const zoomProbe = JSON.parse(await t.eval(`(() => {
+        window.__diceDebug.tuneSet({ 'table.scale': 1.2 });
+        return JSON.stringify({
+          pending: window.__diceDebug.pendingZoom,
+          zoom: window.__diceDebug.zoom,
+        });
+      })()`));
+      assert.equal(zoomProbe.pending, 'close', 'the dial re-queued the PLAYER\'s zoom, not the level the table is on');
+      assert.equal(zoomProbe.zoom, wasZoom, 'and nothing landed while the dice were in the air');
+      await t.dbg('holdClock(false)');
+      await t.settle();
+      await t.waitFor('window.__diceDebug.placardBudget().base.w === 6',
+        { desc: 'the rebake landed at the roll boundary' });
+      assert.equal((await t.dbg('placardBudget()')).occupied, 5, 'and the cards came back up');
+      await t.waitFor(`window.__diceDebug.zoom === 'close'`,
+        { desc: 'and the queued zoom landed at the same boundary' });
+      const zoomed = (await t.dbg('tableExtents()')).w;
+      assert.ok(Math.abs(zoomed - 8.6 * 1.2) < 1e-6,
+        `the close preset was rewritten by the scale it was queued under (${zoomed})`);
+
+      // ---- Shut puts the table back ---------------------------------------
+      await t.dbg('devClose()');
+      await t.dbg('sim(60)');
+      assert.equal(await t.dbg(`tuneGet('cards.width')`), PLACARD_W,
+        'Shut reset the dial to the declaration');
+      assert.deepEqual(t.page.consoleErrors, []);
     },
   },
 ];

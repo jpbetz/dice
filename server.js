@@ -45,7 +45,12 @@ import { fileURLToPath } from 'node:url';
 import { composeRoll, composeThrow, validateMods, validateSpec, DIE_MAX,
   scoringIndices, pushTally, drawBag, MAX_PUSH_THROWS } from './js/rollspec.js';
 import { parseNotation } from './js/notation.js';
-import { SET_IDS } from './js/themes.js';
+// The dice catalogue. `SET_IDS` is EMPTY until `installCatalogue` fills it
+// from the declaration's `houses:` (phase D1) — js/themes.js holds the recipe
+// grammar and dice.yaml holds the recipes, and this process reads the same
+// file the browser does. Filled in place, so this import keeps its identity
+// across every re-read; `setDeclaration` is the one caller.
+import { SET_IDS, installCatalogue } from './js/themes.js';
 import { SYSTEM_IDS } from './js/meanings.js';
 // A place at the table (docs/UX.md §7.63). The station arithmetic is written
 // ONCE, in js/places.js, and this process and every browser import the same
@@ -354,6 +359,37 @@ function syncDeclaredFelts(tree) {
   for (const id of Object.keys(rows)) {
     if (ASSET_ID_RE.test(id) && !FELT_THEMES.includes(id)) DECLARED_FELTS.add(id);
   }
+}
+
+// THE DICE CATALOGUE, UNDER THE SAME LAW (phase D1). `houses:` is the declared
+// half of the wire's set list, and this process reads the tree RAW — the
+// browser's js/tune.js reconciles a recipe against the dial tree and this
+// process has no dial tree, so a recipe field it cannot judge is simply
+// carried, and what the server actually takes from a house is the ID.
+//
+// Which is exactly why the ids are filtered here by ASSET_ID_RE, the same
+// regex the browser drops a row by: without it `/api/roll` would accept
+// `HouseUpper.x` — a set id every client resolves to nothing and silently
+// falls back on — which is the felt bug of the C4 review, one catalogue over.
+// A house whose `dice:` is missing or malformed contributes no ids and is not
+// an error: half a catalogue accepted is worse than a house that is not there.
+function declaredHouses(tree) {
+  const rows = tree && tree.houses;
+  const out = {};
+  if (!rows || typeof rows !== 'object' || Array.isArray(rows)) return out;
+  for (const [houseId, house] of Object.entries(rows)) {
+    if (!ASSET_ID_RE.test(houseId) || !house || typeof house !== 'object' || Array.isArray(house)) continue;
+    const src = house.dice;
+    const dice = {};
+    if (src && typeof src === 'object' && !Array.isArray(src)) {
+      for (const [setId, recipe] of Object.entries(src)) {
+        if (!ASSET_ID_RE.test(setId) || !recipe || typeof recipe !== 'object' || Array.isArray(recipe)) continue;
+        dice[setId] = recipe;
+      }
+    }
+    out[houseId] = { label: house.label, line: house.line, dice };
+  }
+  return out;
 }
 
 // Interpretation systems (GOALS.md goal 6, docs/ROADMAP.md §2): which profile
@@ -4119,12 +4155,7 @@ function isVendor(absPath) {
 // path the client and the tooling fetch (2026-08-14) — not guessed:
 //   index.html      css/style.css, js/main.js, js/report.js, and the importmap's
 //                   two vendor modules; js/main.js reaches models/towers/*.glb.
-//   lab.html        the dice lab, dev chrome rather than player UI — but
-//                   `tools/lab-shots.mjs`, `tools/geo-bench-shots.mjs` and one
-//                   e2e scenario all navigate the served origin to it, so it
-//                   stays servable. It only loads js/ and vendor/, which are
-//                   public anyway, so serving it discloses nothing new.
-//   chrome-lab.html the 2D counterpart (tools/README §), which iframes
+//   chrome-lab.html the 2D lab (tools/README §), which iframes
 //                   index.html. `.gcloudignore` already keeps it out of the
 //                   deployed image; this keeps it working locally.
 //   tests/e2e/fixtures/  the harness fetches tower_fixture.glb THROUGH THE PAGE
@@ -4141,7 +4172,18 @@ const APP_DIRS = ['js', 'css', 'vendor', 'models', 'tests/e2e/fixtures']
 // dice.yaml rides the same list: the declaration is part of the app (it is
 // what /js/tunables.js is generated from, below), and a browser or a curl
 // reading it verbatim discloses nothing the generated module did not.
-const APP_FILES = new Set(['index.html', 'lab.html', 'chrome-lab.html', 'dice.yaml', 'tools/devshell.html']
+// `lab.html` LEFT THIS LIST on 2026-09-03 (docs/DEVMODE.md §9, phase D3): the
+// dice lab retired with js/lab.js and its two shot tools when the panel's sets
+// editor took the recipe knobs onto the live felt. Nothing navigates to it any
+// more, and tests/static-cache.test.mjs asserts the 404 rather than leaving the
+// removal to a comment.
+// `dev.html` JOINED IT on 2026-09-03 (docs/DEVMODE.md §8, phase D5): the
+// developer-mode pop-out, the panel in its own window over a mirror of the
+// table tab's tune. Kept servable for the same reason chrome-lab.html is —
+// it is dev chrome the local server has to hand — and excluded from the
+// deployed upload for the same reason js/devmode.js is (`.gcloudignore`), so
+// on a deploy this path 404s along with the module it imports.
+const APP_FILES = new Set(['index.html', 'chrome-lab.html', 'dev.html', 'dice.yaml', 'tools/devshell.html']
   .map((rel) => path.join(ROOT, rel)));
 
 // Rides the RESOLVED absolute path, never the URL — the same reason isVendor
@@ -4357,6 +4399,11 @@ function readDeclaration(stat) {
 function setDeclaration(next) {
   declaration = next;
   syncDeclaredFelts(next && next.tree);
+  // The third reader, and it goes through here for exactly the reason the
+  // second does (phase D1): a dice set added to the file has to be on the wire
+  // the moment the file is re-read, or `/api/roll` 400s a set the browser is
+  // already wearing.
+  installCatalogue(declaredHouses(next && next.tree));
   return next;
 }
 

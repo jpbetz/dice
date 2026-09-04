@@ -172,7 +172,364 @@ post:
   bloom:
     threshold: 0.9         # linear pre-tonemap luminance a glow-flagged mesh must clear
 
-cards:                     # the name card's footprint; the rig is baked at boot, so these are ⟳
-  standoff: 0.86           # the card centre outboard of the rim (standoff − depth/2 is the clear ground)
+cards:                     # the name card's footprint; the rig is re-baked at the placard flush
+  standoff: 0.86           # the card centre outboard of the rim (standoff − depth/2 is the clear ground, and may not go below 0)
   width: 3.68              # across the chair's ray
   depth: 1.52              # along the chair's ray
+
+houses:                    # THE DICE CATALOGUE — every set the picker offers.
+  #
+  # A HOUSE is a browsing category with an identity; the SETS under `dice:`
+  # are the concrete styles a player picks, and `house.set` is the id on the
+  # wire. What each field MEANS, and why a set may have none of them, is
+  # js/themes.js's header — it is the code that reads these, and it kept the
+  # grammar when the recipes moved here (phase D1, 2026-09-03).
+  #
+  # Every field is optional and ABSENT IS A REAL ANSWER: sealed resin sheds
+  # nothing, the fae dice make the ordinary knock, three sets write
+  # `glow: null` to say the digits carry all the light. Defaults, ranges and
+  # the look/film class of every field: js/tune.js RECIPE.
+
+  # the control the themed houses read as themes against
+  classics:
+    label: Classics
+    line: "unadorned dice — matte bodies, honest numbers"
+    dice:
+      ivory:
+        label: Ivory
+        body: "#f3ead7"
+        text: "#2a2018"
+        accent: "#d8c9a3"
+        feel: { rough: 0.42, metal: 0 }
+      ivorypips:
+        label: Ivory (pips)
+        body: "#f3ead7"
+        text: "#1a1410"
+        accent: "#d8c9a3"
+        feel: { rough: 0.42, metal: 0 }
+        glyph: pip
+      onyx:
+        label: Onyx
+        body: "#141416"
+        text: "#e8e2d2"
+        accent: "#3a3a3f"
+        feel: { rough: 0.48, metal: 0.03 }
+        geo: { tint: "#e8e2d2", ink: 0.14 }
+      slate:
+        label: Slate
+        body: "#4a4e56"
+        text: "#f0e9d8"
+        accent: "#2f3238"
+        feel: { rough: 0.5, metal: 0.03 }
+      crimson:
+        label: Crimson
+        body: "#7f1d1d"
+        text: "#f0e9d8"
+        accent: "#4a1010"
+        feel: { rough: 0.42, metal: 0 }
+      cobalt:
+        label: Cobalt
+        body: "#1e3a7a"
+        text: "#f0e9d8"
+        accent: "#122250"
+        feel: { rough: 0.42, metal: 0 }
+      emerald:
+        label: Emerald
+        body: "#1f4d2e"
+        text: "#f0e9d8"
+        accent: "#122d1c"
+        feel: { rough: 0.42, metal: 0 }
+      brass:
+        label: Brass
+        body: "#9b7a2a"
+        text: "#221807"
+        accent: "#c9a54a"
+        feel: { rough: 0.32, metal: 0.72 }
+        geo: { tint: "#3a2708", ink: 0.55 }
+
+  # nothing under water sits still — the `swell` cadence is this house's
+  tidewrack:
+    label: Tidewrack
+    line: ocean & odyssey — sea-glass and drowned bronze
+    dice:
+      seaglass:
+        label: Sea-glass
+        body: "#0e3a3f"
+        text: "#7fd1c3"
+        accent: "#8a6f3c"
+        glow: { color: "#58e6d9", intensity: 0.07 }
+        feel: { rough: 0.15, metal: 0.1 }
+        shader: { fresnel: { color: "#58e6d9", power: 2.4, intensity: 0.9 } }
+        spec: { iridescence: 0.15, iridescenceIOR: 1.3, envMapIntensity: 1 }
+        geo: { bevel: 0.13, profile: round, wear: 0.6, pillow: 0.3 }
+        decal: { kind: ring, colors: ["#071e22", "#a8dcd2"] }
+        post: { bloom: source }
+        sound: { body: chime, weight: 0.15, sustain: 40 }
+        rest: { kind: swell, yAmpM: 0.0015, yPeriodS: 2.6, rollAmpRad: 0.00524, rollPeriodS: 3.1 }
+
+  # living things: heartwood CREAKS and sapamber is `still` — the sentinel,
+  # not a missing key, so the silence reads as a claim
+  wildwood:
+    label: Wildwood
+    line: "forest, fae, dryadic — the house of living things"
+    dice:
+      heartwood:
+        label: Heartwood
+        body: "#5a4326"
+        text: "#e9b54a"
+        accent: "#6f8f4f"
+        glow: { color: "#ffe9a3", intensity: 0.04 }
+        feel: { rough: 0.72, metal: 0.05 }
+        maps: { relief: { pattern: grain, strength: 0.9, digitDepth: 0.4 } }
+        geo: { bevel: 0.09, profile: round, wear: 0.25, pillow: 0.35, tint: "#1a0a05", ink: 0.35 }
+        sound: { body: thud, weight: 0.5, sustain: 20 }
+        rate: { rate: 0.55, window: 0.15 }
+        rest: { kind: creak, ampRad: 0.00698, periodAS: 2, periodBS: 3 }
+      sapamber:
+        label: Sap Amber
+        body: "#96601f"
+        text: "#38240e"
+        accent: "#ffd166"
+        glow: { color: "#ffb54d", intensity: 0.09 }
+        feel: { rough: 0.08, metal: 0 }
+        spec: { clearcoat: 0.55, clearcoatRoughness: 0.25, ior: 1.4, envMapIntensity: 1.05 }
+        geo: { bevel: 0.1, profile: round, pillow: 0.5 }
+        sound: { body: chime, weight: 0.2, sustain: 12 }
+        rest: { kind: still }
+
+  # one storm in one die. Its parented flicker was retired 2026-08-04: a
+  # light is a consequence of an event, not an idle effect
+  stormcall:
+    label: Stormcall
+    line: sky & tempest — a storm bottled in glass
+    dice:
+      boltglass:
+        label: Bolt-glass
+        body: "#3a4150"
+        text: "#f2f6ff"
+        accent: "#8f7fe8"
+        glow: { color: "#8f7fe8", intensity: 0.09 }
+        feel: { rough: 0.22, metal: 0.2 }
+        shader: { flow: { speed: 2, scale: 12, floor: 0.2, amp: 1.4 } }
+        spec: { iridescence: 0.35, envMapIntensity: 1.05 }
+        particles: { kind: static, colors: ["#f2f6ff", "#b8a8ff"] }
+        geo: { bevel: 0.03, nicks: 2 }
+        post: { bloom: source, ring: { amp: 4 } }
+        sound: { body: crackle, weight: 0.35, sustain: 25 }
+
+  # ships ONE set on purpose — firstfrost went in the 2026-08-04 pass as
+  # "deepglacier at brightness+1"; a frost-alt returns when it earns a real
+  # differentiator (dendrites that GROW after settle, not baked ones)
+  rimehold:
+    label: Rimehold
+    line: frost & glacier — the cold is the mechanic
+    dice:
+      deepglacier:
+        label: Deep Glacier
+        body: "#1e3d5c"
+        text: "#eef4fa"
+        accent: "#8fe3c0"
+        glow: { color: "#a8d8f0", intensity: 0.06 }
+        feel: { rough: 0.12, metal: 0.05 }
+        maps: { relief: { pattern: ferns, strength: 0.85, digitDepth: 0.3 }, roughPattern: ferns }
+        shader: { fresnel: { color: "#8fe3c0", power: 3.2, intensity: 0.55 } }
+        spec: { envMapIntensity: 1.2, specularIntensity: 1.1 }
+        particles: { kind: fog, colors: ["#dceefc", "#a8d8f0"] }
+        geo: { bevel: 0.075, profile: round, wear: 0.15 }
+        decal: { kind: frost, colors: ["#dceefc", "#7fb4d8"], scale: 1.35, life: 10 }
+        post: { bloom: source }
+        sound: { body: thud, weight: 0.85, sustain: 30 }
+        rate: { rate: 0.4, window: 0.25 }
+
+  # black iron, molten numbers: `glow: null` is the claim — the digits carry
+  # ALL the fire, at 0.7 since the 2026-08-04 pass called 1.35 a neon sign
+  emberforge:
+    label: Emberforge
+    line: "fire & the smith — black iron, molten numbers"
+    dice:
+      blackanvil:
+        label: Black Anvil
+        body: "#2b2622"
+        text: "#ffd166"
+        accent: "#ff8c42"
+        glow: null
+        feel: { rough: 0.85, metal: 0.55 }
+        maps:
+          digitGlow: { color: "#ffd166", intensity: 0.7 }
+          relief: { pattern: hammer, strength: 1.1, digitDepth: 0.45 }
+        shader: { flow: { speed: 0.9, scale: 12, cool: "#5a1c06", hot: "#fff2c8", gain: 1.4 } }
+        spec: { specularColor: "#ffb073", specularIntensity: 0.9, envMapIntensity: 0.6 }
+        particles: { kind: sparks, colors: ["#fff2c8", "#ffd166", "#ff9a3c"], fadeTo: "#571b05" }
+        geo: { bevel: 0.1, wear: 0.2, nicks: 3 }
+        decal: { kind: scorch, colors: ["#070402", "#ff8c42"] }
+        light: { color: "#ff8c42", intensity: 10, range: 6.5, mode: breathe }
+        post:
+          bloom: source
+          ring: { amp: 6, jolt: 2.5, speed: 1100 }
+          shimmer: { radius: 2.2, strength: 0.7 }
+        sound: { body: thud, weight: 0.9, sustain: 30 }
+
+  # contained power. The 2026-08-04 pass dropped its breathing emissive and
+  # pulled the rim and the die-light in: three signals for one identity slot
+  arcanum:
+    label: Arcanum
+    line: runes & wizardry — the roll is a casting
+    dice:
+      focuscrystal:
+        label: Focus Crystal
+        body: "#2a2140"
+        text: "#c9a6ff"
+        accent: "#7fd9e8"
+        glow: { color: "#7fd9e8", intensity: 0.08 }
+        feel: { rough: 0.2, metal: 0.15 }
+        maps: { digitGlow: { color: "#c9a6ff", intensity: 0.95 } }
+        shader: { fresnel: { color: "#7fd9e8", power: 3, intensity: 0.3 } }
+        spec: { ior: 1.75, specularIntensity: 1.25, envMapIntensity: 1.2 }
+        particles: { kind: motes, colors: ["#c9a6ff", "#7fd9e8"], scale: 0.8 }
+        geo: { bevel: 0.02 }
+        light: { color: "#7fd9e8", intensity: 10, range: 2, mode: steady }
+        post: { bloom: source }
+        sound: { body: chime, weight: 0.3, sustain: 55 }
+
+  # a die-shaped absence, so the violet halo went 1.1 → 0.45 (2026-08-04) —
+  # a bright rim CONTRADICTS the claim the house is making
+  umbra:
+    label: Umbra
+    line: dark & unnatural — a die-shaped absence
+    dice:
+      voidgrain:
+        label: Void Grain
+        body: "#0b0a10"
+        text: "#cfe98c"
+        accent: "#43265b"
+        glow: { color: "#43265b", intensity: 0.05 }
+        feel: { rough: 1, metal: 0 }
+        maps: { digitGlow: { color: "#cfe98c", intensity: 0.85 } }
+        shader:
+          fresnel: { color: "#43265b", power: 2, intensity: 0.45 }
+          dissolve: { edge: "#cfe98c" }
+        particles: { kind: ash, colors: ["#5a4a6a", "#cfe98c"] }
+        geo: { bevel: 0.015 }
+        light: { color: "#ffffff", intensity: -8, range: 2.5, mode: breathe }
+        post: { bloom: source, ring: { amp: -7 } }
+        sound: { body: hush, weight: 0.4, sustain: 10 }
+
+  # bone that remembers: the `settle-tick` — one small adjustment after
+  # landing, then genuinely still forever
+  reliquary:
+    label: Reliquary
+    line: "bone & relic — aged ivory, scrimshaw numbers"
+    dice:
+      scrimshaw:
+        label: Scrimshaw
+        body: "#e8dcc0"
+        text: "#6b543a"
+        accent: "#5f8f7a"
+        glow: null
+        feel: { rough: 0.6, metal: 0.05 }
+        maps: { relief: { pattern: scrimshaw, strength: 0.95, digitDepth: 0.75 } }
+        geo:
+          bevel: 0.1
+          profile: round
+          wear: 0.45
+          pillow: 0.25
+          nicks: 4
+          tint: "#4a3520"
+          ink: 0.5
+        decal: { kind: smudge, colors: ["#e8dcc0", "#c9b896"], scale: 0.85 }
+        sound: { body: clack, weight: 0.55, sustain: 25 }
+        rest:
+          kind: settle-tick
+          delayMinMs: 200
+          delayMaxMs: 400
+          posBumpM: 0.0003
+          yawRad: 0.00698
+          tailMs: 80
+
+  # W4: staged by the fae venues, never picked — see `where` below
+  moonmoot:
+    label: Moonmoot
+    line: the fae court at night — witchlight over still water
+    dice:
+      witchlight:
+        label: Witchlight
+        body: "#2f3b4c"
+        text: "#d9fbee"
+        accent: "#8ff0e2"
+        glow: { color: "#7fc9b8", intensity: 0.06 }
+        feel: { rough: 0.3, metal: 0.05 }
+        maps:
+          digitGlow: { color: "#d9fbee", intensity: 0.95 }
+          relief: { pattern: grain, strength: 0.35, digitDepth: 0.7 }
+        shader: { fresnel: { color: "#6fd8c8", power: 2.6, intensity: 0.5 } }
+        spec: { ior: 1.56, envMapIntensity: 0.9 }
+        geo: { bevel: 0.11, profile: round, wear: 0.35, pillow: 0.3, tint: "#141c26", ink: 0.2 }
+        post: { bloom: source }
+        rate: { rate: 0.7, window: 0.12 }
+        rest: { kind: still }
+        fog: { color: "#9ff0dc", gain: 1.25 }
+        where: venue
+
+  # MECHANICS M3/M6: d6 faces that are not all numbers
+  symbols:
+    label: Symbols
+    line: faces that are not numbers — monster brawls and Fate
+    dice:
+      monster:
+        label: Monster
+        channel: beta
+        body: "#e8e4dc"
+        text: "#2f2a3a"
+        accent: "#c9c2b4"
+        feel: { rough: 0.34, metal: 0 }
+        glyph: faces
+        faces: ["1", "2", "3", bolt, claw, heart]
+        geo: { bevel: 0.03 }
+      fate:
+        label: Fate
+        line: "plus, minus, blank"
+        body: "#2b3340"
+        text: "#eef2f7"
+        accent: "#8fa6c4"
+        feel: { rough: 0.4, metal: 0 }
+        glyph: faces
+        faces: [minus, minus, blank, blank, plus, plus]
+        geo: { bevel: 0.03 }
+      kind:
+        label: Kind
+        line: "the generous cup — three plus, two blank, one minus"
+        body: "#28402f"
+        text: "#eef7f0"
+        accent: "#8fc4a0"
+        feel: { rough: 0.4, metal: 0 }
+        glyph: faces
+        faces: [minus, blank, blank, plus, plus, plus]
+        geo: { bevel: 0.03 }
+      cruel:
+        label: Cruel
+        line: "the mean cup — one plus, two blank, three minus"
+        body: "#3a2530"
+        text: "#f7eef2"
+        accent: "#c48fa6"
+        feel: { rough: 0.4, metal: 0 }
+        glyph: faces
+        faces: [minus, minus, minus, blank, blank, plus]
+        geo: { bevel: 0.03 }
+
+  # royal, and its dignity is stillness: lacquer sheds nothing, and the
+  # ceremonial retiming (0.65× over the last 30%) is this house's own
+  gildhall:
+    label: Gildhall
+    line: "royal & heraldic — oxblood lacquer, gold leaf"
+    dice:
+      oxblood:
+        label: Oxblood
+        body: "#4a1f1a"
+        text: "#d4af37"
+        accent: "#f3ead7"
+        glow: null
+        feel: { rough: 0.18, metal: 0.4 }
+        spec: { clearcoat: 1, clearcoatRoughness: 0.12, envMapIntensity: 1.25 }
+        geo: { bevel: 0.025 }
+        sound: { body: clack, weight: 0.7, sustain: 20 }
+        rate: { rate: 0.65, window: 0.3 }

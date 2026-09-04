@@ -14,37 +14,39 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// THE FOUR FRAMES NO EXISTING STEP TAKES (Joe's LOOK queue, ROADMAP #1).
-// glade-look, life-look and record-look already carry the other three items;
-// these four had their arguments written down in prose and their pictures
-// never rendered:
+// THE FRAMES NO EXISTING STEP TAKES (Joe's LOOK queue, ROADMAP #1).
+// glade-look, life-look and record-look already carry the other items; these
+// had their arguments written down in prose and their pictures never
+// rendered. Four when this step was written; two since the lab retired (see
+// below):
 //
 //   crop    C27 — does a cropped felt still read as a table? The SAME seeded
 //           throw shot twice, `setFraming({preferDice:true})` off and on, at a
 //           390px phone and a 1600px desktop, for 3d6 / 6d6 / 40d6. The
 //           option is inert as shipped; this is the picture of what turning
 //           it on would buy and what it would cost.
-//   bench   `std` ↕ `round .090` ↕ `round .130` on the lab bench, the three
-//           rows at the SAME hero distance so the edge treatment is the only
-//           thing that differs. Its CALL is answered (§9c chose round .090 on
-//           2026-08-18 and it shipped), so this shoots no open question today;
-//           it is kept for §9c Tier 3, which asks the next one.
-//   set     W4 — the Moonmoot Witchlight set as ART: the lab's row and hero
-//           views under the felt lamp and in the dark, where a carved-and-lit
-//           digit either blooms or does nothing. The frames of it IN the
-//           venue come from glade-look (`glade-*-dice.png`) — both halves are
-//           needed, because the venue lights its own dice.
 //   stump   hollowbole round 6 — the berm, the root-flare fingers and the
 //           moss creep, at two low eyes under both palettes. The verdict is
 //           "grown, not placed": does the model own its transition to the
 //           ground, or is it still an item set on a table (W2c, Joe).
 //
-//   node tools/drive.mjs tools/steps/verdict-shots.mjs            # all four
-//   node tools/drive.mjs tools/steps/verdict-shots.mjs crop bench # a subset
+// TWO OF THE FOUR RETIRED WITH THE LAB (2026-09-03, docs/DEVMODE.md §9 phase
+// D3). `bench` (§9c's three edge treatments at one hero distance) and `set`
+// (W4's Witchlight row and hero views) were both shot on lab.html, and when
+// lab.html retired they had nowhere to stand. Neither shoots an open question:
+// §9c chose round .090 on 2026-08-18 and it shipped, and W4's set art was
+// approved in the same sitting — tools/verdict-sheet.mjs stopped rendering
+// either group before this, which is how they came to be shooting for nobody.
+// A hero frame of one dice set is owed again the day §9c Tier 3 asks the next
+// edge question; DEVMODE §9 carries it as owed, and it will be shot from the
+// real felt through the panel's sets section, not from a second renderer.
+//
+//   node tools/drive.mjs tools/steps/verdict-shots.mjs            # both
+//   node tools/drive.mjs tools/steps/verdict-shots.mjs crop       # a subset
 //
 // Writes shots/v-*.png plus shots/verdict-data.json — the MEASURED numbers
-// each frame was taken at (die span in px, the framing rung, the lab's
-// geometry fingerprints). The sheet captions itself from that file rather
+// each frame was taken at (die span in px, the framing rung, which tower skin
+// was live under each venue). The sheet captions itself from that file rather
 // than from numbers quoted out of a doc, which is how a caption goes stale.
 
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
@@ -56,40 +58,16 @@ const SHOTS = join(ROOT, 'shots');
 const DATA = join(SHOTS, 'verdict-data.json');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// The manifest is MERGED, never clobbered: the four sections are runnable
+// The manifest is MERGED, never clobbered: the sections are runnable
 // independently (`… verdict-shots.mjs crop`) and a partial re-run must not
-// silently delete the other three sections' numbers and leave the sheet
-// captioning frames it can no longer describe.
+// silently delete the other sections' numbers and leave the sheet captioning
+// frames it can no longer describe. It is also what still holds the retired
+// `bench` and `set` rows from the sitting they were shot for.
 function mergeData(patch) {
   let cur = {};
   if (existsSync(DATA)) { try { cur = JSON.parse(readFileSync(DATA, 'utf8')); } catch { cur = {}; } }
   const out = { ...cur, ...patch, generated: new Date().toISOString() };
   writeFileSync(DATA, `${JSON.stringify(out, null, 2)}\n`);
-}
-
-async function labPage(stage) {
-  const page = await stage.ctx.browser.newPage();
-  await page.navigate(`http://localhost:${stage.port}/lab.html`);
-  const deadline = Date.now() + 40000;
-  for (;;) {
-    const ready = await page.eval('!!(window.__lab && window.__lab.ready)').catch(() => false);
-    if (ready === true) break;
-    if (Date.now() > deadline) throw new Error('lab never became ready');
-    await sleep(200);
-  }
-  await page.browser.send('Emulation.setDeviceMetricsOverride',
-    { width: 1500, height: 950, deviceScaleFactor: 2, mobile: false }, page.sessionId);
-  await page.eval('window.__lab.setRotate(false)');
-  // THE LAB'S CHROME IS DEV FURNITURE, and it costs 40% of the frame. The
-  // three panels are `position: fixed` overlays, so hiding them removes the
-  // furniture WITHOUT moving the camera — `frameCamera`/`zoomDie` fit against
-  // window.innerWidth, which an overlay never touched. A cropped screenshot
-  // would have re-framed the die; this does not.
-  await page.eval(`(() => { for (const id of ['side', 'builder', 'bar']) {
-    const el = document.getElementById(id); if (el) el.style.display = 'none';
-  } return true; })()`);
-  await sleep(300);
-  return page;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,83 +138,6 @@ async function shootCrop(stage, t) {
 }
 
 // ---------------------------------------------------------------------------
-// 9c — the std recipe on the lab bench
-// ---------------------------------------------------------------------------
-
-// THE CALL THIS RIG WAS BUILT FOR IS ANSWERED (2026-08-18: `round .090`,
-// shipped — SHIPPED §9c "the standard edge"). The rig is kept because §9c
-// Tier 3 asks the next question about the same surface, and because a
-// three-way at one hero distance is how an edge gets decided here. What is
-// SHIPPED is now `std` and `lab.round090` BOTH — their d6 meshes are
-// bit-identical, so the two rows are a self-check on the rig: if those two
-// frames ever differ, the bench and the app have come apart.
-const BENCH_ROWS = [
-  { id: 'std', label: 'std — the shipped edge (round .090 since 2026-08-18)' },
-  { id: 'lab.round090', label: 'round .090 — the bench row std is built from' },
-  { id: 'lab.round130', label: 'round .130 — the recipe ceiling' },
-];
-
-async function shootBench(stage, page) {
-  await page.eval(`window.__lab.setEnv('table')`);
-  await sleep(300);
-  const geo = await page.eval('JSON.stringify(window.__lab.geoStats())');
-  const stats = JSON.parse(geo);
-  const rows = [];
-  for (const r of BENCH_ROWS) {
-    const ok = await page.eval(`window.__lab.zoomRow(${JSON.stringify(r.id)})`);
-    if (ok !== true) throw new Error(`lab has no row '${r.id}' — the bench moved`);
-    await sleep(250);
-    await page.screenshot(join(SHOTS, `v-9c-${r.id}-row.png`));
-    for (const type of ['d6', 'd20']) {
-      const hit = await page.eval(`window.__lab.zoomDie(${JSON.stringify(r.id)}, ${JSON.stringify(type)})`);
-      if (hit !== true) throw new Error(`lab could not frame ${r.id}/${type}`);
-      await sleep(250);
-      await page.screenshot(join(SHOTS, `v-9c-${r.id}-${type}.png`));
-    }
-    rows.push({ id: r.id, label: r.label, ...(stats[r.id] || {}) });
-    console.log(`  bench ${r.id}: verts=${stats[r.id]?.verts} r=${stats[r.id]?.r}`);
-  }
-  await page.eval('window.__lab.zoomRow(null)');
-  mergeData({ bench: rows });
-}
-
-// ---------------------------------------------------------------------------
-// W4 — the Moonmoot Witchlight set as art
-// ---------------------------------------------------------------------------
-
-const SET_ID = 'moonmoot.witchlight';
-
-async function shootSet(stage, page) {
-  const rows = [];
-  for (const env of ['table', 'dark']) {
-    await page.eval(`window.__lab.setEnv(${JSON.stringify(env)})`);
-    await sleep(350);
-    const ok = await page.eval(`window.__lab.zoomRow(${JSON.stringify(SET_ID)})`);
-    if (ok !== true) {
-      throw new Error(`lab has no row '${SET_ID}' — the set left the registry`);
-    }
-    await sleep(250);
-    await page.screenshot(join(SHOTS, `v-set-${env}-row.png`));
-    await page.eval(`window.__lab.zoomDie(${JSON.stringify(SET_ID)}, 'd20')`);
-    await sleep(250);
-    await page.screenshot(join(SHOTS, `v-set-${env}-d20.png`));
-    rows.push(env);
-    console.log(`  set ${env}: row + d20`);
-  }
-  // The neighbour that makes the value read legible: the SAME frame of the
-  // house set the recipe was reasoned against (Black Anvil's structure,
-  // inverted to cold — js/themes.js). Without it "the body is a quiet step
-  // above the floor" is a sentence rather than a comparison.
-  await page.eval(`window.__lab.setEnv('dark')`);
-  await sleep(300);
-  await page.eval(`window.__lab.zoomDie('emberforge.blackanvil', 'd20')`);
-  await sleep(250);
-  await page.screenshot(join(SHOTS, 'v-set-dark-blackanvil-d20.png'));
-  await page.eval('window.__lab.zoomRow(null)');
-  mergeData({ set: { envs: rows, setId: SET_ID } });
-}
-
-// ---------------------------------------------------------------------------
 // hollowbole round 6 — the grounded stump
 // ---------------------------------------------------------------------------
 
@@ -287,7 +188,7 @@ async function shootStump(stage, t) {
 // ---------------------------------------------------------------------------
 
 export default async function run(stage, args = []) {
-  const want = new Set(args.filter((a) => /^(crop|bench|set|stump)$/.test(a)));
+  const want = new Set(args.filter((a) => /^(crop|stump)$/.test(a)));
   const run1 = (name) => want.size === 0 || want.has(name);
   mkdirSync(SHOTS, { recursive: true });
 
@@ -295,12 +196,6 @@ export default async function run(stage, args = []) {
     const t = await stage.tab('localhost', 'Verdict');
     if (run1('crop')) { console.log('\n— C27, the cropped felt —'); await shootCrop(stage, t); }
     if (run1('stump')) { console.log('\n— hollowbole round 6, the grounded stump —'); await shootStump(stage, t); }
-  }
-  if (run1('bench') || run1('set')) {
-    const page = await labPage(stage);
-    if (run1('bench')) { console.log('\n— 9c, the std recipe —'); await shootBench(stage, page); }
-    if (run1('set')) { console.log('\n— W4, Moonmoot Witchlight —'); await shootSet(stage, page); }
-    await page.close();
   }
   console.log(`\nwrote ${SHOTS}/v-*.png and ${DATA}`);
 }

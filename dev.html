@@ -1,0 +1,505 @@
+<!doctype html>
+<!--
+Copyright 2026 The Dice Table Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<!--
+  DEVELOPER MODE — THE POP-OUT (docs/DEVMODE.md §8, phase D5).
+
+  The panel, in its own window, on a second monitor. Opened by the file
+  section's **Pop out** button (js/main.js `devPopout`), or navigated to by
+  hand at /dev.html while a table tab has the door open.
+
+  ONE WRITER. There is exactly one `tune` in the world and it lives in the tab
+  that owns the scene. This page mounts THE SAME PANEL (js/devmode.js `mount`)
+  over a MIRROR of that tune: `remoteTune` below answers `get`/`diff`/
+  `changes` out of the last snapshot the table broadcast, and its `set` posts
+  a message rather than writing anything. So a value can never be two things
+  at once, the pop-out cannot fork a film it cannot see, and closing either
+  window is one side of a channel going quiet and nothing else.
+
+  A `BroadcastChannel` is origin-scoped by construction: it is not a network,
+  it reaches no other viewer, and it cannot leave this browser (GOALPOST 2, 4).
+
+  WHAT IT DOES NOT CARRY, and why. The cast, the bench, the clock, the A/B
+  slots and the three asset editors stay in the table tab: every one of them
+  is an instrument aimed AT THE FELT — you deal chairs to look at the ring,
+  throw a seed to watch the film, reskin the dice standing on the cloth — and
+  an instrument whose picture is on the other screen is a worse instrument,
+  not a portable one. What travels is what a second monitor is actually for:
+  the dials, the diff and the verbs that write the file.
+
+  ONE TABLE, LATCHED. A channel is origin-scoped and an origin is not a tab,
+  so with two table tabs open this window used to hear both: one write moved
+  both felts and the mirror drew the two trees alternately. Every table stamps
+  its messages with its own id, this window keeps the FIRST it hears, and
+  everything it says afterwards is addressed to that one.
+
+  window.__devPopout = { panel, mirror, base, table, who, snapshot(), state(),
+  set(patch), reset(scope) } is the probe for the harness.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dev panel — dice table</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dev.css">
+<style>
+  /* THE POP-OUT *IS* THE PANEL, so the overlay dress comes off: no fixed
+     corner, no shadow floating over a felt that is not here, no fold (there is
+     nothing behind it to fold away to). Written after the two links on
+     purpose — these rules override css/dev.css's own, media block included. */
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--surface-deep, #0c120d); }
+  #dev-panel {
+    position: static;
+    width: auto;
+    height: calc(100dvh - 26px);
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .dev-glyph { display: none !important; }
+  /* …AND THE PHONE SHEET COMES OFF WITH IT (the D5 review, 2026-09-03). The
+     sheet exists because the panel is an overlay and the felt underneath it is
+     what every dial is for; here there is no felt, so all it did was arrive.
+     Measured at 420×940 — the size Pop out asked for, which is inside
+     css/dev.css's `(max-width: 639px)` — the window came up in the phone
+     dress: the panel a grid, the section bar `nowrap` and scrolling sideways
+     with the `file` section (the diff, Save, the paste box, the whole reason
+     for a second window) clipped off the right edge with no visible
+     affordance. The grid and the bar are the stylesheet's half; `mount({
+     phone: 'never' })` below is the half a stylesheet cannot do, and turns the
+     steppers back into sliders. What is NOT undone is the touch sizing — 44px
+     rows and buttons under a coarse pointer are right in any window, and a
+     window is a thing a person can make narrow on purpose. */
+  #dev-panel {
+    display: flex;
+    grid-template-columns: none;
+    grid-template-rows: none;
+  }
+  #dev-panel .dev-head, #dev-panel .dev-find, #dev-panel .dev-barslot,
+  #dev-panel .dev-statusslot, #dev-panel .dev-body, #dev-panel .dev-foot {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  #dev-panel .dev-find { margin: 6px 10px 0; width: calc(100% - 20px); }
+  #dev-panel .dev-secbar.seg { flex-wrap: wrap; overflow-x: visible; }
+  /* The one thing this page says for itself: whether the table tab is there. */
+  #link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 26px;
+    padding: 0 10px;
+    font: 11px/1 var(--font-mono);
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    background: var(--surface-card);
+    border-bottom: 1px solid var(--hair);
+    user-select: none;
+  }
+  #link b { color: var(--gold); font-weight: 600; letter-spacing: 0.12em; }
+  #link.is-live #link-state { color: var(--gold-bright); }
+  #link.is-gone #link-state { color: var(--amber); }
+  #link-note { margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="link" class="is-gone"><b>DEV</b><span id="link-state">looking for the table…</span><span id="link-note"></span></div>
+<script type="module">
+  import {
+    DIALS, LAWS, pairGroups, defaultsOf, getLeaf, setLeaf, hasLeaf, isDial,
+    assetDialFor, ASSET_SECTIONS,
+  } from './js/tune.js';
+  import { parseYaml } from './js/yaml.js';
+  import { mount } from './js/devmode.js';
+
+  const CHANNEL = 'dice-dev';
+  const PING_MS = 1000;
+  // Three missed pings and the table is gone. The table's own side uses the
+  // same 5 s (js/main.js DEV_POPOUT_TTL_MS), so neither window is ever waiting
+  // on the other's opinion of when a silence became an absence.
+  const GONE_MS = 5000;
+
+  const linkEl = document.getElementById('link');
+  const stateEl = document.getElementById('link-state');
+  const noteEl = document.getElementById('link-note');
+  const note = (text) => { noteEl.textContent = text || ''; };
+
+  const isMap = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const dotted = (p) => (Array.isArray(p) ? p.join('.') : String(p));
+
+  // ---- what the last snapshot said ---------------------------------------
+  let base = null;                    // { shipped, declared, armed, sections }
+  let snap = null;                    // the last snapshot
+  let heard = 0;                      // when it arrived
+  let panel = null;
+  let mirror = null;
+  const T = {};                       // the live tree object the panel reads
+  const waiting = new Map();          // message id → resolve
+  let seq = 0;
+
+  // ONE TABLE, LATCHED (the D5 review, 2026-09-03). A `BroadcastChannel` is
+  // origin-scoped, and an origin is not a tab: two table tabs — the ordinary
+  // local two-player test — both heard every message this window sent, so one
+  // `set` moved BOTH lamps and the mirror then drew the two trees alternately
+  // at about 1 Hz, every row flickering between two felts with nothing to say
+  // which one was being steered. So: the FIRST `base` heard names the table
+  // this window belongs to, every message after that is addressed to it, and a
+  // base or snapshot stamped with any other table is dropped unread. While the
+  // link is dead the hello goes out unaddressed again, which is how this
+  // window finds a table after its own went away.
+  let table = null;
+  // …and this window's own name, so two pop-outs sharing the channel cannot
+  // collide on the request ids they are waiting on.
+  const WHO = `pop-${Math.random().toString(36).slice(2, 10)}`;
+  const linked = () => heard > 0 && (Date.now() - heard) < GONE_MS;
+
+  const channel = new BroadcastChannel(CHANNEL);
+  const post = (msg) => channel.postMessage({
+    from: 'popout',
+    who: WHO,
+    // A hello is the DISCOVERY message and carries no addressee: every table
+    // answers it with its own id, and this window keeps the first.
+    ...(table && msg.kind !== 'hello' ? { to: table } : {}),
+    ...msg,
+  });
+  const ask = (msg) => new Promise((resolve) => {
+    const id = ++seq;
+    waiting.set(id, resolve);
+    post({ ...msg, id });
+    setTimeout(() => { if (waiting.delete(id)) resolve(null); }, 8000);
+  });
+
+  // The tree is REPLACED IN PLACE, never swapped: js/devmode.js's `judge`
+  // reads `tune.T` as an object, and a panel holding a stale reference would
+  // preview against a tree nobody is in any more.
+  const soak = (into, from) => {
+    for (const k of Object.keys(into)) if (!(k in from)) delete into[k];
+    for (const [k, v] of Object.entries(from)) {
+      if (isMap(v) && isMap(into[k])) soak(into[k], v);
+      else into[k] = v;
+    }
+  };
+
+  // ---- the dial tree, read here rather than sent -------------------------
+  //
+  // A dial is metadata, not state: js/tune.js ships the same DIALS to both
+  // windows, so sending them would be sending a constant down a channel. What
+  // the table DOES have to say is which reload-class leaves no binder covers —
+  // a binder is a function, and a function does not travel.
+  const dialAt = (path) => {
+    const p = Array.isArray(path) ? path : String(path).split('.');
+    const d = getLeaf(DIALS, p);
+    if (isDial(d)) return d;
+    if (p.length > 1 && ASSET_SECTIONS.includes(p[0])) {
+      const a = assetDialFor(p);
+      if (isDial(a)) return a;
+    }
+    return null;
+  };
+
+  const PAIRS = pairGroups(DIALS, defaultsOf(DIALS));
+  const lawMates = (path) => {
+    const d = dialAt(path);
+    if (!d || !d.law || !LAWS[d.law] || !LAWS[d.law].pair) return [];
+    const out = [];
+    for (const q of PAIRS.get(d.law) || []) {
+      const key = q.join('.');
+      if (key === dotted(path)) continue;
+      if (!base || !hasLeaf(base.shipped, key)) continue;
+      out.push([key, getLeaf(base.shipped, key)]);
+    }
+    return out;
+  };
+
+  // ---- the mirror ---------------------------------------------------------
+  //
+  // A Tune to the panel's contract, and a WRITE-THROUGH one: every mutator
+  // posts and returns at once with the diff as it last stood. The row it moved
+  // snaps back to the tree's value on the very next repaint and lands again a
+  // beat later when the table's snapshot arrives — which is exactly right, and
+  // is what "the table tab is the only writer" looks like on screen.
+  function remoteTune() {
+    return {
+      // A GETTER, NOT A SNAPSHOT OF THE REFERENCE: this window can re-latch to
+      // a different table after its own goes away, and a panel still holding
+      // the first table's shipped tree would diff every row against a file
+      // nobody in this browser is reading.
+      get SHIPPED() { return base.shipped; },
+      T,
+      dialAt,
+      lawMates,
+      get: (p) => getLeaf(T, p),
+      sections: () => base.sections.slice(),
+      diff: () => (snap ? snap.diff : []),
+      changes: () => (snap ? { ...snap.changes } : {}),
+      binderFor: (p) => ((snap && snap.pending.includes(dotted(p))) ? null : NOOP_BINDER),
+      // OPTIMISTIC, AND THE TABLE IS STILL THE TRUTH. The value lands in the
+      // mirror at once so a dragged row does not fight the person dragging it;
+      // the table's next snapshot overwrites the whole tree a beat later, so a
+      // refused write comes straight back — refused film at a shared table,
+      // an option that is not one of the options, a binder that threw — and
+      // the strip says which. Nothing here decides anything; it just draws
+      // sooner than the round trip.
+      set(patch) {
+        // NOTHING OPTIMISTIC WHILE THERE IS NOTHING TO CORRECT IT (the D5
+        // review, 2026-09-03). The write below is optimistic because the
+        // table's next snapshot overwrites the whole tree a beat later; with
+        // the table gone no snapshot is coming, so the local write would sit
+        // in the row for ever — measured: the table's lamp at 24, the row
+        // reading 39, and the only correction a link-note eight seconds later
+        // at the top of the window. Refused here instead, by name, in the row
+        // that was moved (js/devmode.js REASON.gone).
+        if (!linked()) {
+          note('no table tab — the row went back');
+          return {
+            diff: snap ? snap.diff : [],
+            refused: Object.keys(patch || {}).map((p) => [p, 'gone']),
+            pending: [],
+          };
+        }
+        for (const [k, v] of Object.entries(patch || {})) {
+          if (hasLeaf(T, k)) setLeaf(T, k, v);
+        }
+        ask({ kind: 'set', patch }).then(report);
+        return { diff: snap ? snap.diff : [], refused: [], pending: [] };
+      },
+      reset(scope) {
+        if (!linked()) {
+          note('no table tab — nothing to reset');
+          return { diff: snap ? snap.diff : [], refused: [['reset', 'gone']], pending: [] };
+        }
+        ask({ kind: 'reset', scope: scope === undefined ? 'all' : scope }).then(report);
+        return { diff: snap ? snap.diff : [], refused: [], pending: [] };
+      },
+      // Never reached: `verbs.pastePatch` below is what the panel uses when it
+      // has one. Present because the contract lists it, and refusing loudly
+      // beats returning a promise the caller reads `.refused` off.
+      applyPatchText() { throw new Error('the pop-out pastes through the table tab'); },
+      patchText: () => '',
+      exportYaml: () => '',
+    };
+  }
+  // A binder that does nothing, returned only so `!tune.binderFor(p)` reads
+  // false: the panel asks whether a leaf is COVERED, never for the function.
+  const NOOP_BINDER = () => {};
+
+  // A refusal the table sent back. The panel's own status line is driven by
+  // its `tune.set` result, which here is always empty by construction, so the
+  // pop-out's strip is where a refused write says so.
+  const report = (r) => {
+    if (!r) {
+      // THE ASK TIMED OUT, so the optimistic write it was covering has nothing
+      // coming to correct it: put the mirror back to the last thing the table
+      // actually said and repaint, or the row goes on showing a value that
+      // reached no tree at all (the D5 review, 2026-09-03).
+      note('no answer from the table — the row went back');
+      if (snap) soak(T, snap.T);
+      gone();
+      if (panel) panel.repaint();
+      return;
+    }
+    const bad = (r.refused || []).map(([p, why]) => `${p} (${why})`);
+    note(bad.length ? `refused: ${bad.join(', ')}` : '');
+    if (panel) panel.repaint();
+  };
+
+  // THE PANEL IS LOCKED WHILE THERE IS NO TABLE. The film lock is the panel's
+  // own "this write cannot land" dress and it already draws a reason, so a
+  // window whose table has gone wears it: the rows say why before they are
+  // dragged, and the mirror's `set` refuses them if they are anyway. `apply`
+  // puts the real film state back the moment a snapshot arrives.
+  let locked = false;
+  const gone = () => {
+    if (locked || !panel) return;
+    locked = true;
+    panel.setFilm('locked', 'no table tab — open the door there with `');
+  };
+
+  // ---- the panel ----------------------------------------------------------
+  function build() {
+    // A production table never opens its door, so no snapshot can arrive from
+    // one — but if it ever did, the panel's own guard is the right answer and
+    // this window has no business talking it round.
+    if (snap.mode === 'production') { note('that table is in production'); return; }
+    mirror = remoteTune();
+    panel = mount({
+      tune: mirror,
+      dials: DIALS,
+      mode: snap.mode,
+      film: snap.film,
+      // NOT A PHONE, WHATEVER THE WINDOW MEASURES. The sheet dress is for a
+      // panel overlaid on a felt; this window has no felt behind it, and at
+      // the size Pop out asks for it used to arrive with every slider replaced
+      // by a stepper. The head of this file says the rest.
+      phone: 'never',
+      verbs: {
+        // EVERY VERB THAT LEAVES THE TAB IS RUN IN THE TAB IT LEAVES. A
+        // download saves from the table's document, a copy writes the table's
+        // clipboard, and Save posts from the origin the armed route trusts —
+        // this window only asks.
+        download: () => ask({ kind: 'verb', name: 'download' }).then(ackOf),
+        copyPatch: () => ask({ kind: 'verb', name: 'copyPatch' }).then(ackOf),
+        status: () => Promise.resolve({ armed: !!base.armed, file: 'dice.yaml' }),
+        save: () => ask({ kind: 'verb', name: 'save' }).then((a) => (a && a.body) || { ok: false, reason: (a && a.detail) || 'no answer' }),
+        parsePatch: (text) => flatten(parseYaml(String(text ?? '')).tree),
+        pastePatch: (text) => {
+          ask({ kind: 'set', patch: flatten(parseYaml(String(text ?? '')).tree) }).then(report);
+          return { diff: snap ? snap.diff : [], refused: [], pending: [] };
+        },
+      },
+      // Shut closes THIS WINDOW and nothing else: the table's door is the
+      // table's, and a pop-out that could shut it would reset every dial in a
+      // tab whose felt the person pressing it cannot see.
+      onShut: () => { post({ kind: 'bye' }); window.close(); },
+      info: {
+        get declared() { return base.declared; },
+        get venue() { return snap ? snap.venue : null; },
+        get venueLight() { return snap ? snap.venueLight : null; },
+      },
+    });
+    // THE POP-OUT IS NEVER FOLDED. `mount` folds itself on a narrow window
+    // (css/dev.css's phone sheet, and the same query in js/devmode.js) because
+    // over a felt the felt is what matters; here there is nothing behind it.
+    panel.fold(false);
+    window.__devPopout.panel = panel;
+    window.__devPopout.mirror = mirror;
+  }
+
+  // A yaml fragment as the flat `{ dotted: value }` the wire carries.
+  const flatten = (tree) => {
+    const flat = {};
+    const walk = (node, at) => {
+      for (const [k, v] of Object.entries(node || {})) {
+        if (isMap(v)) walk(v, [...at, k]); else flat[[...at, k].join('.')] = v;
+      }
+    };
+    walk(tree, []);
+    return flat;
+  };
+
+  const ackOf = (a) => {
+    if (!a) { note('no answer from the table'); return null; }
+    note(a.ok ? `${a.name}: ${a.detail}` : `${a.name} refused: ${a.detail}`);
+    return a;
+  };
+
+  // ---- the channel --------------------------------------------------------
+  channel.onmessage = (e) => {
+    const msg = e.data;
+    if (!msg || typeof msg === 'string' || msg.from === 'popout') return;
+    if (msg.kind === 'base') {
+      // The first table to answer is this window's table. A second one that
+      // answers the same hello is another felt, and this window has no way to
+      // draw two — so it is dropped, and the one already latched keeps the
+      // panel. A table may only replace it while the link is dead, which is
+      // how this window re-homes after its own tab closed.
+      if (table && msg.table !== table && linked()) return;
+      table = msg.table || null;
+      base = msg;
+      apply(msg.snapshot);
+      if (!panel) build();
+      return;
+    }
+    // Everything below is a message about ONE tree, so it is only heard from
+    // the tab whose tree this window is drawing.
+    if (table && msg.table && msg.table !== table) return;
+    if (msg.kind === 'snapshot') { apply(msg); return; }
+    if (msg.kind === 'result' || msg.kind === 'verbAck') {
+      // …and only the answers to THIS window's own asks: two pop-outs on one
+      // channel number their requests from 1 apiece.
+      if (msg.to && msg.to !== WHO) return;
+      const done = waiting.get(msg.id);
+      if (done) { waiting.delete(msg.id); done(msg); }
+      return;
+    }
+    if (msg.kind === 'shut') {
+      heard = 0;
+      gone();
+      paint();
+      note('the table shut its door — press ` there to open it again');
+    }
+  };
+
+  function apply(s) {
+    if (!s) return;
+    snap = s;
+    heard = Date.now();
+    soak(T, s.T);
+    if (panel) {
+      // The table's own film state, which also lifts the "no table tab" lock
+      // the moment one is heard from again.
+      locked = false;
+      panel.setFilm(s.film, 'film values are shared — a second viewer is at that table');
+      panel.repaint();
+    }
+    paint();
+  }
+
+  function paint() {
+    const live = linked();
+    // A LOCK THE MOMENT THE LINK GOES STALE, not eight seconds later when a
+    // write times out: the rows say "no table tab" before a finger reaches
+    // them, and the mirror refuses the write if one does anyway.
+    if (!live) gone();
+    linkEl.classList.toggle('is-live', live);
+    linkEl.classList.toggle('is-gone', !live);
+    stateEl.textContent = live
+      ? `linked · ${Object.keys(snap && snap.changes || {}).length} changed`
+      : 'no table tab — open the door there with `';
+  }
+
+  setInterval(() => {
+    // A hello while nothing has been heard, a ping once linked: the first is
+    // how a pop-out opened before the table's door finds it, the second is how
+    // the table knows anybody is still listening (its beat posts nothing
+    // otherwise). The ping is ADDRESSED, so a second table tab on this origin
+    // never starts beating snapshots at a window that is not steering it.
+    if (linked()) post({ kind: 'ping' });
+    else post({ kind: 'hello' });
+    paint();
+  }, PING_MS);
+  window.addEventListener('pagehide', () => { try { post({ kind: 'bye' }); channel.close(); } catch { /* going away */ } });
+
+  window.__devPopout = {
+    panel: null,
+    mirror: null,
+    get base() { return base; },
+    snapshot: () => snap,
+    get who() { return WHO; },
+    get table() { return table; },
+    state: () => ({
+      linked: linked(),
+      table,
+      who: WHO,
+      locked,
+      mounted: !!panel,
+      rows: document.querySelectorAll('#dev-panel .dev-row[data-path]').length,
+      changed: Object.keys((snap && snap.changes) || {}).length,
+    }),
+    // The one verb a scenario needs: a write from THIS window, answered by the
+    // table. Resolves with the table's own `{refused, pending}`.
+    set: (patch) => ask({ kind: 'set', patch }).then((r) => { report(r); return r; }),
+    reset: (scope) => ask({ kind: 'reset', scope }).then((r) => { report(r); return r; }),
+  };
+
+  // Last, so nothing can answer a hello before the probe exists.
+  post({ kind: 'hello' });
+</script>
+</body>
+</html>

@@ -49,6 +49,17 @@ import {
 // no such field.
 import { SETS } from '../../js/themes.js';
 
+// THE CATALOGUE IS LOADED, NOT IMPORTED (developer mode phase D1,
+// 2026-09-03). The dice recipes moved out of js/themes.js and into `houses:`
+// in dice.yaml, so that module ships with an EMPTY registry and whoever wants
+// one installs it. In a browser js/main.js does it from the served module; a
+// Node reader reads the file. The C block measures a staged
+// set's voice, so the recipes have to be here before it runs.
+import { readFileSync } from 'node:fs';
+import { parseYaml } from '../../js/yaml.js';
+import { installCatalogue } from '../../js/themes.js';
+installCatalogue(parseYaml(readFileSync(new URL('../../dice.yaml', import.meta.url), 'utf8')).tree.houses);
+
 function table(head, rows) {
   const w = head.map((h, i) => Math.max(String(h).length, ...rows.map((r) => String(r[i]).length)));
   const line = (cells) => cells.map((c, i) => String(c).padEnd(w[i])).join('  ').trimEnd();

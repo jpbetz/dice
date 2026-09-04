@@ -34,6 +34,17 @@ import { SYSTEM_IDS } from '../js/meanings.js';
 import { exportYaml, parsePortable, planImport, profileToImport, declareFelts } from '../js/portable.js';
 import { STAMP as SCHEMA_STAMP, EPOCH, MAJOR } from '../js/schema.js';
 
+// THE CATALOGUE IS LOADED, NOT IMPORTED (developer mode phase D1,
+// 2026-09-03). The dice recipes moved out of js/themes.js and into `houses:`
+// in dice.yaml, so that module ships with an EMPTY registry and whoever wants
+// one installs it. In a browser js/main.js does it from the served module; a
+// Node reader reads the file. js/portable.js fails a rack's
+// set ids closed against SETS, and these fixtures name shipped ones.
+import { readFileSync } from 'node:fs';
+import { parseYaml } from '../js/yaml.js';
+import { installCatalogue } from '../js/themes.js';
+installCatalogue(parseYaml(readFileSync(new URL('../dice.yaml', import.meta.url), 'utf8')).tree.houses);
+
 let n = 0;
 const t = (name, fn) => {
   n++;

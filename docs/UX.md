@@ -2590,7 +2590,8 @@ disambiguates the tray's ROLL from the banner's REROLL standing lit
 together. `no-newcomer-path` stays open by design — Joe owns the
 orientation direction (§7.14.1).
 
-**Labs (2i-F).** `chrome-lab.html` is lab.html's 2D counterpart — the
+**Labs (2i-F).** `chrome-lab.html` is the last lab standing (the 3D one,
+`lab.html`, retired 2026-09-03 into developer mode's sets section) — the
 REAL app in an iframe, posed through `__diceDebug`: real CSS, real
 hovers, zero forked markup, cannot rot. `tools/contact-sheet.mjs`
 stitches captioned thumbnail grids per out/ directory. docs/mockups are

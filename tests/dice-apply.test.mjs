@@ -42,7 +42,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { parseYaml, patchYaml } from '../js/yaml.js';
-import { applyText, planChanges, validate, reportLine } from '../tools/dice-apply.mjs';
+import { applyText, applyChanges, planChanges, validate, validateChanges, reportLine } from '../tools/dice-apply.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FILE = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
@@ -126,6 +126,34 @@ t('validate: unknown, wrong type, option, through a dial, map-not-leaf — one l
 t('validate: a null at a dial is absent, not a problem; a list is the wrong type', () => {
   assert.deepEqual(validate({ light: { lamp: { y: null } } }), []);
   assert.deepEqual(validate({ light: { lamp: { y: [1, 2] } } }).map((p) => p.message), ['light.lamp.y: expected number, got [1, 2]']);
+});
+
+// A LIST DIAL HAS THREE LAWS AND `each` WAS ONLY ONE OF THEM (the D1 review,
+// 2026-09-03). `judgeValue` checked the vocabulary when there was one and
+// nothing at all when there was not — so a palette of numbers or of nulls
+// validated here, and the armed Save route wrote it into the file for
+// js/particles.js to hand to `hexRGB`. The count comes first, because a face
+// table of two is a different mistake from a face table with a bad word in it.
+t('validate: a list dial\'s length, its entries, and its vocabulary — in that order', () => {
+  const of = (tree) => validate(tree).map((p) => p.message);
+  const set = (recipe) => ({ houses: { h: { label: 'H', dice: { s: recipe } } } });
+  assert.deepEqual(of(set({ faces: ['1', '2', '3', '4', '5', 'claw'] })), []);
+  assert.deepEqual(of(set({ faces: ['plus', 'minus'] })),
+    ['houses.h.dice.s.faces: takes 6 entries, got 2']);
+  assert.deepEqual(of(set({ faces: ['1', '2', '3', '4', '5', 'sword'] })),
+    ['houses.h.dice.s.faces: every entry must be one of 1 | 2 | 3 | 4 | 5 | 6 | bolt | claw | heart | plus | minus | blank, got sword']);
+  assert.deepEqual(of(set({ faces: ['1', '2', '3', '4', '5', 6] })),
+    ['houses.h.dice.s.faces: every entry must be a string, got 6 at 5'],
+    'a YAML 6 is a number, and the table is read as text');
+  // A palette has no vocabulary, which is not the same as no law.
+  assert.deepEqual(of(set({ particles: { kind: 'motes', colors: ['#ffffff'] } })), []);
+  assert.deepEqual(of(set({ particles: { colors: [1, 2] } })),
+    ['houses.h.dice.s.particles.colors: every entry must be a string, got 1 at 0']);
+  assert.deepEqual(of(set({ particles: { colors: [] } })),
+    ['houses.h.dice.s.particles.colors: takes 1-8 entries, got 0']);
+  assert.deepEqual(of(set({ decal: { kind: 'ring', colors: ['#a', '#b', '#c'] } })),
+    ['houses.h.dice.s.decal.colors: takes 1-2 entries, got 3'],
+    'js/decals.js reads two, so a third is a colour nothing paints with');
 });
 
 t('planChanges: only leaves that differ; absent leaves are inserts; null is nothing', () => {
@@ -329,6 +357,96 @@ t('a checkout with no dice.yaml: every leaf is an insert into an empty file', ()
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(r.out.split('\n').slice(0, 2), ['table.scale: (absent) → 3', 'light.lamp.y: (absent) → 30']);
   assert.deepEqual(parseYaml(yamlOf(dir)).tree, { table: { scale: 3 }, light: { lamp: { y: 30 } } });
+});
+
+t('the laws travel with the dial tree, so the tool and the route refuse what `tune.set` does', () => {
+  // A DIVISOR AT ZERO (js/tune.js LAWS.positive). The dial's range is the
+  // slider's and the tool never saw a slider, so without the law a hand-edited
+  // `k: 0` was a legal file that silenced every landing on the next boot.
+  assert.deepEqual(validate({ pace: { tempo: { k: 0 } } }).map((p) => p.message),
+    ['pace.tempo.k: must be greater than zero — the code divides by it, got 0']);
+  assert.deepEqual(validate({ pace: { tempo: { k: 0.05 } } }), [], 'below the slider is not below the law');
+  assert.deepEqual(validateChanges({ 'pace.tempo.k': -1 }).map((p) => p.path), ['pace.tempo.k']);
+
+  // A PAIR (LAWS.cardClear), which no single leaf can answer: `validate` has
+  // the whole file, and an absent half takes the code's own number, because
+  // that is what the table will actually run on.
+  assert.deepEqual(validate({ cards: { standoff: 0.2, depth: 4 } }).map((p) => p.message),
+    ['cards.standoff + cards.depth: a card stands outboard of the rim: '
+      + 'cards.standoff − cards.depth / 2 may not go below 0']);
+  assert.deepEqual(validate({ cards: { depth: 3.9 } }).length, 1,
+    'one half against the shipped other half is still the pair');
+  assert.deepEqual(validate({ cards: { depth: 3.9, standoff: 2 } }), [], '…and the pair holds together');
+  // The checked-in declaration passes both, which is the claim that matters.
+  assert.deepEqual(validate(parseYaml(readFileSync(join(ROOT, 'dice.yaml'), 'utf8')).tree), []);
+
+  // …AND THE FLAT PATH ANSWERS THE PAIR TOO (the D4 review, 2026-09-03). This
+  // test's title said the ROUTE refused what `tune.set` does and only the tool
+  // was shown doing it: `validateChanges` ran `judgeValue`, which skips pair
+  // laws by its own comment, and `applyChanges` called nothing else. A post
+  // naming one half of the pair is judged against the half the CHECKOUT holds,
+  // and with no checkout in hand against the half the CODE holds — the same
+  // reading `validate` gives a file that names one leaf of a pair.
+  assert.deepEqual(validateChanges({ 'cards.standoff': 0.5 }).map((p) => p.path), ['cards.standoff'],
+    'half a pair against the code\'s own depth');
+  assert.deepEqual(validateChanges({ 'cards.standoff': 2.2, 'cards.depth': 3.9 }), [],
+    'the pair that holds together is not a problem, in either judge');
+  assert.deepEqual(
+    validateChanges({ 'cards.standoff': 0.9 }, { base: { cards: { depth: 3.9 } } }).map((p) => p.message),
+    ['cards.standoff + cards.depth: a card stands outboard of the rim: '
+      + 'cards.standoff − cards.depth / 2 may not go below 0'],
+    'and against a checkout that holds the other half, that half is the one it is judged against');
+  // A type problem is reported as a type problem: a value that is not a number
+  // cannot be asked a geometry question.
+  assert.deepEqual(validateChanges({ 'cards.depth': 'deep' }).map((p) => p.message),
+    ['cards.depth: expected number, got deep']);
+});
+
+// THE ARMED ROUTE'S OWN DOOR, end to end on two texts. The failure it closes:
+// two dev tabs, or a checkout edited after the tab booted, and a Save that
+// names ONE half of the pair writes a dice.yaml the next boot refuses WHOLE —
+// both cards leaves back to the defaults, the checkout's own line reverted
+// with them (the D4 review measured it: standoff 0.9 posted alone onto a file
+// holding depth 3.9).
+t('the armed route judges a posted half-pair against the checkout it would patch', () => {
+  const local = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
+  const deep = applyChanges(local, { 'cards.standoff': 2.2, 'cards.depth': 3.9 });
+  assert.deepEqual(deep.problems, [], 'the legal pair lands');
+  assert.deepEqual(parseYaml(deep.text).tree.cards, { standoff: 2.2, width: 3.68, depth: 3.9 });
+  const half = applyChanges(deep.text, { 'cards.standoff': 0.9 });
+  assert.deepEqual(half.problems.map((p) => p.path), ['cards.standoff']);
+  assert.match(half.problems[0].message, /a card stands outboard of the rim/);
+  assert.deepEqual(half.changes, [], 'nothing planned');
+  assert.equal(half.text, deep.text, 'and nothing written');
+  // The other half of the same claim: the pair that holds is still written.
+  const ok = applyChanges(deep.text, { 'cards.standoff': 2.4 });
+  assert.deepEqual(ok.problems, []);
+  assert.equal(parseYaml(ok.text).tree.cards.standoff, 2.4);
+  // What the refusal is FOR: the file the route would have written is a file
+  // the next boot throws away whole, so the check has to be here.
+  const wouldBe = parseYaml(patchYaml(deep.text, { 'cards.standoff': 0.9 })).tree;
+  assert.equal(validate(wouldBe).length, 1, 'the file that post would have made is not a legal file');
+});
+
+// A preset row is a sparse subtree of the dial tree, so the file's own laws
+// have to reach into it (the D4 review). Both judges, one sentence.
+t('a preset row is judged by the same laws as the file it lives in', () => {
+  assert.deepEqual(validate({ presets: { odd: { cards: { standoff: 0.5, depth: 3 } } } }).map((p) => p.message),
+    ['presets.odd.cards.standoff + presets.odd.cards.depth: a card stands outboard of the rim: '
+      + 'cards.standoff − cards.depth / 2 may not go below 0']);
+  assert.deepEqual(validate({ presets: { odd: { cards: { standoff: 2.2, depth: 3.9 } } } }), [],
+    'a pair that holds inside the row is a legal preset, whatever the table itself says');
+  assert.deepEqual(validate({ presets: { odd: { pace: { tempo: { k: 0 } } } } }).map((p) => p.path),
+    ['presets.odd.pace.tempo.k'], 'and the single-value laws reached it already');
+  // A static leaf inside a preset row: a row nobody could ever apply.
+  assert.deepEqual(validate({ presets: { odd: { app: { mode: 'production' } } } }).map((p) => p.message),
+    ['presets.odd.app.mode: not a dial a patch may set: app.mode is set in dice.yaml or DICE_MODE']);
+  assert.deepEqual(validateChanges({ 'presets.odd.app.mode': 'production' }).map((p) => p.path),
+    ['presets.odd.app.mode']);
+  assert.deepEqual(
+    validateChanges({ 'presets.odd.cards.standoff': 0.5 }, { base: { presets: { odd: { cards: { depth: 3 } } } } })
+      .map((p) => p.path),
+    ['presets.odd.cards.standoff'], 'the route reads the row the checkout holds');
 });
 
 for (const d of trees) rmSync(d, { recursive: true, force: true });

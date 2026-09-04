@@ -304,8 +304,8 @@ export function rowRange({ label, value, range, onInput, onCommit, why }) {
 }
 
 export function rowStepper({ label, value, range, onCommit, why }) {
-  const step = (Array.isArray(range) && Number.isFinite(range[2]) && range[2] > 0) ? range[2] : 1;
-  const [min, max] = Array.isArray(range) ? [range[0], range[1]] : [-Infinity, Infinity];
+  let step = (Array.isArray(range) && Number.isFinite(range[2]) && range[2] > 0) ? range[2] : 1;
+  let [min, max] = Array.isArray(range) ? [range[0], range[1]] : [-Infinity, Infinity];
   let current = value;
   const num = numberInput(value, {
     step,
@@ -329,6 +329,18 @@ export function rowStepper({ label, value, range, onCommit, why }) {
   const box = el('div', { class: 'stepper dev-stepper' }, [minus, num, plus]);
   const row = makeRow({ label, why, kind: 'stepper', controls: [minus, num, plus], ctl: [box], val: [], focusable: num });
   row.setValue = (v) => { current = v; num.set(v); };
+  // A RANGE THAT IS NOT A DIAL'S, the same one `rowRange` grew for the clock's
+  // scrub — and the stepper owes it too since the phone sheet (phase D5), where
+  // every range row is drawn as a stepper. The bounds are the clamp the ± walk
+  // honours; the value is left where it is, because re-ranging is not a write.
+  row.setRange = (r) => {
+    if (!Array.isArray(r) || r.length < 2) return;
+    [min, max] = [r[0], r[1]];
+    if (Number.isFinite(r[2]) && r[2] > 0) step = r[2];
+    num.step = String(step);
+    minus.title = `${label} − ${fmtNum(step)}`;
+    plus.title = `${label} + ${fmtNum(step)}`;
+  };
   return row;
 }
 
@@ -365,6 +377,28 @@ export function rowEnum({ label, value, options, onCommit, why }) {
   const seg = segmented(options, value, (v) => { if (onCommit) onCommit(v); }, { name: label });
   const row = makeRow({ label, why, kind: 'enum', controls: [seg], ctl: [seg], val: [], focusable: null });
   row.setValue = (v) => seg.setValue(v);
+  return row;
+}
+
+// AN ENUM TOO WIDE FOR A SEGMENTED ROW. `segmented` is the panel's enum dress
+// and it is right for the two to four states almost every dial has; a dice
+// set's FACE TABLE offers TWELVE (six digits and six drawn symbols), and the
+// control column of a 320px overlay is ~145px, which is twelve pixels a
+// button. Measured in the first look at the sets section (2026-09-03): the
+// twelve read as "1 2 3 4 5 6 b c h p m b", every word ellipsed to its first
+// letter. Otherwise this is `rowEnum` — same marks, same lock, same revert —
+// and it uses the same native `.tin` control the section's own row pickers do,
+// so the section has one idiom for "choose one of many" rather than two.
+export function rowSelect({ label, value, options, onCommit, why }) {
+  const opts = (options || []).map(String);
+  const sel = el('select', { class: 'tin dev-select', 'aria-label': label });
+  sel.replaceChildren(...opts.map((o) => el('option', { value: o, text: o })));
+  sel.value = String(value);
+  sel.addEventListener('change', () => { if (onCommit) onCommit(sel.value); });
+  const row = makeRow({ label, why, kind: 'select', controls: [sel], ctl: [sel], val: [], focusable: sel });
+  // A repaint mid-choice must not close the menu under the pointer, which is
+  // the same rule `deferring` states for a field somebody is typing in.
+  row.setValue = (v) => { if (activeIsNot(sel)) sel.value = String(v); };
   return row;
 }
 

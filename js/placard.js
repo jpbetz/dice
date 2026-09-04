@@ -122,7 +122,11 @@ import { PLACE_MAX, PLACARD, readTurn } from './places.js';
 // A `const BASE_W = PLACARD.w` here would therefore capture 3.68 forever and
 // the dial would move every footprint the layout computes while the rig it is
 // supposed to describe stayed the size it shipped. Functions, read where they
-// are used; the rig is baked once at boot, which is why `cards.*` is a ⟳ row.
+// are used — and that turned out to be the whole of what made `cards.*` a LIVE
+// row in phase D4: `_writePlacard` rewrites every quad on every `update`, so
+// the re-bake js/main.js's `rebuildPlacards` asks for at the placard flush is
+// a flush this rig already knew how to do. There is no geometry captured at
+// `_ensureBuilt` to throw away.
 const baseW = () => PLACARD.w;            // 3.68 — the footprint js/places.js
 const baseD = () => PLACARD.d;            // 1.52   asserts gaps against
 const BASE_H = 0.14;
@@ -282,6 +286,11 @@ export class PlacardRig {
     // frame was last cut to. Every name is printed for it (readTurn); main.js
     // sets it where the orbit cuts.
     this.readerAzim = 0;
+    // THE FOOTPRINT THE BUFFER WAS LAST WRITTEN WITH (phase D4). `PLACARD` is
+    // live — js/main.js's `cards.*` binder moves it the moment the dial does —
+    // so it cannot answer "what is in the vertex buffer", which is the only
+    // question a gate on the re-bake can be about. `update` records it here.
+    this.pad = null;
     this.wash = { active: false, t: 0, dur: 0, place: null, x: 0, y: 0, z: 0, color: null };
   }
 
@@ -761,6 +770,8 @@ export class PlacardRig {
     }
     this.rows = next;
     this.occupied = live.length;
+    // …and what those pads were written FROM, for `budget()` to report.
+    this.pad = { w: baseW(), d: baseD(), h: BASE_H };
     this.geometry.attributes.position.needsUpdate = true;
     this.geometry.attributes.normal.needsUpdate = true;
     this.geometry.attributes.color.needsUpdate = true;
@@ -911,6 +922,7 @@ export class PlacardRig {
     this.albedo = null; this.orm = null; this.emissive = null;
     this.canvas = null; this.ctx = null; this.ormCtx = null;
     this.built = false;
+    this.pad = null;
     this.rows = [];
     this.occupied = 0;
     this.wash = { active: false, t: 0, dur: 0, place: null, x: 0, y: 0, z: 0, color: null };
@@ -939,11 +951,17 @@ export class PlacardRig {
       // …AND THE HOLDER'S FOOTPRINT, for the same reason `face` is here: it is
       // the declaration's now (dice.yaml `cards` → js/places.js PLACARD), and
       // a size that can be declared needs a gate rather than a comment.
-      // Reported LIVE, and that is exact rather than approximate: `cards.*` is
-      // a ⟳ row with no binder — js/main.js copies the tree into PLACARD once
-      // at boot, above this module's first build, and nothing moves it after —
-      // so the number here is the number in the buffer until the next reload.
-      base: { w: baseW(), d: baseD(), h: BASE_H },
+      // Reported OFF THE BUFFER (`this.pad`), not off `PLACARD`, and since
+      // phase D4 that is the whole point: `cards.*` is an apply row whose
+      // binder (js/main.js `cardsSync` → `rebuildPlacards`) writes `PLACARD`
+      // at once and asks for the re-bake at the next placard flush, so between
+      // those two moments the live object and the vertex buffer disagree — and
+      // a gate that read the live object could not tell a landed re-bake from
+      // an assignment. It falls back to the live numbers only before the first
+      // `update`, where there is no buffer to describe. `dev-cards-live` is
+      // what holds it: a dial turned with dice in the air must read here as
+      // the OLD footprint until they land.
+      base: this.pad ? { ...this.pad } : { w: baseW(), d: baseD(), h: BASE_H },
       materials: this.built ? 1 : 0,
       textures: this.built ? 3 : 0,
       occupied: this.occupied,

@@ -145,7 +145,14 @@
 // build, which is the entire point of putting a version on a file.
 import { parseNotation, cutText } from './notation.js';
 import { STAMP as SCHEMA_STAMP, judgeStamp } from './schema.js';
-import { SETS } from './themes.js'; // import-free data — still runs under Node
+// THE SET REGISTRY, READ AT CALL TIME (see `knownSet` below). js/themes.js is
+// still import-free and still runs under Node, but since phase D1 it ships
+// EMPTY: the recipes are `houses:` in dice.yaml and somebody installs them —
+// js/main.js at module eval in a browser, the test or tool itself under Node.
+// This module only ever reads `SETS[id]` inside a parse, which is long after
+// that, so a rack's set ids are checked against the catalogue the tab is
+// actually wearing rather than against a copy frozen at import.
+import { SETS } from './themes.js';
 import { SYSTEM_IDS } from './meanings.js'; // likewise: no imports of its own
 
 const TRIO = ['attributes', 'skills', 'motivations'];

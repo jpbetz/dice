@@ -375,10 +375,14 @@ try {
     // but the tower-glb-loader scenario fetches it THROUGH THE PAGE ORIGIN, so
     // a 404 here is a red e2e suite rather than a production change.
     ['/tests/e2e/fixtures/tower_fixture.glb', 'the e2e GLB fixture'],
-    // Dev chrome, deliberately kept servable: tools/lab-shots.mjs,
-    // tools/geo-bench-shots.mjs and one e2e scenario all navigate to it.
-    ['/lab.html', 'the dice lab'],
+    // Dev chrome, deliberately kept servable: tools/README's pose driver
+    // navigates the served origin to it.
     ['/chrome-lab.html', 'the 2D lab that iframes index.html'],
+    // The developer-mode pop-out (docs/DEVMODE.md §8, phase D5) — the panel in
+    // its own window. `.gcloudignore` withholds it from the deploy along with
+    // js/devmode.js, which it imports; locally it has to be reachable or the
+    // Pop out button opens a 404.
+    ['/dev.html', 'the developer-mode pop-out'],
   ];
   for (const [p, why] of ALLOWED) {
     await t(`allowlist serves ${p} (${why})`, async () => {
@@ -400,6 +404,13 @@ try {
     ['/docs/GOALS.md', 'same: .md is unservable by accident, not by rule'],
     ['/README.md', ''],
     ['/LICENSE', ''],
+    // RETIRED, NOT MERELY DELETED (2026-09-03, docs/DEVMODE.md §9 phase D3).
+    // The dice lab left the allowlist with js/lab.js and its two shot tools
+    // when the developer-mode panel's sets editor took the recipe knobs onto
+    // the live felt. Pinned here rather than left to a comment, because a
+    // re-added `lab.html` line in APP_FILES would otherwise be invisible: the
+    // file is gone, so the happy half above cannot notice its return.
+    ['/lab.html', 'the retired dice lab'],
   ];
   for (const [p, why] of REFUSED) {
     await t(`allowlist refuses ${p}${why ? ` (${why})` : ''}`, async () => {

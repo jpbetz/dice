@@ -13,8 +13,13 @@
 # limitations under the License.
 
 # What NOT to upload to Cloud Build when deploying from source.
-# The app that ships is: server.js, package.json, index.html, lab.html,
-# js/, css/, vendor/, models/, LICENSE.
+# The app that ships is: server.js, package.json, index.html,
+# js/, css/, vendor/, models/, LICENSE — minus developer mode's four files,
+# named at the bottom of this file.
+#
+# `lab.html` left that list on 2026-09-03: the dice lab retired with js/lab.js
+# and its two shot tools when the developer-mode panel's sets editor took over
+# the recipe knobs on the live felt (docs/DEVMODE.md §9).
 #
 # models/ was missing from that list and it is not a cosmetic omission: the
 # baked GLB towers are served from /models/towers/*.glb (js/main.js), so a
@@ -45,3 +50,26 @@ chrome-lab.html
 # is gitignored and therefore invisible to a check that trusts .gitignore.
 gpu-trace.csv
 shots/
+
+# DEVELOPER MODE IS NOT PART OF THE DEPLOYED APP (docs/DEVMODE.md §8, phase 3).
+# `app.mode: production` already makes the door refuse — but that is a value in
+# a file, and a value can be edited by whoever can reach the file. These four
+# are the SECOND answer, the one that does not depend on a setting: the panel,
+# its component kit, its stylesheet and the pop-out page are not uploaded at
+# all, so the deploy has no bytes to open. `tools/` is excluded above, so
+# tools/devshell.html goes with it, and `js/tune.js` deliberately does NOT: the
+# declaration is what the shipped app is configured by, not dev chrome.
+#
+# js/main.js imports js/devmode.js DYNAMICALLY and nowhere else, and `devOpen`
+# latches on the import's failure (one console warn, the door stays shut, the
+# backtick stops being a key) — the `dev-absent-in-prod` scenario boots a tab
+# from a tree with exactly these four files missing and proves it, /dev.html's
+# own 404 included.
+js/devmode.js
+js/devui.js
+css/dev.css
+# …and the fourth: the pop-out page that mounts the panel in its own window
+# (phase D5). It imports js/devmode.js, so on a deploy it would 404 on its own
+# import even if it were uploaded; withholding the page as well keeps
+# `/dev.html` from being a 200 that leads nowhere.
+dev.html

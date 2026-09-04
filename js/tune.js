@@ -78,24 +78,75 @@ export { toPath, pathKey };
 const READS = ['frame', 'roll', 'apply', 'reload'];
 const CLASSES = ['look', 'film'];
 
-function dial(label, def, range, options, cls, read, why) {
+// A LAW IS THE CHECK A RANGE CANNOT MAKE (phase D4, 2026-09-03). A dial's
+// `range` is the SLIDER's and never the value's — the number field beside it
+// takes any finite value on purpose, "because the range was wrong is a thing
+// developer mode exists to discover" (DEVMODE §5). Two kinds of value are not
+// like that, and both were found by typing one in:
+//
+//   · one the code DIVIDES BY. `pace.tempo.k` is the projector's speed and
+//     js/main.js:5004 gates the impact drain on `IMPACT_MIN_GAP_MS / TEMPO.k`;
+//     at 0 that gap is Infinity and every landing goes silent, at −1 the
+//     projector runs the film backwards. The slider floor (0.25) says so; a
+//     typed 0 walked straight past it.
+//   · one that has to hold against ANOTHER leaf. `cards.standoff` and
+//     `cards.depth` are two dials and one geometry: a card stands OUTBOARD of
+//     the rim by construction (js/places.js `seatAnchor` — "the whole card is
+//     outboard of a wall plane at EVERY θ and EVERY mat"), which is what
+//     licenses its depthWrite, its real shadow and the seating raycast. No
+//     range over either one alone can say that.
+//
+// `holds(v, path, read)`. `read(dottedPath)` answers what the WHOLE patch
+// proposes — this patch's own entry where it names the path, T's otherwise —
+// so a pair law judges `{ 'cards.standoff': 2, 'cards.depth': 3.9 }` as the
+// pair it is and not in whichever order `Object.entries` handed the two over.
+// A `pair` law is the one that needs it; a single-value law ignores `read`
+// and so can also be run at BIRTH, inside `judge`, over the declaration.
+export const LAWS = Object.freeze({
+  positive: Object.freeze({
+    reason: 'range-law',
+    pair: false,
+    why: 'must be greater than zero — the code divides by it',
+    holds: (v) => typeof v === 'number' && Number.isFinite(v) && v > 0,
+  }),
+  // standoff − depth/2 is the clear ground between the rim and the card's
+  // inner edge (js/places.js `PLACARD_CLEAR`, 0.10 at the shipped pair). At 0
+  // the card touches the rim; below it a die can reach a card.
+  cardClear: Object.freeze({
+    reason: 'geometry',
+    pair: true,
+    why: 'a card stands outboard of the rim: cards.standoff − cards.depth / 2 may not go below 0',
+    holds: (v, path, read) => {
+      const clear = Number(read('cards.standoff')) - Number(read('cards.depth')) / 2;
+      // A hair of slack for the sliders' own arithmetic: 0.83 − 1.66/2 is
+      // 0.83 − 0.83 in decimal and −1.1e-16 in doubles.
+      return Number.isFinite(clear) && clear >= -1e-9;
+    },
+  }),
+});
+
+function dial(label, def, range, options, cls, read, why, law) {
   if (typeof label !== 'string' || !label) throw new Error('dial: label is required');
   if (!CLASSES.includes(cls)) throw new Error(`dial ${label}: cls must be look|film, got ${cls}`);
   if (!READS.includes(read)) throw new Error(`dial ${label}: read must be one of ${READS.join('|')}, got ${read}`);
   const d = { label, def, range: range || null, cls, read, why: why || '' };
   if (options) d.options = options.slice();
+  if (law !== null && law !== undefined) {
+    if (!Object.hasOwn(LAWS, law)) throw new Error(`dial ${label}: no law named ${JSON.stringify(law)}`);
+    d.law = law;
+  }
   return d;
 }
 
 // A per-viewer dial: light, fog, camera, pacing, chrome. Never locks.
-export function look(label, def, range, read, why = '') {
-  return dial(label, def, range, null, 'look', read, why);
+export function look(label, def, range, read, why = '', law = null) {
+  return dial(label, def, range, null, 'look', read, why, law);
 }
 
 // A dial that feeds the shared bake. Live at a table of one; locked when a
 // second viewer is present (GOALPOST 2: no forked film).
-export function film(label, def, range, read, why = '') {
-  return dial(label, def, range, null, 'film', read, why);
+export function film(label, def, range, read, why = '', law = null) {
+  return dial(label, def, range, null, 'film', read, why, law);
 }
 
 // An enum. `options` is the law: `set` refuses a value outside it.
@@ -104,10 +155,89 @@ export function pick(label, def, options, cls, read, why = '') {
   return dial(label, def, null, options, cls, read, why);
 }
 
+// A LIST-VALUED DIAL — one dial for a whole array, because the array is the
+// unit the code reads (a dice set's six-entry face table, a particle recipe's
+// palette). `each` is the law for an ENTRY when the entries come from a fixed
+// vocabulary (js/dice.js FACE_SHAPES plus the digits) and null when they do
+// not (a palette is colours, and there is no list of legal colours). The
+// whole array replaces — `merge` and `set` have never merged one, and half a
+// face table is not a face table.
+//
+// A NULL `each` IS NOT "NO LAW AT ALL" (the D1 review, 2026-09-03). It said
+// here that "a palette is colours, and there is no list of legal colours",
+// which is true and was read as license: `judge` fell straight through, so
+// `colors: [null]`, `colors: []` and `colors: [1, 2]` all landed — in the
+// declaration, through `tune.set` and through the armed write route — and
+// js/particles.js and js/decals.js then handed a number to `hexRGB`. "Not a
+// fixed vocabulary" is not "not even a string", so every entry of every list
+// dial is a string, and `len` is the second half of the law: how many entries
+// the CODE reads (six faces; one or two decal colours, because js/decals.js
+// reads `colors[0]` and `colors[1] || colors[0]` and nothing else; one to
+// eight particle colours, because js/particles.js picks from the whole
+// palette). Reasons: 'type' for an entry, 'range' for a length.
+export function list(label, def, each, len, cls, read, why = '') {
+  if (!Array.isArray(def)) throw new Error(`dial ${label}: a list dial's def must be an array`);
+  if (each !== null && (!Array.isArray(each) || each.length < 2)) {
+    throw new Error(`dial ${label}: each must be null or at least two entries`);
+  }
+  if (!Array.isArray(len) || len.length !== 2 || !(len[0] >= 1) || !(len[1] >= len[0])) {
+    throw new Error(`dial ${label}: len must be [min, max] with 1 <= min <= max`);
+  }
+  if (def.length < len[0] || def.length > len[1]) throw new Error(`dial ${label}: the default is outside len`);
+  const d = dial(label, def.slice(), null, null, cls, read, why);
+  if (each) d.each = each.slice();
+  d.len = len.slice();
+  return d;
+}
+
 export function isDial(x) {
   return !!x && typeof x === 'object' && !Array.isArray(x)
     && typeof x.label === 'string' && 'def' in x
     && CLASSES.includes(x.cls) && READS.includes(x.read);
+}
+
+// Is `v` a legal reading of dial `d`? Null is ABSENT everywhere in this
+// design and never reaches here. Returns null, or the refusal reason —
+// 'shape' (a map where the dial is a value), 'type', 'option', 'range' (a
+// list dial's entry count). ONE judge, so
+// `reconcile`, `reconcileFields`, `apply` and `addRow` cannot drift apart:
+// before list dials existed each of the four re-implemented the check, and
+// `each` would have had to be added to all four.
+function judge(d, v) {
+  const want = typeOf(d.def);
+  if (isPlain(v)) return want === 'object' ? null : 'shape';
+  if (typeOf(v) !== want || (want === 'number' && !Number.isFinite(v))) return 'type';
+  if (want === 'array') {
+    if (d.len && (v.length < d.len[0] || v.length > d.len[1])) return 'range';
+    if (!v.every((e) => typeof e === 'string')) return 'type';
+    if (d.each && !v.every((e) => d.each.includes(e))) return 'option';
+    return null;
+  }
+  if (d.options && !d.options.includes(v)) return 'option';
+  // A SINGLE-VALUE LAW IS JUDGED AT BIRTH TOO (phase D4). `positive` needs
+  // nothing but the value, so the declaration can be held to it here and a
+  // `k: 0` in dice.yaml is dropped with the default standing, exactly as a
+  // wrong type is. A PAIR law cannot be answered from one leaf and is judged
+  // where both are known: `apply`, and `checkLawPairs` at createTune.
+  if (d.law && !LAWS[d.law].pair && !LAWS[d.law].holds(v)) return LAWS[d.law].reason;
+  return null;
+}
+
+// The same judgement as a sentence, for the console line a dropped
+// declaration leaf prints.
+function judgeWhy(d, v, reason) {
+  const want = typeOf(d.def);
+  if (d.law && reason === LAWS[d.law].reason) return `${LAWS[d.law].why}; the default stands`;
+  if (reason === 'shape') return `expected ${want}, got a map; the default stands`;
+  if (reason === 'range') return `takes ${d.len[0] === d.len[1] ? d.len[0] : `${d.len[0]}-${d.len[1]}`} entries, got ${Array.isArray(v) ? v.length : 0}; the default stands`;
+  // 'type' at a list dial is two different sentences: the value is not a list
+  // at all, or it is a list holding something that is not a string.
+  if (want === 'array' && reason === 'type' && Array.isArray(v)) {
+    return `every entry must be a string, got ${JSON.stringify(v)}; the default stands`;
+  }
+  if (reason === 'type') return `expected ${want}, got ${JSON.stringify(v)}; the default stands`;
+  if (d.each) return `every entry must be one of ${d.each.join('|')}, got ${JSON.stringify(v)}; the default stands`;
+  return `expected one of ${d.options.join('|')}, got ${JSON.stringify(v)}; the default stands`;
 }
 
 const isPlain = (x) => !!x && typeof x === 'object' && !Array.isArray(x)
@@ -192,6 +322,55 @@ export function setLeaf(tree, path, v) {
   return tree;
 }
 
+// Deletes the leaf (or the whole node) at `path` from its parent map. The
+// mirror of `setLeaf` for the one caller that has to UNDO a write rather than
+// put a value back: a minted asset field had no previous value, and writing
+// `undefined` over it would leave a key `leaves` still walks.
+export function dropLeaf(tree, path) {
+  const p = toPath(path);
+  if (!p.length) throw new Error('dropLeaf: empty path');
+  const owner = p.length === 1 ? tree : getLeaf(tree, p.slice(0, -1));
+  if (isPlain(owner)) delete owner[p[p.length - 1]];
+  return tree;
+}
+
+// THE PAIR-LAW GROUPS OF A DIAL TREE: law name → the leaf paths carrying it.
+// "Which leaves are ONE claim" is a question about the dial tree, and there
+// has to be exactly one answer to it — until the D4 review there were two
+// walks asking it (`checkLawPairs` here and `judgePairs` in
+// js/dice-apply-core.js) and a third place that needed it and did not ask
+// (`reset`), which is three chances to disagree about the same sentence.
+// `defaults` is only how the walk finds the leaves; pass the one you have.
+// The answer is a fact about the DIAL TREE and nothing else, so it is cached
+// by that tree's identity and the returned Map is shared — read it, never
+// write it. (`reset` asks once per leaf it is putting back, and the dial tree
+// is some five hundred leaves.)
+const PAIR_CACHE = new WeakMap();
+export function pairGroups(dials, defaults = null) {
+  const had = PAIR_CACHE.get(dials);
+  if (had) return had;
+  const groups = new Map();
+  for (const p of leaves(defaults || defaultsFor(dials))) {
+    const d = getLeaf(dials, p);
+    if (!isDial(d) || !d.law || !LAWS[d.law].pair) continue;
+    if (!groups.has(d.law)) groups.set(d.law, []);
+    groups.get(d.law).push(p);
+  }
+  PAIR_CACHE.set(dials, groups);
+  return groups;
+}
+
+// The shallowest node `setLeaf(tree, path, …)` would have to CREATE — the
+// first segment that is not already a map — or the leaf's own path when every
+// group along the way is there. It is what a rollback deletes, so a write of
+// `…ivory.geo.bevel` into a set with no `geo:` takes the whole `geo` away
+// again rather than leaving an empty group behind.
+function mintedAt(tree, path) {
+  const p = toPath(path);
+  for (let i = 1; i < p.length; i++) if (!isPlain(getLeaf(tree, p.slice(0, i)))) return p.slice(0, i);
+  return p.slice();
+}
+
 // An accessor view over a tree: `alias(T, { lampY: 'light.lamp.y' })` gives
 // an object whose `lampY` reads and writes `T.light.lamp.y`. Getters are
 // enumerable, so `{ ...view }` and `Object.assign(view, patch)` both work,
@@ -252,13 +431,43 @@ export const STATIC_PATHS = Object.freeze(['app.mode']);
 // panel's rows and in what the Save route posts is a DOTTED STRING, so an id
 // with a dot in it stops being one path and becomes two readings of one
 // string — and the flat `{ path: value }` map the route was built around has
-// nowhere to say which was meant. js/yaml.js is ready for the day this is
-// lifted (`formatKey` quotes a dotted key and `readKey` refuses an unquoted
-// one), and the day is when `sets:` arrives, because a dice-set id genuinely
-// carries dots today (`emberforge.blackanvil`). Until then a house felt is
-// `house-moss` and a dotted id is refused with its path, which is the only
-// honest answer a build that cannot round-trip it can give.
-export const ASSET_SECTIONS = Object.freeze(['sets', 'felts', 'towers', 'venues']);
+// nowhere to say which was meant.
+//
+// THE DICE CATALOGUE WAS THE CASE THIS WAS GOING TO BREAK ON, and it did not
+// (phase D1, 2026-09-03). C4 wrote here that the day the rule would have to be
+// lifted "is when `sets:` arrives, because a dice-set id genuinely carries
+// dots today (`emberforge.blackanvil`)". It arrived, and the dot turned out to
+// be a JOIN and not an id: js/themes.js has ALWAYS been two levels — a HOUSE
+// holding SETS — and `emberforge.blackanvil` is the flattened wire key it
+// builds, not something anybody wrote down. So the declaration keeps the two
+// levels it already had (`houses.emberforge.dice.blackanvil`), every id stays
+// dotless, and what a section grew instead is DEPTH: a row's field may be a
+// nested group of dials (`geo`, `feel`) or a COLLECTION OF FURTHER ROWS
+// (`rows(RECIPE)` — a house's `dice`). One walk resolves any of it.
+//
+// A SECTION IS EITHER FILLED OR SPARSE (ASSET_SPARSE). A felt row is FILLED:
+// six fields, all of them meaningful, so a row the file half-writes takes the
+// defaults for the rest and the merge site never guesses. A dice recipe is
+// SPARSE, and has to be, because in js/themes.js's own words "a set uses
+// whichever it earns; every one is optional" — a recipe that arrived filled
+// out would give every set in the catalogue particles, a decal, a parented
+// light and a rest cadence it was written to REFUSE, and restraint is the one
+// thing that file says is also identity. Absent stays absent; the dial's `def`
+// is the code's own fallback, and is what the panel shows in an empty field.
+//
+// AND A PRESET IS A ROW WHOSE SHAPE IS THE DIAL TREE (phase D4, 2026-09-03).
+// `presets:` is the third section and the odd one: its rows are not a kind of
+// thing the app draws, they are named PATCHES — `presets: { dusk: { light: {
+// lamp: { y: 30 } } } }` — so the shape a preset's fields are judged against
+// is `DIALS` itself, and the machinery above needs no new idea to carry one.
+// `assetDialFor('presets.dusk.light.lamp.y')` walks the row id and then the
+// dial tree and answers the lamp-height dial, so a preset's every leaf is
+// type-checked, enum-checked and film-classed by the same one judge, in the
+// browser, in `tools/dice-apply.mjs` and on the armed Save route alike. It is
+// SPARSE for the obvious reason: a preset says the three leaves it moves, and
+// a filled one would be the whole declaration written twice.
+export const ASSET_SECTIONS = Object.freeze(['houses', 'felts', 'presets']);
+export const ASSET_SPARSE = Object.freeze(['houses', 'presets']);
 // A row id: lower-case, digits, `-` and `_`, 32 characters. The house prefix
 // (`house-`) is a CONVENTION and not enforced here — what actually protects a
 // shipped row is the collision check at the merge site (js/main.js
@@ -266,6 +475,19 @@ export const ASSET_SECTIONS = Object.freeze(['sets', 'felts', 'towers', 'venues'
 // because that is the only place that knows what is shipped.
 export const ASSET_ID_RE = /^[a-z0-9][a-z0-9_-]{0,31}$/;
 export const ASSET_ID_WHY = 'lower-case letters, digits, "-" and "_", 32 characters, no dot';
+
+// A COLLECTION OF ROWS INSIDE A ROW. A house is a row; the sets it holds are
+// rows too, at ids the file chooses, so `dice:` cannot be a map of dials —
+// there is no path to put one at. `rows(SHAPE)` marks the field as "more of
+// the same, one level down", and the walk below alternates row id / field for
+// as many levels as a section declares.
+export function rows(label, shape, why = '') {
+  if (!isPlain(shape)) throw new Error(`rows ${label}: shape must be a map of dials`);
+  return Object.freeze({ label, rows: shape, why });
+}
+export function isRows(x) {
+  return !!x && typeof x === 'object' && !Array.isArray(x) && isPlain(x.rows);
+}
 
 // THE FELT ROW — js/main.js's `FELT_THEMES` row, field for field, as dials.
 // `mottle` and `breath` are absent from most shipped rows and mean 1 there
@@ -289,25 +511,325 @@ const FELT_ROW = Object.freeze({
   mottle: look('mottle', 1, [0, 2, 0.05], 'apply', 'how unevenly the nap catches the light; a raked bed wants less'),
 });
 
-// section → the row's dials, or null for a section this build cannot yet
-// declare rows in. Absent is not the same as empty: `sets`, `towers` and
-// `venues` are named here so a row under one of them is refused with the
-// reason it actually has (phase 3, not "no such section").
-export const ASSET_ROWS = Object.freeze({
-  sets: null,
-  felts: FELT_ROW,
-  towers: null,
-  venues: null,
+// ---------------------------------------------------------------------------
+// THE DICE RECIPE (phase D1) — js/themes.js's set recipe, field for field.
+// ---------------------------------------------------------------------------
+//
+// EVERY DEFAULT HERE IS THE CODE'S OWN FALLBACK WHEN THE FIELD IS ABSENT, read
+// out of js/dice.js (`materialFor`, `buildDie`, `buildBeveledGeometry`,
+// `bakeMaps`), js/voices.js, js/post.js and js/dielights.js — NOT a value
+// somebody thought looked nice. That is what makes an empty field in the panel
+// honest: it shows what the die is already doing.
+//
+// LOOK, ALL OF IT BUT ONE. A set is a SKIN over dice.js's (type, variant)
+// seam: js/themes.js's own header says "Geometry, physics and value reading
+// are untouched (a set can never change how a die lands)", and dice.js says it
+// twice more — createDieBody and readValue always use the std entry. So a
+// recipe cannot fork the film and every dial here is per-viewer chrome.
+//
+// THE ONE EXCEPTION IS `faces`, AND IT IS FILM. A face table is not a value —
+// the server still rolls 1..6 and the entry is a READING of the number it
+// rolled (js/rollspec.js: the table "is already per-die on the wire") — but it
+// is a reading two clients have to agree on. One tab whose `claw` face is a
+// `5` is one tab looking at a different roll, which is exactly what GOALPOST 2
+// forbids, so it locks the moment a second seat is present. FORBIDDEN_LEAF
+// bites the word `faces` and stays that way: it is the law for the DIAL TREE,
+// where a fixed path named `faces` could only be the rolled values themselves.
+// tests/tune.test.mjs names this one row as the exemption, with this reason.
+//
+// FACE ENTRIES: a digit paints as a digit and everything else as a drawn
+// symbol (js/dice.js FACE_SHAPES). d6 only — dice.js applies the table only
+// when `type === 'd6'`, because six entries leave fourteen faces of a d20
+// undecided.
+const FACE_ENTRIES = Object.freeze(
+  ['1', '2', '3', '4', '5', '6', 'bolt', 'claw', 'heart', 'plus', 'minus', 'blank']);
+// js/voices.js IMPACT_VOICES, in its own order. `felt` is IMPACT_DEFAULT_BODY
+// — the contact every unthemed die already makes — so it is the default here.
+const SOUND_BODIES = Object.freeze(['felt', 'click', 'chime', 'bell', 'thud', 'crackle', 'clack', 'hush']);
+// js/dice.js PATTERNS, js/particles.js KINDS, js/decals.js KIND_ROW,
+// js/dielights.js's switch. Each is a FUNCTION somebody wrote: DEVMODE §9's
+// "code-only stays code-only" — a fifth pattern is code, and then a word here.
+const RELIEF_PATTERNS = Object.freeze(['hammer', 'grain', 'ferns', 'scrimshaw']);
+const PARTICLE_KINDS = Object.freeze(['sparks', 'static', 'motes', 'fog', 'bubbles', 'dust', 'ash']);
+const DECAL_KINDS = Object.freeze(['frost', 'ring', 'scorch', 'smudge']);
+const DIE_LIGHT_MODES = Object.freeze(['steady', 'wave', 'breathe', 'flicker']);
+// js/themes.js `rest`: four cadences, and `still` is an ASSERTION of stillness
+// rather than the absence of a cadence ("Reject `rest: null` for the same
+// slot — the sentinel makes 'this quiet is on purpose' visible").
+const REST_KINDS = Object.freeze(['still', 'swell', 'creak', 'settle-tick']);
+
+const RECIPE = Object.freeze({
+  label: look('label', 'House set', null, 'apply', 'what the picker chip says'),
+  line: look('line', '', null, 'apply',
+    'this set\'s own one-line identity, where the house line does not say it (symbols.fate: "plus, minus, blank")'),
+
+  // ---- palette: the three colours every set names first --------------------
+  body: look('body', '#f3ead7', null, 'apply', 'the die\'s own colour (dice.js reads it as `color`)'),
+  text: look('text', '#2a2018', null, 'apply', 'the numerals — legibility on the body is the one invariant a set may not trade'),
+  accent: look('accent', '#d8c9a3', null, 'apply', 'the set\'s third colour; the picker chip and the lab tile paint with it'),
+
+  // ---- material feel: dice.js materialFor ---------------------------------
+  feel: {
+    rough: look('roughness', 0.3, [0, 1, 0.01], 'apply', 'dice.js: `def.feel ? def.feel.rough : 0.3`'),
+    metal: look('metalness', 0.1, [0, 1, 0.01], 'apply', 'dice.js: `def.feel ? def.feel.metal : 0.1`'),
+  },
+  // Whole-body emissive, subtle at rest. `glow: null` in the file is ABSENT,
+  // which is the same falsy dice.js tests (`else if (!shroud && def.glow)`) —
+  // three shipped sets write the null on purpose, to say the digits carry all
+  // the light.
+  glow: {
+    color: look('glow colour', '#ffffff', null, 'apply', 'the emissive tint the whole body carries'),
+    intensity: look('glow', 0.06, [0, 1, 0.01], 'apply', 'emissiveIntensity; the shipped sets sit at 0.04–0.09'),
+  },
+
+  // ---- the faces ----------------------------------------------------------
+  glyph: pick('glyph', 'digit', ['digit', 'pip', 'faces'], 'look', 'apply',
+    'digits · Vegas pips (d6; other types fall back to digits) · the `faces` table below'),
+  faces: list('faces', ['1', '2', '3', '4', '5', '6'], FACE_ENTRIES, [6, 6], 'film', 'apply',
+    'd6 only: one entry per VALUE — a digit paints as a digit, a name paints as a drawn symbol (dice.js FACE_SHAPES). The server still rolls 1..6; this is how the number is read, and both tabs must read it the same way'),
+
+  // ---- Level 1: texture-space authoring (dice.js bakeMaps) ------------------
+  maps: {
+    digitGlow: {
+      color: look('digit glow colour', '#ffd166', null, 'apply', 'emissiveMap of the DIGITS alone'),
+      intensity: look('digit glow', 0.7, [0, 2, 0.05], 'apply', 'emissiveIntensity when the digits carry the light'),
+    },
+    relief: {
+      pattern: pick('relief', 'grain', RELIEF_PATTERNS, 'look', 'apply',
+        'the height sketch a normal map is drawn from (dice.js PATTERNS); absent = no normal map at all'),
+      strength: look('relief strength', 0.5, [0, 2, 0.05], 'apply', 'dice.js: `def.maps.relief.strength || 0.5` on normalScale'),
+      digitDepth: look('digit engrave', 0, [0, 1, 0.05], 'apply', 'how deep the numerals cut into the height sketch'),
+      tint: look('relief tint', 0.4, [0, 1, 0.05], 'apply',
+        'how much of the pattern overlays the COLOUR map, so relief reads face-on and not only when the light rakes (dice.js: `?? 0.4`)'),
+    },
+    roughPattern: pick('rough pattern', 'grain', RELIEF_PATTERNS, 'look', 'apply',
+      'a roughnessMap of the same pattern over the set\'s base finish; absent = a flat finish'),
+  },
+
+  // ---- Level 2: shader injection (dice.js patchShader) --------------------
+  shader: {
+    fresnel: {
+      color: look('rim colour', '#7fd9e8', null, 'apply', 'a glancing-angle rim added to the emissive'),
+      power: look('rim power', 2.5, [0.5, 8, 0.1], 'apply', 'dice.js: `?? 2.5` — higher is a tighter rim'),
+      intensity: look('rim', 0.8, [0, 2, 0.05], 'apply', 'dice.js: `?? 0.8`'),
+    },
+    flow: {
+      speed: look('flow speed', 0.3, [0, 4, 0.05], 'apply', 'dice.js: `f.speed ?? 0.3`'),
+      scale: look('flow scale', 10, [1, 40, 0.5], 'apply', 'noise frequency in map space (dice.js `?? 10`)'),
+      floor: look('flow floor', 0.3, [0, 2, 0.05], 'apply', 'the non-molten branch\'s base level (dice.js `?? 0.3`)'),
+      amp: look('flow amp', 1.8, [0, 6, 0.05], 'apply', 'the non-molten branch\'s swing (dice.js `?? 1.8`)'),
+      cool: look('flow cool', '#5a1c06', null, 'apply', 'the molten branch\'s low colour — naming cool AND hot is what selects it'),
+      hot: look('flow hot', '#fff2c8', null, 'apply', 'the molten branch\'s high colour'),
+      gain: look('flow gain', 2, [0, 6, 0.05], 'apply', 'the molten branch\'s multiplier (dice.js `?? 2.0`)'),
+    },
+    dissolve: {
+      edge: look('dissolve edge', '#cfe98c', null, 'apply', 'the burn line\'s colour while a die unmakes'),
+    },
+  },
+
+  // ---- specular identity (three.js MeshPhysicalMaterial) ------------------
+  spec: {
+    clearcoat: look('clearcoat', 0, [0, 1, 0.01], 'apply', 'a lacquer layer over the body'),
+    clearcoatRoughness: look('clearcoat roughness', 0.5, [0, 1, 0.01], 'apply', ''),
+    iridescence: look('iridescence', 0, [0, 1, 0.01], 'apply', 'thin-film sheen; the 2026-08-04 pass calls a high value an oil slick'),
+    iridescenceIOR: look('iridescence IOR', 1.3, [1, 2.4, 0.01], 'apply', ''),
+    ior: look('IOR', 1.5, [1, 2.4, 0.01], 'apply', 'index of refraction — 1.75 reads as cut crystal'),
+    specularIntensity: look('specular', 1, [0, 2, 0.01], 'apply', ''),
+    specularColor: look('specular colour', '#ffffff', null, 'apply', 'the highlight\'s own tint — warm iron spark, cold glass'),
+    envMapIntensity: look('environment', 1, [0, 3, 0.05], 'apply',
+      'how much of the room the die reflects; an unhoused die is pinned to 0.35 either way (dice.js)'),
+  },
+
+  // ---- Level 3: impact-keyed particles (js/particles.js) ------------------
+  particles: {
+    kind: pick('particles', 'motes', PARTICLE_KINDS, 'look', 'apply',
+      'each kind is a claim about why matter leaves a die; absent = the set sheds nothing, which is also identity'),
+    colors: list('particle colours', ['#ffffff'], null, [1, 8], 'look', 'apply',
+      'the palette a burst is drawn from — js/particles.js picks from all of it'),
+    fadeTo: look('fade to', '#571b05', null, 'apply', 'sparks cool toward this before they die'),
+    scale: look('particle scale', 1, [0, 3, 0.05], 'apply', 'count and size, against the kind\'s own budget'),
+  },
+
+  // ---- Level 4a: impact marks on the felt (js/decals.js) ------------------
+  // The kill switch (DECALS_DEFAULT_ENABLED) is off table-wide; the recipe
+  // fields survive because the machinery does.
+  decal: {
+    kind: pick('decal', 'ring', DECAL_KINDS, 'look', 'apply', 'what the die leaves on the cloth'),
+    colors: list('decal colours', ['#ffffff', '#000000'], null, [1, 2], 'look', 'apply',
+      'the mark\'s two colours; js/decals.js reads `colors[1] || colors[0]`, so one is a mark of one colour'),
+    scale: look('decal scale', 1, [0, 3, 0.05], 'apply', ''),
+    life: look('decal life', 6, [0, 30, 0.5], 'apply', 'seconds before the mark is gone'),
+  },
+
+  // ---- Level 3.5: geometry identity (dice.js buildBeveledGeometry) --------
+  // The die the player SEES. NAME BOTH `bevel` AND `profile` OR NEITHER: a set
+  // that names neither wears STD_EDGE `{bevel: .09, profile: round}` as a unit,
+  // and naming either one states your own edge, whose per-field fallbacks are
+  // .055 and 'cut'. The defaults below are STD_EDGE, because that is what a
+  // panel field left empty is actually showing.
+  geo: {
+    bevel: look('bevel', 0.09, [0, 0.2, 0.005], 'apply', 'edge-cut share: 0.02 machined-crisp, 0.13 tumbled'),
+    profile: pick('profile', 'round', ['cut', 'round'], 'look', 'apply', 'flat chamfer facets · true fillet arcs'),
+    segments: look('arc strips', 3, [1, 6, 1], 'apply', 'round only: 1 is a flat strip with fillet shading — the old look'),
+    ink: look('edge ink', 0.25, [0, 1, 0.01], 'apply',
+      'darkness of the painted face outline and the band material; the code\'s own fallback is .25 cut / .12 round'),
+    tint: look('edge tint', '#000000', null, 'apply', 'what the edge darkens TOWARD — brass ages to patina, never to soot'),
+    wear: look('wear', 0, [0, 1, 0.01], 'apply', 'tumbled erosion, corners first (deterministic per set)'),
+    nicks: look('nicks', 0, [0, 5, 1], 'apply', 'discrete chips at seeded corner sites'),
+    pillow: look('pillow', 0, [0, 1, 0.01], 'apply', 'cushion-shaded faces; the silhouette and the digit plane stay flat'),
+  },
+
+  // ---- Level 4b: a light parented to the die (js/dielights.js) ------------
+  // Four table-wide, oldest stolen. Negative intensity pools shadow.
+  light: {
+    color: look('light colour', '#ffffff', null, 'apply', ''),
+    intensity: look('light', 10, [-20, 20, 0.5], 'apply', 'negative pools local shadow instead of emitting (Umbra)'),
+    range: look('light range', 2.5, [0, 12, 0.1], 'apply', 'past ~5 it lands on the dice beside it, which contradicts most claims'),
+    mode: pick('light mode', 'steady', DIE_LIGHT_MODES, 'look', 'apply', 'the envelope; seeded, so every client flickers identically'),
+  },
+
+  // ---- Level 5: post (js/post.js) ----------------------------------------
+  // `bloom` was `true` in js/themes.js and is an enum here, because the file
+  // may not hold a boolean: `source` marks this set's dice as bloom SOURCES,
+  // and there is no strength knob — whatever Levels 1–2 made bright is exactly
+  // what burns.
+  post: {
+    bloom: pick('bloom', 'plain', ['plain', 'source'], 'look', 'apply', 'whether this set\'s dice feed the bloom pass'),
+    ring: {
+      amp: look('shock ring', 6, [-20, 20, 0.5], 'apply', 'one screen-space wave from the roll\'s hardest impact; negative implodes'),
+      jolt: look('frame jolt', 0, [0, 8, 0.1], 'apply', 'a ~120 ms frame shake with the ring; the 2026-08-04 pass calls a per-roll jolt "UI feedback, not a physical event"'),
+      speed: look('ring speed', 1400, [200, 3000, 10], 'apply', 'px/s the wave travels (js/post.js `ring()` default)'),
+    },
+    shimmer: {
+      radius: look('shimmer radius', 2.2, [0, 6, 0.1], 'apply', 'heat wobble above a settled die'),
+      strength: look('shimmer', 0.5, [0, 3, 0.05], 'apply', ''),
+    },
+  },
+
+  // ---- the impact voice (js/voices.js) -----------------------------------
+  // ABSENT is a real answer and it is IMPACT_DEFAULT_BODY at weight 0 and
+  // sustain 0 — byte for byte the knock every unthemed die makes. Joe,
+  // 2026-08-18, on the fae dice: "Just use a normal sound", delivered by
+  // DELETING the recipe. Which is why these defaults are the absent values.
+  sound: {
+    body: pick('voice', 'felt', SOUND_BODIES, 'look', 'apply', 'the contact body (js/voices.js IMPACT_VOICES)'),
+    weight: look('weight', 0, [0, 1, 0.01], 'apply', 'heavier is lower'),
+    sustain: look('sustain', 0, [0, 200, 1], 'apply', 'ms of tail; a resonant body struck forty times in two seconds is clanking'),
+  },
+
+  // ---- the playback retiming (main.js; the projector's clock only) --------
+  rate: {
+    rate: look('catch rate', 1, [0.2, 2, 0.01], 'apply', 'playback speed over the window; <1 decelerates (vine catch, glacial arrest)'),
+    window: look('catch window', 0, [0, 1, 0.01], 'apply', 'the last share of the roll that is retimed. PHYSICS UNTOUCHED — only the playback clock scales'),
+  },
+
+  // ---- the settled-die cadence (main.js restInfo) -------------------------
+  // Four kinds, and the fields are their UNION: a sparse row carries only the
+  // ones its kind reads, which is how the file reads today.
+  rest: {
+    kind: pick('rest', 'still', REST_KINDS, 'look', 'apply',
+      'still is an ASSERTION of stillness, not the absence of a cadence — absent is the absence'),
+    yAmpM: look('swell height', 0.0015, [0, 0.01, 0.0001], 'apply', 'swell: metres of Y drift'),
+    yPeriodS: look('swell period', 2.6, [0.5, 12, 0.1], 'apply', 'swell: seconds'),
+    rollAmpRad: look('swell roll', 0.00524, [0, 0.05, 0.0001], 'apply', 'swell: radians of world-X roll'),
+    rollPeriodS: look('swell roll period', 3.1, [0.5, 12, 0.1], 'apply', 'swell: seconds, incommensurate with the height'),
+    ampRad: look('creak amp', 0.00698, [0, 0.05, 0.0001], 'apply', 'creak: radians per axis'),
+    periodAS: look('creak period A', 2, [0.5, 12, 0.1], 'apply', 'creak: both sines hit zero together at their LCM'),
+    periodBS: look('creak period B', 3, [0.5, 12, 0.1], 'apply', 'creak: the second axis'),
+    delayMinMs: look('tick delay min', 200, [0, 2000, 10], 'apply', 'settle-tick: ms after landing'),
+    delayMaxMs: look('tick delay max', 400, [0, 2000, 10], 'apply', 'settle-tick: ms after landing'),
+    posBumpM: look('tick lift', 0.0003, [0, 0.01, 0.0001], 'apply', 'settle-tick: metres'),
+    yawRad: look('tick yaw', 0.00698, [0, 0.05, 0.0001], 'apply', 'settle-tick: radians'),
+    tailMs: look('tick decay', 80, [0, 600, 5], 'apply', 'settle-tick: ms back to the archive pose, then still forever'),
+  },
+
+  // ---- W4: what a settled die breathes into a venue's fog lattice ---------
+  // Read only while a venue is staged (js/fae-lab.js brightenFog); inert on
+  // the grounded table.
+  fog: {
+    color: look('fog breath', '#9ff0dc', null, 'apply', 'the colour this set puts into the mist it sits in'),
+    gain: look('fog gain', 1, [0, 3, 0.05], 'apply', 'against the venue\'s own default breath'),
+  },
+
+  // ---- the two catalogue rules (where a set may be PICKED, never what it
+  // does — js/stability.js's one law) --------------------------------------
+  where: pick('where', 'anywhere', ['anywhere', 'venue'], 'look', 'apply',
+    'venue: the set resolves everywhere (materials, voices, the wire) but takes no chip in the picker — a venue stages it (was `venueOnly: true`)'),
+  channel: pick('channel', 'stable', ['stable', 'beta'], 'look', 'apply',
+    'beta: offered only on ?stability=beta. It decides where a set may be PICKED and NEVER what it does, because the film is a function of the core and the seed (was `beta: true`)'),
 });
 
+// A HOUSE ROW — js/themes.js's THEMES entry. `dice:` is where the two levels
+// live: js/themes.js's `sets`, renamed for the file because `houses.<h>.sets`
+// beside a top-level `set` on the wire read as the same word for two things,
+// and because `dice:` is what a person writing one would look for.
+const HOUSE_ROW = Object.freeze({
+  label: look('label', 'House', null, 'apply', 'the browsing category\'s name'),
+  line: look('line', '', null, 'apply', 'the one line under it — a house has an identity or it is a folder'),
+  dice: rows('sets', RECIPE, 'the concrete dice styles a player actually picks'),
+});
+
+// (`ASSET_ROWS`, the section → row-shape map, is BELOW the dial tree since
+// phase D4: `presets` declares the dial tree itself as its row shape, so the
+// map cannot be written before `DIALS` exists. Everything between here and
+// there reads it from inside a function, which is why the move costs nothing.)
+
+// A shape's defaults, nested: a group of dials gives a map, a collection gives
+// an empty map (a Clone starts with no sets in it and adds one).
+function shapeDefaults(shape) {
+  const out = {};
+  for (const [k, d] of Object.entries(shape)) {
+    if (isDial(d)) out[k] = Array.isArray(d.def) ? d.def.slice() : d.def;
+    else if (isRows(d)) out[k] = {};
+    else if (isPlain(d)) out[k] = shapeDefaults(d);
+  }
+  return out;
+}
+
 // A fresh row of a section's defaults — what an editor's Clone starts from
-// and what `addRow` fills the fields a caller left out with.
+// and what `addRow` fills the fields a caller left out with. A SPARSE section
+// fills nothing: absent is the answer there (see ASSET_SPARSE).
 export function assetRowDefaults(section) {
   const fields = ASSET_ROWS[section];
   if (!fields) return null;
-  const out = {};
-  for (const [k, d] of Object.entries(fields)) out[k] = Array.isArray(d.def) ? d.def.slice() : d.def;
-  return out;
+  return ASSET_SPARSE.includes(section) ? {} : shapeDefaults(fields);
+}
+
+// The row shape of the COLLECTION at `at` — `['felts']` is the felt row,
+// `['houses', 'std', 'dice']` is the recipe — or null when `at` does not name
+// one. Segments alternate row id / field from the section onward.
+export function collectionShapeAt(at) {
+  const p = toPath(at);
+  let shape = ASSET_ROWS[p[0]];
+  if (!isPlain(shape)) return null;
+  for (let i = 1; i < p.length; i += 2) {
+    const field = p[i + 1];
+    if (!ASSET_ID_RE.test(String(p[i])) || field === undefined) return null;
+    const d = shape[field];
+    if (!isRows(d)) return null;
+    shape = d.rows;
+  }
+  return shape;
+}
+
+// Does `path` name a ROW — a section, an id, then (field, id) pairs? The row,
+// not the field, is the unit `reset`, `removeRow` and the Save patch move.
+export function isRowPath(path) {
+  const p = toPath(path);
+  return p.length >= 2 && p.length % 2 === 0 && collectionShapeAt(p.slice(0, -1)) !== null;
+}
+
+// The DEEPEST row a leaf path belongs to (`houses.std.dice.classic.geo.bevel`
+// → `houses.std.dice.classic`), or null when it is not inside one. One law,
+// used by `apply`'s row guard, by the export's row collapse, by the panel's
+// revert glyph and by main.js's dropped-rows line.
+export function assetRowPath(path) {
+  const p = toPath(path);
+  if (!ASSET_SECTIONS.includes(p[0])) return null;
+  for (let n = p.length - (p.length % 2); n >= 2; n -= 2) {
+    if (isRowPath(p.slice(0, n))) return p.slice(0, n);
+  }
+  return null;
 }
 
 // The dial for one leaf of an asset row, or a STRING saying why there is
@@ -315,21 +837,39 @@ export function assetRowDefaults(section) {
 // so that file can hand an asset path straight here.
 export function assetDialFor(path) {
   const p = toPath(path);
-  const [section, id, field] = p;
+  const section = p[0];
   if (!ASSET_SECTIONS.includes(section)) return 'no dial at this path';
-  const fields = ASSET_ROWS[section];
-  if (!fields) return `\`${section}:\` rows are not declarable in this build (docs/DEVMODE.md §9, phase 3)`;
-  if (id === undefined) return `\`${section}:\` is a map of rows; name one`;
+  return walkRows(section, ASSET_ROWS[section], p.slice(1), [section]);
+}
+
+// `rest` starts at a ROW ID under the collection `at`.
+function walkRows(section, shape, rest, at) {
+  if (!rest.length) return `\`${at.join('.')}:\` is a map of rows; name one`;
+  const id = rest[0];
   if (!ASSET_ID_RE.test(String(id))) return `${JSON.stringify(String(id))} is not a legal ${section} id (${ASSET_ID_WHY})`;
-  if (field === undefined) return `${section}.${id} is a row of fields; name one`;
-  // Four segments and up is almost always a DOTTED ID read as extra levels
-  // (`felts.house.moss.cloth`), so the message names that rather than only
-  // the depth — it is the mistake this path is here to explain.
-  if (p.length > 3) return `${section} rows are one level deep: ${JSON.stringify(`${id}.${field}`)} `
-    + `reads as a row and a field, and an id may not contain a dot (${ASSET_ID_WHY})`;
-  const d = fields[field];
-  return isDial(d) ? d : `no ${section} field named ${JSON.stringify(String(field))} `
-    + `(${Object.keys(fields).join(', ')})`;
+  return walkFields(section, shape, rest.slice(1), at.concat(id));
+}
+
+// `rest` starts at a FIELD of the row (or group) `at`.
+function walkFields(section, shape, rest, at) {
+  if (!rest.length) return `${at.join('.')} is a row of fields; name one`;
+  const k = rest[0], tail = rest.slice(1);
+  const d = shape[k];
+  if (isDial(d)) {
+    return tail.length ? `${at.concat(k).join('.')} is a value, not a map` : d;
+  }
+  if (isRows(d)) return walkRows(section, d.rows, tail, at.concat(k));
+  if (isPlain(d)) {
+    return tail.length ? walkFields(section, d, tail, at.concat(k))
+      : `${at.concat(k).join('.')} is a group of fields; name one`;
+  }
+  const named = `no ${section} field named ${JSON.stringify(String(k))} at ${at.join('.')} `
+    + `(${Object.keys(shape).join(', ')})`;
+  // A tail under an unknown key is almost always a DOTTED ID read as two
+  // segments (`felts.house.moss.cloth`), so the message names that too — it is
+  // the mistake this branch exists to explain.
+  return tail.length ? `${named}; ${JSON.stringify(`${k}.${tail[0]}`)} reads as two segments, `
+    + `and an id may not contain a dot (${ASSET_ID_WHY})` : named;
 }
 
 // ---------------------------------------------------------------------------
@@ -406,7 +946,10 @@ export const DIALS = {
     // dials, and stay on the object.
     breath: {
       state: pick('breath', 'enabled', ENABLED, 'look', 'apply', 'device-local; the reduced-motion path skips the traverse'),
-      dur: look('breath duration', 0.6, [0.05, 3, 0.05], 'apply', 'seconds, each way'),
+      // A DIVISOR (js/main.js:2212, `dt / Math.max(0.0001, BREATH.dur)`), so
+      // `positive`: the clamp there keeps 0 from being a NaN and cannot keep
+      // it from being an instant snap where a breath was asked for.
+      dur: look('breath duration', 0.6, [0.05, 3, 0.05], 'apply', 'seconds, each way', 'positive'),
       hemiDrop: look('hemi drop', 0.65, [0, 1, 0.01], 'apply', 'the ambient falls furthest — it is what closing in is'),
       rimDrop: look('rim drop', 0.75, [0, 1, 0.01], 'apply'),
       keyDrop: look('key drop', 0.45, [0, 1, 0.01], 'apply', 'the key stays halfway: dice must not go unreadable'),
@@ -536,10 +1079,20 @@ export const DIALS = {
   },
   pace: {
     // TEMPO — the projector's curve; never the bake.
+    //
+    // THE THREE SPEEDS CARRY `positive` (phase D4). A speed of zero is not a
+    // slow projector: `k` divides the impact drain's minimum gap
+    // (js/main.js:5004), so `k: 0` silences every landing, and all three
+    // multiply `stepPlayback`'s dt, so a negative one runs the film backwards
+    // — which is a picture of something that never happened, and the one
+    // shape §10 says a dial may not make. The slider floors already said so;
+    // the law is what says it to a typed number and to the file.
     tempo: {
-      k: look('tempo', 1, [0.25, 4, 0.05], 'frame', 'playback speed, never the bake'),
-      flight: look('flight tempo', 0.8, [0.1, 4, 0.05], 'frame', 'the tumble, a touch slower than raw'),
-      settle: look('settle tempo', 25, [1, 60, 0.5], 'frame', 'the tail is effectively skipped'),
+      k: look('tempo', 1, [0.25, 4, 0.05], 'frame', 'playback speed, never the bake', 'positive'),
+      flight: look('flight tempo', 0.8, [0.1, 4, 0.05], 'frame', 'the tumble, a touch slower than raw', 'positive'),
+      settle: look('settle tempo', 25, [1, 60, 0.5], 'frame', 'the tail is effectively skipped', 'positive'),
+      // NOT `positive`: 0 is a real reading here — no ramp, the curve cuts
+      // straight to `settle` — and `tempoCurveAt` says so in its own guard.
       rampS: look('tempo ramp', 2, [0, 6, 0.1], 'frame', 'film seconds; the glide that hides the cut'),
       anchorSpeed: look('anchor speed', 8, [0.5, 40, 0.5], 'frame', 'where tumbling ends, in units/s'),
     },
@@ -604,16 +1157,114 @@ export const DIALS = {
   // tab whose cards are 15% wider is one tab whose ring is not the ring
   // everybody else is looking at.
   //
-  // RELOAD, every one of them: js/placard.js bakes one instanced rig at boot
-  // and the anchors are computed from these numbers at every flush. Moving a
-  // dial marks the row ⟳ and the next boot wears it.
+  // APPLY, since phase D4 (2026-09-03). These were ⟳ rows because js/placard.js
+  // bakes one instanced rig at boot and rebuilding it live was phase 3's
+  // problem; it is phase 3, and js/main.js `rebuildPlacards` is the choke
+  // point — the rig is disposed and re-stood AT THE PLACARD FLUSH, behind the
+  // same roll boundary a zoom and a tower take, never with dice in the air.
+  //
+  // AND THE RANGES ARE A PAIR, not two sliders (the C5 review's minor, taken
+  // here). `standoff − depth/2` is the clear ground between the rim and the
+  // card's inner edge, and it is what licenses the card's depthWrite, its real
+  // shadow and the seating raycast; at the shipped 0.86 / 1.52 it is 0.10. The
+  // two sliders move independently, so what has to hold is the WORST pair they
+  // can offer — the standoff at its floor against the depth at its ceiling —
+  // and 0.80 − 1.60/2 is exactly 0. That is why the depth's ceiling is 1.60
+  // and not the 4 it used to be: a deeper card is not a card this table can
+  // stand, and offering one on a slider would have been offering a picture the
+  // geometry law forbids. The typed field still takes any finite number, and
+  // the `cardClear` law is what refuses one that breaks the pair ('geometry').
   cards: {
-    standoff: film('card standoff', 0.86, [0.2, 4, 0.01], 'reload',
-      'the card centre outboard of the rim; standoff − depth/2 is the clear ground no die can cross'),
-    width: film('card width', 3.68, [1, 8, 0.01], 'reload', 'across the chair\'s ray'),
-    depth: film('card depth', 1.52, [0.4, 4, 0.01], 'reload', 'along the chair\'s ray'),
+    standoff: film('card standoff', 0.86, [0.8, 4, 0.01], 'apply',
+      'the card centre outboard of the rim; standoff − depth/2 is the clear ground no die can cross',
+      'cardClear'),
+    width: film('card width', 3.68, [1, 8, 0.01], 'apply', 'across the chair\'s ray'),
+    depth: film('card depth', 1.52, [0.4, 1.6, 0.01], 'apply', 'along the chair\'s ray',
+      'cardClear'),
   },
 };
+
+// SECTION → THE ROW'S DIALS. ONE ENTRY PER `ASSET_SECTIONS` NAME, and the loop
+// below is what says so: until phase D1 the map was allowed to answer
+// `undefined` for a section that was named but not yet built (`sets:`,
+// `towers:`, `venues:`), and three call sites carried a branch explaining that
+// state to the reader. There is no such state now — the catalogue landed and
+// the tower and venue sections are DEFERRED, which means absent from
+// ASSET_SECTIONS, not present without a shape — so the hazard worth a check is
+// the opposite one: a section added to that list with no shape here, which
+// this turns from a null wandering through three walks into one line at
+// import (the D1 review, 2026-09-03).
+//
+// IT SITS HERE, BELOW THE DIAL TREE, because `presets` declares `DIALS` as its
+// row shape (phase D4) — a preset row IS a sparse subtree of the app's own
+// dials — and a `const` may not be read before it is initialised. Note that
+// the shape is the MODULE's dial tree and not the `dials` a caller handed
+// `createTune`: a preset is judged against the tree the FILE is judged
+// against, which is the same one js/dice-apply-core.js and server.js use, and
+// there is exactly one of those. A test that passes its own dial tree and a
+// `presets:` section together would be judging the second against this one.
+export const ASSET_ROWS = Object.freeze({
+  houses: HOUSE_ROW,
+  felts: FELT_ROW,
+  presets: DIALS,
+});
+for (const s of ASSET_SECTIONS) {
+  if (!isPlain(ASSET_ROWS[s])) throw new Error(`tune: asset section \`${s}\` has no row shape in ASSET_ROWS`);
+}
+
+// THE SECTIONS WHOSE ROW IS A SPARSE SUBTREE OF THE DIAL TREE — `presets:`
+// today, DERIVED and not typed, so a second such section joins by
+// construction. It is the list every law has to reach into: a preset's leaves
+// ARE the app's own leaves, which is what makes `presets.dusk.cards.depth` a
+// `cards.depth` and not a value of its own.
+const DIAL_ROW_SECTIONS = Object.freeze(ASSET_SECTIONS.filter((s) => ASSET_ROWS[s] === DIALS));
+
+// `defaultsOf` for a shape read over and over (the dial tree is ~500 leaves
+// and a law walk asks for it once per preset row). Frozen, because the cached
+// tree is handed to `merge` and to `getLeaf` and must never be written; keyed
+// by identity, so a caller's own dial tree does not outlive it.
+const DEFAULTS_CACHE = new WeakMap();
+function defaultsFor(shape) {
+  let d = DEFAULTS_CACHE.get(shape);
+  if (!d) { d = deepFreeze(defaultsOf(shape)); DEFAULTS_CACHE.set(shape, d); }
+  return d;
+}
+
+// WHERE A PAIR LAW HAS TO HOLD in a tree, as `{ at, dials, defaults }`: the
+// root, judged by the dial tree it was handed, and then one scope per row of
+// a dial-tree section.
+//
+// A preset row is a sparse subtree of the SAME dials, so it has to answer the
+// same geometry — judged against its own row's other half, falling back to the
+// dial's default where the row is silent, exactly as the file's own missing
+// half is. Until the D4 review (2026-09-03) both judges walked the defaults
+// alone, so "no path under `presets.<name>.…` was ever in a law group": the
+// file could hold a preset whose Apply could only ever refuse both leaves
+// 'geometry', with no line anywhere saying why.
+export function lawScopes(tree, dials = DIALS) {
+  const out = [{ at: [], dials, defaults: defaultsFor(dials) }];
+  if (!isPlain(tree)) return out;
+  for (const s of DIAL_ROW_SECTIONS) {
+    const rows = tree[s];
+    if (!isPlain(rows)) continue;
+    for (const [id, row] of Object.entries(rows)) {
+      if (isPlain(row)) out.push({ at: [s, id], dials: ASSET_ROWS[s], defaults: defaultsFor(ASSET_ROWS[s]) });
+    }
+  }
+  return out;
+}
+
+// Is this leaf a STATIC path inside a dial-tree row? `presets.dusk.app.mode`
+// is one, and it is a row nobody can ever apply: `app.mode` has a dial (the
+// panel draws it read-only) and every writer refuses it by name
+// (STATIC_PATHS), so a preset carrying it would come back refused 'static'
+// forever. The D4 review found it reconciling clean, listed by `devPresets()`
+// and refused only on the press. One law, so reconcile, `validate` and the
+// armed route all say the same thing about the same line.
+export function isStaticRowLeaf(path) {
+  const p = toPath(path);
+  return p.length > 2 && DIAL_ROW_SECTIONS.includes(p[0]) && STATIC_PATHS.includes(p.slice(2).join('.'));
+}
 
 // ---------------------------------------------------------------------------
 // The live tree.
@@ -704,17 +1355,9 @@ function reconcile(decl, dials, prefix, refuse) {
     const d = isPlain(dials) ? dials[k] : undefined;
     if (isDial(d)) {
       if (v === null) continue;
-      const want = typeOf(d.def);
-      if (isPlain(v)) { refuse(path, 'shape', `expected ${want}, got a map; the default stands`); continue; }
-      if (typeOf(v) !== want || (want === 'number' && !Number.isFinite(v))) {
-        refuse(path, 'type', `expected ${want}, got ${JSON.stringify(v)}; the default stands`);
-        continue;
-      }
-      if (d.options && !d.options.includes(v)) {
-        refuse(path, 'option', `expected one of ${d.options.join('|')}, got ${JSON.stringify(v)}; the default stands`);
-        continue;
-      }
-      out[k] = v;
+      const bad = judge(d, v);
+      if (bad) { refuse(path, bad, judgeWhy(d, v, bad)); continue; }
+      out[k] = cloneVal(v);
     } else if (isPlain(d)) {
       if (v === null) continue;
       if (!isPlain(v)) { refuse(path, 'shape', `expected a map, got ${JSON.stringify(v)}; the defaults stand`); continue; }
@@ -728,59 +1371,114 @@ function reconcile(decl, dials, prefix, refuse) {
   return out;
 }
 
-// One asset section of the declaration against its row shape: every row is
-// filled out to the whole shape (a field the file omits gets the row
-// default, exactly as an omitted dial gets its own), and a bad id, a bad
-// field or a bad value is dropped by NAME with the default standing. Returns
-// the reconciled section, or null when the section itself is refused —
-// dropping a section wholesale rather than half of it, because half a
-// catalogue is the harder thing to notice.
+// One asset section of the declaration against its row shape, to whatever
+// depth the section declares. A bad id, a bad field or a bad value is dropped
+// by NAME with the default standing. Returns the reconciled section, or null
+// when the section itself is refused — dropping a section wholesale rather
+// than half of it, because half a catalogue is the harder thing to notice.
 function reconcileRows(section, decl, refuse) {
-  const fields = ASSET_ROWS[section];
-  if (!fields) {
-    refuse(section, 'section', `\`${section}:\` rows are not declarable in this build (docs/DEVMODE.md §9, phase 3); the whole section is dropped`);
-    return null;
-  }
+  return reconcileCollection(section, ASSET_ROWS[section], decl, [section], refuse,
+    !ASSET_SPARSE.includes(section));
+}
+
+// A map of rows at `at`, each keyed by an id the file chose.
+function reconcileCollection(section, shape, decl, at, refuse, fill) {
+  const where = at.join('.');
   if (decl === null) return null;                       // absent, like a null at a dial
   if (!isPlain(decl)) {
-    refuse(section, 'shape', `expected a map of rows, got ${JSON.stringify(decl)}; the section is dropped`);
+    refuse(where, 'shape', `expected a map of rows, got ${JSON.stringify(decl)}; it is dropped`);
     return null;
   }
   const out = {};
   for (const [id, row] of Object.entries(decl)) {
-    const at = `${section}.${id}`;
+    const p = at.concat(id);
     if (!ASSET_ID_RE.test(id)) {
-      refuse(at, 'key', `${JSON.stringify(id)} is not a legal ${section} id (${ASSET_ID_WHY}); the row is dropped`);
+      refuse(p.join('.'), 'key', `${JSON.stringify(id)} is not a legal ${section} id (${ASSET_ID_WHY}); the row is dropped`);
       continue;
     }
     if (row === null) continue;
     if (!isPlain(row)) {
-      refuse(at, 'shape', `expected a map of fields, got ${JSON.stringify(row)}; the row is dropped`);
+      refuse(p.join('.'), 'shape', `expected a map of fields, got ${JSON.stringify(row)}; the row is dropped`);
       continue;
     }
-    const built = assetRowDefaults(section);
-    for (const [k, v] of Object.entries(row)) {
-      const d = fields[k];
-      if (!isDial(d)) {
-        refuse(`${at}.${k}`, 'unknown', `no ${section} field named ${JSON.stringify(k)} (${Object.keys(fields).join(', ')}); it is dropped`);
-        continue;
-      }
-      if (v === null) continue;
-      const want = typeOf(d.def);
-      if (isPlain(v)) { refuse(`${at}.${k}`, 'shape', `expected ${want}, got a map; the default stands`); continue; }
-      if (typeOf(v) !== want || (want === 'number' && !Number.isFinite(v))) {
-        refuse(`${at}.${k}`, 'type', `expected ${want}, got ${JSON.stringify(v)}; the default stands`);
-        continue;
-      }
-      if (d.options && !d.options.includes(v)) {
-        refuse(`${at}.${k}`, 'option', `expected one of ${d.options.join('|')}, got ${JSON.stringify(v)}; the default stands`);
-        continue;
-      }
-      built[k] = v;
-    }
-    out[id] = built;
+    out[id] = reconcileFields(section, shape, row, p, refuse, fill);
   }
   return out;
+}
+
+// The fields of one row (or of a nested group of fields inside one). `fill`
+// is the section's: a FILLED section starts from the shape's defaults so a
+// half-written row is whole by the time the merge site sees it; a SPARSE one
+// starts empty, because there absence is the answer (ASSET_SPARSE).
+function reconcileFields(section, shape, decl, at, refuse, fill) {
+  const out = fill ? shapeDefaults(shape) : {};
+  for (const [k, v] of Object.entries(decl)) {
+    const p = at.concat(k), path = p.join('.');
+    const d = shape[k];
+    if (isRows(d)) {
+      const sub = reconcileCollection(section, d.rows, v, p, refuse, fill);
+      if (sub) out[k] = sub; else delete out[k];
+      continue;
+    }
+    if (!isDial(d) && isPlain(d)) {
+      if (v === null) { delete out[k]; continue; }
+      if (!isPlain(v)) { refuse(path, 'shape', `expected a map, got ${JSON.stringify(v)}; the defaults stand`); continue; }
+      out[k] = reconcileFields(section, d, v, p, refuse, fill);
+      continue;
+    }
+    if (!isDial(d)) {
+      refuse(path, 'unknown', `no ${section} field named ${JSON.stringify(k)} at ${at.join('.')} (${Object.keys(shape).join(', ')}); it is dropped`);
+      continue;
+    }
+    if (v === null) continue;
+    // A ROW OF THE DIAL TREE MAY NOT NAME A STATIC LEAF (the D4 review,
+    // 2026-09-03) — see `isStaticRowLeaf`. Dropped by name at birth, where
+    // the person holding the file is told, rather than at the press.
+    if (isStaticRowLeaf(p)) {
+      refuse(path, 'static', `${p.slice(2).join('.')} is set in dice.yaml or DICE_MODE and never by a patch; the field is dropped`);
+      continue;
+    }
+    const bad = judge(d, v);
+    if (bad) { refuse(path, bad, judgeWhy(d, v, bad)); continue; }
+    out[k] = cloneVal(v);
+  }
+  return out;
+}
+
+// A PAIR LAW OVER THE DECLARATION (phase D4). `reconcile` judges one leaf at
+// a time and a pair law cannot be answered that way, so it is answered here,
+// once, over the merged tree. When a group does not hold, EVERY declared leaf
+// carrying that law goes back to its default and is named — not the one that
+// happened to be looked at last. The pair the code ships holds by
+// construction, so putting both back is always a legal state, and refusing
+// half of one is how you get a table whose cards stand inside the rim while
+// the console says something was dropped.
+//
+// AND IT RUNS ONCE PER SCOPE (the D4 review, 2026-09-03), not once: a preset
+// row is a sparse subtree of the same dial tree, so its `cards.depth` is a
+// `cards.depth` and is judged inside its own row — see `lawScopes`.
+function checkLawPairs(dials, declared, defaults, refuse) {
+  for (const scope of lawScopes(declared, dials)) {
+    const base = scope.at.length ? scope.defaults : defaults;
+    const groups = pairGroups(scope.dials, base);
+    if (!groups.size) continue;
+    const named = (p) => scope.at.concat(p).join('.');
+    for (const [name, paths] of groups) {
+      const law = LAWS[name];
+      // Re-merged per group: a group that dropped a leaf changes what the
+      // next group reads, and what it reads has to be the tree as it stands.
+      const sub = scope.at.length ? getLeaf(declared, scope.at) : declared;
+      const merged = merge(base, isPlain(sub) ? sub : {});
+      const read = (dp) => getLeaf(merged, dp);
+      if (paths.every((p) => law.holds(getLeaf(merged, p), p.join('.'), read))) continue;
+      for (const p of paths) {
+        const full = scope.at.concat(p);
+        if (!hasLeaf(declared, full)) continue;
+        refuse(full.join('.'), law.reason, `${law.why}; the defaults stand for all of ${paths.map(named).join(', ')}`);
+        dropLeaf(declared, full);
+      }
+    }
+  }
 }
 
 // `onRefuse(r)` is called once per dropped declaration leaf with
@@ -801,11 +1499,36 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
     else if (typeof console !== 'undefined' && console.warn) console.warn(`tune: declared ${r.message}`);
   };
   declared = reconcile(declared, dials, [], refuse);
+  const defaults = defaultsOf(dials);
+  checkLawPairs(dials, declared, defaults, refuse);
   Object.freeze(refusals);
 
-  const SHIPPED = deepFreeze(merge(defaultsOf(dials), declared));
+  const SHIPPED = deepFreeze(merge(defaults, declared));
   const T = deepClone(SHIPPED);
   const binders = new Map();
+  // WHO IS WATCHING THE TREE CHANGE (phase D5). A binder is the tree's own
+  // re-apply hook — one per path pattern, and the tree puts a value back when
+  // one throws. A WATCHER is nobody's hook: it is told, after the fact, what
+  // landed, and it may not refuse, reorder or undo anything. Two callers need
+  // that and neither can be a binder: the RECORDER, which writes down every
+  // patch whatever path it touched (a `'*'` binder would displace the real
+  // one), and the POP-OUT, which broadcasts a snapshot after every change so a
+  // second window can draw the tree it does not own. A watcher that throws is
+  // logged and dropped from the round — a spectator may not break a write.
+  const watchers = new Set();
+  const fire = (event) => {
+    if (!watchers.size) return;
+    for (const fn of [...watchers]) {
+      try { fn(event); } catch (e) {
+        if (typeof console !== 'undefined' && console.error) console.error('tune: watcher threw:', e);
+      }
+    }
+  };
+  function watch(fn) {
+    if (typeof fn !== 'function') throw new Error('watch: fn must be a function');
+    watchers.add(fn);
+    return () => watchers.delete(fn);
+  }
 
   const dotted = (p) => toPath(p).join('.');
 
@@ -863,6 +1586,24 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
   function apply(entries, { filmLocked = false } = {}) {
     const refused = [], pending = [];
     const runs = new Map();                       // fn → Map(key → { p, v, before })
+    // WHAT THE PATCH PROPOSES, for a pair law (LAWS). The two leaves of
+    // `{ 'cards.standoff': 2, 'cards.depth': 3.9 }` are legal together and
+    // illegal one at a time in the order `Object.entries` happens to give
+    // them, so the law reads the patch and falls back to T — never T alone.
+    const proposed = new Map(entries.map(([p, v]) => [p.join('.'), v]));
+    const readProposed = (dp) => (proposed.has(dp) ? proposed.get(dp) : getLeaf(T, dp));
+    // …AND INSIDE A PRESET ROW IT READS THE ROW (the D4 review, 2026-09-03).
+    // `presets.dusk.cards.depth` is a `cards.depth`, so the law that judges it
+    // must read `presets.dusk.cards.standoff` and not the table's own — and
+    // where the row is silent, the dial's default, which is what applying the
+    // row would leave standing. The same reading `lawScopes` gives the file.
+    const readInRow = (row) => (dp) => {
+      const full = row.concat(toPath(dp));
+      const key = full.join('.');
+      if (proposed.has(key)) return proposed.get(key);
+      const live = getLeaf(T, full);
+      return live === undefined ? getLeaf(defaultsFor(ASSET_ROWS[row[0]]), dp) : live;
+    };
     for (const [p, v] of entries) {
       const key = p.join('.');
       // WHAT A LEAF IS, once rows exist: SHIPPED names every dial and every
@@ -871,7 +1612,38 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
       // it is how the felt editor moves a slider — so its type is read from T
       // where SHIPPED has nothing to say.
       const inShipped = hasLeaf(SHIPPED, p);
-      if (!inShipped && !hasLeaf(T, p)) { refused.push([key, 'unknown']); continue; }
+      // A SPARSE ROW'S ABSENT FIELD IS WRITABLE, AND HAS TO BE (the D1
+      // review, 2026-09-03). The guard above predates the catalogue and was
+      // right while `felts:` was the only asset section: a felt row is FILLED,
+      // so every one of its six fields is in T and "no leaf here" really did
+      // mean "no such dial". A dice recipe is SPARSE by design (ASSET_SPARSE:
+      // "absent is a real answer") — `classics.ivory` names five fields of
+      // ninety — so on a shipped set every field the file does not name had no
+      // leaf in either tree and every write to it was refused 'unknown'. Some
+      // eighty of the panel's recipe knobs were unwritable, on exactly the
+      // rows a person edits first, while `assetDialFor` cheerfully answered
+      // with the dial for each of them.
+      //
+      // The row is still the unit that has to EXIST (the guard below); what
+      // this adds is that a field of a row that does exist may be minted when
+      // the section's shape declares a dial for it. The dial's `def` — the
+      // code's own fallback, which is what the empty panel field was already
+      // showing — stands in as the "before" value for the type and option
+      // checks, so a minted leaf is judged exactly as a written one.
+      //
+      // THE TWO REFUSALS STILL MEAN DIFFERENT THINGS (C4's rule, kept): a row
+      // NOBODY ever had is 'unknown' — there is no dial at a path under it —
+      // and a row the file declares that this session REMOVED is 'row', which
+      // the guard below answers. So the mint asks whether either tree knows
+      // the row, and leaves the removed case to be refused where it was.
+      let minted = null;
+      if (!inShipped && !hasLeaf(T, p)) {
+        const row = p.length > 2 && ASSET_SECTIONS.includes(p[0]) ? assetRowPath(p) : null;
+        const known = !!row && (isPlain(getLeaf(T, row)) || isPlain(getLeaf(SHIPPED, row)));
+        const d = known ? dialAt(p) : null;
+        if (!d) { refused.push([key, 'unknown']); continue; }
+        minted = d;
+      }
       // …AND A ROW THAT IS GONE IS GONE (found by the C4 review, 2026-09-03).
       // SHIPPED still names every leaf of a row the FILE declares after
       // `removeRow` took it out of T, so `hasLeaf(SHIPPED, p)` alone let one
@@ -881,24 +1653,61 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
       // exactly the half-built felt the comment below `diff` says must be
       // impossible. The row is the unit: put it back whole (`reset` at the
       // row's path) or leave it out.
-      if (p.length > 2 && ASSET_SECTIONS.includes(p[0]) && !isPlain(getLeaf(T, [p[0], p[1]]))) {
+      // `assetRowPath` and not `[p[0], p[1]]` since the catalogue arrived
+      // (D1): a set lives at `houses.<house>.dice.<set>`, so the row that has
+      // to be there is the DEEPEST one the path is inside, and a write under a
+      // house whose `dice` map is gone must refuse for the same reason a write
+      // under a removed felt does.
+      const rowAt = p.length > 2 && ASSET_SECTIONS.includes(p[0]) ? assetRowPath(p) : null;
+      if (rowAt && !isPlain(getLeaf(T, rowAt))) {
         refused.push([key, 'row']);
         continue;
       }
-      if (STATIC_PATHS.includes(key)) { refused.push([key, 'static']); continue; }
+      // …AND A STATIC LEAF INSIDE A PRESET ROW IS STATIC TOO (the D4 review):
+      // the row is sparse, so a write here would MINT `app.mode` into it and
+      // hand back a preset whose Apply could only ever be refused.
+      if (STATIC_PATHS.includes(key) || isStaticRowLeaf(p)) { refused.push([key, 'static']); continue; }
       const spec = dialAt(p);
       if (spec && spec.cls === 'film' && filmLocked) { refused.push([key, 'film']); continue; }
-      if (!typeFits(inShipped ? getLeaf(SHIPPED, p) : getLeaf(T, p), v)) { refused.push([key, 'type']); continue; }
-      if (spec && spec.options && !spec.options.includes(v)) { refused.push([key, 'option']); continue; }
+      if (!typeFits(minted ? minted.def : inShipped ? getLeaf(SHIPPED, p) : getLeaf(T, p), v)) {
+        refused.push([key, 'type']); continue;
+      }
+      // A LIST DIAL'S ENTRIES AND LENGTH ARE LAW TOO (the D1 review):
+      // `typeFits` only asks "is this an array", and for a list dial the whole
+      // answer is `judge`'s — 'type' for an entry that is not a string,
+      // 'range' for a table of the wrong size, 'option' for a word outside
+      // `each`. For every other dial this is the option check it always was.
+      if (spec) {
+        const bad = judge(spec, v);
+        if (bad === 'option' || (bad && Array.isArray(spec.def))) { refused.push([key, bad]); continue; }
+      }
+      // …AND SO IS A LAW (phase D4). Both kinds run here — a single-value law
+      // because `judge` above only forwards 'option' and the list reasons, and
+      // a pair law because this is the one place the whole patch is in hand.
+      // The reason is the law's own: 'range-law' for a divisor at zero,
+      // 'geometry' for a card that would stand inside the rim.
+      if (spec && spec.law) {
+        const row = DIAL_ROW_SECTIONS.includes(p[0]) ? assetRowPath(p) : null;
+        const inRow = row && p.length > row.length;
+        if (!LAWS[spec.law].holds(v, inRow ? p.slice(row.length).join('.') : key,
+          inRow ? readInRow(row) : readProposed)) {
+          refused.push([key, LAWS[spec.law].reason]);
+          continue;
+        }
+      }
       const before = getLeaf(T, p);
       const moved = !same(before, v);
+      // What a rollback has to take away: for a minted leaf it is not a value
+      // to put back but a node to delete, and the node is the shallowest one
+      // this write creates (`geo` when only `geo.bevel` was written).
+      const madeAt = minted ? mintedAt(T, p) : null;
       setLeaf(T, p, cloneVal(v));
       const fn = binderFor(p);
       if (fn) {
         let run = runs.get(fn);
         if (!run) { run = new Map(); runs.set(fn, run); }
         const prev = run.get(key);                // the same leaf twice in one patch: the first `before` is the real one
-        run.set(key, { p, v, before: prev ? prev.before : before });
+        run.set(key, prev ? { p, v, before: prev.before, madeAt: prev.madeAt } : { p, v, before, madeAt });
       } else if (spec && spec.read === 'reload' && moved) pending.push(key);
     }
     for (const [fn, run] of runs) {
@@ -907,11 +1716,21 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
         fn(covered[0][0], covered[0][1], covered);
       } catch (e) {
         for (const c of run.values()) {
-          setLeaf(T, c.p, cloneVal(c.before));
+          if (c.madeAt) dropLeaf(T, c.madeAt); else setLeaf(T, c.p, cloneVal(c.before));
           refused.push([c.p.join('.'), 'binder']);
         }
         if (typeof console !== 'undefined' && console.error) console.error(`tune: binder for ${covered[0][0]} threw:`, e);
       }
+    }
+    // WHAT ACTUALLY LANDED, for the watchers — computed here and not by the
+    // caller, because a binder that threw turns an accepted leaf into a
+    // refused one after the fact, and a recorder that wrote down the patch it
+    // ASKED for would emit a step whose values the tree never held.
+    if (watchers.size) {
+      const no = new Set(refused.map(([k]) => k));
+      const landed = {};
+      for (const [p, v] of entries) { const k = p.join('.'); if (!no.has(k)) landed[k] = cloneVal(v); }
+      if (Object.keys(landed).length) fire({ kind: 'set', patch: landed, refused: [...refused] });
     }
     return { diff: diff(), refused, pending };
   }
@@ -954,9 +1773,11 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
   // ---- asset rows ---------------------------------------------------------
   //
   // A row lands or leaves WHOLE. There is no per-leaf `set` that can create
-  // one — `apply` refuses a path neither tree has — because a half-built felt
-  // is a felt the merge site would have to guess the rest of, and guessing is
-  // how a catalogue grows rows nobody wrote.
+  // one — `apply` refuses a leaf whose ROW is not there — because a half-built
+  // felt is a felt the merge site would have to guess the rest of, and
+  // guessing is how a catalogue grows rows nobody wrote. (A FIELD of a row
+  // that is there is a different question, and since D1 `apply` mints one:
+  // a sparse recipe's absent fields are most of its fields.)
   const rowFire = (section) => {
     const fn = binderFor([section, '']);
     if (!fn) return;
@@ -971,36 +1792,63 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
 
   const result = (refused = []) => ({ diff: diff(), refused, pending: [] });
 
-  function addRow(section, id, row = {}) {
-    if (!ASSET_SECTIONS.includes(section)) return result([[String(section), 'unknown']]);
-    const fields = ASSET_ROWS[section];
-    if (!fields) return result([[String(section), 'section']]);
-    if (typeof id !== 'string' || !ASSET_ID_RE.test(id)) return result([[`${section}.${id}`, 'id']]);
-    if (row !== undefined && row !== null && !isPlain(row)) return result([[`${section}.${id}`, 'type']]);
-    const refused = [];
-    const built = assetRowDefaults(section);
-    for (const [k, v] of Object.entries(row || {})) {
-      const d = fields[k];
-      const at = `${section}.${id}.${k}`;
-      if (!isDial(d)) { refused.push([at, 'unknown']); continue; }
-      if (v === null) continue;                       // absent: the default stands
-      if (typeof v === 'boolean' || !typeFits(d.def, v)) { refused.push([at, 'type']); continue; }
-      if (d.options && !d.options.includes(v)) { refused.push([at, 'option']); continue; }
-      built[k] = v;
+  // `where` is the COLLECTION the row lands in: a section name (`'felts'`) or
+  // a path to one nested inside a row (`['houses', 'gildhall', 'dice']` — a
+  // set inside a house). The two-argument form every C4 caller uses still
+  // reads the same; the path form is what the catalogue needed (D1).
+  function addRow(where, id, row = {}) {
+    const at = toPath(where);
+    const section = at[0];
+    if (!ASSET_SECTIONS.includes(section)) return result([[at.join('.'), 'unknown']]);
+    // 'section' MEANS "THAT PATH IS NOT A COLLECTION" (re-described in the D1
+    // review). It used to mean "a section this build cannot declare rows in",
+    // a state that no longer exists; what reaches it now is a path that names
+    // a section but lands somewhere inside a row that is not a map of rows —
+    // `addRow(['houses', 'std', 'label'], …)`, or a collection path with the
+    // wrong number of segments.
+    const shape = collectionShapeAt(at);
+    if (!shape) return result([[at.join('.'), 'section']]);
+    if (typeof id !== 'string' || !ASSET_ID_RE.test(id)) return result([[`${at.join('.')}.${id}`, 'id']]);
+    if (row !== undefined && row !== null && !isPlain(row)) return result([[`${at.join('.')}.${id}`, 'type']]);
+    // The collection's OWNER — the house a set is going into. `addRow` may
+    // create the collection itself (a house with no `dice:` line yet) but
+    // never the row above it: minting `houses.nowhere.dice.x` would leave a
+    // set in a house nothing declares.
+    const ownerPath = at.slice(0, -1);
+    if (ownerPath.length && !isPlain(getLeaf(T, ownerPath))) {
+      return result([[at.join('.'), 'row']]);
     }
-    if (!isPlain(T[section])) T[section] = {};
-    T[section][id] = built;
+    const refused = [];
+    const built = reconcileFields(section, shape, row || {}, at.concat(id),
+      (path, reason) => refused.push([path, reason]), !ASSET_SPARSE.includes(section));
+    // …AND THE PAIR LAWS, for a row of the DIAL TREE (the D4 review): `addRow`
+    // is the door a preset arrives through in the browser, as `createTune` is
+    // the one it arrives through from the file, so it owes the same answer.
+    // `checkLawPairs` drops the offending leaves out of `built` itself — the
+    // row lands, minus the half-claim, with each dropped leaf named.
+    if (DIAL_ROW_SECTIONS.includes(section) && at.length === 1) {
+      checkLawPairs(dials, { [section]: { [id]: built } }, defaults,
+        (path, reason) => refused.push([path, reason]));
+    }
+    if (!ownerPath.length) { if (!isPlain(T[section])) T[section] = {}; } else if (!isPlain(getLeaf(T, at))) {
+      getLeaf(T, ownerPath)[at[at.length - 1]] = {};
+    }
+    getLeaf(T, at)[id] = built;
     rowFire(section);
+    fire({ kind: 'addRow', where: at.join('.'), id });
     return result(refused);
   }
 
-  function removeRow(section, id) {
-    if (!ASSET_SECTIONS.includes(section) || !isPlain(T[section])
-      || !Object.prototype.hasOwnProperty.call(T[section], id)) {
-      return result([[`${section}.${id}`, 'unknown']]);
+  function removeRow(where, id) {
+    const at = toPath(where);
+    const section = at[0];
+    const owner = ASSET_SECTIONS.includes(section) ? getLeaf(T, at) : undefined;
+    if (!isPlain(owner) || !Object.prototype.hasOwnProperty.call(owner, id)) {
+      return result([[`${at.join('.')}.${id}`, 'unknown']]);
     }
-    delete T[section][id];
+    delete owner[id];
     rowFire(section);
+    fire({ kind: 'removeRow', where: at.join('.'), id });
     return result();
   }
 
@@ -1012,41 +1860,42 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
   }
 
   // Whether the FILE declares this row — a shipped row in the asset sense,
-  // which reset restores rather than removes.
-  function rowIsDeclared(section, id) { return isPlain(getLeaf(SHIPPED, [section, id])); }
+  // which reset restores rather than removes. `where` is the collection (a
+  // section name, or a path to one) and `id` the row in it.
+  function rowIsDeclared(where, id) { return isPlain(getLeaf(SHIPPED, toPath(where).concat(id))); }
 
   // The structural half of `reset`: put every asset section (or the one
   // section, or the one row) back to what the file says, adding what was
   // removed and dropping what was added. Returns the sections that moved, so
   // the caller fires their binders after the leaf patch has landed too.
-  // A SCOPE DEEPER THAN A ROW IS NOT A ROW SCOPE (found by the C4 review,
+  // A SCOPE THAT IS NOT A ROW IS NOT A ROW SCOPE (found by the C4 review,
   // 2026-09-03): `prefix[1]` was read without asking how long the prefix was,
   // so `reset('felts.house-moss.name')` reverted all six of the row's fields,
   // and `reset('felts.house-ash.name')` on a session row DELETED the row. The
   // panel never reached it (its revert glyph goes through `tune.set`), but
   // `tuneReset(path)` is a published hook and CONTRACTS says reset takes a
   // path. One field is a leaf: the leaf pass below already does it right.
+  // `isRowPath` is what asks the question now, because since the catalogue
+  // arrived (D1) a row is not always two segments deep — a set is four
+  // (`houses.gildhall.dice.oxblood`) and its fields are five.
   function resetRows(prefix) {
     const moved = new Set();
-    if (prefix.length > 2) return moved;
     for (const s of ASSET_SECTIONS) {
       if (prefix.length && prefix[0] !== s) continue;
-      if (prefix.length > 1) {
-        const id = prefix[1];
-        const want = getLeaf(SHIPPED, [s, id]);
-        const have = getLeaf(T, [s, id]);
-        if (same(want, have)) continue;
-        if (want === undefined) { if (isPlain(T[s])) delete T[s][id]; } else {
-          if (!isPlain(T[s])) T[s] = {};
-          T[s][id] = deepClone(want);
-        }
-        moved.add(s);
-        continue;
-      }
-      const want = Object.prototype.hasOwnProperty.call(SHIPPED, s) ? SHIPPED[s] : undefined;
-      const have = Object.prototype.hasOwnProperty.call(T, s) ? T[s] : undefined;
-      if (same(want, have)) continue;
-      if (want === undefined) delete T[s]; else T[s] = deepClone(want);
+      // Three scopes move a map WHOLE: the section, a collection inside it
+      // (`houses.gildhall.dice`) and a row (`houses.gildhall.dice.oxblood`).
+      // Anything else is a field, and the leaf pass in `reset` has it.
+      const at = prefix.length > 1 ? prefix : [s];
+      if (prefix.length > 1 && !isRowPath(at) && collectionShapeAt(at) === null) continue;
+      const owner = at.length === 1 ? T : getLeaf(T, at.slice(0, -1));
+      const want = getLeaf(SHIPPED, at);
+      if (same(want, getLeaf(T, at))) continue;
+      // What the map sits IN has itself gone (a set whose house was removed):
+      // the row is not the unit to put back — the house is, and `reset` at the
+      // house's path or at the section's is the verb for that.
+      if (!isPlain(owner)) continue;
+      const key = at[at.length - 1];
+      if (want === undefined) delete owner[key]; else owner[key] = deepClone(want);
       moved.add(s);
     }
     return moved;
@@ -1055,6 +1904,35 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
   function changes() {
     const out = {};
     for (const d of diff()) out[d.path] = d.live;
+    return out;
+  }
+
+  // THE OTHER LEAVES THAT ARE ONE CLAIM WITH THIS ONE (a pair law), each with
+  // the value the FILE ships for it — what a caller putting this leaf back has
+  // to put back WITH it. A pair is judged against what the patch proposes, so
+  // half a revert is refused by the half still standing: `set({'cards.depth':
+  // 0.4})`, `set({'cards.standoff': 0.2})` — both legal, clear 0.0 — and then
+  // `reset('cards.depth')` came back `[['cards.depth','geometry']]` with
+  // nothing moved, so a typed value had no way home at all (the D4 review,
+  // 2026-09-03). The pair the file ships holds by construction, which is what
+  // makes widening a revert to the whole group always a legal state.
+  // Empty for every leaf that stands alone, which is all but two of them.
+  function lawMates(path) {
+    const p = toPath(path);
+    const d = dialAt(p);
+    if (!isDial(d) || !d.law || !LAWS[d.law].pair) return [];
+    const row = DIAL_ROW_SECTIONS.includes(p[0]) ? assetRowPath(p) : null;
+    const at = row && p.length > row.length ? row : [];
+    const shape = at.length ? ASSET_ROWS[at[0]] : dials;
+    const out = [];
+    for (const q of pairGroups(shape, defaultsFor(shape)).get(d.law) || []) {
+      const full = at.concat(q);
+      if (full.join('.') === p.join('.')) continue;
+      // A sparse row's silent half has no shipped value to travel: the row's
+      // own absence IS the default, and the default half always holds.
+      if (!hasLeaf(SHIPPED, full)) continue;
+      out.push([full.join('.'), getLeaf(SHIPPED, full)]);
+    }
     return out;
   }
 
@@ -1087,6 +1965,22 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
       const shipped = getLeaf(SHIPPED, p);
       if (!same(shipped, getLeaf(T, p))) entries.push([p, shipped]);
     }
+    // A PAIR GOES BACK TOGETHER (the D4 review, 2026-09-03). A scope that
+    // names one leaf of a pair group widens to the whole group — the same
+    // widening `checkLawPairs` does at birth, and for the same reason it gives
+    // there: "the pair the code ships holds by construction, so putting both
+    // back is always a legal state". Without it a `reset` of half a pair is
+    // judged against the half the session had typed and refused, so the shipped
+    // value was unreachable from the one verb whose whole job is reaching it.
+    // Scopes that already carry both halves (`'cards'`, `'all'`) add nothing.
+    for (const [p] of entries.slice()) {
+      for (const [mate, shipped] of lawMates(p)) {
+        const mp = toPath(mate);
+        if (entries.some(([q]) => q.join('.') === mate)) continue;
+        if (same(shipped, getLeaf(T, mp))) continue;
+        entries.push([mp, shipped]);
+      }
+    }
     const r = apply(entries, { filmLocked: false });
     for (const s of rowsMoved) rowFire(s);
     return rowsMoved.size ? { ...r, diff: diff() } : r;
@@ -1105,15 +1999,25 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
   // Download-and-apply job until the route learns to carry one (phase 3).
   function exportChanges() {
     const out = {};
-    const gone = new Set();
+    const gone = [];
     for (const d of diff()) {
       const p = toPath(d.path);
-      if (d.live === undefined && p.length > 2 && ASSET_SECTIONS.includes(p[0])) {
-        const row = `${p[0]}.${p[1]}`;
-        if (!gone.has(row)) { gone.add(row); out[row] = undefined; }
+      const row = d.live === undefined ? assetRowPath(p) : null;
+      if (row) {
+        const key = row.join('.');
+        if (!gone.includes(key)) gone.push(key);
         continue;
       }
       out[d.path] = d.live;
+    }
+    // ONLY THE SHALLOWEST ROW OF A REMOVAL. A house that left took its sets
+    // with it, so its leaves name two removed rows at once — the house and
+    // each set inside it. Asking patchYaml for both would ask it to take out
+    // lines the first change already took out, at line numbers that no longer
+    // mean what they meant. The house is the removal; the sets went with it.
+    for (const key of gone) {
+      if (gone.some((o) => o !== key && key.startsWith(`${o}.`))) continue;
+      out[key] = undefined;
     }
     return out;
   }
@@ -1146,8 +2050,8 @@ export function createTune({ declared, dials = DIALS, source = '', onRefuse = nu
   function sections() { return Object.keys(SHIPPED).filter((k) => !ASSET_SECTIONS.includes(k)); }
 
   return {
-    SHIPPED, T, refusals, dialAt, get, set, diff, reset, bind, binderFor,
+    SHIPPED, T, refusals, dialAt, get, set, diff, reset, bind, binderFor, watch,
     changes, exportYaml, patchText, applyPatchText, sections,
-    addRow, removeRow, rowsOf, rowIsDeclared,
+    addRow, removeRow, rowsOf, rowIsDeclared, lawMates,
   };
 }

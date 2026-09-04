@@ -61,6 +61,30 @@ limitations under the License.
 // editing is a choice, like the visible section, and every value in the form
 // is asked of `list()` on the repaint beat.
 //
+// `sets` (optional, phase D2): the SECOND asset editor — `{ fields, list,
+// recipe, clone, set, remove, apply, bench }`. Given one, the panel grows a
+// `sets` section: a house picker, a set picker, and the whole dice RECIPE as
+// knobs (ninety of them, in the file's own grouping), with Clone / Throw one
+// of each / Use at table / Remove. Three differences from `felts`, each with
+// a reason:
+//   · every row is EDITABLE, because since phase D1 every recipe lives in
+//     dice.yaml — there is no "shipped in code" row here to lock. What Clone
+//     is for is keeping the shipped one intact while you try something;
+//   · the form is nested and SPARSE — a field the row does not carry is drawn
+//     at its dial's default wearing the `default` mark, because that is what
+//     the die is already doing (js/tune.js RECIPE says where each default
+//     came from);
+//   · the film lock holds only TWO verbs (Throw, Use at table) and one field
+//     (`faces`), not the whole section, because a recipe is per-viewer
+//     playback while a felt is room state. The panel does not decide that —
+//     `tune.set` refuses `faces` on its own, and the api answers null for the
+//     two verbs — it only draws it.
+// …and one gate that is nobody's lock: **Use at table** also waits on the
+// FILE. A row's `inFile` says whether dice.yaml declares it, the server
+// resolves a rolled set out of dice.yaml, so wearing a row that is only in
+// this session's tree 400s every roll (the D2 review, 2026-09-03). The button
+// is drawn disabled with `REASON.unsaved` on it until a Save lands.
+//
 // `info` (optional): `{ declared, venue, venueLight }` — `declared` is the
 // tree the file names (a leaf absent from it wears the faint "default"
 // mark); `venue` is the id of a venue holding the light, or null (light rows
@@ -72,10 +96,10 @@ limitations under the License.
 
 import {
   el, button, segmented, section, subhead,
-  rowRange, rowStepper, rowColor, rowEnum, rowText, rowStatic,
+  rowRange, rowStepper, rowColor, rowEnum, rowSelect, rowText, rowStatic,
   find, diffList, status, stopKeys, fmtNum,
 } from './devui.js';
-import { ASSET_SECTIONS, STATIC_PATHS } from './tune.js';
+import { assetRowPath, STATIC_PATHS } from './tune.js';
 
 export const DEV_PANEL_ID = 'dev-panel';
 // Drawn, never written (DEVMODE §4). The list is tune.js's, not a copy: the
@@ -84,7 +108,16 @@ export const DEV_PANEL_ID = 'dev-panel';
 // the panel's own copy drew app.mode static while its Paste box wrote it).
 export const READ_ONLY_PATHS = STATIC_PATHS;
 export const DEV_GLYPH_ID = 'dev-glyph';
-export const DEV_NARROW_QUERY = '(max-width: 639px)';
+// THE PHONE (docs/DEVMODE.md §7, phase D5). One query, read in two places
+// that have to agree: css/dev.css turns the right-edge column into a bottom
+// sheet on it, and `mount` reads it for the two things a stylesheet cannot do
+// — start the panel FOLDED (the first thing a phone shows is the table) and
+// draw every range row as a STEPPER, because a slider thumb is not a target a
+// fingertip can hit a value on. A coarse pointer counts however wide the
+// window is: a touchscreen at 1200px has the same fingers.
+export const DEV_PHONE_QUERY = '(max-width: 639px), (pointer: coarse)';
+// The name phase 1 gave it, kept because the panel's contract published it.
+export const DEV_NARROW_QUERY = DEV_PHONE_QUERY;
 export const STATUS_MS = 3000;
 export const CAST_MAX = 8;
 export const CAST_POOL = '3d6';
@@ -127,22 +160,49 @@ const REASON = {
   film: 'film values are shared — a second viewer is here',
   type: 'wrong type',
   option: 'not one of the options',
+  // A LIST DIAL'S LENGTH (js/tune.js `list`): six faces, one or two decal
+  // colours. Not a slider's range — a list has no slider.
+  range: 'not as many entries as that list takes',
   binder: 'the re-apply hook threw — value put back (see console)',
   // …and the three an ASSET row can be refused for (js/tune.js addRow).
   shipped: 'that row lives in the code, not the file — Clone it to author one',
   id: 'not a legal id: lower-case letters, digits, "-" and "_", no dot',
-  section: 'this build cannot declare rows in that section yet',
+  // Re-worded in the D1 review: it used to say "this build cannot declare
+  // rows in that section yet", a state that ended when the catalogue landed
+  // (every named section has a row shape now). What is left is a path that
+  // does not name a collection of rows at all.
+  section: 'that path is not a collection of rows',
   // A row lands or leaves WHOLE (js/tune.js): one field of a row that is not
   // there cannot put it back, and one field of a row this session minted has
   // no shipped value to go back to.
   row: 'that row is not there — revert it whole, or Reset all',
+  // …and the two the SETS editor adds (js/main.js devSetApply, devSetClone).
+  // `unsaved` is the one that matters: a dice set rides every roll to the
+  // server, which resolves it out of dice.yaml, so wearing a row the file does
+  // not have yet 400s the roll button with nothing on screen to say why.
+  unsaved: 'Save the row first — the server only accepts a set dice.yaml declares',
+  taken: 'a row of that id is already here — Remove it, or clone under another name',
+  // …and the three phase D4 added. The first two are LAWS (js/tune.js LAWS):
+  // a check no slider range can make, refused at the typed number.
+  'range-law': 'must be greater than zero — the code divides by it',
+  geometry: 'a card must stand outboard of the rim: standoff − depth/2 may not go below 0',
+  // A preset of nothing is not a preset: `changes()` speaks in leaves, so an
+  // empty row is one Save could never write down.
+  empty: 'nothing is changed — turn a dial first',
+  // …and the one the POP-OUT refuses for itself (the D5 review, 2026-09-03).
+  // Every other reason here is the table's; this one is the absence of a
+  // table. dev.html's mirror stops writing the moment the link goes stale, so
+  // a row cannot go on showing a value nobody is holding.
+  gone: 'no table tab — open the door there with `',
 };
 
-// Is this dotted path a FIELD of an asset row (`felts.house-moss.name`)? The
-// row, not the field, is the unit a reset moves.
+// Is this dotted path a FIELD of an asset row (`felts.house-moss.name`, or
+// `houses.gildhall.dice.oxblood.geo.bevel` since the catalogue arrived)? The
+// row, not the field, is the unit a reset moves. js/tune.js owns the walk —
+// two segments is no longer the answer, because a dice set is four.
 const assetRowOf = (dotted) => {
-  const p = String(dotted).split('.');
-  return p.length > 2 && ASSET_SECTIONS.includes(p[0]) ? `${p[0]}.${p[1]}` : null;
+  const p = assetRowPath(String(dotted).split('.'));
+  return p && String(dotted).split('.').length > p.length ? p.join('.') : null;
 };
 
 // HOW LONG A DRAGGED FELT FIELD WAITS BEFORE IT REPAINTS THE CLOTH. A felt
@@ -152,9 +212,187 @@ const assetRowOf = (dotted) => {
 // commit (mouse-up, Enter, a colour picked) never waits.
 export const FELT_LIVE_MS = 140;
 
+// ---------------------------------------------------------------------------
+// THE RECORDER'S EMITTER (docs/DEVMODE.md §8, phase D5)
+// ---------------------------------------------------------------------------
+//
+// WHY A STEP AND NOT A SAVE. Everything else developer mode writes down is a
+// VALUE — a leaf in dice.yaml, a row under `felts:` — and the armed route
+// (§6) puts values in the checkout. A recorded session is not a value; it is
+// a SCRIPT, and a script is code. So this never goes near the write route:
+// `emitStep` returns text, the panel hands it to the browser's own download,
+// and a person reads it before it becomes a file in `tools/steps/`. The route
+// writes one file and validates every byte of it against the dial tree
+// (server.js DEV_WRITE_ON); nothing about it could ever be widened to "and
+// also arbitrary JavaScript" without giving away exactly what makes it safe.
+//
+// WHAT IT EMITS IS A SKELETON, and it says so in its own head: the ops in
+// order, a `stage.shot` after each, and a settle wait after every throw. What
+// it CANNOT know is what the shots are for — which frames matter, what to
+// assert, which origin, how many chairs — so it leaves the loop shaped and
+// the judgement to the person. `tools/steps/dev-look.mjs` is the hand-written
+// article this is a first draft of.
+//
+// The ops are js/main.js's (`devRecord`): `{op:'set', patch}` from the tune's
+// own watcher, `{op:'deal', n}` and `{op:'sit', k}` from the cast, and
+// `{op:'throw', seed, notation}` from the bench — the seed included, always,
+// because a throw without its seed is a step that films something else every
+// time it runs.
+//
+// AND TWO MORE SINCE THE D5 REVIEW (2026-09-03), because a sets-editing
+// session emitted a step that replayed none of it:
+//   · `{op:'row', verb:'add'|'remove', where, id, row}` — a CLONE, written
+//     down whole. `tuneSet` refuses a field of a row that is not there ('row'
+//     — js/tune.js: the row is the unit), so a reel that recorded eighty
+//     recipe edits and not the clone they were edits OF was a reel with
+//     nothing replayable in it. `devRowAdd` / `devRowRemove` (js/main.js) are
+//     the door it replays through;
+//   · `{op:'note', text}` — the one thing the reel knows that the emitted code
+//     cannot say for itself: a field it could not carry, and why. It takes no
+//     act number and no frame, because it is not something the step DOES, and
+//     a reel of nothing but notes still emits them rather than the "nothing
+//     was recorded" skeleton — the notes ARE the answer to "why is this
+//     empty?".
+
+// A file stem a shell and a filesystem both take, from whatever was typed.
+export function stepName(name) {
+  const s = String(name ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return s.slice(0, 48) || 'recorded-step';
+}
+
+// A JS string literal that reads: single quotes while the content allows it
+// (a step is read by a person), JSON's own escaping when it does not.
+const jsStr = (s) => (/^[^'\\\n\r]*$/.test(String(s)) ? `'${s}'` : JSON.stringify(String(s)));
+
+const APACHE = `/*
+Copyright 2026 The Dice Table Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/`;
+
+export function emitStep(name, ops = []) {
+  const stem = stepName(name);
+  const list = Array.isArray(ops) ? ops : [];
+  const out = [];
+  // ACTS, NOT REEL POSITIONS (the D5 review, 2026-09-03). The number in the
+  // comment and the number in the frame's filename are now the SAME number, so
+  // `// 3 · light.lamp.y` is the act whose shot is `03-set-3.png`. They were
+  // the op's position in the reel, which counts the ops that take no frame —
+  // one note in front of one dial and the file's only act was labelled 2 over
+  // a shot named 01.
+  let acts = 0;
+  let notes = 0;
+  const shot = (label) => { out.push(`  await shot(${jsStr(label)});`); };
+  // An act is a thing the step DOES: it gets the next number and a frame.
+  const act = (title) => { acts++; out.push('', `  // ${acts} · ${title}`); return acts; };
+  for (const raw of list) {
+    const op = raw || {};
+    if (op.op === 'set') {
+      const patch = op.patch && typeof op.patch === 'object' ? op.patch : {};
+      const paths = Object.keys(patch);
+      if (!paths.length) continue;
+      const n = act(paths.length === 1 ? paths[0] : `${paths.length} dials`);
+      out.push(`  await t.dbg(${jsStr(`tuneSet(${JSON.stringify(patch)})`)});`);
+      shot(`set-${n}`);
+    } else if (op.op === 'row') {
+      // A ROW LANDS OR LEAVES WHOLE, and so does the line that replays it: the
+      // recipe is written into the step as the tree held it at that moment,
+      // rather than as `devSetClone('classics.ivory', …)`, so a step run next
+      // week rebuilds the row that was dialled and not whatever the set it was
+      // copied from has become since.
+      const where = String(op.where || '');
+      const id = String(op.id || '');
+      if (!where || !id) continue;
+      if (op.verb === 'remove') {
+        const n = act(`${where}.${id} removed`);
+        out.push(`  await t.dbg(${jsStr(`devRowRemove(${JSON.stringify(where)}, ${JSON.stringify(id)})`)});`);
+        shot(`row-${n}`);
+      } else {
+        const row = op.row && typeof op.row === 'object' && !Array.isArray(op.row) ? op.row : {};
+        const n = act(`${where}.${id}`);
+        out.push(`  await t.dbg(${jsStr(`devRowAdd(${JSON.stringify(where)}, ${JSON.stringify(id)}, ${JSON.stringify(row)})`)});`);
+        shot(`row-${n}`);
+      }
+    } else if (op.op === 'note') {
+      // NO NUMBER AND NO FRAME. A note is not an act — it is what the reel
+      // could not carry, said in the file rather than lost between windows.
+      const text = String(op.text ?? '').replace(/\s*[\r\n]+\s*/g, ' ').trim();
+      if (!text) continue;
+      notes++;
+      out.push('', `  // note · ${text}`);
+    } else if (op.op === 'deal') {
+      const n = act('the cast');
+      out.push(`  await t.dbg('demoDeal(${Number(op.n) || 0})');`);
+      out.push('  await t.waitFor(\'window.__diceDebug.places().built === window.__diceDebug.places().queued\','
+        + " { desc: 'the cards stood' });");
+      shot(`deal-${n}`);
+    } else if (op.op === 'sit') {
+      const n = act('the chair');
+      out.push(`  await t.dbg('demoSit(${Number(op.k) || 0})');`);
+      shot(`sit-${n}`);
+    } else if (op.op === 'throw') {
+      const seed = Number.isFinite(Number(op.seed)) ? Number(op.seed) >>> 0 : 0;
+      const notation = typeof op.notation === 'string' && op.notation ? op.notation : '3d6';
+      const n = act(`${notation} on seed ${seed}`);
+      out.push(`  await t.dbg(${jsStr(`devBench(${seed}, ${JSON.stringify(notation)})`)});`);
+      out.push('  await settled();');
+      shot(`throw-${n}`);
+    }
+  }
+  // A REEL OF NOTES IS NOT AN EMPTY REEL, and telling the two apart is the
+  // difference between "you forgot to press Record" and "here is what this
+  // session did that a step cannot replay". Both still take one frame, so the
+  // emitted file is a step either way.
+  if (!acts) {
+    out.push('', notes
+      ? '  // Nothing here could be replayed — the notes above say what was recorded and why it could not be.'
+      : '  // Nothing was recorded — dial something, then Download step again.');
+    shot('empty');
+  }
+  return `${APACHE}
+
+// RECORDED BY DEVELOPER MODE — ${stem}. A SKELETON, not a finished step: it
+// replays what was dialled, in the order it was dialled, and takes a shot
+// after each act. What it cannot know is what the shots are FOR — so name the
+// frames, drop the ones that say nothing, and put the claim in a comment
+// before this file is worth keeping. tools/steps/dev-look.mjs is the article.
+//
+//   node tools/drive.mjs tools/steps/${stem}.mjs [outDir]
+import { mkdirSync } from 'node:fs';
+
+export default async function run(stage, [outDir = ${jsStr(`tools/shots/${stem}`)}]) {
+  mkdirSync(\`tools/out/\${outDir}\`, { recursive: true });
+  const t = await stage.ctx.devTab({ origin: '127.0.0.99', players: 0 });
+  let frame = 0;
+  const shot = async (label) => {
+    await new Promise((r) => setTimeout(r, 400));
+    frame += 1;
+    const file = \`\${outDir}/\${String(frame).padStart(2, '0')}-\${label}.png\`;
+    await stage.shot(t, file);
+    console.log(\`shot \${file}\`);
+  };
+  const settled = async () => {
+    await t.waitFor('!window.__diceDebug.busy', { desc: 'the film landed', timeout: 30000 });
+  };
+${out.join('\n')}
+}
+`;
+}
+
 export function mount({
   host = document.body, tune, dials = null, mode = 'development', film = 'live',
-  cast = null, bench = null, felts = null, verbs = {}, onFold = null, onShut = null, info = null,
+  cast = null, bench = null, felts = null, sets = null, presets = null, record = null,
+  verbs = {}, onFold = null, onShut = null, info = null, phone: phoneDress = 'auto',
 } = {}) {
   if (mode === 'production') throw new Error('developer mode is off in production');
   if (!tune || !tune.SHIPPED || typeof tune.set !== 'function') throw new Error('mount needs a Tune');
@@ -164,6 +402,26 @@ export function mount({
   const readLeaf = (path) => (typeof tune.get === 'function' ? tune.get(dotted(path)) : leafIn(tune.T, path).value);
 
   // ---- state that is not a value ------------------------------------------
+  //
+  // THE PHONE IS READ ONCE, AT MOUNT (phase D5), and that is deliberate: the
+  // rows are BUILT here, so a control kind is not a value the repaint beat can
+  // change its mind about. The sheet's layout follows the query live (it is
+  // css/dev.css's), which is the half a rotated phone or a dragged window
+  // actually needs; the stepper-instead-of-slider is the half that would cost
+  // a rebuild, and a panel rebuilt under a moving window would drop the find
+  // filter, the section, the seed box and the paste box with it.
+  //
+  // `phone` the OPTION is `'auto'` (ask the query) or `'never'` (this mount is
+  // not an overlay over a felt, so the sheet's whole reason is absent). The
+  // pop-out passes `'never'` — the D5 review found it opening at 420px, which
+  // is inside the query, so a second-monitor panel arrived in the phone dress:
+  // every slider a stepper, and the `file` section — the diff, Save, the paste
+  // box, the reason the window exists — scrolled off the right edge of a bar
+  // with no visible affordance. dev.html says the same thing about the overlay
+  // dress in its own head; this is the half of it a stylesheet cannot do.
+  const phone = phoneDress !== 'never'
+    && typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && !!window.matchMedia(DEV_PHONE_QUERY).matches;
   let filmLocked = film === 'locked';
   let filmReason = filmLocked ? REASON.film : '';
   let folded = false;
@@ -177,6 +435,14 @@ export function mount({
   // repaint beat. Absent (null) is a legal panel: the devshell mounts one.
   let benchApi = bench || null;
   const feltsApi = felts || null;
+  const setsApi = sets || null;
+  const presetsApi = presets || null;
+  // THE RECORDER (phase D5) — `{ state, start, stop, ops, save }`. Given one,
+  // the file section grows a record group; given none, the section is exactly
+  // the one phase 1 shipped. The panel holds no recorder state either: the
+  // NAME box is its own (a place a person types, like the seed and the paste
+  // boxes) and everything else is asked of the api on the repaint beat.
+  const recordApi = record || null;
   // Reload-class paths a PANEL write found covered by a binder (the tune
   // reported the change without listing it pending). Only consulted when the
   // tune has no `binderFor`; with one, coverage is asked of the tune itself.
@@ -188,6 +454,7 @@ export function mount({
   const FOOTER_KEYS = ['viewport', 'dpr', 'fps', 'calls', 'tris', 'bodies', 'settle'];
   let statusTimer = null;
   let diffSig = '';
+  let changedCount = 0;            // the whole diff, asset rows included — see paintFooter
 
   // ---- rows ---------------------------------------------------------------
   // path → { row, path, dotted, section, dial, cls, read, kind, last, sub }
@@ -275,6 +542,25 @@ export function mount({
       }
       patch[p] = d.shipped;
     }
+    // A PAIR GOES BACK TOGETHER (the D4 review, 2026-09-03). `cards.standoff`
+    // and `cards.depth` are two dials and one geometry, and `tune.set` judges
+    // that law against what the PATCH proposes — so a ↺ on one card row, or a
+    // section reset that caught only one of them, was refused 'geometry' by
+    // the half still standing and the shipped value was unreachable from the
+    // panel. The mate travels at its SHIPPED value (`tune.lawMates`); the pair
+    // the file ships holds by construction. A mate already AT its shipped
+    // value stays out of the patch — the law reads it from the tree and finds
+    // the same number, and a no-op write would only be one more line for the
+    // film lock to refuse.
+    for (const p of Object.keys(patch)) {
+      for (const [mate, shipped] of (tune.lawMates ? tune.lawMates(p) : [])) {
+        if (mate in patch || READ_ONLY_PATHS.includes(mate)) continue;
+        let live;
+        try { live = tune.get(mate); } catch { continue; }
+        if (stringOf(live) === stringOf(shipped)) continue;
+        patch[mate] = shipped;
+      }
+    }
     for (const rowScope of rowScopes) {
       try { tune.reset(rowScope); } catch (e) { showStatus(e.message, 'error'); }
     }
@@ -307,10 +593,23 @@ export function mount({
     if (READ_ONLY_PATHS.includes(dotted(path))) return 'static';
     if (dial && Array.isArray(dial.options)) return 'enum';
     if (typeof value === 'string' && value.startsWith('#')) return 'color';
-    if (typeof value === 'number' && dial && Array.isArray(dial.range) && dial.read !== 'reload') return 'range';
+    // A SLIDER IS A MOUSE CONTROL. On the sheet every range row is a stepper
+    // instead: ± the dial's own step, with the typeable number between them —
+    // the same commit path, a target a fingertip can hit, and no drag that the
+    // page would rather read as a scroll.
+    if (typeof value === 'number' && dial && Array.isArray(dial.range) && dial.read !== 'reload') {
+      return phone ? 'stepper' : 'range';
+    }
     if (typeof value === 'number' && dial && dial.read === 'reload') return 'stepper';
     return 'text';
   };
+
+  // The same choice for the asset editors' forms, whose rows are built from a
+  // row SHAPE rather than from the dial tree. `live` is the drag callback a
+  // slider fires per frame; a stepper has no drag, so it commits once.
+  const numRow = ({ label, value, range, live, commit, why }) => (phone
+    ? rowStepper({ label, value, range, onCommit: commit, why })
+    : rowRange({ label, value, range, onInput: live || commit, onCommit: commit, why }));
 
   // A dial label that repeats its parent map's key ('lamp penumbra' under the
   // `lamp` subhead) drops that word: the column is narrow, and the repeated
@@ -379,7 +678,9 @@ export function mount({
 
   const sectionNames = [...tune.sections()];
   const barNames = () => [...sectionNames, ...(castApi ? ['cast'] : []),
-    ...(feltsApi ? ['felts'] : []), ...(benchApi ? ['clock', 'ab'] : []), 'file'];
+    ...(feltsApi ? ['felts'] : []), ...(setsApi ? ['sets'] : []),
+    ...(presetsApi ? ['presets'] : []),
+    ...(benchApi ? ['clock', 'ab'] : []), 'file'];
   let bar = null;
   const barSlot = el('div', { class: 'dev-barslot' });
   const rebuildBar = () => {
@@ -662,7 +963,10 @@ export function mount({
       if (Array.isArray(dial.options)) row = rowEnum({ label: dial.label, value: dial.def, options: dial.options, onCommit: now, why });
       else if (typeof dial.def === 'string' && dial.def.startsWith('#')) row = rowColor({ label: dial.label, value: dial.def, onCommit: now, why });
       else if (typeof dial.def === 'number' && Array.isArray(dial.range)) {
-        row = rowRange({ label: dial.label, value: dial.def, range: dial.range, onInput: (v) => writeField(key, v, true), onCommit: now, why });
+        row = numRow({
+          label: dial.label, value: dial.def, range: dial.range,
+          live: (v) => writeField(key, v, true), commit: now, why,
+        });
       } else row = rowText({ label: dial.label, value: dial.def, onCommit: now, why });
       row.root.dataset.path = `felts.${key}`;
       fieldRows.push({ key, row });
@@ -772,6 +1076,477 @@ export function mount({
     body.append(sec.root);
   };
 
+  // ---- sets: the dice catalogue, on the live felt ---------------------------
+  //
+  // THE FELTS SECTION AT DEPTH. A felt row is six flat fields; a dice recipe is
+  // eighty-five, in twenty-one nested groups, and SPARSE — most sets name a
+  // handful and REFUSE the rest, because "restraint is also identity"
+  // (js/themes.js). So the form is built once from the recipe SHAPE
+  // (`fields()` — the same dials js/tune.js judges a write against), nested
+  // maps become subheads in the file's own order, and a field the row does not
+  // carry is drawn at its dial's default wearing the faint `default` mark:
+  // what the panel shows for an empty field is what the die is already doing.
+  //
+  // TWO ROW KINDS THE DIAL TREE NEVER NEEDED, both of them LIST dials. One
+  // with a vocabulary (`faces`) becomes one `rowSelect` per entry — twelve
+  // states will not fit a segmented row — and the six are drawn ONLY while
+  // `glyph` is `faces`, because that is the only state in which dice.js reads
+  // the table. One with no vocabulary (a particle or decal palette) becomes a
+  // single text field of comma-separated colours: there is no fixed set of
+  // legal colours to offer, the length is 1..8, and eight colour wells for a
+  // field most sets do not have would be the loudest thing in the section.
+  let setsRec = null;
+  const buildSets = () => {
+    if (!setsApi) return;
+    const sec = section('sets', { count: 0, onReset: null, open: true });
+    const fields = (typeof setsApi.fields === 'function' && setsApi.fields()) || {};
+
+    // WHICH SET THE FORM EDITS is a choice, not a value — see `sync` for the
+    // three-clause rule and why the felts section's one clause is not enough
+    // here.
+    let pickId = null;
+    let touched = false;
+    let housePickSig = '';
+    let setPickSig = '';
+    let cache = [];
+
+    const rowById = (id) => cache.find((s) => s.id === id) || null;
+    const houseOf = (id) => (rowById(id) || {}).house || null;
+
+    const housePick = el('select', { class: 'tin dev-housepick', 'aria-label': 'house' });
+    const setPick = el('select', { class: 'tin dev-setpick', 'aria-label': 'dice set' });
+    const pickRow = (ctl, name, title, path) => el('div', { class: 'dev-row is-cast', dataset: { path } }, [
+      el('span', { class: 'dev-row-label', title }, [el('span', { class: 'dev-row-name', text: name })]),
+      el('div', { class: 'dev-row-ctl' }, [ctl]),
+    ]);
+    const houseRow = pickRow(housePick, 'house',
+      'sets.house — the browsing categories `houses:` in dice.yaml declares. Clone copies a set into `house`, which is the one this editor authors into',
+      'sets.house');
+    const setRow = pickRow(setPick, 'set',
+      'sets.set — every set in the house, shipped and authored alike. A recipe lives in dice.yaml now, so every one of them is editable; what Clone is for is keeping the shipped one intact while you try something',
+      'sets.set');
+    housePick.addEventListener('change', () => {
+      const first = cache.find((s) => s.house === housePick.value);
+      if (first) { pickId = first.id; touched = true; }
+      panel.repaint();
+    });
+    setPick.addEventListener('change', () => { pickId = setPick.value || null; touched = true; panel.repaint(); });
+
+    const report = (r, verb) => {
+      if (!r) {
+        showStatus(`${verb}: refused${filmLocked ? ` — ${filmReason || REASON.film}` : ''}`, 'warn');
+        return false;
+      }
+      for (const [p, why] of r.refused || []) showStatus(`${p}: ${REASON[why] || why}`, 'warn');
+      return true;
+    };
+
+    // A dragged slider writes LIVE — the value lands in the tree at once, so
+    // the diff and the readout are honest — and lets js/main.js's own 140 ms
+    // timer decide when to rebake the die. A commit (mouse-up, Enter, a colour
+    // picked, an enum) writes without the live flag, which flushes that timer
+    // and repaints the felt now.
+    const writeField = (sub, v, live) => {
+      if (!pickId) return;
+      report(setsApi.set(pickId, { [sub]: v }, !!live), 'sets');
+      if (!live) panel.repaint();
+    };
+
+    // THE REVERT GLYPH ON A ROW WHOSE PATH MOVES. Every dial row's ↺ is bound
+    // once to its own fixed path; a field here belongs to whichever set the
+    // picker names, so the binding is to the FIELD and the row is asked for at
+    // the click. `resetScope` then applies the law js/tune.js states: a leaf
+    // of a declared row goes back to the file's value, and a leaf of a row
+    // this session minted takes the whole row with it, because a row lands and
+    // leaves whole.
+    const revertField = (sub) => {
+      const at = rowById(pickId);
+      if (at) resetScope(`houses.${at.house}.dice.${at.set}.${sub}`);
+    };
+
+    const fieldRows = [];      // { sub, dial, row, group, last }
+    const groups = [];         // { el, rows }  — a subhead and what hides with it
+    const facesGroup = [];     // the six entry rows, hidden unless glyph is `faces`
+
+    const dialAtShape = (d) => (isMap(d) && 'def' in d && 'cls' in d ? d : null);
+
+    // `row` is null for the ONE field that has no control of its own: the
+    // `faces` table is drawn as the six enums above, and this record is what
+    // they read the current array out of and write the new one back into.
+    const addFieldRow = (sub, dial, row, group) => {
+      if (row) row.root.dataset.path = `sets.${sub}`;
+      const rec = { sub, dial, row, group, last: null, lastValue: '', lastState: '' };
+      fieldRows.push(rec);
+      if (row && group) group.rows.push(rec);
+      return rec;
+    };
+
+    const buildShape = (shape, prefix, container, group) => {
+      for (const [key, d] of Object.entries(shape)) {
+        const dial = dialAtShape(d);
+        const sub = prefix ? `${prefix}.${key}` : key;
+        if (dial) {
+          const why = `houses.<house>.dice.<set>.${sub}${dial.why ? ` — ${dial.why}` : ''}`;
+          const now = (v) => writeField(sub, v, false);
+          if (Array.isArray(dial.def) && Array.isArray(dial.each)) {
+            // `faces`: one picker per VALUE, so the row reads "the 1 face
+            // paints a bolt" rather than asking somebody to type a six-entry
+            // list into a text field and get the commas right.
+            for (let i = 0; i < dial.def.length; i++) {
+              const r = rowSelect({
+                label: `${i + 1} →`, value: dial.def[i], options: dial.each,
+                onCommit: (v) => {
+                  const cur = fieldRows.find((f) => f.sub === sub);
+                  const next = Array.isArray(cur && cur.last) ? cur.last.slice() : dial.def.slice();
+                  next[i] = v;
+                  writeField(sub, next, false);
+                },
+                why: `${why} — the face this VALUE paints`,
+              });
+              r.root.dataset.path = `sets.${sub}.${i}`;
+              r.setState({ onRevert: () => revertField(sub) });
+              facesGroup.push({ row: r, index: i, sub });
+              container.append(r.root);
+            }
+            addFieldRow(sub, dial, null, group).faces = true;
+            continue;
+          }
+          let row;
+          if (Array.isArray(dial.def)) {
+            row = rowText({
+              label: dial.label, value: dial.def.join(', '),
+              onCommit: (v) => now(String(v).split(',').map((s) => s.trim()).filter(Boolean)),
+              why: `${why} — comma-separated`,
+            });
+          } else if (Array.isArray(dial.options)) {
+            row = rowEnum({ label: dial.label, value: dial.def, options: dial.options, onCommit: now, why });
+          } else if (typeof dial.def === 'string' && dial.def.startsWith('#')) {
+            row = rowColor({ label: dial.label, value: dial.def, onCommit: now, why });
+          } else if (typeof dial.def === 'number' && Array.isArray(dial.range)) {
+            row = numRow({
+              label: dial.label, value: dial.def, range: dial.range,
+              live: (v) => writeField(sub, v, true), commit: now, why,
+            });
+          } else row = rowText({ label: dial.label, value: dial.def, onCommit: now, why });
+          row.setState({ onRevert: () => revertField(sub) });
+          addFieldRow(sub, dial, row, group);
+          container.append(row.root);
+        } else if (isMap(d) && !('rows' in d)) {
+          const h = subhead(sub.split('.').join(' · '));
+          const g = { el: h, rows: [] };
+          groups.push(g);
+          container.append(h);
+          buildShape(d, sub, container, g);
+        }
+      }
+    };
+
+    const cloneBtn = button('Clone', () => {
+      const r = setsApi.clone(pickId);
+      if (!report(r, 'clone')) return;
+      if (r.id) {
+        pickId = r.id;
+        touched = true;          // Clone just made this row; it is the choice
+        showStatus(`cloned ${r.id} — edit it, throw it, then Save writes the row into dice.yaml`, 'info');
+      }
+      panel.repaint();
+    }, { kind: 'primary', title: 'copy this set into the `house` house, where you can take it apart without moving the shipped one' });
+
+    const benchBtn = button('Throw one of each', () => {
+      const r = setsApi.bench(pickId);
+      if (!report(r, 'throw')) return;
+      showStatus(`bench ${r.notation} · seed ${r.seed} · ${pickId}`, 'info');
+      panel.repaint();
+    }, { title: 'a seeded bench throw of d4 d6 d8 d10 d12 d20 wearing this set — local, labelled bench, values from the seed' });
+
+    // USE AT TABLE HAS TWO GATES, and the second one is the file's. A set
+    // rides every roll to the server, which resolves it out of dice.yaml — so
+    // wearing a row that is only in this session's tree turns the roll button
+    // into a silent 400 (`unknown_set`, a page banner, an empty console). The
+    // verb refuses it by name; this draws the button disabled with the same
+    // sentence, so nobody has to click to find out. Save is what lifts it.
+    const applyBtn = button('Use at table', () => {
+      const id = pickId;
+      const r = setsApi.apply(id);
+      if (!report(r, 'use')) return;
+      if (r.refused && r.refused.length) { panel.repaint(); return; }
+      showStatus(`you are rolling in ${id}`, 'info');
+      panel.repaint();
+    }, { title: 'wear this set — it rides every roll you throw, so a set only this checkout declares is refused while anybody else is here' });
+
+    const removeBtn = button('Remove', () => {
+      const id = pickId;
+      if (!report(setsApi.remove(id), 'remove')) return;
+      pickId = null;
+      showStatus(`removed ${id}`, 'info');
+      panel.repaint();
+    }, { kind: 'danger', title: 'drop a row this editor made (Download carries the removal; the Save route does not — DEVMODE §9)' });
+
+    const note = el('div', { class: 'dev-clockout' });
+    sec.body.append(houseRow, setRow, el('div', { class: 'dev-verbs' }, [cloneBtn]));
+    buildShape(fields, '', sec.body, null);
+    sec.body.append(el('div', { class: 'dev-verbs' }, [benchBtn, applyBtn, removeBtn]), note);
+
+    const rec = {
+      sec,
+      rows: [
+        ...fieldRows.filter((f) => f.row).map((f) => ({ row: f.row, dotted: `sets.${f.sub}`, section: 'sets' })),
+        ...facesGroup.map((f) => ({ row: f.row, dotted: `sets.${f.sub}.${f.index}`, section: 'sets' })),
+      ],
+      subs: groups, kind: 'sets', name: 'sets',
+      sync() {
+        try { cache = setsApi.list() || []; } catch { cache = []; }
+        // WHICH SET THE FORM EDITS, while nobody has used the pickers: the row
+        // the editor last touched, then the row the viewer is WEARING, then
+        // the first in the catalogue. The middle clause is the felts
+        // section's whole rule and it is not enough here — a viewer wears
+        // `std` by default and `std` is not a row under `houses:` at all — so
+        // a clone from the console would have left the form on the
+        // catalogue's first set while the felt showed the clone. Once picked
+        // by hand it is the picker's, so a form is never re-pointed out from
+        // under a typist mid-edit.
+        let focus = null;
+        try { focus = (typeof setsApi.focus === 'function' && setsApi.focus()) || null; } catch { focus = null; }
+        const home = (rowById(focus) ? focus : null)
+          || (cache.find((s) => s.current) || cache[0] || {}).id || null;
+        if (!touched || !pickId || !rowById(pickId)) pickId = home;
+
+        const hsig = [...new Set(cache.map((s) => `${s.house}|${s.houseLabel}`))].join('/');
+        if (hsig !== housePickSig) {
+          housePickSig = hsig;
+          const seen = new Set();
+          housePick.replaceChildren(...cache.filter((s) => !seen.has(s.house) && seen.add(s.house))
+            .map((s) => el('option', { value: s.house, text: s.houseLabel || s.house })));
+        }
+        const house = houseOf(pickId);
+        housePick.value = house || '';
+        const mine = cache.filter((s) => s.house === house);
+        const ssig = `${house}::${mine.map((s) => [s.set, s.label, s.inFile ? 'f' : 's'].join('|')).join('/')}`;
+        if (ssig !== setPickSig) {
+          setPickSig = ssig;
+          setPick.replaceChildren(...mine.map((s) => el('option', {
+            value: s.id, text: s.inFile ? s.label : `${s.label} · session`,
+          })));
+        }
+        setPick.value = pickId || '';
+
+        let recipe = null;
+        try { recipe = setsApi.recipe(pickId); } catch { recipe = null; }
+        // Which of THIS row's leaves the file and the tree disagree about, and
+        // how many SET ROWS in all — the same arithmetic the felts section
+        // does, over four-segment rows instead of two.
+        const at = rowById(pickId);
+        const prefix = at ? `houses.${at.house}.dice.${at.set}.` : null;
+        const changedSubs = new Set();
+        const touchedRows = new Set();
+        let dl = [];
+        try { dl = tune.diff() || []; } catch { dl = []; }
+        for (const d of dl) {
+          const p = String(d.path);
+          if (!p.startsWith('houses.')) continue;
+          const row = assetRowPath(p.split('.'));
+          if (row) touchedRows.add(row.join('.'));
+          if (prefix && p.startsWith(prefix)) changedSubs.add(p.slice(prefix.length));
+        }
+        sec.setCount(touchedRows.size);
+
+        for (const f of fieldRows) {
+          const leaf = leafIn(recipe || {}, f.sub.split('.'));
+          const v = leaf.has ? leaf.value : f.dial.def;
+          f.last = v;
+          if (!f.row) continue;                 // `faces`: the six pickers above
+          const s = stringOf(v);
+          if (s !== f.lastValue) { f.lastValue = s; f.row.setValue(Array.isArray(v) ? v.join(', ') : v); }
+          // A recipe field is look-class but for one: `faces` is a READING two
+          // tabs must agree on, so it locks with the film exactly as a film
+          // dial does (js/tune.js RECIPE).
+          const locked = f.dial.cls === 'film' && filmLocked;
+          const state = `${leaf.has ? 1 : 0}${changedSubs.has(f.sub) ? 1 : 0}${locked ? 1 : 0}`;
+          if (state !== f.lastState) {
+            f.lastState = state;
+            f.row.setState({ isDefault: !leaf.has, changed: changedSubs.has(f.sub), locked });
+            f.row.setLockReason(locked ? (filmReason || REASON.film) : '');
+          }
+        }
+        // THE FACE TABLE IS DRAWN ONLY WHERE IT IS READ. dice.js applies a
+        // `faces` table when `glyph` is `faces` and the die is a d6; six enum
+        // pickers over a set that paints digits would be six controls with no
+        // effect on anything. The glyph is asked of the ROW, falling back to
+        // the dial's default, so a set that says nothing about glyphs shows
+        // none of them. This runs after the loop above, because that loop is
+        // what refreshed the array these six read their entries out of.
+        const glyphRec = fieldRows.find((f) => f.sub === 'glyph');
+        const glyph = recipe && recipe.glyph !== undefined ? recipe.glyph
+          : (glyphRec ? glyphRec.dial.def : 'digit');
+        const facesRec = fieldRows.find((f) => f.faces);
+        const facesNow = (facesRec && Array.isArray(facesRec.last) ? facesRec.last : null) || [];
+        for (const f of facesGroup) {
+          // The glyph decides whether these exist at all; WHILE A FILTER IS
+          // RUNNING, `showSections` owns the rest of the answer, so this only
+          // ever force-hides.
+          if (glyph !== 'faces') f.row.root.hidden = true;
+          else if (!filter) f.row.root.hidden = false;
+          if (facesNow[f.index] !== undefined) f.row.setValue(facesNow[f.index]);
+          f.row.setState({ locked: filmLocked, changed: changedSubs.has('faces') });
+          f.row.setLockReason(filmLocked ? (filmReason || REASON.film) : '');
+        }
+
+        const row = at;
+        cloneBtn.disabled = !row;
+        benchBtn.disabled = !row || filmLocked;
+        // `inFile` is the FILE's answer and it moves the moment Save answers
+        // ok (js/main.js devSetInFile), so this button un-greys without a
+        // reload — which is the whole reason the gate is not `declared`.
+        applyBtn.disabled = !row || filmLocked || row.current || !row.inFile;
+        applyBtn.title = row && !row.inFile && !filmLocked
+          ? REASON.unsaved
+          : 'wear this set — it rides every roll you throw, so a set only this checkout declares is refused while anybody else is here';
+        removeBtn.disabled = !row || !row.removable;
+        const authored = cache.filter((s) => s.removable).length;
+        note.textContent = (!row ? 'no sets'
+          : `${row.id} · ${row.inFile ? 'declared in dice.yaml' : 'added this session — Save writes the row, and Use at table waits for it'}`
+            + `${row.current ? ' · you are rolling in it' : ''}`
+            + `${row.removable ? '' : ' · shipped: Remove is for the rows you author'}`)
+          + `\n${cache.length} sets · ${authored} yours`
+          + `${filmLocked ? '\nthe felt is shared: throw and use are held, and so is the face table' : ''}`;
+      },
+    };
+    setsRec = rec;
+    secs.set('sets', rec);
+    body.append(sec.root);
+  };
+
+  // ---- presets: named patches ----------------------------------------------
+  //
+  // THE ONE SECTION WITH NO FORM (docs/DEVMODE.md §8, phase D4). A felt row
+  // and a dice recipe each have a shape, so each got a form built from it. A
+  // preset's fields ARE the panel's other sections — you make one by turning
+  // the dials and pressing Hold — so what belongs here is a LIST and three
+  // verbs, and the only thing the section has to say for itself is what each
+  // row would do if it were applied.
+  //
+  // APPLY IS A PASTE and is drawn as one: it goes through `tune.set` with the
+  // film lock, so at a shared table a preset's look rows land and its film
+  // rows come back refused BY NAME on the status line. That is why the button
+  // is not disabled while locked — a preset is not all-or-nothing the way a
+  // felt is, and disabling it would hide the half that still works.
+  let presetsRec = null;
+  const buildPresets = () => {
+    if (!presetsApi) return;
+    const sec = section('presets', { count: 0, onReset: null, open: true });
+    let pickName = null;
+    let touched = false;
+    let pickSig = '';
+
+    const picker = el('select', { class: 'tin dev-feltpick', 'aria-label': 'preset' });
+    const pickRow = el('div', { class: 'dev-row is-cast', dataset: { path: 'presets.row' } }, [
+      el('span', {
+        class: 'dev-row-label',
+        title: 'presets.row — every named patch this build has: the rows `presets:` in dice.yaml declares and the ones held this session',
+      }, [el('span', { class: 'dev-row-name', text: 'preset' })]),
+      el('div', { class: 'dev-row-ctl' }, [picker]),
+    ]);
+    picker.addEventListener('change', () => { pickName = picker.value || null; touched = true; panel.repaint(); });
+
+    const nameBox = el('input', {
+      class: 'tin dev-presetname', type: 'text', placeholder: 'name', spellcheck: 'false',
+      'aria-label': 'preset name',
+    });
+    const nameRow = el('div', { class: 'dev-row is-cast', dataset: { path: 'presets.name' } }, [
+      el('span', {
+        class: 'dev-row-label',
+        title: 'the id the held preset takes — lower-case letters, digits, "-" and "_", no dot',
+      }, [el('span', { class: 'dev-row-name', text: 'name' })]),
+      el('div', { class: 'dev-row-ctl' }, [nameBox]),
+    ]);
+
+    const report = (r, verb) => {
+      if (!r) { showStatus(`${verb}: refused`, 'warn'); return null; }
+      for (const [p, why] of r.refused || []) showStatus(`${p}: ${REASON[why] || why}`, 'warn');
+      return r;
+    };
+
+    const holdBtn = button('Hold as preset', () => {
+      const name = nameBox.value.trim();
+      const r = report(presetsApi.hold(name), 'hold');
+      if (!r || (r.refused || []).length) { panel.repaint(); return; }
+      pickName = name;
+      touched = true;
+      nameBox.value = '';
+      showStatus(`held ${name} — Save writes the row into dice.yaml`, 'info');
+      panel.repaint();
+    }, { kind: 'primary', title: 'write the dials as they now stand down under this name' });
+
+    const applyBtn = button('Apply', () => {
+      const name = pickName;
+      const r = report(presetsApi.apply(name), 'apply');
+      if (!r) { panel.repaint(); return; }
+      const held = (r.refused || []).length;
+      showStatus(held
+        ? `${name}: ${r.applied} row${r.applied === 1 ? '' : 's'} applied, ${held} refused`
+        : `${name}: ${r.applied} row${r.applied === 1 ? '' : 's'} applied`, held ? 'warn' : 'info');
+      panel.repaint();
+    }, { title: 'merge this preset into the dials, exactly as a pasted patch is merged' });
+
+    const removeBtn = button('Remove', () => {
+      const name = pickName;
+      if (!report(presetsApi.remove(name), 'remove')) { panel.repaint(); return; }
+      pickName = null;
+      showStatus(`removed ${name}`, 'info');
+      panel.repaint();
+    }, { kind: 'danger', title: 'drop this row (Download carries the removal; the Save route does not — DEVMODE §9)' });
+
+    const note = el('div', { class: 'dev-clockout' });
+    sec.body.append(pickRow, el('div', { class: 'dev-verbs' }, [applyBtn, removeBtn]),
+      nameRow, el('div', { class: 'dev-verbs' }, [holdBtn]), note);
+
+    let cache = [];
+    const rowByName = (n) => cache.find((p) => p.name === n) || null;
+
+    presetsRec = {
+      sec, rows: [], subs: [], kind: 'presets', name: 'presets',
+      sync() {
+        try { cache = presetsApi.list() || []; } catch { cache = []; }
+        if (!touched || !pickName || !rowByName(pickName)) pickName = (cache[0] || {}).name || null;
+        const sig = cache.map((p) => `${p.name}|${p.leaves}|${p.inFile ? 'f' : 's'}`).join('/');
+        if (sig !== pickSig) {
+          pickSig = sig;
+          picker.replaceChildren(...cache.map((p) => el('option', {
+            value: p.name, text: p.inFile ? p.name : `${p.name} · held`,
+          })));
+        }
+        picker.value = pickName || '';
+        const row = rowByName(pickName);
+        let waiting = 0;
+        try { waiting = presetsApi.pending ? presetsApi.pending() : 0; } catch { waiting = 0; }
+        applyBtn.disabled = !row;
+        removeBtn.disabled = !row;
+        holdBtn.disabled = waiting === 0;
+        // The COUNT is the diff's, as every other section's is: a row held
+        // this session and a declared row whose leaves have moved are both
+        // what the FILE would gain or amend, and a declared row nobody has
+        // touched is not a change (the C4 review's rule, kept).
+        const touchedRows = new Set();
+        let dl = [];
+        try { dl = tune.diff() || []; } catch { dl = []; }
+        for (const d of dl) {
+          const p = String(d.path).split('.');
+          if (p[0] === 'presets' && p.length > 2) touchedRows.add(p[1]);
+        }
+        sec.setCount(touchedRows.size);
+        note.textContent = (!row
+          ? 'no presets — turn some dials and Hold them under a name'
+          : `${row.name} · ${row.inFile ? 'declared in dice.yaml' : 'held this session — Save writes the row'}`
+            + ` · ${row.leaves} row${row.leaves === 1 ? '' : 's'}`
+            + (row.film ? `, ${row.film} film` : ''))
+          + `\nHold would write ${waiting} changed row${waiting === 1 ? '' : 's'} down`
+          + (filmLocked ? ' · a locked table takes the look rows and names the film ones' : '');
+      },
+    };
+    secs.set('presets', presetsRec);
+    body.append(sec.root);
+  };
+
   // ---- the clock -----------------------------------------------------------
   let clockRec = null;
   const buildClock = () => {
@@ -784,10 +1559,13 @@ export function mount({
     freeze.root.dataset.path = 'clock.freeze';
     const stepBtn = button('step one frame', () => { benchApi.step(); panel.repaint(); },
       { title: 'advance the projector exactly one baked frame' });
-    const scrub = rowRange({
+    // A stepper on the phone, like every other range row — and a frame scrubber
+    // is the one place a stepper is arguably the BETTER control: ± walks one
+    // baked frame, which is what the step button beside it does.
+    const scrub = numRow({
       label: 'scrub', value: 0, range: [0, 1, 1],
-      onInput: (v) => benchApi.scrub(v),
-      onCommit: (v) => benchApi.scrub(v),
+      live: (v) => benchApi.scrub(v),
+      commit: (v) => benchApi.scrub(v),
       why: 'clock.scrub — move the projector to a baked keyframe. Freeze first, or the running clock walks away from it; a scrubbed passage plays silent, because the impact drain is a one-way cursor',
     });
     scrub.root.dataset.path = 'clock.scrub';
@@ -877,6 +1655,8 @@ export function mount({
   // however often the cast is rebuilt (setCast re-appends its section).
   const tailOrder = () => {
     if (feltsRec) body.append(feltsRec.sec.root);
+    if (setsRec) body.append(setsRec.sec.root);
+    if (presetsRec) body.append(presetsRec.sec.root);
     if (clockRec) body.append(clockRec.sec.root);
     if (abRec) body.append(abRec.sec.root);
     if (fileRec) body.append(fileRec.sec.root);
@@ -938,8 +1718,70 @@ export function mount({
     const verbsB = el('div', { class: 'dev-verbs' }, [previewBtn, applyBtn, saveBtn]);
     sec.body.append(diffSlot, verbsA, subhead('paste patch'), paste, preview, verbsB);
     fileRec = { sec, rows: [], subs: [], kind: 'file', name: 'file', diffSlot, paste, preview, saveBtn, saveRouteBtn, downloadBtn };
+    // ---- the recorder, and the second window --------------------------------
+    //
+    // BOTH LIVE IN `file` BECAUSE BOTH LEAVE THE TAB. Everything above this
+    // line writes dice.yaml; these two write a step and open a window, and the
+    // section is where the panel keeps the verbs whose result is outside it.
+    if (recordApi) fileRec.record = buildRecord(sec.body);
+    if (typeof verbs.popout === 'function') {
+      // ONE BUTTON, NOT A SECOND PANEL. `dev.html` mounts THIS FILE against a
+      // mirror of the tune (dev.html's `remoteTune`), so what pops out is the
+      // panel, not a copy of it — and the table tab stays the only writer,
+      // which is the whole rule the pop-out is built on.
+      sec.body.append(el('div', { class: 'dev-verbs' }, [
+        button('Pop out', () => runVerb('popout'), { title: 'open the panel in its own window (dev.html)' }),
+      ]));
+    }
     secs.set('file', fileRec);
     body.append(sec.root);
+  };
+
+  // ---- the recorder -------------------------------------------------------
+  //
+  // WHAT IT WRITES DOWN AND WHAT IT DOES NOT. Recording is arming a LISTENER,
+  // not wrapping the panel: js/main.js watches the tune itself, so a dial
+  // turned from the console, from a preset Apply or from an A/B flip is in the
+  // step exactly as a slider drag is. What the panel owns here is the NAME and
+  // the two presses, and even the state on the button is asked of the api each
+  // repaint — `devRecord('stop')` from the console must stop the button too.
+  //
+  // Download step is a DOWNLOAD and never the write route (`emitStep` above
+  // says why): the panel composes the text and hands it to `record.save`,
+  // which is main.js's ordinary blob download — the same one Download uses.
+  const buildRecord = (container) => {
+    const nameBox = el('input', {
+      type: 'text', class: 'tin dev-stepname', spellcheck: 'false',
+      placeholder: 'step name', 'aria-label': 'step name',
+    });
+    const note = el('div', { class: 'dev-about' });
+    const runBtn = button('Record', () => {
+      const on = recordApi.state() === 'recording';
+      const r = on ? recordApi.stop() : recordApi.start();
+      if (!r) showStatus(`record: refused (${on ? 'stop' : 'start'})`, 'warn');
+      panel.repaint();
+    }, { title: 'write down every dial, deal and seeded throw from here' });
+    const dlBtn = button('Download step', () => {
+      const ops = recordApi.ops() || [];
+      if (!ops.length) { showStatus('nothing recorded yet — press Record, turn a dial', 'warn'); return; }
+      const stem = stepName(nameBox.value);
+      const saved = recordApi.save(`${stem}.mjs`, emitStep(stem, ops));
+      showStatus(saved ? `tools/steps/${stem}.mjs downloaded — read it before you commit it` : 'download: refused', saved ? 'info' : 'warn');
+    }, { title: 'emit a tools/steps skeleton of what was recorded — a download, never the write route' });
+    container.append(subhead('record'), nameBox, el('div', { class: 'dev-verbs' }, [runBtn, dlBtn]), note);
+    const sync = () => {
+      let state = 'idle', ops = [];
+      try { state = recordApi.state(); ops = recordApi.ops() || []; } catch { /* a shut door answers nothing */ }
+      const on = state === 'recording';
+      runBtn.textContent = on ? 'Stop' : 'Record';
+      runBtn.classList.toggle('dev-btn-danger', on);
+      dlBtn.disabled = !ops.length;
+      note.textContent = ops.length
+        ? `${ops.length} op${ops.length === 1 ? '' : 's'} recorded${on ? ' · recording' : ''}`
+        : (on ? 'recording — nothing yet' : 'not recording');
+    };
+    sync();
+    return { sync, nameBox, runBtn, dlBtn };
   };
 
   // A patch text is parsed (a `parsePatch` verb, else js/yaml.js loaded on
@@ -1119,7 +1961,11 @@ export function mount({
     ]),
   ]);
 
-  const root = el('aside', { id: DEV_PANEL_ID, class: 'dev-panel', 'aria-label': 'developer mode' },
+  // `dev-phone` is the JS's own reading of the query, published as a class so
+  // a scenario (and a screenshot) can tell a sheet from a column without
+  // measuring pixels. The dress is css/dev.css's media rule, not this class:
+  // the stylesheet must be right on a build where this file never ran.
+  const root = el('aside', { id: DEV_PANEL_ID, class: `dev-panel${phone ? ' dev-phone' : ''}`, 'aria-label': 'developer mode' },
     [head, barSlot, findInput, statusSlot, body, foot]);
   const glyph = button('DEV', () => { panel.fold(false); if (onFold) onFold(false); }, { title: 'unfold developer mode (`)' });
   glyph.id = DEV_GLYPH_ID;
@@ -1173,7 +2019,17 @@ export function mount({
   // number you can hold beside another one.
   const brief = (n) => (n >= 100000 ? `${Math.round(n / 1000)}k` : n >= 10000 ? `${(n / 1000).toFixed(1)}k` : String(n));
   const paintFooter = () => {
-    const changed = [...rows.values()].filter((e) => e.row.root.classList.contains('is-changed')).length;
+    // THE SAME NUMBER THE FILE SECTION SHOWS, AND `devInfo().changed` (fixed
+    // in phase D2). It used to be a count of DIAL ROWS wearing the changed
+    // mark, which was the whole diff back when a dial was the only thing that
+    // could differ from the file. Since the asset editors it is not: a cloned
+    // felt, and now a cloned dice set with ninety fields, moved the file
+    // section's count and the corner glyph read `0 changed` beside it —
+    // measured in the first look at the sets section, 2026-09-03, with a set
+    // authored and thrown. §10's rule is that the line has to say what
+    // happened, and there is only one right answer to "how much would Save
+    // write".
+    const changed = changedCount;
     const vp = footer.viewport || null;
     footViewport.textContent = vp ? `${vp.w ?? vp.width}×${vp.h ?? vp.height} @${footer.dpr ?? 1}` : '';
     const perf = [];
@@ -1212,6 +2068,7 @@ export function mount({
         const p = dotted(d.path);
         if (stringOf(d.shipped) !== stringOf(d.live)) changed.set(p, d);
       }
+      changedCount = changed.size;
       // The reload set is a reading, not a memory: every changed leaf whose
       // dial reads once at boot and that no binder covers, wherever the
       // write came from.
@@ -1264,9 +2121,12 @@ export function mount({
         fileRec.diffSlot.replaceChildren(list);
         fileRec.sec.setCount(changed.size);
       }
+      if (fileRec && fileRec.record) fileRec.record.sync();
       if (castRec && castRec.sync) castRec.sync();
       if (castRec && castRec.bench) castRec.bench.sync();
       if (feltsRec) feltsRec.sync();
+      if (setsRec) setsRec.sync();
+      if (presetsRec) presetsRec.sync();
       if (clockRec) {
         clockRec.sync();
         if (clockRec.bench) clockRec.bench.sync();
@@ -1328,18 +2188,19 @@ export function mount({
   castApi = cast || null;
   buildCast();
   buildFelts();
+  buildSets();
+  buildPresets();
   buildBench();
   rebuildBar();
   showSections();
   host.append(root, glyph);
   panel.repaint();
 
-  // A narrow window starts folded (css/dev.css carries the same query for
-  // the panel's width); a deliberate unfold sticks. The caller hears about
-  // it the way it hears about every other fold, so its own state and
-  // isFolded() agree from the first frame.
-  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-    && window.matchMedia(DEV_NARROW_QUERY).matches) {
+  // A PHONE STARTS FOLDED (css/dev.css carries the same query for the sheet's
+  // dress); a deliberate unfold sticks. The caller hears about it the way it
+  // hears about every other fold, so its own state and isFolded() agree from
+  // the first frame.
+  if (phone) {
     panel.fold(true);
     if (onFold) onFold(true);
   }

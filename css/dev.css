@@ -348,6 +348,35 @@ limitations under the License.
   /* the native control paints its own arrow; the well and the hair are .tin's */
   padding: 3px 4px;
 }
+/* ---- sets: the dice catalogue on the live felt (§9, phase D2) -------------- */
+/* Two row pickers (house, set) and the face table's twelve-state selects, all
+   the same native control for the same reason the felt picker is one: there is
+   no width in a 320px overlay for a segmented row of eleven or twelve. */
+#dev-panel .dev-housepick,
+#dev-panel .dev-setpick,
+#dev-panel .dev-select {
+  width: 100%;
+  font: 12px/1.3 var(--font-mono);
+  padding: 3px 4px;
+}
+/* ---- presets: named patches (§8, phase D4) --------------------------------- */
+/* The name field a Hold takes its id from. Same well as every other typed
+   value in the panel, and full width because a preset name is a word and the
+   control column is where a word goes. */
+#dev-panel .dev-presetname {
+  width: 100%;
+  font: 12px/1.3 var(--font-mono);
+  padding: 3px 4px;
+}
+/* ---- the recorder's name box (§8, phase D5) -------------------------------- */
+/* Same well as the preset name, and for the same reason: what is typed here is
+   a file stem, which is a word, and the control column is where a word goes. */
+#dev-panel .dev-stepname {
+  width: 100%;
+  font: 12px/1.3 var(--font-mono);
+  padding: 3px 4px;
+}
+
 .dev-clockout,
 .dev-about {
   font: 11px/1.45 var(--font-mono);
@@ -395,8 +424,110 @@ limitations under the License.
 .dev-foot-line { display: flex; gap: 10px; justify-content: space-between; }
 .dev-foot .dev-verbs { padding-top: 6px; }
 
-/* ---- narrow: the panel spans the width; js/devmode.js starts it folded on
-   the same query, and a deliberate unfold sticks -------------------------- */
-@media (max-width: 639px) {
-  #dev-panel { left: 8px; width: auto; top: auto; max-height: 70vh; }
+/* ---- THE PHONE SHEET (docs/DEVMODE.md §7 "Phone", phase D5) --------------
+   A 320px column pinned to the right edge is a desktop instrument. On a phone
+   it is most of the screen, and the felt — the thing every dial is for — is
+   what is left. So under 640px OR on a coarse pointer the panel stops being a
+   column and becomes a BOTTOM SHEET: full width, `45dvh` tall (dvh, not vh,
+   because the browser's own chrome retracts on scroll and vh would put the
+   verbs under it), and folded by default so the first thing a phone shows is
+   the table.
+
+   `dvh` with a `vh` line above it is the fallback pair, not a duplicate: a
+   browser that does not know the unit keeps the first.
+
+   js/devmode.js reads THE SAME QUERY (DEV_PHONE_QUERY) for the two things CSS
+   cannot do: it starts the panel folded, and it draws every range row as a
+   STEPPER — a 4px-tall slider thumb dragged with a fingertip is a control
+   that cannot hit a value, and the panel's whole job is hitting values.
+
+   44px is the platform's touch floor, and it is the same number the seat
+   picker's rows were raised to (`seat-picker-reach`). It is applied to the
+   rows, the buttons, the steppers and the section headings — every place a
+   finger lands. -------------------------------------------------------- */
+@media (max-width: 639px), (pointer: coarse) {
+  #dev-panel {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: auto;
+    max-height: 45vh;
+    max-height: 45dvh;
+    border-radius: 12px 12px 0 0;
+    border-bottom: 0;
+    font-size: 13px;
+    /* OPAQUE, WHICH THE FLOATING CARD IS NOT (measured 2026-09-03 at 390×844:
+       `--surface-card` is 94% and the 6% that came through was the roll log's
+       own white rows, legible right under the dials). A card floating over the
+       felt is meant to let a little of it through; a sheet that OWNS the
+       bottom of the screen is not, and the reading it was letting through was
+       text. The token still paints the surface — it is laid over an opaque
+       ground of its own colour, so a re-dress of the token still lands. */
+    background-color: rgb(18, 14, 9);
+    background-image: linear-gradient(var(--surface-card), var(--surface-card));
+  }
+  /* THE CHROME HAS TO EARN ITS PIXELS (measured 2026-09-03, 390×844). At 45dvh
+     the sheet is 380px, and the head, the section bar, the find box and the
+     footer took 291 of them: the scroller was left with 82px — two rows of a
+     panel whose whole job is rows. Three trims, and none of them touches the
+     44px floor:
+       · the section bar SCROLLS sideways instead of wrapping (88 → 44);
+       · the footer's three lines flow as one wrapped block, so the viewport
+         and the DPR still say what a screenshot measured (45 → ~30);
+       · the head loses its padding (59 → ~49).
+     The scroller comes out around 190px — four rows and a fifth in reach,
+     which with one section at a time and `find` is a panel you can work. */
+  /* THE FIND BOX MOVES UP BESIDE THE TITLE, which is the biggest single win
+     of the four (a whole 44px row). The panel's children are a flex column on
+     the desktop; here they are a grid, so `find` and the head share row one —
+     `[ find a dial ] [ DEV ` fold ]` — and the scroller gets the row back. */
+  #dev-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  }
+  .dev-head { padding: 4px 10px; grid-column: 2; grid-row: 1; }
+  #dev-panel .dev-find { grid-column: 1; grid-row: 1; width: auto; margin: 4px 0 4px 10px; }
+  .dev-barslot { grid-column: 1 / -1; grid-row: 2; }
+  .dev-statusslot { grid-column: 1 / -1; grid-row: 3; }
+  .dev-body { grid-column: 1 / -1; grid-row: 4; }
+  .dev-foot { grid-column: 1 / -1; grid-row: 5; }
+  .dev-secbar.seg { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .dev-secbar.seg::-webkit-scrollbar { display: none; }
+  .dev-secbar.seg button { flex: 0 0 auto; }
+  .dev-foot { display: flex; flex-wrap: wrap; gap: 2px 10px; padding: 4px 10px 6px; }
+  .dev-foot-line { flex: 0 1 auto; }
+  .dev-foot .dev-verbs { flex: 1 0 100%; padding-top: 4px; }
+  /* A sheet is thumb-reachable at the BOTTOM, so the corner glyph — the one
+     control a folded panel has — moves down beside it rather than staying at
+     the top of a screen a hand does not reach. */
+  .dev-glyph {
+    top: auto;
+    bottom: 8px;
+    right: 8px;
+    min-height: 44px;
+    padding: 6px 14px;
+  }
+  .dev-row { min-height: 44px; grid-template-columns: minmax(0, 40%) minmax(0, 1fr) 64px 24px; }
+  .dev-row.is-stacked { grid-template-columns: minmax(0, 1fr); }
+  .dev-sec-toggle { padding: 12px 0; }
+  .dev-btn { min-height: 44px; padding: 8px 12px; font-size: 12px; }
+  .dev-revert { width: 24px; height: 44px; opacity: 1; }
+  .dev-step.dev-btn { width: 44px; height: 44px; font-size: 18px; }
+  .dev-stepper .dev-num { font-size: 15px; }
+  #dev-panel .dev-seg button { padding: 12px 4px; }
+  #dev-panel .dev-find, #dev-panel .dev-seed,
+  #dev-panel .dev-feltpick, #dev-panel .dev-housepick,
+  #dev-panel .dev-setpick, #dev-panel .dev-select, #dev-panel .dev-presetname,
+  #dev-panel .dev-stepname { min-height: 44px; }
+  .dev-color { width: 44px; height: 34px; }
+  /* One section at a time is the panel's own rule already (js/devmode.js
+     `showSections`); on the sheet the section BAR is what does the choosing,
+     so its cells stay at a fingertip's width and the bar SCROLLS SIDEWAYS
+     rather than wrapping — the trim ten lines above, which bought the scroller
+     44 of its px back. (The comment here used to say the opposite, and the D5
+     review caught a reader about to "fix" the clipped bar by wrapping it and
+     silently spending those px again.) */
+  .dev-secbar.seg button { min-width: 64px; padding: 10px 6px; font-size: 11px; }
 }

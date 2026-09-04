@@ -90,6 +90,17 @@ import {
 // with no three.js import, so unlike js/main.js it loads in Node.
 import { SETS } from '../js/themes.js';
 
+// THE CATALOGUE IS LOADED, NOT IMPORTED (developer mode phase D1,
+// 2026-09-03). The dice recipes moved out of js/themes.js and into `houses:`
+// in dice.yaml, so that module ships with an EMPTY registry and whoever wants
+// one installs it. In a browser js/main.js does it from the served module; a
+// Node reader reads the file. This file asserts on the recipes,
+// so it reads the real dice.yaml — the same bytes the table boots on.
+import { readFileSync } from 'node:fs';
+import { parseYaml } from '../js/yaml.js';
+import { installCatalogue } from '../js/themes.js';
+installCatalogue(parseYaml(readFileSync(new URL('../dice.yaml', import.meta.url), 'utf8')).tree.houses);
+
 let n = 0;
 const t = (name, fn) => {
   n++;

@@ -240,7 +240,7 @@ retaken the first time an app frame existed.
 ## THE SITTING — every open LOOK and LISTEN on one page
 
 ```bash
-node tools/drive.mjs tools/steps/verdict-shots.mjs          # the four new frame sets
+node tools/drive.mjs tools/steps/verdict-shots.mjs          # crop + stump
 node tools/drive.mjs --steps tools/steps/glade-look.mjs,\
   tools/steps/life-look.mjs,tools/steps/record-look.mjs      # the three existing ones
 node tools/verdict-sheet.mjs                                 # → shots/verdicts.html
@@ -295,8 +295,11 @@ freely — the sheets live inside the gitignored `out/` tree.
 
 ## The chrome lab
 
-`/chrome-lab.html` (served by `node server.js`, any port) is the 2D
-counterpart to `lab.html`: it embeds the REAL app in an iframe and poses
+`/chrome-lab.html` (served by `node server.js`, any port) is the last lab
+standing — the 3D one, `lab.html`, retired on 2026-09-03 into the
+developer-mode panel's sets section (docs/DEVMODE.md §9), taking
+`tools/lab-shots.mjs` and `tools/geo-bench-shots.mjs` with it. It embeds the
+REAL app in an iframe and poses
 result-read states (staged draft, banners, peek, check/cinematic
 verdicts, held rolls) through `__diceDebug` — real CSS, real hovers,
 zero forked markup, so it cannot rot the way docs/mockups did.

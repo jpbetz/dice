@@ -173,7 +173,12 @@ function gitSha() {
 // could restage it". The BEFORE leg's `git checkout 48bd128 -- models/towers/`
 // dance is safe under this for the same reason the fae-lab one is — the file
 // is restored, so it is clean again and has no uncommitted mtime to trip on.
-const APP_PATHS = ['js', 'vendor', 'models', 'index.html', 'lab.html'];
+// `lab.html` LEFT THIS LIST 2026-09-03 with the dice lab itself (DEVMODE §9,
+// phase D3). It was here because two frame groups were photographs of that
+// page; both retired with it, and a path that cannot restage any frame on
+// this sheet can only ever redden rows for nothing — the exact failure the
+// per-row bar above exists to avoid.
+const APP_PATHS = ['js', 'vendor', 'models', 'index.html'];
 
 const git = (args) => {
   try { return execFileSync('git', args, { cwd: ROOT }).toString(); } catch { return ''; }

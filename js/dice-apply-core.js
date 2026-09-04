@@ -37,7 +37,8 @@ limitations under the License.
 
 import { parseYaml, patchYaml, formatScalar, YamlError } from './yaml.js';
 import {
-  DIALS, STATIC_PATHS, ASSET_SECTIONS, assetDialFor, isDial, leaves, getLeaf, toPath,
+  DIALS, STATIC_PATHS, ASSET_SECTIONS, LAWS, assetDialFor, isDial, leaves, getLeaf, setLeaf, toPath,
+  merge, lawScopes, pairGroups, isStaticRowLeaf,
 } from './tune.js';
 
 export const isPlain = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -78,10 +79,68 @@ export function judgeValue(dial, value) {
   const want = typeOf(dial.def);
   if (typeOf(value) !== want) return `expected ${want}, got ${formatScalar(value)}`;
   if (want === 'number' && !Number.isFinite(value)) return 'not a finite number';
+  // A LIST DIAL HAS THREE LAWS (js/tune.js `list`, and its `judge` is the same
+  // three in the same order): how many entries the code reads, that an entry
+  // is a string at all, and — where the entries come from a fixed vocabulary —
+  // which strings. `each` alone was the whole check until the D1 review found
+  // that a palette, whose `each` is null, had no law at all: `colors: [1, 2]`
+  // validated here and reached js/particles.js's `hexRGB`. Indexed, not
+  // `find`, because `find` cannot tell "no bad entry" from an entry that IS
+  // `undefined`.
+  if (want === 'list') {
+    if (dial.len && (value.length < dial.len[0] || value.length > dial.len[1])) {
+      const n = dial.len[0] === dial.len[1] ? `${dial.len[0]}` : `${dial.len[0]}-${dial.len[1]}`;
+      return `takes ${n} entries, got ${value.length}`;
+    }
+    const i = value.findIndex((e) => typeof e !== 'string');
+    if (i >= 0) return `every entry must be a string, got ${formatScalar(value[i])} at ${i}`;
+    if (dial.each) {
+      const j = value.findIndex((e) => !dial.each.includes(e));
+      if (j >= 0) return `every entry must be one of ${dial.each.join(' | ')}, got ${formatScalar(value[j])}`;
+    }
+    return null;
+  }
   if (dial.options && !dial.options.includes(value)) {
     return `expected one of ${dial.options.join(' | ')}, got ${formatScalar(value)}`;
   }
+  // A LAW (js/tune.js LAWS, phase D4). Single-value laws are answerable from
+  // the leaf and belong here, so `pace.tempo.k: 0` is refused by the tool and
+  // by the armed route exactly as `tune.set` refuses it. A PAIR law needs the
+  // other leaf and is answered in `validate` below, over the whole tree.
+  if (dial.law && !LAWS[dial.law].pair && !LAWS[dial.law].holds(value)) {
+    return `${LAWS[dial.law].why}, got ${formatScalar(value)}`;
+  }
   return null;
+}
+
+// The pair laws over a whole file (js/tune.js LAWS, `pair: true`). One problem
+// per group, naming every path in it, because a pair is one claim and not two.
+// Absent leaves take their dial defaults — a file that says one half of the
+// pair is judged against the half the code carries, which is what it will
+// actually run on.
+//
+// ONE WALK PER SCOPE, not one per file (the D4 review, 2026-09-03): the root,
+// and then each row of a section whose row shape IS the dial tree (`presets:`),
+// because a preset's `cards.depth` is a `cards.depth`. `lawScopes` and
+// `pairGroups` are js/tune.js's, so this judge and `createTune`'s
+// `checkLawPairs` cannot come to disagree about which leaves are one claim.
+export function judgePairs(tree, dials = DIALS) {
+  const problems = [];
+  const root = isPlain(tree) ? tree : {};
+  for (const scope of lawScopes(root, dials)) {
+    const groups = pairGroups(scope.dials, scope.defaults);
+    if (!groups.size) continue;
+    const sub = scope.at.length ? getLeaf(root, scope.at) : root;
+    const merged = merge(scope.defaults, isPlain(sub) ? sub : {});
+    const named = (p) => dotted(scope.at.concat(p));
+    for (const [name, paths] of groups) {
+      const law = LAWS[name];
+      const read = (p) => getLeaf(merged, p);
+      if (paths.every((p) => law.holds(getLeaf(merged, p), dotted(p), read))) continue;
+      problems.push({ path: named(paths[0]), message: `${paths.map(named).join(' + ')}: ${law.why}` });
+    }
+  }
+  return problems;
 }
 
 // One problem per offending leaf, in the given file's order. The dial tree is
@@ -93,16 +152,45 @@ export function validate(tree, dials = DIALS) {
     const v = getLeaf(tree, path);
     const d = dialFor(dials, path);
     const p = dotted(path);
+    // A NULL AT A MAP IS AN ABSENT MAP, not a mistyped leaf (phase D1). `null`
+    // is absent everywhere in this design — `judgeValue` says so three lines
+    // down and js/tune.js drops it with the default standing — and until the
+    // dice catalogue moved into the file nothing had ever written one AT a
+    // group. Three sets do: `glow: null` is how js/themes.js says "the digits
+    // carry ALL the light", and `leaves` reads that line as a leaf at the
+    // group's own path, which `dialFor` correctly answers "is a group of
+    // fields; name one" — a true sentence about a line that is not a problem.
+    // Refusing it would have made `tools/dice-apply.mjs` reject the
+    // checked-in file, which is the one file it must always accept.
+    if (v === null && typeof d === 'string' && /is a group of fields|a map in the dial tree/.test(d)) continue;
     if (typeof d === 'string') { problems.push({ path: p, message: `${p}: ${d}` }); continue; }
+    // A STATIC LEAF INSIDE A DIAL-TREE ROW (js/tune.js `isStaticRowLeaf`, the
+    // D4 review): `presets.dusk.app.mode` HAS a dial, so nothing above says a
+    // word about it, and every writer refuses it — a row that could only ever
+    // be refused on Apply. Same sentence the reader gives it at birth.
+    if (isStaticRowLeaf(path)) {
+      problems.push({ path: p, message: `${p}: not a dial a patch may set: ${dotted(toPath(path).slice(2))} is set in dice.yaml or DICE_MODE` });
+      continue;
+    }
     const bad = judgeValue(d, v);
     if (bad) problems.push({ path: p, message: `${p}: ${bad}` });
   }
-  return problems;
+  return problems.concat(judgePairs(tree, dials));
 }
 
 // The leaves of `given` whose value differs from `checkout`'s — a leaf the
 // checkout does not name is a change too (`absent: true`; patchYaml inserts
 // it under its map). A null in the given file is no value at all.
+//
+// A LIST IS A LEAF AND TWO EQUAL LISTS ARE NOT `===` (phase D1). `leaves`
+// has always counted an array as a leaf, but until the dice catalogue moved
+// into the file no line of dice.yaml held one — so applying the checkout to
+// ITSELF reported every `faces:` and every `colors:` as a change from a value
+// to the same value, and `tools/dice-apply.mjs`'s own "nothing changed" case
+// stopped being reachable. Same test both ways round, one JSON deep.
+const sameValue = (a, b) => a === b
+  || (Array.isArray(a) && Array.isArray(b) && JSON.stringify(a) === JSON.stringify(b));
+
 export function planChanges(given, checkout) {
   const out = [];
   for (const path of leaves(given)) {
@@ -110,7 +198,7 @@ export function planChanges(given, checkout) {
     if (to === null) continue;
     const from = getLeaf(checkout, path);
     const absent = from === undefined;
-    if (!absent && from === to) continue;
+    if (!absent && sameValue(from, to)) continue;
     out.push({ path, from, to, absent });
   }
   return out;
@@ -151,18 +239,50 @@ export function applyText(checkoutText, givenText, { dials = DIALS, givenName = 
 // (the panel draws it, read-only) and js/tune.js refuses to `set` it, so a
 // path list that only asked "is there a dial?" would let a Save flip the
 // production switch of a running checkout. One list, tune.js's, both sides.
-export function validateChanges(changes, { dials = DIALS, staticPaths = STATIC_PATHS } = {}) {
+// `base` is the CHECKOUT'S OWN TREE, and it is what makes the pair laws
+// answerable here (the D4 review, 2026-09-03). `judgeValue` skips them by
+// design — a pair needs the other leaf — and the route ran nothing else, so a
+// post naming ONE half of a pair against a checkout holding the other wrote a
+// dice.yaml the next boot refuses WHOLE: two tabs, or a checkout edited after
+// the tab booted, and `{'cards.standoff': 0.9}` alone landed on a file whose
+// depth was 3.9. The file is the thing being written, so the file — patch on
+// top of checkout — is the thing to judge. A caller with no file in hand gets
+// the empty base, which is the same reading `validate` gives a file that names
+// one half of a pair: the absent half is the one the CODE carries, because
+// that is what the table will run on.
+export function validateChanges(changes, { dials = DIALS, staticPaths = STATIC_PATHS, base = {} } = {}) {
   const problems = [];
   if (!isPlain(changes)) return [{ path: '', message: 'changes must be a map of dotted path to scalar' }];
   for (const [p, v] of Object.entries(changes)) {
-    if (staticPaths.includes(p)) { problems.push({ path: p, message: `${p}: not a dial: set it in dice.yaml or DICE_MODE` }); continue; }
-    if (isPlain(v) || Array.isArray(v)) { problems.push({ path: p, message: `${p}: expected a scalar, got a ${Array.isArray(v) ? 'list' : 'map'}` }); continue; }
+    if (staticPaths.includes(p) || isStaticRowLeaf(p)) { problems.push({ path: p, message: `${p}: not a dial: set it in dice.yaml or DICE_MODE` }); continue; }
+    // A MAP IS NEVER A POSTED VALUE; A LIST IS ONE ONLY WHERE THE DIAL IS A
+    // LIST (phase D1). `faces` and the particle/decal palettes are single
+    // dials whose value is the whole array — half a face table is not a face
+    // table — so the route has to be able to carry one, while a list posted at
+    // a scalar dial stays the shape mistake it always was. `dialFor` first, so
+    // the answer is about THIS path and not about lists in general.
+    if (isPlain(v)) { problems.push({ path: p, message: `${p}: expected a scalar, got a map` }); continue; }
     const d = dialFor(dials, p);
     if (typeof d === 'string') { problems.push({ path: p, message: `${p}: ${d}` }); continue; }
+    if (Array.isArray(v) && !Array.isArray(d.def)) { problems.push({ path: p, message: `${p}: expected a scalar, got a list` }); continue; }
     const bad = judgeValue(d, v);
     if (bad) problems.push({ path: p, message: `${p}: ${bad}` });
   }
-  return problems;
+  // The pair pass, over the file the patch WOULD make. Only once every leaf
+  // has passed its own judgement: a value that is not a number cannot be
+  // asked a geometry question, and its type is the honest problem to report.
+  if (problems.length || !isPlain(base)) return problems;
+  const would = {};
+  try {
+    for (const [p, v] of Object.entries(changes)) if (v !== null && v !== undefined) setLeaf(would, toPath(p), v);
+  } catch (e) {
+    // Two posted paths that cannot both be leaves of one file (`a.b` and
+    // `a.b.c`). The per-leaf pass above catches every reachable case — a path
+    // through a dial has no dial — so this is the door held shut rather than a
+    // case anyone has seen: a problem line, never a throw out of the route.
+    return [{ path: '', message: `changes: ${e.message}` }];
+  }
+  return judgePairs(merge(base, would), dials);
 }
 
 // The flat counterpart of planChanges: which of the posted leaves actually
@@ -175,7 +295,7 @@ export function planFlatChanges(changes, checkout) {
     if (to === null) continue;
     const from = getLeaf(checkout, toPath(p));
     const absent = from === undefined;
-    if (!absent && from === to) continue;
+    if (!absent && sameValue(from, to)) continue;
     out.push({ path: toPath(p), from, to, absent });
   }
   return out;
@@ -190,7 +310,7 @@ export function applyChanges(checkoutText, changes, { dials = DIALS, staticPaths
     if (e instanceof YamlError) return { problems: [{ path: '', message: `${checkoutName}:${e.line}: ${e.message}` }], changes: [], text: checkoutText };
     throw e;
   }
-  const problems = validateChanges(changes, { dials, staticPaths });
+  const problems = validateChanges(changes, { dials, staticPaths, base: isPlain(checkout) ? checkout : {} });
   if (problems.length) return { problems, changes: [], text: checkoutText };
   const planned = planFlatChanges(changes, isPlain(checkout) ? checkout : {});
   return finishPatch(checkoutText, checkoutName, problems, planned);

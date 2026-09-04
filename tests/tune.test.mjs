@@ -49,7 +49,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  DIALS, look, film, pick, isDial, defaultsOf, merge, leaves, getLeaf, setLeaf, hasLeaf,
+  DIALS, look, film, pick, list, isDial, defaultsOf, merge, leaves, getLeaf, setLeaf, hasLeaf,
   alias, FORBIDDEN_LEAF, STATIC_PATHS, createTune,
   ASSET_SECTIONS, ASSET_ROWS, ASSET_ID_RE, assetRowDefaults, assetDialFor,
 } from '../js/tune.js';
@@ -332,14 +332,14 @@ t('createTune checks the declaration against the dials: null is absent, a wrong 
   assert.deepEqual(t.SHIPPED.light.lamp, { y: 24, color: '#ffe8c4' });
   t = one({ light: 'dim' }, 'light', 'shape', /light: expected a map, got "dim"/);
   assert.equal(t.SHIPPED.light.fog.far, 46);
-  // AN ASSET SECTION THIS BUILD CANNOT DECLARE ROWS IN is dropped WHOLE and
-  // says why (docs/DEVMODE.md §9: `sets:` is phase 3). It used to fall
-  // through to the dotted-key rule below and name the dot, which is a true
-  // sentence about the wrong problem — the id could have been spotless and
-  // the row still would not have landed.
-  t = one({ sets: { 'house.ember': { label: 'Ember' } } }, 'sets', 'section', /`sets:` rows are not declarable/);
-  assert.ok(!('sets' in t.SHIPPED), 'and no half-section is left in the tree');
-  // …while `felts:` IS declarable, so a dotted id meets the id rule instead
+  // `sets:` USED TO BE A SECTION THIS BUILD COULD NOT DECLARE ROWS IN, and
+  // that case is gone with phase D1: the dice catalogue landed under
+  // `houses:`, two levels deep, and there is no named-but-unbuilt asset
+  // section left. A top-level map the dial tree does not know is what it
+  // always was for a non-section — carried as typed values, one refusal per
+  // dotted key.
+  t = one({ sets: { 'house.ember': { label: 'Ember' } } }, 'sets.house.ember', 'key', /key "house\.ember" under sets contains a dot/);
+  // `felts:` IS a section, so a dotted id meets the id rule instead
   t = one({ felts: { 'house.moss': { name: 'Moss' } } }, 'felts.house.moss', 'key', /"house\.moss" is not a legal felts id/);
   assert.deepEqual(t.SHIPPED.felts, {}, 'the section stands; the one bad row is gone');
   // a key with a dot in it is dropped everywhere else too
@@ -671,8 +671,17 @@ t('exportYaml without a source throws', () => {
 // ---------------------------------------------------------------------------
 
 t('the row shape is a map of dials, and assetDialFor answers a dial or says why not', () => {
-  assert.deepEqual([...ASSET_SECTIONS], ['sets', 'felts', 'towers', 'venues']);
+  assert.deepEqual([...ASSET_SECTIONS], ['houses', 'felts', 'presets']);
   assert.ok(Object.isFrozen(ASSET_SECTIONS));
+  // EVERY NAMED SECTION HAS A ROW SHAPE, and js/tune.js throws at import if
+  // one does not. There used to be a third state — named but not yet
+  // declarable — that three walks carried a branch for; the catalogue landed
+  // and the tower and venue sections are DEFERRED, which is absent from this
+  // list rather than present without a shape (the D1 review, 2026-09-03).
+  for (const sec of ASSET_SECTIONS) {
+    assert.ok(ASSET_ROWS[sec] && typeof ASSET_ROWS[sec] === 'object', `${sec} has a row shape`);
+    assert.notEqual(assetRowDefaults(sec), null);
+  }
   for (const [k, d] of Object.entries(ASSET_ROWS.felts)) {
     assert.ok(isDial(d), `felts.${k} is a dial`);
     assert.equal(d.cls, 'look', 'a felt is per-viewer chrome, never the bake');
@@ -681,12 +690,13 @@ t('the row shape is a map of dials, and assetDialFor answers a dial or says why 
   assert.deepEqual(assetRowDefaults('felts'), {
     name: 'House felt', cloth: 'felt', feltBase: '#1c1c24', sceneBg: '#0f0f13', breath: 1, mottle: 1,
   });
-  assert.equal(assetRowDefaults('sets'), null, 'a section with no row shape has no defaults');
+  assert.equal(assetRowDefaults('sets'), null, 'a name that is not a section has no row defaults');
   assert.equal(assetDialFor('felts.house-moss.cloth'), ASSET_ROWS.felts.cloth);
   assert.equal(assetDialFor(['felts', 'house-moss', 'breath']), ASSET_ROWS.felts.breath);
-  assert.match(assetDialFor('sets.house-ember.label'), /not declarable in this build/);
+  assert.equal(assetDialFor('sets.house-ember.label'), 'no dial at this path', '`sets:` never became a section');
   assert.match(assetDialFor('felts.HOUSE.cloth'), /not a legal felts id/);
   assert.match(assetDialFor('felts.house-moss.nope'), /no felts field named "nope"/);
+  assert.match(assetDialFor('felts.house-moss.name.x'), /felts\.house-moss\.name is a value, not a map/);
   assert.match(assetDialFor('felts.house-moss'), /is a row of fields/);
   assert.match(assetDialFor('felts'), /is a map of rows/);
   // A DOTTED ID READS AS A ROW AND A FIELD, and the message says so rather
@@ -728,10 +738,16 @@ t('addRow / removeRow: a row lands whole, counts as its leaves, and reset puts t
 
   // the refusals of addRow itself
   assert.deepEqual(tune.addRow('paints', 'x', {}).refused, [['paints', 'unknown']]);
-  assert.deepEqual(tune.addRow('sets', 'house-ember', {}).refused, [['sets', 'section']]);
+  assert.deepEqual(tune.addRow('houses', 'house-ember', {}).refused, [], 'houses is a section too');
+  assert.deepEqual(tune.removeRow('houses', 'house-ember').refused, []);
   assert.deepEqual(tune.addRow('felts', 'house.moss', {}).refused, [['felts.house.moss', 'id']]);
   assert.deepEqual(tune.addRow('felts', 'HOUSE', {}).refused, [['felts.HOUSE', 'id']]);
   assert.deepEqual(tune.addRow('felts', 'house-x', 7).refused, [['felts.house-x', 'type']]);
+  // 'section' MEANS "that path is not a collection of rows" now. It used to
+  // mean "a section this build cannot declare rows in", a state that ended
+  // with the catalogue (the D1 review); what reaches it is a path that lands
+  // inside a row at something that is not a map of rows.
+  assert.deepEqual(tune.addRow(['houses', 'std', 'label'], 'x', {}).refused, [['houses.std.label', 'section']]);
   assert.deepEqual(tune.addRow('felts', 'house-x', { nope: 1, cloth: 'birch', breath: 'deep' }).refused,
     [['felts.house-x.nope', 'unknown'], ['felts.house-x.cloth', 'option'], ['felts.house-x.breath', 'type']]);
   assert.equal(tune.rowsOf('felts')['house-x'].cloth, 'felt', 'the row still lands, on its defaults');
@@ -810,6 +826,142 @@ t('a leaf write into a REMOVED row is refused, and does not mint half a felt', (
   assert.equal(tune.get('felts.house-moss.breath'), 0.9, 'the file\'s own row, every field of it');
   assert.deepEqual(tune.set({ 'felts.house-moss.name': 'Bog' }).refused, [],
     'and once it is back, a field write lands as it always did');
+});
+
+// A SPARSE SECTION'S ABSENT FIELD IS MOST OF ITS FIELDS (the D1 review,
+// 2026-09-03). `apply`'s "neither tree names this leaf" guard was written when
+// `felts:` was the only asset section, and a felt row is FILLED — every one of
+// its six fields is in T, so "no leaf here" really did mean "no such dial". A
+// dice recipe is SPARSE on purpose (ASSET_SPARSE: "absent is a real answer"),
+// so on a shipped set every field the file does not name was unwritable:
+// `assetDialFor` answered with the dial and the write was refused 'unknown'
+// anyway. Roughly eighty of the ninety recipe knobs, on the rows a person
+// edits first.
+const HOUSE_SRC = [
+  'light:', '  lamp:', '    y: 24',
+  'houses:',
+  '  classics:',
+  '    label: Classics',
+  '    line: unadorned dice',
+  '    dice:',
+  '      ivory:',
+  '        label: Ivory',
+  '        body: "#f3ead7"',
+  '',
+].join('\n');
+
+t('a sparse row: a field the file never named is writable, judged, and the ROW is what takes it back', () => {
+  const tune = mini(parseYaml(HOUSE_SRC).tree, HOUSE_SRC);
+  const set = 'houses.classics.dice.ivory';
+  assert.deepEqual(tune.SHIPPED.houses.classics.dice.ivory, { label: 'Ivory', body: '#f3ead7' },
+    'sparse: the row is what the file says and not one field more');
+  assert.equal(tune.dialAt(`${set}.glyph`).def, 'digit', 'and the absent field still has its dial');
+  assert.equal(tune.get(`${set}.glyph`), undefined, 'with no value behind it');
+
+  assert.deepEqual(tune.set({ [`${set}.glyph`]: 'pip' }).refused, [], 'the write mints the leaf');
+  assert.equal(tune.get(`${set}.glyph`), 'pip');
+  // …and a field inside a group the row does not have yet brings the group
+  // with it — only that field of it, never the group's defaults.
+  assert.deepEqual(tune.set({ [`${set}.geo.bevel`]: 0.05 }).refused, []);
+  assert.deepEqual(tune.get(`${set}.geo`), { bevel: 0.05 }, 'the group holds the one field written');
+
+  // A minted leaf is judged exactly as a written one: the dial's own `def` —
+  // the code's fallback, which is what the empty panel field was showing — is
+  // the value the type check reads.
+  assert.deepEqual(tune.set({ [`${set}.glyph`]: 'runes' }).refused, [[`${set}.glyph`, 'option']]);
+  assert.deepEqual(tune.set({ [`${set}.geo.nicks`]: 'three' }).refused, [[`${set}.geo.nicks`, 'type']]);
+  assert.deepEqual(tune.set({ [`${set}.faces`]: ['1', '2', '3', '4', '5', 'claw'] }, { filmLocked: true }).refused,
+    [[`${set}.faces`, 'film']], 'and a face table locks with a second seat, minted or not');
+  assert.equal(tune.get(`${set}.geo.nicks`), undefined, 'a refused mint leaves nothing behind');
+
+  // The diff says the file did not say it, which is what Save writes out.
+  const d = tune.diff().filter((x) => x.path.startsWith(`${set}.`));
+  assert.deepEqual(d.map((x) => [x.path, x.shipped, x.live, x.declared]), [
+    [`${set}.glyph`, undefined, 'pip', false],
+    [`${set}.geo.bevel`, undefined, 0.05, false],
+  ]);
+  assert.match(tune.exportYaml(), /\n        glyph: pip\n/);
+  assert.match(tune.exportYaml(), /bevel: 0\.05/);
+
+  // The ROW is the unit that takes them away again — a minted field has no
+  // shipped value to go back to, so `reset` at the field's own path refuses
+  // by name (the C4 rule, unchanged).
+  assert.deepEqual(tune.reset(`${set}.glyph`).refused, [[`${set}.glyph`, 'row']]);
+  tune.reset(set);
+  assert.deepEqual(tune.changes(), {});
+  assert.deepEqual(tune.get(set), { label: 'Ivory', body: '#f3ead7' }, 'sparse again, to the field');
+
+  // THE ROW STILL HAS TO EXIST, and the two refusals still mean what they
+  // meant: a set nobody ever had is 'unknown'; a declared set this session
+  // removed is 'row'.
+  assert.deepEqual(tune.set({ 'houses.classics.dice.onyx.body': '#141416' }).refused,
+    [['houses.classics.dice.onyx.body', 'unknown']]);
+  assert.deepEqual(tune.set({ 'houses.nowhere.dice.ivory.glyph': 'pip' }).refused,
+    [['houses.nowhere.dice.ivory.glyph', 'unknown']]);
+  tune.removeRow(['houses', 'classics', 'dice'], 'ivory');
+  assert.deepEqual(tune.set({ [`${set}.glyph`]: 'pip' }).refused, [[`${set}.glyph`, 'row']]);
+  assert.deepEqual(tune.rowsOf('houses').classics.dice, {}, 'and nothing was minted into the hole');
+});
+
+t('a binder that throws over a MINTED field takes the field away, not a value back', () => {
+  const tune = mini(parseYaml(HOUSE_SRC).tree, HOUSE_SRC);
+  const quiet = console.error; console.error = () => {};
+  try {
+    tune.bind('houses.*', () => { throw new Error('the skin did not rebuild'); });
+    const r = tune.set({ 'houses.classics.dice.ivory.geo.bevel': 0.05 });
+    assert.deepEqual(r.refused, [['houses.classics.dice.ivory.geo.bevel', 'binder']]);
+    // A rollback that wrote the previous value back would write `undefined` AT
+    // the leaf and leave an empty `geo:` behind it — a group `leaves` walks and
+    // `changes()` cannot name. The shallowest node the write created is what
+    // goes.
+    assert.equal(tune.get('houses.classics.dice.ivory.geo'), undefined);
+    assert.deepEqual(Object.keys(tune.T.houses.classics.dice.ivory), ['label', 'body']);
+    assert.deepEqual(tune.changes(), {});
+  } finally { console.error = quiet; }
+});
+
+// A LIST DIAL WITH A NULL `each` HAD NO LAW AT ALL (the D1 review): `judge`
+// fell through, so `[]`, `[null]` and `[1, 2]` were all legal palettes — in
+// the declaration, through `set` and through the armed route — and
+// js/particles.js handed the number to `hexRGB`. "Not a fixed vocabulary" is
+// not "not even a string".
+t('a list dial: every entry is a string, `each` is the vocabulary, `len` is how many the code reads', () => {
+  const RECIPE = ASSET_ROWS.houses.dice.rows;
+  assert.deepEqual(RECIPE.faces.len, [6, 6], 'a face table is six or it is not a face table');
+  assert.deepEqual(RECIPE.decal.colors.len, [1, 2], 'js/decals.js reads colors[0] and colors[1] || colors[0]');
+  assert.deepEqual(RECIPE.particles.colors.len, [1, 8], 'a palette is one or more');
+  assert.equal(RECIPE.particles.colors.each, undefined, 'and it has no vocabulary — there is no list of legal colours');
+  assert.throws(() => list('x', ['a'], null, null, 'look', 'apply'), /len/);
+  assert.throws(() => list('x', ['a'], null, [0, 2], 'look', 'apply'), /len/);
+  assert.throws(() => list('x', ['a', 'b'], null, [1, 1], 'look', 'apply'), /outside len/);
+  assert.throws(() => list('x', ['a'], ['a'], [1, 2], 'look', 'apply'), /two entries/);
+
+  const tune = mini(parseYaml(HOUSE_SRC).tree, HOUSE_SRC);
+  const colors = 'houses.classics.dice.ivory.particles.colors';
+  assert.deepEqual(tune.set({ [colors]: ['#112233', '#445566'] }).refused, []);
+  assert.deepEqual(tune.set({ [colors]: [1, 2] }).refused, [[colors, 'type']], 'a number is not a colour');
+  assert.deepEqual(tune.set({ [colors]: [null] }).refused, [[colors, 'type']]);
+  assert.deepEqual(tune.set({ [colors]: [] }).refused, [[colors, 'range']], 'a palette of none is not a palette');
+  assert.deepEqual(tune.get(colors), ['#112233', '#445566'], 'and none of the refusals moved it');
+  const faces = 'houses.classics.dice.ivory.faces';
+  assert.deepEqual(tune.set({ [faces]: ['1', '2', '3', '4', '5', 'claw'] }).refused, []);
+  assert.deepEqual(tune.set({ [faces]: ['plus', 'minus'] }).refused, [[faces, 'range']], 'six values, six readings');
+  assert.deepEqual(tune.set({ [faces]: ['1', '2', '3', '4', '5', 'sword'] }).refused, [[faces, 'option']],
+    'and a symbol nobody drew is refused by name');
+
+  // The same three laws at the DECLARATION, where the message says which.
+  const bad = [];
+  createTune({
+    declared: { houses: { h: { label: 'H', dice: { s: { particles: { kind: 'motes', colors: [1, 2] } } } } } },
+    dials: MINI, onRefuse: (r) => bad.push(r.message),
+  });
+  assert.deepEqual(bad, ['houses.h.dice.s.particles.colors: every entry must be a string, got [1,2]; the default stands']);
+  const short = [];
+  createTune({
+    declared: { houses: { h: { label: 'H', dice: { s: { faces: ['1', '2'] } } } } },
+    dials: MINI, onRefuse: (r) => short.push(r.message),
+  });
+  assert.deepEqual(short, ['houses.h.dice.s.faces: takes 6 entries, got 2; the default stands']);
 });
 
 // `resetRows` read `prefix[1]` without asking how long the prefix was, so a
@@ -894,8 +1046,13 @@ t('dice.yaml is the declaration, and the file is the authority: every leaf has a
   // what stands when a line is deleted, nothing more; the guard here is that
   // every leaf the file names has a dial of the right TYPE (and option), and
   // that the file's sections are the dial tree's, in order.
+  //
+  // AN ASSET SECTION IS CHECKED BY ITS ROW SHAPE, not by the dial tree — there
+  // is no dial at `houses.classics.dice.ivory.body` to walk to, only a row
+  // whose `body` field is one. `assetDialFor` is that walk, and the catalogue
+  // drift guard (tests/catalogue.test.mjs) is where the recipes are read hard.
   const { tree } = parseYaml(text);
-  const fileLeaves = leaves(tree).map(dotted);
+  const fileLeaves = leaves(tree).map(dotted).filter((p) => !ASSET_SECTIONS.includes(p.split('.')[0]));
   for (const p of fileLeaves) {
     const d = getLeaf(DIALS, p);
     assert.ok(isDial(d), `dice.yaml names ${p} but js/tune.js has no dial for it`);
@@ -904,18 +1061,41 @@ t('dice.yaml is the declaration, and the file is the authority: every leaf has a
     if (d.options) assert.ok(d.options.includes(v), `${p} outside its options`);
   }
   assert.equal(tree.app.mode, 'development');
-  assert.deepEqual(Object.keys(tree), Object.keys(DIALS).filter((k) => k in tree), 'sections in the dial tree\'s order');
-  assert.deepEqual(Object.keys(tree), ['app', 'table', 'light', 'camera', 'throw', 'pace', 'sound', 'post', 'cards']);
+  const dialSections = Object.keys(tree).filter((k) => !ASSET_SECTIONS.includes(k));
+  assert.deepEqual(dialSections, Object.keys(DIALS).filter((k) => k in tree), 'sections in the dial tree\'s order');
+  assert.deepEqual(dialSections, ['app', 'table', 'light', 'camera', 'throw', 'pace', 'sound', 'post', 'cards']);
+  // The asset sections come after them, and `houses:` is the only one the file
+  // ships with — a `felts:` row is a house addition, so absence is its default.
+  assert.deepEqual(Object.keys(tree).filter((k) => ASSET_SECTIONS.includes(k)), ['houses']);
 });
 
 t('createTune over the real file: SHIPPED is defaults ⊕ file with nothing refused, and nothing differs at birth', () => {
   const { tree } = parseYaml(text);
   const tune = createTune({ declared: tree, source: text });
-  assert.deepEqual(tune.SHIPPED, merge(defaultsOf(DIALS), tree));
+  // A SPARSE SECTION RECONCILES TO ITSELF, with one documented exception: the
+  // three `glow: null` lines. A null is ABSENT everywhere in this design, so
+  // the reconciled tree has no `glow` key where the file writes the null —
+  // dice.js reads `def.glow` for truth and cannot tell the two apart, and the
+  // LINE is what carries "the digits carry all the light" to the next reader.
+  const declared = JSON.parse(JSON.stringify(tree, (k, v) => (k === 'glow' && v === null ? undefined : v)));
+  assert.deepEqual(tune.SHIPPED, merge(defaultsOf(DIALS), declared));
   assert.deepEqual(tune.refusals, [], 'every declared value fits its dial');
   assert.deepEqual(tune.diff(), []);
-  assert.deepEqual(tune.sections(), Object.keys(DIALS));
-  for (const p of leaves(tune.SHIPPED)) assert.ok(!FORBIDDEN_LEAF.test(dotted(p)), dotted(p));
+  assert.deepEqual(tune.sections(), Object.keys(DIALS), 'and an asset section is never a dial section');
+  // FORBIDDEN_LEAF IS THE DIAL TREE'S LAW, and `houses.<h>.dice.<s>.faces` is
+  // the one path in the file it bites. It is not a value: the server still
+  // rolls 1..6 and the table is how the number is READ (js/rollspec.js — the
+  // table is "already per-die on the wire"). It is film-class exactly because
+  // both tabs must read it the same way, which is the guard GOALPOST 2
+  // actually wants here; a word ban cannot express "agree on it".
+  const exempt = /^houses\.[a-z0-9_-]+\.dice\.[a-z0-9_-]+\.faces$/;
+  for (const p of leaves(tune.SHIPPED)) {
+    if (exempt.test(dotted(p))) {
+      assert.equal(tune.dialAt(p).cls, 'film', `${dotted(p)} is exempt only because it locks`);
+      continue;
+    }
+    assert.ok(!FORBIDDEN_LEAF.test(dotted(p)), dotted(p));
+  }
 });
 
 t('exportYaml round trip: patch nothing → identical bytes; two leaves → only those lines differ', () => {
@@ -987,6 +1167,312 @@ t('applyPatchText merges a fragment through set, refusing unknown paths and the 
   const t2 = mini();
   t2.applyPatchText(paste);
   assert.deepEqual(t2.changes(), tune.changes(), 'copy patch → paste patch round-trips the changes');
+});
+
+
+// ---------------------------------------------------------------------------
+// LAWS (js/tune.js LAWS, phase D4): the check a slider range cannot make.
+// ---------------------------------------------------------------------------
+
+t('a `positive` law refuses zero and below, at the writer and at the file', () => {
+  // The slider floor said 0.25 and the number field beside it takes any finite
+  // value — which is the point of the number field, and was the hole.
+  assert.equal(DIALS.pace.tempo.k.law, 'positive');
+  assert.equal(DIALS.pace.tempo.k.range[0], 0.25, 'and the slider floor is 0.25');
+  assert.equal(DIALS.pace.tempo.rampS.law, undefined, '0 is a real reading for the ramp');
+  const tune = createTune({ declared: {} });
+  assert.deepEqual(tune.set({ 'pace.tempo.k': 0 }).refused, [['pace.tempo.k', 'range-law']]);
+  assert.deepEqual(tune.set({ 'pace.tempo.k': -1 }).refused, [['pace.tempo.k', 'range-law']]);
+  assert.equal(tune.T.pace.tempo.k, 1, 'and the value never moved');
+  assert.deepEqual(tune.set({ 'pace.tempo.k': 0.05 }).refused, [], 'below the slider is not below the law');
+  assert.equal(tune.T.pace.tempo.k, 0.05);
+  // At birth, through `judge`: the file may say it, and the default stands.
+  const seen = [];
+  const t2 = createTune({ declared: { pace: { tempo: { k: 0 } } }, onRefuse: (r) => seen.push(r) });
+  assert.deepEqual(seen.map((r) => [r.path, r.reason]), [['pace.tempo.k', 'range-law']]);
+  assert.match(seen[0].message, /greater than zero/);
+  assert.equal(t2.T.pace.tempo.k, 1, 'the code default stands');
+});
+
+t('the `cardClear` pair law judges the WHOLE patch, in either order', () => {
+  assert.equal(DIALS.cards.standoff.law, 'cardClear');
+  assert.equal(DIALS.cards.depth.law, 'cardClear');
+  assert.equal(DIALS.cards.width.law, undefined, 'width is across the ray and clears nothing');
+  // Every value the SLIDERS offer holds: the worst pair is the standoff at its
+  // floor against the depth at its ceiling, and that is exactly 0.
+  const [sMin] = DIALS.cards.standoff.range;
+  const dMax = DIALS.cards.depth.range[1];
+  assert.ok(sMin - dMax / 2 >= 0, `the slider pair holds (${sMin} − ${dMax}/2)`);
+  const tune = createTune({ declared: {} });
+  assert.deepEqual(tune.set({ 'cards.depth': 3.9 }).refused, [['cards.depth', 'geometry']],
+    'a typed depth that would put the card inside the rim is refused');
+  assert.equal(tune.T.cards.depth, 1.52);
+  // …and the two together, which are legal as a pair and illegal one at a
+  // time in whichever order Object.entries hands them over.
+  assert.deepEqual(tune.set({ 'cards.depth': 3.9, 'cards.standoff': 2 }).refused, []);
+  assert.deepEqual([tune.T.cards.standoff, tune.T.cards.depth], [2, 3.9]);
+  assert.deepEqual(tune.set({ 'cards.standoff': 0.5, 'cards.depth': 3 }).refused,
+    [['cards.standoff', 'geometry'], ['cards.depth', 'geometry']],
+    'a pair that does not hold refuses both halves, and neither lands');
+  assert.deepEqual([tune.T.cards.standoff, tune.T.cards.depth], [2, 3.9]);
+});
+
+t('a pair law over the DECLARATION drops the whole group, not half of it', () => {
+  const seen = [];
+  const tune = createTune({
+    declared: { cards: { standoff: 0.2, depth: 4, width: 5 } },
+    onRefuse: (r) => seen.push(r),
+  });
+  assert.deepEqual(seen.map((r) => r.path).sort(), ['cards.depth', 'cards.standoff']);
+  assert.equal(seen[0].reason, 'geometry');
+  assert.deepEqual([tune.SHIPPED.cards.standoff, tune.SHIPPED.cards.depth], [0.86, 1.52],
+    'both go back to the code default, which is a legal pair by construction');
+  assert.equal(tune.SHIPPED.cards.width, 5, 'and the leaf that carries no law is untouched');
+});
+
+// The D4 review, 2026-09-03: "`reset` of one half of a law pair can be
+// refused, so a value has no way back to the shipped one." `reset` funnels its
+// entries through `apply`, which judges the pair against the patch plus T — so
+// one leaf going home was judged against the OTHER leaf's typed value instead
+// of against the shipped pair, which holds by construction.
+t('a reset that names half a pair widens to the whole group', () => {
+  const tune = createTune({ declared: {} });
+  assert.deepEqual(tune.lawMates('cards.depth'), [['cards.standoff', 0.86]]);
+  assert.deepEqual(tune.lawMates('cards.width'), [], 'a leaf that stands alone has no mate');
+  assert.deepEqual(tune.lawMates('table.scale'), []);
+  // A pair only the typed field can reach: 0.2 − 0.4/2 is exactly 0.
+  assert.deepEqual(tune.set({ 'cards.depth': 0.4 }).refused, []);
+  assert.deepEqual(tune.set({ 'cards.standoff': 0.2 }).refused, []);
+  const r = tune.reset('cards.depth');
+  assert.deepEqual(r.refused, [], 'the leaf goes home');
+  assert.deepEqual([tune.T.cards.standoff, tune.T.cards.depth], [0.86, 1.52],
+    'and its mate goes with it — the shipped pair is the legal state');
+  // A scope that already carries both halves adds nothing, and a scope that
+  // moves neither still adds nothing.
+  tune.set({ 'cards.depth': 3.9, 'cards.standoff': 2.2, 'cards.width': 5 });
+  assert.deepEqual(tune.reset('cards').refused, []);
+  assert.deepEqual(tune.changes(), {});
+  tune.set({ 'cards.width': 5 });
+  assert.deepEqual(tune.reset('cards.width').refused, []);
+  assert.deepEqual(tune.changes(), {}, 'a lawless leaf resets alone');
+});
+
+t('cards.* is an apply row now, not a reload row', () => {
+  for (const k of ['standoff', 'width', 'depth']) {
+    assert.equal(DIALS.cards[k].read, 'apply', `cards.${k} lands at the placard flush`);
+    assert.equal(DIALS.cards[k].cls, 'film', '…and is still the shared geometry');
+  }
+  const tune = createTune({ declared: {} });
+  const seen = [];
+  tune.bind('cards.*', (p, v, covered) => seen.push(covered.map(([q]) => q)));
+  const r = tune.set({ 'cards.width': 4, 'cards.standoff': 1 });
+  assert.deepEqual(r.pending, [], 'nothing is owed to a reload');
+  assert.deepEqual(seen, [['cards.width', 'cards.standoff']], 'one binder call for the pair');
+});
+
+// ---------------------------------------------------------------------------
+// PRESETS (docs/DEVMODE.md §8, phase D4): the third asset section, whose row
+// shape is the DIAL TREE.
+// ---------------------------------------------------------------------------
+
+t('a preset row is judged against the dial tree, leaf for leaf', () => {
+  assert.ok(ASSET_SECTIONS.includes('presets'));
+  assert.equal(ASSET_ROWS.presets, DIALS, 'the row shape IS the dial tree');
+  assert.deepEqual(assetRowDefaults('presets'), {}, 'and it is SPARSE: a preset says what it moves');
+  assert.equal(assetDialFor('presets.dusk.light.lamp.y'), DIALS.light.lamp.y);
+  assert.equal(assetDialFor('presets.dusk.throw.physics.gravity'), DIALS.throw.physics.gravity);
+  assert.match(assetDialFor('presets.dusk.nope'), /no presets field named "nope"/);
+  assert.match(assetDialFor('presets.DUSK.light'), /not a legal presets id/);
+  assert.match(assetDialFor('presets.dusk.light'), /is a group of fields/);
+});
+
+t('addRow mints a preset, set applies it as a paste, and the film lock holds', () => {
+  const tune = createTune({ declared: {} });
+  const bad = tune.addRow('presets', 'dusk', {
+    light: { lamp: { y: 30, angle: 'wide' } },
+    throw: { physics: { gravity: -60 } },
+    nope: { x: 1 },
+  });
+  assert.deepEqual(bad.refused,
+    [['presets.dusk.light.lamp.angle', 'type'], ['presets.dusk.nope', 'unknown']],
+    'a wrong value and a path that is not a dial are named one by one');
+  assert.deepEqual(tune.rowsOf('presets').dusk,
+    { light: { lamp: { y: 30 } }, throw: { physics: { gravity: -60 } } });
+  // The row is a CHANGE — it is what the file would gain.
+  assert.deepEqual(tune.changes(),
+    { 'presets.dusk.light.lamp.y': 30, 'presets.dusk.throw.physics.gravity': -60 });
+  // Applying it is a paste through `set`, so the lock refuses the film half
+  // and the look half still lands.
+  const r = tune.set({ 'light.lamp.y': 30, 'throw.physics.gravity': -60 }, { filmLocked: true });
+  assert.deepEqual(r.refused, [['throw.physics.gravity', 'film']]);
+  assert.equal(tune.T.light.lamp.y, 30);
+  assert.equal(tune.T.throw.physics.gravity, -110);
+  // …and the row is the unit that leaves.
+  assert.deepEqual(tune.removeRow('presets', 'dusk').refused, []);
+  assert.deepEqual(tune.rowsOf('presets'), {});
+  assert.deepEqual(tune.addRow('presets', 'A.b', {}).refused, [['presets.A.b', 'id']]);
+});
+
+// The D4 review, 2026-09-03: "a preset row's leaves escape the PAIR law, in
+// both judges" — `checkLawPairs` and `judgePairs` walked `leaves(defaults)`
+// alone, so no path under `presets.<name>.…` was ever in a law group, and the
+// file could hold a preset whose Apply could only ever refuse both leaves.
+t('the laws reach INSIDE a preset row: the pair is judged in the row it lives in', () => {
+  // At birth: the whole group goes, by name, exactly as at the root.
+  const seen = [];
+  const t1 = createTune({
+    declared: { presets: { odd: { cards: { standoff: 0.5, depth: 3 }, pace: { tempo: { k: 0 } } } } },
+    onRefuse: (r) => seen.push(r),
+  });
+  assert.deepEqual(seen.map((r) => [r.path, r.reason]), [
+    ['presets.odd.pace.tempo.k', 'range-law'],
+    ['presets.odd.cards.standoff', 'geometry'],
+    ['presets.odd.cards.depth', 'geometry'],
+  ]);
+  assert.match(seen[1].message, /the defaults stand for all of presets\.odd\.cards\.standoff, presets\.odd\.cards\.depth/);
+  assert.deepEqual(t1.rowsOf('presets').odd.cards, {}, 'the half-claim is not in the row');
+  // A pair that HOLDS inside the row stands, even where it would be illegal
+  // against the table's own cards: a preset is applied whole.
+  const t2 = createTune({ declared: { presets: { deep: { cards: { standoff: 2.2, depth: 3.9 } } } } });
+  assert.deepEqual(t2.rowsOf('presets').deep, { cards: { standoff: 2.2, depth: 3.9 } });
+  // …and a write into the row reads the ROW's other half, not the table's.
+  assert.deepEqual(t2.set({ 'presets.deep.cards.depth': 3.5 }).refused, []);
+  assert.deepEqual(t2.set({ 'presets.deep.cards.depth': 5 }).refused,
+    [['presets.deep.cards.depth', 'geometry']], '5 − 2.2 is past the rim in the row too');
+  assert.deepEqual([t2.T.cards.standoff, t2.T.cards.depth], [0.86, 1.52], 'the table never moved');
+  assert.deepEqual(t2.lawMates('presets.deep.cards.depth'), [['presets.deep.cards.standoff', 2.2]]);
+  // And `addRow` is the same door: the row lands minus the claim it broke.
+  const r = t2.addRow('presets', 'odd', { cards: { standoff: 0.5, depth: 3 }, light: { lamp: { y: 30 } } });
+  assert.deepEqual(r.refused, [['presets.odd.cards.standoff', 'geometry'], ['presets.odd.cards.depth', 'geometry']]);
+  assert.deepEqual(t2.rowsOf('presets').odd, { cards: {}, light: { lamp: { y: 30 } } });
+  assert.deepEqual(t2.addRow('presets', 'ok', { cards: { standoff: 2.2, depth: 3.9 } }).refused, []);
+});
+
+t('a preset may not name a static leaf: `app.mode` is dropped at birth', () => {
+  const seen = [];
+  const tune = createTune({
+    declared: { presets: { odd: { app: { mode: 'production', title: 'Felt' } } } },
+    onRefuse: (r) => seen.push(r),
+  });
+  assert.deepEqual(seen.map((r) => [r.path, r.reason]), [['presets.odd.app.mode', 'static']]);
+  assert.match(seen[0].message, /set in dice\.yaml or DICE_MODE/);
+  assert.deepEqual(tune.rowsOf('presets').odd, { app: { title: 'Felt' } },
+    'the rest of the row stands: only the field nobody could ever apply is gone');
+  assert.deepEqual(tune.addRow('presets', 'two', { app: { mode: 'production' } }).refused,
+    [['presets.two.app.mode', 'static']]);
+  // …and `set` is the third door: a preset row is SPARSE, so a write there
+  // would have MINTED the field into the row rather than found it missing.
+  const t3 = createTune({ declared: { presets: { odd: { light: { lamp: { y: 30 } } } } } });
+  assert.deepEqual(t3.set({ 'presets.odd.app.mode': 'production' }).refused,
+    [['presets.odd.app.mode', 'static']]);
+  assert.deepEqual(t3.rowsOf('presets').odd, { light: { lamp: { y: 30 } } });
+  assert.deepEqual(t3.set({ 'presets.odd.app.title': 'Felt' }).refused, [],
+    'the leaf beside it is an ordinary dial and mints as one');
+});
+
+t('a declared preset is SHIPPED: reset restores it, and export round-trips', () => {
+  const src = 'light:\n  lamp:\n    y: 24            # the pool\npresets:\n  dusk:\n    light: { lamp: { y: 30 } }\n';
+  const tune = createTune({ declared: parseYaml(src).tree, source: src });
+  assert.deepEqual(tune.SHIPPED.presets, { dusk: { light: { lamp: { y: 30 } } } });
+  assert.ok(tune.rowIsDeclared('presets', 'dusk'));
+  assert.deepEqual(tune.changes(), {}, 'a declared preset nobody has touched is not a change');
+  assert.equal(tune.exportYaml(), src, 'and the export of an unchanged tree is the file');
+  tune.removeRow('presets', 'dusk');
+  assert.deepEqual(tune.changes(), { 'presets.dusk.light.lamp.y': undefined });
+  // The ROW leaves whole — not four absent leaves, which patchYaml's "the
+  // map's last child left" rule would have turned into `dusk: {}`, a row the
+  // reader fills back out on the next boot. The last row out of a section
+  // leaves `presets: {}` behind, which is a section with no rows in it; that
+  // is `exportChanges`' shape and the felts editor's too.
+  assert.deepEqual(parseYaml(tune.exportYaml()).tree.presets, {}, 'the row leaves whole');
+  tune.reset('presets');
+  assert.deepEqual(tune.rowsOf('presets'), { dusk: { light: { lamp: { y: 30 } } } }, 'and reset puts it back');
+  // A held row that the file never had: reset takes it AWAY, there being
+  // nothing to reset it to.
+  tune.addRow('presets', 'noon', { light: { room: { key: 3 } } });
+  tune.reset('all');
+  assert.deepEqual(Object.keys(tune.rowsOf('presets')), ['dusk']);
+});
+
+// ---------------------------------------------------------------------------
+// watch — the spectators (phase D5): the recorder and the pop-out
+// ---------------------------------------------------------------------------
+
+t('watch is told what LANDED, whatever door the write came through', () => {
+  const tune = mini({ light: { lamp: { y: 24 } } });
+  const seen = [];
+  const off = tune.watch((e) => seen.push(e));
+  tune.set({ 'light.lamp.y': 30 });
+  assert.deepEqual(seen, [{ kind: 'set', patch: { 'light.lamp.y': 30 }, refused: [] }]);
+  // A reset is a set: it funnels through the same writer, so a recorder gets
+  // it without knowing there is such a verb.
+  seen.length = 0;
+  tune.reset('all');
+  assert.deepEqual(seen, [{ kind: 'set', patch: { 'light.lamp.y': 24 }, refused: [] }]);
+  // …and applyPatchText too, for the same reason.
+  seen.length = 0;
+  tune.applyPatchText('light:\n  lamp:\n    y: 31\n');
+  assert.deepEqual(seen.map((e) => e.patch), [{ 'light.lamp.y': 31 }]);
+  off();
+  tune.set({ 'light.lamp.y': 32 });
+  assert.equal(seen.length, 1, 'the unsubscribe is the return value, and it works');
+});
+
+t('watch reports the patch that LANDED, not the one that was asked for', () => {
+  const tune = mini({});
+  const seen = [];
+  tune.watch((e) => seen.push(e));
+  // Refused leaves are out; the lawful one of the same patch is in.
+  tune.set({ 'light.lamp.y': 'high', 'light.fog.far': 60, 'throw.rng': 1 });
+  assert.deepEqual(seen[0].patch, { 'light.fog.far': 60 });
+  assert.deepEqual(seen[0].refused, [['light.lamp.y', 'type'], ['throw.rng', 'unknown']]);
+  // A binder that THREW turns an accepted leaf into a refused one after the
+  // fact, and the value is put back — so a recorder that wrote down the ask
+  // would emit a step the tree never took.
+  seen.length = 0;
+  tune.bind('light.lamp.*', () => { throw new Error('nope'); });
+  const was = console.error;
+  console.error = () => {};
+  try { tune.set({ 'light.lamp.y': 40, 'light.fog.far': 50 }); } finally { console.error = was; }
+  assert.deepEqual(seen[0].patch, { 'light.fog.far': 50 });
+  assert.deepEqual(seen[0].refused, [['light.lamp.y', 'binder']]);
+  assert.equal(tune.get('light.lamp.y'), 24, 'and the tree really did go back');
+});
+
+t('a patch that moves nothing tells nobody', () => {
+  const tune = mini({});
+  const seen = [];
+  tune.watch((e) => seen.push(e));
+  tune.set({});
+  tune.set({ 'throw.rng': 1 });
+  assert.deepEqual(seen, [], 'an empty patch and a wholly-refused one are both silence');
+});
+
+t('rows are watched too: the pop-out has to redraw when a row lands or leaves', () => {
+  const tune = createTune({ declared: {} });
+  const seen = [];
+  tune.watch((e) => seen.push(`${e.kind} ${e.where}.${e.id}`));
+  tune.addRow('felts', 'house-moss', { name: 'Moss' });
+  tune.removeRow('felts', 'house-moss');
+  assert.deepEqual(seen, ['addRow felts.house-moss', 'removeRow felts.house-moss']);
+});
+
+t('a watcher that throws is a spectator, not a veto', () => {
+  const tune = mini({});
+  const seen = [];
+  tune.watch(() => { throw new Error('bad watcher'); });
+  tune.watch((e) => seen.push(e.patch));
+  const was = console.error;
+  const lines = [];
+  console.error = (...a) => lines.push(a.join(' '));
+  try {
+    const r = tune.set({ 'light.lamp.y': 40 });
+    assert.deepEqual(r.refused, [], 'the write is not refused by the watcher');
+  } finally { console.error = was; }
+  assert.equal(tune.get('light.lamp.y'), 40, 'and it landed');
+  assert.deepEqual(seen, [{ 'light.lamp.y': 40 }], 'the other watcher still heard it');
+  assert.match(lines.join(' '), /watcher threw/);
+  assert.throws(() => tune.watch('not a function'), /must be a function/);
 });
 
 if (!process.exitCode) console.log(`tune: ${n} tests passed`);

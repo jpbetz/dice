@@ -426,19 +426,22 @@ leverage order for this zero-dep codebase:
    §9c fillet arcs (2026-08-04): a round set now BULGES past its cut
    twin (the arc reaches back toward the sharp edge), so the old
    strictly-by-character radius ladder no longer holds numerically —
-   the lab-geo-bench scenario asserts the current invariants instead
+   the lab-geo-bench scenario asserted the current invariants instead
    via `__lab.geoStats()`: cut radii monotone in bevel, fillets above
    their cut twins but inside the sharp corner, ink/pillow
    silhouette-neutral, wear pulling inward, and every render mesh
-   WATERTIGHT (the unpaired-directed-edge probe).
+   WATERTIGHT (the unpaired-directed-edge probe). **That scenario retired
+   with the lab on 2026-09-03 and nothing re-makes those measurements
+   yet** — docs/DEVMODE.md §9 carries each of them as owed. The claims
+   above are still what the geometry does; they are, for now, unguarded.
 4. **The environment joins the theme** — felt decals from the landing
    point and a colored light PARENTED to the die (a biolume die casts
    teal on its patch of felt; Umbra pools local shadow instead of
    dimming the world). **← SHIPPED 2026-08-03 — and the MARKS half was
    RETIRED TO A KILL SWITCH the same evening** (Joe: loved everything
    but the residue on the table). `DECALS_DEFAULT_ENABLED = false` in
-   js/decals.js gates DecalField.stamp for table and lab alike;
-   `__diceDebug.decalsEnable(true)` / `__lab.decalsEnable(true)` re-arm
+   js/decals.js gates DecalField.stamp (for the lab too, while it stood);
+   `__diceDebug.decalsEnable(true)` re-arms
    one page for trials, and flipping the constant brings the marks back
    for good. Recipes keep their `decal:` fields (inert while off), die
    lights are untouched, and themed-fx locks the clean-felt default
@@ -546,57 +549,36 @@ Side-channel: render-only child meshes (the bevel already works this
 way) can change the SILHOUETTE — verdigris corner caps, crystal spurs,
 vine loops — while the physics hull stays canonical.
 
-## The lab
+## The lab — RETIRED 2026-09-03
 
-`lab.html` is the experimentation rig (dev chrome, not player UI): every
-theme × every die type in one grid, idle-rotation toggle, per-theme
-effect trigger buttons, a ⬇ drop button per set (the Level 3 rig — a
-real physics die whose measured contacts fire the set's bursts; sets
-without particles prove the restraint), and one-click PNG capture.
+`lab.html` + `js/lab.js` were the experimentation rig (dev chrome, not
+player UI): every theme × every die type in one grid, idle rotation, a ⬇
+drop rig per set (a real physics die whose measured contacts fired the
+set's bursts), the GEO BENCH (nine lab-only rows sweeping the Level 3.5
+`geo` space over otherwise-standard dice), the ⚗ SET BUILDER (every
+recipe knob live, rebuilding a dedicated grid row on change, copy-out as
+a themes.js-shaped omit-at-default recipe body), hero framing
+(`__lab.zoomDie` / `zoomRow`), and `sampleWorld(p)` — average framebuffer
+RGB around a projected world point.
 
-THE GEO BENCH (2026-08-04, softer edges Tier 0 — ROADMAP §9c): nine
-lab-only rows sweep the Level 3.5 `geo` space over otherwise-standard
-dice, seated under the std row (cut and fillet widths, an ink-.04
-self-colored row, pillow, and two worn-character rows). Two seams make them honest: a set may
-omit body/text to inherit the std per-type colors, and house-less sets
-clamp to the std envMapIntensity whisper — so a bench row differs from
-std by its geo recipe ALONE. They register through themes.js
-`registerSet` into the page's own SETS instance; SET_IDS (the published
-picker) never sees a `lab.*` id.
+**It retired into developer mode's `houses` section** (docs/DEVMODE.md
+§9, phase D3). The reason is the one docs/IMMERSION.md §"the lab builds a
+parallel universe" gave: the lab had its own `WebGLRenderer`, camera,
+lights, `ENVS` presets and rAF loop, with no roll, no ceremony, no
+verdict and no sound — so a set judged there was judged somewhere the
+player never goes. The panel's sets editor puts the same ninety knobs on
+the REAL felt, under the real lamp, with the standing dice reskinned in
+place and *Throw one of each* through the ordinary bench path.
 
-THE SET BUILDER (same date): the ⚗ panel makes every recipe knob live —
-geometry, colors (or inherit-std), feel, specular identity, internal
-glow, surface maps, glyphs — rebuilding a dedicated grid row on change
-(`bustDie` evicts the variant's cached builds, then the row remakes its
-meshes). Seeds load from std, any bench row, or any house set; sections
-the panel can't tune (shader, particles, decal, light, post, sound,
-rate) ride along and print. The copy-out is a themes.js-shaped recipe
-body, omit-at-default, paste-ready. Scriptable: `__lab.builderSet(patch)`
-/ `__lab.builderRecipe()`.
-
-Every sidebar row carries THE READOUT — its full recipe in one glance,
-std defaults spelled out where a section is absent. Detail navigation:
-click a die on the felt for a HERO frame (`__lab.zoomDie(rowId, type)`),
-↑/↓ flip the SAME die type across sets while framed, ←/→ walk the die
-types, scroll dollies, esc refits the grid; the bench section header
-frames the whole std→builder span (`__lab.zoomRows`). e2e:
-lab-geo-bench (tag `lab`); stills: `tools/geo-bench-shots.mjs`.
-
-For Level 4 the drop rig grew table furniture: a COUPON of felt fades in
-under the die (marks and glow act on a table; the rig floats over a
-void — the coupon is deliberately brighter than the table's felt, since
-the lab's lights are a fraction of the table's), rails at the coupon's
-edges (a tumbling die converts spin to lateral walk and drifts off an
-unfenced floor — the rails hug the dropView frustum so a pinned die
-still shows), a post-settle linger of 3.5 s (Level 4's point is the mark
-that REMAINS; the old 900 ms cleanup suited Level 3's fast-dying bursts
-and swept the felt before a mark could be seen), and `dropView(id)` — a
-~57°-down framing, because the zoom view reads the felt edge-on, which
-is exactly the angle a flat decal vanishes at. Diagnostics: `stamps` in
-dropState, `decalCount/decalDump`, `lightInfo`, and `sampleWorld(p)` —
-average framebuffer RGB around a projected world point, which settled
-"is that mark pale or dark" with numbers when review-distance eyeballs
-couldn't (answer: pale, +8 RGB — the dark blobs were something else).
+Retired with it: `tools/lab-shots.mjs`, `tools/geo-bench-shots.mjs`, the
+`lab-geo-bench` e2e scenario (tag `lab` — the tag is gone), and
+`verdict-shots.mjs`'s `bench` and `set` frame groups. **What the lab
+could do that the sets editor cannot yet is listed as owed in
+docs/DEVMODE.md §9** — the watertight probe over every render mesh, the
+geo-bench sweep's orderings, `zoomDie`'s hero frames, `faceDump`,
+`sampleWorld`, and the drop rig's marks-and-glow furniture. Nothing on
+that list was lost quietly; it was written down the day it stopped
+running.
 
 ## On the main table (shipped 2026-08-03)
 
@@ -712,8 +694,10 @@ unshrouded shimmer-set dice still on the felt, and both reveal paths
 restore mesh.userData.bloom right along with the materials (the mesh
 was born shrouded — without the flag restore, a revealed molten die
 never burned). e2e: themed-post (tag `themes`).
-`tools/lab-shots.mjs` drives it headless over CDP and drops PNGs for
-side-by-side review. Themes land in `js/themes.js` as material recipes;
-the main app consumes NOTHING from the lab until a set graduates
+(`tools/lab-shots.mjs` drove it headless over CDP and dropped PNGs for
+side-by-side review, until both retired on 2026-09-03.) Themes land in
+`js/themes.js` as material recipes — the RECIPES themselves moved into
+`houses:` in dice.yaml on the same day (DEVMODE §9); themes.js keeps the
+grammar. The main app consumed NOTHING from the lab until a set graduated
 (picker + wire come later — §9's (type,setId) cache, per-player identity
 set, saved-pool override).

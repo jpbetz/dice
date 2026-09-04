@@ -95,7 +95,15 @@ and the fix alike.
 
 Deploy from source (no Dockerfile): the Node buildpack runs `npm start` →
 `node server.js`, honors `engines.node`, and installs nothing (zero deps).
-`.gcloudignore` keeps tests/docs/tools out of the upload.
+`.gcloudignore` keeps tests/docs/tools out of the upload — and, since
+2026-09-03, developer mode's own files: `js/devmode.js`, `js/devui.js`,
+`css/dev.css` and `dev.html`, the pop-out page that mounts the panel in its
+own window (docs/DEVMODE.md §8). `app.mode: production` already makes the door
+refuse, but that is a value in a file; withholding the bytes is the answer
+that does not depend on a setting. `js/main.js` imports the panel dynamically
+and latches on the miss, so the deployed tab logs one warn if anyone presses
+the backtick and is otherwise a tab; `/dev.html` is a 404 there, which is the
+right answer for a page whose first import would 404 anyway.
 
 ## One-time setup (your side)
 

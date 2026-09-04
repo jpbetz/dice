@@ -40,12 +40,12 @@ const CELLS = 4; // atlas is CELLS × CELLS
 const STRENGTH_REF = 28; // same normalization as particles.js
 
 // KILL SWITCH (Joe, 2026-08-03): the marks are OFF by default — table
-// and lab both. He loved the ladder, not the residue. Everything else
+// and lab both, while there was a lab (js/lab.js retired 2026-09-03,
+// docs/DEVMODE.md §9). He loved the ladder, not the residue. Everything else
 // Level 4/5 built (die lights, bloom, rings, shimmer) stays live, and
 // the sets keep their `decal:` recipes — inert while this is false.
-// Per-page trial: __diceDebug.decalsEnable(true) (table) or
-// __lab.decalsEnable(true) (lab). To bring the marks back for good,
-// flip this constant.
+// Per-page trial: __diceDebug.decalsEnable(true). To bring the marks back
+// for good, flip this constant.
 export const DECALS_DEFAULT_ENABLED = false;
 
 function hexRGB(hex) {

@@ -54,10 +54,11 @@ under `sets:` and `felts:` in the same file. `app.mode: development` in
 the declaration, overridable by `DICE_MODE=production` at deploy time, is
 the production switch, left on development for now.
 
-Five separate developer doors exist today (`?demo=1`, `lab.html`,
-`chrome-lab.html`, `TOWERLAB` inside main.js, and ~250 `__diceDebug`
-console hooks). Developer mode becomes the one door; `?demo=1` is removed
-in phase 1, and the others fold in over three phases or are retired.
+Five separate developer doors existed when this was written (`?demo=1`,
+`lab.html`, `chrome-lab.html`, `TOWERLAB` inside main.js, and ~250
+`__diceDebug` console hooks). Developer mode becomes the one door; `?demo=1`
+was removed in phase 1 and `lab.html` retired in phase D3 (§9), leaving the
+chrome lab, TOWERLAB and the hooks.
 
 ## 2. Assumptions challenged
 
@@ -305,8 +306,28 @@ are all refused at the one writer), and the line-patching Save only
 rewrites lines a dial changed, so a Save from a running dev session can never flip it. It
 is a lock, not a boundary: `__diceDebug.moodTune` stays on the console as
 it does today, and that is enough because developer mode can only affect
-the tab that opened it. Phase 3 also drops `js/devmode.js` and
-`css/dev.css` from the production upload so it is *absent*, not just off.
+the tab that opened it.
+
+**ABSENT, NOT JUST OFF** (built 2026-09-03, phase D3). `.gcloudignore` names
+`js/devmode.js`, `js/devui.js`, `css/dev.css` and — since the pop-out landed
+in D5 — `dev.html`, so the deployed image does not carry the panel at all —
+`tools/` was already excluded, and `tools/devshell.html` goes with it. That is the SECOND answer, and it is the
+one that does not depend on a value in a file: `app.mode` is a line somebody
+can edit, an upload is bytes that are not there.
+
+The two answers are independent, and the build may disagree with the
+declaration — a fork's deploy, a hand rsync, a `.gcloudignore` that grew a
+line — so the door has to survive a build that says `development` and does
+not have the panel. It does: `devOpen` catches the dynamic import's failure,
+**latches** (`devAbsent`), returns null, and prints ONE `console.warn`, so a
+second backtick makes no second request and no second line. The tree is
+untouched by any of this — `tuneSet` still moves the lamp, because the
+declaration is what the app is configured by and the panel is only a way to
+turn its knobs. `dev-absent-in-prod` (tag `dev`) boots a tab from a tree with
+exactly those four files deleted and asserts each clause — `/dev.html`'s own
+404 included, because the happy half of `tests/static-cache.test.mjs` asserts
+it IS served locally and a line re-added to the upload would otherwise be
+invisible to the whole suite (the D5 review, 2026-09-03).
 
 ## 5. The tunables registry
 
@@ -353,6 +374,44 @@ export const DIALS = {
   slider takes any finite value, because "the range was wrong" is a thing
   developer mode exists to discover. Type is the law, and for an enum the
   option list is the law.
+- **And where a range genuinely is not enough, a `law` is** (phase D4,
+  js/tune.js `LAWS`). Two kinds of value are not "any finite number": one the
+  code DIVIDES BY (`pace.tempo.k` gates the impact drain on
+  `IMPACT_MIN_GAP_MS / k`, so 0 silences every landing and −1 runs the
+  projector backwards — `law: 'positive'`, refused `range-law`), and one that
+  has to hold against ANOTHER leaf (`cards.standoff − cards.depth / 2` is the
+  clear ground that licenses a card's depthWrite, its real shadow and the
+  seating raycast — `law: 'cardClear'`, refused `geometry`). A law is judged
+  at every door the value can arrive through: `tune.set`, the declaration at
+  birth (`createTune`), `tools/dice-apply.mjs` and the armed Save route. A
+  PAIR law reads the whole patch rather than one leaf, so the two halves of
+  `{ standoff: 2, depth: 3.9 }` are judged together and not in whichever order
+  `Object.entries` handed them over; and where the pair fails in the FILE, the
+  whole group goes back to the code's defaults, which hold by construction.
+  Sliders never offer a value a law refuses — the `cards` ranges were clamped
+  so the worst pair they can reach is exactly zero clear ground — because a
+  refusal in the middle of a drag is a refusal nobody asked for.
+- **What "every door" cost to actually mean** (the D4 review, 2026-09-03).
+  Three of the doors were ajar, each in the same shape: a judge that could
+  only see one leaf at a time.
+  - The armed Save route posts a FLAT patch, and `validateChanges` ran
+    `judgeValue`, which skips pair laws by design. So a tab that named one
+    half of a pair — two dev tabs, or a checkout edited after the tab booted
+    — wrote a file the next boot refused WHOLE, taking the checkout's own
+    line back to the default with it. The route judges the file it *would
+    write*: the posted patch merged onto the checkout it holds
+    (`validateChanges(changes, { base })`, js/dice-apply-core.js).
+  - A preset row is a sparse subtree of the dial tree, so its leaves are the
+    app's own leaves and answer the app's own laws — judged inside the row
+    (its other half, or the dial's default where the row is silent), by
+    `createTune`, `addRow`, `tune.set`, `validate` and the route alike
+    (js/tune.js `lawScopes`). A preset may not name a STATIC leaf either:
+    `presets.dusk.app.mode` is a row whose Apply could only ever be refused.
+  - And a pair goes back TOGETHER. A revert of one half was judged against
+    the half still standing, so a typed value had no way home from either
+    `tune.reset` or the panel's ↺; both widen a scope that names one leaf of
+    a group to the whole group (`tune.lawMates`), which is the widening the
+    birth check already did and is legal by the same argument.
 
 ```js
 // js/tune.js
@@ -663,6 +722,27 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
   `light.lamp.*` and `camera.*` binders, so a dial moves the picture with
   nobody asking. `dev-framing-overlay` holds all of it against the film's own
   answers.
+- **Presets** (phase D4, built) — the A/B slots, written down. `Hold as
+  preset` captures the dials as they now stand into a row under `presets:`,
+  `Apply` merges one back, `Remove` takes it away, and Save puts it in the
+  file, so "the light I liked on Tuesday" outlives the tab. It is the one
+  section with NO FORM, and deliberately: a preset's fields ARE the panel's
+  other sections, so what belongs here is a list and three verbs. Three
+  things it does that read as decisions rather than details:
+  - **Apply is a PASTE**, refused exactly where a paste is. At a shared table
+    the look rows land and the film rows come back refused by name on the
+    status line, so the button stays live under the lock — a preset is not
+    all-or-nothing the way a felt is, and disabling it would hide the half
+    that still works.
+  - **Hold drops the sky and drops rows.** The venue's light goes, the same
+    drop Save and the A/B slots make (`devSlotPatch` — a preset that captured
+    the glade's moon would write it onto the table's own lamp the next time it
+    was applied), and so does any `felts:` / `houses:` leaf: an asset is a ROW
+    and a preset that carried one would be a second copy of it under another
+    name. Clone is the verb that copies a row.
+  - **A preset of nothing is refused by name.** `changes()` and `diff()` speak
+    in LEAVES, so an empty row has none: Save would write no line for it and
+    the panel would list a preset the file could never come to hold.
 - **Footer:** the judged viewport and DPR (so a screenshot says what it
   measured), then the HUD — fps and draw calls on one line, triangles, physics
   bodies and the last film's settle seconds on the next (phase 2, built) —
@@ -670,9 +750,87 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
 - **Sync:** the panel holds no state. It repaints from `T` after every
   `tuneSet` and once per animation tick while open, so console
   `moodTune(...)` writes and slider writes converge without wrapping hooks.
-- **Phone** (phase 3): the same rows as a bottom sheet, folded by default.
-  Until then the honest phone loop is *dial on the desktop → Save → reload
-  on the phone*, or *Copy patch → Paste on the phone*.
+- **Phone** (phase D5, built) — under 640px OR on a coarse pointer the panel
+  stops being a column and becomes a **bottom sheet**: full width, `45dvh`
+  tall, folded by default, one section at a time, 44px rows, and a STEPPER
+  wherever the desktop draws a slider. One media query, read in two places
+  that have to agree — css/dev.css for the dress, `DEV_PHONE_QUERY` in
+  js/devmode.js for the two things a stylesheet cannot do (start folded,
+  change the control kind). Three decisions worth the words:
+  - **A slider is a mouse control.** A 4px thumb dragged with a fingertip is a
+    control that cannot hit a value, and hitting values is the panel's whole
+    job — so a range dial becomes ± the dial's own step with the typeable
+    number between them. Same commit path, same refusals, no drag the page
+    would rather read as a scroll.
+  - **The chrome had to earn its pixels.** Measured at 390×844 the first cut
+    gave the scroller 82 of the sheet's 380px — two rows of a panel that is
+    rows. The find box moved up beside the title (the panel's children become
+    a grid), the section bar scrolls sideways instead of wrapping, and the
+    footer's three lines flow as one block, which leaves ~180px: four rows and
+    a fifth in reach. The 44px floor was not touched to get there.
+  - **The sheet is opaque, and the card is not.** `--surface-card` is 94%, and
+    the 6% coming through under the dials was the roll log's own white rows.
+    A card floating over the felt is meant to let a little of it through; a
+    sheet that owns the bottom of the screen is not.
+  - *(The pre-D5 phone loop — dial on the desktop → Save → reload on the phone,
+    or Copy patch → Paste — still works and is still right for a long session;
+    the sheet is for the change you want to make while looking at the phone.)*
+- **Recorder** (phase D5, built) — `devRecord('start' | 'stop')` writes down
+  every `tune.set` patch, cast deal and seeded throw, and **Download step** in
+  the file section emits a `tools/steps/<name>.mjs` skeleton of them. It is a
+  LISTENER, not a wrapper: it arms `tune.watch`, so a dial that moved is in the
+  step whatever door it came through — a slider, `tuneSet` from the console, a
+  preset Apply, an A/B flip. And it is a DOWNLOAD, never the armed route: a
+  step is CODE, and the route is safe precisely because it writes one file and
+  validates every byte of it against the dial tree.
+  - **A CLONE IS AN OP** (the D5 review, 2026-09-03). `tune.set` refuses a
+    field of a row that is not there — the row is the unit — so a reel that
+    heard only `set` events had to drop every recipe edit of a set the session
+    had just authored, and the whole of a sets-editing session emitted a step
+    that reproduced none of it. `tune.watch` fires `addRow`/`removeRow` too;
+    the reel writes the row down WHOLE at the moment it landed, and the step
+    replays it through `devRowAdd(where, id, row)` / `devRowRemove(where, id)`
+    — `tune.addRow`'s own signature, and the one door a step needs that the
+    editors' own verbs are the wrong shape for. A field the reel still cannot
+    carry (a row that was there before Record was pressed and that `dice.yaml`
+    has never heard of) comes out as a `// note ·` line in the file, naming the
+    paths; a reel of nothing but notes emits them rather than the "nothing was
+    recorded" skeleton, because the notes ARE the answer to why it is empty.
+- **Pop-out** (phase D5, built) — `dev.html`, the panel in its own window on a
+  second monitor, opened by the file section's **Pop out**. It mounts THE SAME
+  `js/devmode.js` panel over a MIRROR of the table tab's tune, on a
+  `BroadcastChannel` — origin-scoped by construction, so it is not a network,
+  reaches no other viewer and cannot leave the browser (GOALPOST 2, 4). **The
+  table tab is the only writer**, and everything follows from it: one tune in
+  the world, so a value can never be two things at once; the mirror's `set`
+  posts and the table's next snapshot is the truth, so a refused write comes
+  straight back by name; and closing either window is one side of a channel
+  going quiet. What does NOT travel is the cast, the bench, the clock, the A/B
+  slots and the three asset editors: every one of them is an instrument aimed
+  AT THE FELT, and an instrument whose picture is on the other screen is a
+  worse instrument, not a portable one.
+  - **ONE TABLE, LATCHED** (the D5 review, 2026-09-03). A `BroadcastChannel`
+    is origin-scoped, and an origin is not a tab: with two table tabs open —
+    the ordinary local two-player test — the window heard both, one `set` moved
+    BOTH lamps, and the mirror then drew the two trees alternately at about
+    1 Hz with nothing on screen to say which felt was being dialled. So every
+    table stamps its messages with its own id, the window keeps the FIRST it
+    hears, everything it says after that is addressed, and a table that is not
+    the addressee stays quiet. While the link is dead the hello goes out
+    unaddressed again, which is how the window re-homes after its own tab goes.
+  - **AND IT IS A WINDOW, NOT A PHONE.** **Pop out** opened at 420px, which is
+    inside the phone query, so a second-monitor panel arrived in the sheet
+    dress — every slider a stepper, and the `file` section clipped off a bar
+    that scrolls sideways without saying so. The sheet exists because a felt is
+    behind the panel, and here there is none: the window opens at 700×940
+    (published on `devInfo().popout`, so the tested configuration is the
+    shipped one) and mounts with `phone: 'never'`, with dev.html's own stylesheet
+    undoing the grid and the `nowrap` bar. The 44px touch sizing stays.
+  - **AND A ROW MAY NOT LIE.** The mirror's write is optimistic because the
+    table's next snapshot corrects it a beat later; with no table there is no
+    snapshot, so a drag left the row showing a value nobody held. The panel
+    locks the moment the link goes stale and the mirror refuses the write by
+    name ('gone').
 
 ## 8. Capabilities
 
@@ -693,31 +851,32 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
 | Hooks | `tuneGet()`, `tuneDiff()`, `devInfo()` zero-arg; `tuneSet(p)`, `tuneExport()`, `devOpen()`, `devClose()`, `devFold(b)`, `devDeal(n)` | 1 | S |
 | Save route | `POST /api/dev/write`; env-armed, loopback, same-origin, one file, atomic | 2 · **built** | M |
 | Server reads `table.seats` | `places.js` takes toss and card values from the declaration on both sides | 2 | M |
-| Sound, Post, Cards sections | `sound.master` on the master GainNode and `sound.impact.gain` on the default contact body (both look; `voices.js` keeps the shipped numbers); `post.bloom.threshold` on the `uThresh` uniform; `cards.standoff/width/depth` on `places.js` PLACARD, film and ⟳ — the rig is baked at boot | 2 · **built** | M |
+| Sound, Post, Cards sections | `sound.master` on the master GainNode and `sound.impact.gain` on the default contact body (both look; `voices.js` keeps the shipped numbers); `post.bloom.threshold` on the `uThresh` uniform; `cards.standoff/width/depth` on `places.js` PLACARD, film — ⟳ at C5, LIVE since D4 (`rebuildPlacards`, at the placard flush) | 2 · **built** | M |
 | HUD | fps ring, `renderAudit` calls and tris, bodies, settle time | 2 · **built** | S |
 | Clock | freeze, step one frame, scrub the running film's keyframes | 2 · **built** | S |
 | Seeded bench and replay | throw with a chosen seed (labelled *bench* in the log; values still through `composeRoll`); replay the last seed | 2 · **built** | S |
 | A/B slots | hold two patches, flip on `x`, replay the last seed when a film key differs | 2 · **built** | S |
 | Framing overlay | the fit hull, spots, placard frames, lamp cone, walls, drawn from the film's own functions | 2 · **built** | M |
-| Rebuild choke points | `rebuildFloor()`, `rebuildDice()`; promote reload rows to live | 3 | M |
-| Presets | named patches under `presets:` in the declaration, applied like a paste | 3 | S |
+| Rebuild choke points | `rebuildPlacards()` — `cards.*` promoted from ⟳ to apply, re-baked at the placard flush; `rebuildFloor()` / `rebuildDice()` still owed | 3 · **cards built** (D4) | M |
+| Presets | named patches under `presets:` in the declaration, held from the dials and applied like a paste | 3 · **built** (D4) | S |
 | Venue light as a layer | `venues.<id>.light` composed through `tuneSet`; until then the Save verb drops the rows `venueLightPatch()` names while a venue holds them (`devWriteSave`, js/main.js) | 3 | M |
 | `felts:` editor | felt row form; live on the felt; Save appends the row | 2 · **built** | M |
-| `sets:` editor | the lab's set builder moved onto the live felt; full recipe | 3 | L |
-| Shipped catalogue migrates | `themes.js` sets and `FELT_THEMES` rows move into the declaration, one kind per commit | 3 | M |
-| Towers and venues rows | cosmetic rows over `towerRegisterGlb` and `VENUES`; meshes stay forge bakes | 3 | L |
-| Retire `lab.html`, `lab.js`, `TOWERLAB`, two shot tools | once the sets section and the overlay host them | 3 | S |
-| Phone sheet | 44px rows, steppers | 3 | M |
-| Absent in production | the upload drops `devmode.js` and `dev.css` | 3 | S |
-| Recorder | dial ops to a `tools/steps` skeleton; download only, never the route | 3 | L |
-| Pop-out window | `dev.html` + `BroadcastChannel`, for a second monitor | 3 | L |
+| `sets:` editor | the lab's set builder moved onto the live felt; full recipe, live reskin of the standing dice, Clone / Throw one of each / Use at table / Remove | 3 · **built** (D2) | L |
+| Shipped catalogue migrates | `themes.js` sets and `FELT_THEMES` rows move into the declaration, one kind per commit | 3 · **dice sets built** (D1, `houses:`); felt rows still in main.js | M |
+| Towers and venues rows | cosmetic rows over `towerRegisterGlb` and `VENUES`; meshes stay forge bakes | 3 · **deferred by Joe 2026-09-03** ("I want to defer for now. I'm not sure what I'm going to do with towers and venues yet") — no `towers:` / `venues:` section, no venue-light layer, `TOWERLAB` stays | L |
+| Retire `lab.html`, `lab.js`, two shot tools | the sets section hosts the recipe knobs on the real felt; `TOWERLAB` stays, with towers | 3 · **built** (D3) — what the lab measured and the editor does not, §9 | S |
+| Phone sheet | a bottom sheet at `45dvh`, folded by default, 44px rows, steppers instead of sliders, one section at a time; one media query read by css/dev.css and `DEV_PHONE_QUERY` alike | 3 · **built** (D5) | M |
+| Absent in production | `.gcloudignore` drops `js/devmode.js`, `js/devui.js`, `css/dev.css` and `dev.html`; `devOpen` latches on the import miss | 3 · **built** (D3, `dev.html` D5) | S |
+| Recorder | `devRecord('start'\|'stop')` arms `tune.watch`; every patch, deal, seeded throw and asset-row CLONE to a `tools/steps` skeleton (`emitStep`), replayed through `devRowAdd` / `devRowRemove`; what it still cannot carry comes out as a `// note ·` line in the file; a download only, never the route — a step is code | 3 · **built** (D5) | L |
+| Pop-out window | `dev.html` mounts the same panel over a MIRROR of the table's tune on a `BroadcastChannel`; the table tab stays the only writer; the dials, the diff and the file verbs travel, the felt's own instruments do not. A channel is origin-scoped and an origin is not a tab, so every table stamps its messages and the window LATCHES one (D5 review); and the window is not a phone — `mount({ phone: 'never' })` | 3 · **built** (D5) | L |
 
 ## 9. Assets
 
-The rule: **an asset is a row under `sets:`, `felts:`, `towers:` or
-`venues:` in the declaration; the app resolves ids at use time; the editor
-writes the row, calls the kind's cache-bust and re-apply, and Save appends
-it.** Code-only stays code-only, and the panel says so ("a new cloth is a
+The rule: **an asset is a row under `houses:` (the dice catalogue; `sets:`
+was the sketch's name for it, and the section is two levels because a house
+holds sets), `felts:`, or — later — `towers:` / `venues:` in the declaration;
+the app resolves ids at use time; the editor writes the row, calls the kind's
+cache-bust and re-apply, and Save appends it.** Code-only stays code-only, and the panel says so ("a new cloth is a
 painter function; see FELT_CLOTHS"). A row's fields are optional the same
 way a dial is: a set with only `body` and `text` is a legal set, and the
 recipe's defaults fill the rest. A row's two-state fields are enums
@@ -740,11 +899,116 @@ recipe's defaults fill the rest. A row's two-state fields are enums
   module and still 400'd at `/api/settings` until some later, unrelated edit
   — a house felt that worked alone and failed the moment anybody else sat
   down. Every assignment to `declaration` now goes through one setter.
-- **Dice set.** The recipe is already pure data (themes.js:36-135). Editor
-  = the lab's set builder moved into a sets section on the live felt: every
-  change, debounced, runs `registerSet` → `bustDie` → `bustArt` (new) →
-  reskin standing dice. Code-only: a new pattern, particle or decal kind,
-  voice body, die type.
+- **Dice set** (phase D2, **built**). The recipe was already pure data and is
+  now a row (`houses:`, phase D1), so the editor is a `sets` section on the
+  live felt: a house picker, a set picker, and the whole recipe as knobs in
+  the file's own grouping, with **Clone** / **Throw one of each** / **Use at
+  table** / **Remove**. Code-only, still: a new pattern, particle or decal
+  kind, voice body, die type.
+
+  **The repaint, and what it costs.** A write to `houses.*` does two things.
+  The immediate one is `installCatalogue`, so `SETS` and `T` never disagree
+  and every site that READS a recipe — the rate graph, the rest cadence, the
+  lights and particles a throw attaches — reads the edit at once. It does NOT
+  move what a die is BUILT from: js/dice.js caches a build per (type,
+  variant) and `installCatalogue` cannot see that cache, so a die created
+  inside the 140 ms window wears the old geometry until the flush reaches it
+  (it is on the felt by then, so it does). The expensive one — `bustDie` →
+  `bustArt` → `reskinStanding` → `refreshDieArt` + `renderDiceSetPicker` —
+  rides a 140 ms trailing timer, the felts editor's number for the felts
+  editor's reason: it rebuilds seven geometries and their baked face textures,
+  so a slider dragged at 60 Hz must not ask for sixty a second. A commit and
+  every `devSet*` hook flush the timer instead, so what they answer with is
+  the table after the repaint. `reskinStanding` swaps geometry and materials
+  on the meshes IN PLACE — bodies, poses, values, corrections, picks and
+  parented lights untouched, a departing die included — and it runs in the
+  same task as the bust, which is how js/dice.js's "drop every mesh before
+  busting, disposed textures render blank" is actually kept.
+
+  **What a live edit cannot reach**, said here so nobody has to find out: a
+  set's `light`, `particles`, `decal` and `post.ring` are attached or fired AT
+  THE THROW from the recipe as it stood then, so an edit to those shows on the
+  next throw. `rate` is read at every playback step (`uniformRollRate`), and
+  `rest` is re-derived at the repaint (`restReskin`) — the D2 review measured
+  it moving in NEITHER direction, because `initRest` captures
+  `SETS[id].rest` once at playRoll and `installCatalogue` builds fresh objects
+  (a seaglass clone dialed from `yAmpM: 0.0015` to 0.2 still swelled at
+  0.0015 over 400 frames). A paragraph whose whole job is that nobody finds
+  this out by accident had to be made true rather than narrowed, so
+  `reskinStanding` now re-reads the cadence off the catalogue as it stands,
+  carrying the die's three phase seeds and its `settleAt` across so it does
+  not jump phase — and putting a die whose cadence was dialed OFF back on its
+  archive pose, since stepResting will never touch it again. (A settle-tick
+  that has already fired does not re-fire while the kind is unchanged: its
+  moment passed, and re-arming it on an unrelated colour edit would be a pop
+  nobody asked for.) A cadence is also ARITHMETIC over a sparse row, so the
+  block is read through its dial defaults (`REST_DEFAULTS`): every shipped set
+  names its whole `rest`, but the panel writes one field at a time, and
+  `rest.kind: swell` typed on its own used to divide by an absent period and
+  put the die at NaN — reachable only now that the field moves live, and
+  already what the `default` mark promises about a field a row does not carry.
+  **Throw one of each** exists partly for the rest of it:
+  one button puts a fresh d4 d6 d8 d10 d12 d20 of the set on the felt, down
+  the C2 bench path (local, labelled `bench`, values from the seed through
+  `composeRoll`).
+
+  **Use at table waits for the file**, which is the one gate here that is not
+  a lock (the D2 review, 2026-09-03). `SETS[id]` says this TAB can draw the
+  set; what `diceSet` needs is that the SERVER can resolve it, and the server
+  resolves a rolled set out of dice.yaml (`readSetField` → `unknown_set`). A
+  clone wears perfectly on the felt and 400s every roll from the moment it is
+  worn — measured twice, with an empty console and a page banner reading
+  `unknown dice set: house.ivory-2` as the only evidence. That is the failure
+  `devSetLiveFlush` already closes in the other direction (a row that goes
+  away takes the viewer's choice with it), and it was open in this one. So
+  `devSetApply` refuses a row the file does not declare with the reason
+  `unsaved`, the button is drawn disabled carrying that sentence, and **Save
+  is what lifts it — in the same tab, with no reload**: the route's own
+  success is the gate (`devSetInFile`), because the server re-reads and
+  re-installs the catalogue as part of the write while this tab's `SHIPPED`
+  stays the boot snapshot it was. The player's own settings chip is the same
+  door and takes the same clause, in `openSetMenuFor` beside `venueOnly` and
+  `beta`: an unsaved row is not offered there either. On a tab that never
+  opened the door the clause passes everything, because every set in `THEMES`
+  came out of the file.
+
+  **Three differences from the felts editor**, each with a reason:
+  - **every row is editable.** There is no "shipped in code" row here any
+    more — the catalogue is the file. What Clone is for is keeping the shipped
+    one intact while you take a copy apart.
+  - **the form is sparse.** A field the row does not carry is drawn at its
+    dial's default wearing the `default` mark, because that is what the die is
+    already doing (js/tune.js RECIPE records where every default came from).
+  - **the film lock holds two verbs and one field, not the section.** A felt
+    is ROOM state, so every verb of that editor is refused at a shared table.
+    A recipe is PLAYBACK — two clients with different dice.yaml files already
+    draw the same roll in different materials, which is what GOALPOST 7 means
+    — so what is held is **Use at table** and **Throw one of each** (both put
+    an invented set in front of another viewer) and `faces`, the one
+    film-class field in a recipe, which `tune.set` refuses on its own.
+
+  **Remove is for the rows you author** — the `house` house, and anything this
+  session added anywhere. A shipped set stays, and is refused by name: a saved
+  pool's override, another player's roll payload and a dozen goldens all
+  resolve `emberforge.blackanvil`, and a catalogue that can lose one of those
+  from the panel is one click away from a table that cannot draw somebody
+  else's dice. **Clone** copies into the `house` house at `<set>-2` and
+  deliberately drops `where: venue` and `channel: beta`: both decide where a
+  set may be PICKED, and a clone that inherited either would be a set you just
+  authored and cannot find. A clone given an id BY NAME is refused (`taken`)
+  when a row already wears it: `tune.addRow` writes a row whole, so the
+  auto-numbering walk past the taken ids was the only thing standing between a
+  second clone and somebody's unsaved edits — and a clone whose id is illegal
+  now answers `id: null` rather than naming a row that was never created (both
+  the D2 review, 2026-09-03).
+
+  Two small things the panel had to grow: `rowSelect` in the kit (a native
+  select where an enum has more states than a segmented row can show — the
+  face table has twelve, and the control column is ~145px, where twelve
+  segmented cells measured as one letter each), and a footer count read off
+  the DIFF rather than off the dial rows wearing the changed mark. The old
+  count was the whole diff before asset rows existed; with a set cloned it
+  read `0 changed` in the corner beside a file section that read the truth.
 - **Mat** (phase 2, **built**). A colour row over an existing cloth: two
   colour pickers, breath and mottle sliders, a cloth select; apply = bust the
   felt tile + `applyFeltTheme` + re-render swatches. Code-only: a new cloth.
@@ -803,9 +1067,129 @@ recipe's defaults fill the rest. A row's two-state fields are enums
 - **Tower / venue** (phase 3). `towerRegisterGlb(id, url, opts)` already
   mints a row at runtime; the row is the cosmetic half only. The mesh stays
   a forge bake; portals stay in the GLB.
-- **The shipped catalogue** (phase 3): the sets in `themes.js` and the felt
-  rows in main.js migrate into the declaration one kind per commit, so the
-  file becomes the whole catalogue and not only the house additions.
+- **The shipped catalogue.** The DICE SETS migrated on 2026-09-03 (phase D1):
+  `houses:` in dice.yaml is the catalogue — every house, every set, every
+  recipe field under the same names — and `js/themes.js` keeps the recipe
+  GRAMMAR (what a field means, and every dated ruling behind a turn-down) plus
+  the three objects the app resolves a set through, which `installCatalogue`
+  fills IN PLACE from the declared tree. What that took, and the parts a
+  reader should not have to re-derive:
+  - **A section can be two levels deep now.** A row's field may be a nested
+    group of dials (`geo`, `feel`) or a COLLECTION of further rows
+    (`js/tune.js` `rows(RECIPE)` — a house's `dice:`), and one walk resolves
+    any of it: `assetDialFor`, `assetRowDefaults`, `reconcileRows`, `addRow`
+    (which now takes a PATH to the collection), `removeRow`, `reset` and the
+    export's row collapse all read the same shape. `assetRowPath` is the one
+    law for "which row does this leaf belong to" — a felt is two segments and
+    a dice set is four, and the panel, the diff and the dropped-rows line
+    stopped counting to two.
+  - **`houses:` is SPARSE and `felts:` is FILLED** (`ASSET_SPARSE`). A felt row
+    the file half-writes takes the row defaults for the rest, so the merge site
+    never guesses. A recipe may NOT: js/themes.js's own rule is "a set uses
+    whichever it earns; every one is optional", and a filled recipe would give
+    every set particles, a decal, a parented light and a rest cadence it was
+    written to refuse. The dial defaults are still there — they are the code's
+    own fallbacks, read out of dice.js/voices.js/post.js — and are what an
+    empty field in the panel shows.
+  - **A SPARSE ROW'S ABSENT FIELD IS WRITABLE** (the D1 review, 2026-09-03),
+    and had to be made so: `tune.set`'s "neither tree names this leaf" guard
+    was written for FILLED rows, where a missing leaf really does mean a
+    missing dial, and it refused roughly eighty of a recipe's ninety knobs as
+    `unknown` on every shipped set. A write mints the leaf — with the nested
+    group under it if the row has none, and only the field named, never the
+    group's defaults — provided the ROW exists and the shape declares a dial;
+    the value is judged by that dial as any other write is. The row is still
+    the unit that takes it back (`reset` at the row's path), a row nobody ever
+    had is still `unknown`, and a declared row this session removed is still
+    `row`.
+  - **Three booleans became enums**, because the file may not hold one:
+    `venueOnly: true` → `where: venue`, `beta: true` → `channel: beta`,
+    `post.bloom: true` → `post.bloom: source`. The built recipe keeps the OLD
+    field names, so no consumer learned that the file says it differently.
+  - **`faces` is the one film-class field in a recipe.** A face table is not a
+    value — the server still rolls 1..6 — but it is a READING two clients have
+    to agree on, so it locks the moment a second seat is present. It is also
+    the one path in the file `FORBIDDEN_LEAF` bites, and that regex stays: it
+    is the law for the DIAL TREE, where a fixed path named `faces` could only
+    be the rolled values themselves (`tests/tune.test.mjs` names the exemption).
+  - **A list dial has three laws**: how many entries the code reads (`len` —
+    six faces, one or two decal colours, a palette of one to eight), that an
+    entry is a string, and — where the entries come from a fixed vocabulary —
+    which strings (`each`). The D1 review found the middle one missing: a
+    palette declares `each: null` because there is no list of legal colours,
+    and that was read as no law at all, so `colors: [1, 2]` passed the reader,
+    `tune.set` and the armed route on its way to `hexRGB`. Refusals are
+    `'range'` for the count and `'type'` for the entry.
+  - **Ids stayed dotless.** `emberforge.blackanvil` is a JOIN, not an id: the
+    two levels were always there, so `houses.emberforge.dice.blackanvil` needs
+    no quoted dotted key and `ASSET_ID_RE` is unchanged. The server filters
+    both levels by it before the ids reach the wire.
+  - **Who installs it**: js/main.js at module eval (before the first read of
+    `SET_IDS`, DEVMODE §9's own merge-before-the-ids rule); server.js from
+    `setDeclaration`, the one place its parsed tree is assigned, so a set added
+    to the file is on the wire on the next request with no restart; and each
+    Node test or tool that reads recipes. The catalogue is EMPTY until somebody
+    does — js/themes.js is imported by server.js and so may not read the file
+    itself. (js/lab.js was a fourth caller until the lab retired, below.)
+  - `tests/catalogue.test.mjs` is the drift guard: nothing in `houses:` may be
+    silently dropped by reconciliation, every recipe enum's options are
+    compared against the keys the code actually defines (their modules import
+    three.js, so their sources are read), and `SET_IDS` is pinned in order.
+  The FELT rows have not moved: `FELT_THEMES` is still in main.js and a
+  `felts:` row is still a house addition.
+- **THE DICE LAB RETIRED 2026-09-03** (phase D3), and this is the list of what
+  went with it. `lab.html`, `js/lab.js`, `tools/lab-shots.mjs`,
+  `tools/geo-bench-shots.mjs`, the `lab-geo-bench` e2e scenario (its tag `lab`
+  with it) and `verdict-shots.mjs`'s `bench` and `set` frame groups are gone;
+  `chrome-lab.html` and `TOWERLAB` stay (the chrome lab poses through hooks the
+  panel has no section for, and towers are deferred).
+
+  The lab existed to turn every recipe knob and look at the result, and the
+  `houses` section does that on the REAL felt — under the real lamp, with the
+  standing dice reskinned in place and *Throw one of each* through the bench
+  path — which is a better place to judge a set from than a page with its own
+  renderer, no roll, no ceremony and no sound (docs/IMMERSION.md's reading of
+  the lab, and the reason this retirement was worth taking).
+
+  **What the sets editor cannot do yet. Owed, not lost:**
+  - **The watertight probe.** `lab-geo-bench` walked every render mesh on the
+    page and asserted each directed edge was paired by its reverse — the check
+    that caught a doubled band triangle and a pure-black hole on every beveled
+    edge of every die (Joe found the hole, 2026-08-04). Nothing re-makes it.
+    It needs a hook that hands out a die's position array; `dieGeoStats` answers
+    counts and radii only. **This is the one on the list that guards a shipped
+    law rather than a review convenience, and it is the one to build first.**
+  - **The geo sweep's orderings.** Nine bench rows across the Level 3.5 `geo`
+    space, asserted as a ladder: cut radii monotone in bevel, a fillet bulging
+    past its cut twin but inside the sharp corner, ink and pillow
+    silhouette-neutral, wear pulling inward, segments growing the fillet mesh.
+    Every one of those is reachable from `dieGeoStats` + a cloned row, so this
+    one is a scenario to write, not a hook to add.
+  - **Recipe omit-at-default.** `builderRecipe()` printed a themes.js-shaped
+    body with defaults omitted, and the scenario asserted a profile flip snapped
+    an untouched `ink` to the new profile's default. The editor writes the FILE
+    instead, and `exportYaml` has its own rules; the claim is not the same one
+    and is currently made nowhere.
+  - **Hero framing and face dumps.** `zoomDie(row, type)` framed one die at a
+    fixed distance and `faceDump` read the baked face canvases' average RGB —
+    which is how "does a carved-and-lit digit bloom in the dark" was answered
+    with numbers. The felt has no hero camera and no face-canvas reader.
+  - **`sampleWorld(p)`** — average framebuffer RGB around a projected world
+    point, the instrument that settled "is that mark pale or dark" when
+    review-distance eyeballs could not.
+  - **Firing one set's effect on demand.** `__lab.effect(setId, name)` played a
+    named burst without waiting for a roll to produce it, and
+    `tools/lab-shots.mjs` sampled it at named milliseconds mid-flight — which
+    is how docs/IMMERSION.md's voidgrain `unmake` demo was costed at "zero new
+    code". The editor can wear a set and throw six dice; it cannot make one
+    effect happen.
+  - **The drop rig's furniture.** A felt coupon, rails, a 3.5 s post-settle
+    linger and a ~57°-down `dropView` existed so a flat decal could be judged
+    at the angle it does not vanish at. On the real felt the decal kill switch
+    is off by default and the camera is the table's.
+  - **Every theme at once.** The grid showed every set × every die type side by
+    side; the editor shows the one set you are editing. A contact sheet of the
+    catalogue is a picture nobody can take today.
 
 ## 10. Honesty and safety
 
@@ -936,9 +1320,29 @@ at a shared table or only alone).
 the shipped catalogue migrating into the declaration; tower and venue rows;
 retire the labs; phone sheet; absent in production; recorder; pop-out.
 
-*Proves it:* `dev-set-roundtrip` (define a set, throw it, save, reload, it
-is in the menu and rolls at a real table after restart) and
-`dev-absent-in-prod`.
+*Proves it:* `dev-set-roundtrip` (clone a shipped set, throw one of every die
+type wearing it, turn its body colour and watch the SIX DICE ALREADY STANDING
+repaint — off the chamfer band's own material, which is the one number that is
+both a function of the recipe and a property of the mesh, and off the portrait
+bakery, whose cache is the thing nobody would notice was stale; then the
+panel's own pickers, the sparse form's `default` marks, the face table
+appearing only under `glyph: faces`, a Save through the armed route into a
+scratch checkout, and a FRESH tab there where the set is simply one of the
+sets — in `devSets()`, in the settings chip menu under its house, and accepted
+by the server on a real roll, which is the half that decides whether an
+authored set works at a shared table or only alone; last, a second seat, which
+holds `Use at table`, `Throw one of each` and the face table and NOTHING else,
+because a recipe is playback and a felt is room state),
+`dev-absent-in-prod`, `dev-presets` (the door as the gate, a preset of nothing
+refused by name, a Hold and an Apply read off the lamp's own SpotLight and
+cannon's own gravity rather than off the tree that was asked to move them, the
+row in `tuneExport()` under `presets:` and out again, and a SECOND SEAT, where
+the look row lands and the film row comes back refused — the one direction
+this feature could get wrong that matters, GOALPOST 2) and `dev-cards-live`
+(the ring and the rig's own baked pad both moving at the flush; a dial turned
+with dice in the air changing NOTHING until they land, read in one eval under
+a held clock so the claim is about the gate and not about a race; and the
+geometry law refusing a typed card deep enough to reach past the rim).
 
 **Not covered, on purpose:** device emulation (CDP pins a phone); multi-
 client film proofs from one tab; interpretation systems (code, by CUJ12); a

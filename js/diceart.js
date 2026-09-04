@@ -84,6 +84,26 @@ export function dieArtURL(type, variant = 'std') {
   return cache.get(`${v}/${type}`) ?? cache.get(`std/${type}`) ?? null;
 }
 
+// DROP ONE VARIANT'S PORTRAITS (developer mode phase D2, 2026-09-03). The
+// bakery is a cache keyed by (variant, type) and it exists because a set
+// change is RARE: the first request for a variant bakes all seven types and
+// releases its GL context. The sets editor makes a set change frequent — a
+// dragged slider is a new recipe every 140 ms — and every one of those leaves
+// the tiles showing a portrait of the die as it was, beside a felt showing the
+// die as it is. Nothing else in the app has ever needed this: the app cannot
+// edit a recipe, so a variant's art was true for the life of the tab.
+//
+// `warmedVariants` goes with the entries, or `dieArtURL` would answer from a
+// cache it believes is warm and never re-bake. Returns how many portraits were
+// dropped, which is 0 for a variant nobody has looked at yet.
+export function bustArt(variant) {
+  if (typeof variant !== 'string') return 0;
+  warmedVariants.delete(variant);
+  let n = 0;
+  for (const t of DIE_TYPES) if (cache.delete(`${variant}/${t}`)) n++;
+  return n;
+}
+
 function warmVariant(variant) {
   warmedVariants.add(variant);
   let renderer;

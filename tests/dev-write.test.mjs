@@ -496,10 +496,33 @@ await t('isLoopback recognises loopback and nothing else', () => {
       assert.equal(r.status, 400);
       assert.equal(r.data.reason, 'refused');
       assert.match(r.data.problems.join(' '), /no felts field named "sheen"/);
+      // A SECTION THAT IS NOT ONE. `sets:` was the name DEVMODE §3 sketched for
+      // the dice catalogue and it never became a section: the catalogue landed
+      // under `houses:` in phase D1, two levels deep, so `sets.…` is now an
+      // ordinary path with no dial behind it and says exactly that.
       const bad = await post(base, { file: 'dice.yaml', changes: { 'sets.house-ember.label': 'Ember' } });
-      assert.equal(bad.status, 400, '…and a section this build cannot declare rows in says so');
-      assert.match(bad.data.problems.join(' '), /not declarable in this build/);
-      assert.equal(yamlNow(), before, 'nothing written either time');
+      assert.equal(bad.status, 400, '…and a path with no dial behind it says so');
+      assert.match(bad.data.problems.join(' '), /no dial at this path/);
+      // …and a recipe field outside its options is refused the same way, which
+      // is the whole point of the catalogue being rows with a shape (D1).
+      const nope = await post(base, { file: 'dice.yaml', changes: { 'houses.classics.dice.ivory.glyph': 'runes' } });
+      assert.equal(nope.status, 400, 'an enum outside its options is refused');
+      assert.match(nope.data.problems.join(' '), /expected one of digit \| pip \| faces/);
+      assert.equal(yamlNow(), before, 'nothing written any of the three times');
+    });
+
+    // THE DICE CATALOGUE GOES THROUGH THE SAME DOOR A FELT DOES (phase D1).
+    // A recipe field is a leaf of an asset row two levels down, and what
+    // proves the route understands that is not the 200 — it is the LINE: the
+    // recipe is a one-line flow map in the file, so patching it must rewrite
+    // that value in place and leave the rest of the line, comments and all.
+    await t('a dice recipe field is patched in place, inside its flow map', async () => {
+      const r = await post(base, { file: 'dice.yaml', changes: { 'houses.classics.dice.ivory.feel.rough': 0.9 } });
+      assert.equal(r.status, 200);
+      assert.deepEqual(r.data.changes.map((c) => c.path), ['houses.classics.dice.ivory.feel.rough']);
+      assert.match(yamlNow(), /feel: \{ rough: 0\.9, metal: 0 \}/);
+      const tree = parseYaml(yamlNow()).tree;
+      assert.equal(tree.houses.classics.dice.ivorypips.feel.rough, 0.42, 'and the set beside it is untouched');
     });
 
     await t('a second write reads the first\'s text: the earlier change survives', async () => {

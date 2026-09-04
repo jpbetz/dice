@@ -145,8 +145,22 @@ const rowFor = (root, path) => root.find((n) => n.classList.contains('dev-row') 
 // ---------------------------------------------------------------------------
 
 const look = (label, def, range, read, why = '') => ({ label, def, range, cls: 'look', read, why });
-const film = (label, def, range, read, why = '') => ({ label, def, range, cls: 'film', read, why });
+const film = (label, def, range, read, why = '', law = null) => ({ label, def, range, cls: 'film', read, why, ...(law ? { law } : {}) });
 const pick = (label, def, options, cls, read, why = '') => ({ label, def, range: null, options, cls, read, why });
+
+// THE ONE PAIR LAW, to the contract's shape (js/tune.js LAWS.cardClear, phase
+// D4): two dials and ONE claim, judged against what the whole patch proposes.
+// The fake owes it because the panel's ↺ has to widen a revert to the whole
+// group — half a revert is refused by the half still standing (the D4 review,
+// 2026-09-03) — and that widening is panel code, testable only against a Tune
+// that refuses the way the real one does.
+const PAIRS = {
+  cardClear: {
+    reason: 'geometry',
+    paths: ['cards.standoff', 'cards.depth'],
+    holds: (read) => Number(read('cards.standoff')) - Number(read('cards.depth')) / 2 >= -1e-9,
+  },
+};
 
 const DIALS = {
   app: {
@@ -201,6 +215,14 @@ function fakeTune({ dials = DIALS, declared = DECLARED } = {}) {
     SHIPPED, T, calls,
     dialAt: (p) => { const d = getLeaf(dials, p); return isDial(d) ? d : null; },
     get: (p) => getLeaf(T, p),
+    // The other leaves that are one claim with this one, each at its shipped
+    // value (js/tune.js `lawMates`).
+    lawMates: (p) => {
+      const d = tune.dialAt(p);
+      const g = d && d.law ? PAIRS[d.law] : null;
+      if (!g) return [];
+      return g.paths.filter((q) => q !== String(p) && hasLeaf(SHIPPED, q)).map((q) => [q, getLeaf(SHIPPED, q)]);
+    },
     sections: () => Object.keys(SHIPPED),
     bind: (pattern, fn) => binders.set(pattern, fn),
     binderFor,
@@ -212,6 +234,10 @@ function fakeTune({ dials = DIALS, declared = DECLARED } = {}) {
         if (d && d.cls === 'film' && filmLocked) { refused.push([p, 'film']); continue; }
         if (typeof v !== typeof getLeaf(SHIPPED, p)) { refused.push([p, 'type']); continue; }
         if (d && d.options && !d.options.includes(v)) { refused.push([p, 'option']); continue; }
+        if (d && d.law && PAIRS[d.law]) {
+          const read = (dp) => (dp in patch ? patch[dp] : getLeaf(T, dp));
+          if (!PAIRS[d.law].holds(read)) { refused.push([p, PAIRS[d.law].reason]); continue; }
+        }
         const before = getLeaf(T, p);
         setLeaf(T, p, v);
         calls.push([p, v]);
@@ -327,7 +353,7 @@ function fakeBench({ film = false } = {}) {
 // ---------------------------------------------------------------------------
 
 const ui = await import('../js/devui.js');
-const { mount } = await import('../js/devmode.js');
+const { mount, emitStep, stepName, DEV_PHONE_QUERY } = await import('../js/devmode.js');
 
 let n = 0;
 const pendingTests = [];
@@ -451,6 +477,34 @@ t('rowColor commits a lowercase #rrggbb from either input and refuses junk', () 
   picker.value = '#000000';
   fire(picker, 'change');
   assert.equal(done.at(-1), '#000000');
+});
+
+// A TWELVE-STATE ENUM IS A SELECT, NOT A SEGMENTED ROW (phase D2): the sets
+// editor's face table offers six digits and six drawn symbols, and the panel's
+// control column is ~145px. Same marks and same lock as `rowEnum`; what
+// differs is the control and the fact that it does not fight the pointer —
+// a repaint while the menu is open leaves the value alone.
+t('rowSelect commits the chosen option and defers a repaint while it is focused', () => {
+  const done = [];
+  const opts = ['1', '2', '3', '4', '5', '6', 'bolt', 'claw', 'heart', 'plus', 'minus', 'blank'];
+  const r = ui.rowSelect({ label: '1 →', value: '1', options: opts, onCommit: (v) => done.push(v) });
+  const sel = byClass(r.root, 'dev-select');
+  assert.equal(sel.tagName, 'SELECT');
+  assert.equal(sel.childNodes.length, 12, 'one option per entry');
+  assert.equal(sel.value, '1');
+  sel.value = 'bolt';
+  fire(sel, 'change');
+  assert.deepEqual(done, ['bolt']);
+  r.setValue('claw');
+  assert.equal(sel.value, 'claw', 'a repaint moves it while nothing is focused here');
+  document.activeElement = sel;
+  r.setValue('heart');
+  assert.equal(sel.value, 'claw', '…and leaves it alone while somebody is choosing');
+  document.activeElement = null;
+  // …and it wears the row marks the rest of the kit does.
+  r.setState({ locked: true });
+  assert.equal(sel.disabled, true);
+  assert.equal(r.root.classList.contains('is-locked'), true);
 });
 
 t('rowText keeps the type of the value it was born with', () => {
@@ -744,15 +798,90 @@ t('a slider release writes once: the change after the last input carries no new 
   assert.equal(tune.T.light.lamp.y, 32);
 });
 
-t('a narrow window starts folded AND says so through onFold', () => {
+// THE PHONE SHEET (docs/DEVMODE.md §7, phase D5). One query, read in two
+// places that have to agree — css/dev.css for the sheet's dress, this file for
+// the two things a stylesheet cannot do. Both halves are held here, and the
+// query is asked of the module rather than spelled twice, so a change to it
+// cannot leave the test measuring the old string.
+t('a phone starts folded AND says so through onFold', () => {
   const folds = [];
   const was = window.matchMedia;
-  window.matchMedia = (q) => ({ matches: q === '(max-width: 639px)' });
+  window.matchMedia = (q) => ({ matches: q === DEV_PHONE_QUERY });
   try {
-    const { panel } = fresh({ onFold: (on) => folds.push(on) });
+    const { panel, root } = fresh({ onFold: (on) => folds.push(on) });
     assert.equal(panel.isFolded(), true);
     assert.deepEqual(folds, [true], 'the caller and isFolded() agree from the first frame');
+    assert.equal(root.classList.contains('dev-phone'), true,
+      'and the panel publishes its own reading of the query as a class');
   } finally { window.matchMedia = was; }
+});
+
+t('a coarse pointer is a phone however wide the window is', () => {
+  const was = window.matchMedia;
+  // The query is one string with two clauses; a browser answers the STRING.
+  // This stub is the coarse half: the window is 1600px and the answer is yes.
+  window.matchMedia = (q) => ({ matches: q === DEV_PHONE_QUERY });
+  try {
+    assert.equal(window.innerWidth, 1600, 'a wide window…');
+    const { panel } = fresh();
+    assert.equal(panel.isFolded(), true, '…and a touchscreen is still a phone');
+  } finally { window.matchMedia = was; }
+});
+
+t('on the phone every range row is a stepper — a fingertip cannot hit a value on a slider', () => {
+  const was = window.matchMedia;
+  window.matchMedia = (q) => ({ matches: q === DEV_PHONE_QUERY });
+  let root; let panel; let tune;
+  try { ({ root, panel, tune } = fresh()); } finally { window.matchMedia = was; }
+  panel.fold(false);
+  const lamp = rowFor(root, 'light.lamp.y');
+  assert.ok(lamp, 'the lamp row is drawn');
+  assert.equal(lamp.classList.contains('is-stepper'), true, 'a range dial wears the stepper dress');
+  assert.equal(lamp.classList.contains('is-range'), false, 'and not the slider dress');
+  assert.equal(root.all((n) => n.attrs.get('type') === 'range').length, 0,
+    'no slider anywhere in the panel');
+  // A stepper is not a lesser control: it commits the same way, through the
+  // same `tune.set`, and it can still be typed into.
+  const minus = root.find((n) => n.tagName === 'BUTTON' && n.classList.contains('dev-step'));
+  assert.ok(minus, 'the stepper has its buttons');
+  const num = byClass(lamp, 'dev-num');
+  num.value = '41';
+  fire(num, 'change');
+  assert.equal(tune.T.light.lamp.y, 41, 'and the typed value lands');
+  // …and the ENUM, COLOUR and RELOAD rows are untouched: the phone changes one
+  // control kind, not the panel.
+  assert.equal(rowFor(root, 'camera.framing.prefer').classList.contains('is-enum'), true);
+  assert.equal(rowFor(root, 'light.lamp.color').classList.contains('is-color'), true);
+  assert.equal(rowFor(root, 'table.ceilingY').classList.contains('is-stepper'), true);
+});
+
+t("mount({ phone: 'never' }) keeps the desktop dress however the query answers", () => {
+  // THE POP-OUT (the D5 review, 2026-09-03). dev.html mounts this same panel
+  // in a window with no felt behind it, and Pop out used to open that window at
+  // a width INSIDE the phone query — so a second-monitor panel arrived with
+  // every slider replaced by a stepper and its `file` section scrolled off a
+  // `nowrap` bar. The sheet's reason is the felt; where there is none, the
+  // option says so. The stub below is a phone by every measure the panel has.
+  const was = window.matchMedia;
+  window.matchMedia = (q) => ({ matches: q === DEV_PHONE_QUERY });
+  let root; let panel;
+  try { ({ root, panel } = fresh({ phone: 'never' })); } finally { window.matchMedia = was; }
+  assert.equal(panel.isFolded(), false, 'it does not start folded: there is nothing behind it to show');
+  assert.equal(root.classList.contains('dev-phone'), false, 'and it does not claim to be a sheet');
+  assert.equal(rowFor(root, 'light.lamp.y').classList.contains('is-range'), true, 'a range row is a slider');
+  assert.ok(root.all((n) => n.attrs.get('type') === 'range').length > 0, 'sliders are drawn');
+  // …and 'auto' (the default, and what the table tab passes) still asks.
+  window.matchMedia = (q) => ({ matches: q === DEV_PHONE_QUERY });
+  let auto;
+  try { auto = fresh({ phone: 'auto' }); } finally { window.matchMedia = was; }
+  assert.equal(auto.panel.isFolded(), true, "'auto' is the query's answer, which here is yes");
+  assert.equal(auto.root.classList.contains('dev-phone'), true);
+});
+
+t('a desktop keeps its sliders', () => {
+  const { root } = fresh();
+  assert.equal(rowFor(root, 'light.lamp.y').classList.contains('is-range'), true);
+  assert.ok(root.all((n) => n.attrs.get('type') === 'range').length > 0, 'sliders are drawn');
 });
 
 t('no panel reset writes app.mode: section ↺, Reset all, the footer Reset and the diff revert all skip it (DEVMODE §4)', () => {
@@ -784,6 +913,39 @@ t('no panel reset writes app.mode: section ↺, Reset all, the footer Reset and 
   assert.equal(two.tune.T.light.lamp.y, 24);
   assert.equal(two.tune.T.throw.physics.gravity, -80, 'film held');
   assert.match(byClass(two.root, 'dev-statusslot').textContent, /gravity: film values are shared/);
+});
+
+// The D4 review, 2026-09-03: "`reset` of one half of a law pair can be
+// refused, so a value has no way back to the shipped one." The panel's ↺ goes
+// through `tune.set` with the shipped value, so it hit the same wall the
+// hook did — and the sliders cannot reach the state, but the typed field can,
+// which is the state a person gets stuck in.
+t('a ↺ on half a pair takes the whole pair back (the pair law, phase D4)', () => {
+  const dials = {
+    cards: {
+      standoff: film('card standoff', 0.86, [0.8, 4, 0.01], 'apply', '', 'cardClear'),
+      depth: film('card depth', 1.52, [0.4, 1.6, 0.01], 'apply', '', 'cardClear'),
+    },
+  };
+  const declared = { cards: { standoff: 0.86, depth: 1.52 } };
+  const host = new Node('div');
+  const tune = fakeTune({ dials, declared });
+  const panel = mount({ host, tune, info: { declared, venue: null } });
+  const root = panel.root;
+  // A pair the typed field can reach and the sliders cannot: 0.2 − 0.4/2 = 0.
+  assert.deepEqual(tune.set({ 'cards.depth': 0.4 }).refused, []);
+  assert.deepEqual(tune.set({ 'cards.standoff': 0.2 }).refused, []);
+  panel.repaint();
+  // Half the pair on its own IS refused — that is the wall being fixed, and
+  // the widening is the fix, not a weaker law.
+  assert.deepEqual(tune.set({ 'cards.depth': 1.52 }).refused, [['cards.depth', 'geometry']],
+    'the shipped depth against the typed standoff is not a legal pair');
+  const row = rowFor(root, 'cards.depth');
+  click(byClass(row, 'dev-revert'));
+  assert.deepEqual([tune.T.cards.standoff, tune.T.cards.depth], [0.86, 1.52],
+    'the ↺ put BOTH halves back, because the pair the file ships holds by construction');
+  assert.equal(byClass(root, 'dev-statusslot').textContent, '', 'and nothing was refused');
+  panel.unmount();
 });
 
 t('reload-class writes count as pending and show Save & reload', () => {
@@ -1086,6 +1248,118 @@ t('felts: the count is what the FILE would gain, lose or amend — not the house
   panel.unmount();
 });
 
+// ---------------------------------------------------------------------------
+// the sets section (phase D2) — and the gate the D2 review found missing.
+// ---------------------------------------------------------------------------
+
+// A recipe SLICE, to the contract's shape and not imported (js/tune.js
+// ASSET_ROWS.houses.dice.rows is the real one, ninety fields deep). Three
+// fields is enough: the section's form is proved in `dev-set-roundtrip`, and
+// what is proved here is the verb row underneath it.
+const SET_FIELDS = {
+  label: look('label', 'Set', null, 'apply'),
+  body: look('body', '#f2efe6', null, 'apply'),
+  geo: { bevel: look('bevel', 0.09, [0, 0.3, 0.005], 'apply') },
+};
+
+function fakeSets(rows) {
+  const cat = rows.map((r) => ({
+    house: 'std', set: 'classic', label: 'Classic', houseLabel: 'Standard',
+    inFile: true, removable: false, current: false, ...r,
+  })).map((r) => ({ ...r, id: r.id || `${r.house}.${r.set}` }));
+  const log = [];
+  const at = (id) => cat.find((s) => s.id === id) || null;
+  return {
+    log,
+    cat,
+    fields: () => SET_FIELDS,
+    list: () => cat.map((s) => ({ ...s })),
+    recipe: (id) => (at(id) ? { label: at(id).label, body: '#f2efe6' } : null),
+    clone: (id) => { log.push(`clone(${id})`); return { id: `${id}-2`, refused: [], sets: cat }; },
+    set: (id, patch) => { log.push(`set(${id})`); return { id, refused: [], sets: cat }; },
+    remove: (id) => { log.push(`remove(${id})`); return { id, refused: [], sets: cat }; },
+    bench: (id) => { log.push(`bench(${id})`); return { notation: 'x', seed: 'ivy', refused: [] }; },
+    // js/main.js devSetApply, to the letter: a row dice.yaml does not declare
+    // is refused BY NAME and the viewer keeps the set they had, because the
+    // server resolves a rolled set out of the file.
+    apply: (id) => {
+      const row = at(id);
+      if (!row.inFile) {
+        log.push(`apply-refused(${id})`);
+        return { set: (cat.find((s) => s.current) || {}).id || 'std', refused: [[`houses.${row.house}.dice.${row.set}`, 'unsaved']], sets: cat };
+      }
+      for (const s of cat) s.current = s.id === id;
+      log.push(`apply(${id})`);
+      return { set: id, refused: [], sets: cat };
+    },
+  };
+}
+
+// THE ONE THING THAT CAN BREAK THE ROLL BUTTON (the D2 review, 2026-09-03).
+// A cloned set draws perfectly on the felt and is unknown to the SERVER, which
+// resolves a rolled set out of dice.yaml — so wearing one 400s every roll
+// (`unknown_set`) with a page banner and an empty console as the only
+// evidence. The verb refuses it; this is the half that keeps a click from
+// being how you find out, and the half that un-greys when a Save lands.
+t('sets: Use at table is held until the FILE declares the row, and says so', () => {
+  const sets = fakeSets([
+    { house: 'classics', set: 'ivory', label: 'Ivory', houseLabel: 'Classics', current: true },
+    { house: 'house', set: 'ivory-2', label: 'Ivory (house)', houseLabel: 'House', inFile: false, removable: true },
+  ]);
+  const { root, panel } = fresh({ sets });
+  const sec = root.find((n) => n.classList.contains('dev-section') && n.dataset.section === 'sets');
+  assert.ok(sec, 'the section is there when a sets api is given');
+  const use = byText(sec, 'Use at table');
+  const pick = byClass(sec, 'dev-setpick');
+
+  // The form opens on the row the viewer WEARS, which the file declares.
+  assert.equal(pick.value, 'classics.ivory');
+  assert.equal(use.disabled, true, 'and it is already the current set, so there is nothing to use');
+
+  // …now the row this session cloned.
+  pick.value = 'house.ivory-2';
+  fire(pick, 'change');
+  assert.equal(use.disabled, true, 'a row the file does not declare cannot be worn');
+  assert.equal(use.title, 'Save the row first — the server only accepts a set dice.yaml declares',
+    'and the button carries the reason rather than making somebody click for it');
+  assert.match(byClass(sec, 'dev-clockout').textContent, /Save writes the row, and Use at table waits for it/);
+  click(use);
+  assert.deepEqual(sets.log, [], 'a disabled button asks the api nothing');
+
+  // SAVE LANDED. js/main.js's `inFile` moves the moment the armed route
+  // answers ok — the server re-read the file it just wrote — so the button
+  // un-greys on the next repaint, with no reload.
+  sets.cat.find((s) => s.id === 'house.ivory-2').inFile = true;
+  panel.repaint();
+  assert.equal(use.disabled, false, 'the file declares it now');
+  assert.match(byClass(sec, 'dev-clockout').textContent, /house\.ivory-2 · declared in dice\.yaml/);
+  click(use);
+  assert.deepEqual(sets.log, ['apply(house.ivory-2)']);
+  assert.match(byClass(root, 'dev-statusslot').textContent, /you are rolling in house\.ivory-2/);
+  panel.unmount();
+});
+
+// A REFUSAL MAY NOT BE FOLLOWED BY A CLAIM OF SUCCESS. `report` answers true
+// for any object — that is how a partly-refused write still repaints — so the
+// verb has to look at `refused` before it says "you are rolling in it".
+t('sets: a refused Use at table prints the reason and no claim', () => {
+  const sets = fakeSets([
+    { house: 'house', set: 'ivory-2', label: 'Ivory (house)', houseLabel: 'House', inFile: false, removable: true },
+  ]);
+  const { root, panel } = fresh({ sets });
+  const sec = root.find((n) => n.classList.contains('dev-section') && n.dataset.section === 'sets');
+  // Reach past the disabled button the way the console does — the verb is the
+  // authority, and the panel is not what makes the refusal true.
+  const r = sets.apply('house.ivory-2');
+  assert.deepEqual(r.refused, [['houses.house.dice.ivory-2', 'unsaved']]);
+  byText(sec, 'Use at table').disabled = false;
+  click(byText(sec, 'Use at table'));
+  const status = byClass(root, 'dev-statusslot').textContent;
+  assert.match(status, /houses\.house\.dice\.ivory-2: Save the row first/);
+  assert.doesNotMatch(status, /you are rolling in/);
+  panel.unmount();
+});
+
 // THE PREVIEW READS BOTH TREES, because Apply does. `tune.set` was widened to
 // take a write into a row minted THIS session — that is how the felt editor
 // moves a slider — and the preview still asked only SHIPPED, so it said "no
@@ -1302,6 +1576,337 @@ t('the panel never reaches for location, storage or the network', async () => {
       assert.ok(!src.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').includes(word), `${f} mentions ${word}`);
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// the presets section (phase D4) — the one asset section with no form.
+// ---------------------------------------------------------------------------
+
+function fakePresets(rows, waiting = 0) {
+  const cat = rows.map((r) => ({ inFile: false, leaves: 1, film: 0, paths: [], ...r }));
+  const log = [];
+  const at = (name) => cat.find((p) => p.name === name) || null;
+  return {
+    log,
+    cat,
+    list: () => cat.map((p) => ({ ...p })),
+    pending: () => waiting,
+    hold: (name) => {
+      if (!name) { log.push('hold(refused)'); return { name, refused: [[`presets.${name}`, 'id']] }; }
+      cat.push({ name, inFile: false, leaves: waiting, film: 0, paths: [] });
+      log.push(`hold(${name})`);
+      return { name, refused: [] };
+    },
+    apply: (name) => { log.push(`apply(${name})`); return { name, applied: at(name).leaves - 1, refused: [['throw.physics.gravity', 'film']] }; },
+    remove: (name) => { cat.splice(cat.indexOf(at(name)), 1); log.push(`remove(${name})`); return { name, refused: [] }; },
+  };
+}
+
+t('presets: the list, the three verbs, and a Hold with nothing to hold', () => {
+  const presets = fakePresets([{ name: 'dusk', inFile: true, leaves: 3, film: 1 }], 2);
+  const { root, panel } = fresh({ presets });
+  const sec = root.find((n) => n.classList.contains('dev-section') && n.dataset.section === 'presets');
+  assert.ok(sec, 'the section is there when a presets api is given');
+  const note = () => byClass(sec, 'dev-clockout').textContent;
+  assert.match(note(), /dusk · declared in dice\.yaml · 3 rows, 1 film/);
+  assert.match(note(), /Hold would write 2 changed rows down/,
+    'the button says what it would capture before you press it');
+
+  // APPLY IS A PASTE: the refused film row is reported by name and the rest
+  // still lands, so the button is live at a locked table too.
+  click(byText(sec, 'Apply'));
+  assert.deepEqual(presets.log, ['apply(dusk)']);
+  assert.match(byClass(root, 'dev-status').textContent, /2 rows applied, 1 refused/);
+
+  const name = byClass(sec, 'dev-presetname');
+  name.value = 'noon';
+  click(byText(sec, 'Hold as preset'));
+  assert.deepEqual(presets.log, ['apply(dusk)', 'hold(noon)']);
+  assert.equal(name.value, '', 'the field empties, so a second Hold is a deliberate act');
+  assert.equal(presets.cat.length, 2);
+
+  click(byText(sec, 'Remove'));
+  assert.deepEqual(presets.log.at(-1), 'remove(noon)', 'Remove takes the row the picker names');
+  panel.unmount();
+});
+
+t('presets: nothing changed means nothing to hold, and no rows means no verbs', () => {
+  const presets = fakePresets([], 0);
+  const { root, panel } = fresh({ presets });
+  const sec = root.find((n) => n.classList.contains('dev-section') && n.dataset.section === 'presets');
+  assert.match(byClass(sec, 'dev-clockout').textContent, /no presets — turn some dials/);
+  assert.equal(byText(sec, 'Hold as preset').disabled, true, 'a preset of nothing is not a preset');
+  assert.equal(byText(sec, 'Apply').disabled, true);
+  assert.equal(byText(sec, 'Remove').disabled, true);
+  click(byText(sec, 'Hold as preset'));
+  assert.deepEqual(presets.log, [], 'and the disabled button does not reach the verb');
+  panel.unmount();
+});
+
+// ---------------------------------------------------------------------------
+// the recorder and the pop-out (phase D5)
+// ---------------------------------------------------------------------------
+
+// The kit's shape is `{ state, start, stop, ops, save }` and the panel asks
+// every one of them on the repaint beat — so the fake is a small state machine
+// rather than a log, and what is asserted is what the BUTTONS then say.
+function recorder() {
+  const state = { on: false, ops: [], saved: [] };
+  return {
+    state,
+    api: {
+      state: () => (state.on ? 'recording' : 'idle'),
+      start: () => { state.on = true; state.ops = []; return { state: 'recording' }; },
+      stop: () => { state.on = false; return { state: 'idle' }; },
+      ops: () => state.ops,
+      save: (filename, text) => { state.saved.push([filename, text]); return filename; },
+    },
+  };
+}
+
+t('the record group: Record arms it, the note counts the ops, Download step emits a step', () => {
+  const r = recorder();
+  const { root, panel } = fresh({ record: r.api });
+  const sec = root.find((n) => n.classList.contains('dev-section') && n.dataset.section === 'file');
+  const btn = byText(sec, 'Record');
+  assert.ok(btn, 'the file section carries the recorder');
+  const note = byClass(sec, 'dev-about');
+  assert.equal(note.textContent, 'not recording');
+  const dl = byText(sec, 'Download step');
+  assert.equal(dl.disabled, true, 'nothing recorded: nothing to download');
+
+  click(btn);
+  assert.equal(r.state.on, true, 'Record armed it');
+  assert.equal(byText(sec, 'Stop') !== null, true, 'and the button is now the other verb');
+  assert.equal(note.textContent, 'recording — nothing yet');
+
+  r.state.ops = [{ op: 'set', patch: { 'light.lamp.y': 40 } }, { op: 'deal', n: 3 }];
+  panel.repaint();
+  assert.equal(note.textContent, '2 ops recorded · recording');
+
+  const name = byClass(sec, 'dev-stepname');
+  name.value = 'Dusk Look';
+  click(byText(sec, 'Download step'));
+  assert.equal(r.state.saved.length, 1);
+  assert.equal(r.state.saved[0][0], 'dusk-look.mjs', 'the typed name becomes a file stem');
+  assert.match(r.state.saved[0][1], /tuneSet\(\{"light\.lamp\.y":40\}\)/);
+  assert.match(byClass(root, 'dev-status').textContent, /tools\/steps\/dusk-look\.mjs downloaded/);
+
+  click(byText(sec, 'Stop'));
+  assert.equal(r.state.on, false);
+  assert.equal(byText(sec, 'Record') !== null, true);
+  panel.unmount();
+});
+
+t('the recorder is asked, never remembered: devRecord from the console moves the button', () => {
+  const r = recorder();
+  const { root, panel } = fresh({ record: r.api });
+  const sec = root.find((n) => n.classList.contains('dev-section') && n.dataset.section === 'file');
+  r.state.on = true;                       // as `devRecord('start')` from the console would
+  panel.repaint();
+  assert.ok(byText(sec, 'Stop'), 'the panel reads the state it did not set');
+  panel.unmount();
+});
+
+t('no record api, no record group — the file section is the one phase 1 shipped', () => {
+  const { root, panel } = fresh();
+  const sec = root.find((n) => n.classList.contains('dev-section') && n.dataset.section === 'file');
+  assert.equal(byText(sec, 'Record'), null);
+  assert.equal(byClass(sec, 'dev-stepname'), null);
+  panel.unmount();
+});
+
+t('Pop out is drawn only when a caller hands over the verb', () => {
+  const plain = fresh();
+  const secA = plain.root.find((n) => n.classList.contains('dev-section') && n.dataset.section === 'file');
+  assert.equal(byText(secA, 'Pop out'), null, 'js/devmode.js opens no window of its own');
+  plain.panel.unmount();
+
+  const opened = [];
+  const { root, panel } = fresh({ verbs: { popout: () => { opened.push(1); return { url: '/dev.html' }; } } });
+  const sec = root.find((n) => n.classList.contains('dev-section') && n.dataset.section === 'file');
+  click(byText(sec, 'Pop out'));
+  assert.deepEqual(opened, [1]);
+  panel.unmount();
+});
+
+// ---- the emitter --------------------------------------------------------
+//
+// A fixture op list, the four ops the recorder writes down, and the three
+// claims that make the output worth downloading: it is VALID JavaScript, it
+// carries every op IN ORDER, and every seed it saw is in it.
+
+t('stepName: whatever was typed becomes a file stem', () => {
+  assert.equal(stepName('Dusk Look'), 'dusk-look');
+  assert.equal(stepName('  ../../etc/passwd  '), 'etc-passwd', 'no separator survives');
+  assert.equal(stepName(''), 'recorded-step');
+  assert.equal(stepName(null), 'recorded-step');
+  assert.equal(stepName('a'.repeat(80)).length, 48, 'and a stem is a name, not an essay');
+});
+
+t('emitStep: the ops in order, the seeds kept, and it parses as JavaScript', async () => {
+  const ops = [
+    { op: 'set', patch: { 'light.lamp.y': 40, 'light.fog.far': 70 } },
+    { op: 'deal', n: 3 },
+    { op: 'throw', seed: 1089386929, notation: '3d6 # bench' },
+    { op: 'sit', k: 2 },
+    { op: 'set', patch: { 'throw.physics.gravity': -60 } },
+  ];
+  const text = emitStep('dusk look', ops);
+
+  assert.ok(text.startsWith('/*\nCopyright 2026 The Dice Table Authors'), 'the Apache header, as every first-party file carries');
+  assert.match(text, /import \{ mkdirSync \} from 'node:fs';/);
+  assert.match(text, /export default async function run\(stage, \[outDir = 'tools\/shots\/dusk-look'\]\)/);
+  assert.match(text, /stage\.ctx\.devTab\(/, 'a step opens a dev tab');
+
+  // IN ORDER — the whole value of a recording. Read as positions in the text,
+  // because "contains" says nothing about sequence.
+  const at = (re) => text.search(re);
+  const marks = [
+    /tuneSet\(\{"light\.lamp\.y":40,"light\.fog\.far":70\}\)/,
+    /demoDeal\(3\)/,
+    /devBench\(1089386929, "3d6 # bench"\)/,
+    /demoSit\(2\)/,
+    /tuneSet\(\{"throw\.physics\.gravity":-60\}\)/,
+  ].map(at);
+  assert.ok(marks.every((i) => i > 0), `every op is in the step (${JSON.stringify(marks)})`);
+  assert.deepEqual(marks, [...marks].sort((a, b) => a - b), 'and in the order they were recorded');
+
+  // A shot after each act, and a settle wait after the throw — the two things
+  // that make the emitted file a step rather than a transcript.
+  assert.equal((text.match(/await shot\(/g) || []).length, 5);
+  assert.match(text, /await settled\(\);\n  await shot\('throw-3'\);/);
+
+  // AND IT PARSES. A skeleton nobody can run is not a skeleton.
+  const { writeFileSync, mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'devstep-'));
+  try {
+    const file = join(dir, 'emitted.mjs');
+    writeFileSync(file, text);
+    const { execFileSync } = await import('node:child_process');
+    execFileSync(process.execPath, ['--check', file]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+t('emitStep: a quote in a value cannot break the step it is written into', async () => {
+  const text = emitStep('quoted', [
+    { op: 'set', patch: { 'app.title': "it's a table" } },
+    { op: 'throw', seed: 7, notation: "2d20kh1 # it's advantage" },
+  ]);
+  const { writeFileSync, mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'devstep-'));
+  try {
+    const file = join(dir, 'quoted.mjs');
+    writeFileSync(file, text);
+    const { execFileSync } = await import('node:child_process');
+    execFileSync(process.execPath, ['--check', file]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  assert.match(text, /it's a table/, 'and the value survives whole');
+});
+
+t('emitStep: nothing recorded emits a step that says so rather than an empty function', async () => {
+  const text = emitStep('empty', []);
+  assert.match(text, /Nothing was recorded/);
+  assert.match(text, /await shot\('empty'\)/);
+  const { writeFileSync, mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'devstep-'));
+  try {
+    const file = join(dir, 'empty.mjs');
+    writeFileSync(file, text);
+    const { execFileSync } = await import('node:child_process');
+    execFileSync(process.execPath, ['--check', file]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// ---- the two ops the D5 review added ------------------------------------
+//
+// A REEL THAT RECORDED A CLONE MUST EMIT ONE. `tuneSet` refuses a field of a
+// row that is not there, so before this the whole of a sets-editing session
+// came out as one note and nothing else: the step reproduced none of it and,
+// because the note had no branch here, did not say so either.
+
+t('emitStep: a row op replays the clone the recipe edits were edits of', async () => {
+  const text = emitStep('sets', [
+    { op: 'row', verb: 'add', where: 'houses.house.dice', id: 'ivory-probe', row: { label: 'Ivory (house)', body: '#f2efe6', geo: { bevel: 0.09 } } },
+    { op: 'set', patch: { 'houses.house.dice.ivory-probe.body': '#ff0000' } },
+    { op: 'set', patch: { 'light.lamp.y': 44 } },
+    { op: 'row', verb: 'remove', where: 'felts', id: 'house-moss' },
+  ]);
+  const at = (re) => text.search(re);
+  const marks = [
+    /devRowAdd\("houses\.house\.dice", "ivory-probe", \{"label":"Ivory \(house\)","body":"#f2efe6","geo":\{"bevel":0\.09\}\}\)/,
+    /tuneSet\(\{"houses\.house\.dice\.ivory-probe\.body":"#ff0000"\}\)/,
+    /tuneSet\(\{"light\.lamp\.y":44\}\)/,
+    /devRowRemove\("felts", "house-moss"\)/,
+  ].map(at);
+  assert.ok(marks.every((i) => i > 0), `every op reached the step (${JSON.stringify(marks)})`);
+  assert.deepEqual(marks, [...marks].sort((a, b) => a - b), 'in the order they were recorded');
+  assert.equal((text.match(/await shot\(/g) || []).length, 4, 'a frame after each act');
+
+  // AND IT PARSES: a recipe goes into the step as JSON inside a JS string, and
+  // the quoting has to survive both.
+  const { writeFileSync, mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'devstep-'));
+  try {
+    const file = join(dir, 'sets.mjs');
+    writeFileSync(file, text);
+    const { execFileSync } = await import('node:child_process');
+    execFileSync(process.execPath, ['--check', file]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+t('emitStep: the act number and the frame number are the same number', () => {
+  const text = emitStep('numbered', [
+    { op: 'note', text: 'one field of a row this reel does not build' },
+    { op: 'set', patch: { 'light.lamp.y': 44 } },
+    { op: 'note', text: 'and another' },
+    { op: 'deal', n: 2 },
+  ]);
+  // The reel positions were 2 and 4; the acts are 1 and 2, and the shots the
+  // step takes are 01- and 02-, so a comment names the frame beside it.
+  assert.match(text, /\n  \/\/ 1 · light\.lamp\.y\n/);
+  assert.match(text, /await shot\('set-1'\);/);
+  assert.match(text, /\n  \/\/ 2 · the cast\n/);
+  assert.match(text, /await shot\('deal-2'\);/);
+  assert.ok(!/set-2|deal-4/.test(text), 'and no act is numbered by its place in the reel');
+});
+
+t('emitStep: a note reaches the file, and takes no frame', () => {
+  const text = emitStep('noted', [
+    { op: 'note', text: '3 fields of a row this reel does not build — Clone it while recording' },
+    { op: 'set', patch: { 'light.lamp.y': 44 } },
+  ]);
+  assert.match(text, /\/\/ note · 3 fields of a row this reel does not build — Clone it while recording/);
+  assert.equal((text.match(/await shot\(/g) || []).length, 1, 'one act, one frame: a note is not an act');
+});
+
+t('emitStep: a reel of nothing but notes emits them, not the empty skeleton', async () => {
+  const text = emitStep('all-notes', [
+    { op: 'note', text: '2 fields of a row this reel does not build: felts.house-moss.name, felts.house-moss.breath' },
+  ]);
+  assert.match(text, /felts\.house-moss\.name/, 'the note is in the file');
+  assert.ok(!/Nothing was recorded/.test(text),
+    'and it does not claim nothing was recorded — something was, and it says what');
+  assert.match(text, /Nothing here could be replayed/);
+  assert.match(text, /await shot\('empty'\)/, 'still a step: one frame');
+  const { writeFileSync, mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'devstep-'));
+  try {
+    const file = join(dir, 'all-notes.mjs');
+    writeFileSync(file, text);
+    const { execFileSync } = await import('node:child_process');
+    execFileSync(process.execPath, ['--check', file]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 // the async tests settle before the summary

@@ -1140,10 +1140,13 @@ Third, and worth saying next to "most dramatic": the trigger is a crit-fail
 **and** a set declaring `shader.dissolve`, which today is voidgrain alone. One
 house of nine × a crit fail. Most sessions will never see it.
 
-**Demo.** The best of the batch, because the rig already does it:
-`__lab.effect('umbra.voidgrain', 'unmake')` is reachable today with zero new
-code, and `tools/lab-shots.mjs:84-89` already screenshots an effect at named
-milliseconds mid-flight. **Put the look in front of Joe first, before any app
+**Demo.** The best of the batch, because the rig already did it:
+`__lab.effect('umbra.voidgrain', 'unmake')` was reachable with zero new code,
+and `tools/lab-shots.mjs:84-89` screenshotted an effect at named milliseconds
+mid-flight. **Both retired with the dice lab on 2026-09-03** (DEVMODE §9), so
+this demo now costs what it saves: developer mode's `houses` section can wear
+the set and *Throw one of each*, but nothing fires one set's effect on demand
+or samples it mid-flight. That is one of the owed items §9 lists. **Put the look in front of Joe first, before any app
 work** — if it does not land, nothing else matters. The assertion that catches
 the real bug, and which nobody would think to write: after completion,
 `mesh.material === getDie(type, variant).materials`, and a second voidgrain die
@@ -1910,15 +1913,19 @@ docs/SHIPPED.md should record each verdict.
 
 ### Open
 
-- **Does `fx.html` ship to production?** `.gcloudignore` excludes
-  `chrome-lab.html` (line 30) but **ships `lab.html`**. Shipping `fx.html` is
+- **Does `fx.html` ship to production?** `.gcloudignore` excluded
+  `chrome-lab.html` but shipped `lab.html`. **That premise expired 2026-09-03**:
+  `lab.html` retired entirely (DEVMODE §9) and the same commit taught
+  `.gcloudignore` to withhold developer mode's three files, so the tree's
+  precedent now runs the other way — dev chrome is absent from the deploy
+  unless a reason is written down. Shipping `fx.html` is
   what makes the phone experiments judgeable at all — Joe needs a URL he can open
   on a real phone on real cellular. There are no roles and no secrets to leak, and
   the flag cannot reach another client. The cost is that a stranger could find
   `/fx.html`. One line either way; Joe's call.
-- **The `fx` tag's place in the suite.** Out of `smoke` (following the `lab`
-  tag's precedent) so the per-step gate stays seconds, with a row in
-  TESTING.md:158-173.
+- **The `fx` tag's place in the suite.** Out of `smoke` (the `lab` tag's
+  precedent, retired with its page but still the right shape) so the per-step
+  gate stays seconds, with a row in TESTING.md:158-173.
 - **Two facts currently written in no `.md` file** and which belong in
   `tools/README.md`: port **8231** is the agent-safe live server
   (`dice-agent` in `.claude/launch.json`) and is the only way an agent can look at

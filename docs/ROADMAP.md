@@ -847,9 +847,14 @@ curvature, not edge width). Nothing here waits on anyone now.
 Three things that entry got wrong while it waited, all worth knowing before
 the Tier 3 work re-reads it:
 
-- **The bench recipes live in `js/lab.js`, not `js/fae-lab.js`** — the
+- **The bench recipes lived in `js/lab.js`, not `js/fae-lab.js`** — the
   `BENCH` table near the top. `js/fae-lab.js` is the venue lab and contains
-  the string `bevel` zero times.
+  the string `bevel` zero times. **`js/lab.js` retired 2026-09-03** with the
+  rest of the dice lab (docs/DEVMODE.md §9): Tier 3 sweeps its geo space from
+  developer mode's `houses` section instead, on the real felt — and re-reads
+  §9's owed list first, because the geo-bench orderings and the watertight
+  probe went with the page and are not re-made anywhere yet. The nine bench
+  recipes themselves are in git at `dbee311:js/lab.js`.
 - **`std` was never a recipe.** It was the ABSENCE of one: `bevel` fell back
   to a module constant and `profile` fell back to `'cut'`, independently. So
   "make std wear round .090" could not be done by editing a `std` entry, and
