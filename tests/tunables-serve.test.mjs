@@ -525,13 +525,20 @@ await t('a bad DICE_MODE loses to nothing: it exits even with a good file', asyn
   }
 }
 
-// ---- the declaration's own felts are accepted ON THE WIRE -------------------
+// ---- the declaration's felts are what the WIRE accepts ----------------------
 //
 // docs/DEVMODE.md §9 (phase C4): "The server parses the same file, so it
 // accepts a new id on the wire after a restart, and after the mtime re-read
 // in phase 2." Without this half a house felt works solo and is 400'd at a
 // shared table — which is precisely the failure tests/felt-ids.test.mjs
 // exists to keep the three hand-kept lists from producing.
+//
+// AND SINCE PHASE E1 THE DECLARATION IS THE WHOLE LIST (2026-09-03). server.js
+// held eleven mat ids in a literal and ADDED the file's rows to them; the mats
+// are rows now, so this fixture — a small declaration of this test's own —
+// declares the two it wants and the server accepts exactly those. `ocean` used
+// to work here on the strength of the literal alone, which is precisely the
+// second source of truth the migration removed.
 {
   // …and two ids the BROWSER will never resolve, declared beside the good one.
   // `reconcileRows` drops a row whose id fails ASSET_ID_RE and `reconcile`
@@ -539,7 +546,8 @@ await t('a bad DICE_MODE loses to nothing: it exits even with a good file', asyn
   // allowlist widened by every key under `felts:` would accept a room felt no
   // client can wear (the C4 review, 2026-09-03). The dotted one is quoted
   // because js/yaml.js refuses an unquoted dotted key outright.
-  const withFelts = `${FIXTURE}\nfelts:\n  house-moss:\n    name: Moss\n    cloth: silt\n`
+  const withFelts = `${FIXTURE}\nfelts:\n  ocean:\n    name: Ocean\n    feltBase: "#16404a"\n`
+    + `  house-moss:\n    name: Moss\n    cloth: silt\n`
     + `  HouseUpper:\n    name: Upper\n  "house.dot":\n    name: Dotted\n`;
   const dir = makeTree(withFelts);
   trees.push(dir);
@@ -558,7 +566,7 @@ await t('a bad DICE_MODE loses to nothing: it exits even with a good file', asyn
     assert.equal(j.status, 200, `join: ${j.status}`);
     const { playerId } = j.body;
 
-    await t('a felt the declaration adds is accepted where the code has no row', async () => {
+    await t('a felt the declaration names is accepted; the code has no row for any of them', async () => {
       const s = await post('/api/settings', { room, playerId, settings: { felt: 'house-moss' } });
       assert.equal(s.status, 200, `settings: ${s.status} ${JSON.stringify(s.body)}`);
       assert.equal(s.body.settings.felt, 'house-moss', 'and it is the room\'s felt now');
@@ -568,7 +576,12 @@ await t('a bad DICE_MODE loses to nothing: it exits even with a good file', asyn
       const s = await post('/api/settings', { room, playerId, settings: { felt: 'chartreuse' } });
       assert.equal(s.status, 400, 'an unknown felt is a 400, not a silent fallback');
       const back = await post('/api/settings', { room, playerId, settings: { felt: 'ocean' } });
-      assert.equal(back.body.settings.felt, 'ocean', 'a shipped id still works');
+      assert.equal(back.body.settings.felt, 'ocean', 'while a row THIS file declares does work');
+      // …and `taproom`, which the repo's own dice.yaml ships, is refused here,
+      // because this fixture does not declare it. That is the E1 property
+      // stated as a test: the wire list is the file, not the build.
+      const notHere = await post('/api/settings', { room, playerId, settings: { felt: 'taproom' } });
+      assert.equal(notHere.status, 400, 'a mat this declaration does not name is not a mat this server has');
     });
 
     // THE INVERSE OF THIS FILE'S OWN FAILURE, and the one the C4 review found:

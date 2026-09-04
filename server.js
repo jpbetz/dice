@@ -327,37 +327,42 @@ const DIE_TYPES = Object.keys(DIE_MAX);
 // normalize is for settings with an interior: the experience templates' text
 // needs the same capping and control-char stripping a roll label gets, and a
 // boolean checker has no way to hand the cleaned value back.
-const FELT_THEMES = ['emerald', 'crimson', 'midnight', 'slate', 'walnut',
-  'obsidian', 'ocean', 'plum', 'sand', 'silt', 'taproom'];
-
-// …AND THE FELTS THE DECLARATION ADDS (docs/DEVMODE.md §9, phase C4). A row
-// under `felts:` in dice.yaml is a felt this deployment has that the code
-// does not, and the id has to be accepted on the wire or it "works solo and
-// silently fails at a shared table" — which is the exact failure
-// tests/felt-ids.test.mjs exists to catch between the three hand-kept lists.
-// Refilled by `readDeclaration`, so the mtime re-read that makes a dial live
-// makes a felt id live too, no restart. The array literal above is the
-// SHIPPED list and stays a literal: that test regex-scrapes it.
+// THE FELT IDS ARE THE DECLARATION'S, ALL OF THEM (docs/DEVMODE.md §9, phase
+// E1). A hand-kept literal stood here through C4 with the eleven mats the code
+// shipped, and the file's rows were ADDED to it; the mats moved into `felts:`
+// in dice.yaml on 2026-09-03 (Joe: "make a new mat as YAML-only as a new dice
+// set is now"), so there is one list and this process reads it off the tree it
+// already parsed — exactly as it takes the dice-set ids from `houses:` below.
+// A felt id has to be accepted on the wire or it "works solo and silently
+// fails at a shared table", which is the failure tests/felt-ids.test.mjs
+// exists to catch. Refilled through the one `setDeclaration`, so the mtime
+// re-read that makes a dial live makes a mat live too, no restart.
 //
-// AND IT WIDENS BY THE CLIENT'S LAW, NOT BY THE FILE'S (found by the C4
+// AND IT IS FILTERED BY THE CLIENT'S LAW, NOT THE FILE'S (found by the C4
 // review, 2026-09-03). The browser drops a declared row whose id is not
 // `ASSET_ID_RE` — `HouseUpper`, `house.dot` — before the picker ever sees it
 // (js/tune.js `reconcileRows`, and a dotted key never survives `reconcile` at
-// all), so widening this list with EVERY key under `felts:` inverted the very
-// bug tests/felt-ids.test.mjs exists to catch: not "works solo, fails on the
-// wire" but "accepted on the wire, resolvable by nobody" — one viewer sets the
-// room to `HouseUpper` and every table keeps its old cloth with no swatch
-// pressed and nothing said. It was reachable by the first thing a person is
-// likely to type, because DEVMODE §3's own example was `house.moss`. Same
-// regex, same answer, both ends.
-const DECLARED_FELTS = new Set();
-const feltIds = () => (DECLARED_FELTS.size ? FELT_THEMES.concat([...DECLARED_FELTS]) : FELT_THEMES);
-function syncDeclaredFelts(tree) {
-  DECLARED_FELTS.clear();
+// all), so taking EVERY key under `felts:` inverted the very bug that test
+// exists to catch: not "works solo, fails on the wire" but "accepted on the
+// wire, resolvable by nobody" — one viewer sets the room to `HouseUpper` and
+// every table keeps its old cloth with no swatch pressed and nothing said. It
+// was reachable by the first thing a person is likely to type, because
+// DEVMODE §3's own example was `house.moss`. Same regex, same answer, both
+// ends.
+//
+// A FILE WITH NO `felts:` LEAVES THIS EMPTY, and that is the same answer
+// `houses:` gives one line down: half a catalogue accepted is worse than a
+// catalogue that is not there. The felt setting then refuses every value and
+// every room keeps the default — which is what a server booted against a
+// declaration it could not read should do.
+const FELT_IDS = new Set();
+const feltIds = () => [...FELT_IDS];
+function syncFeltIds(tree) {
+  FELT_IDS.clear();
   const rows = tree && tree.felts;
   if (!rows || typeof rows !== 'object' || Array.isArray(rows)) return;
   for (const id of Object.keys(rows)) {
-    if (ASSET_ID_RE.test(id) && !FELT_THEMES.includes(id)) DECLARED_FELTS.add(id);
+    if (ASSET_ID_RE.test(id)) FELT_IDS.add(id);
   }
 }
 
@@ -511,7 +516,8 @@ function normalizeExperiences(raw) {
 const SETTING_SPECS = {
   felt: {
     default: 'obsidian',
-    // `feltIds()`, not the literal: the declaration's own rows count too.
+    // `feltIds()` — the mats the declaration names, which since phase E1 is
+    // all of them (there is no literal here any more).
     validate: (v) => typeof v === 'string' && feltIds().includes(v),
   },
   // The room's interpretation system. Room-wide rather than personal on
@@ -4390,7 +4396,7 @@ function readDeclaration(stat) {
 }
 
 // THE ONE PLACE `declaration` IS ASSIGNED, so what the file says and what the
-// wire accepts can never disagree. `syncDeclaredFelts` is the second reader of
+// wire accepts can never disagree. `syncFeltIds` is the second reader of
 // the tree (the first is the served module), and it was a separate call inside
 // readDeclaration for about an hour: the Save route adopts a tree it parsed
 // itself (adoptDeclaration) and never went through that function, so a felt
@@ -4398,7 +4404,7 @@ function readDeclaration(stat) {
 // the next unrelated edit. Assign through here and that hole cannot reopen.
 function setDeclaration(next) {
   declaration = next;
-  syncDeclaredFelts(next && next.tree);
+  syncFeltIds(next && next.tree);
   // The third reader, and it goes through here for exactly the reason the
   // second does (phase D1): a dice set added to the file has to be on the wire
   // the moment the file is re-read, or `/api/roll` 400s a set the browser is
@@ -4814,4 +4820,4 @@ if (IS_MAIN) {
   });
 }
 
-export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor, entryExistsForAll, cleanName, sanitizePools, sanitizeProfiles, MAX_PROFILES, LOG_DEBUG, LOG_INFO, LOG_THRESHOLD };
+export { server, DIE_TYPES, PALETTE, feltIds, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor, entryExistsForAll, cleanName, sanitizePools, sanitizeProfiles, MAX_PROFILES, LOG_DEBUG, LOG_INFO, LOG_THRESHOLD };

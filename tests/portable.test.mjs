@@ -43,7 +43,16 @@ import { STAMP as SCHEMA_STAMP, EPOCH, MAJOR } from '../js/schema.js';
 import { readFileSync } from 'node:fs';
 import { parseYaml } from '../js/yaml.js';
 import { installCatalogue } from '../js/themes.js';
-installCatalogue(parseYaml(readFileSync(new URL('../dice.yaml', import.meta.url), 'utf8')).tree.houses);
+const DECLARED = parseYaml(readFileSync(new URL('../dice.yaml', import.meta.url), 'utf8')).tree;
+installCatalogue(DECLARED.houses);
+// …AND THE MATS THE SAME WAY (phase E1, 2026-09-03). `felts:` in dice.yaml is
+// the felt catalogue now, and js/portable.js is handed it rather than holding
+// a literal — in the browser by js/main.js at boot, here by the test, which is
+// the same shape as the catalogue line above it. A reader that is never told
+// refuses every `felt:` line, so this call is not decoration: it is what makes
+// `felt: 'obsidian'` in the fixtures below a felt this build has.
+const SHIPPED_FELTS = Object.keys(DECLARED.felts);
+declareFelts(SHIPPED_FELTS);
 
 let n = 0;
 const t = (name, fn) => {
@@ -620,28 +629,33 @@ t('an unknown felt refuses by line — a silent fallback is a table nobody prepa
   assert.ok(parsed.error.includes('felt'), parsed.error);
 });
 
-t('…but a felt the DECLARATION adds is not unknown, once main.js has said so', () => {
-  // docs/DEVMODE.md §9 (phase C4): a `felts:` row in dice.yaml is a felt this
-  // deployment has and this module's hand-kept literal does not. The ids come
-  // from the served /js/tunables.js, which does not exist on disk — so js/main.js
-  // hands them down through `declareFelts` rather than this file importing
-  // anything. Under Node (here) nobody calls it, and the literal is the whole
-  // list, which is exactly the state the test above measures.
+t('…and the felt enum is the DECLARATION\'s, handed down rather than written here', () => {
+  // docs/DEVMODE.md §9 (phases C4 and E1): a `felts:` row in dice.yaml is a
+  // felt this deployment has, and since 2026-09-03 EVERY mat is one — this
+  // module holds no list at all. The ids come from the served
+  // /js/tunables.js, which does not exist on disk, so js/main.js hands them
+  // down through `declareFelts` rather than this file importing anything.
   const rack = ['table:', "  felt: 'house-moss'"].join('\n');
   assert.equal(parsePortable(rack).ok, false, 'undeclared: refused at its line');
-  declareFelts(['house-moss']);
+  declareFelts(SHIPPED_FELTS.concat(['house-moss']));
   try {
     const parsed = parsePortable(rack);
     assert.equal(parsed.ok, true, parsed.error);
     assert.deepEqual(parsed.table, { felt: 'house-moss' });
-    // …and the shipped enum is not widened past what was declared
+    // …and the enum is not widened past what was declared
     assert.equal(parsePortable(['table:', "  felt: 'house-ash'"].join('\n')).ok, false);
-    // a declared id that shadows a shipped one changes nothing: the list is
-    // a union, and `obsidian` was always in it
-    declareFelts(['obsidian', 'house-moss']);
-    assert.equal(parsePortable(rack).ok, true);
-  } finally {
+    // the shipped mats ride along, because they are declared rows too
+    assert.equal(parsePortable(['table:', "  felt: 'obsidian'"].join('\n')).ok, true);
+    // A READER THAT WAS NEVER TOLD REFUSES EVERYTHING, and says which question
+    // it could not answer rather than "is not one of" with nothing after it.
+    // This is the E1 state that used to be impossible: before the mats moved
+    // into the file there was a literal here to fall back on.
     declareFelts([]);
+    const untold = parsePortable(['table:', "  felt: 'obsidian'"].join('\n'));
+    assert.equal(untold.ok, false);
+    assert.match(untold.error, /has not been told the felt catalogue/);
+  } finally {
+    declareFelts(SHIPPED_FELTS);
   }
   assert.equal(parsePortable(rack).ok, false, 'and cleared again, it is unknown again');
 });

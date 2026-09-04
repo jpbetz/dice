@@ -122,9 +122,14 @@ t('the catalogue is SPARSE: a field the file does not name stays absent', () => 
   assert.equal(ivory.rest, undefined, 'and no cadence — "sets without `rest` do not cadence"');
   assert.equal(ivory.light, undefined);
   assert.equal(ivory.post, undefined);
-  // …and the FELT section is the other kind, still filled out to its shape.
+  // …and the FELT section is the other kind, still filled out to its shape —
+  // minus the two SPARSE GROUPS inside it (phase E2, js/tune.js `sparse`),
+  // whose defaults are the cloth's rows rather than anything in the file, so
+  // absence there is the answer exactly as it is for a dice recipe.
   const felts = createTune({ declared: { felts: { 'house-x': { name: 'X' } } } });
-  assert.equal(Object.keys(felts.SHIPPED.felts['house-x']).length, 6, 'a felt row is filled');
+  assert.deepEqual(Object.keys(felts.SHIPPED.felts['house-x']),
+    ['name', 'cloth', 'feltBase', 'sceneBg', 'breath', 'mottle', 'texture', 'tile'],
+    'a felt row is filled, and `gloss`/`sound` are the painter\'s until the row says otherwise');
 });
 
 // ---------------------------------------------------------------------------

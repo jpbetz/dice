@@ -300,9 +300,17 @@ replays the last seed only when the two slots differ on a film-class path).
 
 The **felts editor** (phase 2, 2026-09-02) is the first ASSET surface, and
 its hooks follow the same shape. Readout: `devFelts()` — zero-arg, answers on
-every tab, one entry per felt this build has, with `shipped` (the row lives in
-js/main.js), `inFile` (dice.yaml declares it) and `current` (the table is
-wearing it). Writers, all taking an argument so P7's zero-arg sweep leaves
+every tab, one entry per felt this build has, with `inFile` (dice.yaml
+declares it), `removable` (this session minted it, so the panel may drop it)
+and `current` (the table is wearing it). There is no `shipped` any more: the
+mats moved into the declaration in phase E1, so there is no row that lives in
+code. Since phase E2 an entry also carries the row's `texture`, `tile` and its
+`gloss`/`sound` groups — null where the row is silent, with `defaults` holding
+what the CLOTH answers for it — and `devFeltSurface(id)` is the RESOLVED
+surface, which is the other question: the painter's registries merged under
+the row, plus `loaded` (`none | pending | ready | failed`) for an image mat's
+picture. It takes an argument so P7's sweep leaves it alone, and answers about
+the mat on the table when called bare. Writers, all taking an argument so P7's zero-arg sweep leaves
 them alone and all answering `null` with the door shut, in production, or
 while the film is locked: `devFeltAdd(id, row?)` (a house row, missing fields
 taking the row defaults), `devFeltSet(id, patch)`, `devFeltRemove(id)`,

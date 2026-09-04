@@ -51,13 +51,16 @@ import { dirname, join } from 'node:path';
 import {
   DIALS, look, film, pick, list, isDial, defaultsOf, merge, leaves, getLeaf, setLeaf, hasLeaf,
   alias, FORBIDDEN_LEAF, STATIC_PATHS, createTune,
-  ASSET_SECTIONS, ASSET_ROWS, ASSET_ID_RE, assetRowDefaults, assetDialFor,
+  ASSET_SECTIONS, ASSET_ROWS, ASSET_ID_RE, assetRowDefaults, assetDialFor, isSparse, LAWS,
 } from '../js/tune.js';
 import { parseYaml } from '../js/yaml.js';
 // The two Node-pure modules whose numbers the C5 dials copy. Neither imports
 // three or cannon (js/places.js is imported by server.js; js/voices.js is the
 // audio DATA), so both can be read here.
-import { MASTER_GAIN, IMPACT_VOICES, IMPACT_DEFAULT_BODY } from '../js/voices.js';
+import {
+  MASTER_GAIN, IMPACT_VOICES, IMPACT_DEFAULT_BODY,
+  TAP_E, TAP_RATIO_MAX, CLOTH_TAIL_MAX, CLOTH_FIZZ_MAX,
+} from '../js/voices.js';
 import { PLACARD, PLACARD_STANDOFF, PLACARD_W, PLACARD_D } from '../js/places.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -682,13 +685,27 @@ t('the row shape is a map of dials, and assetDialFor answers a dial or says why 
     assert.ok(ASSET_ROWS[sec] && typeof ASSET_ROWS[sec] === 'object', `${sec} has a row shape`);
     assert.notEqual(assetRowDefaults(sec), null);
   }
+  // A FELT ROW IS DIALS AND, SINCE PHASE E2, TWO SPARSE GROUPS OF THEM
+  // (js/tune.js `sparse`). Every leaf of either is still a look dial with a
+  // default; what a group changes is what ABSENCE means, which is the section
+  // below.
   for (const [k, d] of Object.entries(ASSET_ROWS.felts)) {
-    assert.ok(isDial(d), `felts.${k} is a dial`);
-    assert.equal(d.cls, 'look', 'a felt is per-viewer chrome, never the bake');
-    assert.ok(!FORBIDDEN_LEAF.test(`felts.${k}`), `felts.${k} reaches nothing it may not`);
+    for (const [sub, leaf] of Object.entries(isSparse(d) ? d.sparse : { '': d })) {
+      const at = sub ? `felts.${k}.${sub}` : `felts.${k}`;
+      assert.ok(isDial(leaf), `${at} is a dial`);
+      assert.equal(leaf.cls, 'look', 'a felt is per-viewer chrome, never the bake');
+      assert.ok(!FORBIDDEN_LEAF.test(at), `${at} reaches nothing it may not`);
+    }
   }
+  // …AND `gloss` AND `sound` ARE NOT IN THE DEFAULTS AT ALL, which is the
+  // whole of what `sparse` buys: their defaults are the CLOTH's rows
+  // (js/main.js FELT_GLOSS, js/voices.js CLOTH_VOICES) and which one applies
+  // depends on this row's own `cloth`, so a row that arrived carrying wool's
+  // numbers would have answered for silt and oak and changed two shipped
+  // surfaces while every test said the file had not moved.
   assert.deepEqual(assetRowDefaults('felts'), {
     name: 'House felt', cloth: 'felt', feltBase: '#1c1c24', sceneBg: '#0f0f13', breath: 1, mottle: 1,
+    texture: '', tile: 5,
   });
   assert.equal(assetRowDefaults('sets'), null, 'a name that is not a section has no row defaults');
   assert.equal(assetDialFor('felts.house-moss.cloth'), ASSET_ROWS.felts.cloth);
@@ -718,14 +735,18 @@ t('addRow / removeRow: a row lands whole, counts as its leaves, and reset puts t
   const r = tune.addRow('felts', 'house-moss', { name: 'Moss', cloth: 'silt', feltBase: '#1f3a22' });
   assert.deepEqual(r.refused, []);
   assert.deepEqual(tune.rowsOf('felts'), {
-    'house-moss': { name: 'Moss', cloth: 'silt', feltBase: '#1f3a22', sceneBg: '#0f0f13', breath: 1, mottle: 1 },
-  }, 'the fields the caller left out take the row defaults');
+    'house-moss': {
+      name: 'Moss', cloth: 'silt', feltBase: '#1f3a22', sceneBg: '#0f0f13', breath: 1, mottle: 1,
+      texture: '', tile: 5,
+    },
+  }, 'the fields the caller left out take the row defaults — and the two SPARSE groups do not arrive at all');
   assert.deepEqual(tune.changes(), {
     'felts.house-moss.name': 'Moss', 'felts.house-moss.cloth': 'silt', 'felts.house-moss.feltBase': '#1f3a22',
     'felts.house-moss.sceneBg': '#0f0f13', 'felts.house-moss.breath': 1, 'felts.house-moss.mottle': 1,
+    'felts.house-moss.texture': '', 'felts.house-moss.tile': 5,
   }, 'every leaf of the row counts as a change');
   const added = tune.diff().filter((d) => d.path.startsWith('felts.'));
-  assert.equal(added.length, 6);
+  assert.equal(added.length, 8, 'the six flat fields plus the two E2 added; the sparse groups are absent');
   assert.deepEqual([...new Set(added.map((d) => d.shipped))], [undefined], 'the file said none of it');
   assert.deepEqual([...new Set(added.map((d) => d.cls))], ['look'], 'and each leaf wears its row dial');
 
@@ -759,12 +780,134 @@ t('addRow / removeRow: a row lands whole, counts as its leaves, and reset puts t
   assert.deepEqual(tune.changes(), {});
 });
 
+// ---------------------------------------------------------------------------
+// A SPARSE GROUP INSIDE A FILLED ROW, AND A PATH THAT IS A PATH (phase E2)
+// ---------------------------------------------------------------------------
+//
+// E2 gave a felt row a SURFACE: an image cloth (`texture`, `tile`) and two
+// groups — `gloss` and `sound` — whose defaults are the CLOTH's rows and not
+// anything written in dice.yaml. Two claims, and the first is the one a
+// regression would be silent about: a row that names neither group has no key
+// for either, so every mat that shipped before E2 goes on wearing its
+// painter's numbers BY CONSTRUCTION.
+t('`gloss` and `sound` are sparse groups: absent means the painter answers', () => {
+  const src = 'felts:\n  house-moss:\n    name: Moss\n    cloth: silt\n'
+    + '  house-ash:\n    name: Ash\n    cloth: image\n    texture: models/mats/linen.png\n'
+    + '    sound: { tail: 1.3 }\n';
+  const tune = mini(parseYaml(src).tree, src);
+  const moss = tune.SHIPPED.felts['house-moss'];
+  assert.equal('gloss' in moss, false, 'a row that says nothing about gloss has no gloss key');
+  assert.equal('sound' in moss, false, '…and none about sound');
+  assert.equal(moss.texture, '', 'the FILLED fields still fill: an empty path is what a painted cloth says');
+  assert.equal(moss.tile, 5);
+  // A group the file DOES name keeps exactly what it named — not the group's
+  // defaults with one field moved, which would answer the other five for a
+  // painter that has its own answers.
+  assert.deepEqual(tune.SHIPPED.felts['house-ash'].sound, { tail: 1.3 },
+    'one field of a sparse group is one field, and the painter keeps the rest');
+  assert.equal(assetDialFor('felts.house-ash.sound.tail'), ASSET_ROWS.felts.sound.sparse.tail);
+  assert.equal(assetDialFor('felts.house-ash.gloss.mid'), ASSET_ROWS.felts.gloss.sparse.mid);
+  assert.match(assetDialFor('felts.house-ash.sound'), /is a group of fields/);
+  assert.match(assetDialFor('felts.house-ash.sound.nope'), /no felts field named "nope"/);
+
+  // MINTING A SPARSE LEAF is how the panel moves one: the row exists, the
+  // group does not, and the write creates it — the same rule a sparse dice
+  // recipe's absent field lives under (the D1 review).
+  assert.deepEqual(tune.set({ 'felts.house-moss.gloss.swing': 0.04 }).refused, []);
+  assert.equal(tune.get('felts.house-moss.gloss.swing'), 0.04);
+  assert.deepEqual(tune.changes(), { 'felts.house-moss.gloss.swing': 0.04 },
+    'and Save writes the one line, not the whole group');
+  assert.deepEqual(tune.set({ 'felts.house-moss.gloss.mid': 'x' }).refused,
+    [['felts.house-moss.gloss.mid', 'type']]);
+  tune.reset('all');
+  assert.equal(tune.get('felts.house-moss.gloss.swing'), undefined, 'reset takes the minted leaf away again');
+  assert.equal(tune.exportYaml(), src);
+});
+
+t('a texture path must be under models/, and the empty string is a real answer', () => {
+  // The law is about the DEPLOY, not about trust: `models/` is the one asset
+  // directory server.js serves and .gcloudignore ships, so a path outside it
+  // is a row that works on the author's disk and 404s for everybody else.
+  const d = ASSET_ROWS.felts.texture;
+  assert.equal(d.law, 'assetPath');
+  assert.equal(LAWS.assetPath.pair, false, 'it needs nothing but the value, so the FILE is held to it too');
+  const src = 'felts:\n  house-a:\n    texture: models/mats/linen.png\n'
+    + '  house-b:\n    texture: /etc/passwd\n'
+    + '  house-c:\n    texture: models/../../secrets.png\n';
+  const tune = mini(parseYaml(src).tree, src);
+  assert.equal(tune.SHIPPED.felts['house-a'].texture, 'models/mats/linen.png');
+  assert.equal(tune.SHIPPED.felts['house-b'].texture, '', 'dropped by name, with the default standing');
+  assert.equal(tune.SHIPPED.felts['house-c'].texture, '', '…and so is one that escapes with ..');
+  assert.deepEqual(tune.refusals.map((r) => [r.path, r.reason]),
+    [['felts.house-b.texture', 'path'], ['felts.house-c.texture', 'path']]);
+  // The same law at the panel's door.
+  assert.deepEqual(tune.set({ 'felts.house-a.texture': 'http://elsewhere/x.png' }).refused,
+    [['felts.house-a.texture', 'path']]);
+  assert.deepEqual(tune.set({ 'felts.house-a.texture': 'models/mats/other.png' }).refused, []);
+  assert.deepEqual(tune.set({ 'felts.house-a.texture': '' }).refused, [],
+    'and clearing it is how a row stops being an image mat');
+  // …AND NOT THROUGH A PERCENT-ESCAPE EITHER (the E2 review, 2026-09-03).
+  // `models/%2e%2e/%2e%2e/etc/passwd` starts with `models/` and holds no
+  // literal `..`, so the law as first written accepted a value its own `why`
+  // said it refused. server.js decodes before it splits and 403s it, so this
+  // is a law telling the truth rather than a hole being closed.
+  assert.deepEqual(tune.set({ 'felts.house-a.texture': 'models/%2e%2e/%2e%2e/etc/passwd' }).refused,
+    [['felts.house-a.texture', 'path']]);
+  assert.deepEqual(tune.addRow('felts', 'house-z', { cloth: 'image', texture: 'models/%2e%2e/x.png' }).refused,
+    [['felts.house-z.texture', 'path']], 'and a whole row lands under the same law');
+  assert.match(LAWS.assetPath.why, /percent-escape/, 'the sentence a reader trusts says what holds');
+  // `tile` is a divisor (js/main.js feltTileReps), so it carries the law that
+  // says so rather than only a slider floor.
+  assert.equal(ASSET_ROWS.felts.tile.law, 'positive');
+  assert.deepEqual(tune.set({ 'felts.house-a.tile': 0 }).refused, [['felts.house-a.tile', 'range-law']]);
+});
+
+// THE TWO DIALS WHOSE RANGE IS A MODEL, NOT A TASTE (the E2 review,
+// 2026-09-03). Both were shipped with a range that could not say what the
+// file says, or could say what the code cannot mean:
+//
+//   · `tile` at step 0.5 could not express the shipped `linen`'s 1.25 — the
+//     slider drew 1.5, and one `change` on it (a click, an arrow key, a drag
+//     released where it started) rewrote a shipped mat to three repeats
+//     instead of four, which is no longer one image pixel per texel.
+//   · `tail` ran to 2.5, past the 2.381 where the settle cluster's ratio
+//     reaches 1 and the taps stop decaying.
+//
+// A range is a claim about what the code can do with a value, so this test is
+// about the arithmetic and not about the numbers looking sensible.
+t('a slider can say what the file says, and cannot say what the mixer would take back', () => {
+  const [tMin, tMax, tStep] = ASSET_ROWS.felts.tile.range;
+  const declared = parseYaml(readFileSync(join(ROOT, 'dice.yaml'), 'utf8')).tree.felts.linen.tile;
+  assert.equal(declared, 1.25, 'the shipped image mat, at one image pixel per texel');
+  assert.ok(declared >= tMin && declared <= tMax, `${declared} is inside [${tMin}, ${tMax}]`);
+  assert.ok(Math.abs(Math.round(declared / tStep) * tStep - declared) < 1e-9,
+    `${declared} lands on the ${tStep} step — a slider that snapped it would rewrite the mat`);
+  // …and the top of the range is the coarsest thing the model can SAY.
+  // `feltTileReps` is round(5 / tile), so every span past 10/3 is one repeat:
+  // a range that went further would be dial that all meant the same picture.
+  const reps = (span) => Math.max(1, Math.round(5 / span));
+  assert.equal(reps(tMax), 1, 'the top of the range is one repeat across the tile');
+  assert.equal(reps(tMax * 2), 1, '…and so is everything past it, which is why it stops here');
+  assert.equal(reps(declared), 4);
+
+  // The tail's top IS js/voices.js's clamp, so the panel cannot offer a value
+  // the mixer will quietly take back.
+  const tail = ASSET_ROWS.felts.sound.sparse.tail.range;
+  assert.equal(tail[1], CLOTH_TAIL_MAX, 'the dial stops where the clamp does');
+  assert.ok(TAP_E * tail[1] <= TAP_RATIO_MAX, 'so the settle cluster always shrinks');
+  assert.ok(TAP_E * (tail[1] + tail[2]) > TAP_RATIO_MAX,
+    'and it is the LAST step under the cap, not a cautious number short of it');
+  const fizz = ASSET_ROWS.felts.sound.sparse.fizz.range;
+  assert.equal(fizz[1], CLOTH_FIZZ_MAX, 'the fizz dial stops at the clamp too — it is a fraction of a modulation');
+});
+
 t('a declared row is a SHIPPED row: reset restores it, remove reports it gone, export takes its lines out', () => {
   const src = 'light:\n  lamp:\n    y: 24\nfelts:\n  house-moss:\n    name: Moss   # the first house felt\n    cloth: silt\n';
   const tune = mini(parseYaml(src).tree, src);
   assert.deepEqual(tune.SHIPPED.felts['house-moss'], {
     name: 'Moss', cloth: 'silt', feltBase: '#1c1c24', sceneBg: '#0f0f13', breath: 1, mottle: 1,
-  }, 'the file names two fields; the row shape fills the rest');
+    texture: '', tile: 5,
+  }, 'the file names two fields; the row shape fills the rest, minus the sparse groups');
   assert.ok(tune.rowIsDeclared('felts', 'house-moss'));
   assert.ok(!tune.rowIsDeclared('felts', 'house-ash'));
   assert.deepEqual(tune.changes(), {}, 'a declared row is not a change');
@@ -783,7 +926,7 @@ t('a declared row is a SHIPPED row: reset restores it, remove reports it gone, e
   // back out with the row defaults, so Remove + Save + reload would hand the
   // row straight back.
   tune.removeRow('felts', 'house-moss');
-  assert.deepEqual(Object.values(tune.changes()), [undefined, undefined, undefined, undefined, undefined, undefined],
+  assert.deepEqual(Object.values(tune.changes()), new Array(8).fill(undefined),
     'changes() still speaks in leaves — which is why the route cannot carry a removal');
   const gone = tune.exportYaml();
   assert.deepEqual(parseYaml(gone).tree.felts, {}, 'the row is gone and the section is empty, not a stub row');
@@ -997,7 +1140,7 @@ t('one `felts.*` binder covers both kinds of change: a field write and a row lan
   const tune = mini();
   const seen = [];
   // The binder main.js registers ignores its arguments and re-reads the tree
-  // (feltThemesSync), which is what lets ONE binder serve both — a leaf write
+  // (installFelts), which is what lets ONE binder serve both — a leaf write
   // hands it (path, value) as every dial binder is handed, and a structural
   // change hands it the SECTION, because a row landing has no leaf to name.
   tune.bind('felts.*', (path, value) => seen.push([path, tune.rowsOf('felts'), value]));
@@ -1064,9 +1207,12 @@ t('dice.yaml is the declaration, and the file is the authority: every leaf has a
   const dialSections = Object.keys(tree).filter((k) => !ASSET_SECTIONS.includes(k));
   assert.deepEqual(dialSections, Object.keys(DIALS).filter((k) => k in tree), 'sections in the dial tree\'s order');
   assert.deepEqual(dialSections, ['app', 'table', 'light', 'camera', 'throw', 'pace', 'sound', 'post', 'cards']);
-  // The asset sections come after them, and `houses:` is the only one the file
-  // ships with — a `felts:` row is a house addition, so absence is its default.
-  assert.deepEqual(Object.keys(tree).filter((k) => ASSET_SECTIONS.includes(k)), ['houses']);
+  // The asset sections come after them, in the file's own order: the dice
+  // catalogue migrated in phase D1 and the mats in phase E1 (2026-09-03), so
+  // the two catalogues this app ships are both declarations now. `presets:` is
+  // still absent, because a preset is something a person holds, not something
+  // the build comes with.
+  assert.deepEqual(Object.keys(tree).filter((k) => ASSET_SECTIONS.includes(k)), ['houses', 'felts']);
 });
 
 t('createTune over the real file: SHIPPED is defaults ⊕ file with nothing refused, and nothing differs at birth', () => {
@@ -1078,6 +1224,16 @@ t('createTune over the real file: SHIPPED is defaults ⊕ file with nothing refu
   // dice.js reads `def.glow` for truth and cannot tell the two apart, and the
   // LINE is what carries "the digits carry all the light" to the next reader.
   const declared = JSON.parse(JSON.stringify(tree, (k, v) => (k === 'glow' && v === null ? undefined : v)));
+  // …AND A FILLED ONE RECONCILES TO ITSELF PLUS ITS DEFAULTS, which is what
+  // FILLED means (ASSET_SPARSE names the sparse ones; `felts:` is not among
+  // them). Nine of the eleven mats say nothing about `cloth` or `mottle` and
+  // read back carrying both, so js/main.js's merge site never has to guess —
+  // it is the property tests/felts-catalogue.test.mjs states in full, restated
+  // here as the reason this expectation is not a plain `merge`.
+  const feltDefaults = assetRowDefaults('felts');
+  for (const row of Object.values(declared.felts || {})) {
+    for (const [k, v] of Object.entries(feltDefaults)) if (!(k in row)) row[k] = v;
+  }
   assert.deepEqual(tune.SHIPPED, merge(defaultsOf(DIALS), declared));
   assert.deepEqual(tune.refusals, [], 'every declared value fits its dial');
   assert.deepEqual(tune.diff(), []);

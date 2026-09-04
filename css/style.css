@@ -3941,7 +3941,50 @@ body.seated #result-banner { left: calc(var(--table-left) + 24px); transform: no
 }
 .settings-sec .prow + .prow { margin-top: 10px; }
 .settings-sec > .hint { margin-top: 8px; }
-#felt-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+/* THE MAT PICKER IS A CATALOGUE, AND CATALOGUES GROW (2026-09-03, developer
+   mode phase E2). A mat used to cost a PAINTER — a function in js/main.js, a
+   gloss row and a voice row — so this strip grew about once a quarter and its
+   height was nobody's problem. A mat is now a row in dice.yaml and a picture
+   under models/, which is the whole point of that work, and the twelfth one
+   was the row that found the ceiling: eleven pills wrap to three rows here,
+   twelve wrap to four, and the fourth row pushed the STAGING destination 8px
+   past a 493px-tall window — the settings panel is capped by the viewport, so
+   past that it scrolls, and a destination that scrolls without saying so is
+   the exact defect `settings-destinations` was written against (357px hidden
+   in one column).
+   So the strip is bounded and scrolls INSIDE ITSELF past that: the mat list
+   may now grow without moving anything else in the dialog, which is what a
+   data-authored catalogue needs.
+   THE CUT IS DELIBERATELY MID-ROW (the E2 review, 2026-09-03). It was 87px —
+   exactly three rows — and a clean cut at a row boundary is the same defect
+   one level in: `taproom` and `linen` sat entirely under a fold with no
+   sliver, no fade and no count, and `linen` is the mat that work is FOR.
+   Measured on STAGING at 1280x493: a pill is 25px (a 15px dot + 2x4px padding
+   + 2x1px border), the row pitch is 31px with the 6px gap, and the twelve
+   chips wrap to rows at +0/+31/+62/+93 from the strip's top. 100px therefore
+   shows three whole rows and 7px of the fourth — enough of a pill's curve to
+   say "there is more here", which is the affordance the boundary cut threw
+   away. Recompute both numbers if the pill dress moves.
+   AND ONLY WHERE THE WINDOW IS SHORT. The 493px window is what the cap is
+   for, and the rule carried no media query, so a 1080p desktop was cropped
+   for a short window's reason. Past 700px of viewport the strip opens to six
+   rows (190px) and scrolls only past THAT; measured at 700, 1080 and on a
+   390x844 phone, all twelve chips are in view (the strip's own content is
+   118px) and the STAGING destination still does not scroll — panel
+   scrollHeight − clientHeight is 0 at every one of them.
+   (The set menu next door has scrolled past ~340px since Tier 6 §9; this is
+   the same answer at the strip's own scale.) */
+#felt-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 100px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+@media (min-height: 700px) {
+  #felt-swatches { max-height: 190px; }
+}
 .felt-swatch {
   display: inline-flex;
   align-items: center;

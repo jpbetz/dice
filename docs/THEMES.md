@@ -701,3 +701,37 @@ side-by-side review, until both retired on 2026-09-03.) Themes land in
 grammar. The main app consumed NOTHING from the lab until a set graduated
 (picker + wire come later — §9's (type,setId) cache, per-player identity
 set, saved-pool override).
+
+
+## The mats are data too (2026-09-03)
+
+The same move, one surface over. A MAT — the cloth the dice land on — was
+eleven rows in a literal in `js/main.js` over three painters; the rows moved
+into `felts:` in `dice.yaml` (developer mode phase E1) and the SURFACE
+followed a day later (phase E2). A row is:
+
+    linen:
+      name: Linen
+      cloth: image                       # felt | silt | oak | image
+      texture: models/mats/linen.png     # tiled; under models/, no `..`, no %
+      tile: 1.25                         # world units one repeat covers
+      feltBase: "#8d7f66"                # MULTIPLIES the picture: the tint
+      sceneBg: "#221c14"                 # the room behind it, and the fog
+      breath: 0.8                        # how far this cloth takes the beat
+      mottle: 0.7                        # how unevenly the nap catches light
+      gloss: { mid: 0.94, swing: 0.06 }  # absent = the painter's own row
+      sound: { centre: 1.12, tail: 1.25 }  # absent, field by field, likewise
+
+`cloth: felt | silt | oak` still names a PAINTER — a function, and a new one
+is code — but `image` takes its picture from the file, so a mat that is a
+photograph or a bake is YAML and an asset and nothing else. The picture is a
+near-white greyscale because `feltBase` multiplies over it: the row's hex
+stays the mat's one opinion about colour, exactly as a set's `body` is. The
+two nested groups are SPARSE — absent means the painter answers, field by
+field — which is what keeps every mat that shipped before this sounding and
+shining as it did. Three of the sound fields are clamped where they are USED
+rather than at the slider (`gain`, `tail`, `fizz`), because a row that asked
+for a settle tail that grows instead of fading would be a crescendo every
+time a die landed. The row fields, the resolver and the loading rules are in
+[DEVMODE.md](DEVMODE.md) §9; the arc they close is
+[handoff/2026-08-29-mats.md](handoff/2026-08-29-mats.md).

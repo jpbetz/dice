@@ -5039,6 +5039,23 @@ channels, and the picker reads tidier for it. **It is full again**: a twelfth
 mat needs another ~31px from somewhere, and the next thing to give is the
 Venue sub-line, which wraps to two.
 
+**And the twelfth arrived, so the strip scrolls inside itself (2026-09-03).**
+A mat stopped costing a painter — it is a row in `dice.yaml` and a picture
+under `models/` now (developer mode phase E2) — so this picker is the one
+control in the panel that grows without anybody redesigning it, and the answer
+could not go on being "find 31px elsewhere" once a twelfth, a thirteenth and a
+house row could all arrive in an afternoon. `#felt-swatches` is capped and
+scrolls itself, so the list may grow without moving anything else in the
+dialog. **The cap cuts MID-ROW on purpose**: it was three whole rows first,
+which reproduced §7.36's own defect one level in — `taproom` and `linen` sat
+under a fold with no sliver, no fade and no count (the phase E2 review). At
+1280x493 a pill is 25px and the row pitch 31px, so 100px shows three rows and
+7px of the fourth: the strip says it has more in it. Past 700px of viewport it
+opens to six rows, because a short window's cap has no business cropping a
+1080p one. Staging still lands at 0px over on both channels, measured at 493,
+700, 1080 and on a 390x844 phone, and `settings-destinations` asserts both
+halves — nothing fully hidden, and something cut.
+
 **Felt stays in Staging, and that was a measurement.** Felt is room-wide, so
 blast radius alone (§7.37) argues it belongs in Table once no venue is on
 offer to own it. Moved there it stood **483px against a 459px panel** — 24px

@@ -1195,8 +1195,12 @@ const FELT_FIELDS = {
 };
 const FELT_ROW_DEF = { name: 'House felt', cloth: 'felt', feltBase: '#1c1c24', breath: 1 };
 
+// `removable` is the phase-E1 shape (js/main.js devFeltsValue): the mats moved
+// into dice.yaml, so there is no `shipped` row that lives in code any more —
+// what a row is or is not is IN THE FILE, and what may be removed is what this
+// session authored.
 function fakeFelts(rows) {
-  const cat = rows.map((r) => ({ ...FELT_ROW_DEF, shipped: false, inFile: false, current: false, ...r }));
+  const cat = rows.map((r) => ({ ...FELT_ROW_DEF, inFile: false, removable: true, current: false, ...r }));
   const log = [];
   const at = (id) => cat.find((f) => f.id === id) || null;
   return {
@@ -1205,7 +1209,7 @@ function fakeFelts(rows) {
     fields: () => FELT_FIELDS,
     list: () => cat.map((f) => ({ ...f })),
     add: (id, row) => {
-      cat.push({ ...FELT_ROW_DEF, shipped: false, inFile: false, current: false, id, ...row });
+      cat.push({ ...FELT_ROW_DEF, inFile: false, removable: true, current: false, id, ...row });
       log.push(`add(${id})`);
       return { id, refused: [], felts: cat };
     },
@@ -1222,8 +1226,8 @@ function fakeFelts(rows) {
 // (the C4 review, 2026-09-03).
 t('felts: the count is what the FILE would gain, lose or amend — not the house-row tally', () => {
   const felts = fakeFelts([
-    { id: 'obsidian', name: 'Obsidian', shipped: true },
-    { id: 'house-moss', name: 'Moss', inFile: true, current: true },
+    { id: 'obsidian', name: 'Obsidian', inFile: true, removable: false },
+    { id: 'house-moss', name: 'Moss', inFile: true, removable: false, current: true },
   ]);
   const { root, tune, panel } = fresh({ felts });
   const sec = root.find((n) => n.classList.contains('dev-section') && n.dataset.section === 'felts');
@@ -1232,8 +1236,13 @@ t('felts: the count is what the FILE would gain, lose or amend — not the house
   assert.equal(count.textContent, '', 'a declared row nobody has touched is not a change');
   assert.equal(sec.classList.contains('is-changed'), false);
   const note = byClass(sec, 'dev-clockout').textContent;
-  assert.match(note, /house-moss · declared in dice\.yaml/);
-  assert.match(note, /\n1 house felt · 1 shipped/, 'the catalogue tally moved to the note, which has words for it');
+  assert.match(note, /house-moss · declared in dice\.yaml — Remove is for the rows you author/);
+  // ONE CLAUSE PER ROW KIND (the E1 review, 2026-09-03): `removable` is
+  // exactly `!inFile`, so a second clause hung off it read "obsidian ·
+  // declared in dice.yaml · declared: Remove is for the rows you author" —
+  // redundant by construction, not just in this case.
+  assert.ok(!/· declared:/.test(note), 'and it does not say "declared" twice');
+  assert.match(note, /\n0 session felts · 2 declared/, 'the catalogue tally moved to the note, which has words for it');
 
   // One row edited and one row minted this session: two rows in the diff, two
   // in the count — the same arithmetic the file section does.
@@ -1245,6 +1254,67 @@ t('felts: the count is what the FILE would gain, lose or amend — not the house
   panel.repaint();
   assert.equal(count.textContent, '· 2 changed', 'two rows, not three leaves and not two house rows');
   assert.equal(sec.classList.contains('is-changed'), true);
+  panel.unmount();
+});
+
+// …AND THE SECTION HAS TO NAME WHAT IT COUNTED (the E1 review, 2026-09-03).
+// The count above is per ROW; the dot is per FIELD, as it is on every dial row
+// in the panel. While the eleven lived in js/main.js the section could get
+// away with a whole-row flag — a declared row was read-only, so the only rows
+// with fields that could move were the ones this session minted, and every
+// field of those moves at once. E1 made the eleven editable, and then the
+// header read "· 1 changed" over six rows all saying nothing had, with no ↺ to
+// put the moved one back (the glyph is gated on the dot). The sets editor next
+// door has named the exact field since D2; this is the felts side of it.
+t('felts: the dot and the ↺ are the FIELD\'s — a declared row marks the one that moved', () => {
+  const felts = fakeFelts([
+    { id: 'obsidian', name: 'Obsidian', feltBase: '#1c1c24', breath: 1.5, inFile: true, removable: false, current: true },
+    { id: 'house-ash', name: 'Ash', inFile: false, removable: true },
+  ]);
+  const { root, tune, panel } = fresh({ felts });
+  const sec = root.find((n) => n.classList.contains('dev-section') && n.dataset.section === 'felts');
+  const count = byClass(sec, 'dev-sec-count');
+  const marked = (key) => rowFor(root, `felts.${key}`).classList.contains('is-changed');
+  const glyph = (key) => byClass(rowFor(root, `felts.${key}`), 'dev-revert');
+  const KEYS = ['name', 'cloth', 'feltBase', 'breath'];
+
+  // The form followed the felt on the table, and nothing has moved.
+  assert.equal(byClass(sec, 'dev-feltpick').value, 'obsidian');
+  assert.deepEqual(KEYS.map(marked), [false, false, false, false]);
+
+  // One field of the DECLARED row moves.
+  tune.extraDiff = [
+    { path: 'felts.obsidian.breath', shipped: 1.5, live: 1.2, cls: 'look', read: 'apply', declared: true },
+  ];
+  panel.repaint();
+  assert.equal(count.textContent, '· 1 changed', 'one row in this section moved');
+  assert.deepEqual(KEYS.map(marked), [false, false, false, true],
+    '…and the section says WHICH of its fields did');
+  assert.equal(glyph('breath').hidden, false, 'the moved field offers its own ↺');
+  assert.equal(glyph('name').hidden, true, 'a field nobody touched has nothing to put back');
+
+  // THE ↺ NAMES THE PICKED ROW, not a fixed path: a field row here is
+  // re-pointed at whichever mat the picker holds, so the binding is to the
+  // field and the row is asked for at the click (js/devmode.js revertField).
+  const wrote = [];
+  const realSet = tune.set;
+  tune.set = (patch, opts) => { wrote.push(patch); return realSet.call(tune, patch, opts); };
+  click(glyph('breath'));
+  assert.deepEqual(wrote, [{ 'felts.obsidian.breath': 1.5 }],
+    'the file\'s own value, at the path the picker names');
+  tune.set = realSet;
+
+  // A row the file does not have yet is changed WHOLE — every field of it is
+  // something Save would write down, diff leaf or no diff leaf.
+  tune.extraDiff = [
+    { path: 'felts.house-ash.name', shipped: undefined, live: 'Ash', cls: 'look', read: 'apply', declared: false },
+  ];
+  const picker = byClass(sec, 'dev-feltpick');
+  picker.value = 'house-ash';
+  fire(picker, 'change');
+  assert.equal(picker.value, 'house-ash', 'the picker holds the session row');
+  assert.deepEqual(KEYS.map(marked), [true, true, true, true],
+    'a session row: Save adds all of them, so all of them are changed');
   panel.unmount();
 });
 

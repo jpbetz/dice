@@ -109,6 +109,38 @@ export const LAWS = Object.freeze({
     why: 'must be greater than zero — the code divides by it',
     holds: (v) => typeof v === 'number' && Number.isFinite(v) && v > 0,
   }),
+
+  // A PATH INTO `models/`, AND NOWHERE ELSE (phase E2, 2026-09-03). A felt
+  // row may now name an IMAGE for its cloth (`texture: models/mats/linen.png`),
+  // which is the first leaf in this file that is a URL the browser FETCHES
+  // rather than a number the app reads. Two halves, and only the first is
+  // about safety:
+  //   · `models/` is the one directory of assets server.js serves and
+  //     `.gcloudignore` ships (APP_DIRS), so a path outside it is a row that
+  //     works on the author's disk and 404s for everybody else — the failure
+  //     this project keeps naming, where it looked right so nothing said it
+  //     was wrong. A path that escapes with `..` is the same mistake with a
+  //     traversal attached.
+  //   · the empty string is a REAL answer and the one nine mats give: a cloth
+  //     painted by code says nothing about a texture. It is the dial's default
+  //     for that reason, and the law has to let it through.
+  //
+  // AND NO `%` AT ALL (the E2 review, 2026-09-03). `models/%2e%2e/%2e%2e/etc/
+  // passwd` starts with `models/` and contains no literal `..`, so the law as
+  // first written accepted a path whose own `why` said it did not — server.js
+  // `safeResolve` decodes before it splits and 403s it, so nothing was ever
+  // reachable through it, but a law that holds less than its sentence says is
+  // a law a reader is wrong to trust. A percent-escape is refused outright
+  // rather than decoded and re-checked: no asset in this tree needs one, and
+  // "the path is the path" is a rule that survives being read quickly.
+  assetPath: Object.freeze({
+    reason: 'path',
+    pair: false,
+    why: 'must be a path under `models/` (the one asset directory the server serves), '
+      + 'with no `..` and no percent-escape',
+    holds: (v) => typeof v === 'string'
+      && (v === '' || (v.startsWith('models/') && !v.includes('..') && !v.includes('%'))),
+  }),
   // standoff − depth/2 is the clear ground between the rim and the card's
   // inner edge (js/places.js `PLACARD_CLEAR`, 0.10 at the shipped pair). At 0
   // the card touches the rim; below it a die can reach a card.
@@ -469,10 +501,15 @@ export const STATIC_PATHS = Object.freeze(['app.mode']);
 export const ASSET_SECTIONS = Object.freeze(['houses', 'felts', 'presets']);
 export const ASSET_SPARSE = Object.freeze(['houses', 'presets']);
 // A row id: lower-case, digits, `-` and `_`, 32 characters. The house prefix
-// (`house-`) is a CONVENTION and not enforced here — what actually protects a
-// shipped row is the collision check at the merge site (js/main.js
-// `feltThemesSync`, where the shipped row stands and one console line says so),
-// because that is the only place that knows what is shipped.
+// (`house-`) is a CONVENTION and not enforced here — what protects a row the
+// FILE already declares is that the WRITERS refuse it by name (js/main.js
+// `devFeltAdd`, `devSetClone`), because `addRow` writes a row WHOLE: an Add at
+// `taproom` would not merge into the shipped mat, it would replace it, with
+// every field the caller left out arriving as a row default. (Rewritten
+// 2026-09-03, phase E1: this used to name a collision check inside
+// `feltThemesSync`, a merge site that stopped existing when the mats moved out
+// of js/main.js and into `felts:` — there is no longer a place where a shipped
+// row stands apart from a declared one.)
 export const ASSET_ID_RE = /^[a-z0-9][a-z0-9_-]{0,31}$/;
 export const ASSET_ID_WHY = 'lower-case letters, digits, "-" and "_", 32 characters, no dot';
 
@@ -489,19 +526,54 @@ export function isRows(x) {
   return !!x && typeof x === 'object' && !Array.isArray(x) && isPlain(x.rows);
 }
 
+// A SPARSE GROUP INSIDE A FILLED ROW (phase E2, 2026-09-03). `ASSET_SPARSE` is
+// a property of a SECTION, and that was enough while a row's fields were flat.
+// E2 gave a felt row two nested groups — `gloss` and `sound` — whose defaults
+// are not written in this file at all: they are the CLOTH's rows (js/main.js
+// FELT_GLOSS, js/voices.js CLOTH_VOICES), and which one applies depends on the
+// row's own `cloth` field. So "absent" here does not mean "take the dial's
+// def"; it means "the cloth answers", and a filled group would answer for it —
+// eleven mats would arrive carrying wool's gloss numbers, silt and oak
+// included, and the migration would change the look of two shipped surfaces
+// while every test said the file had not moved.
+//
+// So the group fills NOTHING and is otherwise an ordinary map of dials: it is
+// walked, judged, minted and reverted exactly as `feel` or `geo` is. The
+// dial's `def` is still required and is still shown in the panel — it is the
+// `felt` row's value, the reference every cloth is measured against — but it
+// is a READOUT there, never a value the file gains by being reconciled.
+export function sparse(label, shape, why = '') {
+  if (!isPlain(shape)) throw new Error(`sparse ${label}: shape must be a map of dials`);
+  return Object.freeze({ label, sparse: shape, why });
+}
+export function isSparse(x) {
+  return !!x && typeof x === 'object' && !Array.isArray(x) && isPlain(x.sparse);
+}
+
 // THE FELT ROW — js/main.js's `FELT_THEMES` row, field for field, as dials.
 // `mottle` and `breath` are absent from most shipped rows and mean 1 there
 // (main.js: "absent means 1, the shipped beat"), so 1 is the default here and
 // a row that says nothing about them gets the shipped behaviour.
 //
 // `cloth` NAMES A PAINTER AND THE PAINTERS ARE CODE (DEVMODE §9: "Code-only
-// stays code-only"). The options are the three in main.js's FELT_CLOTHS; a
-// fourth cloth is a function somebody writes, and then a line here.
+// stays code-only"). The options are the four in main.js's FELT_CLOTHS; a
+// fifth cloth is a function somebody writes, and then a line here.
+//
+// …AND `image` IS THE ONE THAT TAKES ITS PICTURE FROM THE FILE (phase E2,
+// 2026-09-03). Joe: "make a new mat as YAML-only as a new dice set is now."
+// E1 moved the ROWS into dice.yaml and left every SURFACE in code, so a new
+// mat was still one of three cloths in a new colour — the "one mat in nine
+// colours" complaint the cloth registry was built to answer, one level up. A
+// row that names `cloth: image` and a `texture:` under `models/` is a mat
+// nobody wrote a painter for, and the three fields below (`texture`, `tile`,
+// and the two groups) are the whole of what makes it a surface rather than a
+// picture: how big the weave is, how it answers the lamp, and what a die
+// sounds like landing on it.
 const FELT_ROW = Object.freeze({
   name: look('name', 'House felt', null, 'apply', 'what the swatch is called in the picker'),
-  cloth: pick('cloth', 'felt', ['felt', 'silt', 'oak'], 'look', 'apply',
-    'the painter this mat is made of — main.js FELT_CLOTHS; a new one is code, not a row'),
-  feltBase: look('felt base', '#1c1c24', null, 'apply', 'the cloth\'s own colour, and the seed its grain is drawn from'),
+  cloth: pick('cloth', 'felt', ['felt', 'silt', 'oak', 'image'], 'look', 'apply',
+    'the painter this mat is made of — main.js FELT_CLOTHS; `image` takes its picture from `texture` below, and a new painter is code, not a row'),
+  feltBase: look('felt base', '#1c1c24', null, 'apply', 'the cloth\'s own colour, and the seed its grain is drawn from — an image mat MULTIPLIES it, so it is the tint as well as the swatch'),
   // `scene bg`, not `scene background`: the label column is 320px of mono and
   // the long form measured as "scene back…", which is the half that says
   // nothing. The sentence lives in the tooltip, where there is room for it.
@@ -509,6 +581,86 @@ const FELT_ROW = Object.freeze({
   breath: look('breath depth', 1, [0, 2, 0.05], 'apply',
     'how far this cloth takes the declare beat — a darker cloth has less light to lose, so it must lose more of it'),
   mottle: look('mottle', 1, [0, 2, 0.05], 'apply', 'how unevenly the nap catches the light; a raked bed wants less'),
+
+  // THE IMAGE CLOTH'S TWO FIELDS. Both are inert for a painted cloth and the
+  // panel says so rather than hiding them: a row that says `cloth: felt` and
+  // carries a texture path is a row somebody is halfway through changing.
+  //
+  // THE PATH RIDES NOWHERE (E2's wire rule). A felt id is room state and goes
+  // over the wire; a texture path never does. Every client reads the same
+  // dice.yaml through /js/tunables.js and fetches the same `models/` path from
+  // the same origin, so there is nothing to send and nothing a peer could be
+  // told that it could not already read. That is also why the law below is
+  // about the DEPLOY (`models/` is what `.gcloudignore` ships and server.js
+  // serves) rather than about trust.
+  texture: look('texture', '', null, 'apply',
+    'the image tiled over the mat, under `models/` — only read when `cloth` is `image`, and empty everywhere else',
+    'assetPath'),
+  // THE RANGE IS THE MODEL'S RANGE, AND THE STEP IS A SHIPPED VALUE'S (the E2
+  // review, 2026-09-03). js/main.js `feltTileReps` is
+  // `round(FELT_TILE_U / tile)` — a whole number of repeats across the tile,
+  // because a fractional one is a seam every five units in a grid — so this
+  // dial is continuous over a model that is not, and the first range written
+  // for it was wrong at both ends:
+  //   · step 0.5 could not express `linen`'s own 1.25. The slider drew it as
+  //     1.5 and ONE `change` on it — a click, an arrow key, a drag released
+  //     where it started — rewrote the shipped mat to 1.5, which is three
+  //     repeats instead of four and so no longer one image pixel per texel:
+  //     the exact property dice.yaml and tests/felts-catalogue.test.mjs both
+  //     state. 0.05 lands on 1.25, on 2.5 and on 1.
+  //   · everything past 10/3 rounds to one repeat, so a top of 40 was 32
+  //     units of dial that all meant the same picture. 5 IS one repeat — the
+  //     tile size every painted cloth is authored at — and it is the coarsest
+  //     thing this floor can say.
+  tile: look('tile', 5, [0.25, 5, 0.05], 'apply',
+    'world units one repeat of the texture covers, snapped to a whole number of repeats across the 5-unit felt tile (main.js FELT_TILE_U); 1.25 draws a 256px picture at one image pixel per texel, 5 stretches it over the whole tile',
+    'positive'),
+
+  // ---- what the cloth does to the lamp, and to a landing --------------------
+  //
+  // BOTH GROUPS ARE SPARSE, AND THAT IS THE WHOLE DESIGN (see `sparse` above).
+  // The defaults are not these numbers: they are the CLOTH's rows, which is
+  // what makes silt matte and oak long-tailed without a single mat saying so.
+  // A row that names neither group behaves byte for byte as it did before E2 —
+  // by construction, not by care — and a row that names one field of one group
+  // overrides that field and inherits the other five.
+  //
+  // The `def` shown here is the `felt` row of each registry: the reference
+  // every other cloth was measured against (js/main.js FELT_GLOSS, js/voices.js
+  // CLOTH_VOICES §4b), and the honest thing for a panel to show as "the
+  // default" when the row is silent about a cloth it cannot know.
+  gloss: sparse('gloss', {
+    mid: look('gloss mid', 0.91, [0, 1, 0.005], 'apply',
+      'the mat\'s mean roughness — LOWER is glossier; the map carries the value and the material\'s scalar is pinned at 1'),
+    swing: look('gloss swing', 0.110, [0, 0.4, 0.005], 'apply',
+      'how far the polished and dull patches swing either side of `mid`; past about 8 sRGB code values the gloss stops being the mottle\'s companion and becomes the mat\'s dominant structure'),
+  }, 'how this cloth answers the lamp; absent means the painter\'s own row (main.js FELT_GLOSS)'),
+
+  // js/voices.js §4b names every one of these and says what it is FOR; the
+  // `why` strings here are that file's own sentences, cut to a tooltip.
+  sound: sparse('sound', {
+    centre: look('centre', 1, [0.2, 2.5, 0.01], 'apply',
+      'spectral trim on the landing and its tail — how much of the contact the surface swallows before it can resonate'),
+    length: look('length', 1, [0.2, 2.5, 0.01], 'apply',
+      'envelope trim, in the same direction and for the same reason'),
+    gain: look('level', 1, [0, 1, 0.01], 'apply',
+      'plain absorption, and THE ONE DIAL CAPPED AT 1: §5\'s mix plan is a ceiling applied before this multiply, so a cloth may only ever take away from it'),
+    // …AND THE TOP OF THIS ONE IS A CLAMP, not a taste (the E2 review,
+    // 2026-09-03). The settle cluster is geometric: `ratio = TAP_E (0.42) *
+    // tail`, so at tail 2.381 the ratio reaches 1 and the taps stop decaying
+    // — and past it they GROW. At the 2.5 this range first shipped, the
+    // sixteenth tap was 2.08x the first and louder than the landing itself,
+    // over two seconds of "tail". js/voices.js `CLOTH_TAIL_MAX` is the cap
+    // that holds against a hand-edited dice.yaml (the same reasoning as
+    // `gain`'s, one dial up); this range stops where that cap does, so the
+    // slider cannot ask for a value the mixer will quietly take back.
+    tail: look('tail', 1, [0.1, 2.26, 0.01], 'apply',
+      'multiplies the settle cluster\'s geometric ratio, and so decides HOW MANY TAPS THERE ARE — felt gives a die four bounces back, grain catches it, a plank hands it back twelve times'),
+    grind: look('grind', 1, [0.2, 3, 0.01], 'apply',
+      'the sustained layer\'s spectral factor, and the one number here that goes UP for a soft surface: down for the knock, up for the scrape, and the pair is the material'),
+    fizz: look('fizz', 0, [0, 0.95, 0.01], 'apply',
+      'how much of the face-clack modulation the surface smothers — the whole "grind becomes a hiss" move, at one multiply'),
+  }, 'what a die sounds like landing on this cloth; absent means the painter\'s own voice (js/voices.js CLOTH_VOICES)'),
 });
 
 // ---------------------------------------------------------------------------
@@ -775,12 +927,16 @@ const HOUSE_ROW = Object.freeze({
 // there reads it from inside a function, which is why the move costs nothing.)
 
 // A shape's defaults, nested: a group of dials gives a map, a collection gives
-// an empty map (a Clone starts with no sets in it and adds one).
+// an empty map (a Clone starts with no sets in it and adds one), and a SPARSE
+// group gives nothing at all — no key, because absence is the answer there and
+// a key holding the reference cloth's numbers would be a different answer
+// wearing the same shape (see `sparse`).
 function shapeDefaults(shape) {
   const out = {};
   for (const [k, d] of Object.entries(shape)) {
     if (isDial(d)) out[k] = Array.isArray(d.def) ? d.def.slice() : d.def;
     else if (isRows(d)) out[k] = {};
+    else if (isSparse(d)) continue;
     else if (isPlain(d)) out[k] = shapeDefaults(d);
   }
   return out;
@@ -859,6 +1015,12 @@ function walkFields(section, shape, rest, at) {
     return tail.length ? `${at.concat(k).join('.')} is a value, not a map` : d;
   }
   if (isRows(d)) return walkRows(section, d.rows, tail, at.concat(k));
+  // A sparse group is an ordinary group to every question but "what does an
+  // absent field mean" — so the walk is the same one.
+  if (isSparse(d)) {
+    return tail.length ? walkFields(section, d.sparse, tail, at.concat(k))
+      : `${at.concat(k).join('.')} is a group of fields; name one`;
+  }
   if (isPlain(d)) {
     return tail.length ? walkFields(section, d, tail, at.concat(k))
       : `${at.concat(k).join('.')} is a group of fields; name one`;
@@ -1418,6 +1580,16 @@ function reconcileFields(section, shape, decl, at, refuse, fill) {
     if (isRows(d)) {
       const sub = reconcileCollection(section, d.rows, v, p, refuse, fill);
       if (sub) out[k] = sub; else delete out[k];
+      continue;
+    }
+    // A SPARSE GROUP KEEPS ONLY WHAT THE FILE WROTE, whatever the section's
+    // own answer is: `felts:` is FILLED and `gloss`/`sound` inside it are not,
+    // because their defaults live in the cloth registries and not in this
+    // file (see `sparse`). A row that leaves the group out has no key for it.
+    if (isSparse(d)) {
+      if (v === null) { delete out[k]; continue; }
+      if (!isPlain(v)) { refuse(path, 'shape', `expected a map, got ${JSON.stringify(v)}; the cloth's own row stands`); continue; }
+      out[k] = reconcileFields(section, d.sparse, v, p, refuse, false);
       continue;
     }
     if (!isDial(d) && isPlain(d)) {

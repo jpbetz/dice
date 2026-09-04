@@ -702,17 +702,92 @@ export const CLOTH_VOICES = {
     label: 'a waxed plank table',
     centre: 1.3, length: 1.35, gain: 1, tail: 1.6, grind: 1.35, fizz: 0,
   },
+  // A PICTURE IS NOT A MATERIAL (phase E2, 2026-09-03). `cloth: image` paints
+  // a mat from a file under `models/`, and an image says nothing whatever
+  // about what a die sounds like landing on it — a linen weave and a slate
+  // slab can be the same PNG at two tints. So the painter's own voice is the
+  // REFERENCE row, identical to felt's, and the honest place for an image
+  // mat's sound is its own `sound:` group in dice.yaml, where somebody has
+  // decided. That default is the conservative one for the same reason the
+  // unknown-cloth fallback is: silent about sound rather than wrong about it.
+  image: {
+    label: 'a printed mat, voiced by its row',
+    centre: 1, length: 1, gain: 1, tail: 1, grind: 1, fizz: 0,
+  },
 };
 
 export const CLOTH_DEFAULT = 'felt';
+
+// THE SIX DIALS A ROW MAY OVERRIDE, in the order §4b introduces them. `label`
+// is not among them: it says what the CLOTH is, and a row that has moved every
+// number away from the painter's is still landing on that painter's picture.
+export const CLOTH_DIALS = Object.freeze(['centre', 'length', 'gain', 'tail', 'grind', 'fizz']);
+
+// THE TWO CEILINGS A ROW MAY NOT LIFT (the E2 review, 2026-09-03), beside the
+// one `gain` already had. All three are enforced in `clothVoiceFor` below and
+// for one reason: dice.yaml is a file a person edits, so a cap that only the
+// panel's slider knew about would be no cap at all.
+//
+//   · `tail` MULTIPLIES THE SETTLE CLUSTER'S GEOMETRIC RATIO (`settleTail`
+//     below: `ratio = TAP_E * tail`). At ratio 1 the taps stop decaying;
+//     past it they GROW, and the cluster stops being a tail and becomes a
+//     crescendo — measured at the old dial maximum of 2.5: sixteen taps,
+//     the last of them 2.08x the first and about 1.04x the landing impact
+//     itself, over 2.01 s. So the ratio is held under `TAP_RATIO_MAX` and
+//     the number of taps goes on being what a surface says about itself.
+//   · `fizz` is a DEPTH, subtracted: js/main.js's grind is
+//     `… * (1 - cloth.fizz)`, so 5 is not "very smothered", it is an
+//     inverted modulation — the AM turned inside out and louder than it
+//     started. It is a fraction, and it is clamped to one.
+export const TAP_RATIO_MAX = 0.95;   // the settle cluster must SHRINK, always
+export const CLOTH_TAIL_MAX = 2.26;  // TAP_RATIO_MAX / TAP_E, down to the dial's 0.01 step
+export const CLOTH_FIZZ_MAX = 0.95;  // at 1 the face-clack is gone entirely; past it, inverted
 
 // THE ONE READER, and the covering rule with it. Anything that is not a known
 // cloth, and any venue that lays its own floor over the mat, resolves to the
 // reference row — so an unvoiced cloth is silent about sound rather than
 // wrong about it, exactly as an unvoiced venue is.
-export function clothVoiceFor(venueId, cloth) {
+//
+// `over` IS THE MAT'S OWN ROW (phase E2, 2026-09-03), and it arrives here
+// rather than at the call site so that ONE function keeps owning the covering
+// rule. A venue lays its floor over the mat, and a row's overrides are as
+// covered as the cloth they modify: a `sound:` group under a mat you cannot
+// see would voice a die landing in moss as if the moss were that mat. The
+// early return above is what says so, and it says it for both halves at once.
+//
+// Absent means the painter's, field by field — `sound: { tail: 1.3 }` takes
+// the tail and inherits the other five — because that is what makes a row
+// that names nothing byte-identical to the cloth it is made of.
+export function clothVoiceFor(venueId, cloth, over = null) {
   if (venueId && venueId !== 'table') return CLOTH_VOICES[CLOTH_DEFAULT];
-  return CLOTH_VOICES[cloth] || CLOTH_VOICES[CLOTH_DEFAULT];
+  const base = CLOTH_VOICES[cloth] || CLOTH_VOICES[CLOTH_DEFAULT];
+  if (!over || typeof over !== 'object') return base;
+  const out = { ...base };
+  let moved = false;
+  for (const k of CLOTH_DIALS) {
+    const v = over[k];
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    out[k] = v;
+    moved = true;
+  }
+  // Identity is worth keeping: a row with an empty `sound:` group hands back
+  // the painter's own object, so `clothVoiceFor('table', 'silt') === silt`
+  // stays true and the memoized composition upstream compares cheaply.
+  if (!moved) return base;
+  // §5's MIX PLAN IS A CEILING AND IT IS ENFORCED HERE, not by a slider. The
+  // 0.35 impact clamp is applied OUTSIDE this multiplier, so a row with
+  // `gain: 1.4` would lift a landing straight through it — which is why level
+  // is the one dial capped at 1 (§4b), and a cap that only the panel's range
+  // knew about would be no cap at all against a hand-edited dice.yaml.
+  out.gain = Math.max(0, Math.min(1, out.gain));
+  // …and the two the E2 review found uncapped beside it (see CLOTH_TAIL_MAX
+  // above): the tail may only ever shrink, and the fizz is a fraction of a
+  // modulation that exists. Both are clamped here rather than at the dial for
+  // the reason `gain` is — a hand-edited row reaches the mixer without ever
+  // touching a slider.
+  out.tail = Math.max(0, Math.min(CLOTH_TAIL_MAX, out.tail));
+  out.fizz = Math.max(0, Math.min(CLOTH_FIZZ_MAX, out.fizz));
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -738,8 +813,15 @@ export const TAP_FLOOR_FRAC = 0.01; // stop when a tap is under 1% of A0
 // `[{ decay, gap }]`, jitter-free and cloth-aware. Ends at the floor, so its
 // LENGTH is the answer to "how many times does this surface hand the die
 // back".
+//
+// AND IT ENDS AT THE FLOOR FOR ANY CLOTH IT IS HANDED (the E2 review). Every
+// call site reaches this through `clothVoiceFor`, which clamps `tail` at the
+// row; the ratio is held here as well because this function's own sentence —
+// "ends at the floor" — is the thing a reader relies on, and a decaying walk
+// that a caller can turn into a growing one is not that. Nothing shipped is
+// near it: oak's 1.6 is a ratio of 0.672.
 export function settleTail(cloth) {
-  const ratio = TAP_E * ((cloth && cloth.tail) || 1);
+  const ratio = Math.max(0, Math.min(TAP_RATIO_MAX, TAP_E * ((cloth && cloth.tail) || 1)));
   const out = [];
   for (let k = 0; k < TAP_MAX; k++) {
     const decay = Math.pow(ratio, k);

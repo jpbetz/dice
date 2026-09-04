@@ -471,9 +471,17 @@ await t('isLoopback recognises loopback and nothing else', () => {
       assert.equal(r.status, 200, JSON.stringify(r.data));
       assert.equal(r.data.changes.length, 4);
       const tree = parseYaml(yamlNow()).tree;
-      assert.deepEqual(tree.felts, {
-        'house-moss': { name: 'Moss', cloth: 'silt', feltBase: '#1f3a22', sceneBg: '#0c120d' },
-      }, 'the section the file never had was created under the root');
+      // THE ROW JOINS THE SHIPPED MATS (phase E1, 2026-09-03): `felts:` used to
+      // be a section the file never had, and this assertion read the whole
+      // section. The eleven live there now, so what the Save adds is a row
+      // AFTER them, and what is asserted is that it landed and that they did
+      // not move.
+      assert.deepEqual(tree.felts['house-moss'],
+        { name: 'Moss', cloth: 'silt', feltBase: '#1f3a22', sceneBg: '#0c120d' });
+      assert.equal(Object.keys(tree.felts).at(-1), 'house-moss');
+      assert.deepEqual(tree.felts.taproom,
+        { name: 'Taproom', feltBase: '#544530', sceneBg: '#191310', breath: 1.1, cloth: 'oak', mottle: 0.6 },
+        'and the mat beside it is the one the file shipped, line for line');
       assert.equal(tree.light.lamp.y, 30, 'and the dials written before it are untouched');
 
       const join = await fetch(`${base}/api/join`, {

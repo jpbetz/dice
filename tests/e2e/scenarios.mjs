@@ -14391,6 +14391,62 @@ export const scenarios = [
         `document.getElementById('portable-zone').classList.contains('hidden')`),
       '…and the text tool is still folded — arriving at your profiles must not '
       + 'hand you a YAML editor');
+
+      // ---- AND THE ONE STRIP THAT SCROLLS INSIDE ITSELF --------------------
+      //
+      // §7.36's rule is that the DESTINATION does not scroll, and the mat
+      // picker is the one control that grows without anybody redesigning the
+      // panel: a mat is a row in dice.yaml now (developer mode phase E2), so
+      // twelve chips wrap to four rows where eleven wrapped to three, and the
+      // fourth row put the destination 8px past a 493px window. The strip was
+      // therefore capped — and capped at exactly three rows, which reproduced
+      // the very defect this scenario is named for one level in: `taproom`
+      // and `linen` sat under a fold with no sliver, no fade and no count
+      // (the E2 review, 2026-09-03).
+      //
+      // So the claim is not "it is capped", it is "the cut says there is
+      // more": at the short window the cap is FOR, every chip has some of
+      // itself on screen, and the destination still does not scroll. Measured
+      // at the window that found the ceiling, because a cap for a short
+      // window has to be judged in one.
+      await ctx.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 1280, height: 493, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
+      try {
+        await a.dbg('openSettings("staging")');
+        await a.waitFor(`document.getElementById('settings-panel')
+          .getAnimations().every((an) => an.playState === 'finished')`,
+        { desc: 'the panel has settled at 1280x493' });
+        const strip = JSON.parse(await a.eval(`JSON.stringify((() => {
+          const el = document.getElementById('felt-swatches');
+          const box = el.getBoundingClientRect();
+          const chips = [...el.querySelectorAll('.felt-swatch')];
+          const panel = document.getElementById('settings-panel');
+          return {
+            n: chips.length,
+            clientH: el.clientHeight,
+            scrollH: el.scrollHeight,
+            unseen: chips.filter((c) => c.getBoundingClientRect().top >= box.bottom - 0.5)
+              .map((c) => c.dataset.felt),
+            sliver: chips.filter((c) => {
+              const r = c.getBoundingClientRect();
+              return r.top < box.bottom - 0.5 && r.bottom > box.bottom + 0.5;
+            }).map((c) => c.dataset.felt),
+            panelOver: Math.max(0, panel.scrollHeight - panel.clientHeight),
+          };
+        })())`));
+        assert.equal(strip.panelOver, 0,
+          `the STAGING destination still does not scroll (${strip.panelOver}px over) — which is `
+          + 'what the strip\'s own cap buys, and §7.36\'s whole rule');
+        assert.ok(strip.scrollH > strip.clientH,
+          'the strip itself has more in it than it shows — otherwise this claim is vacuous');
+        assert.deepEqual(strip.unseen, [],
+          `every mat has some of itself on screen; ${strip.unseen.join(', ')} had none`);
+        assert.ok(strip.sliver.length > 0,
+          'and the cut lands MID-ROW: a boundary cut is a fold with no affordance, '
+          + 'which is the defect this scenario exists about');
+      } finally {
+        await ctx.browser.send('Emulation.clearDeviceMetricsOverride', {}, a.page.sessionId);
+      }
     },
   },
   {
@@ -26509,6 +26565,18 @@ export const scenarios = [
       // ticks only through sim(): one beat so the glyph's count is current.)
       await t.dbg(`tuneSet({'light.lamp.y': 40})`);
       await t.dbg('sim(10)');
+      // …AND THE GLYPH IS PAINTED BEFORE THE FOLD, not after it (2026-09-03).
+      // The panel repaints once per rAF frame WHILE IT IS OPEN (js/main.js) —
+      // folding stops the repaint, which is the whole point of folding — so
+      // the count the corner carries is the one the last open frame wrote.
+      // `sim()` steps the film and does not promise an rAF frame, so the fold
+      // could land between the write and the paint: measured 2026-09-03, this
+      // read `DEV` beside a `devInfo().changed` of 1, on two runs in three,
+      // and only when another scenario had run before it. The claim is
+      // unchanged — a folded panel carries its count — and the wait is where
+      // it was always meant to be.
+      await t.waitFor(`document.getElementById('dev-glyph').textContent.includes('1 changed')`,
+        { desc: 'the open panel painted the count into the corner glyph' });
       await press();
       await t.waitFor(`window.__diceDebug.devInfo().panel === 'folded'`, { desc: 'folded on the second press' });
       d = await dom();
@@ -27087,8 +27155,12 @@ export const scenarios = [
         // A NEVER-OPENED TAB ANSWERS THE READOUT AND REFUSES EVERY WRITER —
         // the negative half, first, as every dev scenario takes it.
         const shipped = await t.dbg('devFelts()');
-        assert.equal(shipped.length, 11, 'the eleven js/main.js ships, and not one more');
-        assert.ok(shipped.every((f) => f.shipped && !f.inFile), 'all of them from code, none from the file');
+        assert.equal(shipped.length, 12, 'the twelve dice.yaml declares, and not one more');
+        // PHASE E1 (2026-09-03): the mats moved out of js/main.js and into
+        // `felts:`, so "shipped" and "in the file" stopped being two answers.
+        // Every row is declared, and none of them is the panel's to remove.
+        assert.ok(shipped.every((f) => f.inFile && !f.removable),
+          'all of them from the declaration, none of them Remove\'s to take');
         assert.equal(shipped.find((f) => f.current).id, 'obsidian', 'and the table is on the default');
         assert.equal(await t.dbg(`devFeltAdd('house-moss', {})`), null, 'the door is shut: no row is minted');
         assert.equal(await t.dbg(`devFeltApply('walnut')`), null, '…and nothing is applied');
@@ -27105,22 +27177,24 @@ export const scenarios = [
         assert.deepEqual(add.refused, [], 'a legal row lands whole');
         const moss = add.felts.find((f) => f.id === 'house-moss');
         assert.ok(moss, 'and it is in the catalogue beside the shipped eleven');
-        assert.equal(moss.shipped, false, 'it is not shipped');
-        assert.equal(moss.inFile, false, '…nor in the file yet — Save is what puts it there');
+        assert.equal(moss.inFile, false, 'it is not in the file yet — Save is what puts it there');
+        assert.equal(moss.removable, true, '…which is exactly what makes it this panel\'s to drop');
         assert.equal(moss.mottle, 1, 'and the field it said nothing about took the row default');
 
-        // A SHIPPED ID IS NOT THE EDITOR'S TO REDEFINE: `taproom` in the file
-        // cannot quietly become a different mat than the one a golden and
-        // eleven months of screenshots mean.
+        // A ROW THE FILE DECLARES IS NOT ADD'S TO REDEFINE: `tune.addRow`
+        // writes a row WHOLE, so an Add at `obsidian` would quietly become a
+        // different mat than the one a golden and eleven months of screenshots
+        // mean, with the fields it did not name arriving as row defaults. Edit
+        // it or Clone it.
         assert.deepEqual((await t.dbg(`devFeltAdd('obsidian', { name: 'Not obsidian' })`)).refused,
           [['felts.obsidian', 'shipped']]);
         assert.deepEqual((await t.dbg(`devFeltAdd('House.Moss', {})`)).refused,
           [['felts.House.Moss', 'id']], 'and a dotted id is not an id');
-        assert.deepEqual((await t.dbg(`devFeltAdd('house-ash', { cloth: 'linen', nope: 1 })`)).refused,
+        assert.deepEqual((await t.dbg(`devFeltAdd('house-ash', { cloth: 'velvet', nope: 1 })`)).refused,
           [['felts.house-ash.cloth', 'option'], ['felts.house-ash.nope', 'unknown']],
           'a field that is not a field, and a cloth that is not a painter, are named one by one');
         assert.deepEqual((await t.dbg(`devFeltRemove('house-ash')`)).refused, []);
-        assert.equal((await t.dbg('devFelts()')).length, 12, 'one row added, and only one');
+        assert.equal((await t.dbg('devFelts()')).length, 13, 'one row added, and only one');
 
         // …AND IT DOES NOT GROW A CHIP IN THE PLAYER'S PICKER (the C4 review,
         // 2026-09-03). Every chip's click is `selectFelt`, which POSTs the ROOM
@@ -27130,7 +27204,7 @@ export const scenarios = [
         // the table", which is a false cause. A row this session invented gets
         // its chip when it is SAVED, and not before.
         const chips = () => t.eval(`[...document.querySelectorAll('#felt-swatches .felt-swatch')].map((b) => b.dataset.felt)`);
-        assert.equal((await chips()).length, 11, 'a session row is not a felt the picker may offer');
+        assert.equal((await chips()).length, 12, 'a session row is not a felt the picker may offer');
         assert.equal(await t.eval(`!!document.querySelector('#felt-swatches .felt-swatch[data-felt="house-moss"]')`),
           false, 'and there is no chip to click');
 
@@ -27156,7 +27230,7 @@ export const scenarios = [
         // ---- the panel's own section ---------------------------------------
         await t.waitFor(`!!document.querySelector('#dev-panel select.dev-feltpick option[value="house-moss"]')`,
           { desc: 'the panel section shows the new row' });
-        assert.equal(await t.eval(`document.querySelectorAll('#dev-panel select.dev-feltpick option').length`), 12);
+        assert.equal(await t.eval(`document.querySelectorAll('#dev-panel select.dev-feltpick option').length`), 13);
         // WHICH ROW THE FORM EDITS follows the felt on the TABLE until somebody
         // makes a choice of their own. The panel opened on obsidian, and a
         // `devFeltApply` from the console moved it — that is the row you are
@@ -27169,13 +27243,59 @@ export const scenarios = [
         assert.equal(await t.eval(`${nameIn}.value`), 'Moss');
         assert.equal(await t.eval(`document.querySelector('#dev-panel .dev-row[data-path="felts.feltBase"] .dev-hex').value`), '#1f3a22');
         assert.equal(await t.eval(`${clothCtl}.classList.contains('is-locked')`), false, 'a house row is editable');
-        // A shipped row is drawn read-only, from one place: the row itself.
+        // …AND SO IS A DECLARED ONE, since phase E1. This assertion read `true`
+        // when the eleven lived in js/main.js and the form drew them read-only
+        // with "a shipped felt lives in js/main.js — Clone it to edit" on the
+        // lock. The catalogue is the file now, so that sentence describes a
+        // state that no longer exists; it is the sets editor's own first
+        // difference ("every row is editable"), arriving one editor late. What
+        // a declared row still refuses is REMOVE, asserted below.
         const pickRow = (id) => t.eval(`(() => { const s = ${picked};`
           + ` s.value = ${JSON.stringify(id)}; s.dispatchEvent(new Event('change')); })()`);
         await pickRow('obsidian');
-        assert.equal(await t.eval(`${clothCtl}.classList.contains('is-locked')`), true,
-          'a shipped felt cannot be edited here — it lives in js/main.js');
+        assert.equal(await t.eval(`${clothCtl}.classList.contains('is-locked')`), false,
+          'a declared mat is edited here; its lines in dice.yaml are what Save amends');
+        const removeBtn = `document.querySelector('#dev-panel .dev-section[data-section="felts"] .dev-btn-danger')`;
+        assert.equal(await t.eval(`${removeBtn}.disabled`), true,
+          '…and Remove is the verb it refuses: a declared row leaves by having its lines deleted');
         assert.equal(await t.eval(`${nameIn}.value`), 'Obsidian', 'the form re-points at the row the picker names');
+
+        // WHICH FIELD MOVED, SAID BY THE ROW and not only by the header (the
+        // E1 review, 2026-09-03). Editing one of the eleven is the thing E1 is
+        // FOR, and the section counted such an edit ("· n changed") while every
+        // row in it went on saying nothing had moved — so the panel named a
+        // row and refused to name the field, and the ↺ that puts one field
+        // back was unreachable, because the glyph is gated on that same dot.
+        // The sets editor next door has marked the exact field since D2.
+        const feltRow = (k) => `document.querySelector('#dev-panel .dev-row[data-path="felts.${k}"]')`;
+        const feltDots = async () => JSON.parse(await t.eval(
+          `JSON.stringify(['name','cloth','feltBase','sceneBg','breath','mottle'].map((k) =>`
+          + ` document.querySelector('#dev-panel .dev-row[data-path="felts.' + k + '"]')`
+          + `.classList.contains('is-changed')))`));
+        const feltCount = () => t.eval(`document.querySelector('#dev-panel .dev-section[data-section="felts"] .dev-sec-count').textContent`);
+        assert.deepEqual(await feltDots(), [false, false, false, false, false, false],
+          'nothing of the declared mat has moved yet');
+        assert.equal(await feltCount(), '· 1 changed', 'one row in the section: the one this session minted');
+        assert.deepEqual((await t.dbg(`devFeltSet('obsidian', { breath: 1.2 })`)).refused, []);
+        await t.waitFor(`${feltRow('breath')}.classList.contains('is-changed')`,
+          { desc: 'the field that moved wears the dot' });
+        assert.deepEqual(await feltDots(), [false, false, false, false, true, false],
+          '…and the five that did not, do not');
+        assert.equal(await feltCount(), '· 2 changed', 'two rows now: the minted one and the mat just edited');
+        // EIGHT LEAVES, not six: phase E2 gave the row `texture` and `tile`,
+        // which are FILLED fields and so land with every minted row. Its two
+        // SPARSE groups — `gloss` and `sound` — do not, which is what keeps
+        // this mat wearing its painter's own answers.
+        assert.equal((await t.dbg('devInfo()')).changed, 9, 'eight leaves of the new row, plus this one');
+        // …AND THE ↺ ON THAT ROW PUTS THE FILE'S VALUE BACK, at the path the
+        // picker names — a field row here is re-pointed at whichever mat is
+        // picked, so the binding is to the FIELD (js/devmode.js revertField).
+        await t.eval(`${feltRow('breath')}.querySelector('.dev-revert').click()`);
+        await t.waitFor(`window.__diceDebug.devInfo().changed === 8`,
+          { desc: 'the row ↺ put the declaration\'s own breath back' });
+        assert.equal((await t.dbg('devFelts()')).find((f) => f.id === 'obsidian').breath, 1.5);
+        assert.deepEqual(await feltDots(), [false, false, false, false, false, false], 'and the dot went with it');
+        assert.equal(await feltCount(), '· 1 changed');
         // …and having been picked by hand, it STAYS picked: a felt applied from
         // the console now leaves the choice alone.
         await t.dbg(`devFeltApply('house-moss')`);
@@ -27186,39 +27306,70 @@ export const scenarios = [
         await t.waitFor(`!!document.querySelector('#dev-panel select.dev-feltpick option[value="house-obsidian"]')`,
           { desc: 'Clone minted a house copy of the shipped row' });
         const cloned = (await t.dbg('devFelts()')).find((f) => f.id === 'house-obsidian');
-        assert.equal(cloned.feltBase, '#1c1c24', 'the clone carries the shipped row\'s own colour');
-        assert.equal(cloned.shipped, false, 'and is editable, which the original was not');
+        assert.equal(cloned.feltBase, '#1c1c24', 'the clone carries the declared row\'s own colour');
+        assert.equal(cloned.removable, true, 'and is a row this session owns, which the original is not');
         assert.equal(await t.eval(`${clothCtl}.classList.contains('is-locked')`), false);
-        // Remove takes it away again; the catalogue is back to twelve.
+        // Remove takes it away again; the catalogue is back to thirteen.
         assert.deepEqual((await t.dbg(`devFeltRemove('house-obsidian')`)).refused, []);
-        assert.equal((await t.dbg('devFelts()')).length, 12);
+        assert.equal((await t.dbg('devFelts()')).length, 13);
 
         // ---- the file ------------------------------------------------------
         const exported = await t.dbg('tuneExport()');
-        assert.match(exported, /\nfelts:\n {2}house-moss:\n/, 'the export grew the section the file never had');
+        // THE SECTION IS THERE ALREADY (phase E1): the eleven mats live under
+        // `felts:`, so what the export grows is a ROW after them rather than
+        // the section itself. `felts:` is the last block in dice.yaml, which is
+        // why the row's lines land at the end and `startsWith(original)` below
+        // still holds.
+        assert.match(exported, /\n {2}linen:\n[\s\S]*\n {2}house-moss:\n/,
+          'the row was inserted under the section, after the mats the file ships');
         assert.match(exported, /\n {4}feltBase: "#1f3a22"\n/);
         assert.match(exported, /\n {4}breath: 0\.9\n/);
         assert.ok(exported.startsWith(original), 'appended; not one byte of the dials moved');
 
         await t.eval(`document.querySelector('#dev-panel .dev-saveroute').click()`);
-        await t.waitFor(`document.querySelector('#dev-panel .dev-statusslot')?.textContent.includes('saved 6 changes')`,
-          { desc: 'the route wrote the row\'s six leaves' });
+        await t.waitFor(`document.querySelector('#dev-panel .dev-statusslot')?.textContent.includes('saved 8 changes')`,
+          { desc: 'the route wrote the row\'s eight leaves' });
         const saved = readFileSync(join(dir, 'dice.yaml'), 'utf8');
         assert.equal(saved, exported, 'and the server patched its own file to exactly what the tab would have downloaded');
         assert.equal(readFileSync(join(ROOT, 'dice.yaml'), 'utf8'), original, 'the CHECKOUT was never touched');
 
+        // ---- THE FILE HAS MOVED, AND THIS TAB KNOWS IT ---------------------
+        //
+        // (The E1 review, 2026-09-03.) `SHIPPED` is the declaration as it stood
+        // at BOOT, so a gate that asked only SHIPPED went on calling the row
+        // this session just saved a session row — and Remove would then have
+        // dropped it out of `T.felts` and `FELT_THEMES` while dice.yaml carried
+        // it, with `tune.reset` unable to put it back (SHIPPED has no such row)
+        // and nothing but a reload to restore it. The sets editor kept a ledger
+        // of saved rows for exactly this window; both editors read it now.
+        const afterSave = (await t.dbg('devFelts()')).find((f) => f.id === 'house-moss');
+        assert.equal(afterSave.inFile, true, 'the file declares it from the moment the route answered ok');
+        assert.equal(afterSave.removable, false, '…so it is not Remove\'s to take — on this tab, without a reload');
+        assert.deepEqual((await t.dbg(`devFeltRemove('house-moss')`)).refused,
+          [['felts.house-moss', 'shipped']], 'and the refusal names the row instead of dropping it');
+        assert.deepEqual((await t.dbg(`devFeltAdd('house-moss', { name: 'Not moss' })`)).refused,
+          [['felts.house-moss', 'shipped']], 'nor is it Add\'s to redefine whole');
+        assert.equal((await t.dbg('devFelts()')).length, 13, 'nothing left the catalogue and nothing was overwritten');
+        // …AND THE PLAYER'S PICKER GREW ITS CHIP, which is the same lag seen
+        // from the other side: a chip is the FILE's answer (`feltInPicker`), so
+        // a mat that just became declared has earned one now, not next boot.
+        await t.waitFor(`!!document.querySelector('#felt-swatches .felt-swatch[data-felt="house-moss"]')`,
+          { desc: 'the thirteenth swatch arrived on the tab that saved it' });
+        assert.equal((await chips()).length, 13, 'thirteen chips, without a reload');
+
         // ---- a fresh tab, where it is simply one of the felts ---------------
         const fresh = await open('127.0.0.75', `${ctx.room}-fresh`);
         const list = await fresh.dbg('devFelts()');
-        assert.equal(list.length, 12, 'twelve felts on a tab that never opened the door');
+        assert.equal(list.length, 13, 'thirteen felts on a tab that never opened the door');
         const row = list.find((f) => f.id === 'house-moss');
         assert.equal(row.inFile, true, 'the file declares it now');
-        assert.equal(row.shipped, false, '…and it is still not code');
+        assert.equal(row.removable, false,
+          '…so it is one of the twelve\'s kind: edited here, deleted in dice.yaml');
         assert.equal(row.name, 'Moss');
         assert.equal((await fresh.dbg('devInfo()')).changed, 0,
           'and it reads as SHIPPED — the file is the declaration, not a diff');
-        assert.equal(await fresh.eval(`document.querySelectorAll('#felt-swatches .felt-swatch').length`), 12,
-          'the settings picker drew a twelfth swatch without anybody opening the panel');
+        assert.equal(await fresh.eval(`document.querySelectorAll('#felt-swatches .felt-swatch').length`), 13,
+          'the settings picker drew a thirteenth swatch without anybody opening the panel');
         assert.equal(await fresh.eval(`document.querySelector('#felt-swatches .felt-swatch[data-felt="house-moss"] span:last-child').textContent`), 'Moss');
         // …and applying it from the panel wore it here too, which is the
         // difference between "the picker offers it" and "this tab invented it".
@@ -27238,8 +27389,21 @@ export const scenarios = [
         assert.equal((await fresh.dbg('devOpen()')).panel, 'open');
         await fresh.waitFor(`document.querySelector('#dev-panel .dev-saveroute')?.hidden === false`,
           { desc: 'the fresh tab heard back that the route is armed' });
-        assert.deepEqual((await fresh.dbg(`devFeltRemove('house-moss')`)).refused, []);
-        assert.equal((await fresh.dbg('devFelts()')).length, 11, 'the catalogue is back to the shipped eleven');
+        // …AND THE PANEL WILL NOT TAKE IT (phase E1, 2026-09-03). Before the
+        // mats moved into the file this refusal was an accident of where the
+        // rows lived — a shipped mat was not in `T.felts` at all, so
+        // `tune.removeRow` answered `unknown`. They are all rows now, so the
+        // rule has to be said out loud, and it is the sets editor's word for
+        // word: Remove is for the rows you author.
+        assert.deepEqual((await fresh.dbg(`devFeltRemove('house-moss')`)).refused,
+          [['felts.house-moss', 'shipped']], 'a declared row is not Remove\'s to take');
+        assert.equal((await fresh.dbg('devFelts()')).length, 13, 'and nothing left the catalogue');
+        // The removal itself still has a door — `devRowRemove` is the raw
+        // `tune.removeRow` a recorded step replays through, and Download +
+        // tools/dice-apply.mjs is how a person carries one — so what the Save
+        // route can and cannot say about it is still reachable, and still true.
+        assert.deepEqual((await fresh.dbg(`devRowRemove('felts', 'house-moss')`)).refused, []);
+        assert.equal((await fresh.dbg('devFelts()')).length, 12, 'the catalogue is back to the declared twelve');
         assert.deepEqual((await fresh.dbg(`devFeltSet('house-moss', { name: 'Bog' })`)).refused,
           [['felts.house-moss.name', 'row']], 'one field cannot put a removed row back — it lands or leaves whole');
         assert.equal((await fresh.dbg('devFelts()')).find((f) => f.id === 'house-moss'), undefined,
@@ -27282,6 +27446,288 @@ export const scenarios = [
         if (server.exitCode === null) server.kill('SIGTERM');
         rmSync(dir, { recursive: true, force: true });
       }
+    },
+  },
+  {
+    name: 'dev-image-mat',
+    tags: ['dev', 'look'],
+    timeout: 90000,
+    // A CLOTH IS DATA (docs/DEVMODE.md §9, phase E2). Joe, 2026-09-03: "make a
+    // new mat as YAML-only as a new dice set is now." Phase E1 moved the
+    // eleven ROWS into dice.yaml and left every SURFACE in js/main.js, so a new
+    // mat was still one of three painted cloths in a new colour. `linen` is the
+    // first mat nobody wrote a painter for: a picture under `models/`, a scale,
+    // a gloss row and a voice, all of it seven lines of YAML.
+    //
+    // FOUR CLAIMS, and the last is the one that decides whether a mat may be
+    // authored by a person rather than by a build:
+    //
+    //   · THE PICTURE REALLY LANDS ON THE FLOOR. The tile is sampled off the
+    //     material's own canvas: an image mat is DARKER than its `feltBase`
+    //     everywhere (the tint is a multiply) and it has structure, which a
+    //     flat colour has none of. This is what a `loaded: ready` claim would
+    //     be worth nothing without — the state can say ready while the paint
+    //     never happened, and did, until the tile-cache bust landed.
+    //   · IT TILES AT THE SCALE THE ROW ASKS FOR. Two probes exactly one
+    //     `tile` apart are the same pixel, and two probes half a repeat apart
+    //     are not — the second half is what says the first is a real repeat
+    //     rather than a flat canvas agreeing with itself.
+    //   · THE ROW'S SOUND REACHES THE MIXER. `sound:` in dice.yaml is four
+    //     numbers over the painter's six, and `clothAudioInfo()` is where the
+    //     composed tier says what it is doing. A mat whose voice was written
+    //     down, saved, shown in the panel and never heard is exactly the shape
+    //     of miss E2's resolver exists to make impossible.
+    //   · A PICTURE THAT DOES NOT ARRIVE COSTS THE TABLE NOTHING. A mat is
+    //     chrome, and chrome that can take the app down with a typo in a YAML
+    //     string is the wrong trade: the mat keeps its flat colour, the state
+    //     reads `failed`, and no exception reaches the page.
+    //
+    // No dice are thrown, which is what lets this carry the `look` tag.
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.86', name: 'Dev' });
+      await t.dbg('sim(60)');
+
+      // THE ROW IS THE FILE'S. Nothing here mints it — that is the point.
+      const linen = (await t.dbg('devFelts()')).find((f) => f.id === 'linen');
+      assert.ok(linen, 'dice.yaml declares the image mat');
+      assert.equal(linen.cloth, 'image');
+      assert.equal(linen.texture, 'models/mats/linen.png');
+      assert.equal(linen.tile, 1.25);
+      assert.deepEqual(linen.gloss, { mid: 0.94, swing: 0.06 }, 'the row says how it answers the lamp');
+      assert.deepEqual(linen.sound, { centre: 1.12, length: 1.1, tail: 1.25, grind: 1.1 },
+        '…and the four things it disagrees with the reference row about');
+
+      // …and the writers are shut until the door is opened, as everywhere else.
+      assert.equal(await t.dbg(`devFeltApply('linen')`), null, 'the door is shut: nothing is applied');
+      assert.equal((await t.dbg('devOpen()')).panel, 'open');
+
+      // ---- the resolved surface -------------------------------------------
+      //
+      // THE MERGE, WHICH IS THE WHOLE OF E2: the painter's registries under the
+      // row's own numbers, field by field. `painter` is reported beside it so a
+      // reader can see which half each number came from — and so this can
+      // assert that the two really differ, rather than that a default happened
+      // to equal what the row asked for.
+      await t.waitFor(`window.__diceDebug.devFeltSurface('linen').loaded === 'ready'`,
+        { desc: 'the picture arrived from models/' });
+      const s = await t.dbg(`devFeltSurface('linen')`);
+      assert.equal(s.cloth, 'image');
+      assert.equal(s.tile, 1.25, 'four repeats across the 5-unit felt tile — the picture at 1:1');
+      assert.deepEqual(s.gloss, { mid: 0.94, swing: 0.06 }, 'the row\'s gloss won');
+      assert.deepEqual(s.painter.gloss, { mid: 0.91, swing: 0.11 }, '…over the painter\'s, which is wool\'s');
+      assert.deepEqual(s.sound, { centre: 1.12, length: 1.1, gain: 1, tail: 1.25, grind: 1.1, fizz: 0 },
+        'four of six from the row; `gain` and `fizz` are the painter\'s, because the row is silent about them');
+      assert.deepEqual(s.painter.sound, { centre: 1, length: 1, gain: 1, tail: 1, grind: 1, fizz: 0 },
+        'a picture says nothing about sound, so its painter says the least it can');
+      // Zero-arg (P7): with no id it answers about the mat on the table, which
+      // is not linen yet.
+      assert.equal((await t.dbg('devFeltSurface()')).id, 'obsidian');
+      assert.equal((await t.dbg('devFeltSurface()')).loaded, 'none', 'a painted cloth has no picture to wait for');
+
+      // ---- wear it ---------------------------------------------------------
+      const BASE = [141, 127, 102];         // #8d7f66, the row's own tint
+      const probe = async (x, z) => JSON.parse(await t.eval(
+        `JSON.stringify(window.__diceDebug.feltPixel(${x}, ${z}))`));
+      assert.equal((await t.dbg(`devFeltApply('linen')`)).felt, 'linen');
+      assert.equal((await t.dbg('felt')).feltBase, '#8d7f66', 'the table says it is wearing the row');
+      await t.waitFor(`window.__diceDebug.feltPixel(0.3, 0.3)[0] !== ${BASE[0]}`,
+        { desc: 'the cloth is the picture and not the flat tint' });
+
+      // THE TINT IS A MULTIPLY, so the picture may only ever DARKEN the row's
+      // colour: every sample is under the flat base, and the spread between
+      // them is the weave. A flat canvas would pass "differs from base" on its
+      // own if the fill were merely wrong; it cannot pass this.
+      const grid = [];
+      for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) grid.push(await probe(i * 0.15, j * 0.15));
+      const reds = grid.map((p) => p[0]);
+      assert.ok(Math.max(...reds) < BASE[0],
+        `every sample is under the flat tint (max ${Math.max(...reds)} against ${BASE[0]})`);
+      assert.ok(Math.max(...reds) - Math.min(...reds) > 20,
+        `and they are not all the same: ${Math.min(...reds)}..${Math.max(...reds)} — that spread IS the weave`);
+
+      // …AND IT REPEATS AT THE SCALE THE ROW ASKED FOR. `feltPixel` samples the
+      // tile canvas by world position, so a probe and a probe one `tile` along
+      // are the same texel by construction if — and only if — the picture was
+      // drawn as a whole number of repeats across it.
+      for (const [x, z] of [[0.2, 0.2], [0.55, 1.4], [2.1, 3.3]]) {
+        assert.deepEqual(await probe(x + 1.25, z), await probe(x, z),
+          `one repeat along x from (${x}, ${z}) is the same thread`);
+        assert.deepEqual(await probe(x, z + 1.25), await probe(x, z),
+          `…and one repeat along z`);
+      }
+      let apart = 0;
+      for (const [x, z] of [[0.2, 0.2], [0.55, 1.4], [2.1, 3.3]]) {
+        if ((await probe(x + 0.6, z))[0] !== (await probe(x, z))[0]) apart++;
+      }
+      assert.ok(apart >= 2, 'half a repeat away is a different thread — the tile is not agreeing with itself');
+
+      // ---- the row's voice, at the mixer ----------------------------------
+      const audio = await t.dbg('clothAudioInfo()');
+      assert.equal(audio.felt, 'linen', 'the MAT…');
+      assert.equal(audio.id, 'image', '…and the cloth it is made of are two answers now');
+      assert.equal(audio.covered, false, 'no venue floor over the mat, so the cloth speaks');
+      assert.deepEqual(
+        ['centre', 'length', 'gain', 'tail', 'grind', 'fizz'].map((k) => audio.declared[k]),
+        [1.12, 1.1, 1, 1.25, 1.1, 0],
+        'the composed tier is wearing the ROW\'s numbers, not the painter\'s');
+      // `tail` DECIDES HOW MANY TIMES THE SURFACE HANDS THE DIE BACK
+      // (js/voices.js settleTail), so 1.25 is a claim with a count in it:
+      // wool's ratio 0.42 becomes 0.525, and the cluster reaches the 1% floor
+      // two taps later. That is the sentence "a thin cloth over a hard table"
+      // as arithmetic.
+      assert.equal(audio.tail.length, 8, 'eight taps against the reference row\'s six');
+      const woolTaps = Number(await t.eval(`(() => { const d = window.__diceDebug; d.devFeltApply('obsidian'); `
+        + `const n = d.clothAudioInfo().tail.length; d.devFeltApply('linen'); return n; })()`));
+      assert.equal(woolTaps, 6, 'and wool still hands it back six times — the change is the mat\'s alone');
+
+      // ---- a picture that never arrives ------------------------------------
+      //
+      // The path is judged before it is fetched (js/tune.js `assetPath`), so
+      // the only failure that can reach the browser is a legal path with
+      // nothing at the end of it — a rename, a bad deploy, a typo inside
+      // `models/`. What it costs is nothing: the flat colour stands, the state
+      // says `failed`, and the table goes on being a table.
+      assert.deepEqual((await t.dbg(`devFeltSet('linen', { texture: '../../etc/passwd' })`)).refused,
+        [['felts.linen.texture', 'path']], 'a path outside models/ never becomes a fetch');
+      assert.deepEqual((await t.dbg(`devFeltSet('linen', { texture: 'http://elsewhere/x.png' })`)).refused,
+        [['felts.linen.texture', 'path']]);
+      const GONE = [58, 42, 30];            // #3a2a1e, flat
+      assert.deepEqual((await t.dbg(`devFeltAdd('house-gone', { name: 'Gone', cloth: 'image',`
+        + ` texture: 'models/mats/no-such-mat.png', feltBase: '#3a2a1e', sceneBg: '#14100c' })`)).refused, []);
+      assert.equal((await t.dbg(`devFeltApply('house-gone')`)).felt, 'house-gone');
+      await t.waitFor(`window.__diceDebug.devFeltSurface('house-gone').loaded === 'failed'`,
+        { desc: 'the fetch came back with nothing' });
+      for (const [x, z] of [[0.4, 0.4], [1.9, 2.7], [3.5, 0.9]]) {
+        assert.deepEqual((await probe(x, z)).slice(0, 3), GONE,
+          `the mat stands on its flat feltBase at (${x}, ${z})`);
+      }
+      // …and it is a MAT that failed, not the app: the picker still offers
+      // every row, the surface readout still answers, and nothing threw.
+      assert.equal((await t.dbg('devFelts()')).length, 13);
+      assert.equal((await t.dbg(`devFeltSurface('house-gone')`)).cloth, 'image');
+      assert.deepEqual(t.page.errors, [], 'no page exception');
+      assert.deepEqual(t.page.consoleErrors, [], 'and the console line it logs is a warning, not an error');
+
+      // Back to a painted cloth, and the picture is still cached: a mat
+      // returned to costs one canvas lookup, which is what the tile cache is
+      // for and what the load-state key had to be busted around.
+      assert.equal((await t.dbg(`devFeltApply('linen')`)).felt, 'linen');
+      await t.waitFor(`window.__diceDebug.feltPixel(0.3, 0.3)[0] !== ${BASE[0]}`,
+        { desc: 'the weave came straight back' });
+      assert.equal((await t.dbg(`devFeltSurface('linen')`)).loaded, 'ready');
+
+      // ---- and the ROW AS THE PANEL DRAWS IT -------------------------------
+      //
+      // (The E2 review, 2026-09-03: "nothing automated exercises the felts
+      // editor's new rows — the sparse default marks, the subheads, and the
+      // nested write path are covered by eye only".) Everything above is the
+      // file's answer and the floor's; this is the FORM's, which is the only
+      // place a person meets any of it.
+      //
+      // AND THE SLIDER IS THE POINT OF IT. The `tile` dial shipped with a 0.5
+      // step, which cannot express this row's own 1.25: the slider drew 1.5,
+      // and one `change` on it — a click, an arrow key, a drag released where
+      // it started — rewrote a shipped mat to three repeats instead of four,
+      // so the picture stopped being at one image pixel per texel while the
+      // file still said it was. A panel that cannot show a value without
+      // changing it is worse than no panel, so the reading is pinned here.
+      const pickSel = `document.querySelector('#dev-panel select.dev-feltpick')`;
+      const fRow = (k) => `document.querySelector('#dev-panel .dev-row[data-path="felts.${k}"]')`;
+      const pickFelt = async (id) => {
+        await t.eval(`(() => { const s = ${pickSel}; s.value = ${JSON.stringify(id)};`
+          + ` s.dispatchEvent(new Event('change')); })()`);
+        assert.equal(await t.eval(`${pickSel}.value`), id);
+      };
+      await pickFelt('linen');
+      assert.deepEqual(JSON.parse(await t.eval(`JSON.stringify([...document.querySelectorAll(`
+        + `'#dev-panel .dev-section[data-section="felts"] .dev-subhead')].map((h) => h.textContent))`)),
+        ['gloss', 'sound'], 'the two sparse groups are the form\'s two subheads');
+      const tileIn = JSON.parse(await t.eval(`JSON.stringify([...${fRow('tile')}`
+        + `.querySelectorAll('input')].map((i) => ({ type: i.type, step: i.step, value: i.value })))`));
+      assert.deepEqual(tileIn.map((i) => i.type), ['range', 'number'], 'a slider and a typed number');
+      assert.deepEqual(tileIn.map((i) => Number(i.value)), [1.25, 1.25],
+        'BOTH read the row\'s own 1.25 — a step the shipped value does not land on is a rewrite waiting for a click');
+      // …and the proof of it: a `change` on the slider WITHOUT MOVING IT.
+      await t.eval(`(() => { const i = ${fRow('tile')}.querySelector('input[type=range]');`
+        + ` i.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await t.dbg('sim(2)');
+      assert.equal((await t.dbg('devFelts()')).find((f) => f.id === 'linen').tile, 1.25,
+        'the untouched slider wrote nothing');
+      assert.deepEqual(await probe(0.2 + 1.25, 0.2), await probe(0.2, 0.2),
+        '…and the weave is still four repeats across the tile, which is what 1:1 means here');
+
+      // THE SPARSE MARK IS THE PAINTER'S NUMBER, PER ROW (js/devmode.js
+      // `leafIn(row.defaults, at)`). A field the row leaves out shows what the
+      // mat is already doing, faintly, and which number that is depends on the
+      // cloth — so the two rows below disagree about `sound.tail` while
+      // neither of them says a word about it.
+      const mark = async (k) => JSON.parse(await t.eval(`JSON.stringify((() => {`
+        + ` const r = ${fRow(k)}; const i = r.querySelector('input[type=number]');`
+        + ` return { def: r.classList.contains('is-default'), v: i ? Number(i.value) : null }; })())`));
+      assert.deepEqual(await mark('gloss.mid'), { def: false, v: 0.94 }, 'the row said this one');
+      assert.deepEqual(await mark('sound.tail'), { def: false, v: 1.25 }, '…and this one');
+      assert.deepEqual(await mark('sound.gain'), { def: true, v: 1 },
+        'and the two it did not are the painter\'s, shown as defaults');
+      assert.deepEqual(await mark('sound.fizz'), { def: true, v: 0 });
+      await pickFelt('taproom');
+      assert.deepEqual(await mark('gloss.mid'), { def: true, v: 0.89 }, 'a plank answers the lamp differently…');
+      assert.deepEqual(await mark('sound.tail'), { def: true, v: 1.6 }, '…and hands the die back twelve times…');
+      assert.deepEqual(await mark('sound.grind'), { def: true, v: 1.35 },
+        '…all of it faint, because the mat says none of it');
+      await pickFelt('linen');
+
+      // THE NESTED WRITE. `felts.linen.sound.grind` is two levels inside a row
+      // inside a section, and it has to land as that leaf and take nothing
+      // else with it — the group is sparse, so a write that filled it out
+      // would silently pin four of the painter's numbers into the row.
+      await t.eval(`(() => { const i = ${fRow('sound.grind')}.querySelector('input[type=number]');`
+        + ` i.value = '1.4'; i.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await t.waitFor(`window.__diceDebug.devFeltSurface('linen').sound.grind === 1.4`,
+        { desc: 'the typed number reached the resolver' });
+      assert.deepEqual((await t.dbg('devFelts()')).find((f) => f.id === 'linen').sound,
+        { centre: 1.12, length: 1.1, tail: 1.25, grind: 1.4 },
+        'one leaf moved; the two the row never named are still the painter\'s');
+      assert.equal((await t.dbg('clothAudioInfo()')).declared.grind, 1.4, 'and the mixer heard it');
+      await t.eval(`${fRow('sound.grind')}.querySelector('.dev-revert').click()`);
+      await t.waitFor(`window.__diceDebug.devFeltSurface('linen').sound.grind === 1.1`,
+        { desc: 'the row ↺ put the file\'s own grind back' });
+
+      // …AND A REFUSED TEXTURE IS A SENTENCE, not a reason code. The panel
+      // answered an illegal path with the bare word `path` until the E2
+      // review: `REASON` (js/devmode.js) had no line for the law E2 added,
+      // and every other law in this panel has one.
+      await t.eval(`(() => { const i = ${fRow('texture')}.querySelector('input');`
+        + ` i.value = '../../etc/passwd'; i.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await t.waitFor(`(document.querySelector('#dev-panel .dev-statusslot')?.textContent || '')`
+        + `.includes('felts.linen.texture')`, { desc: 'the status line answered the typed path' });
+      const said = await t.eval(`document.querySelector('#dev-panel .dev-statusslot').textContent`);
+      assert.match(said, /felts\.linen\.texture: a texture is a path under models\//,
+        `the panel says what a texture is; it said "${said}"`);
+      assert.doesNotMatch(said, /: path$/, 'and not the reason code it used to end on');
+      assert.equal((await t.dbg('devFelts()')).find((f) => f.id === 'linen').texture,
+        'models/mats/linen.png', 'and the row kept its picture');
+
+      // …AND A HAND-EDITED `tile` CANNOT HANG THE TABLE (the E2 review). The
+      // panel's dial stops at 0.25, but dice.yaml is a file a person edits and
+      // the repeat count is `round(5 / tile)`: 0.001 is 5,000 repeats, which
+      // is 25 million `drawImage` calls inside one repaint and a tab that
+      // stops answering. Bounded at `FELT_MAX_REPS` it is one more canvas —
+      // and the proof is that everything below this line still answers.
+      assert.deepEqual((await t.dbg(`devFeltSet('linen', { tile: 0.001 })`)).refused, [],
+        'the law only says a divisor is positive; the bound is the painter\'s');
+      // …and the READOUT says the snap out loud: `devFeltSurface` reports the
+      // span the floor really draws (FELT_TILE_U / reps), so the bound is a
+      // number a reader can see rather than a silence.
+      await t.waitFor(`window.__diceDebug.devFeltSurface('linen').tile === 5 / 32`,
+        { desc: 'the absurd row resolved to the 32-repeat bound' });
+      await t.dbg('sim(2)');
+      const tiny = await probe(0.3, 0.3);
+      assert.ok(Array.isArray(tiny) && tiny.length >= 3 && tiny[0] < BASE[0],
+        `the floor still painted the picture at 32 repeats (${JSON.stringify(tiny)})`);
+      assert.deepEqual((await t.dbg(`devFeltSet('linen', { tile: 1.25 })`)).refused, []);
+      await t.waitFor(`window.__diceDebug.devFeltSurface('linen').tile === 1.25`,
+        { desc: 'and back to the file\'s own scale' });
+      assert.deepEqual(t.page.errors, [], 'no page exception from any of it');
     },
   },
   {

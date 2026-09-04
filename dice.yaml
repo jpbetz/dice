@@ -533,3 +533,141 @@ houses:                    # THE DICE CATALOGUE — every set the picker offers.
         geo: { bevel: 0.025 }
         sound: { body: clack, weight: 0.7, sustain: 20 }
         rate: { rate: 0.65, window: 0.3 }
+
+felts:                     # THE MAT CATALOGUE — every cloth the swatch picker offers.
+  #
+  # A row is a NAME, a CLOTH and two colours: `feltBase` is the mat's own
+  # colour and the seed its grain is drawn from, `sceneBg` the room behind it
+  # and the fog's colour. `cloth` names the PAINTER (js/main.js FELT_CLOTHS —
+  # `felt` when the row says nothing), and a new one is a function somebody
+  # writes, not a row. Defaults, ranges and the class of every field:
+  # js/tune.js FELT_ROW.
+  #
+  # `breath` is HOW FAR THIS CLOTH TAKES THE DECLARE BEAT (Joe, 2026-08-29), a
+  # multiplier on `light.breath` above; absent means 1, the shipped beat. It
+  # exists because one setting was measured wrong across the range: the beat
+  # drops ambient to ~49%, which on `sand` reads as the room stepping back and
+  # on `obsidian` moves about 14 levels of RGB, since half of near-black is
+  # still near-black. The rule is simply that a darker cloth has less light to
+  # lose, so it must lose a larger fraction of it. Ordered by how dark the
+  # base is.
+  emerald:
+    name: Emerald
+    feltBase: "#1f3128"
+    sceneBg: "#191512"
+    breath: 1.35
+  crimson:
+    name: Crimson
+    feltBase: "#46201e"
+    sceneBg: "#1a1211"
+    breath: 1.15
+  midnight:
+    name: Midnight
+    feltBase: "#1e2a3f"
+    sceneBg: "#121520"
+    breath: 1.35
+  slate:
+    name: Slate
+    feltBase: "#2c3438"
+    sceneBg: "#161a1c"
+    breath: 1.25
+  walnut:
+    name: Walnut
+    feltBase: "#402e1c"
+    sceneBg: "#1b1410"
+    breath: 1.15
+
+  # The exploration batch (2026-07): more of the palette than green/brown —
+  # near-black stone, cold deep teal, wine-dark purple, and one LIGHT table
+  # (dice and gold chrome read differently on it by design).
+  obsidian:
+    name: Obsidian
+    feltBase: "#1c1c24"
+    sceneBg: "#0f0f13"
+    breath: 1.5
+  ocean:
+    name: Ocean
+    feltBase: "#16404a"
+    sceneBg: "#0f181c"
+    breath: 1.3
+  plum:
+    name: Plum
+    feltBase: "#3b2342"
+    sceneBg: "#160f18"
+    breath: 1.3
+
+  # The one light table: it needs the LEAST, and a full-strength beat here
+  # takes it somewhere the other eight never go.
+  sand:
+    name: Sand
+    feltBase: "#7c6a4d"
+    sceneBg: "#211a11"
+    breath: 0.8
+
+  # THE FIRST MAT THAT IS NOT FELT (Joe's own seed). `cloth` names its
+  # painter; every row above omits it and gets the default, so the nine that
+  # shipped are untouched by construction. Stage one is look only — the
+  # physics that makes sand DEADEN a throw is a separate, priced piece.
+  #
+  # `mottle` 0.45: the felt's nap catches light unevenly across the whole
+  # table, but a raked bed is smoothed flat on purpose, so the same field at
+  # full strength reads as damp patches rather than as nap.
+  silt:
+    name: Silt
+    feltBase: "#a2977f"
+    sceneBg: "#1a1712"
+    breath: 0.85
+    cloth: silt
+    mottle: 0.45
+
+  # THE HARD SURFACE, and the register's other end: every row above swallows
+  # a die and this one hands it back. `mottle` 0.6 because a waxed board
+  # catches light unevenly along its length, but far less than a nap does.
+  taproom:
+    name: Taproom
+    feltBase: "#544530"
+    sceneBg: "#191310"
+    breath: 1.1
+    cloth: oak
+    mottle: 0.6
+
+  # THE FIRST MAT NOBODY WROTE A PAINTER FOR (developer mode phase E2,
+  # 2026-09-03). Joe: "make a new mat as YAML-only as a new dice set is now."
+  # Every row above names one of three PAINTERS — a function in js/main.js —
+  # so a new surface was still a code change wearing a row. `cloth: image`
+  # takes the picture from a file instead, and these seven lines are the whole
+  # of a mat that no line of code knows about.
+  #
+  # `texture` is served from this origin under models/ (server.js APP_DIRS,
+  # and .gcloudignore ships models/). It rides NOWHERE on the wire: a felt id
+  # is room state, but every client reads this same file through
+  # /js/tunables.js and fetches the same path, so there is nothing to send.
+  #
+  # `tile` 1.25 is not a taste. models/mats/linen.png is 256px and the felt
+  # tile is 1024px over 5 world units, so four repeats across the tile draw
+  # the weave at 1:1 — one image pixel per texel. Ask for 5 and the same
+  # picture is stretched fourfold and reads as a blur of it.
+  #
+  # `feltBase` MULTIPLIES the picture here rather than sitting under it (the
+  # weave is a near-white greyscale), so it is a tint and a ceiling both: the
+  # mat is this oat at the thread crowns and about 30% darker in the gaps.
+  #
+  # `gloss` and `sound` are the row saying what the picture cannot. A PNG has
+  # no opinion about how a surface answers the lamp or what a die sounds like
+  # landing on it, so `cloth: image` defaults to wool's answers to both and
+  # this is where linen disagrees: matte, with less swing than a nap (it is
+  # woven flat, not raised), and brighter and shorter-tailed than wool because
+  # a thin cloth over a hard table is most of the way to the table. Every
+  # field left out is the painter's — `gain` and `fizz` are not named here, so
+  # they stay at the reference row.
+  linen:
+    name: Linen
+    feltBase: "#8d7f66"
+    sceneBg: "#221c14"
+    breath: 0.8
+    cloth: image
+    texture: models/mats/linen.png
+    tile: 1.25
+    mottle: 0.7
+    gloss: { mid: 0.94, swing: 0.06 }
+    sound: { centre: 1.12, length: 1.1, tail: 1.25, grind: 1.1 }

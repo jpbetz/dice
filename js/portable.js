@@ -184,10 +184,6 @@ const MAX_POOLS_PER_FILE = MAX_PROFILES * MAX_POOLS_PER_PLAYER + MAX_POOLS_PER_P
 const MAX_NAME = 24;
 const MAX_TABLE_NAME = 28; // SETTING_SPECS.tableName's cap
 
-// The `table:` values, mirrored by hand from server.js SETTING_SPECS (see the
-// header: no import). Adding a felt or a system there means adding it here.
-const FELT_THEMES = ['emerald', 'crimson', 'midnight', 'slate', 'walnut',
-  'obsidian', 'ocean', 'plum', 'sand', 'silt', 'taproom'];
 // From the module that defines them, not a hand-kept copy — see
 // js/meanings.js SYSTEM_IDS for what the copies cost.
 const SYSTEMS = SYSTEM_IDS;
@@ -203,30 +199,44 @@ const TOWER_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
 // refuses at its line), a REGEXP is an id whose catalogue lives elsewhere
 // (shape only, checked against the real registry at the apply site), and null
 // is free text (capped, never enumerated).
-const TABLE_KEYS = { name: null, felt: FELT_THEMES, system: SYSTEMS, zoom: ZOOMS, tower: TOWER_ID };
+// `felt` is not in this table at all: its catalogue is the DECLARATION's and
+// arrives through `declareFelts` — see below. `allowedFor` is the one reader
+// that knows, so the enum machinery underneath is unchanged.
+const TABLE_KEYS = { name: null, felt: null, system: SYSTEMS, zoom: ZOOMS, tower: TOWER_ID };
 
-// THE ONE ENUM HERE THAT GROWS AFTER THE FILE WAS WRITTEN (docs/DEVMODE.md
-// §9, phase C4). A `felts:` row in the declaration is a felt this deployment
-// has and this module's literal does not, and a rack carrying it would be
-// refused at its own line — "these felts would be dropped to the default on
-// export/import", which is the failure tests/felt-ids.test.mjs names.
+// THE ONE ENUM HERE THAT IS NOT WRITTEN DOWN HERE (docs/DEVMODE.md §9, phases
+// C4 and E1). A hand-kept literal of eleven mats stood here, mirrored from
+// server.js SETTING_SPECS, and the declaration's rows were added to it; on
+// 2026-09-03 the mats themselves became rows under `felts:` in dice.yaml, so
+// the whole list arrives this way now. A rack carrying a felt the deployment
+// has must not be refused at its own line — "these felts would be dropped to
+// the default on export/import", which is the failure tests/felt-ids.test.mjs
+// names.
 //
 // HANDED DOWN, NOT IMPORTED. The ids come from the served /js/tunables.js,
 // which is generated and never on disk — and this file is loaded under NODE
 // by tests/portable.test.mjs, where importing it would fail outright. So
-// js/main.js, which already has the merged catalogue, calls this once at boot
-// and again whenever a row is added or dropped. A caller that never calls it
-// (the tests, the lobby) gets exactly the list the literal above spells out.
+// js/main.js, which holds the installed catalogue, calls this once at boot and
+// again whenever a row is added or dropped.
+//
+// AND A CALLER THAT NEVER CALLS IT HAS NO FELTS, which is the honest answer
+// and not the old one. Before E1 an uninformed caller got the eleven the
+// literal spelled out; there is no literal to fall back on, so a rack read by
+// a reader that was never told the catalogue refuses every `felt:` line at its
+// own line rather than accepting an id it cannot vouch for. In the browser
+// that state does not exist — js/main.js calls this during module evaluation,
+// before any rack is read. Under Node it is the test's job to say what the
+// declaration holds, exactly as the dice catalogue's tests install `houses:`.
 const declaredFelts = new Set();
 export function declareFelts(ids) {
   declaredFelts.clear();
   for (const id of Array.isArray(ids) ? ids : []) {
-    if (typeof id === 'string' && id && !FELT_THEMES.includes(id)) declaredFelts.add(id);
+    if (typeof id === 'string' && id) declaredFelts.add(id);
   }
 }
 function allowedFor(key) {
-  if (key !== 'felt' || !declaredFelts.size) return TABLE_KEYS[key];
-  return FELT_THEMES.concat([...declaredFelts]);
+  if (key !== 'felt') return TABLE_KEYS[key];
+  return [...declaredFelts];
 }
 
 const BARE_KEY_RE = /^[A-Za-z0-9][A-Za-z0-9 _-]*$/;
@@ -571,6 +581,13 @@ export function parsePortable(text) {
       const allowed = allowedFor(key);
       let value = sv.value;
       if (Array.isArray(allowed)) {
+        // An EMPTY enum is not "nothing is legal", it is "this reader was never
+        // told what is" — the `felt` case under Node with no `declareFelts`
+        // (phase E1). Saying so beats "is not one of " with nothing after it.
+        if (!allowed.length) {
+          return fail(lineNo, `${key} ${JSON.stringify(value.slice(0, 30))} cannot be checked: `
+            + `this reader has not been told the ${key} catalogue (js/portable.js declareFelts)`);
+        }
         if (!allowed.includes(value)) {
           return fail(lineNo, `${key} ${JSON.stringify(value.slice(0, 30))} is not one of ${allowed.join(', ')}`);
         }

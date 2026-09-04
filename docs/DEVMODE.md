@@ -168,11 +168,22 @@ sets:                      # dice sets authored as data (shipped sets stay in th
 felts:
   house-moss:
     name: Moss
-    cloth: felt            # felt | silt | oak  (the painters in FELT_CLOTHS)
+    cloth: felt            # felt | silt | oak | image  (FELT_CLOTHS)
     feltBase: "#1f3a22"
     sceneBg: "#0c120d"
     breath: 0.9
     mottle: 1
+  house-leather:
+    name: Leather
+    cloth: image                       # the picture comes from the file
+    texture: models/mats/leather.png   # under models/, served and deployed
+    tile: 1.25                         # world units one repeat covers
+    feltBase: "#3a2a1e"                # MULTIPLIES the picture: the tint
+    sceneBg: "#14100c"
+    breath: 1.1
+    mottle: 0.1
+    gloss: { mid: 0.9, swing: 0.09 }   # absent = the painter's own row
+    sound: { tail: 1.3, grind: 1.2 }   # absent, field by field, likewise
 ```
 
 **A row id carries no dot** (`house-moss`, not `house.moss` — a narrowing
@@ -860,9 +871,9 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
 | Rebuild choke points | `rebuildPlacards()` — `cards.*` promoted from ⟳ to apply, re-baked at the placard flush; `rebuildFloor()` / `rebuildDice()` still owed | 3 · **cards built** (D4) | M |
 | Presets | named patches under `presets:` in the declaration, held from the dials and applied like a paste | 3 · **built** (D4) | S |
 | Venue light as a layer | `venues.<id>.light` composed through `tuneSet`; until then the Save verb drops the rows `venueLightPatch()` names while a venue holds them (`devWriteSave`, js/main.js) | 3 | M |
-| `felts:` editor | felt row form; live on the felt; Save appends the row | 2 · **built** | M |
+| `felts:` editor | felt row form; live on the felt; Save appends the row | 2 · **built**; every row editable and the catalogue in the file since E1; a mat is YAML-only since E2 | M |
 | `sets:` editor | the lab's set builder moved onto the live felt; full recipe, live reskin of the standing dice, Clone / Throw one of each / Use at table / Remove | 3 · **built** (D2) | L |
-| Shipped catalogue migrates | `themes.js` sets and `FELT_THEMES` rows move into the declaration, one kind per commit | 3 · **dice sets built** (D1, `houses:`); felt rows still in main.js | M |
+| Shipped catalogue migrates | `themes.js` sets and `FELT_THEMES` rows move into the declaration, one kind per commit | 3 · **built** — dice sets D1 (`houses:`), mats E1 (`felts:`), 2026-09-03 | M |
 | Towers and venues rows | cosmetic rows over `towerRegisterGlb` and `VENUES`; meshes stay forge bakes | 3 · **deferred by Joe 2026-09-03** ("I want to defer for now. I'm not sure what I'm going to do with towers and venues yet") — no `towers:` / `venues:` section, no venue-light layer, `TOWERLAB` stays | L |
 | Retire `lab.html`, `lab.js`, two shot tools | the sets section hosts the recipe knobs on the real felt; `TOWERLAB` stays, with towers | 3 · **built** (D3) — what the lab measured and the editor does not, §9 | S |
 | Phone sheet | a bottom sheet at `45dvh`, folded by default, 44px rows, steppers instead of sliders, one section at a time; one media query read by css/dev.css and `DEV_PHONE_QUERY` alike | 3 · **built** (D5) | M |
@@ -874,7 +885,8 @@ the table), handles its own Esc, and is not in the app's Esc chain, so `r`,
 
 The rule: **an asset is a row under `houses:` (the dice catalogue; `sets:`
 was the sketch's name for it, and the section is two levels because a house
-holds sets), `felts:`, or — later — `towers:` / `venues:` in the declaration;
+holds sets), `felts:` (the mat catalogue — both migrated whole, D1 and E1),
+or — later — `towers:` / `venues:` in the declaration;
 the app resolves ids at use time; the editor writes the row, calls the kind's
 cache-bust and re-apply, and Save appends it.** Code-only stays code-only, and the panel says so ("a new cloth is a
 painter function; see FELT_CLOTHS"). A row's fields are optional the same
@@ -888,10 +900,13 @@ recipe's defaults fill the rest. A row's two-state fields are enums
   and rejected on the wire). `main.js` merges `felts` before the swatches
   render. The server parses the same file, so it accepts a new id on the
   wire after a restart, and after the mtime re-read in phase 2. Ids carry a
-  house prefix so a custom row never shadows a shipped one — and where one
-  does anyway, the SHIPPED row stands and a console line names it, because
-  `taproom` in a file may not quietly become a different mat than the
-  `taproom` a golden and eleven months of screenshots mean.
+  house prefix so a custom row never shadows a declared one. (Through C4 a
+  collision was possible — the eleven mats lived in code and the file could
+  name one — and the shipped row stood with a console line naming it. Phase E1
+  removed the second list, so what protects `taproom` now is that Add refuses
+  an id the file already declares: `tune.addRow` writes a row whole, and the
+  mat a golden and eleven months of screenshots mean may not be redefined by a
+  panel whose job is authoring new ones.)
 
   The second half of "the server parses the same file" is easy to half-ship
   and was: a Save ADOPTS the tree it just parsed rather than re-reading the
@@ -973,9 +988,10 @@ recipe's defaults fill the rest. A row's two-state fields are enums
   came out of the file.
 
   **Three differences from the felts editor**, each with a reason:
-  - **every row is editable.** There is no "shipped in code" row here any
-    more — the catalogue is the file. What Clone is for is keeping the shipped
-    one intact while you take a copy apart.
+  - **the section is two levels deep** (a house holds sets), so it carries a
+    house picker above the set picker. ("Every row is editable" was the first
+    of these until phase E1, when the mats moved into the file too and the
+    felts editor grew the same freedom.)
   - **the form is sparse.** A field the row does not carry is drawn at its
     dial's default wearing the `default` mark, because that is what the die is
     already doing (js/tune.js RECIPE records where every default came from).
@@ -1009,10 +1025,120 @@ recipe's defaults fill the rest. A row's two-state fields are enums
   the DIFF rather than off the dial rows wearing the changed mark. The old
   count was the whole diff before asset rows existed; with a set cloned it
   read `0 changed` in the corner beside a file section that read the truth.
-- **Mat** (phase 2, **built**). A colour row over an existing cloth: two
-  colour pickers, breath and mottle sliders, a cloth select; apply = bust the
-  felt tile + `applyFeltTheme` + re-render swatches. Code-only: a new cloth.
-  What shipped, and the four places it touches:
+- **Mat** (phases 2, E1 and E2, **built**). A row form: two colour pickers,
+  breath and mottle sliders, a cloth select, a texture path and a tile scale,
+  and two sub-groups — `gloss` and `sound` — whose fields read faint at the
+  painter's own value until the row names one. Apply = bust the felt tile +
+  `applyFeltTheme` + re-render swatches. Code-only: a new PAINTER; a mat that
+  is a picture is not one.
+
+  **A mat is YAML-only** (phase E2, 2026-09-03). E1 moved the eleven ROWS into
+  the file and left every SURFACE in `js/main.js`, so a new mat was still one
+  of three painters in a new colour — the "one mat in nine colours" ceiling one
+  level up. A row now carries its own surface:
+  - `cloth: image` with a `texture:` under `models/` and a `tile:` (world units
+    per repeat). `paintImageCloth` draws the picture as a whole number of
+    repeats across the 1024px felt tile — the tile is what wraps on the floor,
+    so a fractional repeat would be a seam every five units in a grid — then
+    tints with `feltBase` through `multiply`, which is why a texture for this
+    slot is a near-white greyscale: the row's hex stays the mat's one opinion
+    about colour, and the mottle, the gloss and the fog pipeline never learn
+    that the ink came from a PNG. `tile`'s slider is stepped 0.05 over
+    [0.25, 5] because the model behind it is `round(5 / tile)` whole repeats:
+    a step that could not express the shipped 1.25 rewrote the mat on a
+    click, and everything past 10/3 is the same one repeat (the E2 review).
+    The path is judged by `assetPath` (under
+    `models/`, no `..`, no percent-escape) because `models/` is what server.js serves and
+    `.gcloudignore` ships; a path outside it is a mat that works on the
+    author's disk and 404s for everybody else. **The path rides nowhere**: a
+    felt id is room state, but every client reads the same declaration and
+    fetches the same origin-relative path, so there is nothing to send.
+  - **loading is asynchronous and costs the table nothing.** The mat stands on
+    its flat `feltBase` while the fetch is in flight; on arrival the tile cache
+    key is busted and the cloth (and its swatch chip) repaint once; on failure
+    the flat colour stands and one `console.warn` names the path. Nothing
+    throws and nothing blocks — chrome that can take the app down with a typo
+    in a YAML string is the wrong trade. `devFeltSurface(id)` reports
+    `loaded: none | pending | ready | failed`.
+  - `gloss:` and `sound:` are **sparse groups inside a filled row**
+    (`js/tune.js` `sparse`), and that is the load-bearing decision. Their
+    defaults are not written in dice.yaml at all — they are the PAINTER's rows
+    (`FELT_GLOSS`, `js/voices.js` `CLOTH_VOICES`) — so a filled group would
+    have handed all eleven mats wool's numbers, silt and oak included, and
+    changed two shipped surfaces with the file unmoved. Absent means the
+    painter answers, field by field, so a mat that names neither behaves byte
+    for byte as it did before E2 **by construction**. Three of the six are
+    CLAMPED in `clothVoiceFor`, not by their sliders, because dice.yaml is a
+    file a person edits: `gain` at 1 (§5's mix plan is a ceiling), `tail` at
+    `CLOTH_TAIL_MAX` (past `1 / TAP_E` the settle cluster stops decaying and
+    the taps GROW — at the dial's first maximum the sixteenth tap was louder
+    than the landing) and `fizz` at 0.95 (it is subtracted: `1 - fizz`, so
+    past one the modulation inverts). The E2 review found the last two
+    uncapped; the tail dial now stops where its clamp does.
+  - one resolver, and every consumer reads it: `feltSurfaceOf(row)` merges the
+    registries under the row, and `paintGloss`, `clothVoice`, the swatch
+    signature and the readouts all go through it. `clothVoiceFor` took the
+    overrides as a third argument rather than merging at the call site, so the
+    one function that owns the covering rule ("a venue lays its floor over the
+    mat") owns it for a row's overrides too. `tests/felt-image.test.mjs` scrapes
+    `js/main.js` for a second reading of either registry, because a fourth
+    reader added later would silently ignore the row — it would look right.
+  - shipped: `models/mats/linen.png` (256px greyscale weave, tileable, ~23 kB
+    — per-scanline adaptive filtering, and the rest is the weave's own noise:
+    96 levels over 65,536 pixels; 128px would halve it and lose the 1:1 the
+    mat exists to show — baked by a throwaway `node:zlib` encoder) and the `linen` row that uses it,
+    so the image path is exercised by the file the app ships and by
+    `dev-image-mat`. The same test checks the PNG's chunk CRCs and that its
+    wrap is not the sharpest edge in the picture.
+
+  **The whole catalogue is the file** (phase E1, 2026-09-03 — Joe: "make a new
+  mat as YAML-only as a new dice set is now"). C4 shipped the editor beside
+  ELEVEN mats that lived in a literal in `js/main.js`, which meant the section
+  had two kinds of row in it and said so on every surface: shipped rows drawn
+  read-only with "a shipped felt lives in js/main.js — Clone it to edit", a
+  collision refusal so a declared `taproom` could not shadow the code's, a
+  shipped-tile guard in the cache bust, and three hand-kept id lists that
+  `tests/felt-ids.test.mjs` existed to keep in agreement. E1 moved the eleven
+  into `felts:` — rows, comments and all — and every one of those went with
+  them:
+  - `js/main.js` `FELT_THEMES` starts EMPTY and `installFelts(DECLARED.felts)`
+    fills it IN PLACE (the `installCatalogue` move, one catalogue over), above
+    `floorGeo`, which is the first line in the file that reads a row. The cache
+    bust became a PRUNE — the tile key (`${cloth}|${base}` then; `feltTileKey`
+    since E2) fully determines a PAINTED cloth's canvas, so a row returned to
+    needs no bust and what a bust is for is dropping the keys no row wears any
+    more. E2's image cloth is the one row where the key does not decide the
+    canvas — it is painted flat while the fetch is in flight — and that is the
+    bust `onFeltImage` still does.
+  - `server.js` reads its wire list off the tree it already parsed
+    (`syncFeltIds`, through the one `setDeclaration`), still filtered by
+    `ASSET_ID_RE`; `js/portable.js` holds no list at all and is handed one by
+    `declareFelts`. A reader that is never told refuses every `felt:` line and
+    says which question it could not answer — under Node that is the test's job,
+    exactly as installing `houses:` is.
+  - the panel: **every row is editable**, which is the sets editor's first
+    difference arriving one editor late, and **Remove is for the rows you
+    author** — `devFeltRemovable` is `devSetRemovable`'s rule, and a declared
+    mat leaves by having its lines deleted. `devFelts()` answers `inFile` and
+    `removable` where it used to answer `shipped`. Editable rows mean fields
+    that can MOVE, so the section marks the moved FIELD, not the row, and
+    each one carries its own ↺ (the E1 review, 2026-09-03: the header read
+    "· 1 changed" over six rows that all said nothing had).
+  - **"in the file" means in the file NOW**, on both editors. `SHIPPED` is a
+    boot snapshot, so the row this session just SAVED through the armed route
+    is one dice.yaml carries and `tune.rowIsDeclared` does not know about
+    until the next reload. `devRowSaved` — the ledger `devSetInFile` already
+    kept — is filled from the route's own applied-paths list and read by
+    `devFeltInFile` too, so Remove refuses the mat you just saved, Add will
+    not redefine it whole, and the player's swatch picker grows its chip at
+    the moment of the Save rather than one boot later.
+  - `tests/felts-catalogue.test.mjs` pins the deleted literal ONCE and compares
+    the file to it field for field and in id order (the picker draws in the
+    file's order); `tests/felt-ids.test.mjs` reads the declaration and now
+    guards that no file grew a literal back, plus the four cloth mirrors, which
+    did not move.
+
+  What shipped in phase 2, and the four places it touches:
   - `js/tune.js` grew `ASSET_SECTIONS`, `ASSET_ROWS` (a section's ROW SHAPE,
     as dials — so `felts.<id>.cloth` type-checks and enum-checks through the
     same `tune.set` a dial does), `ASSET_ID_RE`, and `addRow` / `removeRow` /
@@ -1025,24 +1151,24 @@ recipe's defaults fill the rest. A row's two-state fields are enums
   - `js/dice-apply-core.js`'s `dialFor` resolves an asset path through the row
     shape, so the apply TOOL and the armed Save ROUTE accept a felt row with
     no second idea of what a legal value is.
-  - `js/main.js` `feltThemesSync()` merges `T.felts` into `FELT_THEMES` before
-    the first `renderFeltSwatches`, busts exactly the tile-cache keys that
-    left or changed (never one a shipped row is using), hands the ids down to
-    `js/portable.js` (`declareFelts`), refuses a collision with a shipped id
-    with one console line, and falls the table back when the felt it is
-    wearing is removed. `server.js` does its half from the tree it parsed
-    (`DECLARED_FELTS`, refilled by the one `setDeclaration`) — **filtered by
-    `ASSET_ID_RE`, the same law the browser drops a row by**, or the wire
-    would accept a room felt no client can resolve (the C4 review,
-    2026-09-03: the inverse of `tests/felt-ids.test.mjs`'s failure).
-    The PLAYER's swatch picker draws only rows the catalogue can defend —
-    shipped ids and ids the FILE declares — because a chip's click is
-    `selectFelt`, which POSTs the room setting; a row minted this session
-    reaches the table through the panel's Apply and through Save + reload.
-  - the panel's `felts` section: a picker over every felt, a form built from
-    the row shape, Clone / Apply to table / Remove, and a 140 ms debounce on a
-    dragged field (a felt apply redraws a 1024px tile, the gloss map and the
-    whole mottle attribute — sixty of those a second is not a slider).
+  - `js/main.js` `installFelts()` (C4's `feltThemesSync`) fills `FELT_THEMES`
+    from `T.felts` before the first `renderFeltSwatches`, prunes the tile-cache
+    keys no row wears any more, hands the ids down to `js/portable.js`
+    (`declareFelts`), and falls the table back when the felt it is wearing is
+    removed. `server.js` does its half from the tree it parsed (`syncFeltIds`,
+    refilled by the one `setDeclaration`) — **filtered by `ASSET_ID_RE`, the
+    same law the browser drops a row by**, or the wire would accept a room felt
+    no client can resolve (the C4 review, 2026-09-03: the inverse of
+    `tests/felt-ids.test.mjs`'s failure).
+    The PLAYER's swatch picker draws only rows the catalogue can defend — the
+    ids the FILE declares — because a chip's click is `selectFelt`, which POSTs
+    the room setting; a row minted this session reaches the table through the
+    panel's Apply and through Save + reload.
+  - the panel's `felts` section: a picker over every felt the file declares
+    plus any row this session minted, a form built from the row shape, Clone /
+    Apply to table / Remove, and a 140 ms debounce on a dragged field (a felt
+    apply redraws a 1024px tile, the gloss map and the whole mottle attribute —
+    sixty of those a second is not a slider).
   Two things a reader should not have to discover: **Apply to table is
   LOCAL** (it wears the felt on this tab and never sends the room setting —
   a felt only this checkout declares is one nobody else could resolve, and
@@ -1059,7 +1185,7 @@ recipe's defaults fill the rest. A row's two-state fields are enums
   either, for the same reason nothing else can write one leaf at a time:
   `felts.<id>.cloth` for an id neither tree has is refused `unknown`, and for
   a row that was REMOVED it is refused `row` — one field may not put back
-  half of a row, or `feltThemesSync` would guess the other five out of the
+  half of a row, or `installFelts` would guess the other five out of the
   row defaults. A field of a row this session minted DOES land (that is how
   the editor's own sliders write), and the preview says so, because the
   preview must list exactly what Apply will do. Clone is the verb that makes
@@ -1135,8 +1261,9 @@ recipe's defaults fill the rest. A row's two-state fields are enums
     silently dropped by reconciliation, every recipe enum's options are
     compared against the keys the code actually defines (their modules import
     three.js, so their sources are read), and `SET_IDS` is pinned in order.
-  The FELT rows have not moved: `FELT_THEMES` is still in main.js and a
-  `felts:` row is still a house addition.
+  The FELT rows followed on the same day (phase E1, above): `felts:` in
+  dice.yaml is the mat catalogue, `installFelts` is `installCatalogue` one
+  catalogue over, and `tests/felts-catalogue.test.mjs` is its drift guard.
 - **THE DICE LAB RETIRED 2026-09-03** (phase D3), and this is the list of what
   went with it. `lab.html`, `js/lab.js`, `tools/lab-shots.mjs`,
   `tools/geo-bench-shots.mjs`, the `lab-geo-bench` e2e scenario (its tag `lab`

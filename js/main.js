@@ -92,7 +92,7 @@ import {
   IMPACT_VOICES, IMPACT_DEFAULT_BODY,
   IMPACT_SOFT_STRENGTH, IMPACT_SOFT_CENTRE, IMPACT_SOFT_LENGTH,
   CLUNK_VOICES, VENUE_AUDIO, bedAirHz,
-  CLOTH_VOICES, CLOTH_DEFAULT, clothVoiceFor, settleTail, TAP_A0_FRAC,
+  CLOTH_VOICES, CLOTH_DEFAULT, CLOTH_DIALS, clothVoiceFor, settleTail, TAP_A0_FRAC,
   BED_PINK, BED_BROWN, BED_CRACKLE, BED_TICK_SHAPE, BED_SWELL,
   BED_FADE_S, BED_VOICE_S, DUCK_DB, DUCK_ATTACK_S, DUCK_RECOVER_TAU,
   // MASTER_GAIN is NOT imported here any more: `sound.master` in dice.yaml is
@@ -306,16 +306,24 @@ const devSetLive = { timer: null, ids: new Set(), all: false };
 // 2026-09-03, in the first look at this section.
 let devSetFocus = null;
 // THE ROWS THIS TAB HAS ALREADY WRITTEN INTO THE CHECKOUT'S dice.yaml, dotted
-// (`houses.house.dice.ivory-2`). Up here with the rest of the sets editor's
-// state and for the same reason, and filled by the armed Save route
-// (`devWriteSave`), which is thirteen hundred lines above the editor that
-// reads it — a `const` beside that editor would be behind the route in source
-// order, and the route is a function anything can call. What it is FOR is
-// `devSetInFile`: after a Save the file declares the row and the server
-// accepts it on the wire, while this tab's `SHIPPED` — a boot-time snapshot —
-// still does not know that, and a gate that asked only SHIPPED would refuse
-// the set you just saved until you reloaded.
-const devSetSaved = new Set();
+// (`houses.house.dice.ivory-2`, `felts.house-moss`). Up here with the rest of
+// the sets editor's state and for the same reason, and filled by the armed
+// Save route (`devWriteSave`), which is thirteen hundred lines above the
+// editors that read it — a `const` beside one of them would be behind the
+// route in source order, and the route is a function anything can call. What
+// it is FOR is `devSetInFile` and `devFeltInFile`: after a Save the file
+// declares the row and the server accepts it on the wire, while this tab's
+// `SHIPPED` — a boot-time snapshot — still does not know that, and a gate that
+// asked only SHIPPED would refuse the set you just saved until you reloaded.
+//
+// BOTH EDITORS READ IT, since the E1 review (2026-09-03). It held `houses.`
+// rows alone and the felts side asked `tune.rowIsDeclared` on its own, so in
+// the window between an armed Save and a reload the panel would still Remove a
+// mat dice.yaml now declares: the row left `T.felts` and `FELT_THEMES` while
+// the file carried it, and `tune.reset` could not put it back, because SHIPPED
+// has no such row. One ledger, two readers, and the same sentence stays true —
+// a row the FILE declares stays.
+const devRowSaved = new Set();
 
 // ONE IIFE for both, because the mint can fail and the failure has to be able
 // to choose the lobby: mintRoomKey throws rather than fall back to Math.random
@@ -2184,11 +2192,12 @@ function moodMotesDown() {
 // and off the tree — a clock is not a value anyone declares. `on: true`
 // became `state: enabled | disabled` (no leaf is a boolean, DEVMODE rev 3).
 //
-// `depth` is NOT in the tree, on purpose: it is the CLOTH's number, pushed by
-// applyFeltTheme (obsidian, the default felt, pushes 1.5 at boot), so a dial
-// for it would read "changed" on every fresh tab and a Save would write the
-// felt's value over the file's. It becomes `felts.<id>.breath` when the felt
-// rows migrate into the declaration (DEVMODE phase 3).
+// `depth` is NOT in the tree at THIS path, on purpose: it is the CLOTH's
+// number, pushed by applyFeltTheme (obsidian, the default felt, pushes 1.5 at
+// boot), so a dial for it here would read "changed" on every fresh tab and a
+// Save would write the worn felt's value over the file's. It is in the tree at
+// `felts.<id>.breath` since phase E1 (2026-09-03), which is where it belongs:
+// one number per mat, declared beside the colour it goes with.
 const BREATH = Object.assign(alias(T.light.breath, {
   state: 'state',             // device-local; __diceDebug.breath(false) and the reduced-motion path
   dur: 'dur',                 // seconds, each way
@@ -2202,9 +2211,10 @@ const BREATH = Object.assign(alias(T.light.breath, {
   target: 0,         // where it is heading
   // How far this CLOTH takes the beat, 0..~1.6. PUSHED by applyFeltTheme, not
   // read from FELT_THEMES, because FELT_THEMES is declared thousands of lines
-  // below and applyMood runs during module evaluation — the same TDZ that
-  // makes MOOD.moteHost pushed state rather than a lookup. 1 is the shipped
-  // beat and the value a theme gets by saying nothing.
+  // below — and filled from `felts:` a thousand further down still — while
+  // applyMood runs during module evaluation: the same TDZ that makes
+  // MOOD.moteHost pushed state rather than a lookup. 1 is the shipped beat and
+  // the value a mat gets by saying nothing.
   depth: 1,
 });
 tune.bind('light.breath.*', () => applyMoodLights());
@@ -2440,62 +2450,32 @@ const DECAL_CAP_PER_ROLL = 6;     // drama, not mud
 // The theme id is room state (settings.felt); the 2D gold/ivory UI palette
 // never changes.
 //
-// `breath` is HOW FAR THIS CLOTH TAKES THE DECLARE BEAT (Joe, 2026-08-29), a
-// multiplier on BREATH's dials; absent means 1, the shipped beat. It exists
-// because one setting was measured wrong across the range: the beat drops
-// ambient to ~49%, which on `sand` reads as the room stepping back and on
-// `obsidian` moves about 14 levels of RGB, since half of near-black is still
-// near-black. The rule is simply that a darker cloth has less light to lose,
-// so it must lose a larger fraction of it. Ordered by how dark the base is.
-const FELT_THEMES = {
-  emerald:  { name: 'Emerald',  feltBase: '#1f3128', sceneBg: '#191512', breath: 1.35 },
-  crimson:  { name: 'Crimson',  feltBase: '#46201e', sceneBg: '#1a1211', breath: 1.15 },
-  midnight: { name: 'Midnight', feltBase: '#1e2a3f', sceneBg: '#121520', breath: 1.35 },
-  slate:    { name: 'Slate',    feltBase: '#2c3438', sceneBg: '#161a1c', breath: 1.25 },
-  walnut:   { name: 'Walnut',   feltBase: '#402e1c', sceneBg: '#1b1410', breath: 1.15 },
-  // The exploration batch (2026-07): more of the palette than green/brown —
-  // near-black stone, cold deep teal, wine-dark purple, and one LIGHT table
-  // (dice and gold chrome read differently on it by design).
-  obsidian: { name: 'Obsidian', feltBase: '#1c1c24', sceneBg: '#0f0f13', breath: 1.5 },
-  ocean:    { name: 'Ocean',    feltBase: '#16404a', sceneBg: '#0f181c', breath: 1.3 },
-  plum:     { name: 'Plum',     feltBase: '#3b2342', sceneBg: '#160f18', breath: 1.3 },
-  // The one light table: it needs the LEAST, and a full-strength beat here
-  // takes it somewhere the other eight never go.
-  sand:     { name: 'Sand',     feltBase: '#7c6a4d', sceneBg: '#211a11', breath: 0.8 },
-  // THE FIRST MAT THAT IS NOT FELT (Joe's own seed). `cloth` names its
-  // painter; every row above omits it and gets DEFAULT_CLOTH, so the nine
-  // that shipped are untouched by construction. Stage one is look only —
-  // the physics that makes sand DEADEN a throw is a separate, priced piece.
-  //
-  // `mottle` 0.45: the felt's nap catches light unevenly across the whole
-  // table, but a raked bed is smoothed flat on purpose, so the same field at
-  // full strength reads as damp patches rather than as nap.
-  silt:     { name: 'Silt',     feltBase: '#a2977f', sceneBg: '#1a1712',
-              breath: 0.85, cloth: 'silt', mottle: 0.45 },
-  // THE HARD SURFACE, and the register's other end: every row above swallows
-  // a die and this one hands it back. `mottle` 0.6 because a waxed board
-  // catches light unevenly along its length, but far less than a nap does.
-  taproom:  { name: 'Taproom',  feltBase: '#544530', sceneBg: '#191310',
-              breath: 1.1, cloth: 'oak', mottle: 0.6 },
-};
-// THE ROWS THIS BUILD SHIPS, before the declaration adds any (docs/DEVMODE.md
-// §9, phase C4). `FELT_THEMES` is no longer a closed object: `feltThemesSync`
-// merges every row under `felts:` in dice.yaml — and every row developer mode
-// mints this session — into it, and takes them out again on Shut. This list
-// is what "shipped" means for the felt catalogue: a declared id that collides
-// with one of these is refused and the shipped row stands, the swatch picker
-// draws these as read-only, and the fallback when a declared felt is removed
-// out from under the table lands here.
-const FELT_SHIPPED_IDS = Object.freeze(Object.keys(FELT_THEMES));
+// AND THE ROWS THEMSELVES ARE THE FILE'S NOW (phase E1, 2026-09-03). Joe:
+// "make a new mat as YAML-only as a new dice set is now" — so the eleven-row
+// literal that stood here moved WHOLE into `felts:` in dice.yaml, comments and
+// all, and this object is EMPTY until `installFelts` fills it in place a few
+// hundred lines below. It is the `installCatalogue` move one catalogue over,
+// and for the same reason: every closure in this file captured this object, so
+// filling it in place is what lets the migration change where the rows come
+// from without touching a single reader.
+//
+// WHICH MEANS THERE IS NO LONGER A "SHIPPED" HALF AND A "DECLARED" HALF. C4's
+// `FELT_SHIPPED_IDS`, its collision refusal and its shipped-tile guard were all
+// answers to a catalogue that lived in two places at once; there is one place
+// now, so they are gone. What survives is the distinction the sets editor uses
+// (js/main.js `devSetRemovable`): a row the FILE declares may be edited but not
+// removed from the panel — deleting its lines in dice.yaml is how a mat leaves
+// — and a row this session minted is the panel's to take away again.
+const FELT_THEMES = {};
 const DEFAULT_FELT = 'obsidian';
 let currentFeltId = DEFAULT_FELT;
-// The DEFAULT cloth never passes through applyFeltTheme — boot assigns the id
-// directly — so its beat depth has to be pushed here or the shipped table is
-// the one theme running the beat at the wrong strength. (Obsidian is the
-// default AND the darkest, so it is exactly the row that needs 1.5.) The
-// lights are re-applied because MOOD is already up by this line.
-BREATH.depth = FELT_THEMES[DEFAULT_FELT].breath ?? 1;
-applyMoodLights();
+// HOW MANY TIMES THE CATALOGUE HAS BEEN INSTALLED (phase E2). `installFelts`
+// bumps it, and the audio tier's memo (`surfaceGround`) keys on it beside the
+// venue and the felt: since a ROW may carry its own `sound:`, "the same felt
+// id" is no longer enough to mean "the same voice". Declared here rather than
+// beside its reader because `installFelts` runs at module eval, hundreds of
+// lines above the audio section.
+let feltRevision = 0;
 
 // Current merged room settings — initialized HERE, not next to
 // applyRoomSettings below, because setSound()'s module-eval call chain
@@ -2591,10 +2571,20 @@ const FELT_REPEAT = 160 / FELT_TILE_U;   // tiles across the plane
 // chip from `feltTileCanvas(...).toDataURL()`, so a swatch has always shown the
 // real tile rather than a paint chip. It only needed the cloth threaded
 // through with the colour.
+//
+// …AND SINCE PHASE E2 (2026-09-03) ONE OF THE PAINTERS TAKES ITS PICTURE FROM
+// THE FILE. `image` is not a fourth cloth in the sense the other three are: it
+// is the seam that lets a mat be authored WITHOUT writing a painter, which is
+// what Joe asked for ("make a new mat as YAML-only as a new dice set is now").
+// The row names a `texture:` under `models/` and a `tile:`; everything after
+// the draw — the tint, the mottle, the gloss, the fog — is the same pipeline
+// the painted cloths ride, because the only thing that changed is where the
+// ink in the tile came from.
 const FELT_CLOTHS = {
   felt: paintFeltCloth,
   silt: paintSiltCloth,
   oak: paintOakCloth,
+  image: paintImageCloth,
 };
 const DEFAULT_CLOTH = 'felt';
 
@@ -2667,25 +2657,160 @@ const FELT_GLOSS = {
   // surface here that genuinely has glossy and dull regions — and the one that
   // can carry the lowest `mid` without reading wet.
   oak: { mid: 0.89, swing: 0.110 },
+  // AN IMAGE SAYS NOTHING ABOUT HOW IT ANSWERS THE LAMP (phase E2,
+  // 2026-09-03) — a linen weave and a slate slab can be the same PNG at two
+  // tints — so `image` starts where wool does, the reference every other row
+  // here was measured against, and the row's own `gloss:` group in dice.yaml
+  // is where a mat says otherwise. Same conservative default as its voice
+  // (js/voices.js CLOTH_VOICES.image) and for the same reason.
+  image: { mid: 0.91, swing: 0.110 },
 };
 // 1.25 world units a texel, against lobes 40-106 units across — the field is
 // low-frequency by nature, so this is oversampling it about thirtyfold.
 const FELT_GLOSS_PX = 128;
 
+// A MAT'S PICTURE, FETCHED ONCE (phase E2, 2026-09-03). Keyed by PATH and not
+// by row: two mats at two tints over one linen are one download, and a row
+// whose path is being typed into the panel a character at a time must not
+// re-fetch what it already has.
+//
+// THREE STATES AND NO FOURTH. `pending` is the honest answer while the fetch
+// is in flight — the mat stands on its flat `feltBase` and the table is
+// usable — `ready` repaints it, and `failed` LEAVES the flat colour standing
+// and logs exactly one line naming the path. None of the three throws and
+// none of them blocks the table: a mat is chrome, and a chrome asset that can
+// take the app down with a typo in a YAML string is the wrong trade. (The
+// same rule js/towerglb.js applies to a tower that will not load.)
+const feltImages = new Map();
+let feltFloorReady = false;        // …the floor mesh exists; see `onFeltImage`
+function feltImage(path) {
+  let rec = feltImages.get(path);
+  if (rec) return rec;
+  rec = { path, state: 'pending', img: null };
+  feltImages.set(path, rec);
+  const img = new Image();
+  img.decoding = 'async';
+  img.addEventListener('load', () => {
+    rec.state = 'ready';
+    rec.img = img;
+    onFeltImage(path);
+  });
+  img.addEventListener('error', () => {
+    rec.state = 'failed';
+    console.warn(`[felts] texture "${path}" did not load — the mat keeps its flat feltBase. `
+      + 'A texture path is served from this origin under models/, so check the file is there.');
+    onFeltImage(path);
+  });
+  img.src = path;
+  return rec;
+}
+
+// WHAT A LANDED (OR REFUSED) IMAGE HAS TO MOVE. The tile cache exists so a mat
+// returned to is byte-identical, and its key fully determines the canvas —
+// which is exactly why an image landing has to BUST it: the canvas under that
+// key was painted flat while the fetch was in flight, and nothing else would
+// ever ask for it again.
+//
+// The swatch chips go with it, because a chip is the same tile at 64px, and
+// `feltSwatchSig` carries the load state for that reason.
+//
+// GUARDED ON THE FLOOR EXISTING. This runs from an image event, which cannot
+// fire before the module finishes evaluating — but `recompositeFelt` reaches
+// `floorTexture` and `floorGeo`, which are `const`s several hundred lines
+// below this one, and a ReferenceError inside an event listener is the silent
+// kind. The flag says what is true instead of relying on what is likely.
+function onFeltImage(path) {
+  for (const row of Object.values(FELT_THEMES)) {
+    if (row.cloth === 'image' && row.texture === path) feltTileCache.delete(feltTileKey(row));
+  }
+  if (!feltFloorReady) return;
+  const worn = FELT_THEMES[currentFeltId];
+  if (worn && worn.cloth === 'image' && worn.texture === path) recompositeFelt();
+  renderFeltSwatches();
+}
+
+// THE CACHE KEY IS EVERYTHING THAT DECIDES THE CANVAS, which for a painted
+// cloth is the painter and the colour (the grain is seeded from the colour)
+// and for an image cloth is those plus the picture and how big it is drawn.
+// Before E2 this was `${cloth}|${base}` in two places; a mat whose texture
+// path moved would have kept the previous picture's canvas, which is the same
+// bug the cloth half of the key was added to fix.
+function feltTileKey(row) {
+  const cloth = FELT_CLOTHS[row.cloth] ? row.cloth : DEFAULT_CLOTH;
+  if (cloth !== 'image') return `${cloth}|${row.feltBase}`;
+  return `image|${row.feltBase}|${row.texture || ''}|${feltTileReps(row)}`;
+}
+
+// HOW MANY REPEATS OF THE PICTURE FIT ACROSS ONE TILE, and it is a whole
+// number on purpose. The canvas tile is the thing that repeats on the floor —
+// FELT_TILE_PX over FELT_TILE_U world units, wrapped FELT_REPEAT times across
+// the plane — so an image repeat that did not divide it would put a visible
+// half-repeat seam every five units, in a grid, across the one surface the
+// camera looks at edge-on. So the row's `tile` (world units per repeat) is
+// honoured to the nearest whole division of the tile, and a row asking for
+// more than five units a repeat gets one repeat per tile, which is the
+// coarsest this floor can express without a second texture. The panel's dial
+// stops at both of those ends for that reason (js/tune.js `tile`).
+//
+// AND BOUNDED AT THE FINE END TOO (the E2 review, 2026-09-03). The dial's
+// floor is 0.25 — twenty repeats, a 51px cell out of a 256px picture — but
+// dice.yaml is a file a person edits, and `tile: 0.001` is 5,000 repeats and
+// 25 million `drawImage` calls inside one repaint: a tab that stops
+// answering, off one typo, in the same breath as the audio caps two files
+// over. 32 is past anything the picture can still be read at.
+const FELT_MAX_REPS = 32;
+function feltTileReps(row) {
+  const span = Number.isFinite(row.tile) && row.tile > 0 ? row.tile : FELT_TILE_U;
+  return Math.min(FELT_MAX_REPS, Math.max(1, Math.round(FELT_TILE_U / span)));
+}
+
+// A MAT FROM A FILE. The picture supplies the STRUCTURE and `feltBase`
+// supplies the COLOUR — `multiply`, so the row's own hex is the tint and the
+// swatch and the mottle seed all go on meaning the same thing. That is what
+// keeps this cloth inside the pipeline the other three ride: gloss, mottle
+// and the fog all read `feltBase`, and none of them learns that the ink under
+// it came from a PNG.
+//
+// A greyscale weave near white is what a texture for this slot wants to be
+// (models/mats/linen.png is one): multiply can only ever darken, so a picture
+// carrying its own colour would be a second opinion about the hue and a
+// picture carrying its own darkness would black the mat out.
+//
+// Flat until it lands, and flat forever if it never does — `onFeltImage`
+// above is what turns a landing into a repaint.
+function paintImageCloth(ctx, rnd, base, row) {
+  const path = (row && row.texture) || '';
+  if (!path) return;
+  const rec = feltImage(path);
+  if (rec.state !== 'ready') return;
+  const reps = feltTileReps(row || {});
+  const cell = FELT_TILE_PX / reps;
+  for (let gy = 0; gy < reps; gy++) {
+    for (let gx = 0; gx < reps; gx++) ctx.drawImage(rec.img, gx * cell, gy * cell, cell, cell);
+  }
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, FELT_TILE_PX, FELT_TILE_PX);
+  ctx.globalCompositeOperation = 'source-over';
+}
+
 // Keyed by cloth AND colour: two cloths at one hex are two different tiles,
-// and before the key grew they would have silently traded canvases.
+// and before the key grew they would have silently traded canvases. It takes
+// the whole ROW since E2, because an image cloth's canvas is decided by three
+// more of its fields (`feltTileKey`).
 const feltTileCache = new Map();
-function feltTileCanvas(base, cloth = DEFAULT_CLOTH) {
-  const key = `${cloth}|${base}`;
+function feltTileCanvas(row) {
+  const key = feltTileKey(row);
   let c = feltTileCache.get(key);
   if (c) return c;
+  const base = row.feltBase;
   c = document.createElement('canvas');
   c.width = c.height = FELT_TILE_PX;
   const ctx = c.getContext('2d');
   const rnd = mulberry32(feltSeed(base));
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, FELT_TILE_PX, FELT_TILE_PX);
-  (FELT_CLOTHS[cloth] || paintFeltCloth)(ctx, rnd, base);
+  (FELT_CLOTHS[row.cloth] || paintFeltCloth)(ctx, rnd, base, row);
   feltTileCache.set(key, c);
   return c;
 }
@@ -3137,8 +3262,9 @@ glossTexture.anisotropy = 4;
 // ABOVE its reader: this file has paid for that ordering twice.
 const GLOSS = { paints: 0, swingScale: 1 };
 
-function paintGloss(base, cloth = DEFAULT_CLOTH) {
-  const g = FELT_GLOSS[cloth] || FELT_GLOSS[DEFAULT_CLOTH];
+function paintGloss(row) {
+  const base = row.feltBase;
+  const g = feltSurfaceOf(row).gloss;
   const lobes = mottleLobes(base);
   const ctx = glossCanvas.getContext('2d');
   const im = ctx.createImageData(FELT_GLOSS_PX, FELT_GLOSS_PX);
@@ -3160,9 +3286,188 @@ function paintGloss(base, cloth = DEFAULT_CLOTH) {
   return g;
 }
 
+// ---------------------------------------------------------------------------
+// THE FELT CATALOGUE IS THE DECLARATION'S (docs/DEVMODE.md §9, phase E1)
+// ---------------------------------------------------------------------------
+//
+// EVERY MAT IS A ROW UNDER `felts:` IN dice.yaml, and there is no second list.
+// C4 made a felt the first asset the FILE could author, beside eleven the code
+// held; E1 finished the move (Joe, 2026-09-03: "make a new mat as YAML-only as
+// a new dice set is now"), so the eleven are rows like any other and this
+// function is the whole integration: it fills `FELT_THEMES` in place from the
+// declared tree, and the picker, `applyFeltTheme`, `recompositeFelt` and the
+// swatch chips learn nothing about where a row came from.
+//
+// IN PLACE, AND BEFORE THE IDS ARE COMPUTED. Both halves are DEVMODE §9's
+// rules and both have a recorded reason. In place, because every closure in
+// this file captured the object (`installCatalogue` is the same move for the
+// dice catalogue). Before, because "today `registerSet` runs after, and a
+// critic found a registered set invisible in the picker and rejected on the
+// wire" — so the boot call sits HERE, above `floorGeo`, which is the first
+// line in this file that reads a row. It hands the ids down to js/portable.js
+// in the same breath (a rack carrying a felt the file declares must not be
+// refused at its own line); server.js does its half from the tree it parsed.
+//
+// THE TILE CACHE IS PRUNED TO WHAT IS WORN. The cache is keyed by
+// `feltTileKey(row)` — the painter and the colour for a painted cloth, plus
+// the picture and its repeat count for an image one — and for a painted cloth
+// that key fully determines the canvas (the grain is seeded from the colour),
+// so a row returned to is byte-identical and needs no bust at all. An IMAGE
+// row is the one exception, and it is deliberate: its canvas is painted FLAT
+// while the fetch is in flight and the key cannot say so, which is precisely
+// what `onFeltImage` busts. What a bust is otherwise for is the OTHER
+// direction: a colour slider
+// dragged at 60 Hz mints a 1024px canvas per stop, and a row that left takes
+// its canvas with it. So every install drops the keys no row wears any more,
+// and never a key another row still does.
+const FELT_ROW_DEFAULTS = Object.freeze(assetRowDefaults('felts'));
+
+// One declared row → the shape `FELT_THEMES` rows have. js/tune.js already
+// type-checked every field against the row's dials (ASSET_ROWS.felts) and
+// `felts:` is a FILLED section, so every field of a row out of `rowsOf` is
+// present and legal; the `??` fallbacks are for the one caller that can hand
+// over a partial row, which is a hand-written `devFeltAdd` from the console.
+//
+// …EXCEPT `gloss` AND `sound`, WHICH STAY ABSENT WHEN THEY ARE ABSENT (phase
+// E2, 2026-09-03). They are SPARSE groups inside a filled row (js/tune.js
+// `sparse`) because their defaults are not written in dice.yaml at all: they
+// are the CLOTH's own rows, and which one applies depends on this row's
+// `cloth`. Copying them across with a `??` would answer the question the
+// resolver below exists to answer, and would answer it wrong for silt and oak.
+function feltRowOf(row) {
+  const d = FELT_ROW_DEFAULTS;
+  const out = {
+    name: String(row.name ?? d.name),
+    cloth: FELT_CLOTHS[row.cloth] ? row.cloth : d.cloth,
+    feltBase: String(row.feltBase ?? d.feltBase),
+    sceneBg: String(row.sceneBg ?? d.sceneBg),
+    breath: Number.isFinite(row.breath) ? row.breath : d.breath,
+    mottle: Number.isFinite(row.mottle) ? row.mottle : d.mottle,
+    texture: String(row.texture ?? d.texture),
+    tile: Number.isFinite(row.tile) && row.tile > 0 ? row.tile : d.tile,
+  };
+  if (row.gloss && typeof row.gloss === 'object') out.gloss = { ...row.gloss };
+  if (row.sound && typeof row.sound === 'object') out.sound = { ...row.sound };
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// THE ONE PLACE A CLOTH'S SURFACE IS RESOLVED (phase E2, 2026-09-03)
+// ---------------------------------------------------------------------------
+//
+// A CLOTH USED TO BE A KEY INTO THREE REGISTRIES. `FELT_CLOTHS[cloth]` painted
+// it, `FELT_GLOSS[cloth]` said how it answered the lamp, `CLOTH_VOICES[cloth]`
+// said what a die sounded like landing on it — three lookups in three places,
+// each with its own `|| …[DEFAULT_CLOTH]` fallback, and tests/felt-ids.test.mjs
+// grew a mirror per registry to keep them from drifting apart.
+//
+// AFTER E2 A ROW MAY OVERRIDE ANY OF IT, which is the difference between "a
+// mat is a colour over one of three surfaces" and Joe's ask: "make a new mat
+// as YAML-only as a new dice set is now." A row that names `gloss:` or
+// `sound:` moves those numbers for ITS mat and for no other mat wearing the
+// same painter. So the registries stay exactly what they were — the PAINTER's
+// defaults, with all their measurement written down beside them — and this
+// function is the only place the two halves meet. Every reader goes through
+// it: `paintGloss`, `clothVoice`, `clothAudioInfo`, and the panel's readout.
+//
+// THE SOUND HERE IS THE MAT'S OWN, UNCOVERED. `clothVoiceFor` owns the rule
+// that a venue lays its floor over the mat and the cloth then says nothing
+// (js/voices.js §4b); this readout is about the CLOTH, so it asks that
+// function with the table's own venue and lets `clothVoice()` below apply the
+// covering rule at the one call site where the venue is known. Reading the
+// venue here would also be a boot-order bug: `paintGloss` runs several hundred
+// lines above `venueAudioId`.
+function feltSurfaceOf(row, id = null) {
+  const cloth = FELT_CLOTHS[row.cloth] ? row.cloth : DEFAULT_CLOTH;
+  const base = FELT_GLOSS[cloth] || FELT_GLOSS[DEFAULT_CLOTH];
+  const over = row.gloss && typeof row.gloss === 'object' ? row.gloss : null;
+  const gloss = { ...base };
+  if (over) {
+    if (Number.isFinite(over.mid)) gloss.mid = Math.max(0, Math.min(1, over.mid));
+    if (Number.isFinite(over.swing)) gloss.swing = over.swing;
+  }
+  const texture = cloth === 'image' ? (row.texture || '') : '';
+  const rec = texture ? feltImages.get(texture) : null;
+  return {
+    id, cloth, texture,
+    tile: cloth === 'image' ? FELT_TILE_U / feltTileReps(row) : FELT_TILE_U,
+    gloss,
+    sound: clothVoiceFor('table', cloth, row.sound || null),
+    // `none` is not a failure: it is what every painted cloth says, and what
+    // an image row says while its `texture` is still an empty string.
+    loaded: !texture ? 'none' : rec ? rec.state : 'pending',
+  };
+}
+function feltSurface(id = currentFeltId) {
+  return feltSurfaceOf(FELT_THEMES[id] || feltRowOf({}), id);
+}
+
+// `repaint` false at boot only: the first `renderFeltSwatches` has not run
+// yet, and repainting a table that has not been built is a crash looking for
+// a place to happen.
+function installFelts({ repaint = true } = {}) {
+  const rows = tune.rowsOf('felts');
+  const before = new Set(Object.values(FELT_THEMES).map(feltTileKey));
+  for (const id of Object.keys(FELT_THEMES)) delete FELT_THEMES[id];
+  for (const [id, row] of Object.entries(rows)) {
+    if (!row || typeof row !== 'object') continue;
+    FELT_THEMES[id] = feltRowOf(row);
+  }
+  const worn = new Set(Object.values(FELT_THEMES).map(feltTileKey));
+  for (const key of before) if (!worn.has(key)) feltTileCache.delete(key);
+  declareFelts(Object.keys(FELT_THEMES));
+  // A ROW'S `sound:` IS PART OF THE COMPOSED SURFACE TIER, which is memoized
+  // on the ids that used to decide it (`surfaceGround`). Since E2 the ROW
+  // decides it too, so an edit to `sound.tail` on the mat under the dice would
+  // have gone unheard until the venue or the felt changed. This is the one
+  // function every felt edit passes through, so the catalogue's revision is
+  // bumped here and the memo keys on it.
+  feltRevision++;
+  if (!repaint) return;
+  if (!FELT_THEMES[currentFeltId]) {
+    // The table was standing on a row that just went away. Back to the room's
+    // own felt, or the default when the room's is the one that left.
+    applyFeltTheme(FELT_THEMES[roomSettings.felt] ? roomSettings.felt : DEFAULT_FELT);
+  } else if (Object.prototype.hasOwnProperty.call(rows, currentFeltId)) {
+    // A live edit to the felt the table is wearing: the whole apply, because
+    // `breath` is pushed into BREATH and `sceneBg` into the scene and the fog,
+    // and half of them would leave the room disagreeing with the cloth.
+    applyFeltTheme(currentFeltId);
+  } else {
+    renderFeltSwatches();
+  }
+}
+
+tune.bind('felts.*', () => installFelts());
+installFelts({ repaint: false });
+
+// THE ROW THE TABLE IS BUILT FROM, read once. Four lines below need it — the
+// tile canvas, the mottle, the gloss and the beat — and `DEFAULT_FELT` never
+// passes through `applyFeltTheme`, because boot assigns the id directly.
+//
+// AND IT IS READ DEFENSIVELY, which it did not have to be while the eleven
+// were a literal in this file. A declaration is a file a person edits: delete
+// obsidian's lines and `FELT_THEMES[DEFAULT_FELT].feltBase` is a TypeError
+// during module evaluation, which stops main.js mid-file and leaves
+// `__diceDebug` standing with half its getters unreachable — with NOTHING in
+// the console, because a module-eval throw is not a console.error (measured
+// 2026-09-02, the C4 integration). One warning and the row defaults is the
+// answer this file already gives everywhere else a row can go missing.
+const bootFelt = FELT_THEMES[DEFAULT_FELT] || feltRowOf({});
+if (!FELT_THEMES[DEFAULT_FELT]) {
+  console.warn(`[felts] dice.yaml declares no '${DEFAULT_FELT}' row — the table boots on the row `
+    + 'defaults. Put it back, or move DEFAULT_FELT to a mat the file has.');
+}
+// The beat's depth is PUSHED for this cloth (see BREATH.depth for why pushed
+// and not read) or the shipped table is the one theme running the beat at the
+// wrong strength — obsidian is the default AND the darkest, so it is exactly
+// the row that needs 1.5. The lights are re-applied because MOOD is already
+// up by this line.
+BREATH.depth = bootFelt.breath ?? 1;
+applyMoodLights();
+
 const floorGeo = new THREE.PlaneGeometry(160, 160, FELT_SEGMENTS, FELT_SEGMENTS);
-const floorTexture = new THREE.CanvasTexture(
-  feltTileCanvas(FELT_THEMES[DEFAULT_FELT].feltBase, FELT_THEMES[DEFAULT_FELT].cloth));
+const floorTexture = new THREE.CanvasTexture(feltTileCanvas(bootFelt));
 floorTexture.colorSpace = THREE.SRGBColorSpace;
 floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
 floorTexture.repeat.set(FELT_REPEAT, FELT_REPEAT);
@@ -3174,8 +3479,8 @@ floorTexture.repeat.set(FELT_REPEAT, FELT_REPEAT);
 // that there is real structure in the tile for it to keep.
 floorTexture.anisotropy = 4;
 
-feltMottle(floorGeo, FELT_THEMES[DEFAULT_FELT].feltBase, FELT_THEMES[DEFAULT_FELT].mottle);
-paintGloss(FELT_THEMES[DEFAULT_FELT].feltBase, FELT_THEMES[DEFAULT_FELT].cloth);
+feltMottle(floorGeo, bootFelt.feltBase, bootFelt.mottle);
+paintGloss(bootFelt);
 
 const floor = new THREE.Mesh(
   floorGeo,
@@ -3194,6 +3499,11 @@ const floor = new THREE.Mesh(
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
+// …and from here an image landing may repaint the table (`onFeltImage`). The
+// flag is the guard, not a comment: this floor's texture and geometry are
+// `const`s, and a reference to one from an image event that arrived early
+// would be a ReferenceError inside a listener, which is the silent kind.
+feltFloorReady = true;
 
 // Repaint the cloth for a new base colour. Swaps the tile image and the
 // mottle field in place — the texture object and the geometry both outlive
@@ -3219,7 +3529,7 @@ function applyFloorOverride(ov) {
   if (!ov) {
     m.roughness = FLOOR_SHIPPED.roughness;
     const t = FELT_THEMES[currentFeltId];
-    if (GLOSS.swingScale !== 1) { GLOSS.swingScale = 1; paintGloss(t.feltBase, t.cloth); }
+    if (GLOSS.swingScale !== 1) { GLOSS.swingScale = 1; paintGloss(t); }
     feltMottle(floorGeo, t.feltBase, t.mottle);
     floorGeo.attributes.color.needsUpdate = true;
     return;
@@ -3231,7 +3541,7 @@ function applyFloorOverride(ov) {
   if (typeof ov.glossSwing === 'number') {
     GLOSS.swingScale = ov.glossSwing;
     const t = FELT_THEMES[currentFeltId];
-    paintGloss(t.feltBase, t.cloth);
+    paintGloss(t);
   }
   // The mottle is the field the gloss sits beside, so being able to turn it
   // off is what makes "the gloss is a companion, not the new dominant
@@ -3245,13 +3555,13 @@ function applyFloorOverride(ov) {
 
 function recompositeFelt() {
   const theme = FELT_THEMES[currentFeltId];
-  floorTexture.image = feltTileCanvas(theme.feltBase, theme.cloth);
+  floorTexture.image = feltTileCanvas(theme);
   floorTexture.needsUpdate = true;
   // THE THIRD MUTATION. A cloth swapped without this leaves the whole table
   // repainted and still wearing the previous cloth's gloss — invisible in any
   // single frame, which is why `felt-gloss` sweeps four themes and back and
   // asserts the digest returns to where it started.
-  paintGloss(theme.feltBase, theme.cloth);
+  paintGloss(theme);
   feltMottle(floorGeo, theme.feltBase, theme.mottle);
   floorGeo.attributes.color.needsUpdate = true;
 }
@@ -3276,104 +3586,6 @@ function applyFeltTheme(id) {
   renderFeltSwatches(); // keep the settings-modal selection mirrored
   return true;
 }
-
-// ---------------------------------------------------------------------------
-// THE DECLARATION'S OWN FELTS (docs/DEVMODE.md §9, phase C4)
-// ---------------------------------------------------------------------------
-//
-// A FELT IS THE FIRST ASSET THE FILE CAN AUTHOR. Every row under `felts:` in
-// dice.yaml — and every row developer mode's editor mints in this tab — is
-// merged into `FELT_THEMES` here, which is the whole integration: the picker
-// draws from that object, `applyFeltTheme` reads from it, `recompositeFelt`
-// paints from it, and none of them learn a thing about where a row came from.
-//
-// MERGED BEFORE THE IDS ARE COMPUTED, which is DEVMODE §9's own rule and the
-// reason it is a rule: "today `registerSet` runs after, and a critic found a
-// registered set invisible in the picker and rejected on the wire". So this
-// runs at module eval, before the first `renderFeltSwatches`, and it hands
-// the ids down to js/portable.js in the same breath (the rack's felt enum is
-// a hand-kept literal there — see `declareFelts` — and a rack carrying a felt
-// the file declares must not be refused at its own line). server.js does its
-// half from the tree it already parsed.
-//
-// A COLLIDING ID IS REFUSED AND THE SHIPPED ROW STANDS. `taproom` in the file
-// cannot quietly become a different mat than the `taproom` a scenario, a
-// golden and eleven months of screenshots mean; ids carry a house prefix
-// precisely so this never comes up, and the console line is for the day it
-// does.
-//
-// THE TILE CACHE IS BUSTED FOR EXACTLY WHAT LEFT OR CHANGED, and never for a
-// key a shipped row is using: the cache is keyed `${cloth}|${base}`, so a
-// house felt that happens to name obsidian's hex and cloth shares obsidian's
-// canvas — dropping it would make the default felt repaint for nothing.
-const FELT_SHIPPED_TILES = new Set(FELT_SHIPPED_IDS.map(
-  (id) => `${FELT_THEMES[id].cloth || DEFAULT_CLOTH}|${FELT_THEMES[id].feltBase}`));
-const feltTileKey = (row) => `${row.cloth || DEFAULT_CLOTH}|${row.feltBase}`;
-// The row shape js/tune.js declares (ASSET_ROWS.felts), as plain defaults.
-const FELT_ROW_DEFAULTS = Object.freeze(assetRowDefaults('felts'));
-
-// One declared row → the shape `FELT_THEMES` rows have. js/tune.js already
-// type-checked every field against the row's dials (ASSET_ROWS.felts), so
-// this is a copy and not a second validator; the `??` fallbacks are for the
-// one caller that can hand over a partial row, which is a hand-written
-// `devFeltAdd` from the console.
-function feltRowOf(row) {
-  const d = FELT_ROW_DEFAULTS;
-  return {
-    name: String(row.name ?? d.name),
-    cloth: FELT_CLOTHS[row.cloth] ? row.cloth : d.cloth,
-    feltBase: String(row.feltBase ?? d.feltBase),
-    sceneBg: String(row.sceneBg ?? d.sceneBg),
-    breath: Number.isFinite(row.breath) ? row.breath : d.breath,
-    mottle: Number.isFinite(row.mottle) ? row.mottle : d.mottle,
-  };
-}
-
-// `repaint` false at boot only: the first `renderFeltSwatches` has not run
-// yet, and repainting a table that has not been built is a crash looking for
-// a place to happen.
-function feltThemesSync({ repaint = true } = {}) {
-  const rows = tune.rowsOf('felts');
-  // Out with the rows this build no longer declares (Shut, Remove, a reset).
-  for (const id of Object.keys(FELT_THEMES)) {
-    if (FELT_SHIPPED_IDS.includes(id)) continue;
-    const key = feltTileKey(FELT_THEMES[id]);
-    if (!FELT_SHIPPED_TILES.has(key)) feltTileCache.delete(key);
-    delete FELT_THEMES[id];
-  }
-  for (const [id, row] of Object.entries(rows)) {
-    if (FELT_SHIPPED_IDS.includes(id)) {
-      console.warn(`[felts] declared felt id '${id}' is one this build ships; the shipped row stands. `
-        + 'Give a house row its own id (docs/DEVMODE.md §9).');
-      continue;
-    }
-    if (!row || typeof row !== 'object') continue;
-    FELT_THEMES[id] = feltRowOf(row);
-    const key = feltTileKey(FELT_THEMES[id]);
-    // The row's colour or cloth may have moved since the tile was drawn, and
-    // the cache is what makes a theme returned to byte-identical — so an
-    // EDITED row has to lose its canvas or the felt would repaint itself
-    // right back to the colour it had.
-    if (!FELT_SHIPPED_TILES.has(key)) feltTileCache.delete(key);
-  }
-  declareFelts(Object.keys(FELT_THEMES).filter((id) => !FELT_SHIPPED_IDS.includes(id)));
-  if (!repaint) return;
-  if (!FELT_THEMES[currentFeltId]) {
-    // The table was standing on a row that just went away. Back to the room's
-    // own felt, or the default when the room's is the one that left.
-    applyFeltTheme(FELT_THEMES[roomSettings.felt] ? roomSettings.felt : DEFAULT_FELT);
-  } else if (Object.prototype.hasOwnProperty.call(rows, currentFeltId)) {
-    // A live edit to the felt the table is wearing: the whole apply, because
-    // `breath` is pushed into BREATH and `sceneBg` into the scene and the fog,
-    // and half of them would leave the room disagreeing with the cloth.
-    applyFeltTheme(currentFeltId);
-  } else {
-    renderFeltSwatches();
-  }
-}
-
-tune.bind('felts.*', () => feltThemesSync());
-feltThemesSync({ repaint: false });
 
 // ---------------------------------------------------------------------------
 // Physics world
@@ -4278,7 +4490,17 @@ function clothId() {
   const t = FELT_THEMES[currentFeltId];
   return (t && t.cloth) || CLOTH_DEFAULT;
 }
-function clothVoice() { return clothVoiceFor(venueAudioId(), clothId()); }
+// …AND SINCE PHASE E2 THE ROW MAY SPEAK OVER THE PAINTER (2026-09-03). A mat
+// declares `sound:` in dice.yaml and those numbers override the cloth's, field
+// by field — which is what makes an image mat voiceable at all, since a
+// picture says nothing about what a die sounds like landing on it. The
+// overrides go INTO `clothVoiceFor` rather than being merged here, so the one
+// function that owns the covering rule owns it for both halves: a row's
+// `sound:` under a glade is as covered as the cloth it modifies.
+function clothVoice() {
+  const t = FELT_THEMES[currentFeltId];
+  return clothVoiceFor(venueAudioId(), clothId(), (t && t.sound) || null);
+}
 
 // The two tiers composed, memoized on the pair that decides them — the
 // rolling layer asks per die per frame, and neither id changes inside a frame.
@@ -4287,7 +4509,10 @@ function clothVoice() { return clothVoiceFor(venueAudioId(), clothId()); }
 // shape `impactVoicingFor` publishes exactly what it published before.
 let surfaceGroundCache = { key: null, row: GROUND_NEUTRAL };
 function surfaceGround() {
-  const key = venueAudioId() + '|' + clothId();
+  // `feltRevision` and not just the ids: a row carries its own `sound:` now,
+  // so two throws at one felt id can want two different voices — the second
+  // after somebody moved `sound.tail` in the panel. `installFelts` bumps it.
+  const key = venueAudioId() + '|' + clothId() + '|' + currentFeltId + '|' + feltRevision;
   if (surfaceGroundCache.key !== key) {
     const g = venueAudio().ground;
     const c = clothVoice();
@@ -17603,20 +17828,28 @@ window.__diceDebug = {
   devSlot(slot) { return devSlotApply(slot); },
   devFlip() { return devFlip(); },
   devAbInfo() { return devAbInfo(); },
-  // THE FELTS (DEVMODE §9, phase 2). `devFelts()` is the READOUT — zero-arg,
-  // answers on any tab, and lists every felt this build has with `shipped`
-  // (it lives in js/main.js), `inFile` (dice.yaml declares it) and `current`
-  // (the table is wearing it). The four writers take an argument, so P7's
-  // zero-arg sweep leaves them alone, and each answers null with the door
-  // shut, in production, or while the film is locked:
+  // THE FELTS (DEVMODE §9, phases 2 and E1). `devFelts()` is the READOUT —
+  // zero-arg, answers on any tab, and lists every felt this build has with
+  // `inFile` (dice.yaml declares it), `removable` (this session minted it, so
+  // Remove may take it) and `current` (the table is wearing it). The four
+  // writers take an argument, so P7's zero-arg sweep leaves them alone, and
+  // each answers null with the door shut, in production, or while the film is
+  // locked:
   //   devFeltAdd(id, row?) mints a house row, devFeltSet(id, patch) moves its
-  //   fields, devFeltRemove(id) drops it, devFeltApply(id) wears it on THIS
-  //   tab (never the wire — see devFeltApply for why).
+  //   fields (any row's — the catalogue is the file, so every row is
+  //   editable), devFeltRemove(id) drops one this session made, and
+  //   devFeltApply(id) wears it on THIS tab (never the wire — see
+  //   devFeltApply for why). devFeltSurface(id) is the RESOLVED surface,
+  //   which is a different question from the row: see devFeltSurfaceValue.
   devFelts() { return devFeltsValue(); },
   devFeltAdd(id, row) { return devFeltAdd(id, row); },
   devFeltSet(id, patch) { return devFeltSet(id, patch); },
   devFeltRemove(id) { return devFeltRemove(id); },
   devFeltApply(id) { return devFeltApply(id); },
+  // …and the READOUT E2 added: the cloth's registries merged with the row's
+  // own `gloss:` and `sound:`, plus whether an image mat's picture has landed
+  // (`loaded`: none | pending | ready | failed).
+  devFeltSurface(id) { return devFeltSurfaceValue(id); },
   // THE SETS (DEVMODE §9, phase D2). `devSets()` is the READOUT — zero-arg,
   // answers on any tab, and says what the catalogue holds (`houses`, `sets`),
   // what THIS viewer wears (`current`), what a venue is staging over it
@@ -17955,7 +18188,11 @@ window.__diceDebug = {
     const g = surfaceGround();
     const live = rollVoices.find((v) => v && v.target > 0) || null;
     return {
-      id, venue: venueAudioId(), label: c.label,
+      // `felt` is the MAT and `id` the cloth it is made of, and since phase E2
+      // they are two answers: a row carries its own `sound:` over the
+      // painter's, so `declared` below is the resolved voice of THIS mat and
+      // not of every mat sharing its painter.
+      id, felt: currentFeltId, venue: venueAudioId(), label: c.label,
       covered: venueAudioId() !== 'table' && id !== 'felt',
       declared: { ...c },
       // The composed surface tier — venue × cloth — as the impacts and the
@@ -26891,7 +27128,7 @@ async function devWriteSave(changes) {
   // server's own `changes` list is what is believed here — it validated and
   // applied them — falling back to what was posted only if an older route
   // answered without one.
-  devSetsSaved(Array.isArray(body.changes)
+  devRowsSaved(Array.isArray(body.changes)
     ? body.changes.map((c) => c && c.path)
     : Object.keys(patch));
   return { ...body, held, dropped };
@@ -27062,24 +27299,76 @@ function devPanelSync() {
 // look at it on the table, Save writes it into dice.yaml, and the next boot
 // has a felt in the picker that no line of code knows about.
 //
-// EVERY ROW IN THIS TAB, shipped and declared alike, so the picker can offer
-// the eleven main.js ships as things to CLONE. `shipped` is the read-only
-// mark (a row that lives in code is not this panel's to write); `inFile` says
-// the declaration already carries it, which is the difference between "Save
-// will add this row" and "Save will amend it".
+// EVERY ROW IN THIS TAB, and since phase E1 they are all the same kind of
+// thing: rows in dice.yaml. `inFile` says the declaration already carries this
+// one, which is the difference between "Save will add this row" and "Save will
+// amend it"; `removable` is the sets editor's rule at the felts editor's door
+// (`devSetRemovable`) — a declared row may be EDITED here and taken away only
+// by deleting its lines in the file, while a row this session minted is the
+// panel's to drop. The old `shipped` mark went with the literal it described:
+// there is no felt that lives in the code any more.
+// The six sound dials, in js/voices.js's own order — the readouts below hand
+// back exactly those, so a `label` (which belongs to the CLOTH) never reads as
+// something the row set.
+const pickKeys = (obj, keys) => Object.fromEntries(keys.map((k) => [k, obj[k]]));
+
+// …AND SINCE PHASE E2 A ROW CARRIES A SURFACE (2026-09-03). `gloss` and
+// `sound` are SPARSE groups: absent means the painter's own row, so the row
+// reports what it DECLARES (null where it says nothing) and `defaults` reports
+// what the cloth would answer. The panel needs both to draw a faint default in
+// an empty field, and telling them apart is the whole of what makes "this mat
+// is quieter than oak" a thing somebody can see they said.
 function devFeltsValue() {
-  return Object.entries(FELT_THEMES).map(([id, t]) => ({
-    id,
-    name: t.name,
-    cloth: t.cloth || DEFAULT_CLOTH,
-    feltBase: t.feltBase,
-    sceneBg: t.sceneBg,
-    breath: t.breath ?? FELT_ROW_DEFAULTS.breath,
-    mottle: t.mottle ?? FELT_ROW_DEFAULTS.mottle,
-    shipped: FELT_SHIPPED_IDS.includes(id),
-    inFile: tune.rowIsDeclared('felts', id),
-    current: id === currentFeltId,
-  }));
+  return Object.entries(FELT_THEMES).map(([id, t]) => {
+    const s = feltSurfaceOf(t, id);
+    return {
+      id,
+      name: t.name,
+      cloth: t.cloth || DEFAULT_CLOTH,
+      feltBase: t.feltBase,
+      sceneBg: t.sceneBg,
+      breath: t.breath ?? FELT_ROW_DEFAULTS.breath,
+      mottle: t.mottle ?? FELT_ROW_DEFAULTS.mottle,
+      texture: t.texture ?? FELT_ROW_DEFAULTS.texture,
+      tile: t.tile ?? FELT_ROW_DEFAULTS.tile,
+      gloss: t.gloss ? { ...t.gloss } : null,
+      sound: t.sound ? { ...t.sound } : null,
+      defaults: {
+        gloss: { ...(FELT_GLOSS[s.cloth] || FELT_GLOSS[DEFAULT_CLOTH]) },
+        sound: pickKeys(CLOTH_VOICES[s.cloth] || CLOTH_VOICES[CLOTH_DEFAULT], CLOTH_DIALS),
+      },
+      loaded: s.loaded,
+      inFile: devFeltInFile(id),
+      removable: devFeltRemovable(id),
+      current: id === currentFeltId,
+    };
+  });
+}
+// THE RESOLVED SURFACE, WHICH IS THE ANSWER NO OTHER READOUT GIVES (DEVMODE
+// §9, phase E2). `devFelts()` says what the ROW declares and
+// `clothAudioInfo()` says what the composed audio tier is doing; this says
+// what the two registries and the row came to between them — the merge that
+// `paintGloss` and `clothVoice` actually read — plus whether the picture has
+// arrived, which is the one piece of state on this surface that is neither in
+// the file nor in the code.
+//
+// Zero-arg safe (P7): with no id it answers about the mat on the table.
+function devFeltSurfaceValue(id) {
+  const at = typeof id === 'string' && id ? id : currentFeltId;
+  if (!FELT_THEMES[at]) return null;
+  const s = feltSurface(at);
+  return {
+    id: at, cloth: s.cloth, texture: s.texture, tile: s.tile,
+    gloss: { ...s.gloss },
+    sound: pickKeys(s.sound, CLOTH_DIALS),
+    loaded: s.loaded,
+    // What the cloth would have said on its own, so a reader can see which
+    // half of the merge each number came from.
+    painter: {
+      gloss: { ...(FELT_GLOSS[s.cloth] || FELT_GLOSS[DEFAULT_CLOTH]) },
+      sound: pickKeys(CLOTH_VOICES[s.cloth] || CLOTH_VOICES[CLOTH_DEFAULT], CLOTH_DIALS),
+    },
+  };
 }
 
 // THE GATE THE FOUR WRITERS SHARE, and `null` is the only thing that comes
@@ -27087,19 +27376,43 @@ function devFeltsValue() {
 // locked. Locked matters here for a reason that is not the usual one — a felt
 // is ROOM state and a row only this checkout declares is one a second viewer
 // could not resolve, so a locked table must not be shown a cloth nobody else
-// has. (Every other refusal — a shipped id, a dotted id, a field that is not
+// has. (Every other refusal — a declared id, a dotted id, a field that is not
 // a field — comes back as a REPORT naming it, not as null: see devFeltAdd.)
 function devFeltGate() {
   return devOn() && !devProduction() && devState.film !== 'locked';
 }
 
+// DOES dice.yaml DECLARE THIS MAT? The felts half of `devSetInFile`, and it is
+// a function for the same second reason: `SHIPPED` is the declaration as it
+// stood AT BOOT, while the armed Save route patches the checkout and the
+// server re-reads it, so from the moment Save answers ok the file carries the
+// row — and the ledger is where this tab learns that before its next reload.
+// (The E1 review, 2026-09-03: without the second clause the panel would still
+// Remove a mat the file now declares, and `tune.reset` could not put it back.)
+function devFeltInFile(id) {
+  return typeof id === 'string'
+    && (tune.rowIsDeclared('felts', id) || devRowSaved.has(`felts.${id}`));
+}
+
+// WHOSE ROW REMOVE MAY TAKE, and it is the sets editor's answer word for word
+// (`devSetRemovable`, phase D2): a row dice.yaml declares stays. `taproom` is
+// what a golden, a scenario and eleven months of screenshots resolve, and a
+// catalogue that can lose one of those to a stray click is one click from a
+// table wearing a cloth nobody else has. Deleting its lines in the file is how
+// a declared mat leaves; what Remove is for is the rows this editor made.
+function devFeltRemovable(id) {
+  return typeof id === 'string' && !devFeltInFile(id);
+}
+
 function devFeltAdd(id, row) {
   if (!devFeltGate()) return null;
-  // A SHIPPED ID IS REFUSED BY NAME, not silently: `feltThemesSync` would drop
-  // the row on the very next merge anyway (the shipped row stands — `taproom`
-  // in a file may not quietly become a different mat than the `taproom` a
-  // golden means), and refusing at the door is the version that says so.
-  if (typeof id !== 'string' || FELT_SHIPPED_IDS.includes(id)) {
+  // A ROW THE FILE ALREADY DECLARES IS REFUSED BY NAME, not silently
+  // overwritten: `tune.addRow` writes a row WHOLE, so an Add at `taproom`
+  // would quietly redefine the mat a golden means, and the fields a caller
+  // left out would arrive as row defaults. Edit it (`devFeltSet`) or Clone it.
+  // `devFeltInFile`, not `rowIsDeclared`, so a row this session already SAVED
+  // is protected the same way the eleven are — it is in the file now.
+  if (typeof id !== 'string' || devFeltInFile(id)) {
     return { id, refused: [[`felts.${id}`, 'shipped']], felts: devFeltsValue() };
   }
   const r = tune.addRow('felts', id, row || {});
@@ -27115,8 +27428,16 @@ function devFeltSet(id, patch) {
   return { id, refused: r.refused, felts: devFeltsValue() };
 }
 
+// Drop a row this editor made. A declared row is refused BY NAME rather than
+// silently ignored — see devFeltRemovable for why it stays. (Before phase E1
+// this needed no gate: a shipped mat was not in `T.felts` at all, so
+// `tune.removeRow` answered `unknown` and the refusal was an accident of where
+// the rows lived. They live in the file now, so the rule has to be said.)
 function devFeltRemove(id) {
   if (!devFeltGate()) return null;
+  if (!devFeltRemovable(id)) {
+    return { id, refused: [[`felts.${id}`, 'shipped']], felts: devFeltsValue() };
+  }
   const r = tune.removeRow('felts', id);
   return { id, refused: r.refused, felts: devFeltsValue() };
 }
@@ -27331,7 +27652,7 @@ function devSetLiveFlush() {
     refreshDieArt();
     renderDiceSetPicker();
   }
-  // THE VIEWER'S OWN CHOICE MAY NOT OUTLIVE THE ROW (`feltThemesSync`'s rule,
+  // THE VIEWER'S OWN CHOICE MAY NOT OUTLIVE THE ROW (`installFelts`'s rule,
   // and here it matters more): `diceSet` rides every roll this tab throws, and
   // the server refuses a set no dice.yaml declares — so a set removed, or
   // reset away by Shut, while the viewer was wearing it would leave the ROLL
@@ -27384,26 +27705,38 @@ function devSetInFile(id) {
   const at = devSetSplit(id);
   if (!at) return false;
   return tune.rowIsDeclared(['houses', at.house, 'dice'], at.set)
-    || devSetSaved.has(`houses.${at.house}.dice.${at.set}`);
+    || devRowSaved.has(`houses.${at.house}.dice.${at.set}`);
 }
 // The same question about a HOUSE — the browsing category, which a Clone mints
 // alongside its first set and Save writes with it. Only the readout draws it;
 // nothing gates on it, since a house is not an id the wire ever carries.
 function devHouseInFile(id) {
-  return tune.rowIsDeclared('houses', id) || devSetSaved.has(`houses.${id}`);
+  return tune.rowIsDeclared('houses', id) || devRowSaved.has(`houses.${id}`);
 }
 
 // The armed Save route landed: every path it wrote is in the file now, so the
 // asset ROWS those paths belong to are declared. Called from `devWriteSave`
 // with the server's own list of what it applied — its answer, not this tab's
-// hope, because the route validates every change before it patches. Both row
-// depths under `houses:` are recorded — a house is two segments and a set is
-// four — so the two predicates above read the same ledger.
-function devSetsSaved(paths) {
+// hope, because the route validates every change before it patches.
+// `assetRowPath` answers the DEEPEST row a path belongs to and nothing else,
+// so a house (two segments), a set (four) and a felt (two) are all recorded by
+// the same walk, and each predicate above reads its own section out of it.
+function devRowsSaved(paths) {
+  let felts = false;
   for (const p of paths || []) {
     const row = assetRowPath(String(p).split('.'));
-    if (row && row[0] === 'houses' && (row.length === 2 || row.length === 4)) devSetSaved.add(row.join('.'));
+    if (!row) continue;
+    const at = row.join('.');
+    if (row[0] === 'felts' && !devRowSaved.has(at)) felts = true;
+    devRowSaved.add(at);
   }
+  // …AND THE PLAYER'S PICKER LEARNS IT WITHOUT A RELOAD (the E1 review,
+  // 2026-09-03). `feltInPicker` is the FILE's answer, so a mat that just
+  // became declared has earned its chip — and until this line it got one only
+  // on the next boot, which is the same one-reload lag the sets editor's Use
+  // at table was fixed for. The swatch signature decides whether anything is
+  // actually redrawn, so a Save that carried no felt row costs nothing.
+  if (felts) renderFeltSwatches();
   devPanelSync();
 }
 
@@ -29744,15 +30077,20 @@ function applyRoomSettings(settings) {
 // table — felt unchanged", which is a false cause, and the chip stayed
 // clickable after the film locked, when every panel verb is correctly null. A
 // session row reaches the table through the panel's Apply and through Save +
-// reload, which is what `devFeltApply`'s own comment says. So: shipped rows
-// and rows the FILE declares get a chip; a row this session invented does not,
-// until it is saved. (The signature drops it too, or the picker would rebuild
-// on a change it does not draw.)
+// reload, which is what `devFeltApply`'s own comment says. So: the rows the
+// FILE declares get a chip; a row this session invented does not, until it is
+// saved. (The signature drops it too, or the picker would rebuild on a change
+// it does not draw.) Phase E1 made that one clause instead of two — with the
+// eleven now declared like everything else, "shipped" and "in the file" are
+// the same answer — and the E1 review made it `devFeltInFile`, so "saved"
+// means saved NOW: the chip arrives when the armed route answers ok, not one
+// reload later, which is the same lag the sets editor's Use at table was fixed
+// for.
 // Both hoist, for the reason spelled out above: the first call lands during
 // module evaluation, and a `const` arrow here is a dead-zone throw that stops
 // main.js mid-file with no console error.
 function feltInPicker(id) {
-  return FELT_SHIPPED_IDS.includes(id) || tune.rowIsDeclared('felts', id);
+  return devFeltInFile(id);
 }
 function feltSwatchIds() {
   return Object.keys(FELT_THEMES).filter(feltInPicker);
@@ -29760,7 +30098,13 @@ function feltSwatchIds() {
 function feltSwatchSig() {
   return feltSwatchIds().map((id) => {
     const t = FELT_THEMES[id];
-    return [id, t.name, t.feltBase, t.cloth || DEFAULT_CLOTH].join('|');
+    // THE LOAD STATE IS PART OF THE SIGNATURE (phase E2). A chip is the mat's
+    // own tile at 64px, so an image row's chip is drawn FLAT while its picture
+    // is in flight; without this the picker would keep that flat chip for the
+    // life of the tab, because nothing else about the row moved when the
+    // image landed.
+    const s = feltSurfaceOf(t, id);
+    return [id, t.name, t.feltBase, s.cloth, s.texture, s.tile, s.loaded].join('|');
   }).join('/');
 }
 function renderFeltSwatches() {
@@ -29779,7 +30123,7 @@ function renderFeltSwatches() {
       // The swatch shows the CLOTH, not a paint chip: the same grain tile
       // the table itself wears (the felt exploration deserves to be seen
       // in the picker, not guessed from a flat dot).
-      dot.style.backgroundImage = `url(${feltTileCanvas(theme.feltBase, theme.cloth).toDataURL()})`;
+      dot.style.backgroundImage = `url(${feltTileCanvas(theme).toDataURL()})`;
       dot.style.backgroundSize = '64px 64px';
       const nm = document.createElement('span');
       nm.textContent = theme.name;

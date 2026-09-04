@@ -81,7 +81,8 @@ import {
   BED_PINK, BED_BROWN, BED_CRACKLE, BED_TICK_SHAPE, BED_SWELL,
   PINK_BUFFER_RMS, BROWN_BUFFER_RMS, MATERIAL_BOUNDARY_HZ,
   impactSpectrum, bedProfile, bedDistance, biquadMag,
-  CLOTH_VOICES, CLOTH_DEFAULT, clothVoiceFor, settleTail, TAP_E, TAP_T0, TAP_MAX,
+  CLOTH_VOICES, CLOTH_DEFAULT, CLOTH_DIALS, clothVoiceFor, settleTail, TAP_E, TAP_T0, TAP_MAX,
+  TAP_RATIO_MAX, CLOTH_TAIL_MAX, CLOTH_FIZZ_MAX, TAP_FLOOR_FRAC,
 } from '../js/voices.js';
 // THE SET REGISTRY ITSELF, because the kill is the ABSENCE of a field on one
 // row and nothing in js/voices.js can see that. `SETS` and not `THEMES`: it is
@@ -868,6 +869,121 @@ t('oak HANDS THE DIE BACK — the register\'s other end', () => {
   assert.ok(oak.grind > 1 && oak.centre > 1, 'and so is the scrape');
   assert.ok(silt.centre < 1 && silt.grind > 1,
     'while grain still disagrees with itself, which is what makes it grain');
+});
+
+// ---------------------------------------------------------------------------
+// 4c. A MAT MAY SPEAK OVER ITS PAINTER (the mats arc, phase E2, 2026-09-03)
+// ---------------------------------------------------------------------------
+//
+// A felt row in dice.yaml may carry its own `sound:` group, which is what
+// makes `cloth: image` voiceable at all — a picture says nothing about what a
+// die sounds like landing on it, so the row is the only place that can. The
+// merge is HERE and not at the call site so that the one function owning the
+// covering rule owns it for the overrides too.
+
+t('a row\'s sound overrides the painter field by field, and silence inherits', () => {
+  const felt = CLOTH_VOICES.felt;
+  // NOTHING NAMED IS THE PAINTER, BY IDENTITY. This is the byte-for-byte claim
+  // the whole of E2 rests on: every mat that shipped before it names no
+  // `sound:`, so every one of them hands back the same object it always did.
+  assert.equal(clothVoiceFor('table', 'silt', null), CLOTH_VOICES.silt);
+  assert.equal(clothVoiceFor('table', 'silt', {}), CLOTH_VOICES.silt);
+  assert.equal(clothVoiceFor('table', 'oak', { nope: 3 }), CLOTH_VOICES.oak,
+    'a key that is not a dial moves nothing');
+  // One field of six is one field: the row takes the tail and inherits the
+  // rest, which is what lets a mat say the one thing it disagrees about.
+  const tuned = clothVoiceFor('table', 'felt', { tail: 1.3 });
+  assert.equal(tuned.tail, 1.3);
+  for (const k of CLOTH_DIALS) if (k !== 'tail') assert.equal(tuned[k], felt[k], `${k} is still the painter's`);
+  assert.equal(tuned.label, felt.label, 'a row does not rename the cloth it is made of');
+  assert.ok(settleTail(tuned).length > settleTail(felt).length, 'and the longer tail is really longer');
+  // A NON-NUMBER IS NOT AN OVERRIDE. The declaration is type-checked upstream,
+  // but this function is also reachable from a console hook, and a row is not
+  // the place to discover NaN.
+  for (const bad of ['1.2', null, NaN, Infinity, undefined]) {
+    assert.equal(clothVoiceFor('table', 'felt', { tail: bad }), felt, `${String(bad)} is not a tail`);
+  }
+  // §5's MIX PLAN IS A CEILING and the cap is enforced here, not by a slider:
+  // the 0.35 impact clamp is applied outside this multiply, so a hand-edited
+  // `gain: 1.4` would lift a landing straight through it.
+  assert.equal(clothVoiceFor('table', 'felt', { gain: 1.4 }).gain, 1);
+  assert.equal(clothVoiceFor('table', 'felt', { gain: -1 }).gain, 0);
+  assert.equal(clothVoiceFor('table', 'felt', { gain: 0.6 }).gain, 0.6);
+  // …AND A COVERED CLOTH'S ROW IS COVERED TOO. A venue lays one disc over the
+  // mat, so in a glade the dice are not on that cloth — and a `sound:` group
+  // under a mat you cannot see would voice a die landing in moss as if the
+  // moss were that mat.
+  assert.equal(clothVoiceFor('moonrise', 'silt', { tail: 1.9 }), CLOTH_VOICES.felt);
+});
+
+// THE TWO CEILINGS THE E2 REVIEW FOUND MISSING (2026-09-03). `gain` was
+// capped above with the reasoning "a cap that only the panel's range knew
+// about would be no cap at all against a hand-edited dice.yaml" — and `tail`,
+// which has the louder failure of the two, had none.
+t('a row may not turn the settle tail into a crescendo', () => {
+  // THE ARITHMETIC, so the cap is a number with a reason and not a taste.
+  // `settleTail` walks `ratio^k`; at ratio 1 the taps stop decaying and past
+  // it they GROW. Measured before the clamp, at the dial's own maximum of
+  // 2.5: sixteen taps, the last of them 2.079 — twice the first tap and about
+  // 1.04x the landing impact itself — over 2.01 s of "tail". A hand-edited
+  // 99 gave a gain of 1.9e24 into a GainNode and taps scheduled 1.7e23
+  // seconds out.
+  assert.ok(TAP_E * CLOTH_TAIL_MAX <= TAP_RATIO_MAX, 'the cap holds the ratio under one');
+  assert.ok(CLOTH_TAIL_MAX < 1 / TAP_E, '…which is what "under one" means in tails');
+  for (const asked of [CLOTH_TAIL_MAX, 2.5, 3, 99, Number.MAX_SAFE_INTEGER]) {
+    const v = clothVoiceFor('table', 'felt', { tail: asked });
+    assert.ok(v.tail <= CLOTH_TAIL_MAX, `tail ${asked} came back as ${v.tail}`);
+    const taps = settleTail(v);
+    assert.ok(taps.length <= TAP_MAX, 'the cluster is still bounded');
+    for (let k = 1; k < taps.length; k++) {
+      assert.ok(taps[k].decay < taps[k - 1].decay,
+        `tap ${k} of a tail asked for at ${asked} is quieter than the one before it`);
+    }
+    assert.ok(taps[taps.length - 1].decay <= 1, 'and no tap is ever louder than the first');
+  }
+  assert.equal(clothVoiceFor('table', 'felt', { tail: -3 }).tail, 0,
+    'a negative tail would alternate sign and schedule taps backwards in time');
+  assert.equal(clothVoiceFor('table', 'felt', { tail: 1.25 }).tail, 1.25, 'and a real one is untouched');
+  // …AND `settleTail` HOLDS ITS OWN SENTENCE. Every call site reaches it
+  // through `clothVoiceFor`, but the function says "ends at the floor" and a
+  // reader is entitled to that for whatever it is handed.
+  const wild = settleTail({ tail: 400 });
+  assert.ok(wild.length <= TAP_MAX);
+  assert.ok(wild[wild.length - 1].decay <= 1, 'no growing walk, even from a direct call');
+  assert.deepEqual(settleTail({ tail: 0 }).map((x) => x.decay), settleTail(CLOTH_VOICES.felt).map((x) => x.decay),
+    'and 0 has always read as "this row says nothing about its tail" — the `|| 1` fallback, unchanged');
+  // The shipped cloths are nowhere near it, which is what makes this a
+  // guardrail rather than a change: oak is the longest tail in the file.
+  const longest = Math.max(...Object.values(CLOTH_VOICES).map((c) => c.tail));
+  assert.ok(TAP_E * longest < TAP_RATIO_MAX * 0.75, `the longest shipped tail is ${longest} — well inside`);
+  assert.ok(settleTail(CLOTH_VOICES.oak).length < TAP_MAX,
+    'and it still ends at the 1% floor rather than at the cap');
+  assert.ok(settleTail(CLOTH_VOICES.oak).at(-1).decay >= TAP_FLOOR_FRAC);
+});
+
+t('and fizz is a fraction of a modulation that exists', () => {
+  // js/main.js's grind is `… * (1 - cloth.fizz)`, so a row at 5 is not "very
+  // smothered": it is the AM turned inside out and four times deeper than it
+  // started. At 1 the face-clack is gone entirely, which is as far as the
+  // sentence "grain gets between the die and the surface" goes.
+  assert.equal(clothVoiceFor('table', 'felt', { fizz: 5 }).fizz, CLOTH_FIZZ_MAX);
+  assert.equal(clothVoiceFor('table', 'felt', { fizz: -2 }).fizz, 0);
+  assert.equal(clothVoiceFor('table', 'felt', { fizz: 0.75 }).fizz, 0.75);
+  assert.ok(CLOTH_FIZZ_MAX < 1, 'something of the clack always survives');
+});
+
+t('the image cloth is voiced by its row, and its painter says the least it can', () => {
+  // A picture is not a material: a linen weave and a slate slab can be the
+  // same PNG at two tints. So the painter's own row is the REFERENCE row —
+  // identical to felt's — and a mat that wants to sound like anything says so
+  // in dice.yaml. Same conservative default as the unknown-cloth fallback, and
+  // for the same reason: silent about sound rather than wrong about it.
+  const img = CLOTH_VOICES.image;
+  assert.ok(img, 'js/main.js FELT_CLOTHS paints `image`, so this file must voice it');
+  for (const k of CLOTH_DIALS) assert.equal(img[k], CLOTH_VOICES.felt[k], `${k} is the reference`);
+  assert.deepEqual(settleTail(img).map((x) => x.gap), settleTail(CLOTH_VOICES.felt).map((x) => x.gap));
+  assert.notEqual(img.label, CLOTH_VOICES.felt.label, 'it still says what it is');
+  assert.deepEqual([...CLOTH_DIALS], ['centre', 'length', 'gain', 'tail', 'grind', 'fizz']);
 });
 
 console.log(`voices: ${n} assertions run`);
