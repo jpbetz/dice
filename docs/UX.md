@@ -8129,7 +8129,51 @@ the footprint dials already ride (§7.63, DEVMODE §8):
   is the SEAM"), so taking the card away leaves exactly a plaque: same seam,
   same contact shadow, same footprint, 0.09 tall instead of 2.09.
 - **`inlay`** — no object at all. The name lies on the felt `cards.inset`
-  inside the rim on the chair's own ray.
+  inside the rim on the chair's own ray. **This is the default since
+  2026-09-04** (Joe, on the three: *"Make inlay the default for now. Keep the
+  others in developer mode as options"*). The tent shipped from 2026-09-01 to
+  that day and is not deleted — it is the control this was judged against, it
+  is one word away in the panel, and `placard-look` still holds it.
+- **`stamp`** — the inlay, pressed (Joe, same day: *"a leather stamp type of
+  inlay option that has a thin border or, if possible, is actually stamped
+  into the mat"*). A thin ruled rounded frame round the name, a faint dark
+  ground inside it, and a letterpress impression under both: a highlight
+  offset down-frame, a shadow up-frame, the mark on top.
+
+**Why the stamp is painted and not lit.** "Actually stamped" asks for relief,
+and this table has already measured that: §5.4b, the Nap (2026-08-29) — **a
+normal map cannot be seen on a horizontal floor under a 67-degree key**. The
+refusal is a measurement and the surface is this same felt, so a stamp's bevel
+would meet exactly the physics that killed it. The impression is therefore
+baked into the ink, where it reads as depth from every chair and at every zoom
+because it does not depend on where the lamp is.
+
+**`cards.scale` is the size of the printed thing** (Joe: *"give me more
+control of the size of the placards in developer mode"*), and it fills a gap
+rather than adding a nicety: `cards.width` and `cards.depth` move the
+**holder's** footprint and have never moved the **card** — `CARD_W` was a
+const, so widening the pad grew a brass slab under a name that stayed exactly
+the size it was. The new dial multiplies the dress and only the dress (the
+tent's card panels; the flat styles' band), so it is `look`, it never locks,
+and the footprint and the ring do not move with it. Recorded rather than
+clamped: a tent past ≈2 is deeper than its own pad and overhangs the rim —
+nothing breaks, since the card has no collider and the WALL is what stops
+dice, but it looks like what it is. The plate's band is the exception and is
+bounded by its own stock: a name printed off the edge of the plaque it sits on
+is not a size, it is a mistake, so above 1 the plate's band stops at the face
+and the way to a bigger one is `cards.width`/`cards.depth`.
+
+**`cards.wash` is the light-up while dice are in the air** (Joe: *"give me
+control of the light up of the placard that happens when rolling dice, I might
+turn it down or turn it off"*) — `state` `enabled | disabled` and `peak`
+0–1 (shipped 0.62). **What turning it off costs, since it is a real cost:**
+attribution here is *seat plus wash* (§7.63) — with the arc dark, attribution
+is the seat alone. Still true and still unambiguous for a placed roll, and
+thinner at a table where two people sit close together. **The ghost keeps
+working without it**, deliberately: the arc is still computed on the film's
+own clock and only the mesh stops being drawn, so `ink.mode: ghost` with
+`wash.state: disabled` is a real combination in which the name is the whole of
+the cue.
 
 Beside them, the ink's own three: **`cards.ink.mode`** `steady | ghost`
 (ghost lifts one station's ink from rest to full on **the roller's own wash**,
@@ -8184,6 +8228,12 @@ and anisotropic, so the gutter is sized for the mip (sixteen texels, paid for
 by the fitter's own 51 px of padding); and glyphs on a transparent ground
 fringe dark, so the ink is laid down as an alpha mask and coloured through it
 with `source-in` under a clip.
+
+**Found by looking, in the stamp's turn (2026-09-04):** the first stamp had
+two side rules and no top or bottom — a shape nobody would design on purpose.
+The frame was inset from the atlas ROW while the quad only shows the row's
+middle 78% and a gutter's worth of its width, so the horizontal rules were
+simply cropped away. The frame is inset from what the band *shows*.
 
 **Recorded, not fixed:** an emoji in a name prints as a one-colour silhouette
 under the flat styles (the demo cast's "🎲 Dicey"), because the ink is one

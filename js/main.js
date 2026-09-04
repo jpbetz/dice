@@ -260,8 +260,10 @@ tune.bind('table.seats.*', seatTossSync);
 // read again by `placardRebuild` on its way past, exactly as `PLACARD` is.
 const cardDress = () => ({
   style: T.cards.style,
+  scale: T.cards.scale,
   inset: T.cards.inset,
   ink: { mode: T.cards.ink.mode, rest: T.cards.ink.rest, tone: T.cards.ink.tone },
+  wash: { state: T.cards.wash.state, peak: T.cards.wash.peak },
 });
 const cardsSync = () => {
   Object.assign(PLACARD, { standoff: T.cards.standoff, w: T.cards.width, d: T.cards.depth });

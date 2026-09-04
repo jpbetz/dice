@@ -425,7 +425,9 @@ t('the armed route judges a posted half-pair against the checkout it would patch
     standoff: 2.2, width: 3.68, depth: 3.9,
     // the dress rides along untouched: it is `look` and this pair is `film`,
     // and the geometry law below is about the two numbers, not the five
-    style: 'tent', inset: 0.6, ink: { mode: 'steady', rest: 0.55, tone: 'ink' },
+    style: 'inlay', scale: 1, inset: 0.6,
+    ink: { mode: 'steady', rest: 0.55, tone: 'ink' },
+    wash: { state: 'enabled', peak: 0.62 },
   });
   const half = applyChanges(deep.text, { 'cards.standoff': 0.9 });
   assert.deepEqual(half.problems.map((p) => p.path), ['cards.standoff']);

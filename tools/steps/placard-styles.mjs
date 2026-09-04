@@ -156,11 +156,15 @@ export default async function run(stage, [outDir = 'tools/shots/placard-styles',
   };
 
   const DRESSES = [
-    ['tent   ', { 'cards.style': 'tent' }, 'tent'],
-    ['plate  ', { 'cards.style': 'plate' }, 'plate'],
-    ['inlay  ', { 'cards.style': 'inlay', 'cards.ink.tone': 'ink' }, 'inlay-sepia'],
-    ['chalk  ', { 'cards.style': 'inlay', 'cards.ink.tone': 'chalk' }, 'inlay-chalk'],
-    ['faint  ', { 'cards.style': 'inlay', 'cards.ink.tone': 'chalk', 'cards.ink.rest': 0.28 }, 'inlay-faint'],
+    ['tent   ', { 'cards.style': 'tent', 'cards.scale': 1 }, 'tent'],
+    ['plate  ', { 'cards.style': 'plate', 'cards.scale': 1 }, 'plate'],
+    ['inlay  ', { 'cards.style': 'inlay', 'cards.ink.tone': 'ink', 'cards.scale': 1 }, 'inlay-sepia'],
+    ['chalk  ', { 'cards.style': 'inlay', 'cards.ink.tone': 'chalk', 'cards.scale': 1 }, 'inlay-chalk'],
+    ['stamp  ', { 'cards.style': 'stamp', 'cards.ink.tone': 'ink', 'cards.scale': 1 }, 'stamp-sepia'],
+    ['stampC ', { 'cards.style': 'stamp', 'cards.ink.tone': 'chalk', 'cards.scale': 1 }, 'stamp-chalk'],
+    ['stamp+ ', { 'cards.style': 'stamp', 'cards.ink.tone': 'ink', 'cards.scale': 1.5 }, 'stamp-big'],
+    ['inlay+ ', { 'cards.style': 'inlay', 'cards.ink.tone': 'ink', 'cards.scale': 1.6 }, 'inlay-big'],
+    ['inlay- ', { 'cards.style': 'inlay', 'cards.ink.tone': 'ink', 'cards.scale': 0.65 }, 'inlay-small'],
   ];
 
   for (const z of ['wide', 'medium']) {
@@ -168,7 +172,7 @@ export default async function run(stage, [outDir = 'tools/shots/placard-styles',
     await tab.waitFor(`window.__diceDebug.zoom === '${z}'`, { desc: `zoom ${z}` });
     console.log(`# N=${N} ${w}x${h} ${z} — idle, from seat 0`);
     for (const [tag, patch, name] of DRESSES) await look(tag, patch, `n${N}-${z}-${name}`);
-    await tab.dbg(`tuneSet({"cards.ink.rest":0.55})`);
+    await tab.dbg(`tuneSet({"cards.ink.rest":0.55,"cards.scale":1})`);
   }
 
   // …and the same table with dice on it, because a name is judged beside the

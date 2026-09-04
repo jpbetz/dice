@@ -716,7 +716,7 @@ const REST_KINDS = Object.freeze(['still', 'swell', 'creak', 'settle-tick']);
 // server.js and the apply tool under Node. The two copies are pinned where a
 // mirrored list can be pinned honestly — in the browser, by `placard-styles`,
 // which walks every option here and asserts the rig comes back WEARING it.
-const PLACARD_STYLES = Object.freeze(['tent', 'plate', 'inlay']);
+const PLACARD_STYLES = Object.freeze(['tent', 'plate', 'inlay', 'stamp']);
 const PLACARD_INK_MODES = Object.freeze(['steady', 'ghost']);
 const PLACARD_INK_TONES = Object.freeze(['ink', 'chalk']);
 
@@ -1368,10 +1368,27 @@ export const DIALS = {
     // it never locks at a table of two, and two people comparing styles are
     // still watching one film — which is also what makes the comparison
     // honest, since the only thing that moved is pixels.
-    style: pick('style', 'tent', PLACARD_STYLES, 'look', 'apply',
-      'the folded tent card · a low plaque lying flat · the name inlaid on the felt, no object at all'),
+    // THE INLAY IS THE TABLE'S DRESS (Joe, 2026-09-04, on the three: "Make
+    // inlay the default for now. Keep the others in developer mode as
+    // options"). The tent shipped from 2026-09-01 to today and is not
+    // deleted — it is the control this was judged against and it is one word
+    // away in the panel.
+    style: pick('style', 'inlay', PLACARD_STYLES, 'look', 'apply',
+      'the name on the felt · a low plaque lying flat · the folded tent card · the name pressed '
+      + 'into the felt inside a thin rule'),
+    // THE SIZE OF THE PRINTED THING, which the three dials above have never
+    // been (Joe, 2026-09-04: "give me more control of the size of the
+    // placards"). `width`/`depth` are the HOLDER's footprint — film, because
+    // the ring is shared — and until today nothing moved the CARD, whose
+    // dimensions were consts. This multiplies the dress and only the dress, so
+    // it is look and it never locks. Its cost at the top of the range is
+    // recorded beside `cardW` in js/placard.js: a tent past ~2 overhangs its
+    // own pad, which looks like what it is and breaks nothing.
+    scale: look('size', 1, [0.2, 4, 0.01], 'apply',
+      'the printed thing\'s size — the tent\'s card panels, the flat styles\' band. '
+      + 'Not the holder: that is width/depth'),
     inset: look('inlay inset', 0.60, [-1.5, 4, 0.01], 'apply',
-      'the inlay only: how far INSIDE the rim the ink lies, on the chair\'s own ray (0 is the rim)'),
+      'the two bare styles: how far INSIDE the rim the ink lies, on the chair\'s own ray (0 is the rim)'),
     ink: {
       // The flat styles print on a transparent quad, so the ink can fade
       // without the object it is on fading with it. Nothing here reaches the
@@ -1382,8 +1399,21 @@ export const DIALS = {
       rest: look('ink at rest', 0.55, [0, 1, 0.01], 'apply',
         'the flat styles\' opacity when nothing is happening — the whole of "very subtle" as a number'),
       tone: pick('ink tone', 'ink', PLACARD_INK_TONES, 'look', 'apply',
-        'the INLAY\'s hand: warm sepia, authored against bone paper, or pale chalk, authored against '
-        + 'the felt itself. Where there is stock under the ink (the tent, the plate) it is always sepia'),
+        'the hand of the styles printed straight onto the felt: warm sepia, authored against bone '
+        + 'paper, or pale chalk, authored against the cloth. Where there is stock under the ink '
+        + '(the tent, the plate) it is always sepia'),
+    },
+    // THE ARC UNDER THE CARD WHILE ITS OWNER'S DICE ARE IN THE AIR (Joe,
+    // 2026-09-04: "control of the light up of the placard that happens when
+    // rolling dice, I might turn it down or turn it off"). What turning it off
+    // costs — attribution becomes the seat alone — is written out at
+    // js/placard.js `washPeak`, along with the reason `ink.mode: ghost` keeps
+    // working without it.
+    wash: {
+      state: pick('wash', 'enabled', ENABLED, 'look', 'apply',
+        'the roller\'s hue on the ground under their name while their film plays'),
+      peak: look('wash peak', 0.62, [0, 1, 0.01], 'apply',
+        'how bright the arc gets at the middle of the film'),
     },
   },
 };

@@ -21293,6 +21293,22 @@ export const scenarios = [
         // be WORSE than the S4 record (−60 px), so a regression past what Joe
         // saw is still red. When S4b lands, restore the two `assert.equal(...,
         // false)` gates (band vs live banner, ink vs 520 px) in place of this.
+        //
+        // THIS LEG WEARS THE TENT (2026-09-04, UX §7.65). `cards.style`
+        // defaults to the inlay now, and every number in the ladder above is a
+        // measurement OF THE FOLDED CARD — the −60 px bar included, which is
+        // what a regression is judged against. Measuring a different object
+        // against it would not be stricter or looser, it would be meaningless.
+        // The shipped dress has its own G1 record, taken over both dresses at
+        // N=2..8: `place-ring-banner`. Set on BOTH tabs because the dress is
+        // per-viewer, which is the point of it being `look`.
+        for (const t of [front, back]) {
+          assert.deepEqual((await t.dbg(`tuneSet({'cards.style': 'tent'})`)).refused, [],
+            'the tent is reachable from a table of two — the dress never locks');
+          await t.dbg('sim(30)');
+        }
+        await front.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
+          { desc: 'the tents stood' });
         for (const [t, mine, who] of [[front, 0, 'front'], [back, 1, 'back']]) {
           const banner = await t.eval(BANNER_RECT);
           assert.ok(banner, `${who}: the result banner is up after the roll — or this leg proves nothing`);
@@ -22503,6 +22519,15 @@ export const scenarios = [
         const names = ['Bram', 'Cassiopeia Winterbourne', 'Dev', 'Eluned', 'Fionn', 'Gus',
           'Han 🎲🎲🎲🎲🎲🎲🎲🎲🎲🎲'];
         for (const nm of names) await ctx.rawPlayer(nm);
+        // THE TENT, EXPLICITLY, SINCE 2026-09-04. `cards.style` defaults to
+        // the INLAY now (UX §7.65, Joe's word), and every number below —
+        // the ridge standing taller than a die, the one material, the printed
+        // band's own ndc against the rim — is a claim about the FOLDED CARD.
+        // This scenario is the tent's gate and the tent is the control the
+        // other two dresses are judged against, so it wears it rather than
+        // inheriting whatever the table happens to ship with.
+        assert.deepEqual((await a.dbg(`tuneSet({'cards.style': 'tent'})`)).refused, [],
+          'the tent is still one word away');
         await a.waitFor('window.__diceDebug.places().stations.length === 8',
           { desc: 'a full house of eight cards' });
         await a.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
@@ -23076,6 +23101,15 @@ export const scenarios = [
         await t.dbg(`setZoom('wide')`);
         await t.waitFor(`window.__diceDebug.zoom === 'wide'`, { desc: 'wide' });
         const record = [];
+        // BOTH DRESSES, since 2026-09-04 (UX §7.65). G1 is a claim about the
+        // OWN NAME and the result banner sharing the bottom centre of the
+        // screen, and that is true of whatever the name is printed on — so it
+        // is measured for the shipped inlay AND for the tent, rather than
+        // pinned to one and quietly stopping being about the table people see.
+        // The only style-shaped number in here is how many quads a name is:
+        // the tent prints on two panels and every flat style on one.
+        for (const [style, inks] of [['inlay', 1], ['tent', 2]]) {
+        assert.deepEqual((await t.dbg(`tuneSet({'cards.style': ${JSON.stringify(style)}})`)).refused, []);
         for (let n = 2; n <= 8; n++) {   // a table of one stands no card
           await t.dbg(`devDeal(${n - 1})`);
           await t.dbg('demoSit(0)');
@@ -23090,28 +23124,31 @@ export const scenarios = [
           const widest = { x0: felt - 260, x1: felt + 260, y0: banner.y0, y1: banner.y1 };
           const p = await t.dbg('places()');
           const own = await t.dbg('placardFrame(0)');
-          assert.ok(own && own.ink.length === 2, `N=${n}: the own card projects two inks`);
+          assert.ok(own && own.ink.length === inks,
+            `${style} N=${n}: the own name projects ${inks} ink quad(s), got ${own && own.ink.length}`);
           const clearance = own.ink.map((ink) => Math.round(widest.y0 - Math.max(...ink.map((q) => q.y))));
           const hits = own.ink.map((ink) => quadHitsRect(ink, widest));
-          record.push(`N${n}: own ink vs 520px band hits ${JSON.stringify(hits)} clearance ${clearance.join('/')}px (banner ${Math.round(banner.x1 - banner.x0)}x${Math.round(banner.y1 - banner.y0)} at y ${Math.round(banner.y0)})`);
+          record.push(`${style} N${n}: own ink vs 520px band hits ${JSON.stringify(hits)} clearance ${clearance.join('/')}px (banner ${Math.round(banner.x1 - banner.x0)}x${Math.round(banner.y1 - banner.y0)} at y ${Math.round(banner.y0)})`);
           // The S4 record: N=1 (no retreat) −125 px with a 3d6 title, −78
           // with this 1d6; N >= 2 (retreat ×1.2) −50 at worst. A frame worse
           // than that moved the card or the camera, not the banner.
           // The banner has stepped aside (body.seated): the own name never meets
           // the LIVE rect, at any N.
           for (const ink of own.ink) {
-            assert.equal(quadHitsRect(ink, banner), false, `N=${n}: the own name meets the live banner`);
+            assert.equal(quadHitsRect(ink, banner), false, `${style} N=${n}: the own name meets the live banner`);
           }
           for (const s of p.stations) {
             if (s.place === 0) continue;
             const f = await t.dbg(`placardFrame(${s.place})`);
             for (const ink of f.ink) {
-              assert.equal(quadHitsRect(ink, banner), false, `N=${n}: card ${s.place}'s name is nowhere near the banner`);
+              assert.equal(quadHitsRect(ink, banner), false, `${style} N=${n}: card ${s.place}'s name is nowhere near the banner`);
             }
           }
           await t.dbg('clearTable()');
           await t.settle();
         }
+        }
+        await t.dbg(`tuneReset('cards')`);
         console.log(`    [recorded] G1 from seat 0 at wide, 1600×900 — the own name against the 520px banner:\n      ${record.join('\n      ')}`);
       } finally {
         await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId).catch(() => {});
@@ -29714,7 +29751,7 @@ export const scenarios = [
         .map((st) => [st.place, st.theta, st.yaw, st.world.x, st.world.z,
           Math.hypot(st.world.x, st.world.z)]);
 
-      const STYLES = ['tent', 'plate', 'inlay'];
+      const STYLES = ['tent', 'plate', 'inlay', 'stamp'];
       // THE LIST IS PINNED FROM BOTH SIDES — every word the tree offers is
       // worn below, and a word it does not offer is refused here. Between the
       // two, js/tune.js's hand copy of js/placard.js STYLES cannot drift
@@ -29722,7 +29759,8 @@ export const scenarios = [
       // dropped there is refused by this line.
       assert.deepEqual((await t.dbg(`tuneSet({'cards.style': 'obelisk'})`)).refused,
         [['cards.style', 'option']], 'a dress nobody wrote is refused, not drawn');
-      assert.equal(await t.dbg(`tuneGet('cards.style')`), 'tent', 'and the value never moved');
+      assert.equal(await t.dbg(`tuneGet('cards.style')`), 'inlay',
+        'and the value never moved off the shipped dress');
       const base = { ring: await ring() };
       const seen = {};
       for (const style of STYLES) {
@@ -29749,7 +29787,7 @@ export const scenarios = [
       }
 
       // ---- the read: the CARD row's density, not the floor atlas's ---------
-      for (const style of ['plate', 'inlay']) {
+      for (const style of ['plate', 'inlay', 'stamp']) {
         const band = seen[style].band;
         assert.ok(band, `${style}: reports its band`);
         assert.ok(band.pxPerUnit >= 150 && band.pxPerUnitDown >= 150,
@@ -29769,16 +29807,66 @@ export const scenarios = [
       assert.ok(seen.inlay.tris < seen.tent.tris / 10,
         `and an order of magnitude fewer triangles (${seen.inlay.tris} vs ${seen.tent.tris})`);
       assert.equal(seen.tent.band, null, 'the tent has no flat band and does not pretend to');
-      // …and the opaque rig is genuinely GONE under the inlay rather than
-      // standing there degenerate, which is what `places().visible` reports.
-      await t.dbg(`tuneSet({'cards.style': 'inlay'})`);
-      await settled();
-      assert.equal((await t.dbg('places()')).stations.every((st) => st.visible), false,
-        'under the inlay no card object is in the frame at all');
+      // …and the opaque rig is genuinely GONE under the two BARE styles rather
+      // than standing there degenerate, which is what `places().visible`
+      // reports. The stamp is checked beside the inlay because it is the one
+      // that could plausibly regress: it paints far more into the atlas row,
+      // and painting more is exactly the change that would tempt a writer to
+      // put something back in the opaque mesh.
+      for (const bare of ['inlay', 'stamp']) {
+        await t.dbg(`tuneSet({'cards.style': ${JSON.stringify(bare)}})`);
+        await settled();
+        assert.equal((await t.dbg('places()')).stations.some((st) => st.visible), false,
+          `under the ${bare} no card object is in the frame at all`);
+      }
       await t.dbg(`tuneSet({'cards.style': 'tent'})`);
       await settled();
       assert.equal((await t.dbg('places()')).stations.every((st) => st.visible), true,
         'and the tent puts them back');
+
+      // ---- the size dial ---------------------------------------------------
+      // `cards.scale` moves the PRINTED thing and nothing else. The two halves
+      // that matter: the card actually grows (it never did — CARD_W was a
+      // const and `cards.width` moved the holder under it), and the FOOTPRINT
+      // and the ring do not move with it, which is what keeps this `look`.
+      const face1 = (await t.dbg('placardBudget()')).face;
+      const pad1 = (await t.dbg('placardBudget()')).base;
+      await t.dbg(`tuneSet({'cards.scale': 1.6})`);
+      await settled();
+      const big = await t.dbg('placardBudget()');
+      assert.ok(Math.abs(big.face.w - face1.w * 1.6) < 1e-6,
+        `the card grew with the dial (${big.face.w} against ${face1.w} x 1.6)`);
+      assert.ok(Math.abs(big.face.ridgeY - (0.14 + (face1.ridgeY - 0.14) * 1.6)) < 1e-6,
+        'and stands taller by the same factor above its pad, which does not scale');
+      assert.deepEqual(big.base, pad1, 'the holder\'s footprint did NOT move — that is width/depth');
+      assert.deepEqual(await ring(), base.ring, 'nor did the ring');
+      // …and on a flat style the band is what grows.
+      await t.dbg(`tuneSet({'cards.style': 'inlay', 'cards.scale': 1})`);
+      await settled();
+      const band1 = (await t.dbg('placardBudget()')).band;
+      await t.dbg(`tuneSet({'cards.scale': 1.6})`);
+      await settled();
+      const band2 = (await t.dbg('placardBudget()')).band;
+      assert.ok(Math.abs(band2.w - band1.w * 1.6) < 1e-6,
+        `the inlay's band grew with the dial (${band2.w} against ${band1.w} x 1.6)`);
+      assert.ok(band2.pxPerUnit < band1.pxPerUnit,
+        'and its density falls as it grows, reported rather than assumed '
+        + `(${band2.pxPerUnit.toFixed(1)} from ${band1.pxPerUnit.toFixed(1)})`);
+      await t.dbg(`tuneSet({'cards.scale': 1})`);
+      await settled();
+
+      // ---- the wash dial ---------------------------------------------------
+      // Off means OFF in the frame, and the ghost still works without it —
+      // the arc is still computed on the film's clock, only the mesh stops
+      // being drawn. Checked here rather than argued: the pair is the one
+      // combination a reader would doubt.
+      assert.equal((await t.dbg('placardBudget()')).wash.peak, 0.62, 'the shipped arc');
+      await t.dbg(`tuneSet({'cards.wash.peak': 0.2})`);
+      await settled();
+      assert.equal((await t.dbg('placardBudget()')).wash.peak, 0.2, 'turned down');
+      await t.dbg(`tuneSet({'cards.wash.state': 'disabled'})`);
+      await settled();
+      assert.equal((await t.dbg('placardBudget()')).wash.peak, 0, 'and off is 0, whatever the peak says');
 
       // ---- the ghost, and its negative control -----------------------------
       // The lift rides the wash, which rides the FILM's own clock, so the
@@ -29816,6 +29904,8 @@ export const scenarios = [
         return best;
       };
       const ghosted = await lift('ghost');
+      const washOff = await t.dbg('washInfo()');
+      assert.equal(washOff.opacity, 0, 'the arc stayed dark through that whole film');
       assert.ok(ghosted.alpha > 0.5,
         `ghost: the roller's own name is lifted well past its rest (peaked at ${ghosted.alpha})`);
       assert.ok(ghosted.lit >= 0, 'ghost: and exactly one station is the lifted one');
@@ -29831,8 +29921,10 @@ export const scenarios = [
 
       await t.dbg(`tuneReset('cards')`);
       await settled();
-      assert.equal((await t.dbg('placardDress()')).worn.style, 'tent',
-        'reset puts the table back in its shipped dress');
+      const back = await t.dbg('placardDress()');
+      assert.equal(back.worn.style, 'inlay', 'reset puts the table back in its shipped dress');
+      assert.equal(back.worn.wash.state, 'enabled', 'and lights the arc again');
+      assert.equal(back.worn.scale, 1, 'at the shipped size');
       assert.deepEqual(t.page.consoleErrors, []);
     },
   },
