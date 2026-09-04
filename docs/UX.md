@@ -8140,6 +8140,70 @@ the footprint dials already ride (§7.63, DEVMODE §8):
   ground inside it, and a letterpress impression under both: a highlight
   offset down-frame, a shadow up-frame, the mark on top.
 
+- **`embossed`** — **the stamp's own mark, raised, with the lamp on its top
+  edge**, between the ROLL plate's two flourishes (Joe: *"something that fits
+  with the ROLL tray? Maybe a stamp option that is gold-leaf and with the
+  scroll work type stuff surrounding ROLL"*, then, on the first build: *"I was
+  imagining the embossed one to have the same raised text as stamped, but with
+  the color just slightly more golden, just on the TOP of the raised text"*).
+  **The first pass was gold leaf and that was the wrong object** — it filled
+  each glyph with a metal sweep, which is a surface laid *over* a letter. What
+  he described is the letter itself, in the ink its neighbours are written in,
+  with the lamp finding its crest. So the body stays sepia and only the sliver
+  above it warms, which is why the two dresses read as the same hand: one
+  pressed into the felt, one standing out of it. `ink.tone` chooses which
+  light — warm gold on the sepia body, cool near-white on the chalk one,
+  because a golden crest on a pale letter is a highlight darker than the thing
+  it is lighting.
+
+**Its ornament is the tray's own, not a second one that resembles it.**
+css/style.css `.cue-rule` is the engraving beside ROLL — *"a hairline that
+fades out of the plate and lands in a lozenge beside the word — the same
+rotated square the ceremony's ornate corners are cut from, **so the app has
+ONE ornament, not two**"*. Drawing scrollwork here would have made it two. So
+the emboss draws exactly that: a rule fading in from each side, a 45° lozenge
+at each inner end, and caps tracked the way a struck plate tracks them. The
+numbers are read off that css block and cited beside each one — with **one
+deliberate departure**: the plate tracks 0.3em on a four-letter fixed word,
+this tracks 0.18em on somebody's name, because at 0.3em "Oleander Vex" fitted
+as "Olea…" and a dress whose ornament eats the thing it is ornamenting is the
+wrong trade.
+
+**The emboss is the stamp run the other way up**, and one swap is genuinely
+all that separates them: a recess is lit on its far edge and shadowed on its
+near one; a raised mark is the reverse. Both were looked at both ways round
+before choosing — swapped, the emboss's three passes read as an engraving,
+which is the style sitting next to it in the menu. The crest is never
+*drawn*: it is what is **left of** the highlight pass once the body is laid
+over it, so the whole relief costs the same three passes the stamp costs.
+
+**Which edge is "top" is a screen convention, deliberately, not the lamp's
+real position.** `light.lamp` hangs over the middle of the table, so the
+physically-correct lit edge faces the centre — a *different* edge for every
+chair, and `readTurn` flips the printing 180° for the far half of them, so a
+lamp-correct crest would sit on top for you and underneath for the player
+opposite. The band is read from four azimuths and has to look raised from all
+of them, so the highlight is baked at the row's top edge. Same trade §5.4b
+made refusing the Nap: on this surface a painted impression beats a lit one.
+
+**How golden, swept and looked at** (1600×900, medium, N=4, "Thorbjörn" at the
+far chair): at **0.40** of the way from ink to gold the crest is not there and
+the name reads as flat sepia — the plain inlay with extra steps; at **0.62** it
+is a warm top edge, raised but reading warm rather than lit; at **0.85** it
+reads as metal catching the lamp while the body underneath is plainly the same
+sepia as its neighbours. **0.85 ships.** The number can be that high without
+becoming the leaf again because it colours a sliver `press` wide and nothing
+else — *"just on the top of the raised text"* is the claim about **where**,
+and this is the one about **how golden**. A raised letter also stands prouder
+than a pressed one is deep (0.022 of the row against the stamp's 0.014): at
+the stamp's depth the crest was 1.7 screen px, a hint of gold rather than a
+lit edge.
+
+**The chalk emboss reads its relief from the shadow alone**, recorded rather
+than fixed: a crest cannot be brighter than a body that is already near-white,
+so the pale variant is carried by the dark edge beneath it. The gold one is
+the case the brief asked for.
+
 **Why the stamp is painted and not lit.** "Actually stamped" asks for relief,
 and this table has already measured that: §5.4b, the Nap (2026-08-29) — **a
 normal map cannot be seen on a horizontal floor under a 67-degree key**. The
@@ -8208,6 +8272,8 @@ Flat text is not what failed; flat text at a floor texture's resolution is.
 | tent | 2 | 384 | 25222 | 1.75 | 18 / 18–24 |
 | plate | 3 | 400 | 16825 | 1.17 | 36 / 13–26 |
 | inlay | 1 | 16 | 19173 | 1.33 | 37 / 15–28 |
+| stamp | 1 | 16 | 19173 | 1.33 | 37 / 15–28 |
+| embossed | 1 | 16 | 19173 | 1.33 | 37 / 14–28 |
 
 **The inlay is both quieter and more legible than the tent**, which the tent's
 own reasoning did not predict: the argument for the fold was that a flat plate
@@ -8228,6 +8294,43 @@ and anisotropic, so the gutter is sized for the mip (sixteen texels, paid for
 by the fitter's own 51 px of padding); and glyphs on a transparent ground
 fringe dark, so the ink is laid down as an alpha mask and coloured through it
 with `source-in` under a clip.
+
+**What the emboss cost the fitter, and what that cost bought.** A tracked
+dress has to be *measured* tracked: the fitter had one notion of how wide a
+word is — `measureText` — and 0.18em between every pair of glyphs is, on a
+ten-letter name at 160 px, 288 px of width it could not see. Left alone it
+would have fitted a name that then printed off both ends of its own band. And
+once measured honestly, the emboss hit the truncator far sooner than its
+neighbours: "Thorbjörn" printed whole on the inlay and as "Thorb…" here, which
+is the read getting worse to make a word look struck — **GOALPOST 1 outranks
+the ornament.** A struck plate answers that the way this does, by setting its
+caps smaller and giving the room to the tracking: the tracked dress has its
+own font floor of **76 px** (still 32 above the reported floor), and it
+reserves the **lozenge** but not the gap, which lives in `PAD_PX`'s existing
+slack — reserving both cost a whole letter. `placard-styles` holds the claim
+in the only form that is true: the emboss must print **at least as much** of a
+name as the plain inlay does, never less. (It can legitimately print *more* —
+on the 23-character name it shows "Aleksandrin…" where the inlay shows
+"Aleksandr…".) That gate was **vacuous when first written**: the demo cast
+shuffles twelve names and the run happened to deal four short ones, so
+sabotaging the floor left it green. It names its own cast now, as
+`placard-look` does and for the same reason.
+
+**Found by looking, in the emboss's second turn:** "Priya" came back with **no
+ornament at all**. One `return` guarded both halves of the flourish, so on any
+name long enough to crowd the sweep the dress lost the very figure that makes
+it this dress — while the fitter went on reserving room for a mark nobody
+drew. The rule is the luxury (it is what the panel's own `flex: 0 1 46px`
+gives up first) and the pair of lozenges is the identity: the lozenges are now
+unconditional, and on a crowded name the **gap** gives way before they do, so
+one moves in toward the word rather than out past the gutter and off the band.
+
+**Found by looking, in the emboss's first turn:** the flourishes were two faint dots.
+The ornament was sized as a share of the ROW, which put the hairline at 2.5
+atlas px — under one screen pixel once the band is projected. The css states
+those numbers against a 24 px font (1 px rule, 5 px lozenge, 46 px sweep), so
+they are stated in **ems** here and scale with the fitter, as the plate's do
+with its.
 
 **Found by looking, in the stamp's turn (2026-09-04):** the first stamp had
 two side rules and no top or bottom — a shape nobody would design on purpose.

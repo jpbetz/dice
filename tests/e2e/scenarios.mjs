@@ -29732,9 +29732,18 @@ export const scenarios = [
     //     beside it: the same roll under `steady` must lift NOTHING, or the
     //     assertion above is measuring the wash's existence and not the mode.
     async fn(ctx) {
-      const t = await ctx.devTab({ origin: '127.0.0.94', players: 3, name: 'Ink' });
+      // THE CAST IS NAMED, NOT DEALT, and that is the difference between an
+      // armed gate and a decorative one. The demo cast shuffles its twelve
+      // names, so at N=4 a run may deal four short ones — and the claim below
+      // (an ornament may not cost a name) is about the LONG one. Sabotaged to
+      // check: with the tracked floor put back to the shared 108, this
+      // scenario stayed green on a dealt cast and went red the moment the
+      // roster held the 23-character name. `placard-look` picks its names for
+      // the same reason and says so.
+      const t = await ctx.devTab({ origin: '127.0.0.94', players: 0, name: 'Ink' });
+      for (const nm of ['Aleksandrina Quillfeath', 'Thorbjörn', 'Bo']) await ctx.rawPlayer(nm);
       await t.waitFor('window.__diceDebug.places().stations.length === 4',
-        { desc: 'the viewer and three' });
+        { desc: 'the viewer and three, two of them hostile to a fitter' });
       await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
         { desc: 'the cards stood' });
       const settled = async () => {
@@ -29751,7 +29760,7 @@ export const scenarios = [
         .map((st) => [st.place, st.theta, st.yaw, st.world.x, st.world.z,
           Math.hypot(st.world.x, st.world.z)]);
 
-      const STYLES = ['tent', 'plate', 'inlay', 'stamp'];
+      const STYLES = ['tent', 'plate', 'inlay', 'stamp', 'embossed'];
       // THE LIST IS PINNED FROM BOTH SIDES — every word the tree offers is
       // worn below, and a word it does not offer is refused here. Between the
       // two, js/tune.js's hand copy of js/placard.js STYLES cannot drift
@@ -29763,12 +29772,18 @@ export const scenarios = [
         'and the value never moved off the shipped dress');
       const base = { ring: await ring() };
       const seen = {};
+      const seenText = {};   // what the plain inlay prints, per station
       for (const style of STYLES) {
         assert.deepEqual((await t.dbg(`tuneSet({'cards.style': ${JSON.stringify(style)}})`)).refused, [],
           `${style} is an option the tree accepts`);
         await settled();
         const dress = await t.dbg('placardDress()');
         assert.equal(dress.worn.style, style, `${style}: the rig came back wearing it`);
+        if (style === 'inlay') {
+          for (const st of (await t.dbg('places()')).stations) {
+            seenText[st.place] = await t.dbg(`placardText(${st.place})`);
+          }
+        }
         // THE LAW, at every station and for every dress.
         assert.deepEqual(await ring(), base.ring,
           `${style}: the ring did not move — a style may not touch the anchors`);
@@ -29780,6 +29795,22 @@ export const scenarios = [
           assert.equal(await t.dbg(`placardText(${st.place})`), st.shown,
             `${style}: station ${st.place} prints the row's word`);
           assert.ok(st.fontPx >= 44, `${style}: station ${st.place} is painted at ${st.fontPx}px`);
+          // …AND THE TRACKED DRESS DOES NOT PAY FOR ITS ORNAMENT IN NAMES.
+          // The emboss sets its caps smaller so the tracking and the flourish
+          // fit; what it may not do is truncate a name the plain inlay prints
+          // whole, which is what it did on its first pass ("Thorbjörn" →
+          // "Thorb…"). Held against the inlay's own answer for the same word.
+          if (style === 'embossed') {
+            // NOT "the same string" — "at least as much of the name". The
+            // emboss sets smaller to pay for its tracking, so on a name that
+            // BOTH dresses have to cut it can legitimately show MORE letters
+            // than the inlay does (the 23-character one: "Aleksandrin…"
+            // against "Aleksandr…"). What it may never do is show fewer.
+            const here = await t.dbg(`placardText(${st.place})`);
+            assert.ok(here.length >= seenText[st.place].length,
+              `embossed: station ${st.place} prints "${here}" where the inlay prints `
+              + `"${seenText[st.place]}" — an ornament may not cost a name`);
+          }
           const f = await t.dbg(`placardFrame(${st.place})`);
           assert.ok(f && f.ink.length, `${style}: station ${st.place} reports a printed band`);
         }
@@ -29787,7 +29818,7 @@ export const scenarios = [
       }
 
       // ---- the read: the CARD row's density, not the floor atlas's ---------
-      for (const style of ['plate', 'inlay', 'stamp']) {
+      for (const style of ['plate', 'inlay', 'stamp', 'embossed']) {
         const band = seen[style].band;
         assert.ok(band, `${style}: reports its band`);
         assert.ok(band.pxPerUnit >= 150 && band.pxPerUnitDown >= 150,
@@ -29813,7 +29844,7 @@ export const scenarios = [
       // that could plausibly regress: it paints far more into the atlas row,
       // and painting more is exactly the change that would tempt a writer to
       // put something back in the opaque mesh.
-      for (const bare of ['inlay', 'stamp']) {
+      for (const bare of ['inlay', 'stamp', 'embossed']) {
         await t.dbg(`tuneSet({'cards.style': ${JSON.stringify(bare)}})`);
         await settled();
         assert.equal((await t.dbg('places()')).stations.some((st) => st.visible), false,

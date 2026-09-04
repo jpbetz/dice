@@ -716,7 +716,7 @@ const REST_KINDS = Object.freeze(['still', 'swell', 'creak', 'settle-tick']);
 // server.js and the apply tool under Node. The two copies are pinned where a
 // mirrored list can be pinned honestly — in the browser, by `placard-styles`,
 // which walks every option here and asserts the rig comes back WEARING it.
-const PLACARD_STYLES = Object.freeze(['tent', 'plate', 'inlay', 'stamp']);
+const PLACARD_STYLES = Object.freeze(['tent', 'plate', 'inlay', 'stamp', 'embossed']);
 const PLACARD_INK_MODES = Object.freeze(['steady', 'ghost']);
 const PLACARD_INK_TONES = Object.freeze(['ink', 'chalk']);
 
@@ -1374,8 +1374,8 @@ export const DIALS = {
     // deleted — it is the control this was judged against and it is one word
     // away in the panel.
     style: pick('style', 'inlay', PLACARD_STYLES, 'look', 'apply',
-      'the name on the felt · a low plaque lying flat · the folded tent card · the name pressed '
-      + 'into the felt inside a thin rule'),
+      'the name on the felt · a low plaque lying flat · the folded tent card · pressed into the felt '
+      + 'inside a thin rule · gold leaf, raised, between the ROLL plate\'s own two flourishes'),
     // THE SIZE OF THE PRINTED THING, which the three dials above have never
     // been (Joe, 2026-09-04: "give me more control of the size of the
     // placards"). `width`/`depth` are the HOLDER's footprint — film, because
@@ -1400,8 +1400,8 @@ export const DIALS = {
         'the flat styles\' opacity when nothing is happening — the whole of "very subtle" as a number'),
       tone: pick('ink tone', 'ink', PLACARD_INK_TONES, 'look', 'apply',
         'the hand of the styles printed straight onto the felt: warm sepia, authored against bone '
-        + 'paper, or pale chalk, authored against the cloth. Where there is stock under the ink '
-        + '(the tent, the plate) it is always sepia'),
+        + 'paper, or pale chalk, authored against the cloth. On the emboss it is which METAL — gold '
+        + 'leaf or silver. Where there is stock under the ink (the tent, the plate) it is always sepia'),
     },
     // THE ARC UNDER THE CARD WHILE ITS OWNER'S DICE ARE IN THE AIR (Joe,
     // 2026-09-04: "control of the light up of the placard that happens when

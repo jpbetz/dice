@@ -240,6 +240,21 @@ const TRIS = QUADS * 2;                   // 48 per placard, 384 for the rig
 //          somebody put a tool to (Joe, 2026-09-04: "a leather stamp type of
 //          inlay option that has a thin border or, if possible, is actually
 //          stamped into the mat").
+//   embossed  the name in GOLD LEAF, raised, between the ROLL plate's own
+//          two flourishes (Joe, same day: "something that fits with the ROLL
+//          tray? Maybe a stamp option that is gold-leaf and with the scroll
+//          work type stuff surrounding ROLL"). Gold tooling on leather, which
+//          is what the tray is already pretending to be.
+//
+// AND ITS ORNAMENT IS THE TRAY'S OWN, not a second one that looks like it.
+// css/style.css `.cue-rule` is the engraving beside ROLL — "a hairline that
+// fades out of the plate and lands in a lozenge beside the word — the same
+// rotated square the ceremony's ornate corners are cut from, SO THE APP HAS
+// ONE ORNAMENT, NOT TWO". Drawing scrollwork here would have made it two.
+// So the emboss draws that: a rule fading in from each side, a 45° lozenge at
+// each inner end, and caps tracked wide the way a struck plate tracks them
+// (letter-spacing 0.3em there, EMBOSS_TRACK here). The numbers are read off
+// that block and cited beside each one.
 //
 // WHY THE STAMP IS PAINTED AND NOT LIT, said out loud because "actually
 // stamped" asks for real relief and the honest answer is that this table has
@@ -266,7 +281,7 @@ const TRIS = QUADS * 2;                   // 48 per placard, 384 for the rig
 // 640 px over 3.45 units, 185.5 px per unit, fourteen times the density and
 // the same fitter with the same reported floor. Flat text is not what failed;
 // flat text at a floor texture's resolution is.
-export const STYLES = Object.freeze(['tent', 'plate', 'inlay', 'stamp']);
+export const STYLES = Object.freeze(['tent', 'plate', 'inlay', 'stamp', 'embossed']);
 export const INK_MODES = Object.freeze(['steady', 'ghost']);
 export const INK_TONES = Object.freeze(['ink', 'chalk']);
 
@@ -318,14 +333,76 @@ const STAMP_INSET = 0.05;      // the border, in from what the band actually SHO
 const STAMP_RULE = 0.016;      // its line weight
 const STAMP_RADIUS = 0.085;    // its corner
 const STAMP_PRESS = 0.014;     // how far the impression's two edges are offset
+const EMBOSS_PRESS = 0.022;    // …and how far a RAISED letter stands, which is more
 const STAMP_GROUND = 0.10;     // the alpha of the pressed ground inside the border
+
+// THE EMBOSS, off css/style.css's cue block so the two cannot drift apart by
+// taste. `.tray-line2 .roll-cue` is 24px at 0.3em tracking; `.cue-rule` is a
+// 46px hairline fading to transparent with a 5px lozenge rotated 45° at its
+// inner end, both at opacity 0.6 of the lettering.
+// css says 0.3em and this is 0.18, which is a deliberate departure rather than
+// a misreading: the plate tracks FOUR letters of a fixed word, and this tracks
+// somebody's name. Measured on the cast's own long one — at 0.3em "Oleander
+// Vex" fitted as "Olea…", losing two thirds of a name to make a word look
+// struck. The fitter is honest about it either way (it measures the tracking
+// now, which it did not at first, and truncates visibly), but a dress whose
+// ornament eats the thing it is ornamenting is the wrong trade.
+const EMBOSS_TRACK = 0.18;     // em; css .tray-line2 .roll-cue is 0.3em on a 4-letter word
+// THE ORNAMENT IS SIZED OFF THE TYPE, not off the band, and the first pass got
+// that wrong in the way a ratio taken from the wrong denominator always goes
+// wrong: as a share of the row the hairline came to 2.5 atlas px, which is
+// under a screen pixel once the band is projected, so the flourishes were two
+// faint dots either side of the name. The css block they come from states them
+// against a 24px font — 1px rule, 5px lozenge, 46px sweep — so they are stated
+// that way here and they scale with the fitter, as the plate's do with its.
+const EMBOSS_RULE = 1.9;       // the hairline's length, in ems (css 46px / 24px)
+const EMBOSS_GAP = 0.35;       // between the lozenge and the first letter, in ems
+const EMBOSS_LOZENGE = 0.21;   // the rotated square's side (css 5px / 24px)
+const EMBOSS_HAIR = 0.042;     // the hairline's weight (css 1px / 24px)
+const EMBOSS_RULE_A = 0.6;     // css .cue-rule opacity
+// THE CATCH-LIGHT ON THE CREST, and it is a catch-light rather than a leaf
+// (Joe, 2026-09-04, on the first emboss: "I was imagining the embossed one to
+// have the same raised text as stamped, but with the color just slightly more
+// golden, just on the TOP of the raised text").
+//
+// The first pass filled the whole glyph with a metal sweep, which is gold LEAF
+// — a surface laid over the letter. What he described is the letter itself,
+// raised, in the ink its neighbours are written in, with the lamp finding its
+// top edge. So the body stays `KIT_TABLE.ink` (or `chalk`, per tone) and only
+// the sliver above it warms. That sliver is not drawn: it is what is LEFT of
+// the highlight pass once the body is laid over it, which is why the whole
+// effect costs the same three passes the stamp costs.
+//
+// `tone` still chooses the hand, and here it chooses which light: warm gold on
+// the sepia body, cool near-white on the chalk one — because a golden crest on
+// a pale chalk letter is a highlight darker than the thing it is lighting.
+const EMBOSS_LIT = { ink: '#e6bc6a', chalk: '#f4f7ff' };
+// How far the crest is mixed toward that light. Swept and LOOKED AT, three
+// values on the same frame (1600×900, medium, N=4, "Thorbjörn" at the far
+// chair — tools/steps/placard-styles.mjs shoots it):
+//   0.40  the crest is not there. The name reads as flat sepia, which is the
+//         plain inlay with extra steps.
+//   0.62  a warm top edge. Raised, but the word reads warm rather than lit.
+//   0.85  the crest reads as METAL catching the lamp, and the body underneath
+//         is still plainly the same sepia its neighbours are written in.
+// 0.85, and the reason the number can be this high without becoming the leaf
+// the brief corrected is that it colours a sliver `press` wide and nothing
+// else — "just on the top of the raised text" is a claim about WHERE, and this
+// is the claim about how golden.
+const EMBOSS_LIT_MIX = 0.85;
+// …and how far the far edge goes the other way, into the shadow the raised
+// letter throws on the felt behind it.
+const EMBOSS_DEEP_MIX = -0.45;
 
 // FLAT STYLES print on the ink mesh; the tent prints in the opaque atlas.
 // Written once, because five call sites were asking it and the fifth would
 // have been the one that forgot the stamp.
-const isFlat = (style) => style === 'plate' || style === 'inlay' || style === 'stamp';
-// …and the two that stand no object at all.
-const isBare = (style) => style === 'inlay' || style === 'stamp';
+const isFlat = (style) => style !== 'tent';
+// …and the ones that stand no object at all.
+const isBare = (style) => style === 'inlay' || style === 'stamp' || style === 'embossed';
+// …and the two that are PRESSED: a mark with an impression under it, drawn
+// through the scratch row rather than straight onto the atlas.
+const isPressed = (style) => style === 'stamp' || style === 'embossed';
 
 // ---------------------------------------------------------------------------
 // The atlas — 8 rows of 256 px, one row per station
@@ -382,6 +459,15 @@ const CARD_PX = ATLAS_W * (U_CARD[1] - U_CARD[0]);    // 640
 const PAD_PX = Math.round(ROW_PX * 0.16); // 51
 const FONT_MAX = Math.round(ROW_PX * 0.50);  // 160
 const FONT_MIN = 2 * Math.round(ROW_PX * 0.17);  // 108 — v2's 88, one row-step up.
+// …AND A LOWER ONE FOR THE DRESS THAT TRACKS ITS CAPS (2026-09-04). The emboss
+// spends width on two things the other dresses do not — 0.18em between every
+// pair of glyphs and an ornament at each end — so at the shared floor it hit
+// the truncator far sooner than its neighbours: "Thorbjörn" printed whole on
+// the inlay and as "Thorb…" here, which is the READ getting worse to make a
+// word look struck (GOALPOST 1). A struck plate answers this the way this
+// does: it sets its caps SMALLER and gives the room to the tracking. 76 px is
+// still 32 above the reported floor, and the name comes back whole.
+const FONT_MIN_TRACKED = 2 * Math.round(ROW_PX * 0.12);  // 76
 // EVEN, because the fitter steps down in 2s from an even maximum: an odd floor
 // is a floor the loop steps straight past (measured: FONT_MIN 87 landed at 86).
 
@@ -728,7 +814,31 @@ export class PlacardRig {
     let f = FONT_MAX;
     x.font = `700 ${f}px Georgia, serif`;
     const room = CARD_PX - 2 * PAD_PX;
-    while (f > FONT_MIN && x.measureText(name).width > room) {
+    // THE EMBOSS TRACKS ITS CAPS, so the emboss must be MEASURED tracked
+    // (2026-09-04). The fitter had one notion of how wide a word is —
+    // `measureText` — and the tray's dress adds 0.3em between every pair of
+    // glyphs, which on a ten-letter name at 160px is 432px of width the fitter
+    // could not see. Left alone it would have fitted a name that then printed
+    // straight off both ends of its own band. One function, asked everywhere
+    // the width is asked for, including the truncation loop below.
+    const tracked = this.dress.style === 'embossed';
+    const wide = (t) => x.measureText(t).width
+      + (tracked ? f * EMBOSS_TRACK * Math.max(0, [...t].length - 1) : 0);
+    // THE ORNAMENT'S OWN ROOM IS RESERVED, and only the part of it that is not
+    // negotiable: the lozenge and its gap, at each end. The fading RULE takes
+    // whatever is left over and is simply absent on a long name — which is how
+    // the panel's own flex `0 1 46px` behaves, and how a bookbinder would set
+    // it. So every embossed name keeps the pair of lozenges that make it this
+    // dress, and only the sweep is a luxury.
+    // THE LOZENGE IS RESERVED; THE GAP IS NOT. Reserving both cost more width
+    // than the ornament actually needs — the fitter's `room` already sits
+    // inside PAD_PX of slack at each edge (51 px), which is where the gap
+    // lives — and the difference was a whole letter: "Thorbjörn" fitted as
+    // "Thorbjö…" with both reserved and whole with one. Measured, not
+    // reasoned: the gate below prints what each dress shows for the same name.
+    const reserve = (fp) => (tracked ? 2 * fp * EMBOSS_LOZENGE : 0);
+    const floor = tracked ? FONT_MIN_TRACKED : FONT_MIN;
+    while (f > floor && wide(name) > room - reserve(f)) {
       f -= 2;
       x.font = `700 ${f}px Georgia, serif`;
     }
@@ -740,8 +850,9 @@ export class PlacardRig {
     // it to 452 in a 430 px room. The first v2 look pass painted the front
     // chair's own card 'Fron…'.
     let shown = name;
-    if (x.measureText(name).width > room) {
-      while (shown.length > 1 && x.measureText(`${shown}…`).width > room) shown = shown.slice(0, -1);
+    const fits = room - reserve(f);
+    if (wide(name) > fits) {
+      while (shown.length > 1 && wide(`${shown}…`) > fits) shown = shown.slice(0, -1);
     }
     // The cut is by UTF-16 unit and can land between the halves of a
     // surrogate pair; a lone high surrogate renders as U+FFFD on the card —
@@ -758,6 +869,8 @@ export class PlacardRig {
     const cy = y + ROW_PX / 2 + ROW_PX * 0.016;
     if (this.dress.style === 'stamp') {
       this._paintStamp(slot, shown, f, inkColor);
+    } else if (this.dress.style === 'embossed') {
+      this._paintEmboss(slot, shown, f, this.dress.ink.tone, inkColor);
     } else if (!clear) {
       x.fillStyle = inkColor;
       x.fillText(shown, cx, cy);
@@ -792,7 +905,9 @@ export class PlacardRig {
     return {
       shown,
       fontPx: f,
-      ink: { w: Math.min(1, x.measureText(shown).width / CARD_PX), h: Math.min(1, f / ROW_PX) },
+      // the ink's share of the card region — TRACKED where the dress tracks,
+      // because this is the box the banner-collision gates are written on
+      ink: { w: Math.min(1, wide(shown) / CARD_PX), h: Math.min(1, f / ROW_PX) },
     };
   }
 
@@ -814,18 +929,43 @@ export class PlacardRig {
   // exactly what would kill the illusion of a lit edge. So each pass is drawn
   // as a mask, coloured through, and stamped down with `drawImage` at its
   // offset, which carries correct coverage with it.
-  _paintStamp(slot, shown, fontPx, inkColor) {
-    const x = this.ctx;
-    const y = slot * ROW_PX;
-    const w = (U_CARD[1] - U_CARD[0]) * ATLAS_W;
-    const x0 = U_CARD[0] * ATLAS_W;
+  // ONE ROW-SIZED SCRATCH CANVAS, allocated on demand and shared by both
+  // pressed styles: every layer of every mark is drawn into it, coloured
+  // through, and stamped onto the atlas with `drawImage`.
+  _scratchRow(w) {
     if (!this._scratch) {
       this._scratch = document.createElement('canvas');
       this._scratch.width = Math.round(w);
       this._scratch.height = ROW_PX;
       this._scratchCtx = this._scratch.getContext('2d');
     }
-    const sx = this._scratchCtx;
+    return this._scratchCtx;
+  }
+
+  // A MARK, COLOURED THROUGH ITS OWN COVERAGE. `draw` lays the shape down in
+  // opaque black (its alpha is the shape); `fill` is then composited with
+  // `source-in`, which sets the rgb of every covered pixel and leaves coverage
+  // alone. `fill` may be a gradient — which is the whole of how the leaf works.
+  _layer(w, draw, fill) {
+    const sx = this._scratchRow(w);
+    sx.setTransform(1, 0, 0, 1, 0, 0);
+    sx.globalCompositeOperation = 'source-over';
+    sx.clearRect(0, 0, w, ROW_PX);
+    sx.strokeStyle = '#000000';
+    sx.fillStyle = '#000000';
+    draw(sx);
+    sx.globalCompositeOperation = 'source-in';
+    sx.fillStyle = fill;
+    sx.fillRect(0, 0, w, ROW_PX);
+    sx.globalCompositeOperation = 'source-over';
+    return this._scratch;
+  }
+
+  _paintStamp(slot, shown, fontPx, inkColor) {
+    const x = this.ctx;
+    const y = slot * ROW_PX;
+    const w = (U_CARD[1] - U_CARD[0]) * ATLAS_W;
+    const x0 = U_CARD[0] * ATLAS_W;
     const press = Math.max(1, Math.round(ROW_PX * STAMP_PRESS));
     const rule = Math.max(1, ROW_PX * STAMP_RULE);
     const rad = ROW_PX * STAMP_RADIUS;
@@ -856,18 +996,7 @@ export class PlacardRig {
       ctx.textBaseline = 'middle';
       ctx.fillText(shown, w / 2, ROW_PX / 2 + ROW_PX * 0.016);
     };
-    const layer = (color) => {
-      sx.setTransform(1, 0, 0, 1, 0, 0);
-      sx.globalCompositeOperation = 'source-over';
-      sx.clearRect(0, 0, w, ROW_PX);
-      sx.strokeStyle = '#000000';
-      sx.fillStyle = '#000000';
-      mark(sx);
-      sx.globalCompositeOperation = 'source-in';
-      sx.fillStyle = color;
-      sx.fillRect(0, 0, w, ROW_PX);
-      return this._scratch;
-    };
+    const layer = (color) => this._layer(w, mark, color);
     // THE PRESSED GROUND: the border's own shape, filled, at a low alpha. It
     // is what makes the rule read as the EDGE of something rather than as a
     // line lying on top of the felt.
@@ -892,6 +1021,17 @@ export class PlacardRig {
     x.restore();
   }
 
+  // A BLEND OF TWO PAINTS, `t` of the way from a to b. The emboss's crest is
+  // the body ink carried toward the lamp's own colour rather than replaced by
+  // it, which is what keeps "slightly more golden" slight: at t = 1 this is
+  // gold leaf again, and that is the thing the brief corrected.
+  _mix(a, b, t) {
+    const ca = new THREE.Color(a);
+    const cb = new THREE.Color(b);
+    const ch = (u, v) => Math.round(255 * (u + (v - u) * t));
+    return `rgb(${ch(ca.r, cb.r)},${ch(ca.g, cb.g)},${ch(ca.b, cb.b)})`;
+  }
+
   // A lighter (t > 0) or darker (t < 0) relative of the ink, for the
   // impression's two edges. Kept off THREE.Color deliberately: this is canvas
   // paint in sRGB and the numbers should be the ones the eye gets.
@@ -901,6 +1041,141 @@ export class PlacardRig {
     const m = Math.abs(t);
     const ch = (v) => Math.round(255 * (v + (to - v) * m));
     return `rgb(${ch(c.r)},${ch(c.g)},${ch(c.b)})`;
+  }
+
+  // THE EMBOSS — the stamp's own mark, RAISED, with the lamp on its top edge.
+  //
+  // It is the stamp's mechanism run the other way up, and one swap is
+  // genuinely all that separates the two: a recess is lit on its far edge and
+  // shadowed on its near one, a raised mark is the reverse. What is left over
+  // is dress — the tray's rule-and-lozenge instead of a border box, caps
+  // tracked the way the plate tracks them, and a crest that warms toward gold.
+  //
+  // THE GOLD IS THE TOP SLIVER AND NOTHING ELSE (Joe's correction, above at
+  // EMBOSS_LIT). The body of every letter is the same ink the stamp writes in,
+  // so the two dresses are recognisably the same hand — one pressed into the
+  // felt, one standing out of it — and the metal is only where the light is.
+  //
+  // WHICH EDGE IS "TOP" IS A SCREEN CONVENTION, DELIBERATELY, and not the
+  // lamp's real position. `light.lamp` hangs over the middle of the table, so
+  // the physically-correct lit edge would be the one facing the centre — which
+  // is a DIFFERENT edge for every chair, and `readTurn` flips the printing 180°
+  // for the far half of them, so a lamp-correct crest would appear on top for
+  // you and underneath for the player opposite. The band is read from four
+  // azimuths and has to look raised from all of them, so the highlight is
+  // baked at the row's top edge and arrives at the top of the picture for
+  // every card that faces a reader. This is the same trade §5.4b made when it
+  // refused the Nap: on this surface, a painted impression beats a lit one.
+  //
+  // WHY IT IS NOT ONE SHARED FUNCTION WITH `_paintStamp`: the two share the
+  // scratch row and `_layer` (which is where the fiddly part is), and the rest
+  // of them is what a designer would change — the shape of the mark, the order
+  // of the passes, whether there is a ground under it. Folding those into one
+  // function behind two booleans would make the next dress harder to write,
+  // not easier, and there is going to be a next dress.
+  //
+  // WHY IT IS NOT ONE SHARED FUNCTION WITH `_paintStamp`: the two share the
+  // scratch row and `_layer` (which is where the fiddly part is), and the rest
+  // of them is what a designer would change — the shape of the mark, the order
+  // of the passes, whether there is a ground under it. Folding those into one
+  // function behind two booleans would make the next dress harder to write,
+  // not easier, and there is going to be a next dress.
+  _paintEmboss(slot, shown, fontPx, tone, inkColor) {
+    const x = this.ctx;
+    const y = slot * ROW_PX;
+    const w = (U_CARD[1] - U_CARD[0]) * ATLAS_W;
+    const x0 = U_CARD[0] * ATLAS_W;
+    // A RAISED LETTER STANDS PROUDER THAN A PRESSED ONE IS DEEP, on the same
+    // felt at the same distance: the stamp's 0.014 of the row put the crest at
+    // 1.7 screen px at medium, which is a hint of gold rather than a lit edge.
+    // Measured up until the light read without the letter looking doubled.
+    const press = Math.max(1, Math.round(ROW_PX * EMBOSS_PRESS));
+    const lit = EMBOSS_LIT[tone === 'chalk' ? 'chalk' : 'ink'];
+    // The band's own middle, which is all the quad shows.
+    const midY = ROW_PX / 2 + ROW_PX * 0.016;
+    // TRACKED CAPS, measured rather than assumed: canvas has no
+    // letter-spacing, so the word is drawn a glyph at a time and its width is
+    // the sum plus the tracking between. The name keeps its own case — this is
+    // somebody's name and not a label, and 'MX. QUILL' is not what they wrote.
+    const track = fontPx * EMBOSS_TRACK;
+    const chars = [...shown];
+    const glyphs = (ctx) => {
+      ctx.font = `700 ${fontPx}px Georgia, serif`;
+      const widths = chars.map((c) => ctx.measureText(c).width);
+      const total = widths.reduce((a, b) => a + b, 0) + track * Math.max(0, chars.length - 1);
+      let cx = w / 2 - total / 2;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < chars.length; i++) {
+        ctx.fillText(chars[i], cx, midY);
+        cx += widths[i] + track;
+      }
+      return total;
+    };
+    // THE FLOURISH, css `.cue-rule`: a hairline that fades OUT of the plate
+    // and lands in a lozenge beside the word. Its length is what is left
+    // after the word, capped, so a long name gets a short rule and a two
+    // letter one gets the full sweep — which is what the flex `0 1 46px` does
+    // in the panel.
+    const mark = (ctx) => {
+      const total = glyphs(ctx);
+      const hair = Math.max(1, fontPx * EMBOSS_HAIR);
+      const loz = fontPx * EMBOSS_LOZENGE;
+      const gap = fontPx * EMBOSS_GAP;
+      // THE LOZENGE IS NOT OPTIONAL AND THE RULE IS. Found by looking, at 3×:
+      // "Priya" came back with no ornament at all, because a single `return`
+      // guarded both — so on any name long enough to crowd the sweep, the
+      // dress lost the very figure that makes it this dress, and the fitter
+      // was reserving room for a mark nobody drew. The rule is the luxury (it
+      // is what the panel's own `flex: 0 1 46px` gives up first); the pair of
+      // lozenges is the identity, and it is what `reserve()` pays for.
+      //
+      // THE GAP GIVES WAY BEFORE THE LOZENGE DOES, for the same reason: on a
+      // crowded name the lozenge moves IN toward the word rather than out past
+      // the gutter and off the band. `avail` is the room outboard of the word,
+      // and `reserve()` guarantees it is always at least the lozenge's own
+      // width — so this clamp never has to drop one.
+      const avail = (w / 2 - INK_GUTTER) - total / 2;
+      const g0 = Math.min(gap, Math.max(0, avail - loz * 1.2));
+      const room = avail - g0 - loz;
+      const len = Math.max(0, Math.min(fontPx * EMBOSS_RULE, room));
+      ctx.save();
+      ctx.globalAlpha = EMBOSS_RULE_A;
+      for (const side of [-1, 1]) {
+        const inner = w / 2 + side * (total / 2 + g0);
+        if (len > 0) {
+          // the inner end (beside the word) is solid; the outer fades to nothing
+          const outer = inner + side * len;
+          const g = ctx.createLinearGradient(outer, 0, inner, 0);
+          g.addColorStop(0, 'rgba(0,0,0,0)');
+          g.addColorStop(1, 'rgba(0,0,0,1)');
+          ctx.fillStyle = g;
+          ctx.fillRect(Math.min(inner, outer), midY - hair / 2, len, hair);
+        }
+        // …and the lozenge: the rotated square, at the inner end, always
+        ctx.save();
+        ctx.translate(inner + side * loz * 0.7, midY);
+        ctx.rotate(Math.PI / 4);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(-loz / 2, -loz / 2, loz, loz);
+        ctx.restore();
+      }
+      ctx.restore();
+      ctx.fillStyle = '#000000';
+    };
+    x.save();
+    x.beginPath();
+    x.rect(x0, y, w, ROW_PX);
+    x.clip();
+    // THREE PASSES, AND THE ORDER IS THE RELIEF. The shadow the letter throws
+    // goes down-frame; the crest goes up-frame; the BODY lands last, on top of
+    // both, so what survives of each is a sliver exactly `press` wide. Raised,
+    // therefore, is not a swap of colours — it is a swap of which offset the
+    // light is on, and the stamp is this function with the two exchanged.
+    x.drawImage(this._layer(w, mark, this._stampTint(inkColor, EMBOSS_DEEP_MIX)), x0, y + press);
+    x.drawImage(this._layer(w, mark, this._mix(inkColor, lit, EMBOSS_LIT_MIX)), x0, y - press);
+    x.drawImage(this._layer(w, mark, inkColor), x0, y);
+    x.restore();
   }
 
   // ---- geometry ---------------------------------------------------------

@@ -180,13 +180,13 @@ cards:                     # the name card's footprint; the rig is re-baked at t
   # THE DRESS — what is DRAWN at that anchor, never where the anchor is. The
   # three above are film (two clients must agree on the ring); these are look,
   # per viewer, and switching them moves pixels and nothing else.
-  style: inlay             # inlay: the name on the felt · stamp: pressed, inside a thin rule · plate: a low plaque · tent: the folded card
+  style: inlay             # inlay: the name on the felt · stamp: pressed, in a thin rule · embossed: gold leaf with the ROLL flourishes · plate: a low plaque · tent: the folded card
   scale: 1                 # the size of the PRINTED thing (the card, or the band); width/depth above are the holder's
   inset: 0.60              # the bare styles: how far INSIDE the rim the ink lies, on the chair's own ray
   ink:                     # the flat styles print on their own transparent quad, so the ink can fade alone
     mode: steady           # steady: sits at rest · ghost: lifted to full by the roller's own wash
     rest: 0.55             # the ink's opacity when nothing is happening
-    tone: ink              # the hand of the styles printed on the felt — ink: warm sepia · chalk: pale, for a dark cloth
+    tone: ink              # the hand of the styles printed on the felt — ink: warm sepia (gold leaf on the emboss) · chalk: pale (silver leaf)
   wash:                    # the roller's hue on the ground under their name while their film plays
     state: enabled         # enabled | disabled — off makes attribution the seat alone
     peak: 0.62             # how bright the arc gets at the middle of the film
