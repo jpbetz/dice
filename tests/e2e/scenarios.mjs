@@ -29660,4 +29660,180 @@ export const scenarios = [
       assert.deepEqual(t.page.consoleErrors, []);
     },
   },
+  {
+    name: 'placard-styles',
+    // NOT `look`, and the runner is right to insist: the ghost's whole claim
+    // is about what happens while dice are IN THE AIR, so this scenario rolls
+    // and pays for the lane it belongs in. Everything above the ghost is
+    // cosmetic and would qualify; the mode is not provable without a film.
+    tags: ['place', 'dev'],
+    timeout: 150000,
+    // THE THREE DRESSES (docs/UX.md §7.65; `cards.style`, 2026-09-04). Joe:
+    // "one that is not even a physical placard, just text on the mat surface.
+    // Very subtle. Far less distracting."
+    //
+    // `placard-look` holds the TENT and is untouched — it is the control, and
+    // it runs at the shipped default. What is held here is what a second and
+    // third way of standing a name can plausibly get wrong:
+    //
+    //   the LAW — a style changes only what is DRAWN at the anchor. Every
+    //     station's ray, radius and gap is compared across all three, to the
+    //     double: if a dress ever moves the ring, the dial stops being `look`
+    //     and two people comparing styles stop watching one table.
+    //   the LIST — every option js/tune.js offers comes back WORN. The
+    //     vocabulary is a hand copy (that module cannot import js/placard.js,
+    //     which imports three), so the copy is pinned where it can be pinned
+    //     honestly: in the browser, against the rig.
+    //   the READ — the flat band's density is the CARD row's, not the floor
+    //     atlas's. This is the whole of why GOALS goal 2's retirement of mat
+    //     inscriptions does not reach it, and 12.8 px per world unit is the
+    //     number that retirement was about.
+    //   the COST — the inlay draws no object at all, so the opaque rig and its
+    //     shadow pass leave the frame rather than standing there degenerate.
+    //   the GHOST — one station's ink lifts, on the ROLLER's own wash, and
+    //     every other station stays exactly at rest. With the negative control
+    //     beside it: the same roll under `steady` must lift NOTHING, or the
+    //     assertion above is measuring the wash's existence and not the mode.
+    async fn(ctx) {
+      const t = await ctx.devTab({ origin: '127.0.0.94', players: 3, name: 'Ink' });
+      await t.waitFor('window.__diceDebug.places().stations.length === 4',
+        { desc: 'the viewer and three' });
+      await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
+        { desc: 'the cards stood' });
+      const settled = async () => {
+        await t.dbg('sim(30)');
+        await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
+          { desc: 'the rig agrees with the roster' });
+      };
+      // EVERY STATION'S PLACE IN THE WORLD, to the double — the ray it sits on,
+      // where on that ray, and which way it faces. This is the whole of what a
+      // style is forbidden to touch, so it is compared whole rather than
+      // sampled: one number per station would pass a dress that moved the ring
+      // and turned it back.
+      const ring = async () => (await t.dbg('places()')).stations
+        .map((st) => [st.place, st.theta, st.yaw, st.world.x, st.world.z,
+          Math.hypot(st.world.x, st.world.z)]);
+
+      const STYLES = ['tent', 'plate', 'inlay'];
+      // THE LIST IS PINNED FROM BOTH SIDES — every word the tree offers is
+      // worn below, and a word it does not offer is refused here. Between the
+      // two, js/tune.js's hand copy of js/placard.js STYLES cannot drift
+      // without a red: a name added there and not here is never worn, and one
+      // dropped there is refused by this line.
+      assert.deepEqual((await t.dbg(`tuneSet({'cards.style': 'obelisk'})`)).refused,
+        [['cards.style', 'option']], 'a dress nobody wrote is refused, not drawn');
+      assert.equal(await t.dbg(`tuneGet('cards.style')`), 'tent', 'and the value never moved');
+      const base = { ring: await ring() };
+      const seen = {};
+      for (const style of STYLES) {
+        assert.deepEqual((await t.dbg(`tuneSet({'cards.style': ${JSON.stringify(style)}})`)).refused, [],
+          `${style} is an option the tree accepts`);
+        await settled();
+        const dress = await t.dbg('placardDress()');
+        assert.equal(dress.worn.style, style, `${style}: the rig came back wearing it`);
+        // THE LAW, at every station and for every dress.
+        assert.deepEqual(await ring(), base.ring,
+          `${style}: the ring did not move — a style may not touch the anchors`);
+        const b = await t.dbg('placardBudget()');
+        assert.equal(b.occupied, 4, `${style}: four names standing`);
+        assert.ok(b.draws <= 4, `${style}: still inside the design's 4 draws (got ${b.draws})`);
+        // every name is painted, and painted as the roster's own word
+        for (const st of (await t.dbg('places()')).stations) {
+          assert.equal(await t.dbg(`placardText(${st.place})`), st.shown,
+            `${style}: station ${st.place} prints the row's word`);
+          assert.ok(st.fontPx >= 44, `${style}: station ${st.place} is painted at ${st.fontPx}px`);
+          const f = await t.dbg(`placardFrame(${st.place})`);
+          assert.ok(f && f.ink.length, `${style}: station ${st.place} reports a printed band`);
+        }
+        seen[style] = b;
+      }
+
+      // ---- the read: the CARD row's density, not the floor atlas's ---------
+      for (const style of ['plate', 'inlay']) {
+        const band = seen[style].band;
+        assert.ok(band, `${style}: reports its band`);
+        assert.ok(band.pxPerUnit >= 150 && band.pxPerUnitDown >= 150,
+          `${style}: ${band.pxPerUnit.toFixed(1)} x ${band.pxPerUnitDown.toFixed(1)} px per world unit — `
+          + 'the floor atlas that retired mat inscriptions gave 12.8');
+        assert.ok(Math.abs(band.pxPerUnit - band.pxPerUnitDown) < 1,
+          `${style}: and it is isotropic, so a glyph drawn round arrives round `
+          + `(${band.pxPerUnit.toFixed(1)} vs ${band.pxPerUnitDown.toFixed(1)})`);
+      }
+
+      // ---- the cost --------------------------------------------------------
+      assert.equal(seen.tent.materials, 1, 'the tent is one material, as it always was');
+      assert.equal(seen.inlay.materials, 2, 'a flat style pays one more: paint that fades cannot ride an opaque rig');
+      assert.ok(seen.inlay.draws < seen.tent.draws,
+        `the inlay draws FEWER calls than the tent (${seen.inlay.draws} vs ${seen.tent.draws}) — `
+        + 'the opaque mesh and its shadow pass leave the frame entirely');
+      assert.ok(seen.inlay.tris < seen.tent.tris / 10,
+        `and an order of magnitude fewer triangles (${seen.inlay.tris} vs ${seen.tent.tris})`);
+      assert.equal(seen.tent.band, null, 'the tent has no flat band and does not pretend to');
+      // …and the opaque rig is genuinely GONE under the inlay rather than
+      // standing there degenerate, which is what `places().visible` reports.
+      await t.dbg(`tuneSet({'cards.style': 'inlay'})`);
+      await settled();
+      assert.equal((await t.dbg('places()')).stations.every((st) => st.visible), false,
+        'under the inlay no card object is in the frame at all');
+      await t.dbg(`tuneSet({'cards.style': 'tent'})`);
+      await settled();
+      assert.equal((await t.dbg('places()')).stations.every((st) => st.visible), true,
+        'and the tent puts them back');
+
+      // ---- the ghost, and its negative control -----------------------------
+      // The lift rides the wash, which rides the FILM's own clock, so the
+      // clock is held: what is being measured is the mode, not a race between
+      // CDP round trips and rAF.
+      const alphasNow = async () => (await t.dbg('placardDress()'));
+      await t.dbg(`tuneSet({'cards.style': 'inlay', 'cards.ink.mode': 'ghost', 'cards.ink.rest': 0.1})`);
+      await settled();
+      const rest = await alphasNow();
+      assert.ok(rest.alphas.slice(0, 4).every((a) => Math.abs(a - 0.1) < 1e-3),
+        `at rest every name sits at the dial (${rest.alphas.slice(0, 4).join(', ')})`);
+      const lift = async (mode) => {
+        await t.dbg(`tuneSet({'cards.ink.mode': ${JSON.stringify(mode)}})`);
+        await settled();
+        await t.dbg('holdClock(true)');
+        await t.dbg(`commandRoll('4d6')`);
+        // WALK THE WHOLE FILM AND KEEP THE PEAK. The lift is `sin(πu)` across
+        // the roll, so the first sample that moves at all is somewhere up the
+        // ramp and says nothing about how loud the name gets — an earlier
+        // version of this loop stopped there and read 0.367 off a mode that
+        // reaches 1. Sampled to the END of the film, max kept.
+        let best = { alpha: 0, lit: -1, alphas: [] };
+        for (let i = 0; i < 60; i++) {
+          await t.dbg('holdClock(false)');
+          await t.dbg('sim(6)');
+          await t.dbg('holdClock(true)');
+          const d = await alphasNow();
+          if (d.alpha > best.alpha) best = { alpha: d.alpha, lit: d.lit, alphas: d.alphas.slice(0, 4) };
+          if (!(await t.dbg('busy'))) break;
+        }
+        await t.dbg('holdClock(false)');
+        await t.settle();
+        await t.dbg('clearTable()');
+        await t.settle();
+        return best;
+      };
+      const ghosted = await lift('ghost');
+      assert.ok(ghosted.alpha > 0.5,
+        `ghost: the roller's own name is lifted well past its rest (peaked at ${ghosted.alpha})`);
+      assert.ok(ghosted.lit >= 0, 'ghost: and exactly one station is the lifted one');
+      assert.equal(ghosted.alphas.filter((a) => a > 0.1 + 1e-3).length, 1,
+        `ghost: nobody else's name moved (${ghosted.alphas.join(', ')})`);
+      // RULE 15. The same roll under `steady` must lift nothing at all — the
+      // assertion above passes just as happily on a build where the ink is
+      // simply always opaque, and this is the leg that says otherwise.
+      const steadied = await lift('steady');
+      assert.ok(steadied.alpha <= 0.1 + 1e-3,
+        `steady: the same roll lifts NOTHING (peaked at ${steadied.alpha}) — without this leg the `
+        + 'ghost assertion above is a measurement of the wash and not of the mode');
+
+      await t.dbg(`tuneReset('cards')`);
+      await settled();
+      assert.equal((await t.dbg('placardDress()')).worn.style, 'tent',
+        'reset puts the table back in its shipped dress');
+      assert.deepEqual(t.page.consoleErrors, []);
+    },
+  },
 ];

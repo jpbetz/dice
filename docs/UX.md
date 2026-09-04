@@ -8110,3 +8110,86 @@ dials (light, camera, pace) are per-viewer and work at any table; film dials
 when a second seat arrives. `?demo=1` is gone; the cast that was that door is
 a section of this panel. Design, phases and proofs: [DEVMODE.md](DEVMODE.md);
 the hooks and the harness door: [TESTING.md](TESTING.md).
+
+### 7.65 Three dresses for a name (2026-09-04)
+
+Joe, on the deployed ring: *"I'd like you to try generating a few different
+placards. I'm imagining one that is not even a physical placard, just text on
+the mat surface. Very subtle. Far less distracting… We'll need developer mode
+support to switch between placards that we are testing."*
+
+**`cards.style` is the dial**, live at the placard flush through the binder
+the footprint dials already ride (§7.63, DEVMODE §8):
+
+- **`tent`** — the shipped folded card in its holder. **The control, and
+  untouched**: nothing in this section runs for it, `placard-look` still holds
+  it, and its numbers are what the other two are read against.
+- **`plate`** — the tent's own holder alone, lying flat, printed face up. The
+  pad was never decoration (composition rule 11, "grown, not placed — the tell
+  is the SEAM"), so taking the card away leaves exactly a plaque: same seam,
+  same contact shadow, same footprint, 0.09 tall instead of 2.09.
+- **`inlay`** — no object at all. The name lies on the felt `cards.inset`
+  inside the rim on the chair's own ray.
+
+Beside them, the ink's own three: **`cards.ink.mode`** `steady | ghost`
+(ghost lifts one station's ink from rest to full on **the roller's own wash**,
+so a name is loudest exactly while their dice are in the air, and every other
+name stays where it was), **`cards.ink.rest`** (the opacity when nothing is
+happening — the whole of "very subtle" as a number), and **`cards.ink.tone`**
+`ink | chalk` (the inlay's hand: warm sepia authored against bone paper, or
+pale chalk authored against the felt itself).
+
+**THE LAW: a style changes only what is DRAWN at the anchor, never the
+anchor.** `seatAnchor`, `placardFootprint` and `placardGap` are untouched, so
+the ring, the gaps, the camera's framing subjects and everything on the wire
+are identical under all three. That is what makes the dial **`look`** where
+the three footprint dials beside it are `film` — it never locks at a table of
+two, and two people on different styles are still watching one table — and it
+is what makes the comparison honest, since the only thing that moves is
+pixels. `placard-styles` compares every station's ray, radius and yaw to the
+double across all three dresses.
+
+**Why this is not the retired mat inscription** (GOALS goal 2's amendment,
+2026-08-29). That mechanism died because the FLOOR atlas gives 12.8 px per
+world unit and "THE GATE OF STORMS" printed as "ATE OF ST". The inlay reads
+the CARD row — 185.5 px per world unit, fourteen times, through the same
+fitter with the same reported 44 px floor and the same visible truncation.
+Flat text is not what failed; flat text at a floor texture's resolution is.
+
+**Measured** at N=4, 1600×900, medium, from seat 0
+(`tools/steps/placard-styles.mjs`):
+
+| style | draws | tris | band px² | % of frame | name px, own / others |
+| --- | --- | --- | --- | --- | --- |
+| tent | 2 | 384 | 25222 | 1.75 | 18 / 18–24 |
+| plate | 3 | 400 | 16825 | 1.17 | 36 / 13–26 |
+| inlay | 1 | 16 | 19173 | 1.33 | 37 / 15–28 |
+
+**The inlay is both quieter and more legible than the tent**, which the tent's
+own reasoning did not predict: the argument for the fold was that a flat plate
+"loses the far read", and on the round table what actually happens is that a
+near-vertical band is foreshortened hard by a camera looking down at it while
+a band lying on the ground is not. The cost goes the same way — under the
+inlay the opaque rig and its shadow pass leave the frame rather than standing
+there degenerate, so a table of eight is one draw call and 16 triangles. A
+flat style pays one more MATERIAL (paint that fades cannot ride an opaque,
+depth-writing, shadow-casting mesh) and no extra texture: the ink is a
+transparent quad reading the same atlas row.
+
+**Two things found by looking rather than by the numbers**, both fixed in the
+ship commit: the ink band caught the neighbouring brass region along its edge
+and drew a bright hairline beside every name on the dark felt — half a texel
+is the bilinear answer and was **not** enough, because the atlas is mipmapped
+and anisotropic, so the gutter is sized for the mip (sixteen texels, paid for
+by the fitter's own 51 px of padding); and glyphs on a transparent ground
+fringe dark, so the ink is laid down as an alpha mask and coloured through it
+with `source-in` under a clip.
+
+**Recorded, not fixed:** an emoji in a name prints as a one-colour silhouette
+under the flat styles (the demo cast's "🎲 Dicey"), because the ink is one
+colour by construction. **Which way up** is the tent's own predicate
+(`readTurn`), unchanged at Joe's word — a flat name *could* turn continuously,
+having no wall to lean into, and that option is written here rather than
+taken. **Your own name** is out of frame at the near seat under every dress,
+including the tent: the camera frames the seats' spots and the OTHER players'
+cards on purpose (§7.63), and the flat styles do not change that.

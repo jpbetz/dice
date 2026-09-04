@@ -999,7 +999,7 @@ export class PlacardRig {
   // unflipped up, so `readTurn(azim, reader)[0]` is the answer here for the
   // same reason it is the answer there. A flat name COULD turn continuously —
   // it has no wall to lean into, which is the constraint that quantises the
-  // tent — and that option is written down in UX §7.64 rather than taken.
+  // tent — and that option is written down in UX §7.65 rather than taken.
   _writeInk(slot, rec, turn) {
     let o = slot * INK_VERTS * 3;
     let uo = slot * INK_VERTS * 2;

@@ -17799,7 +17799,7 @@ window.__diceDebug = {
     return placardRig ? placardRig.budget()
       : { draws: 0, tris: 0, atlasPx: 0, rows: 0, materials: 0, textures: 0, occupied: 0, shown: true };
   },
-  // WHAT THE CARDS ARE WEARING (`cards.style`; docs/UX.md §7.64). `asked` is
+  // WHAT THE CARDS ARE WEARING (`cards.style`; docs/UX.md §7.65). `asked` is
   // the dial's answer and `worn` the vertex buffer's, and they differ for
   // exactly as long as dice are in the air — the placard flush is what closes
   // the gap, and a scenario that read only one of them could not tell a

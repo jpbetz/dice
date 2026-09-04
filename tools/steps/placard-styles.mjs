@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// THE THREE DRESSES, SIDE BY SIDE (docs/UX.md §7.64; `cards.style`).
+// THE THREE DRESSES, SIDE BY SIDE (docs/UX.md §7.65; `cards.style`).
 //
 //   node tools/drive.mjs tools/steps/placard-styles.mjs [outDir] [width] [height] [N]
 //
@@ -141,7 +141,8 @@ export default async function run(stage, [outDir = 'tools/shots/placard-styles',
       + `  band ${Math.round(area)} px² (${(100 * area / frame).toFixed(2)}% of frame)`
       + `  name px own ${near ? near.px.toFixed(0) : '—'}`
       + ` others ${others.length ? `${others[0].toFixed(0)}..${others[others.length - 1].toFixed(0)}` : '—'}`
-      + `  all in frame ${reads.every((r) => r.in)}`);
+      + `  in frame ${reads.filter((r) => r.in).length}/${reads.length}`
+      + ` (out: ${reads.filter((r) => !r.in).map((r) => (r.mine ? `${r.place}*` : r.place)).join(',') || 'none'})`);
     if (b.band) {
       console.log(`    band ${b.band.w.toFixed(2)} x ${b.band.d.toFixed(2)} world at `
         + `${b.band.pxPerUnit.toFixed(1)}/${b.band.pxPerUnitDown.toFixed(1)} px per world unit `
