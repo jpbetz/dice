@@ -709,6 +709,16 @@ const DIE_LIGHT_MODES = Object.freeze(['steady', 'wave', 'breathe', 'flicker']);
 // rather than the absence of a cadence ("Reject `rest: null` for the same
 // slot — the sentinel makes 'this quiet is on purpose' visible").
 const REST_KINDS = Object.freeze(['still', 'swell', 'creak', 'settle-tick']);
+// js/placard.js STYLES / INK_MODES / INK_TONES — the name's three dresses and
+// the ink's two behaviours (2026-09-04). Each is a WRITER somebody wrote, so a
+// fourth dress is code and then a word here; this file cannot import the list
+// it mirrors, because js/placard.js imports three and this module is read by
+// server.js and the apply tool under Node. The two copies are pinned where a
+// mirrored list can be pinned honestly — in the browser, by `placard-styles`,
+// which walks every option here and asserts the rig comes back WEARING it.
+const PLACARD_STYLES = Object.freeze(['tent', 'plate', 'inlay']);
+const PLACARD_INK_MODES = Object.freeze(['steady', 'ghost']);
+const PLACARD_INK_TONES = Object.freeze(['ink', 'chalk']);
 
 const RECIPE = Object.freeze({
   label: look('label', 'House set', null, 'apply', 'what the picker chip says'),
@@ -1343,6 +1353,38 @@ export const DIALS = {
     width: film('card width', 3.68, [1, 8, 0.01], 'apply', 'across the chair\'s ray'),
     depth: film('card depth', 1.52, [0.4, 1.6, 0.01], 'apply', 'along the chair\'s ray',
       'cardClear'),
+    // THE DRESS (2026-09-04, Joe: "I'd like you to try generating a few
+    // different placards … one that is not even a physical placard, just text
+    // on the mat surface. Very subtle. Far less distracting … we'll need
+    // developer mode support to switch between placards that we are testing").
+    //
+    // LOOK, WHERE THE THREE ABOVE ARE FILM, and the split is the point rather
+    // than an oversight. The footprint dials are film because `seatAnchor`,
+    // `placardFootprint` and `placardGap` are geometry two clients agree on
+    // double for double — one tab whose cards are wider is one tab whose ring
+    // is not the ring. The dress touches NONE of them: js/placard.js draws a
+    // different object at the same anchor, on the same ring, with the same
+    // gaps and the same framing subjects. So it is per-viewer by construction,
+    // it never locks at a table of two, and two people comparing styles are
+    // still watching one film — which is also what makes the comparison
+    // honest, since the only thing that moved is pixels.
+    style: pick('style', 'tent', PLACARD_STYLES, 'look', 'apply',
+      'the folded tent card · a low plaque lying flat · the name inlaid on the felt, no object at all'),
+    inset: look('inlay inset', 0.60, [-1.5, 4, 0.01], 'apply',
+      'the inlay only: how far INSIDE the rim the ink lies, on the chair\'s own ray (0 is the rim)'),
+    ink: {
+      // The flat styles print on a transparent quad, so the ink can fade
+      // without the object it is on fading with it. Nothing here reaches the
+      // tent, whose name is painted into the opaque atlas.
+      mode: pick('ink', 'steady', PLACARD_INK_MODES, 'look', 'apply',
+        'steady sits at rest · ghost is lifted to full by the roller\'s own wash, so a name is loudest '
+        + 'exactly while their dice are in the air'),
+      rest: look('ink at rest', 0.55, [0, 1, 0.01], 'apply',
+        'the flat styles\' opacity when nothing is happening — the whole of "very subtle" as a number'),
+      tone: pick('ink tone', 'ink', PLACARD_INK_TONES, 'look', 'apply',
+        'the INLAY\'s hand: warm sepia, authored against bone paper, or pale chalk, authored against '
+        + 'the felt itself. Where there is stock under the ink (the tent, the plate) it is always sepia'),
+    },
   },
 };
 

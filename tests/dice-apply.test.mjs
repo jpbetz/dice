@@ -421,7 +421,12 @@ t('the armed route judges a posted half-pair against the checkout it would patch
   const local = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
   const deep = applyChanges(local, { 'cards.standoff': 2.2, 'cards.depth': 3.9 });
   assert.deepEqual(deep.problems, [], 'the legal pair lands');
-  assert.deepEqual(parseYaml(deep.text).tree.cards, { standoff: 2.2, width: 3.68, depth: 3.9 });
+  assert.deepEqual(parseYaml(deep.text).tree.cards, {
+    standoff: 2.2, width: 3.68, depth: 3.9,
+    // the dress rides along untouched: it is `look` and this pair is `film`,
+    // and the geometry law below is about the two numbers, not the five
+    style: 'tent', inset: 0.6, ink: { mode: 'steady', rest: 0.55, tone: 'ink' },
+  });
   const half = applyChanges(deep.text, { 'cards.standoff': 0.9 });
   assert.deepEqual(half.problems.map((p) => p.path), ['cards.standoff']);
   assert.match(half.problems[0].message, /a card stands outboard of the rim/);

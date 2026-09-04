@@ -176,6 +176,16 @@ cards:                     # the name card's footprint; the rig is re-baked at t
   standoff: 0.86           # the card centre outboard of the rim (standoff − depth/2 is the clear ground, and may not go below 0)
   width: 3.68              # across the chair's ray
   depth: 1.52              # along the chair's ray
+  #
+  # THE DRESS — what is DRAWN at that anchor, never where the anchor is. The
+  # three above are film (two clients must agree on the ring); these are look,
+  # per viewer, and switching them moves pixels and nothing else.
+  style: tent              # tent: the folded card · plate: a low plaque lying flat · inlay: the name on the felt, no object
+  inset: 0.60              # the inlay only: how far INSIDE the rim the ink lies, on the chair's own ray
+  ink:                     # the flat styles print on their own transparent quad, so the ink can fade alone
+    mode: steady           # steady: sits at rest · ghost: lifted to full by the roller's own wash
+    rest: 0.55             # the ink's opacity when nothing is happening
+    tone: ink              # the INLAY's hand — ink: warm sepia · chalk: pale, for ink lying on a dark felt
 
 houses:                    # THE DICE CATALOGUE — every set the picker offers.
   #

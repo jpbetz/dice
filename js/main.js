@@ -250,8 +250,22 @@ tune.bind('table.seats.*', seatTossSync);
 // take, so the cards never change size with dice in the air. The dial writes
 // the object first and asks for the rebake second, because `placardRebuild`
 // reads `PLACARD` through js/places.js on its way past.
+//
+// THE DRESS RIDES THE SAME BINDER AND THE SAME FLUSH (2026-09-04, `cards.style`).
+// It is LOOK where the three above are film, so it never locks — but it is
+// still a re-cut of the vertex buffer, and a name may no more change shape
+// with dice in the air than a card may change size. `setDress` answers whether
+// anything actually moved, so a standoff nudge does not re-paint eight atlas
+// rows, and a rig that does not exist yet is not a special case: the dress is
+// read again by `placardRebuild` on its way past, exactly as `PLACARD` is.
+const cardDress = () => ({
+  style: T.cards.style,
+  inset: T.cards.inset,
+  ink: { mode: T.cards.ink.mode, rest: T.cards.ink.rest, tone: T.cards.ink.tone },
+});
 const cardsSync = () => {
   Object.assign(PLACARD, { standoff: T.cards.standoff, w: T.cards.width, d: T.cards.depth });
+  if (placardRig) placardRig.setDress(cardDress());
   rebuildPlacards();
 };
 Object.assign(PLACARD, { standoff: T.cards.standoff, w: T.cards.width, d: T.cards.depth });
@@ -17717,8 +17731,13 @@ window.__diceDebug = {
     // (row.ink.w x row.ink.h) share of it. The atlas row may be printed
     // mirrored or flipped for the reader (places.js readTurn), which moves a
     // CENTRED box by nothing at all, so the same s/t serve every station.
-    const iw = row.ink ? row.ink.w : 0;
-    const ih = row.ink ? row.ink.h : 0;
+    // THE FLAT STYLES REPORT THEIR OWN SHARE (`row.inkBox`, 2026-09-04): their
+    // band is the atlas row's cropped middle, so the name's fraction OF THE
+    // QUAD is not its fraction of the row. The tent has no crop and no
+    // `inkBox`, and reads `row.ink` exactly as it always has.
+    const box = row.inkBox || row.ink;
+    const iw = box ? box.w : 0;
+    const ih = box ? box.h : 0;
     const lerp3 = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
     const at = (q, sx, tz) => lerp3(lerp3(q[0], q[3], sx), lerp3(q[1], q[2], sx), tz);
     for (let i = 0; i < row.corners.length; i += 4) {
@@ -17779,6 +17798,15 @@ window.__diceDebug = {
   placardBudget() {
     return placardRig ? placardRig.budget()
       : { draws: 0, tris: 0, atlasPx: 0, rows: 0, materials: 0, textures: 0, occupied: 0, shown: true };
+  },
+  // WHAT THE CARDS ARE WEARING (`cards.style`; docs/UX.md §7.64). `asked` is
+  // the dial's answer and `worn` the vertex buffer's, and they differ for
+  // exactly as long as dice are in the air — the placard flush is what closes
+  // the gap, and a scenario that read only one of them could not tell a
+  // landed re-bake from an assignment.
+  placardDress() {
+    return placardRig ? placardRig.dressInfo()
+      : { asked: null, worn: null, rest: 0, alpha: 0 };
   },
   // The rig's kill switch, so a budget can be measured on ONE frame with the
   // cards and without them — a gate that only measured the new frame would
@@ -26630,6 +26658,11 @@ function placardRebuild() {
     if (!rows.length) { placardBuilt = placardQueued; demoOverlaySync(); return; }
     placardRig = new PlacardRig(scene);
   }
+  // The dress is read HERE and not only at the dial, for `PLACARD`'s own
+  // reason: the rig is built lazily, so a table that opens with a style
+  // already set has nobody to have told. Idempotent — it answers false when
+  // nothing moved and the update below is the one re-cut either way.
+  placardRig.setDress(cardDress());
   // A TABLE OF ONE STANDS NO CARD (Joe, 2026-09-02: "Single player doesn't
   // need a name tag. It feels more than a little silly"). The seat, the toss
   // and the frame are still yours; the card appears with the second chair.

@@ -190,6 +190,83 @@ const VERTS = QUADS * 4;                  // 96 per placard, 768 for the rig
 const TRIS = QUADS * 2;                   // 48 per placard, 384 for the rig
 
 // ---------------------------------------------------------------------------
+// THE THREE DRESSES — `cards.style` (Joe, 2026-09-04: "I'm imagining one that
+// is not even a physical placard, just text on the mat surface. Very subtle.
+// Far less distracting")
+// ---------------------------------------------------------------------------
+//
+// The tent above is one answer to "where does a name live at a round table",
+// and it is the LOUDEST one the table has: 2.09 world units of lit object
+// standing at every chair, taller than a die, in front of whatever the venue
+// dressed the room with. This block adds two quieter answers so the three can
+// be judged against each other in one sitting rather than argued about.
+//
+//   tent   the shipped card, UNTOUCHED — the control. Nothing below runs for it.
+//   plate  the holder alone, lying flat: a low plaque just outside the rim,
+//          printed face up. Still an object with a seam and a contact shadow,
+//          a fraction of the silhouette.
+//   inlay  no object at all. The name lies ON THE FELT inside the rim, ink
+//          and nothing else — the subtlest thing that can still be read.
+//
+// THE LAW THIS BLOCK KEEPS, and the reason the dial is `look` and not `film`:
+// A STYLE CHANGES ONLY WHAT IS DRAWN AT THE ANCHOR, NEVER THE ANCHOR. It does
+// not touch `PLACARD`, `seatAnchor`, `placardFootprint` or `placardGap` — the
+// shared geometry two clients must agree on double for double. So the ring,
+// the gaps, the camera's framing subjects and everything on the wire are
+// identical under all three, which is what makes the comparison honest: what
+// moves when you turn this dial is pixels, and only pixels.
+//
+// AND THE RETIRED MAT INSCRIPTIONS ARE NOT THIS (GOALS goal 2's amendment).
+// That mechanism died because the FLOOR atlas gives 12.8 px per world unit and
+// "THE GATE OF STORMS" printed as "ATE OF ST". The ink below is the CARD row —
+// 640 px over 3.45 units, 185.5 px per unit, fourteen times the density and
+// the same fitter with the same reported floor. Flat text is not what failed;
+// flat text at a floor texture's resolution is.
+export const STYLES = Object.freeze(['tent', 'plate', 'inlay']);
+export const INK_MODES = Object.freeze(['steady', 'ghost']);
+export const INK_TONES = Object.freeze(['ink', 'chalk']);
+
+// The plaque: the tent's own holder, lower and without the card. BASE_H is the
+// tent's 0.14; a plate that keeps it reads as a holder somebody took the card
+// out of, so it drops to a stock thickness with the same chamfer proportion.
+const PLATE_H = 0.09;
+const PLATE_CHAMFER = 0.04;
+
+// THE INK FLOATS, AND ONLY JUST. 4 mm off whatever it is printed on: enough to
+// clear z-fighting with the plate's top face and the felt at every zoom the
+// camera reaches, small enough that its own shadow would be a lie (it casts
+// none, and receives none — an inscription is paint, not a sheet of paper).
+const INK_LIFT = 0.004;
+// The share of the atlas row the ink quad takes, top and bottom cropped off in
+// TEXTURE space rather than in world space. The row is 320 px and the fitter's
+// ceiling is 160, so the middle 0.78 (250 px) cannot clip a glyph — and the
+// crop is what lets a 2:1 row print on a plate whose top is 2.42:1 without
+// stretching a single letter. (Stretching is the failure v2 wrote the 1:2
+// atlas proportion to kill; it would be silly to re-introduce it here.)
+const INK_CROP = 0.78;
+// The plate's printed band inside its own top face, per side.
+const INK_MARGIN = 0.14;
+// Texels of the card region the ink band does NOT reach, so a mip level cannot
+// mix the neighbouring brass into a name's edge — see `_writeInk`.
+const INK_GUTTER = 16;
+// One ink quad a placard: the plate has one readable face and the inlay is one
+// readable face. (The tent has two panels and prints on neither of these — it
+// prints in the opaque atlas, as it always has.)
+const INK_QUADS = 1;
+const INK_VERTS = INK_QUADS * 4;
+
+// THE DRESS — per viewer, never on the wire. `inset` is how far INBOARD of the
+// rim the inlay's ink lies (0 is exactly on the rim, negative is out past it,
+// where the plate stands); `ink.rest` is the ink's opacity when nothing is
+// happening, which is the whole of "very subtle" as a number; `ink.mode`
+// decides whether that is where it stays.
+const DRESS_DEF = Object.freeze({
+  style: 'tent',
+  inset: 0.60,
+  ink: Object.freeze({ mode: 'steady', rest: 0.55, tone: 'ink' }),
+});
+
+// ---------------------------------------------------------------------------
 // The atlas — 8 rows of 256 px, one row per station
 // ---------------------------------------------------------------------------
 
@@ -221,10 +298,20 @@ const EMIS_PX = 512;                      //      in row fractions, not pixels
 // keeps the density at 185.5 ≥ the 170 floor. The brass, bead and edge stock
 // give up the width the card took — they are gradients and flats, and 192 /
 // 48 / 144 px carry them exactly as well as 256 / 64 / 192 did.
+//
+// U_STOCK is the card's own paper WITHOUT A NAME ON IT (2026-09-04, the
+// styles). The plate is printed the way the tent is — bone stock, sepia ink —
+// but its two halves come apart: the STOCK is an opaque face of the object and
+// the INK is a transparent quad floating over it, because that is what lets
+// the ink fade on its own (`ink.mode: ghost`) while the plaque stays put. So
+// the stock needs a region of its own, and it is a vertical gradient over 72
+// px exactly as the brass and the edge stock are — the width comes out of
+// U_EDGE, which was 144 px of flat colour and is worth 72.
 const U_CARD = [0, 0.625];
 const U_BASE = [0.625, 0.8125];
 const U_BEAD = [0.8125, 0.859375];
-const U_EDGE = [0.859375, 1];
+const U_EDGE = [0.859375, 0.9296875];
+const U_STOCK = [0.9296875, 1];
 
 const CARD_PX = ATLAS_W * (U_CARD[1] - U_CARD[0]);    // 640
 // The fitter's range rides the ROW, not a constant: the row grew again, so
@@ -244,6 +331,10 @@ const KIT_TABLE = {
   card: '#e3d8bd',        // matte bone paper — a shade under the key light's
   cardEdge: '#cabd9d',    //   blow-out, measured by looking at the first pass
   ink: '#5a4632',         // warm sepia — the die painter's own hand
+  // …and the pale hand, for ink lying on a dark felt (`ink.tone: chalk`). The
+  // sepia above is authored against BONE PAPER; on the green felt itself it is
+  // a dark mark on a dark ground, which is subtle in the sense of invisible.
+  chalk: '#efe6d2',
   base: '#b98f4a',        // cast brass
   baseDark: '#8a6733',
   bead: '#ffffff',        // white: the VERTEX COLOUR carries the player's hue
@@ -292,6 +383,16 @@ export class PlacardRig {
     // question a gate on the re-bake can be about. `update` records it here.
     this.pad = null;
     this.wash = { active: false, t: 0, dur: 0, place: null, x: 0, y: 0, z: 0, color: null };
+    // THE DRESS THE BUFFER WAS LAST WRITTEN WITH, beside `pad` and for `pad`'s
+    // reason: `setDress` records what was ASKED FOR, and only an `update` puts
+    // it in the vertex buffer. A gate on the re-bake is about the buffer.
+    this.dress = { ...DRESS_DEF, ink: { ...DRESS_DEF.ink } };
+    this.worn = null;
+    // What the atlas rows were last painted FOR. The ground under a name (bone
+    // stock or nothing at all) and its colour are both functions of the dress,
+    // so a style or a tone change repaints the eight rows the same way a
+    // rename repaints one — in place, no new canvas, no new texture.
+    this.paintedKey = null;
   }
 
   // ---- build ------------------------------------------------------------
@@ -374,6 +475,60 @@ export class PlacardRig {
     this.mesh.visible = false;
     this._scene.add(this.mesh);
 
+    // -- the ink ------------------------------------------------------------
+    // A SECOND MESH, AND ONLY FOR THE FLAT STYLES. It carries one transparent
+    // quad per station — the name and nothing else, over the plate's stock or
+    // over the bare felt — and it is a separate object for two reasons that
+    // are really one: the rig above is OPAQUE, depth-writing and shadow-
+    // casting, and paint that fades is none of those. Sorting an alpha quad
+    // inside an opaque mesh is not a thing three.js will do, and turning the
+    // whole rig transparent to get it would cost the cards their depth write.
+    //
+    // It shares the ALBEDO ATLAS — same texture, same row, same fitter, same
+    // reported font floor — so the ink costs one draw, no texture and no
+    // second painter. Under the tent it holds zero area and is not visible at
+    // all, which is why the shipped card's budget does not move.
+    //
+    // LIT, NOT BASIC (the wash is basic and additive; this deliberately is
+    // not). An inscription is pigment on cloth: in a dark venue it has to go
+    // dark with the room, or it reads as a decal somebody left lit — the exact
+    // "it is a sticker" failure the wash's own ramp comment records. It writes
+    // no depth (so it never occludes a die that rolls over it), receives no
+    // shadow (paint has no thickness to catch one) and casts none.
+    this.ink = new Float32Array(PLACE_MAX * INK_VERTS * 3);
+    this.inkUv = new Float32Array(PLACE_MAX * INK_VERTS * 2);
+    this.inkCol = new Float32Array(PLACE_MAX * INK_VERTS * 4);
+    this.inkNrm = new Float32Array(PLACE_MAX * INK_VERTS * 3);
+    const iidx = new Uint16Array(PLACE_MAX * INK_QUADS * 6);
+    for (let q = 0; q < PLACE_MAX * INK_QUADS; q++) {
+      const b = q * 4;
+      iidx.set([b, b + 1, b + 2, b, b + 2, b + 3], q * 6);
+    }
+    const ig = new THREE.BufferGeometry();
+    ig.setAttribute('position', new THREE.BufferAttribute(this.ink, 3));
+    ig.setAttribute('normal', new THREE.BufferAttribute(this.inkNrm, 3));
+    ig.setAttribute('uv', new THREE.BufferAttribute(this.inkUv, 2));
+    ig.setAttribute('color', new THREE.BufferAttribute(this.inkCol, 4));
+    ig.setIndex(new THREE.BufferAttribute(iidx, 1));
+    this.inkGeom = ig;
+    this.inkMat = new THREE.MeshStandardMaterial({
+      map: this.albedo,
+      roughness: 0.95,
+      metalness: 0,
+      transparent: true,
+      depthWrite: false,
+      vertexColors: true,       // vec4: rgb 1, and the ALPHA is the fade
+      side: THREE.DoubleSide,
+    });
+    this.inkMesh = new THREE.Mesh(ig, this.inkMat);
+    this.inkMesh.name = 'placardInk';
+    this.inkMesh.renderOrder = 9;      // over the venue's fog sheets, under the wash at 10
+    this.inkMesh.frustumCulled = false;
+    this.inkMesh.castShadow = false;
+    this.inkMesh.receiveShadow = false;
+    this.inkMesh.visible = false;
+    this._scene.add(this.inkMesh);
+
     // -- the wash -----------------------------------------------------------
     // The pick ring's recipe verbatim, for the pick ring's recorded reason: a
     // fae venue hangs three fog sheets at renderOrder 5/6/7 and a mark lying
@@ -442,6 +597,13 @@ export class PlacardRig {
       x.fillRect(U_BEAD[0] * ATLAS_W, y, (U_BEAD[1] - U_BEAD[0]) * ATLAS_W, ROW_PX);
       x.fillStyle = k.cardEdge;
       x.fillRect(U_EDGE[0] * ATLAS_W, y, (U_EDGE[1] - U_EDGE[0]) * ATLAS_W, ROW_PX);
+      // the plate's bone stock — the card region's own gradient, with no name
+      // on it, because the plate's name is a separate quad floating over this
+      const sg = x.createLinearGradient(0, y, 0, y + ROW_PX);
+      sg.addColorStop(0, '#efe6cf');
+      sg.addColorStop(1, k.card);
+      x.fillStyle = sg;
+      x.fillRect(U_STOCK[0] * ATLAS_W, y, (U_STOCK[1] - U_STOCK[0]) * ATLAS_W, ROW_PX);
     }
     const ox = this.ormCtx;
     const put = (region, rough, metal) => {
@@ -455,23 +617,42 @@ export class PlacardRig {
     put(U_BASE, k.orm.base[0], k.orm.base[1]);
     put(U_BEAD, k.orm.bead[0], k.orm.bead[1]);
     put(U_EDGE, k.orm.edge[0], k.orm.edge[1]);
+    put(U_STOCK, k.orm.card[0], k.orm.card[1]);   // the plate's face IS card stock
   }
 
   // ONE ROW, IN PLACE — the recompositeFelt no-churn law. A rename clears 128
   // scanlines of the card region and redraws them; no new canvas, no new
   // texture, no GPU allocation. Returns what was actually painted, so the
   // 44 px floor is a reported number rather than a hoped-for one.
+  //
+  // THE GROUND UNDER THE NAME IS THE DRESS'S (2026-09-04). Under the tent the
+  // row is what it always was — bone stock with sepia on it, one opaque region
+  // of an opaque mesh. Under the two flat styles the SAME 640 px region is
+  // painted as ink on NOTHING: the glyphs and their antialiasing, transparent
+  // everywhere else, so the ink mesh can lay them over the plate's own stock
+  // or straight onto the felt. One region, one fitter, one reported font
+  // floor, in one of two grounds — which is what keeps the flat styles honest
+  // against the tent rather than a second painter with a second set of bugs.
   _paintRow(slot, name) {
     const x = this.ctx;
     const k = KIT_TABLE;
     const y = slot * ROW_PX;
     const w = (U_CARD[1] - U_CARD[0]) * ATLAS_W;
+    const clear = this.dress.style !== 'tent';
+    // Chalk is the INLAY's answer and only its: a pale hand is authored
+    // against the FELT, and on the plate's bone stock (and on the tent's) it
+    // would print white on cream. Where there is stock under the ink, the ink
+    // is the kit's sepia.
+    const inkColor = (this.dress.style === 'inlay' && this.dress.ink.tone === 'chalk')
+      ? k.chalk : k.ink;
     x.clearRect(U_CARD[0] * ATLAS_W, y, w, ROW_PX);
-    const g = x.createLinearGradient(0, y, 0, y + ROW_PX);
-    g.addColorStop(0, '#efe6cf');
-    g.addColorStop(1, k.card);
-    x.fillStyle = g;
-    x.fillRect(U_CARD[0] * ATLAS_W, y, w, ROW_PX);
+    if (!clear) {
+      const g = x.createLinearGradient(0, y, 0, y + ROW_PX);
+      g.addColorStop(0, '#efe6cf');
+      g.addColorStop(1, k.card);
+      x.fillStyle = g;
+      x.fillRect(U_CARD[0] * ATLAS_W, y, w, ROW_PX);
+    }
     if (!name) {
       if (this.albedo) this.albedo.needsUpdate = true;
       return { shown: null, fontPx: 0, ink: { w: 0, h: 0 } };
@@ -510,10 +691,35 @@ export class PlacardRig {
     if (last >= 0xd800 && last <= 0xdbff) shown = shown.slice(0, -1); // unpaired high surrogate
     if (shown !== name) shown += '…';
 
-    x.fillStyle = k.ink;
     x.textAlign = 'center';
     x.textBaseline = 'middle';
-    x.fillText(shown, U_CARD[0] * ATLAS_W + w / 2, y + ROW_PX / 2 + ROW_PX * 0.016);
+    const cx = U_CARD[0] * ATLAS_W + w / 2;
+    const cy = y + ROW_PX / 2 + ROW_PX * 0.016;
+    if (!clear) {
+      x.fillStyle = inkColor;
+      x.fillText(shown, cx, cy);
+    } else {
+      // GLYPHS ON NOTHING, WITHOUT A FRINGE. Text drawn straight onto cleared
+      // canvas leaves its antialiased edge pixels part-covered over
+      // TRANSPARENT BLACK, and the sampler mixes that black in: a dark halo
+      // round every letter, invisible in sepia and obvious in chalk. So the
+      // glyphs are laid down as an alpha MASK and the colour is composited
+      // through them with `source-in`, which sets the rgb of every covered
+      // pixel and leaves its coverage alone. The clip is what makes that safe:
+      // `source-in` clears the destination wherever the source is absent, and
+      // the clip is the one row's card region, so the other seven rows (and
+      // every other region of this row) are outside the operation entirely.
+      x.save();
+      x.beginPath();
+      x.rect(U_CARD[0] * ATLAS_W, y, w, ROW_PX);
+      x.clip();
+      x.fillStyle = '#000000';
+      x.fillText(shown, cx, cy);
+      x.globalCompositeOperation = 'source-in';
+      x.fillStyle = inkColor;
+      x.fillRect(U_CARD[0] * ATLAS_W, y, w, ROW_PX);
+      x.restore();
+    }
     if (this.albedo) this.albedo.needsUpdate = true;
     // WHAT SHARE OF THE CARD THE NAME ACTUALLY COVERS, centred, as fractions
     // of the card region. The card's own band is one thing and the INK on it is
@@ -604,7 +810,6 @@ export class PlacardRig {
       this.uv[uo++] = b; this.uv[uo++] = t;
     };
 
-    const hue = rec.hue;
     const quad = (a, b, c, d, tint) => {
       // normal from the CCW winding, so a flipped face is a black face and
       // therefore visible in the look pass rather than silently wrong
@@ -623,6 +828,33 @@ export class PlacardRig {
       }
     };
 
+    // THE STYLE DECIDES WHAT IS DRAWN HERE, AND NOTHING ELSE (2026-09-04).
+    // Everything above this line — the anchor, the reader's turn, the slot's
+    // own share of the buffer — is the same arithmetic for all three dresses,
+    // which is the mechanical half of "a style never moves the anchor".
+    // `inlay` writes no object at all: its name is the ink mesh's business,
+    // and the padding at the foot of this function collapses all 24 quads.
+    if (this.dress.style === 'plate') this._writePlate(P, N, quad, uvRect, rec);
+    else if (this.dress.style === 'tent') this._writeTent(P, N, quad, uvRect, rec, turn);
+    // WHAT IS LEFT OF THE SLOT IS COLLAPSED, not left as it was. The buffer is
+    // fixed-length by design (a join never reallocates), so a dress that draws
+    // 8 quads where the last one drew 24 must write the other 16 away or the
+    // tent's panels stay on screen under the plate. Degenerate at the origin,
+    // exactly as `_writeEmpty` leaves an empty station: zero area, zero pixels.
+    const endO = (slot + 1) * VERTS * 3;
+    if (o < endO) {
+      this.pos.fill(0, o, endO);
+      this.nrm.fill(0, o, endO);
+      this.col.fill(1, o, endO);
+      for (let i = o; i < endO; i += 3) this.nrm[i + 1] = 1;
+      this.uv.fill(0, uo, (slot + 1) * VERTS * 2);
+    }
+    this._writeInk(slot, rec, turn);
+  }
+
+  // -- the tent: the shipped card, untouched --------------------------------
+  _writeTent(P, N, quad, uvRect, rec, turn) {
+    const hue = rec.hue;
     // -- the holder: a truncated pyramid, so the chamfer IS the bevel -------
     const bw = baseW() / 2, bd = baseD() / 2;
     const tw = bw - CHAMFER, td = bd - CHAMFER;
@@ -700,6 +932,179 @@ export class PlacardRig {
     rec.corners = faces;
   }
 
+  // -- the plate: the holder alone, lying flat -------------------------------
+  //
+  // THE OBJECT IS THE TENT'S OWN PAD, and that is the argument for it rather
+  // than a coincidence of code. The pad was never decoration: VENUE-COMPOSITION
+  // rule 11 is "grown, not placed — the tell is the SEAM", and the seam here is
+  // the chamfer and the contact shadow it throws. Take the card away and what
+  // is left is exactly a plaque: a bevelled brass slab with the same seam, the
+  // same shadow, the same footprint, printed face up on the card's own stock.
+  // Eight quads instead of twenty-four, 0.09 tall instead of 2.09.
+  //
+  // WHAT IT COSTS IS THE FAR READ, and that number is the whole reason the
+  // tent exists — a flat face is seen at cos(90 − elevation), which was 0.98
+  // near and 0.72 far on the rectangle the tent was measured against. The
+  // round table changed both the elevations and the distances, so the honest
+  // move is to draw it and measure it there rather than to argue from the old
+  // frame: that is what `placard-styles` does.
+  _writePlate(P, N, quad, uvRect, rec) {
+    const hue = rec.hue;
+    const bw = baseW() / 2, bd = baseD() / 2;
+    const tw = bw - PLATE_CHAMFER, td = bd - PLATE_CHAMFER;
+    const B = [P(-bw, 0, bd), P(bw, 0, bd), P(bw, 0, -bd), P(-bw, 0, -bd)];
+    const T = [P(-tw, PLATE_H, td), P(tw, PLATE_H, td), P(tw, PLATE_H, -td), P(-tw, PLATE_H, -td)];
+    // the printed face is CARD STOCK, not brass: the plaque is a card the
+    // table laid down, which is what keeps it in the same material family as
+    // the tent it is being judged against
+    quad(T[0], T[1], T[2], T[3]); uvRect(U_STOCK);
+    for (let i = 0; i < 4; i++) { quad(B[i], B[(i + 1) % 4], T[(i + 1) % 4], T[i]); uvRect(U_BASE); }
+    quad(B[3], B[2], B[1], B[0]); uvRect(U_EDGE);
+    // the lacquer bead, on the chamfer, for the tent's recorded reason: yours
+    // runs the full width, everybody else's is a centred pip
+    const hw = (rec.mine ? beadWMine() : BEAD_W_OTHER) / 2;
+    const bn = Math.hypot(PLATE_CHAMFER, PLATE_H);
+    const lift = 0.004;
+    const dy = (PLATE_CHAMFER / bn) * lift, dz = (PLATE_H / bn) * lift;
+    quad(P(-hw, PLATE_H + dy, td + dz), P(-hw, dy, bd + dz),
+      P(hw, dy, bd + dz), P(hw, PLATE_H + dy, td + dz), hue);
+    uvRect(U_BEAD);
+    quad(P(hw, PLATE_H + dy, -td - dz), P(hw, dy, -bd - dz),
+      P(-hw, dy, -bd - dz), P(-hw, PLATE_H + dy, -td - dz), hue);
+    uvRect(U_BEAD);
+    // The readable face, for placardFrame() — the top, until `_writeInk`
+    // replaces it with the tighter band the name actually occupies.
+    rec.corners = T.slice();
+  }
+
+  // -- the ink: the name, on its own transparent quad ------------------------
+  //
+  // One quad per station, in the ink mesh, for the two flat styles; a
+  // degenerate one under the tent, whose name is painted into the opaque atlas
+  // as it always was. Where it lies is the style's business:
+  //
+  //   plate  on the plaque's top face, inside a margin, at the atlas row's own
+  //          proportions — cropped in TEXTURE space to fit a 2.42:1 top with a
+  //          2.56:1 band, because the alternative is stretching letters.
+  //   inlay  on the ground itself, `inset` units INSIDE the rim on the chair's
+  //          own ray. The seat's own y is measured where the INK lies, not at
+  //          the anchor: the anchor is outboard of the rim and a venue may lay
+  //          its ground at a different height there (the `surfaceUnder` trap
+  //          that put the tower's contact shadow under the floor for five
+  //          rounds), and the two points are 1.5 units apart.
+  //
+  // WHICH WAY UP IS THE TENT'S OWN PREDICATE, unchanged and deliberately so
+  // (Joe, 2026-09-04, choosing it over a continuously-turned label): the quad
+  // is built with its text-up pointing INBOARD, which is the +z panel's own
+  // unflipped up, so `readTurn(azim, reader)[0]` is the answer here for the
+  // same reason it is the answer there. A flat name COULD turn continuously —
+  // it has no wall to lean into, which is the constraint that quantises the
+  // tent — and that option is written down in UX §7.64 rather than taken.
+  _writeInk(slot, rec, turn) {
+    let o = slot * INK_VERTS * 3;
+    let uo = slot * INK_VERTS * 2;
+    let co = slot * INK_VERTS * 4;
+    const style = this.dress.style;
+    const blank = style === 'tent' || !rec || !rec.name;
+    if (blank) {
+      this.ink.fill(0, o, o + INK_VERTS * 3);
+      this.inkNrm.fill(0, o, o + INK_VERTS * 3);
+      for (let i = 0; i < INK_VERTS; i++) this.inkNrm[o + i * 3 + 1] = 1;
+      this.inkUv.fill(0, uo, uo + INK_VERTS * 2);
+      this.inkCol.fill(0, co, co + INK_VERTS * 4);
+      return;
+    }
+
+    // the band's world size, at the cropped row's aspect and never stretched
+    const aspect = CARD_PX / (ROW_PX * INK_CROP);      // 2.564
+    let iw, id, iy, iz;
+    if (style === 'plate') {
+      iw = baseW() - 2 * INK_MARGIN;
+      id = iw / aspect;
+      const availD = baseD() - 2 * INK_MARGIN;
+      if (id > availD) { id = availD; iw = id * aspect; }
+      iy = rec.seatY + PLATE_H + INK_LIFT;
+      iz = 0;
+    } else {
+      // THE INLAY IS SIZED LIKE THE CARD IT REPLACES, not like the plate: it
+      // has no stock to stay inside, so it takes the printed band's own width
+      // and the name arrives at the density the fitter was tuned for.
+      iw = CARD_W;
+      id = iw / aspect;
+      iz = -(PLACARD.standoff + this.dress.inset);
+      const wx = rec.anchor.x + iz * Math.sin(rec.anchor.azim);
+      const wz = rec.anchor.z + iz * Math.cos(rec.anchor.azim);
+      iy = this._seatY(wx, wz) + INK_LIFT;
+    }
+    rec.inkSize = {
+      w: iw, d: id, y: iy, inset: style === 'inlay' ? this.dress.inset : 0,
+      pxPerUnit: CARD_PX / iw, pxPerUnitDown: (ROW_PX * INK_CROP) / id,
+    };
+
+    const { x: ox, z: oz, azim } = rec.anchor;
+    const ca = Math.cos(azim), sa = Math.sin(azim);
+    const P = (lx, lz) => [ox + lx * ca + lz * sa, iy, oz + (-lx * sa + lz * ca)];
+    const hw = iw / 2, hd = id / 2;
+    // TL, BL, BR, TR with text-up toward −z (inboard), matching the tent's
+    // +z panel, so `turn[0]` is the flip this quad takes.
+    const C = [P(-hw, iz - hd), P(-hw, iz + hd), P(hw, iz + hd), P(hw, iz - hd)];
+    // the readable band IS this quad now, so the frame gate measures the ink
+    rec.corners = C.slice();
+    for (const p of C) {
+      this.ink[o] = p[0]; this.ink[o + 1] = p[1]; this.ink[o + 2] = p[2];
+      this.inkNrm[o] = 0; this.inkNrm[o + 1] = 1; this.inkNrm[o + 2] = 0;
+      o += 3;
+    }
+    // the row's middle INK_CROP, in v, so the band keeps the atlas proportion
+    const mid = 1 - (slot + 0.5) / PLACE_MAX;
+    const half = INK_CROP / (2 * PLACE_MAX);
+    // …AND A GUTTER OFF THE EDGE IN U, which is not a rounding nicety. The card
+    // region ends at u 0.625 and the BRASS begins there, so a band that
+    // samples to the boundary catches brass along its whole edge — on the tent
+    // that is invisible (cream card, cream-ish sliver, an opaque object), and
+    // on a TRANSPARENT quad lying on dark felt it is a bright hairline drawn
+    // beside every name. Measured by looking, at 4× on the first inlay frames:
+    // a 1 px line down the right of "Gus" and under "Dicey".
+    //
+    // SIXTEEN TEXELS, NOT ONE, and the second attempt is the interesting one:
+    // half a texel is the bilinear answer and it was still there, because the
+    // texture is MIPMAPPED and anisotropic — at a grazing angle the sampler is
+    // reading a coarse level where that boundary is one texel wide and the
+    // brass is already mixed into it. So the gutter is sized for the mip, not
+    // for the lerp. It costs nothing at all: the fitter already reserves 51 px
+    // of padding each side (PAD_PX) and no glyph has ever been painted within
+    // 35 of the edge. The v edges need no gutter — their neighbours are the
+    // next station's card region, which is transparent under this dress too.
+    const eu = INK_GUTTER / ATLAS_W;
+    const u0 = U_CARD[0] + eu, u1 = U_CARD[1] - eu;
+    const fu = turn[0][0], fv = turn[0][1];
+    const a = fu ? u1 : u0;
+    const b = fu ? u0 : u1;
+    const t = fv ? mid - half : mid + half;
+    const s = fv ? mid + half : mid - half;
+    this.inkUv[uo++] = a; this.inkUv[uo++] = t;
+    this.inkUv[uo++] = a; this.inkUv[uo++] = s;
+    this.inkUv[uo++] = b; this.inkUv[uo++] = s;
+    this.inkUv[uo++] = b; this.inkUv[uo++] = t;
+    const alpha = this.inkRest();
+    for (let i = 0; i < 4; i++) {
+      this.inkCol[co] = 1; this.inkCol[co + 1] = 1; this.inkCol[co + 2] = 1;
+      this.inkCol[co + 3] = alpha;
+      co += 4;
+    }
+  }
+
+  // THE INK'S OPACITY WHEN NOTHING IS HAPPENING, and it means the same thing
+  // in both modes on purpose — one number, one meaning. `steady` never leaves
+  // it. `ghost` rests here and is lifted to FULL by the roller's own wash
+  // (`_inkAlpha`), so the dial reads as "how present is a name that nobody is
+  // using", which is the question Joe's "very subtle" is actually asking. A
+  // table that wants no names until they matter drags this to 0.1; one that
+  // wants them always legible leaves it where it is and stays `steady`.
+  inkRest() {
+    return Math.min(1, Math.max(0, Number(this.dress.ink.rest) || 0));
+  }
+
   // THE GROUND IS MEASURED, NOT ASSUMED — the `surfaceUnder` pattern
   // (js/main.js:1173-1186). The felt is y 0, but a fae venue lays its OWN
   // opaque ground over it at 0.02 and clearing detail at 0.035, so a placard
@@ -747,19 +1152,31 @@ export class PlacardRig {
         corners: null,
       };
     }
+    // WHAT THE ATLAS WAS PAINTED FOR. A dress can change the GROUND under
+    // every name (bone stock under the tent, nothing at all under the two flat
+    // styles) and the ink's own colour, and neither is a function of the
+    // roster — so the rename test below is not enough on its own, and a style
+    // flipped between two updates would have left eight cream cards floating
+    // over the felt. Same in-place repaint, one key wider.
+    const key = `${this.dress.style === 'tent' ? 'stock' : 'clear'}:`
+      + `${this.dress.style === 'inlay' ? this.dress.ink.tone : 'ink'}`;
+    const redress = this.paintedKey !== key;
+    this.paintedKey = key;
     for (let slot = 0; slot < PLACE_MAX; slot++) {
       const rec = next[slot];
       const was = this.rows[slot] || null;
       if (!rec) {
         this._writeEmpty(slot);
+        this._writeInk(slot, null, null);
         if (was) this._paintRow(slot, null);
         continue;
       }
       rec.seatY = this._seatY(rec.anchor.x, rec.anchor.z);
       this._writePlacard(slot, rec);
       // A row is repainted only when the WORD on it changed — a zoom, a tower
-      // and a promotion all move geometry and touch no pixel of the atlas.
-      if (!was || was.name !== rec.name) {
+      // and a promotion all move geometry and touch no pixel of the atlas —
+      // or when the DRESS changed what a word is printed on.
+      if (!was || was.name !== rec.name || redress) {
         const painted = this._paintRow(slot, rec.name);
         rec.shown = painted.shown;
         rec.fontPx = painted.fontPx;
@@ -769,25 +1186,115 @@ export class PlacardRig {
         rec.fontPx = was.fontPx;
         rec.ink = was.ink;
       }
+      // THE NAME'S SHARE OF THE FLAT BAND, which is not its share of the atlas
+      // row: that band shows the row's middle INK_CROP, so a glyph filling
+      // half the ROW fills half of 0.78 of it and the down fraction is divided
+      // by the crop. Set HERE and not in `_writeInk` because the geometry is
+      // written before the row is painted — `rec.ink` is still the zero
+      // initialiser at that point, and an inkBox built from it reported every
+      // name as a box of no height. `placardFrame` prefers this where it
+      // exists; the tent has no crop, no inkBox, and reads `row.ink` as ever.
+      rec.inkBox = this.dress.style === 'tent' || !rec.ink ? null
+        : { w: rec.ink.w, h: Math.min(1, rec.ink.h / INK_CROP) };
     }
     this.rows = next;
     this.occupied = live.length;
     // …and what those pads were written FROM, for `budget()` to report.
-    this.pad = { w: baseW(), d: baseD(), h: BASE_H };
+    this.pad = {
+      w: baseW(), d: baseD(),
+      h: this.dress.style === 'plate' ? PLATE_H : BASE_H,
+    };
+    // …and the DRESS they were written under, for the same reason: `setDress`
+    // records the ask and only this line records the buffer.
+    this.worn = { ...this.dress, ink: { ...this.dress.ink } };
     this.geometry.attributes.position.needsUpdate = true;
     this.geometry.attributes.normal.needsUpdate = true;
     this.geometry.attributes.color.needsUpdate = true;
     this.geometry.attributes.uv.needsUpdate = true;
     this.geometry.computeBoundingSphere();
-    this.mesh.visible = this.shown && this.occupied > 0;
+    this._inkFlush();
+    // AN INLAY DRAWS NO OBJECT AT ALL, so the opaque rig has nothing in it —
+    // every quad is degenerate and the mesh is 8 × 48 empty triangles. Hiding
+    // it is not cosmetic: it is the draw call and the shadow pass, and the
+    // whole claim of the style is that the table stops carrying eight objects.
+    this.mesh.visible = this.shown && this.occupied > 0 && this.dress.style !== 'inlay';
+    this.inkMesh.visible = this.shown && this.occupied > 0 && this.dress.style !== 'tent';
+  }
+
+  // The ink buffers, uploaded and bounded. Its own function because `update`
+  // and `_rewrite` both end here and the two used to differ by a line.
+  _inkFlush() {
+    if (!this.built) return;
+    this.inkGeom.attributes.position.needsUpdate = true;
+    this.inkGeom.attributes.normal.needsUpdate = true;
+    this.inkGeom.attributes.uv.needsUpdate = true;
+    this.inkGeom.attributes.color.needsUpdate = true;
+    this.inkGeom.computeBoundingSphere();
   }
 
   // The rig's own kill switch, so `scene-draw-budget` can measure the SAME
   // frame with and without the cards and catch a baseline regression too.
   setShown(on) {
     this.shown = !!on;
-    if (this.built) this.mesh.visible = this.shown && this.occupied > 0;
+    if (this.built) {
+      this.mesh.visible = this.shown && this.occupied > 0 && this.dress.style !== 'inlay';
+      this.inkMesh.visible = this.shown && this.occupied > 0 && this.dress.style !== 'tent';
+    }
     return this.shown;
+  }
+
+  // ---- the dress --------------------------------------------------------
+
+  // WHAT THE CARDS ARE WEARING (`cards.style`, `cards.inset`, `cards.ink.*`).
+  // Takes the whole dress or any part of it, refuses a value outside its
+  // options exactly as js/tune.js would, and answers whether anything MOVED —
+  // js/main.js asks for a re-bake on true and does nothing at all on false, so
+  // a binder that fires on every `cards.*` leaf does not re-cut the rig
+  // because the standoff moved by nothing.
+  //
+  // IT DOES NOT DRAW. The rig is re-cut at the placard flush, behind the roll
+  // boundary a zoom and a tower take (js/main.js `rebuildPlacards`), for the
+  // reason the footprint dials are re-cut there: names may not change shape
+  // with dice in the air.
+  setDress(d) {
+    if (!d || typeof d !== 'object') return false;
+    const now = { ...this.dress, ink: { ...this.dress.ink } };
+    if (typeof d.style === 'string' && STYLES.includes(d.style)) now.style = d.style;
+    if (Number.isFinite(d.inset)) now.inset = d.inset;
+    const ink = d.ink;
+    if (ink && typeof ink === 'object') {
+      if (typeof ink.mode === 'string' && INK_MODES.includes(ink.mode)) now.ink.mode = ink.mode;
+      if (typeof ink.tone === 'string' && INK_TONES.includes(ink.tone)) now.ink.tone = ink.tone;
+      if (Number.isFinite(ink.rest)) now.ink.rest = Math.min(1, Math.max(0, ink.rest));
+    }
+    const same = now.style === this.dress.style && now.inset === this.dress.inset
+      && now.ink.mode === this.dress.ink.mode && now.ink.tone === this.dress.ink.tone
+      && now.ink.rest === this.dress.ink.rest;
+    if (same) return false;
+    this.dress = now;
+    return true;
+  }
+
+  // The dress as WORN — what the buffer was last written under, null before
+  // the first update. `dress` is the ask; this is the picture.
+  dressInfo() {
+    // THE ALPHA IS PER STATION, and reporting one number here was a real
+    // mistake for a minute: the ghost lifts the ROLLER's name, so a report
+    // that read slot 0 while station 1 was rolling said the feature did
+    // nothing. `alphas` is the buffer, station by station; `alpha` is the
+    // loudest of them, which is the one a reader is looking at.
+    const alphas = [];
+    for (let i = 0; i < PLACE_MAX; i++) {
+      alphas.push(this.inkCol ? +this.inkCol[i * INK_VERTS * 4 + 3].toFixed(4) : 0);
+    }
+    return {
+      asked: { ...this.dress, ink: { ...this.dress.ink } },
+      worn: this.worn ? { ...this.worn, ink: { ...this.worn.ink } } : null,
+      rest: this.inkRest(),
+      alphas,
+      alpha: alphas.reduce((m, a) => Math.max(m, a), 0),
+      lit: alphas.findIndex((a) => a > this.inkRest() + 1e-6),
+    };
   }
 
   rowAt(place) { return this.rows[place] || null; }
@@ -826,12 +1333,13 @@ export class PlacardRig {
     for (let slot = 0; slot < PLACE_MAX; slot++) {
       const rec = this.rows[slot];
       if (rec) this._writePlacard(slot, rec);
-      else this._writeEmpty(slot);
+      else { this._writeEmpty(slot); this._writeInk(slot, null, null); }
     }
     this.geometry.attributes.position.needsUpdate = true;
     this.geometry.attributes.normal.needsUpdate = true;
     this.geometry.attributes.color.needsUpdate = true;
     this.geometry.attributes.uv.needsUpdate = true;
+    this._inkFlush();
   }
 
   // ---- the wash ---------------------------------------------------------
@@ -874,7 +1382,41 @@ export class PlacardRig {
     this.wash.place = null;
     this.washMat.opacity = 0;
     this.washMesh.visible = false;
+    this._inkAlpha(null, 0);
     return this.wash;
+  }
+
+  // THE GHOST — the name that is only there when it matters (`cards.ink.mode`).
+  //
+  // It rides the WASH's own envelope and not a clock of its own, and that is
+  // the whole design: the wash is already the second half of the attribution
+  // rule ("attribution is seat + wash"), already a pure function of where the
+  // FILM is — held while the film is held, jumped when it is jumped, over when
+  // it is over — and already the thing that says "these dice are that
+  // person's". A name that brightens on any other schedule would be a second
+  // opinion about whose roll this is. So one station's ink is lifted from its
+  // resting opacity to full across `sin(πu)`, exactly the arc under it, and
+  // every other station stays at rest.
+  //
+  // Nothing here is a film input and nothing is seeded: it is opacity, per
+  // viewer, downstream of a pixel. A tab in `steady` and a tab in `ghost` are
+  // looking at the same dice on the same felt at the same moments.
+  _inkAlpha(place, lift) {
+    if (!this.built || !this.inkCol) return;
+    const rest = this.inkRest();
+    const ghost = this.dress.ink.mode === 'ghost';
+    let moved = false;
+    for (let slot = 0; slot < PLACE_MAX; slot++) {
+      const rec = this.rows[slot];
+      const on = ghost && rec && slot === place;
+      const a = !rec || !rec.name ? 0
+        : (on ? rest + (1 - rest) * Math.min(1, Math.max(0, lift)) : rest);
+      const co = slot * INK_VERTS * 4;
+      if (this.inkCol[co + 3] === a) continue;
+      for (let i = 0; i < 4; i++) this.inkCol[co + i * 4 + 3] = a;
+      moved = true;
+    }
+    if (moved) this.inkGeom.attributes.color.needsUpdate = true;
   }
 
   // Opacity 0 → 0.62 → 0 across the film. `t` is the film's own position
@@ -887,7 +1429,9 @@ export class PlacardRig {
     this.wash.t = t;
     const u = t / this.wash.dur;
     if (u >= 1) { this.washClear(); return; }
-    this.washMat.opacity = WASH_PEAK * Math.sin(Math.PI * Math.max(0, u));
+    const arc = Math.sin(Math.PI * Math.max(0, u));
+    this.washMat.opacity = WASH_PEAK * arc;
+    this._inkAlpha(this.wash.place, arc);
   }
 
   washInfo() {
@@ -913,18 +1457,22 @@ export class PlacardRig {
   // After it the object is the one the constructor made: unbuilt, empty.
   dispose() {
     if (!this.built) return;
-    for (const m of [this.mesh, this.washMesh]) {
+    for (const m of [this.mesh, this.inkMesh, this.washMesh]) {
       if (!m) continue;
       this._scene.remove(m);
       if (m.geometry) m.geometry.dispose();
     }
     for (const t of [this.albedo, this.orm, this.emissive]) if (t) t.dispose();
-    for (const m of [this.material, this.washMat]) if (m) m.dispose();
+    for (const m of [this.material, this.inkMat, this.washMat]) if (m) m.dispose();
     this.mesh = null; this.washMesh = null; this.material = null; this.washMat = null;
+    this.inkMesh = null; this.inkMat = null; this.inkGeom = null;
+    this.ink = null; this.inkUv = null; this.inkCol = null; this.inkNrm = null;
     this.albedo = null; this.orm = null; this.emissive = null;
     this.canvas = null; this.ctx = null; this.ormCtx = null;
     this.built = false;
     this.pad = null;
+    this.worn = null;
+    this.paintedKey = null;
     this.rows = [];
     this.occupied = 0;
     this.wash = { active: false, t: 0, dur: 0, place: null, x: 0, y: 0, z: 0, color: null };
@@ -932,11 +1480,30 @@ export class PlacardRig {
 
   budget() {
     const standing = this.built && this.mesh.visible;
+    const inking = this.built && this.inkMesh.visible;
     return {
-      // the rig's own draw calls in a frame: the mesh, its shadow-map pass,
-      // and the wash while a film is playing
-      draws: (standing ? 2 : 0) + (this.built && this.washMesh.visible ? 1 : 0),
-      tris: standing ? PLACE_MAX * TRIS : 0,
+      // THE RIG'S OWN DRAW CALLS IN A FRAME: the mesh, its shadow-map pass,
+      // and the wash while a film is playing — plus, under the two flat
+      // styles, the ink. The ink casts no shadow, so it is ONE call and not
+      // two, and under the inlay the opaque mesh is not drawn at all: a table
+      // of eight goes from 2 calls to 1 and from 384 triangles to 16. That is
+      // the budget half of "far less distracting", and it is reported here
+      // rather than claimed, because the tent's own numbers were.
+      draws: (standing ? 2 : 0) + (inking ? 1 : 0)
+        + (this.built && this.washMesh.visible ? 1 : 0),
+      tris: (standing ? PLACE_MAX * TRIS : 0) + (inking ? PLACE_MAX * INK_QUADS * 2 : 0),
+      // WHAT IS BEING WORN, off the buffer and not off the ask (`pad`'s own
+      // rule): `style` is what the vertices say, `asked` what the dial says,
+      // and `dev-cards-live`'s claim — a dial turned with dice in the air
+      // changes nothing until they land — is the gap between them.
+      style: this.worn ? this.worn.style : this.dress.style,
+      ink: this.worn
+        ? { ...this.worn.ink, rest: this.inkRest(), alpha: this.inkCol ? +this.inkCol[3].toFixed(4) : 0 }
+        : null,
+      inset: this.worn ? this.worn.inset : this.dress.inset,
+      // the ink band's own size and density, the flat styles' answer to
+      // `face` below — the number that says this is not the floor atlas
+      band: this._bandInfo(),
       atlasPx: ATLAS_W,
       atlasH: ATLAS_H,
       rows: PLACE_MAX,
@@ -964,10 +1531,23 @@ export class PlacardRig {
       // what holds it: a dial turned with dice in the air must read here as
       // the OLD footprint until they land.
       base: this.pad ? { ...this.pad } : { w: baseW(), d: baseD(), h: BASE_H },
-      materials: this.built ? 1 : 0,
+      // TWO MATERIALS UNDER A FLAT STYLE, and the second one is the price of
+      // paint that can fade: an opaque, depth-writing, shadow-casting rig
+      // cannot also carry a transparent quad. It shares the atlas, so the
+      // texture count does not move.
+      materials: this.built ? (inking ? 2 : 1) : 0,
       textures: this.built ? 3 : 0,
       occupied: this.occupied,
       shown: this.shown,
     };
+  }
+
+  // The printed band the flat styles actually stand up, measured off the row
+  // that was written rather than computed from the dials a second time.
+  _bandInfo() {
+    for (const r of this.rows) {
+      if (r && r.inkSize) return { ...r.inkSize, crop: INK_CROP };
+    }
+    return null;
   }
 }
