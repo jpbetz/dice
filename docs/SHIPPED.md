@@ -56,6 +56,14 @@ now reads the saved brightness rather than assuming the former 0.62.
 `npm test` passed the unit and fuzz suites and all 60 smoke scenarios; both
 targeted scenarios passed after the final fitter change.
 
+**Follow-up finish adjustment:** the owner found the gold too shiny and the
+stamp too much like a bronze plate. Gold now uses warmer, lower highlights,
+gentler reflected bands and less grain contrast. The stamp's ground is less
+saturated and roughly half as opaque, with a softer burnished rim and 15%
+more transparency through the lettering/tooling. Its detail and recess
+direction are retained. The material study and 1600×900 scene captures were
+inspected again; `placard-styles` passed after the adjustment.
+
 ## The roll is framed before it moves (2026-08-31)
 
 **The second item in this file found by somebody playing the game**, and the

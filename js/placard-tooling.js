@@ -109,9 +109,9 @@ export class ToolingPainter {
     }
     const out = this.pixels.data;
     out.fill(0);
-    const low = raised ? (chalk ? [65, 78, 94] : [96, 48, 13]) : (chalk ? [106, 99, 84] : [42, 21, 13]);
-    const face = raised ? (chalk ? [192, 204, 220] : [210, 150, 53]) : (chalk ? [188, 173, 143] : [64, 35, 22]);
-    const light = raised ? (chalk ? [255, 255, 255] : [255, 238, 169]) : (chalk ? [222, 207, 172] : [151, 105, 64]);
+    const low = raised ? (chalk ? [65, 78, 94] : [112, 73, 29]) : (chalk ? [106, 99, 84] : [45, 33, 26]);
+    const face = raised ? (chalk ? [192, 204, 220] : [200, 151, 65]) : (chalk ? [188, 173, 143] : [70, 51, 38]);
+    const light = raised ? (chalk ? [255, 255, 255] : [234, 205, 139]) : (chalk ? [222, 207, 172] : [124, 104, 79]);
     for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
       const i = y * w + x, o = i * 4;
       let a = src[o + 3] / 255;
@@ -121,15 +121,15 @@ export class ToolingPainter {
       const ny = (surface[i - w] - surface[i + w]) * 1.8;
       const rake = (-nx * .48 - ny * .78) / Math.hypot(nx, ny, 1);
       const grain = noise(x, y) - .5;
-      // Gold has a broad polished face, a dark reflected band, fine leaf
-      // wrinkles, and bright bevels. Leather has a compressed, porous floor.
-      const sweep = raised ? .15 * Math.sin(y / h * 26 + x / w * 2)
-        + .07 * Math.sin(y * .19 + Math.sin(x * .07)) : .035 * Math.sin(x * .22 + y * .41);
-      const v = clamp(.50 + rake * .95 + sweep + grain * (raised ? .07 : .15));
+      // Satin gold keeps the broad reflection but softens the bright edge
+      // and fine wrinkles. Leather's shallow tooling lets the mat show through.
+      const sweep = raised ? .10 * Math.sin(y / h * 26 + x / w * 2)
+        + .035 * Math.sin(y * .19 + Math.sin(x * .07)) : .025 * Math.sin(x * .22 + y * .41);
+      const v = clamp(.50 + rake * (raised ? .75 : .68) + sweep + grain * (raised ? .04 : .10));
       const from = v < .5 ? low : face, to = v < .5 ? face : light;
       const blend = v < .5 ? v * 2 : (v - .5) * 2;
       for (let k = 0; k < 3; k++) out[o + k] = from[k] + (to[k] - from[k]) * blend;
-      out[o + 3] = a * 255;
+      out[o + 3] = a * 255 * (raised ? 1 : .85);
     }
     this.fx.putImageData(this.pixels, 0, 0);
     target.save();
@@ -155,9 +155,10 @@ export class ToolingPainter {
     cartouche(target, left, top, fw, fh, 25);
     target.save(); target.clip();
     const ground = target.createLinearGradient(0, top, 0, h - top);
-    ground.addColorStop(0, 'rgba(72,36,18,.60)');
-    ground.addColorStop(.48, 'rgba(148,91,45,.65)');
-    ground.addColorStop(1, 'rgba(85,45,23,.58)');
+    // A restrained compression tint, not the bright centre of a bronze plate.
+    ground.addColorStop(0, 'rgba(65,43,29,.30)');
+    ground.addColorStop(.48, 'rgba(104,75,51,.36)');
+    ground.addColorStop(1, 'rgba(74,51,34,.30)');
     target.fillStyle = ground; target.fillRect(left, top, fw, fh);
     // Tiny paired pores, stable across names, rather than random grain that
     // crawls whenever a player joins. The felt remains visible through them.
