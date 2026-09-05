@@ -284,6 +284,12 @@ const TRIS = QUADS * 2;                   // 48 per placard, 384 for the rig
 export const STYLES = Object.freeze(['tent', 'plate', 'inlay', 'stamp', 'embossed']);
 export const INK_MODES = Object.freeze(['steady', 'ghost']);
 export const INK_TONES = Object.freeze(['ink', 'chalk']);
+// What the emboss puts either side of the name (`cards.flourish`, 2026-09-04,
+// Joe: "make an option to remove the lozenges entirely… and see if you can fix
+// them"). `full` is the tray's own figure, `rule` the hairlines alone, `none`
+// the bare name — which also hands the fitter back the room the lozenges were
+// reserving, so a long name prints longer with the ornament off.
+export const FLOURISHES = Object.freeze(['full', 'rule', 'none']);
 
 // The plaque: the tent's own holder, lower and without the card. BASE_H is the
 // tent's 0.14; a plate that keeps it reads as a holder somebody took the card
@@ -322,6 +328,7 @@ const INK_VERTS = INK_QUADS * 4;
 const DRESS_DEF = Object.freeze({
   style: 'inlay',
   scale: 1,
+  flourish: 'full',
   inset: 0.60,
   ink: Object.freeze({ mode: 'steady', rest: 0.55, tone: 'ink' }),
   wash: Object.freeze({ state: 'enabled', peak: 0.62 }),
@@ -356,10 +363,19 @@ const EMBOSS_TRACK = 0.18;     // em; css .tray-line2 .roll-cue is 0.3em on a 4-
 // against a 24px font — 1px rule, 5px lozenge, 46px sweep — so they are stated
 // that way here and they scale with the fitter, as the plate's do with its.
 const EMBOSS_RULE = 1.9;       // the hairline's length, in ems (css 46px / 24px)
-const EMBOSS_GAP = 0.35;       // between the lozenge and the first letter, in ems
 const EMBOSS_LOZENGE = 0.21;   // the rotated square's side (css 5px / 24px)
-const EMBOSS_HAIR = 0.042;     // the hairline's weight (css 1px / 24px)
-const EMBOSS_RULE_A = 0.6;     // css .cue-rule opacity
+// …AND THREE NUMBERS THE CSS CANNOT GIVE, because the plate and the felt are
+// not the same ground (Joe, 2026-09-04, on the shipped emboss: "I can't really
+// see the lines to the sides from the lozenges"). In the panel a 1px rule at
+// 0.6 alpha sits on LIT BRONZE, an inch from the reader's eye, in DOM pixels.
+// Out here the same figure is sepia ink on a dark felt, projected small, and
+// half of its length is a fade to nothing — measured off his frame, the
+// visible part averaged about 18% alpha over three screen pixels, which is
+// not a line, it is a rumour of one. So the weight goes up, the fade runs at
+// nearly full ink, and the gap closes to give the sweep somewhere to be.
+const EMBOSS_GAP = 0.22;       // between the word and the lozenge, in ems (was 0.35)
+const EMBOSS_HAIR = 0.075;     // the hairline's weight (css says 0.042 of the type)
+const EMBOSS_RULE_A = 0.9;     // css .cue-rule is 0.6, against bronze
 // THE CATCH-LIGHT ON THE CREST, and it is a catch-light rather than a leaf
 // (Joe, 2026-09-04, on the first emboss: "I was imagining the embossed one to
 // have the same raised text as stamped, but with the color just slightly more
@@ -836,7 +852,11 @@ export class PlacardRig {
     // lives — and the difference was a whole letter: "Thorbjörn" fitted as
     // "Thorbjö…" with both reserved and whole with one. Measured, not
     // reasoned: the gate below prints what each dress shows for the same name.
-    const reserve = (fp) => (tracked ? 2 * fp * EMBOSS_LOZENGE : 0);
+    // …and only where a lozenge is actually going to be drawn: with the
+    // ornament off, that room goes back to the name, which is the second half
+    // of what `flourish: none` is for.
+    const reserve = (fp) => (tracked && this.dress.flourish === 'full'
+      ? 2 * fp * EMBOSS_LOZENGE : 0);
     const floor = tracked ? FONT_MIN_TRACKED : FONT_MIN;
     while (f > floor && wide(name) > room - reserve(f)) {
       f -= 2;
@@ -867,6 +887,7 @@ export class PlacardRig {
     x.textBaseline = 'middle';
     const cx = U_CARD[0] * ATLAS_W + w / 2;
     const cy = y + ROW_PX / 2 + ROW_PX * 0.016;
+    if (this.dress.style !== 'embossed') this._orn = null;
     if (this.dress.style === 'stamp') {
       this._paintStamp(slot, shown, f, inkColor);
     } else if (this.dress.style === 'embossed') {
@@ -1099,10 +1120,19 @@ export class PlacardRig {
     // somebody's name and not a label, and 'MX. QUILL' is not what they wrote.
     const track = fontPx * EMBOSS_TRACK;
     const chars = [...shown];
+    // MEASURED ONCE, DRAWN THREE TIMES. The layout used to be computed inside
+    // `mark`, which runs once per pass — three identical `measureText` walks
+    // per row, and three chances for the passes to disagree about where the
+    // ornament goes if any of it ever stopped being a pure function. It is one
+    // object now, and it is also what `budget().ornament` reports, so the
+    // thing the gate asserts is the thing that was drawn.
+    const probe = this._scratchRow(w);
+    probe.setTransform(1, 0, 0, 1, 0, 0);
+    probe.font = `700 ${fontPx}px Georgia, serif`;
+    const widths = chars.map((c) => probe.measureText(c).width);
+    const total = widths.reduce((a, b) => a + b, 0) + track * Math.max(0, chars.length - 1);
     const glyphs = (ctx) => {
       ctx.font = `700 ${fontPx}px Georgia, serif`;
-      const widths = chars.map((c) => ctx.measureText(c).width);
-      const total = widths.reduce((a, b) => a + b, 0) + track * Math.max(0, chars.length - 1);
       let cx = w / 2 - total / 2;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
@@ -1110,55 +1140,85 @@ export class PlacardRig {
         ctx.fillText(chars[i], cx, midY);
         cx += widths[i] + track;
       }
-      return total;
     };
     // THE FLOURISH, css `.cue-rule`: a hairline that fades OUT of the plate
     // and lands in a lozenge beside the word. Its length is what is left
     // after the word, capped, so a long name gets a short rule and a two
     // letter one gets the full sweep — which is what the flex `0 1 46px` does
     // in the panel.
-    const mark = (ctx) => {
-      const total = glyphs(ctx);
-      const hair = Math.max(1, fontPx * EMBOSS_HAIR);
-      const loz = fontPx * EMBOSS_LOZENGE;
-      const gap = fontPx * EMBOSS_GAP;
-      // THE LOZENGE IS NOT OPTIONAL AND THE RULE IS. Found by looking, at 3×:
-      // "Priya" came back with no ornament at all, because a single `return`
-      // guarded both — so on any name long enough to crowd the sweep, the
-      // dress lost the very figure that makes it this dress, and the fitter
-      // was reserving room for a mark nobody drew. The rule is the luxury (it
-      // is what the panel's own `flex: 0 1 46px` gives up first); the pair of
-      // lozenges is the identity, and it is what `reserve()` pays for.
+    // THE ORNAMENT'S LAYOUT, in the band's own pixels, outward from the word.
+    // Everything below reads it; nothing below recomputes it.
+    //
+    // THE RULE BEGINS WHERE THE LOZENGE ENDS, and getting that wrong is what
+      // made the sweeps invisible (Joe: "I can't really see the lines to the
+      // sides from the lozenges"). The css figure is a hairline SOLID where it
+      // meets the word and fading outward, with the lozenge sitting at that
+      // solid end. Drawn literally, the lozenge lands ON the only part of the
+      // rule with any ink in it, and what is left showing is the tail that
+      // fades to nothing — so the ornament was a diamond with an invisible
+      // smudge beside it. The order outward from the word is now: gap,
+      // lozenge, THEN the rule, solid at the lozenge and fading away from it.
+      //
+      // THE LOZENGE IS NOT OPTIONAL AND THE RULE IS. Found by looking earlier
+      // in the same pass: "Priya" came back with no ornament at all, because a
+      // single `return` guarded both — so any name long enough to crowd the
+      // sweep lost the figure that makes it this dress, while the fitter went
+      // on reserving room for a mark nobody drew. The rule is what the panel's
+      // own `flex: 0 1 46px` gives up first; the pair of lozenges is the
+      // identity, and it is what `reserve()` pays for.
       //
       // THE GAP GIVES WAY BEFORE THE LOZENGE DOES, for the same reason: on a
       // crowded name the lozenge moves IN toward the word rather than out past
       // the gutter and off the band. `avail` is the room outboard of the word,
       // and `reserve()` guarantees it is always at least the lozenge's own
       // width — so this clamp never has to drop one.
-      const avail = (w / 2 - INK_GUTTER) - total / 2;
-      const g0 = Math.min(gap, Math.max(0, avail - loz * 1.2));
-      const room = avail - g0 - loz;
-      const len = Math.max(0, Math.min(fontPx * EMBOSS_RULE, room));
+    const wants = this.dress.flourish;
+    const showLoz = wants === 'full';
+    const hair = Math.max(1, fontPx * EMBOSS_HAIR);
+    const loz = fontPx * EMBOSS_LOZENGE;
+    const lozW = showLoz ? loz : 0;
+    const avail = (w / 2 - INK_GUTTER) - total / 2;
+    const g0 = Math.min(fontPx * EMBOSS_GAP, Math.max(0, avail - lozW * 1.2));
+    const len = wants === 'none' ? 0
+      : Math.max(0, Math.min(fontPx * EMBOSS_RULE, avail - g0 - lozW));
+    // …as offsets from the word's own edge, which is what makes them
+    // comparable: `lozOut` is where the diamond stops and `ruleAt` where the
+    // hairline starts, and the whole of the defect this pass fixed is that the
+    // second used to be smaller than the first.
+    const lay = {
+      flourish: wants, total, hair, gap: g0, len,
+      loz: lozW, lozOut: g0 + lozW, ruleAt: g0 + lozW,
+      alpha: EMBOSS_RULE_A, press,
+    };
+    this._orn = lay;
+
+    const mark = (ctx) => {
+      glyphs(ctx);
+      if (wants === 'none') { ctx.fillStyle = '#000000'; return; }
       ctx.save();
       ctx.globalAlpha = EMBOSS_RULE_A;
       for (const side of [-1, 1]) {
         const inner = w / 2 + side * (total / 2 + g0);
-        if (len > 0) {
-          // the inner end (beside the word) is solid; the outer fades to nothing
-          const outer = inner + side * len;
-          const g = ctx.createLinearGradient(outer, 0, inner, 0);
-          g.addColorStop(0, 'rgba(0,0,0,0)');
-          g.addColorStop(1, 'rgba(0,0,0,1)');
-          ctx.fillStyle = g;
-          ctx.fillRect(Math.min(inner, outer), midY - hair / 2, len, hair);
+        if (showLoz) {
+          // the lozenge first, its inner point at the end of the gap
+          ctx.save();
+          ctx.translate(inner + side * loz * 0.5, midY);
+          ctx.rotate(Math.PI / 4);
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(-loz / 2, -loz / 2, loz, loz);
+          ctx.restore();
         }
-        // …and the lozenge: the rotated square, at the inner end, always
-        ctx.save();
-        ctx.translate(inner + side * loz * 0.7, midY);
-        ctx.rotate(Math.PI / 4);
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(-loz / 2, -loz / 2, loz, loz);
-        ctx.restore();
+        if (len > 0) {
+          // …then the rule, starting where the lozenge stops: SOLID there,
+          // fading to nothing outward, which is the css gradient's own sense.
+          const start = inner + side * lozW;
+          const end = start + side * len;
+          const g = ctx.createLinearGradient(start, 0, end, 0);
+          g.addColorStop(0, 'rgba(0,0,0,1)');
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = g;
+          ctx.fillRect(Math.min(start, end), midY - hair / 2, len, hair);
+        }
       }
       ctx.restore();
       ctx.fillStyle = '#000000';
@@ -1628,7 +1688,7 @@ export class PlacardRig {
     // stamp and the inlay share a transparent ground and paint COMPLETELY
     // differently on it, so a key that could not tell them apart would leave
     // eight plain names on the felt the first time you switched between them.
-    const key = `${this.dress.style}:${this.dress.ink.tone}`;
+    const key = `${this.dress.style}:${this.dress.ink.tone}:${this.dress.flourish}`;
     const redress = this.paintedKey !== key;
     this.paintedKey = key;
     for (let slot = 0; slot < PLACE_MAX; slot++) {
@@ -1730,6 +1790,7 @@ export class PlacardRig {
     const now = { ...this.dress, ink: { ...this.dress.ink } };
     if (typeof d.style === 'string' && STYLES.includes(d.style)) now.style = d.style;
     if (Number.isFinite(d.scale)) now.scale = d.scale;
+    if (typeof d.flourish === 'string' && FLOURISHES.includes(d.flourish)) now.flourish = d.flourish;
     if (Number.isFinite(d.inset)) now.inset = d.inset;
     const wash = d.wash;
     if (wash && typeof wash === 'object') {
@@ -1744,7 +1805,7 @@ export class PlacardRig {
       if (Number.isFinite(ink.rest)) now.ink.rest = Math.min(1, Math.max(0, ink.rest));
     }
     const same = now.style === this.dress.style && now.inset === this.dress.inset
-      && now.scale === this.dress.scale
+      && now.scale === this.dress.scale && now.flourish === this.dress.flourish
       && now.ink.mode === this.dress.ink.mode && now.ink.tone === this.dress.ink.tone
       && now.ink.rest === this.dress.ink.rest
       && now.wash.state === this.dress.wash.state && now.wash.peak === this.dress.wash.peak;
@@ -1975,6 +2036,7 @@ export class PlacardRig {
     this.albedo = null; this.orm = null; this.emissive = null;
     this.canvas = null; this.ctx = null; this.ormCtx = null;
     this._scratch = null; this._scratchCtx = null;
+    this._orn = null;
     this.built = false;
     this.pad = null;
     this.worn = null;
@@ -2008,9 +2070,13 @@ export class PlacardRig {
         : null,
       inset: this.worn ? this.worn.inset : this.dress.inset,
       scale: this.worn ? this.worn.scale : this.dress.scale,
+      flourish: this.worn ? this.worn.flourish : this.dress.flourish,
       // the ink band's own size and density, the flat styles' answer to
       // `face` below — the number that says this is not the floor atlas
       band: this._bandInfo(),
+      // …and the emboss's ornament as it was last LAID OUT, in band pixels
+      // outward from the word: null under every other dress.
+      ornament: this._orn ? { ...this._orn } : null,
       atlasPx: ATLAS_W,
       atlasH: ATLAS_H,
       rows: PLACE_MAX,

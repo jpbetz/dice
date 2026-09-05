@@ -22526,8 +22526,15 @@ export const scenarios = [
         // This scenario is the tent's gate and the tent is the control the
         // other two dresses are judged against, so it wears it rather than
         // inheriting whatever the table happens to ship with.
-        assert.deepEqual((await a.dbg(`tuneSet({'cards.style': 'tent'})`)).refused, [],
-          'the tent is still one word away');
+        // AT UNIT SIZE TOO (2026-09-04, second lesson of the same day). Every
+        // number below — the face against a d6's edge, the ridge, the 185.5 px
+        // per world unit — is a claim about the CARD'S OWN PROPORTIONS, and
+        // `cards.scale` is a dial the owner moves (1.8 as of `08153a3`). It
+        // went red at 103.1 px per unit on a change that was about a different
+        // dress entirely, which is a gate measuring the owner's taste instead
+        // of the design. The dress AND its size are both stated here.
+        assert.deepEqual((await a.dbg(`tuneSet({'cards.style': 'tent', 'cards.scale': 1})`)).refused, [],
+          'the tent at its authored size is still one word away');
         await a.waitFor('window.__diceDebug.places().stations.length === 8',
           { desc: 'a full house of eight cards' });
         await a.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
@@ -29761,20 +29768,33 @@ export const scenarios = [
           Math.hypot(st.world.x, st.world.z)]);
 
       const STYLES = ['tent', 'plate', 'inlay', 'stamp', 'embossed'];
+      const STYLES_ALL = STYLES;
       // THE LIST IS PINNED FROM BOTH SIDES — every word the tree offers is
       // worn below, and a word it does not offer is refused here. Between the
       // two, js/tune.js's hand copy of js/placard.js STYLES cannot drift
       // without a red: a name added there and not here is never worn, and one
       // dropped there is refused by this line.
+      // WHAT THE FILE SHIPS IS READ, NOT SPELLED OUT. This line used to name
+      // the dress ('inlay') and went red the first time the owner tuned the
+      // panel and saved (`08153a3`) — a scenario about whether an unknown word
+      // is refused has no business also being a copy of dice.yaml. The claim
+      // is that the refusal leaves the value WHERE IT WAS, whatever that is.
+      const shipped = await t.dbg(`tuneGet('cards.style')`);
+      assert.ok(STYLES_ALL.includes(shipped), `the file ships a dress this build has (${shipped})`);
       assert.deepEqual((await t.dbg(`tuneSet({'cards.style': 'obelisk'})`)).refused,
         [['cards.style', 'option']], 'a dress nobody wrote is refused, not drawn');
-      assert.equal(await t.dbg(`tuneGet('cards.style')`), 'inlay',
+      assert.equal(await t.dbg(`tuneGet('cards.style')`), shipped,
         'and the value never moved off the shipped dress');
       const base = { ring: await ring() };
       const seen = {};
       const seenText = {};   // what the plain inlay prints, per station
       for (const style of STYLES) {
-        assert.deepEqual((await t.dbg(`tuneSet({'cards.style': ${JSON.stringify(style)}})`)).refused, [],
+        // AT UNIT SIZE, because the density below is a claim about the
+        // MECHANISM and not about the owner's current taste: `cards.scale` is
+        // a dial he moves (1.8 as of `08153a3`), and a band scaled up is
+        // legitimately fewer px per world unit. The shipped size gets its own
+        // assertion after the walk.
+        assert.deepEqual((await t.dbg(`tuneSet({'cards.style': ${JSON.stringify(style)}, 'cards.scale': 1})`)).refused, [],
           `${style} is an option the tree accepts`);
         await settled();
         const dress = await t.dbg('placardDress()');
@@ -29829,6 +29849,28 @@ export const scenarios = [
           + `(${band.pxPerUnit.toFixed(1)} vs ${band.pxPerUnitDown.toFixed(1)})`);
       }
 
+      // …AND AT WHATEVER SIZE THE FILE ACTUALLY SHIPS. The floor here is not
+      // the 150 above: it is the distance from the thing that failed. The
+      // retired mat inscription had 12.8 px per world unit, and the point is
+      // that no size this dial can reach brings the ink near it.
+      await t.dbg(`tuneReset('cards.scale')`);
+      await t.dbg(`tuneSet({'cards.style': 'inlay'})`);
+      await settled();
+      const shippedScale = await t.dbg(`tuneGet('cards.scale')`);
+      const atShipped = (await t.dbg('placardBudget()')).band;
+      assert.ok(atShipped.pxPerUnit >= 50,
+        `at the shipped size the band is ${atShipped.pxPerUnit.toFixed(1)} px per world unit — `
+        + 'the floor atlas that retired mat inscriptions gave 12.8');
+      // …AND IT IS REALLY THE SHIPPED SIZE. Without this line the assertion
+      // above cannot tell the shipped scale from the unit one — both clear 50
+      // — so a `tuneReset` that quietly did nothing would read exactly like a
+      // passing gate. Density falls as the band grows, so the product is the
+      // invariant: this size times this scale is the size measured in the walk.
+      assert.ok(Math.abs(atShipped.pxPerUnit * shippedScale - seen.inlay.band.pxPerUnit) < 1,
+        `the band was measured at the file's own scale ${shippedScale} `
+        + `(${atShipped.pxPerUnit.toFixed(1)} x ${shippedScale} against the unit-size `
+        + `${seen.inlay.band.pxPerUnit.toFixed(1)})`);
+
       // ---- the cost --------------------------------------------------------
       assert.equal(seen.tent.materials, 1, 'the tent is one material, as it always was');
       assert.equal(seen.inlay.materials, 2, 'a flat style pays one more: paint that fades cannot ride an opaque rig');
@@ -29860,6 +29902,12 @@ export const scenarios = [
       // that matter: the card actually grows (it never did — CARD_W was a
       // const and `cards.width` moved the holder under it), and the FOOTPRINT
       // and the ring do not move with it, which is what keeps this `look`.
+      // FROM A KNOWN BASE. `cards.scale` ships at whatever the owner last
+      // saved (1.8 as of `08153a3`), so a leg that reads "the card grew ×1.6"
+      // has to say what it grew FROM — otherwise it compares a 1.6 against a
+      // 1.8 and calls the dial broken.
+      await t.dbg(`tuneSet({'cards.scale': 1})`);
+      await settled();
       const face1 = (await t.dbg('placardBudget()')).face;
       const pad1 = (await t.dbg('placardBudget()')).base;
       await t.dbg(`tuneSet({'cards.scale': 1.6})`);
@@ -29884,6 +29932,49 @@ export const scenarios = [
         'and its density falls as it grows, reported rather than assumed '
         + `(${band2.pxPerUnit.toFixed(1)} from ${band1.pxPerUnit.toFixed(1)})`);
       await t.dbg(`tuneSet({'cards.scale': 1})`);
+      await settled();
+
+      // ---- the emboss's ornament -------------------------------------------
+      // `cards.flourish`, and the geometry the FIRST build of it got wrong
+      // (Joe, on the shipped emboss: "I can't really see the lines to the
+      // sides from the lozenges"). The css figure is a hairline solid where it
+      // meets the word and fading outward, with the lozenge at that solid end
+      // — so drawn literally the lozenge covers the only part of the rule with
+      // ink in it, and what shows is a diamond beside an invisible smudge.
+      // That is a LAYOUT fact and therefore gateable: the rule must begin
+      // where the lozenge stops.
+      await t.dbg(`tuneSet({'cards.style': 'embossed', 'cards.scale': 1, 'cards.flourish': 'full'})`);
+      await settled();
+      const orn = (await t.dbg('placardBudget()')).ornament;
+      assert.ok(orn, 'the emboss reports the ornament it laid out');
+      assert.equal(orn.flourish, 'full');
+      assert.ok(orn.loz > 0, `a lozenge is drawn (${orn.loz})`);
+      assert.ok(orn.len > 0, `and a rule beside it (${orn.len})`);
+      assert.ok(orn.ruleAt >= orn.lozOut - 1e-9,
+        `the rule begins where the lozenge stops (${orn.ruleAt} against ${orn.lozOut}) — `
+        + 'overlapping them hides the only part of the sweep with ink in it');
+      // …and the two states that take it away. `none` also hands the fitter
+      // back the width the lozenges reserve, which is the half of this dial
+      // that is about the READ rather than about taste.
+      const wordAt = async (f) => {
+        await t.dbg(`tuneSet({'cards.flourish': ${JSON.stringify(f)}})`);
+        await settled();
+        const b = await t.dbg('placardBudget()');
+        const longest = (await t.dbg('places()')).stations
+          .map((st) => st.shown).sort((a, b2) => b2.length - a.length)[0];
+        return { orn: b.ornament, longest };
+      };
+      const ruleOnly = await wordAt('rule');
+      assert.equal(ruleOnly.orn.loz, 0, 'rule: the lozenges are gone');
+      assert.ok(ruleOnly.orn.len > 0, 'rule: and the hairlines are not');
+      const bare = await wordAt('none');
+      assert.equal(bare.orn.loz, 0, 'none: no lozenge');
+      assert.equal(bare.orn.len, 0, 'none: and no rule');
+      const full = await wordAt('full');
+      assert.ok(bare.longest.length >= full.longest.length,
+        `none gives the reserved width back to the name ("${bare.longest}" against `
+        + `"${full.longest}")`);
+      await t.dbg(`tuneReset('cards')`);
       await settled();
 
       // ---- the wash dial ---------------------------------------------------
@@ -29953,9 +30044,10 @@ export const scenarios = [
       await t.dbg(`tuneReset('cards')`);
       await settled();
       const back = await t.dbg('placardDress()');
-      assert.equal(back.worn.style, 'inlay', 'reset puts the table back in its shipped dress');
+      assert.equal(back.worn.style, shipped,
+        'reset puts the table back in the dress the file ships');
       assert.equal(back.worn.wash.state, 'enabled', 'and lights the arc again');
-      assert.equal(back.worn.scale, 1, 'at the shipped size');
+      assert.equal(back.worn.scale, await t.dbg(`tuneGet('cards.scale')`), 'at the shipped size');
       assert.deepEqual(t.page.consoleErrors, []);
     },
   },

@@ -419,16 +419,19 @@ t('the laws travel with the dial tree, so the tool and the route refuse what `tu
 // holding depth 3.9).
 t('the armed route judges a posted half-pair against the checkout it would patch', () => {
   const local = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
+  const before = parseYaml(local).tree.cards;
   const deep = applyChanges(local, { 'cards.standoff': 2.2, 'cards.depth': 3.9 });
   assert.deepEqual(deep.problems, [], 'the legal pair lands');
-  assert.deepEqual(parseYaml(deep.text).tree.cards, {
-    standoff: 2.2, width: 3.68, depth: 3.9,
-    // the dress rides along untouched: it is `look` and this pair is `film`,
-    // and the geometry law below is about the two numbers, not the five
-    style: 'inlay', scale: 1, inset: 0.6,
-    ink: { mode: 'steady', rest: 0.55, tone: 'ink' },
-    wash: { state: 'enabled', peak: 0.62 },
-  });
+  // THE DRESS RIDES ALONG UNTOUCHED — asserted against what the FILE held, not
+  // against a copy of it. This line used to spell the dress out leaf by leaf,
+  // which made it a second dice.yaml: it went red the first time the owner
+  // tuned the panel and saved (`08153a3`, style embossed at scale 1.8), on a
+  // change that had nothing to do with what this test is about. The claim here
+  // is that a film pair moves and the look leaves beside it do not, whatever
+  // they happen to be set to.
+  assert.deepEqual(parseYaml(deep.text).tree.cards,
+    { ...before, standoff: 2.2, depth: 3.9 },
+    'the two film leaves moved and every look leaf beside them stayed');
   const half = applyChanges(deep.text, { 'cards.standoff': 0.9 });
   assert.deepEqual(half.problems.map((p) => p.path), ['cards.standoff']);
   assert.match(half.problems[0].message, /a card stands outboard of the rim/);

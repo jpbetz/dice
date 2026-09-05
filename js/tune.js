@@ -719,6 +719,8 @@ const REST_KINDS = Object.freeze(['still', 'swell', 'creak', 'settle-tick']);
 const PLACARD_STYLES = Object.freeze(['tent', 'plate', 'inlay', 'stamp', 'embossed']);
 const PLACARD_INK_MODES = Object.freeze(['steady', 'ghost']);
 const PLACARD_INK_TONES = Object.freeze(['ink', 'chalk']);
+// js/placard.js FLOURISHES — what the emboss puts either side of a name.
+const PLACARD_FLOURISHES = Object.freeze(['full', 'rule', 'none']);
 
 const RECIPE = Object.freeze({
   label: look('label', 'House set', null, 'apply', 'what the picker chip says'),
@@ -1387,6 +1389,12 @@ export const DIALS = {
     scale: look('size', 1, [0.2, 4, 0.01], 'apply',
       'the printed thing\'s size — the tent\'s card panels, the flat styles\' band. '
       + 'Not the holder: that is width/depth'),
+    // THE EMBOSS'S ORNAMENT, and nothing else reads it: the stamp's border is
+    // that dress's own business and the plain inlay has no ornament to switch.
+    // `none` also hands the fitter back the width the lozenges reserve, so a
+    // long name prints longer with it off.
+    flourish: pick('flourish', 'full', PLACARD_FLOURISHES, 'look', 'apply',
+      'the emboss only: the tray\'s lozenge and its fading rule · the rule alone · the bare name'),
     inset: look('inlay inset', 0.60, [-1.5, 4, 0.01], 'apply',
       'the two bare styles: how far INSIDE the rim the ink lies, on the chair\'s own ray (0 is the rim)'),
     ink: {

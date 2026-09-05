@@ -8316,6 +8316,58 @@ shuffles twelve names and the run happened to deal four short ones, so
 sabotaging the floor left it green. It names its own cast now, as
 `placard-look` does and for the same reason.
 
+**`cards.flourish` — `full | rule | none`** (Joe, on the shipped emboss: *"I
+can't really see the lines to the sides from the lozenges. Not sure what's
+wrong with them. Make an option to remove the lozenges entirely in developer
+mode please, and see if you can fix them."*). Both halves of that, and **the
+second half was a real geometry bug, not a taste question**: the css figure is a
+hairline **solid where it meets the word and fading outward**, with the
+lozenge sitting at that solid end. Drawn literally, the lozenge lands on the
+only part of the rule with any ink in it, and what shows is a diamond beside
+an invisible smudge. The order outward from the word is now gap → lozenge →
+rule, the rule solid at the lozenge and fading away from it.
+
+**Three numbers the css could not give**, because the plate and the felt are
+not the same ground: in the panel a 1 px rule at 0.6 alpha sits on lit bronze,
+an inch from the eye, in DOM pixels; out here it is sepia ink on dark felt,
+projected small, half of its length a fade to nothing — measured off his frame,
+the visible part averaged about **18% alpha over three screen pixels**, which
+is not a line, it is a rumour of one. Weight goes 0.042 → **0.075** of the
+type, the fade runs at **0.9** rather than 0.6, and the gap closes 0.35 →
+**0.22** em to give the sweep somewhere to be.
+
+`none` is not only taste: it hands the fitter back the width the lozenges
+reserve, so a long name prints longer with the ornament off (the 23-character
+one gains a letter). The layout is **reported** (`placardBudget().ornament`,
+in band pixels outward from the word) and therefore gateable — `placard-styles`
+asserts the rule begins where the lozenge stops, and that assertion goes red
+when the overlap is put back.
+
+**Two brittleness lessons from the same day, both fixed rather than worked
+around.** The owner tuned the panel and saved (`08153a3` — embossed at scale
+1.8, inset 4), and three checks went red on a change that had nothing to do
+with what they were about: `dice-apply`'s half-pair test spelled the dress out
+leaf by leaf (it asserts *"the film pair moved and every look leaf beside it
+stayed"* now, against what the file held); `placard-styles` named `inlay` as
+the shipped dress (it reads it now); and the band-density gate was written at
+scale 1 (the mechanism claim is measured at unit size, and a second assertion
+holds the **shipped** size clear of the 12.8 that retired mat inscriptions).
+`placard-look` went the same way an hour later — every number in it is a claim
+about the *card's own proportions*, so it states the size as well as the dress
+now.
+
+**A test that spells out a value the owner is expected to tune is a second
+copy of `dice.yaml`** — and a gate that inherits a dial it is not about is
+measuring taste instead of design. Both shapes will recur as dials land: state
+the size you mean, or read the one the file ships.
+
+**And the shipped-size assertion could not fail when first written** — the
+vacuous-gate trap, twice in two days: both the shipped scale and the unit one
+clear the floor, so a `tuneReset` that quietly did nothing would have read
+exactly like a pass. Density falls as a band grows, so the product is the
+invariant, and the gate asserts *this size × this scale = the size measured at
+unit scale*, which only holds if the reset actually happened.
+
 **Found by looking, in the emboss's second turn:** "Priya" came back with **no
 ornament at all**. One `return` guarded both halves of the flourish, so on any
 name long enough to crowd the sweep the dress lost the very figure that makes
