@@ -10734,27 +10734,61 @@ export const scenarios = [
         { desc: 'a quiet rAF frame is drawn after the roll settles' });
       const plain = await a.dbg('renderAudit()');
       assert.equal(plain.post, false, 'a quiet frame does not pay for the post stack');
-      // THE DUAL GATE (UX §7.63). This tab is online and therefore holds a
-      // place, so a placard is standing in every frame above: the budget has
-      // to be read BOTH ways or a baseline regression hides behind the new
-      // feature's allowance. The cards' own cost is the difference, measured
-      // on one frame rather than remembered from two runs.
-      assert.equal((await a.dbg('places()')).on, true,
-        'the tab holds a place, so the cards are in this frame — otherwise the '
-        + 'leg below measures the same thing twice and proves nothing');
-      assert.ok(plain.calls <= 200,
-        `the worst plain frame WITH the cards stays under budget (measured 188, got ${plain.calls})`);
+      // THE DUAL GATE (UX §7.63) — REPAIRED 2026-09-04, and it had been
+      // IMPOSSIBLE, not flaky, since the day it stopped being true.
+      //
+      // It read `places().on === true` and called that "a placard is standing
+      // in every frame above". `on` means THIS TAB HOLDS A STATION. On
+      // 2026-09-02 a table of one stopped standing a card at all (Joe: "Single
+      // player doesn't need a name tag. It feels more than a little silly" —
+      // js/main.js placardRebuild, `rows.length >= 2 ? rows : []`), and this
+      // tab is `allowSolo: true`. So from that day the guard passed, no card
+      // was standing, `placardShow(false)` hid nothing, the draw count never
+      // moved and the wait below timed out on every run. A gate that cannot
+      // pass is worth exactly as much as one that cannot fail, and this one is
+      // the only thing standing between a placard draw-call regression and the
+      // suite — which matters more now that there are five dresses.
+      //
+      // So the leg SEATS SOMEBODY. A second chair is what makes cards exist,
+      // and it is asserted through the rig's own occupancy rather than through
+      // the roster, because the roster is what lied last time.
+      await ctx.rawPlayer('Bo');
+      await a.waitFor('window.__diceDebug.placardBudget().occupied >= 2',
+        { desc: 'a second chair, so cards actually stand' });
+      await a.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued',
+        { desc: 'and the rig agrees with the roster' });
+      await a.dbg('sim(30)');
+      const withCards = await a.dbg('renderAudit()');
+      // READ WHILE THEY ARE STANDING. `placardBudget().draws` reports what the
+      // rig costs IN THIS FRAME, so asking it after `placardShow(false)` gets
+      // the honest answer to a different question: 0.
+      const rig = await a.dbg('placardBudget()');
+      assert.ok(withCards.calls <= 200,
+        `the worst plain frame WITH the cards stays under budget (got ${withCards.calls})`);
       await a.dbg('placardShow(false)');
-      await a.waitFor(`window.__diceDebug.renderAudit().calls < ${plain.calls}`,
+      await a.waitFor(`window.__diceDebug.renderAudit().calls < ${withCards.calls}`,
         { desc: 'a frame drawn without the placard rig' });
       const bare = await a.dbg('renderAudit()');
-      assert.ok(bare.calls <= 186,
-        `and the same frame WITHOUT them is still the 186 it was measured at (got ${bare.calls})`);
-      assert.ok(plain.calls - bare.calls <= 2,
-        `the whole eight-station rig is the mesh and its shadow — two calls `
-        + `(got ${plain.calls - bare.calls})`);
+      // THE COST IS THE RIG'S OWN REPORT, not a remembered constant. The five
+      // dresses do not cost the same — the tent is a mesh plus its shadow pass
+      // and the three bare styles are one transparent quad and no shadow at
+      // all — so a hard-coded 2 here would be a number about whichever dress
+      // the file happened to ship. `placardBudget().draws` is what the rig says
+      // it costs; this is the frame agreeing with it.
+      //
+      // AND THE FIRST THING IT CAUGHT was the rig lying by one. A material
+      // that is both `transparent` and `DoubleSide` is drawn TWICE by three.js
+      // (back faces, then front), so every flat dress cost two calls while
+      // reporting one — invisible for as long as this leg could not run. The
+      // ink is `FrontSide` now: the quad's normal is +y by construction and
+      // the camera is never under the felt.
+      assert.equal(withCards.calls - bare.calls, rig.draws,
+        `the cards' cost in the frame is the cost the rig reports (${withCards.calls} − `
+        + `${bare.calls} against ${rig.draws} for the ${rig.style})`);
+      assert.ok(rig.draws <= 2,
+        `and the whole eight-station rig is at most two calls (got ${rig.draws} for the ${rig.style})`);
       await a.dbg('placardShow(true)');
-      await a.waitFor(`window.__diceDebug.renderAudit().calls === ${plain.calls}`,
+      await a.waitFor(`window.__diceDebug.renderAudit().calls === ${withCards.calls}`,
         { desc: 'the cards come back' });
       // THE CLAMP, ASSERTED RATHER THAN REMEMBERED. IMMERSION-AUDIT §10 called
       // this an open gap for days; `git log -S` says the clamp has been there
@@ -22975,6 +23009,11 @@ export const scenarios = [
             { desc: `seated at ${k} of ${n}, cards agree with the roster` });
         };
         const record = [];
+        // WHAT THE FILE SHIPS, read rather than named: the dress and how many
+        // quads a name is under it (the tent prints on two panels, every flat
+        // style on one).
+        const shippedDress = await t.dbg(`tuneGet('cards.style')`);
+        const shippedInks = shippedDress === 'tent' ? 2 : 1;
         const barB = [];
         // A TABLE OF ONE STANDS NO CARD (Joe, 2026-09-02): the seat is yours,
         // the card appears with the second chair.
@@ -23108,6 +23147,11 @@ export const scenarios = [
         await t.dbg(`setZoom('wide')`);
         await t.waitFor(`window.__diceDebug.zoom === 'wide'`, { desc: 'wide' });
         const record = [];
+        // WHAT THE FILE SHIPS, read rather than named: the dress and how many
+        // quads a name is under it (the tent prints on two panels, every flat
+        // style on one).
+        const shippedDress = await t.dbg(`tuneGet('cards.style')`);
+        const shippedInks = shippedDress === 'tent' ? 2 : 1;
         // BOTH DRESSES, since 2026-09-04 (UX §7.65). G1 is a claim about the
         // OWN NAME and the result banner sharing the bottom centre of the
         // screen, and that is true of whatever the name is printed on — so it
@@ -23115,8 +23159,20 @@ export const scenarios = [
         // pinned to one and quietly stopping being about the table people see.
         // The only style-shaped number in here is how many quads a name is:
         // the tent prints on two panels and every flat style on one.
-        for (const [style, inks] of [['inlay', 1], ['tent', 2]]) {
-        assert.deepEqual((await t.dbg(`tuneSet({'cards.style': ${JSON.stringify(style)}})`)).refused, []);
+        // EACH DRESS AT THE SIZE IT IS JUDGED AT, and the two are different on
+        // purpose (2026-09-04). The SHIPPED dress runs at the file's own
+        // `cards.scale`, because this leg is about the collision a player
+        // actually meets — if the owner scales the ring up until a name lands
+        // on the banner, that is a true red and worth having. The TENT runs at
+        // its AUTHORED size, because it is the historical control here and the
+        // S4 remedy ladder was measured there; at the owner's current 1.8 it
+        // puts station 6's name on the banner at N=7, which is a fact about a
+        // combination nobody ships rather than about the ring.
+        for (const [style, inks, scale] of [[shippedDress, shippedInks, null], ['tent', 2, 1]]) {
+        const patch = { 'cards.style': style };
+        if (scale !== null) patch['cards.scale'] = scale;
+        else await t.dbg(`tuneReset('cards.scale')`);
+        assert.deepEqual((await t.dbg(`tuneSet(${JSON.stringify(patch)})`)).refused, []);
         for (let n = 2; n <= 8; n++) {   // a table of one stands no card
           await t.dbg(`devDeal(${n - 1})`);
           await t.dbg('demoSit(0)');

@@ -8275,6 +8275,34 @@ Flat text is not what failed; flat text at a floor texture's resolution is.
 | stamp | 1 | 16 | 19173 | 1.33 | 37 / 15–28 |
 | embossed | 1 | 16 | 19173 | 1.33 | 37 / 14–28 |
 
+*(draws re-measured against the frame 2026-09-04 — see below; the flat dresses
+read 2 before the ink went single-sided.)*
+
+**Those draw counts were the rig's own claim, and it was under by one until
+2026-09-04.** `placardBudget().draws` counted the ink as a single call; the
+frame drew two, because a material that is both `transparent` and `DoubleSide`
+is rendered twice by three.js (back faces, then front) for sorting. Nothing
+needed the back face — the quad's normal is +y by construction (the corner
+order is fixed and a seat's azimuth is a rotation, which preserves winding) and
+the camera is above the felt at every zoom, chair and venue — so the ink is
+`FrontSide`, every flat dress is genuinely one call cheaper than it was, and
+the table above is now what the frame actually draws. Measured per dress on a
+bare scene: flat dresses 2 → **1**, the plate 4 → **3**, the tent unchanged at
+2, each equal to what the rig reports.
+
+**It went unnoticed because the gate that would have caught it could not run.**
+`scene-draw-budget`'s dual leg measures one frame with the cards and one
+without, and it guarded itself with `places().on === true` — which means *this
+tab holds a station*, not *a card is standing*. When a table of one stopped
+standing a card (2026-09-02), that guard kept passing on a solo tab while zero
+cards existed, so `placardShow(false)` hid nothing, the count never moved, and
+the leg timed out on every run from that day. **A gate that cannot pass is
+worth exactly what one that cannot fail is worth.** It seats a second chair
+now, asserts occupancy through the rig rather than the roster (the roster is
+what lied), and compares the frame's cost against `placardBudget().draws`
+instead of a remembered constant — so the five dresses each hold their own
+number, and the rig lying by one is itself a red.
+
 **The inlay is both quieter and more legible than the tent**, which the tent's
 own reasoning did not predict: the argument for the fold was that a flat plate
 "loses the far read", and on the round table what actually happens is that a

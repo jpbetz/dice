@@ -681,7 +681,21 @@ export class PlacardRig {
       transparent: true,
       depthWrite: false,
       vertexColors: true,       // vec4: rgb 1, and the ALPHA is the fade
-      side: THREE.DoubleSide,
+      // FRONT FACES ONLY, AND IT IS WORTH A DRAW CALL. A material that is both
+      // `transparent` and `DoubleSide` is rendered TWICE by three.js — back
+      // faces, then front — to get the sorting right, so every flat dress was
+      // quietly costing two calls where the rig reported one. Measured on a
+      // bare scene (tools, 2026-09-04): frame 4 → 2 with the ink hidden, i.e.
+      // 2 calls, against `placardBudget().draws` of 1; the plate 4 against 3.
+      //
+      // Nothing needs the back face. The quad's geometric normal is +y by
+      // construction — the corner order is fixed and the seat's azimuth is a
+      // ROTATION, which preserves winding — and the camera is above the felt
+      // at every zoom, every chair and every venue. So this is one call, and
+      // the number the rig reports is now the number the frame draws, which
+      // `scene-draw-budget` asserts against each other rather than against a
+      // remembered constant.
+      side: THREE.FrontSide,
     });
     this.inkMesh = new THREE.Mesh(ig, this.inkMat);
     this.inkMesh.name = 'placardInk';
