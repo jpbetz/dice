@@ -1394,7 +1394,7 @@ export const DIALS = {
     // `none` also hands the fitter back the width the lozenges reserve, so a
     // long name prints longer with it off.
     flourish: pick('flourish', 'full', PLACARD_FLOURISHES, 'look', 'apply',
-      'the emboss only: the tray\'s lozenge and its fading rule · the rule alone · the bare name'),
+      'the emboss only: leaf scrolls and diamonds · fine rules · the bare name'),
     inset: look('inlay inset', 0.60, [-1.5, 4, 0.01], 'apply',
       'the two bare styles: how far INSIDE the rim the ink lies, on the chair\'s own ray (0 is the rim)'),
     ink: {

@@ -30038,7 +30038,8 @@ export const scenarios = [
       // the arc is still computed on the film's clock, only the mesh stops
       // being drawn. Checked here rather than argued: the pair is the one
       // combination a reader would doubt.
-      assert.equal((await t.dbg('placardBudget()')).wash.peak, 0.62, 'the shipped arc');
+      assert.equal((await t.dbg('placardBudget()')).wash.peak,
+        await t.dbg("tuneGet('cards.wash.peak')"), 'the arc follows the saved brightness');
       await t.dbg(`tuneSet({'cards.wash.peak': 0.2})`);
       await settled();
       assert.equal((await t.dbg('placardBudget()')).wash.peak, 0.2, 'turned down');

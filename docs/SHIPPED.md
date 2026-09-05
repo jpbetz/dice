@@ -11,6 +11,51 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Tooled leather and raised gold placards (2026-09-05)
+
+The owner asked to significantly improve both finishes: a decorative leather
+stamp carrying a name, and a raised, gold embossed name. The inherited
+assumption was that offset copies of text, with a gold top edge, could supply
+all the material detail. They supplied an outline; the new finish shades the
+whole contour and surface.
+
+`js/placard-tooling.js` paints into the existing placard atlas on rename or
+dress change. A distance field follows each glyph's counters and serifs. The
+stamp uses an inward bevel, a dark compressed face, a burnished lip, stable
+pores, a double scored cartouche, repeated border cuts, and corner/central
+leaf sprigs. Emboss uses outward bevels, short bronze sidewalls, a soft contact
+shadow, broad gold reflections and fine leaf grain. Chalk tone gives the
+emboss a silver finish. Relief is a painted depth cue, not displaced geometry
+or a view-dependent reflection. The marks still darken with the scene.
+
+The diamond remains in the ROLL cue's family, with new paired scrolls above
+and below the name for `cards.flourish: full`; `rule` has simple rules, and
+`none` leaves the gilded name alone. Tracking drops from 0.18em to 0.08em;
+both tooled finishes can fit down to 76px before ellipsizing. The live ring,
+name orientation, fading/ghost behavior, scale, opacity and inset keep their
+existing controls. The owner's saved `dice.yaml` values were not edited.
+
+This deliberately supersedes UX §7.65's exact-copy ornament and gold-only-
+on-the-crest guidance, in response to the owner's newer, more detailed brief.
+It also replaces the three offset passes with contour shading. The atlas and
+GPU texture counts stay fixed: either bare finish costs one draw / 16
+allocated triangles. The reusable scratch canvases and fields add about
+4.7 MiB of canvas/pixel working storage while tooling is in use; teardown releases
+those references. Measured desktop repaints took about 16–19ms for stamp and
+5–10ms for emboss per name, outside the animation loop.
+
+`tools/steps/placard-tooling.mjs` captures a fixed named cast at the owner's
+saved scale (1.8), opacity (0.75) and inset (4), plus an explicitly labeled
+native-resolution material study. Desktop captures were inspected at
+1600×900. A 390×844 portrait capture also records the existing framing limit:
+most of this four-person ring is outside the empty-table phone view. These
+finishes do not change the camera; this work does not claim to fix that.
+`placard-styles` verifies styles, name fitting, anchors, ornament controls and
+ghost fading; `scene-draw-budget` verifies the draw cost. Its wash assertion
+now reads the saved brightness rather than assuming the former 0.62.
+`npm test` passed the unit and fuzz suites and all 60 smoke scenarios; both
+targeted scenarios passed after the final fitter change.
+
 ## The roll is framed before it moves (2026-08-31)
 
 **The second item in this file found by somebody playing the game**, and the

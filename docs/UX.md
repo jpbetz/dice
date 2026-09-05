@@ -8113,6 +8113,12 @@ the hooks and the harness door: [TESTING.md](TESTING.md).
 
 ### 7.65 Three dresses for a name (2026-09-04)
 
+**Current finish, 2026-09-05:** stamp and emboss now use detailed tooling,
+with recessed leather and fully gilded raised lettering. `full` adds leaf
+scrolls above/below the name; `rule` and `none` remain available. The former
+thin frame, offset-copy relief, crest-only gold and exact-copy ROLL ornament
+below are historical. See [the shipped finish update](SHIPPED.md#tooled-leather-and-raised-gold-placards-2026-09-05).
+
 Joe, on the deployed ring: *"I'd like you to try generating a few different
 placards. I'm imagining one that is not even a physical placard, just text on
 the mat surface. Very subtle. Far less distracting… We'll need developer mode
