@@ -28,6 +28,14 @@ export default async function run(stage, [dir = 'tools/out/placard-tooling']) {
   await t.dbg('setPanelState({pools: false, log: false})');
   await t.dbg('devFold(true)');
   const measures = [];
+  await t.page.browser.send('Emulation.setDeviceMetricsOverride',
+    { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
+  await t.dbg('devFold(false)');
+  await t.eval(`(() => { const f = document.querySelector('.dev-find'); f.value = 'cards'; f.dispatchEvent(new Event('input', {bubbles: true})); })()`);
+  await t.dbg("tuneSet({'cards.style': 'parchment'})");
+  await t.dbg('sim(30)');
+  await stage.shot(t, `${dir}/developer-controls.png`);
+  await t.dbg('devFold(true)');
   for (const [device, width, height] of [['desktop', 1600, 900], ['phone', 390, 844]]) {
     await t.page.browser.send('Emulation.setDeviceMetricsOverride',
       { width, height, deviceScaleFactor: 1, mobile: device === 'phone' }, t.page.sessionId);
@@ -42,7 +50,7 @@ export default async function run(stage, [dir = 'tools/out/placard-tooling']) {
     await t.dbg('setZoom("wide")');
     await t.dbg('sim(120)');
     await t.dbg('setZoom("medium")');
-    for (const [style, flourish] of [['stamp', 'full'], ['embossed', 'full'], ['embossed', 'none']]) {
+    for (const [style, flourish] of [['stamp', 'full'], ['stamp', 'none'], ['embossed', 'full'], ['parchment', 'full'], ['arcane', 'full']]) {
       await t.dbg(`tuneSet(${JSON.stringify({ 'cards.style': style, 'cards.flourish': flourish })})`);
       await t.dbg('sim(30)');
       await t.waitFor('window.__diceDebug.places().built === window.__diceDebug.places().queued');
@@ -52,6 +60,11 @@ export default async function run(stage, [dir = 'tools/out/placard-tooling']) {
       measures.push({ tag, dress: await t.dbg('placardDress()'), budget: await t.dbg('placardBudget()'),
         stations: (await t.dbg('places()')).stations });
     }
+    if (device === 'desktop') {
+      await t.dbg(`tuneSet(${JSON.stringify({ 'cards.palette.mode': 'custom', 'cards.palette.text': '#edddff', 'cards.palette.accent': '#ac8ed3', 'cards.palette.surface': '#332548', 'cards.font.family': 'book', 'cards.font.weight': 'regular', 'cards.font.spacing': .08 })})`);
+      await t.dbg('sim(30)');
+      await stage.shot(t, `${dir}/desktop-arcane-custom.png`);
+    }
   }
   // Native atlas details, using the same painter and fitter as the live rig.
   // This is a material study, explicitly separate from the scene screenshots.
@@ -60,14 +73,16 @@ export default async function run(stage, [dir = 'tools/out/placard-tooling']) {
     const THREE = await import('three');
     const rig = new PlacardRig(new THREE.Scene());
     rig._ensureBuilt();
-    const sheet = document.createElement('canvas'); sheet.width = 1280; sheet.height = 700;
-    const c = sheet.getContext('2d'); c.fillStyle = '#342a23'; c.fillRect(0, 0, 1280, 700);
+    const sheet = document.createElement('canvas'); sheet.width = 1280; sheet.height = 1050;
+    const c = sheet.getContext('2d'); c.fillStyle = '#342a23'; c.fillRect(0, 0, 1280, 1050);
     const times = [];
     for (const [i, style, tone, flourish, label] of [
       [0, 'stamp', 'ink', 'full', 'TOOLED LEATHER'],
       [1, 'embossed', 'ink', 'full', 'RAISED GOLD'],
       [2, 'embossed', 'ink', 'none', 'GOLD / NO ORNAMENT'],
       [3, 'embossed', 'chalk', 'full', 'RAISED SILVER'],
+      [4, 'parchment', 'ink', 'full', 'PARCHMENT / BOOK SERIF'],
+      [5, 'arcane', 'ink', 'full', 'ARCANE / CELESTIAL INK'],
     ]) {
       rig.dress.style = style; rig.dress.flourish = flourish; rig.dress.ink.tone = tone;
       const start = performance.now();

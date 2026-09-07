@@ -29823,7 +29823,7 @@ export const scenarios = [
         .map((st) => [st.place, st.theta, st.yaw, st.world.x, st.world.z,
           Math.hypot(st.world.x, st.world.z)]);
 
-      const STYLES = ['tent', 'plate', 'inlay', 'stamp', 'embossed'];
+      const STYLES = ['tent', 'plate', 'inlay', 'stamp', 'embossed', 'parchment', 'arcane'];
       const STYLES_ALL = STYLES;
       // THE LIST IS PINNED FROM BOTH SIDES — every word the tree offers is
       // worn below, and a word it does not offer is refused here. Between the
@@ -29894,7 +29894,7 @@ export const scenarios = [
       }
 
       // ---- the read: the CARD row's density, not the floor atlas's ---------
-      for (const style of ['plate', 'inlay', 'stamp', 'embossed']) {
+      for (const style of ['plate', 'inlay', 'stamp', 'embossed', 'parchment', 'arcane']) {
         const band = seen[style].band;
         assert.ok(band, `${style}: reports its band`);
         assert.ok(band.pxPerUnit >= 150 && band.pxPerUnitDown >= 150,
@@ -29904,6 +29904,39 @@ export const scenarios = [
           `${style}: and it is isotropic, so a glyph drawn round arrives round `
           + `(${band.pxPerUnit.toFixed(1)} vs ${band.pxPerUnitDown.toFixed(1)})`);
       }
+
+      // The actual developer controls write through the binder, re-fit long
+      // names, and survive export/reset. Seven styles share these controls.
+      const custom = {
+        'cards.palette.mode': 'custom', 'cards.palette.text': '#cceeff',
+        'cards.palette.accent': '#bb7799', 'cards.palette.surface': '#243954',
+        'cards.font.family': 'mono', 'cards.font.weight': 'regular', 'cards.font.spacing': .12,
+      };
+      await t.eval(`(() => {
+        const choose = (path, value) => document.querySelector('[data-path="' + path + '"] [data-value="' + value + '"]').click();
+        const family = document.querySelector('[data-path="cards.font.family"] select');
+        family.value = 'mono'; family.dispatchEvent(new Event('change', { bubbles: true }));
+        choose('cards.font.weight', 'regular');
+        for (const [path, value] of Object.entries(${JSON.stringify(custom)})) {
+          const row = document.querySelector('[data-path="' + path + '"]');
+          const field = row.querySelector('input[type="color"], input[type="number"]');
+          if (field) { field.value = value; field.dispatchEvent(new Event('change', { bubbles: true })); }
+        }
+      })()`);
+      await settled();
+      const customized = (await t.dbg('placardDress()')).worn;
+      assert.deepEqual(customized.font, { family: 'mono', weight: 'regular', spacing: .12 });
+      assert.deepEqual(customized.palette, { mode: 'custom', text: '#cceeff', accent: '#bb7799', surface: '#243954' });
+      assert.deepEqual(await ring(), base.ring, 'font and palette leave every station in place');
+      for (const st of (await t.dbg('places()')).stations) {
+        assert.ok(st.shown && st.fontPx >= 76, 'custom type remains fitted and visibly ellipsized when needed');
+      }
+      const exported = await t.dbg('tuneExport()');
+      assert.ok(exported.includes('#cceeff') && exported.includes('mono'), 'custom colors and type are saved by the existing export');
+      await t.dbg("tuneReset('cards.font')");
+      await t.dbg("tuneReset('cards.palette')");
+      await settled();
+      assert.equal((await t.dbg('placardDress()')).worn.palette.mode, 'theme', 'reset restores theme colors');
 
       // …AND AT WHATEVER SIZE THE FILE ACTUALLY SHIPS. The floor here is not
       // the 150 above: it is the distance from the thing that failed. The

@@ -102,6 +102,7 @@ import {
   find, diffList, status, stopKeys, fmtNum,
 } from './devui.js';
 import { assetRowPath, STATIC_PATHS } from './tune.js';
+import { paletteFor } from './placard-design.js';
 
 export const DEV_PANEL_ID = 'dev-panel';
 // Drawn, never written (DEVMODE §4). The list is tune.js's, not a copy: the
@@ -496,14 +497,23 @@ export function mount({
     const p = dotted(path);
     let cur;
     try { cur = readLeaf(path); } catch { cur = undefined; }
-    if (cur !== undefined && stringOf(cur) === stringOf(v)) { panel.repaint(); return null; }
+    const patch = {};
+    // Editing a swatch should visibly change the name immediately. Start
+    // custom from the current theme so the other two colors stay put.
+    if (/^cards\.palette\.(text|accent|surface)$/.test(p) && tune.get('cards.palette.mode') === 'theme') {
+      const palette = paletteFor(tune.get('cards'));
+      for (const key of ['text', 'accent', 'surface']) patch[`cards.palette.${key}`] = palette[key];
+      patch['cards.palette.mode'] = 'custom';
+    }
+    if (!Object.keys(patch).length && cur !== undefined && stringOf(cur) === stringOf(v)) { panel.repaint(); return null; }
+    patch[p] = v;
     let r = null;
     try {
-      r = tune.set({ [p]: v }, { filmLocked });
+      r = tune.set(patch, { filmLocked });
     } catch (e) {
       showStatus(`${p}: ${e.message}`, 'error');
     }
-    settle(r, [p]);
+    settle(r, Object.keys(patch));
     panel.repaint();
     return r;
   };
@@ -601,6 +611,7 @@ export function mount({
 
   const kindFor = (dial, value, path) => {
     if (READ_ONLY_PATHS.includes(dotted(path))) return 'static';
+    if (['cards.style', 'cards.font.family'].includes(dotted(path))) return 'select';
     if (dial && Array.isArray(dial.options)) return 'enum';
     if (typeof value === 'string' && value.startsWith('#')) return 'color';
     // A SLIDER IS A MOUSE CONTROL. On the sheet every range row is a stepper
@@ -640,6 +651,7 @@ export function mount({
     const commit = (v) => write(path, v);
     let row;
     if (kind === 'static') row = rowStatic({ label, value, why: `${why} — not a dial: set it in dice.yaml or DICE_MODE` });
+    else if (kind === 'select') row = rowSelect({ label, value, options: dial.options, onCommit: commit, why });
     else if (kind === 'enum') row = rowEnum({ label, value, options: dial.options, onCommit: commit, why });
     else if (kind === 'color') row = rowColor({ label, value, onCommit: commit, why });
     else if (kind === 'range') row = rowRange({ label, value, range: dial.range, onInput: commit, onCommit: commit, why });

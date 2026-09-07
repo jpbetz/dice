@@ -59,6 +59,7 @@ function makeTree(yaml = FILE) {
   cpSync(join(ROOT, 'tools', 'dice-apply.mjs'), join(dir, 'tools', 'dice-apply.mjs'));
   cpSync(join(ROOT, 'js', 'yaml.js'), join(dir, 'js', 'yaml.js'));
   cpSync(join(ROOT, 'js', 'tune.js'), join(dir, 'js', 'tune.js'));
+  cpSync(join(ROOT, 'js', 'placard-design.js'), join(dir, 'js', 'placard-design.js'));
   cpSync(join(ROOT, 'js', 'dice-apply-core.js'), join(dir, 'js', 'dice-apply-core.js'));
   writeFileSync(join(dir, 'dice.yaml'), yaml);
   return dir;

@@ -18,6 +18,8 @@ limitations under the License.
 // rename or dress change; the table still draws one transparent atlas quad.
 // All colour arithmetic here is sRGB canvas paint, not THREE's linear colour.
 
+import { hexRGB, mixColor } from './placard-design.js';
+
 const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
 const noise = (x, y) => {
   let n = Math.imul(x + 17, 374761393) ^ Math.imul(y + 31, 668265263);
@@ -40,19 +42,6 @@ function distance(alpha, field, w, h, inside) {
     field[i] = Math.min(field[i], field[i + 1] + 1, field[i + w] + 1,
       field[i + w + 1] + 1.4142, field[i + w - 1] + 1.4142);
   }
-}
-
-function cartouche(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w - r, y + r, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w - r, y + h - r, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x + r, y + h - r, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x + r, y + r, x + r, y);
-  ctx.closePath();
 }
 
 function diamond(ctx, x, y, r) {
@@ -98,7 +87,7 @@ export class ToolingPainter {
     c.lineJoin = c.lineCap = 'round'; draw(c); c.restore();
   }
 
-  relief(target, x0, y0, { raised, chalk, bevel }) {
+  relief(target, x0, y0, { raised, chalk, bevel, color }) {
     const { w, h, inner, outer, surface } = this;
     const src = this.ctx.getImageData(0, 0, w, h).data;
     distance(src, inner, w, h, true);
@@ -109,9 +98,15 @@ export class ToolingPainter {
     }
     const out = this.pixels.data;
     out.fill(0);
-    const low = raised ? (chalk ? [65, 78, 94] : [112, 73, 29]) : (chalk ? [106, 99, 84] : [45, 33, 26]);
-    const face = raised ? (chalk ? [192, 204, 220] : [200, 151, 65]) : (chalk ? [188, 173, 143] : [70, 51, 38]);
-    const light = raised ? (chalk ? [255, 255, 255] : [234, 205, 139]) : (chalk ? [222, 207, 172] : [124, 104, 79]);
+    const base = color || (raised ? (chalk ? '#c0ccdc' : '#c89741') : '#38281f');
+    const low = raised && base === '#c89741' ? [112, 73, 29]
+      : raised && base === '#c0ccdc' ? [65, 78, 94]
+        : hexRGB(mixColor(base, '#100d0c', raised ? .6 : .22));
+    const face = hexRGB(base);
+    // Hide has diffuse compressed fibres, without a bright burnished rim.
+    const light = raised && base === '#c89741' ? [234, 205, 139]
+      : raised && base === '#c0ccdc' ? [255, 255, 255]
+        : hexRGB(mixColor(base, raised ? '#fff4d7' : '#ad9680', raised ? .5 : .20));
     for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
       const i = y * w + x, o = i * 4;
       let a = src[o + 3] / 255;
@@ -125,7 +120,7 @@ export class ToolingPainter {
       // and fine wrinkles. Leather's shallow tooling lets the mat show through.
       const sweep = raised ? .10 * Math.sin(y / h * 26 + x / w * 2)
         + .035 * Math.sin(y * .19 + Math.sin(x * .07)) : .025 * Math.sin(x * .22 + y * .41);
-      const v = clamp(.50 + rake * (raised ? .75 : .68) + sweep + grain * (raised ? .04 : .10));
+      const v = clamp(.50 + rake * (raised ? .75 : .36) + sweep + grain * (raised ? .04 : .10));
       const from = v < .5 ? low : face, to = v < .5 ? face : light;
       const blend = v < .5 ? v * 2 : (v - .5) * 2;
       for (let k = 0; k < 3; k++) out[o + k] = from[k] + (to[k] - from[k]) * blend;
@@ -143,71 +138,138 @@ export class ToolingPainter {
       target.drawImage(this.mask, x0 + 1, y0 + 5); target.restore();
       for (let z = 3; z > 0; z--) target.drawImage(this.mask, x0, y0 + z);
     }
+    if (!raised) target.filter = 'blur(.45px)';
     target.drawImage(this.finish, x0, y0);
     target.restore();
   }
 
-  stamp(target, x0, y0, text, fontPx, { crop, gutter, chalk }) {
+  stamp(target, x0, y0, glyphs, fontPx, { crop, gutter, palette, flourish }) {
     const { w, h } = this;
     const top = h * (1 - crop) / 2 + 12, left = gutter + 16;
     const fw = w - left * 2, fh = h - top * 2;
     target.save(); target.translate(x0, y0);
-    cartouche(target, left, top, fw, fh, 25);
+    // A soft-edged patch of matte hide. No metal sweep, bevelled perimeter,
+    // or scalloped plate silhouette: the tool compresses the hide itself.
+    target.beginPath(); target.roundRect(left, top, fw, fh, 24);
     target.save(); target.clip();
-    const ground = target.createLinearGradient(0, top, 0, h - top);
-    // A restrained compression tint, not the bright centre of a bronze plate.
-    ground.addColorStop(0, 'rgba(65,43,29,.30)');
-    ground.addColorStop(.48, 'rgba(104,75,51,.36)');
-    ground.addColorStop(1, 'rgba(74,51,34,.30)');
-    target.fillStyle = ground; target.fillRect(left, top, fw, fh);
-    // Tiny paired pores, stable across names, rather than random grain that
-    // crawls whenever a player joins. The felt remains visible through them.
+    target.globalAlpha = .64; target.fillStyle = palette.surface;
+    target.fillRect(left, top, fw, fh);
+    target.globalAlpha = 1;
+    // Jittered pores and fine creases have no regular weave or square cells.
+    // Keep their contrast below the impression; hide is not hammered metal.
     for (let y = top; y < h - top; y += 3) for (let x = left; x < w - left; x += 3) {
-      const n = noise(x | 0, y | 0);
-      if (n < .55) continue;
-      target.fillStyle = `rgba(24,12,7,${.04 + n * .09})`;
-      target.fillRect(x, y, 1.5, .8);
-      target.fillStyle = 'rgba(210,150,83,.07)'; target.fillRect(x, y + 1, 1.5, .7);
+      const n = noise(x | 0, y | 0), m = noise(y | 0, x | 0);
+      const px = x + n * 3, py = y + m * 3;
+      target.fillStyle = '#241b15'; target.globalAlpha = .04 + n * .07;
+      target.beginPath(); target.ellipse(px, py, .5 + n, .4, m * 3, 0, Math.PI * 2); target.fill();
+      target.fillStyle = '#b9a28b'; target.globalAlpha = .025 + m * .035;
+      target.fillRect(px, py + 1, 1.5, .6);
+      if (n > .88) {
+        target.strokeStyle = '#37261c'; target.globalAlpha = .05;
+        target.lineWidth = .6; target.beginPath(); target.moveTo(px, py);
+        target.quadraticCurveTo(px + 3, py - 1, px + 5, py + m * 3); target.stroke();
+      }
     }
-    target.restore(); target.restore();
-    this.mark((c) => {
-      c.lineWidth = 4.5;
-      cartouche(c, left, top, fw, fh, 25); c.stroke();
-      c.lineWidth = 2.6;
-      cartouche(c, left + 10, top + 10, fw - 20, fh - 20, 23); c.stroke();
-      // Repeating angled tool impressions between two scored border lines.
-      c.lineWidth = 2;
-      for (let x = left + 44; x < w / 2 - 28; x += 12) for (const side of [-1, 1]) {
-        const px = side < 0 ? x : w - x;
-        for (const y of [top + 5, h - top - 5]) {
-          c.beginPath(); c.moveTo(px - 2, y - 2); c.lineTo(px + 2, y + 2); c.stroke();
+    target.restore();
+    // The edge fades into the mat, instead of catching light as a metal rim.
+    target.globalAlpha = .10; target.strokeStyle = palette.surface;
+    target.lineWidth = 7; target.filter = 'blur(3px)';
+    target.beginPath(); target.roundRect(left, top, fw, fh, 24); target.stroke();
+    target.restore();
+    if (flourish !== 'none') {
+      this.mark((c) => {
+        c.lineWidth = 2.8;
+        c.beginPath(); c.roundRect(left + 12, top + 12, fw - 24, fh - 24, 17); c.stroke();
+        if (flourish === 'rule') return;
+        c.lineWidth = 1.7;
+        c.beginPath(); c.roundRect(left + 20, top + 20, fw - 40, fh - 40, 12); c.stroke();
+        // Short oblique impressions, like a saddle-maker's border tool.
+        for (let x = left + 38; x < w - left - 30; x += 13) {
+          for (const y of [top + 16, h - top - 16]) {
+            c.beginPath(); c.moveTo(x - 2, y - 2); c.lineTo(x + 2, y + 2); c.stroke();
+          }
         }
-      }
-      // Four carved corner sprigs, contained in the border's shoulders.
-      for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
-        c.save(); c.translate(w / 2 + sx * (fw / 2 - 17), h / 2 + sy * (fh / 2 - 27));
-        c.scale(-sx, -sy); c.lineWidth = 2.6; sprig(c, 56, 20); c.restore();
-      }
-      for (const y of [top + 5, h - top - 5]) {
-        diamond(c, w / 2, y, 7);
-        for (const side of [-1, 1]) { c.beginPath(); c.arc(w / 2 + side * 16, y, 2.6, 0, Math.PI * 2); c.fill(); }
-      }
-      for (const sy of [-1, 1]) for (const sx of [-1, 1]) {
-        c.save(); c.translate(w / 2 + sx * 22, h / 2 + sy * (fh / 2 - 21));
-        c.scale(sx, -sy); c.lineWidth = 2.8; sprig(c, 110, 12); c.restore();
-      }
-      c.font = `700 ${fontPx}px Georgia, serif`;
-      c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.fillText(text, w / 2, h / 2 + h * .016);
-    });
-    this.relief(target, x0, y0, { raised: false, chalk, bevel: Math.max(2.5, fontPx * .028) });
+        for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+          c.save(); c.translate(w / 2 + sx * (fw / 2 - 30), h / 2 + sy * (fh / 2 - 38));
+          c.scale(-sx, -sy); c.lineWidth = 2.3; sprig(c, 53, 18); c.restore();
+        }
+      });
+      this.relief(target, x0, y0, { raised: false, color: palette.accent, bevel: 3 });
+    }
+    this.mark(glyphs);
+    this.relief(target, x0, y0, { raised: false, color: palette.text, bevel: Math.max(3, fontPx * .035) });
   }
 
-  emboss(target, x0, y0, glyphs, lay, chalk) {
+  theme(target, x0, y0, glyphs, { style, palette, flourish, crop, gutter }) {
+    const { w, h } = this;
+    const left = gutter + 13, top = h * (1 - crop) / 2 + 9;
+    target.save(); target.translate(x0, y0);
+    if (style === 'parchment') {
+      // Uneven deckled edges and fibres distinguish a manuscript strip from
+      // the rigid plate. Small damage stays outside the name's fitting box.
+      target.beginPath();
+      for (let x = left; x <= w - left; x += 6) {
+        const y = top + noise(x, 3) * 5;
+        if (x === left) target.moveTo(x, y); else target.lineTo(x, y);
+      }
+      for (let x = w - left; x >= left; x -= 6) target.lineTo(x, h - top - noise(x, 9) * 5);
+      target.closePath();
+      target.save(); target.clip();
+      target.fillStyle = palette.surface; target.fill();
+      const edge = target.createLinearGradient(0, top, 0, h - top);
+      edge.addColorStop(0, 'rgba(70,37,19,.26)'); edge.addColorStop(.14, 'rgba(70,37,19,0)');
+      edge.addColorStop(.86, 'rgba(70,37,19,0)'); edge.addColorStop(1, 'rgba(70,37,19,.22)');
+      target.fillStyle = edge; target.fillRect(left, top, w - 2 * left, h - 2 * top);
+      for (let y = top; y < h - top; y += 4) for (let x = left; x < w - left; x += 5) {
+        target.globalAlpha = noise(x, y | 0) * .09;
+        target.fillStyle = '#5e3f25'; target.fillRect(x, y, 1 + noise(y | 0, x) * 5, .7);
+      }
+      target.restore();
+      if (flourish !== 'none') {
+        target.strokeStyle = target.fillStyle = palette.accent; target.lineWidth = 2;
+        for (const y of [top + 22, h - top - 22]) {
+          target.beginPath(); target.moveTo(left + 26, y); target.lineTo(w - left - 26, y); target.stroke();
+        }
+        if (flourish === 'full') for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+          target.save(); target.translate(w / 2 + sx * (w / 2 - left - 28), h / 2 + sy * (h / 2 - top - 39));
+          target.scale(-sx, -sy); sprig(target, 57, 14); target.restore();
+        }
+      }
+    } else {
+      // Celestial ink: open orbital rules and compass stars around the name.
+      // The centre stays quiet, and the entire inscription stays scene-lit.
+      const halo = target.createRadialGradient(w / 2, h / 2, 12, w / 2, h / 2, w * .45);
+      halo.addColorStop(0, palette.surface + '80'); halo.addColorStop(1, palette.surface + '00');
+      target.fillStyle = halo; target.fillRect(left, top, w - left * 2, h - top * 2);
+      if (flourish !== 'none') {
+        target.strokeStyle = target.fillStyle = palette.accent; target.lineWidth = 2;
+        for (const sy of [-1, 1]) {
+          const y = h / 2 + sy * 91;
+          for (const sx of [-1, 1]) {
+            target.beginPath(); target.moveTo(w / 2 + sx * 27, y);
+            target.quadraticCurveTo(w / 2 + sx * 125, y + sy * 17, w / 2 + sx * 240, y - sy * 6); target.stroke();
+          }
+          diamond(target, w / 2, y, 5);
+          if (flourish === 'full') {
+            target.beginPath(); target.arc(w / 2, y, 14, 0, Math.PI * 2); target.stroke();
+            for (const sx of [-1, 1]) {
+              diamond(target, w / 2 + sx * 192, y + sy * 6, 4);
+              for (let i = 0; i < 3; i++) {
+                target.beginPath(); target.arc(w / 2 + sx * (54 + i * 15), y + sy * (8 + i * 2), 1.7, 0, Math.PI * 2); target.fill();
+              }
+            }
+          }
+        }
+      }
+    }
+    target.fillStyle = palette.text; glyphs(target);
+    target.restore();
+  }
+
+  emboss(target, x0, y0, glyphs, lay, chalk, palette) {
     const { w, h } = this;
     const mid = h / 2 + h * .016;
     this.mark((c) => {
-      glyphs(c);
       if (lay.flourish === 'none') return;
       c.lineWidth = 3;
       // Name-sized ornaments above and below leave long names their width.
@@ -235,6 +297,8 @@ export class ToolingPainter {
         }
       }
     });
-    this.relief(target, x0, y0, { raised: true, chalk, bevel: Math.max(2.5, lay.fontPx * .035) });
+    this.relief(target, x0, y0, { raised: true, chalk, color: palette.accent, bevel: 2.5 });
+    this.mark(glyphs);
+    this.relief(target, x0, y0, { raised: true, chalk, color: palette.text, bevel: Math.max(2.5, lay.fontPx * .035) });
   }
 }

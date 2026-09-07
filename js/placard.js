@@ -70,6 +70,9 @@ limitations under the License.
 import * as THREE from 'three';
 import { PLACE_MAX, PLACARD, readTurn } from './places.js';
 import { ToolingPainter } from './placard-tooling.js';
+import { STYLES, FONTS, WEIGHTS, PALETTES, FONT_DEFAULT, PALETTE_DEFAULT,
+  fontCSS, paletteFor, mixColor, lettering } from './placard-design.js';
+export { STYLES } from './placard-design.js';
 
 // ---------------------------------------------------------------------------
 // The form (world units) — see docs/UX.md §7.63 for where these come from.
@@ -267,7 +270,6 @@ const TRIS = QUADS * 2;                   // 48 per placard, 384 for the rig
 // 640 px over 3.45 units, 185.5 px per unit, fourteen times the density and
 // the same fitter with the same reported floor. Flat text is not what failed;
 // flat text at a floor texture's resolution is.
-export const STYLES = Object.freeze(['tent', 'plate', 'inlay', 'stamp', 'embossed']);
 export const INK_MODES = Object.freeze(['steady', 'ghost']);
 export const INK_TONES = Object.freeze(['ink', 'chalk']);
 // What the emboss puts either side of the name (`cards.flourish`, 2026-09-04,
@@ -315,6 +317,8 @@ const DRESS_DEF = Object.freeze({
   style: 'inlay',
   scale: 1,
   flourish: 'full',
+  font: FONT_DEFAULT,
+  palette: PALETTE_DEFAULT,
   inset: 0.60,
   ink: Object.freeze({ mode: 'steady', rest: 0.55, tone: 'ink' }),
   wash: Object.freeze({ state: 'enabled', peak: 0.62 }),
@@ -334,7 +338,7 @@ const EMBOSS_HAIR = 0.075;
 // have been the one that forgot the stamp.
 const isFlat = (style) => style !== 'tent';
 // …and the ones that stand no object at all.
-const isBare = (style) => style === 'inlay' || style === 'stamp' || style === 'embossed';
+const isBare = (style) => style !== 'tent' && style !== 'plate';
 // …and the two that are PRESSED: a mark with an impression under it, drawn
 // through the scratch row rather than straight onto the atlas.
 const isPressed = (style) => style === 'stamp' || style === 'embossed';
@@ -669,7 +673,10 @@ export class PlacardRig {
   // sheen, the card's edge stock. Painted once.
   _paintStatic() {
     const x = this.ctx;
-    const k = KIT_TABLE;
+    const palette = paletteFor(this.dress);
+    const k = this.dress.palette.mode === 'custom'
+      ? { ...KIT_TABLE, card: palette.surface, cardEdge: mixColor(palette.surface, '#000000', .15),
+        base: palette.accent, baseDark: mixColor(palette.accent, '#000000', .3) } : KIT_TABLE;
     for (let r = 0; r < PLACE_MAX; r++) {
       const y = r * ROW_PX;
       // brass, with a vertical fall so the bevel does not read as a sticker
@@ -691,7 +698,7 @@ export class PlacardRig {
       // the plate's bone stock — the card region's own gradient, with no name
       // on it, because the plate's name is a separate quad floating over this
       const sg = x.createLinearGradient(0, y, 0, y + ROW_PX);
-      sg.addColorStop(0, '#efe6cf');
+      sg.addColorStop(0, this.dress.palette.mode === 'custom' ? mixColor(k.card, '#ffffff', .1) : '#efe6cf');
       sg.addColorStop(1, k.card);
       x.fillStyle = sg;
       x.fillRect(U_STOCK[0] * ATLAS_W, y, (U_STOCK[1] - U_STOCK[0]) * ATLAS_W, ROW_PX);
@@ -726,21 +733,16 @@ export class PlacardRig {
   // against the tent rather than a second painter with a second set of bugs.
   _paintRow(slot, name) {
     const x = this.ctx;
-    const k = KIT_TABLE;
     const y = slot * ROW_PX;
     const w = (U_CARD[1] - U_CARD[0]) * ATLAS_W;
     const clear = this.dress.style !== 'tent';
-    // Chalk is the INLAY's answer and only its: a pale hand is authored
-    // against the FELT, and on the plate's bone stock (and on the tent's) it
-    // would print white on cream. Where there is stock under the ink, the ink
-    // is the kit's sepia.
-    const inkColor = (isBare(this.dress.style) && this.dress.ink.tone === 'chalk')
-      ? k.chalk : k.ink;
+    const palette = paletteFor(this.dress);
+    const inkColor = palette.text;
     x.clearRect(U_CARD[0] * ATLAS_W, y, w, ROW_PX);
     if (!clear) {
       const g = x.createLinearGradient(0, y, 0, y + ROW_PX);
-      g.addColorStop(0, '#efe6cf');
-      g.addColorStop(1, k.card);
+      g.addColorStop(0, this.dress.palette.mode === 'custom' ? mixColor(palette.surface, '#ffffff', .1) : '#efe6cf');
+      g.addColorStop(1, palette.surface);
       x.fillStyle = g;
       x.fillRect(U_CARD[0] * ATLAS_W, y, w, ROW_PX);
     }
@@ -756,7 +758,7 @@ export class PlacardRig {
     // purpose: a name you can read at half the length beats a name you cannot
     // read at all, which is the whole complaint this resize answers.
     let f = FONT_MAX;
-    x.font = `700 ${f}px Georgia, serif`;
+    x.font = fontCSS(this.dress, f);
     const room = CARD_PX - 2 * PAD_PX;
     // THE EMBOSS TRACKS ITS CAPS, so the emboss must be MEASURED tracked
     // (2026-09-04). The fitter had one notion of how wide a word is —
@@ -766,8 +768,8 @@ export class PlacardRig {
     // straight off both ends of its own band. One function, asked everywhere
     // the width is asked for, including the truncation loop below.
     const tracked = this.dress.style === 'embossed';
-    const wide = (t) => x.measureText(t).width
-      + (tracked ? f * EMBOSS_TRACK * Math.max(0, [...t].length - 1) : 0);
+    const spacing = () => f * (this.dress.font.spacing + (tracked ? EMBOSS_TRACK : 0));
+    const wide = (t) => lettering(x, t, fontCSS(this.dress, f), spacing()).width;
     // THE ORNAMENT'S OWN ROOM IS RESERVED, and only the part of it that is not
     // negotiable: the lozenge and its gap, at each end. The fading RULE takes
     // whatever is left over and is simply absent on a long name — which is how
@@ -785,10 +787,10 @@ export class PlacardRig {
     // of what `flourish: none` is for.
     const reserve = (fp) => (tracked && this.dress.flourish === 'full'
       ? 2 * fp * EMBOSS_LOZENGE : 0);
-    const floor = isPressed(this.dress.style) ? FONT_MIN_TOOLING : FONT_MIN;
+    const floor = isPressed(this.dress.style) || ['parchment', 'arcane'].includes(this.dress.style) ? FONT_MIN_TOOLING : FONT_MIN;
     while (f > floor && wide(name) > room - reserve(f)) {
       f -= 2;
-      x.font = `700 ${f}px Georgia, serif`;
+      x.font = fontCSS(this.dress, f);
     }
     // THE ELLIPSIS IS ONLY RESERVED WHEN IT IS ACTUALLY NEEDED. This loop used
     // to measure `name + '…'` unconditionally, so every name paid for a cut it
@@ -815,14 +817,20 @@ export class PlacardRig {
     x.textBaseline = 'middle';
     const cx = U_CARD[0] * ATLAS_W + w / 2;
     const cy = y + ROW_PX / 2 + ROW_PX * 0.016;
+    const letters = lettering(x, shown, fontCSS(this.dress, f), spacing());
+    const glyphs = (c) => letters.draw(c, CARD_PX / 2, ROW_PX / 2 + ROW_PX * .016);
     if (this.dress.style !== 'embossed') this._orn = null;
     if (this.dress.style === 'stamp') {
-      this._paintStamp(slot, shown, f);
+      this._toolingPainter().stamp(x, U_CARD[0] * ATLAS_W, y, glyphs, f,
+        { crop: INK_CROP, gutter: INK_GUTTER, palette, flourish: this.dress.flourish });
     } else if (this.dress.style === 'embossed') {
       this._paintEmboss(slot, shown, f, this.dress.ink.tone);
+    } else if (this.dress.style === 'parchment' || this.dress.style === 'arcane') {
+      this._toolingPainter().theme(x, U_CARD[0] * ATLAS_W, y, glyphs,
+        { style: this.dress.style, palette, flourish: this.dress.flourish, crop: INK_CROP, gutter: INK_GUTTER });
     } else if (!clear) {
       x.fillStyle = inkColor;
-      x.fillText(shown, cx, cy);
+      letters.draw(x, cx, cy);
     } else {
       // GLYPHS ON NOTHING, WITHOUT A FRINGE. Text drawn straight onto cleared
       // canvas leaves its antialiased edge pixels part-covered over
@@ -839,7 +847,7 @@ export class PlacardRig {
       x.rect(U_CARD[0] * ATLAS_W, y, w, ROW_PX);
       x.clip();
       x.fillStyle = '#000000';
-      x.fillText(shown, cx, cy);
+      letters.draw(x, cx, cy);
       x.globalCompositeOperation = 'source-in';
       x.fillStyle = inkColor;
       x.fillRect(U_CARD[0] * ATLAS_W, y, w, ROW_PX);
@@ -867,11 +875,6 @@ export class PlacardRig {
     return this._tooling;
   }
 
-  _paintStamp(slot, shown, fontPx) {
-    this._toolingPainter().stamp(this.ctx, U_CARD[0] * ATLAS_W, slot * ROW_PX,
-      shown, fontPx, { crop: INK_CROP, gutter: INK_GUTTER, chalk: this.dress.ink.tone === 'chalk' });
-  }
-
   _paintEmboss(slot, shown, fontPx, tone) {
     const w = CARD_PX;
     // The band's own middle, which is all the quad shows.
@@ -880,29 +883,11 @@ export class PlacardRig {
     // letter-spacing, so the word is drawn a glyph at a time and its width is
     // the sum plus the tracking between. The name keeps its own case — this is
     // somebody's name and not a label, and 'MX. QUILL' is not what they wrote.
-    const track = fontPx * EMBOSS_TRACK;
-    const chars = [...shown];
-    // MEASURED ONCE, DRAWN THREE TIMES. The layout used to be computed inside
-    // `mark`, which runs once per pass — three identical `measureText` walks
-    // per row, and three chances for the passes to disagree about where the
-    // ornament goes if any of it ever stopped being a pure function. It is one
-    // object now, and it is also what `budget().ornament` reports, so the
-    // thing the gate asserts is the thing that was drawn.
     const probe = this._toolingPainter().ctx;
-    probe.setTransform(1, 0, 0, 1, 0, 0);
-    probe.font = `700 ${fontPx}px Georgia, serif`;
-    const widths = chars.map((c) => probe.measureText(c).width);
-    const total = widths.reduce((a, b) => a + b, 0) + track * Math.max(0, chars.length - 1);
-    const glyphs = (ctx) => {
-      ctx.font = `700 ${fontPx}px Georgia, serif`;
-      let cx = w / 2 - total / 2;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      for (let i = 0; i < chars.length; i++) {
-        ctx.fillText(chars[i], cx, midY);
-        cx += widths[i] + track;
-      }
-    };
+    const letters = lettering(probe, shown, fontCSS(this.dress, fontPx),
+      fontPx * (EMBOSS_TRACK + this.dress.font.spacing));
+    const total = letters.width;
+    const glyphs = (ctx) => letters.draw(ctx, w / 2, midY);
     // THE FLOURISH, css `.cue-rule`: a hairline that fades OUT of the plate
     // and lands in a lozenge beside the word. Its length is what is left
     // after the word, capped, so a long name gets a short rule and a two
@@ -955,7 +940,7 @@ export class PlacardRig {
     this._orn = lay;
 
     this._toolingPainter().emboss(this.ctx, U_CARD[0] * ATLAS_W, slot * ROW_PX,
-      glyphs, lay, tone === 'chalk');
+      glyphs, lay, tone === 'chalk', paletteFor(this.dress));
   }
 
   // ---- geometry ---------------------------------------------------------
@@ -1408,9 +1393,11 @@ export class PlacardRig {
     // stamp and the inlay share a transparent ground and paint COMPLETELY
     // differently on it, so a key that could not tell them apart would leave
     // eight plain names on the felt the first time you switched between them.
-    const key = `${this.dress.style}:${this.dress.ink.tone}:${this.dress.flourish}`;
+    const key = JSON.stringify([this.dress.style, this.dress.ink.tone, this.dress.flourish,
+      this.dress.font, this.dress.palette]);
     const redress = this.paintedKey !== key;
     this.paintedKey = key;
+    if (redress) this._paintStatic();
     for (let slot = 0; slot < PLACE_MAX; slot++) {
       const rec = next[slot];
       const was = this.rows[slot] || null;
@@ -1507,7 +1494,7 @@ export class PlacardRig {
   // with dice in the air.
   setDress(d) {
     if (!d || typeof d !== 'object') return false;
-    const now = { ...this.dress, ink: { ...this.dress.ink } };
+    const now = { ...this.dress, ink: { ...this.dress.ink }, font: { ...this.dress.font }, palette: { ...this.dress.palette } };
     if (typeof d.style === 'string' && STYLES.includes(d.style)) now.style = d.style;
     if (Number.isFinite(d.scale)) now.scale = d.scale;
     if (typeof d.flourish === 'string' && FLOURISHES.includes(d.flourish)) now.flourish = d.flourish;
@@ -1524,12 +1511,18 @@ export class PlacardRig {
       if (typeof ink.tone === 'string' && INK_TONES.includes(ink.tone)) now.ink.tone = ink.tone;
       if (Number.isFinite(ink.rest)) now.ink.rest = Math.min(1, Math.max(0, ink.rest));
     }
-    const same = now.style === this.dress.style && now.inset === this.dress.inset
-      && now.scale === this.dress.scale && now.flourish === this.dress.flourish
-      && now.ink.mode === this.dress.ink.mode && now.ink.tone === this.dress.ink.tone
-      && now.ink.rest === this.dress.ink.rest
-      && now.wash.state === this.dress.wash.state && now.wash.peak === this.dress.wash.peak;
-    if (same) return false;
+    if (d.font && typeof d.font === 'object') {
+      if (FONTS.includes(d.font.family)) now.font.family = d.font.family;
+      if (WEIGHTS.includes(d.font.weight)) now.font.weight = d.font.weight;
+      if (Number.isFinite(d.font.spacing)) now.font.spacing = Math.max(0, Math.min(.5, d.font.spacing));
+    }
+    if (d.palette && typeof d.palette === 'object') {
+      if (PALETTES.includes(d.palette.mode)) now.palette.mode = d.palette.mode;
+      for (const key of ['text', 'accent', 'surface']) {
+        if (/^#[0-9a-f]{6}$/i.test(d.palette[key])) now.palette[key] = d.palette[key];
+      }
+    }
+    if (JSON.stringify(now) === JSON.stringify(this.dress)) return false;
     this.dress = now;
     return true;
   }

@@ -262,6 +262,8 @@ const cardDress = () => ({
   style: T.cards.style,
   scale: T.cards.scale,
   flourish: T.cards.flourish,
+  font: { ...T.cards.font },
+  palette: { ...T.cards.palette },
   inset: T.cards.inset,
   ink: { mode: T.cards.ink.mode, rest: T.cards.ink.rest, tone: T.cards.ink.tone },
   wash: { state: T.cards.wash.state, peak: T.cards.wash.peak },

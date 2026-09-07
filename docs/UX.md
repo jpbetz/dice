@@ -8113,11 +8113,27 @@ the hooks and the harness door: [TESTING.md](TESTING.md).
 
 ### 7.65 Three dresses for a name (2026-09-04)
 
-**Current finish, 2026-09-05:** stamp and emboss now use detailed tooling,
-with recessed leather and fully gilded raised lettering. `full` adds leaf
-scrolls above/below the name; `rule` and `none` remain available. The former
-thin frame, offset-copy relief, crest-only gold and exact-copy ROLL ornament
-below are historical. See [the shipped finish update](SHIPPED.md#tooled-leather-and-raised-gold-placards-2026-09-05).
+**Current finish and controls, 2026-09-07:** seven styles, including
+`parchment` (worn manuscript paper) and `arcane` (celestial ink and orbital
+rules). Stamp now uses matte hide, dark blind tooling, and fine irregular
+pores; its theme ignores chalk tone so it cannot become pale metal. The
+style and font family use readable dropdowns. `cards.font` offers `family`
+(`theme | serif | book | sans | mono`), `weight` (`regular | bold`) and
+`spacing` (extra em tracking). Every type change re-fits the name.
+
+`cards.palette.mode` chooses `theme | custom`; custom has `text`, `accent`
+and `surface` color swatches. Editing a swatch automatically starts a custom
+palette from the currently worn theme, preserving its other colors. Choosing
+`theme` restores that style's palette. Theme fonts choose book serif for
+parchment, sans for arcane, and the existing serif elsewhere; explicit fonts
+override that choice. Font stacks use local system fallbacks without network
+font loads. `full | rule | none` ornament now applies to stamp, embossed,
+parchment and arcane. Existing size, inset, opacity, ghost and wash controls
+still apply. Details and validation: [the shipped expansion](SHIPPED.md#placard-themes-type-and-palette-controls-2026-09-07).
+
+The older exact-copy ornament, crest-only gold, and bronze-like cartouche
+descriptions below are historical; the earlier tooling update is recorded in
+[SHIPPED.md](SHIPPED.md#tooled-leather-and-raised-gold-placards-2026-09-05).
 
 Joe, on the deployed ring: *"I'd like you to try generating a few different
 placards. I'm imagining one that is not even a physical placard, just text on

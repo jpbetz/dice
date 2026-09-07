@@ -11,6 +11,51 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Placard themes, type and palette controls (2026-09-07)
+
+The owner asked for more developer control over name placards, at least two
+new themed styles, and a leather stamp that reads as leather. The inherited
+assumption was that a shaded cartouche could communicate hide; its smooth
+symmetrical perimeter and pale tooling still read as a bronze plate.
+
+The stamp now has matte brown hide, fine irregular pores and creases, a
+soft perimeter, dark recessed lettering and optional saddle-tool borders.
+Its theme uses natural leather regardless of the inlay's chalk tone. The
+new `parchment` style has deckled paper, fibres, book serif and manuscript
+rules; `arcane` has pale sans lettering, compass diamonds, dots and orbital
+rules around an open centre. All three are drawn into the existing atlas;
+relief is a painted impression, not displaced geometry.
+
+Developer mode → **cards** now offers seven styles in a readable dropdown.
+`font.family` offers theme, serif, book, sans and mono; `font.weight` offers
+regular and bold, and `font.spacing` adds em tracking. The fitter measures
+the same glyph widths and spacing it paints, with visible ellipses for long
+names. `palette.mode` chooses the style palette or custom text, accent and
+surface colors. Editing a swatch starts custom colors from the current theme
+so the other colors stay put. The ornament dial now serves all four decorated
+styles. The new controls use the existing binder, export, reset and save
+path. The owner's saved `dice.yaml` choices were not changed.
+
+This supersedes §7.65's emboss-only ornament and fixed-font/fixed-color
+mechanisms in response to the new brief. Style, font and palette changes
+remain local appearance choices: anchors, physics and shared values stay the
+same. The browser-free design module supplies the same style vocabulary to
+the registry and renderer, replacing their duplicated list. New flat styles
+use the same one draw / 16 allocated triangles as the inlay, with no new GPU
+textures. Painting happens only on a name or appearance change.
+
+Reproduce the visual review with
+`node tools/drive.mjs tools/steps/placard-tooling.mjs`: actual 1600×900 table
+views at saved size/opacity/inset, the developer panel, a custom palette/font
+example, and a separately labeled native atlas study. The 390×844 captures
+retain the previously recorded phone framing limitation: the four-person ring
+extends beyond the empty-table view. This change does not address the camera.
+`placard-styles` exercises all seven styles, actual font and color inputs,
+export/reset, name fitting, anchors and ghost fading; `scene-draw-budget`
+checks the live frame cost. The apply-tool fixture now includes the registry's
+new shared module. Validation passed: `npm test` (unit, fuzz and all 60 smoke
+scenarios), both targeted scenarios, and all 61 developer UI tests.
+
 ## Tooled leather and raised gold placards (2026-09-05)
 
 The owner asked to significantly improve both finishes: a decorative leather

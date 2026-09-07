@@ -213,9 +213,9 @@ limitations under the License.
 }
 .dev-row-ctl { display: flex; align-items: center; min-width: 0; gap: 4px; }
 .dev-row-val { display: flex; justify-content: flex-end; min-width: 0; }
-.dev-row.is-enum .dev-row-ctl, .dev-row.is-stepper .dev-row-ctl, .dev-row.is-cast .dev-row-ctl { grid-column: 2 / 4; }
+.dev-row.is-select .dev-row-ctl, .dev-row.is-enum .dev-row-ctl, .dev-row.is-stepper .dev-row-ctl, .dev-row.is-cast .dev-row-ctl { grid-column: 2 / 4; }
 .dev-row.is-text .dev-row-val, .dev-row.is-static .dev-row-val { grid-column: 2 / 4; }
-.dev-row.is-enum .dev-row-val, .dev-row.is-stepper .dev-row-val, .dev-row.is-text .dev-row-ctl, .dev-row.is-static .dev-row-ctl { display: none; }
+.dev-row.is-select .dev-row-val, .dev-row.is-enum .dev-row-val, .dev-row.is-stepper .dev-row-val, .dev-row.is-text .dev-row-ctl, .dev-row.is-static .dev-row-ctl { display: none; }
 /* A FOUR-WAY ENUM STACKS (cast.overlay, 2026-09-02). Four state words do not
    fit the control column at 320px — measured on the shipped panel: 37px a
    button, and `disabled | regions | framing` drawn as `dis… reg… fra…`,

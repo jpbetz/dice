@@ -71,6 +71,7 @@ limitations under the License.
 // Running it at the first covered leaf would show the scene a T that the
 // later leaves of the same Reset, Paste or multi-leaf set had not reached.
 
+import { STYLES as PLACARD_STYLES, FONTS, WEIGHTS, PALETTES } from './placard-design.js';
 import { parseYaml, patchYaml, emitYaml, toPath, pathKey } from './yaml.js';
 
 export { toPath, pathKey };
@@ -709,14 +710,7 @@ const DIE_LIGHT_MODES = Object.freeze(['steady', 'wave', 'breathe', 'flicker']);
 // rather than the absence of a cadence ("Reject `rest: null` for the same
 // slot — the sentinel makes 'this quiet is on purpose' visible").
 const REST_KINDS = Object.freeze(['still', 'swell', 'creak', 'settle-tick']);
-// js/placard.js STYLES / INK_MODES / INK_TONES — the name's three dresses and
-// the ink's two behaviours (2026-09-04). Each is a WRITER somebody wrote, so a
-// fourth dress is code and then a word here; this file cannot import the list
-// it mirrors, because js/placard.js imports three and this module is read by
-// server.js and the apply tool under Node. The two copies are pinned where a
-// mirrored list can be pinned honestly — in the browser, by `placard-styles`,
-// which walks every option here and asserts the rig comes back WEARING it.
-const PLACARD_STYLES = Object.freeze(['tent', 'plate', 'inlay', 'stamp', 'embossed']);
+// Placard styles and typography share the painter's browser-free vocabulary.
 const PLACARD_INK_MODES = Object.freeze(['steady', 'ghost']);
 const PLACARD_INK_TONES = Object.freeze(['ink', 'chalk']);
 // js/placard.js FLOURISHES — what the emboss puts either side of a name.
@@ -1376,8 +1370,7 @@ export const DIALS = {
     // deleted — it is the control this was judged against and it is one word
     // away in the panel.
     style: pick('style', 'inlay', PLACARD_STYLES, 'look', 'apply',
-      'the name on the felt · a low plaque lying flat · the folded tent card · pressed into the felt '
-      + 'inside a thin rule · gold leaf, raised, between the ROLL plate\'s own two flourishes'),
+      'inlay · folded tent · low plate · matte leather stamp · raised metal · parchment manuscript · arcane sigils'),
     // THE SIZE OF THE PRINTED THING, which the three dials above have never
     // been (Joe, 2026-09-04: "give me more control of the size of the
     // placards"). `width`/`depth` are the HOLDER's footprint — film, because
@@ -1389,14 +1382,22 @@ export const DIALS = {
     scale: look('size', 1, [0.2, 4, 0.01], 'apply',
       'the printed thing\'s size — the tent\'s card panels, the flat styles\' band. '
       + 'Not the holder: that is width/depth'),
-    // THE EMBOSS'S ORNAMENT, and nothing else reads it: the stamp's border is
-    // that dress's own business and the plain inlay has no ornament to switch.
-    // `none` also hands the fitter back the width the lozenges reserve, so a
-    // long name prints longer with it off.
+    // Ornament is shared by the tooled finishes and the two new themes.
     flourish: pick('flourish', 'full', PLACARD_FLOURISHES, 'look', 'apply',
-      'the emboss only: leaf scrolls and diamonds · fine rules · the bare name'),
+      'themed ornament: full decoration · simple rules · no ornament; applies to stamp, emboss, parchment and arcane'),
+    font: {
+      family: pick('family', 'theme', FONTS, 'look', 'apply', 'theme chooses its typeface · serif · book serif · sans · monospace'),
+      weight: pick('weight', 'bold', WEIGHTS, 'look', 'apply', 'regular or bold lettering; the name is fitted again after each change'),
+      spacing: look('letter spacing', 0, [0, 0.3, 0.01], 'apply', 'extra space between letters, in em; added to the embossed style’s own tracking'),
+    },
+    palette: {
+      mode: pick('colors', 'theme', PALETTES, 'look', 'apply', 'theme uses the style’s palette; custom uses the three color swatches below'),
+      text: look('text color', '#efe6d2', null, 'apply', 'custom palette: lettering, including the face of pressed or raised letters'),
+      accent: look('accent color', '#bba170', null, 'apply', 'custom palette: ornament and holder trim'),
+      surface: look('surface color', '#78543c', null, 'apply', 'custom palette: leather, parchment, card stock or the arcane tint; plain inlay has no ground'),
+    },
     inset: look('inlay inset', 0.60, [-1.5, 4, 0.01], 'apply',
-      'the two bare styles: how far INSIDE the rim the ink lies, on the chair\'s own ray (0 is the rim)'),
+      'the styles on the mat: how far INSIDE the rim the ink lies, on the chair\'s own ray (0 is the rim)'),
     ink: {
       // The flat styles print on a transparent quad, so the ink can fade
       // without the object it is on fading with it. Nothing here reaches the
@@ -1409,7 +1410,7 @@ export const DIALS = {
       tone: pick('ink tone', 'ink', PLACARD_INK_TONES, 'look', 'apply',
         'the hand of the styles printed straight onto the felt: warm sepia, authored against bone '
         + 'paper, or pale chalk, authored against the cloth. On the emboss it is which METAL — gold '
-        + 'leaf or silver. Where there is stock under the ink (the tent, the plate) it is always sepia'),
+        + 'leaf or silver. Leather, parchment and arcane keep their theme palette. Custom colors override tone'),
     },
     // THE ARC UNDER THE CARD WHILE ITS OWNER'S DICE ARE IN THE AIR (Joe,
     // 2026-09-04: "control of the light up of the placard that happens when
