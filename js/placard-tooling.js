@@ -19,6 +19,7 @@ limitations under the License.
 // All colour arithmetic here is sRGB canvas paint, not THREE's linear colour.
 
 import { hexRGB, mixColor } from './placard-design.js';
+import { drawCelticKnot } from './placard-knots.js';
 
 const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
 const noise = (x, y) => {
@@ -65,103 +66,14 @@ function sprig(ctx, length, height) {
   }
 }
 
-// Build a closed interlace once. Crossings are geometric intersections, then
-// alternated along the strand; each is repainted as an actual overpass. The
-// cached paths are canvas work only, with no per-frame or GPU allocation.
-function weavePath(pointAt) {
-  const n = 300, points = Array.from({ length: n }, (_, i) => pointAt((i + .137) / n * Math.PI * 2));
-  const crossings = [];
-  const cross = (a, b) => a[0] * b[1] - a[1] * b[0];
-  const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
-  for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) {
-    if (i === 0 && j === n - 1) continue;
-    const a = points[i], b = points[j];
-    const u = sub(points[(i + 1) % n], a), v = sub(points[(j + 1) % n], b);
-    const det = cross(u, v);
-    if (Math.abs(det) < 1e-6) continue;
-    const delta = sub(b, a), t = cross(delta, v) / det, s = cross(delta, u) / det;
-    if (t <= 0 || t >= 1 || s <= 0 || s >= 1) continue;
-    crossings.push({ a: i + t, b: j + s, x: a[0] + t * u[0], y: a[1] + t * u[1] });
-  }
-  const visits = crossings.flatMap((c) => [c.a, c.b]).sort((a, b) => a - b);
-  const point = (t) => {
-    const i = Math.floor(t), f = t - i;
-    const a = points[(i % n + n) % n], b = points[((i + 1) % n + n) % n];
-    return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
-  };
-  const path = new Path2D();
-  points.forEach(([x, y], i) => i ? path.lineTo(x, y) : path.moveTo(x, y)); path.closePath();
-  const overpasses = crossings.map((c) => {
-    const t = visits.indexOf(c.a) % 2 === 0 ? c.a : c.b;
-    const piece = new Path2D();
-    // Walk enough strand to cover the clipped crossing even where it bends.
-    for (let d = -12; d <= 12; d++) {
-      const [x, y] = point(t + d);
-      if (d === -12) piece.moveTo(x, y); else piece.lineTo(x, y);
-    }
-    return { ...c, path: piece };
-  });
-  return { path, overpasses };
-}
-
-// The medallion has four looping lobes woven through an inner ring. Its
-// flanking knots use a broad, multi-pass lattice instead of two sine waves.
-let celticWeaves;
+// A square interlace between two returning braids. Give the crossings real
+// room in the atlas; clear on the scratch canvas so gaps reveal the ground.
 function ornateCeltic(ctx, x, y, palette) {
-  if (!celticWeaves) celticWeaves = {
-    seal: weavePath((t) => {
-      const r = .68 + .30 * Math.cos(4 * t);
-      return [46 * r * Math.cos(3 * t), 35 * r * Math.sin(3 * t)];
-    }),
-    band: weavePath((t) => [105 * Math.cos(3 * t), 24 * Math.sin(2 * t)]),
-  };
   const color = mixColor(palette.accent, palette.text, .25);
-  const highlight = mixColor(color, '#ffffff', .42);
-  const ribbon = (shape, offset) => {
-    ctx.save(); ctx.translate(x + offset, y); ctx.lineCap = ctx.lineJoin = 'round';
-    const paint = (path) => {
-      ctx.strokeStyle = color; ctx.lineWidth = 6.5; ctx.stroke(path);
-      ctx.strokeStyle = highlight; ctx.lineWidth = 1.6; ctx.stroke(path);
-    };
-    paint(shape.path);
-    for (const over of shape.overpasses) {
-      ctx.save(); ctx.beginPath(); ctx.arc(over.x, over.y, 7, 0, Math.PI * 2); ctx.clip();
-      ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = 10; ctx.stroke(over.path);
-      ctx.globalCompositeOperation = 'source-over'; paint(over.path); ctx.restore();
-    }
-    ctx.restore();
-  };
-  ribbon(celticWeaves.seal, 0);
-  ribbon(celticWeaves.band, -160); ribbon(celticWeaves.band, 160);
-  ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = highlight; ctx.lineWidth = 1.8;
-  // Small centre stones and pierced terminals finish the silhouette.
-  diamond(ctx, x, y, 3.5);
+  drawCelticKnot(ctx, 'seal', x, y, 80, color);
   for (const side of [-1, 1]) {
-    ctx.beginPath(); ctx.ellipse(x + side * 283, y, 5, 10, 0, 0, Math.PI * 2); ctx.stroke();
-    diamond(ctx, x + side * 283, y, 2);
+    drawCelticKnot(ctx, 'braid', x + side * 165, y, 228, color);
   }
-  ctx.restore();
-}
-
-// Four returning loops with alternating crossings: a compact central knot
-// gives the long plaits a recognisable interlaced figure at table distance.
-function knotSeal(ctx, x, y, color) {
-  ctx.save(); ctx.translate(x, y);
-  ctx.strokeStyle = color; ctx.lineWidth = 3.6; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.roundRect(-24, -8, 48, 16, 8); ctx.stroke();
-  ctx.beginPath(); ctx.roundRect(-8, -24, 16, 48, 8); ctx.stroke();
-  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
-    const horizontal = sx === sy;
-    const cross = (half) => {
-      ctx.beginPath();
-      ctx.moveTo(sx * 8 - (horizontal ? half : 0), sy * 8 - (horizontal ? 0 : half));
-      ctx.lineTo(sx * 8 + (horizontal ? half : 0), sy * 8 + (horizontal ? 0 : half));
-      ctx.stroke();
-    };
-    ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = 7.1; cross(4);
-    ctx.globalCompositeOperation = 'source-over'; ctx.lineWidth = 3.6; cross(6);
-  }
-  ctx.restore();
 }
 
 export class ToolingPainter {
@@ -341,8 +253,8 @@ export class ToolingPainter {
       halo.addColorStop(0, palette.surface + '80'); halo.addColorStop(1, palette.surface + '00');
       target.fillStyle = halo; target.fillRect(left, top, w - left * 2, h - top * 2);
       if (style === 'celtic' && flourish !== 'none') {
-        // Full gets more vertical room and broader woven ribbons; rule
-        // remains the small four-loop knot and the original fine lines.
+        // Full gets two returning braids and a square interlace; rule
+        // uses the same authored central knot between fine lines.
         const c = this.ctx;
         c.clearRect(0, 0, w, h);
         for (const sy of [-1, 1]) {
@@ -350,7 +262,7 @@ export class ToolingPainter {
             ornateCeltic(c, w / 2, h / 2 + sy * 112, palette);
           } else {
             const y = h / 2 + sy * 96;
-            knotSeal(c, w / 2, y, palette.accent);
+            drawCelticKnot(c, 'seal', w / 2, y, 48, palette.accent);
             c.save(); c.strokeStyle = palette.accent; c.lineWidth = 1.5;
             for (const sx of [-1, 1]) {
               c.beginPath(); c.moveTo(w / 2 + sx * 45, y);

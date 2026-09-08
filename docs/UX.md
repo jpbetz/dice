@@ -8116,11 +8116,11 @@ the hooks and the harness door: [TESTING.md](TESTING.md).
 **Current finish and controls, 2026-09-08:** eight styles, including
 `parchment` (worn manuscript paper) and `arcane` (celestial ink and orbital
 rules), and `celtic` (Scottish Celtic-inspired interlace in Arcane’s cool
-palette). Celtic’s `full` ornament now has large woven medallions and
-broad interlaced ribbons, using more of the atlas row for a taller band
-without changing the name’s size;
+palette). Celtic’s `full` ornament uses authored returning braids and square
+knots with broad transparent breaks at each overpass, using more of the atlas
+row for a taller band without changing the name’s size;
 `rule` has small central knots, and `none` leaves the name alone.
-[Current ornament](SHIPPED.md#fuller-celtic-ornament-2026-09-08) ·
+[Current ornament and asset sources](SHIPPED.md#authored-celtic-crossings-2026-09-08) ·
 [original style](SHIPPED.md#celtic-knotwork-placards-2026-09-08).
 
 Stamp now uses matte hide, dark blind tooling, and fine irregular

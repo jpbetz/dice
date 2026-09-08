@@ -18,6 +18,7 @@ limitations under the License.
 // node tools/drive.mjs tools/steps/placard-tooling.mjs [outDir]
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { probeCelticWeave } from '../../tests/e2e/placard-knot-probe.mjs';
 
 export default async function run(stage, [dir = 'tools/out/placard-tooling']) {
   dir = resolve(dir);
@@ -57,6 +58,16 @@ export default async function run(stage, [dir = 'tools/out/placard-tooling']) {
       await new Promise((r) => setTimeout(r, 350));
       const tag = `${device}-${style}-${flourish}`;
       await stage.shot(t, `${dir}/${tag}.png`);
+      if (device === 'desktop' && style === 'celtic' && flourish === 'full') {
+        const { px } = await t.dbg('placardFrame(0)');
+        const x = Math.floor(px.x0) - 8, y = Math.floor(px.y0) - 8;
+        const { data } = await t.page.browser.send('Page.captureScreenshot', {
+          format: 'png', clip: { x, y, width: Math.ceil(px.x1) - x + 8,
+            height: Math.ceil(px.y1) - y + 8, scale: 1 },
+        }, t.page.sessionId);
+        writeFileSync(`${dir}/desktop-celtic-detail.png`, Buffer.from(data, 'base64'));
+        console.log(`Celtic near-seat band: ${(px.x1 - px.x0).toFixed(1)} screen px wide`);
+      }
       measures.push({ tag, dress: await t.dbg('placardDress()'), budget: await t.dbg('placardBudget()'),
         stations: (await t.dbg('places()')).stations });
     }
@@ -83,7 +94,7 @@ export default async function run(stage, [dir = 'tools/out/placard-tooling']) {
       [3, 'embossed', 'chalk', 'full', 'RAISED SILVER'],
       [4, 'parchment', 'ink', 'full', 'PARCHMENT / BOOK SERIF'],
       [5, 'arcane', 'ink', 'full', 'ARCANE / CELESTIAL INK'],
-      [6, 'celtic', 'ink', 'full', 'CELTIC / WOVEN MEDALLION'],
+      [6, 'celtic', 'ink', 'full', 'CELTIC / RETURNING BRAIDS'],
       [7, 'celtic', 'ink', 'rule', 'CELTIC / SMALL KNOTS'],
     ]) {
       rig.dress.style = style; rig.dress.flourish = flourish; rig.dress.ink.tone = tone;
@@ -98,6 +109,9 @@ export default async function run(stage, [dir = 'tools/out/placard-tooling']) {
     return { png: sheet.toDataURL('image/png').split(',')[1], times };
   })()`);
   writeFileSync(`${dir}/material-study.png`, Buffer.from(study.png, 'base64'));
+  const weave = await t.eval(`(${probeCelticWeave.toString()})()`);
+  writeFileSync(`${dir}/celtic-crossings.png`, Buffer.from(weave.png, 'base64'));
+  writeFileSync(`${dir}/celtic-crossings.json`, JSON.stringify(weave.samples, null, 2));
   console.log(`Repaint milliseconds: ${JSON.stringify(study.times)}`);
   writeFileSync(`${dir}/measurements.json`, JSON.stringify(measures, null, 2));
   if (t.page.consoleErrors.length) throw new Error(t.page.consoleErrors.join('\n'));

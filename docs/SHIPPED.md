@@ -11,7 +11,48 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Authored Celtic crossings (2026-09-08)
+
+The owner pointed out that the breaks at overlaps were missing. The inherited
+assumption was that calculating crossings and repainting a thin highlighted
+curve made a convincing weave. The earlier checks measured size, name fitting
+and GPU cost; none measured the negative space that defines the interlace.
+
+The full ornament now adapts AnonMoos's public-domain **Celtic-knot-twoloops-bigends**
+and **Celtic-knot-insquare** SVGs: two returning braids flank a square knot
+above/below the name. `rule` uses the same square knot between its fine rules.
+Original SVGs, source links, revisions, hashes, licensing and the adaptations
+are recorded in [the artwork directory](../art/placards/README.md).
+The author's explicit crossing paths replace automatic intersection detection.
+Solid teal ribbons replace the thin central highlights, and the braid has
+4.19 atlas pixels of transparent clearance beside each overpass. Erasure is
+confined to the scratch canvas so each gap reveals the ground tint and felt.
+
+The 95% full crop, name fitting, palette controls and saved settings remain
+as before. Cached paths add no GPU textures, materials or draws. A full row
+repaint measured 1.2 ms in the material study.
+
+`tools/steps/placard-tooling.mjs` captures the 1600×900 table at the owner's
+saved size/opacity, a native material study, an unscaled near-seat detail,
+and phone views under `tools/out/celtic-authored`. The near band measured
+242.3 screen pixels wide; the existing phone framing still crops the ring.
+The new shared pixel probe shrinks the actual ornament to 224 pixels wide
+and checks both crossing orientations in all four braids. Across 24 samples,
+bridge alpha is at least 252/255, both gaps dip to at most 58/255, and the
+returning strands reach at least 240/255. A negative control disabling
+erasure rejects all 24 crossings. `placard-styles` runs that probe as well
+as the existing name, font, palette, crop and placement checks.
+
+Validation: `placard-styles` and `scene-draw-budget` pass. `npm test` passed
+unit/fuzz checks and 59/60 smoke scenarios; `push-turn` briefly reported an
+unbanked state after the Bank click, then passed its isolated rerun. No
+banking code or assertions changed in this work.
+
 ## Fuller Celtic ornament (2026-09-08)
+
+The generated weave described here was superseded by
+[authored crossings](#authored-celtic-crossings-2026-09-08) after the owner
+identified that its gaps did not read at table size.
 
 The owner found the first full embellishment plain and hard to see. The
 inherited assumption was that a tiny four-loop symbol and hairline plaits

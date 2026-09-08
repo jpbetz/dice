@@ -29,6 +29,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { assert, Table, freePort, startServer } from './harness.mjs';
+import { probeCelticWeave } from './placard-knot-probe.mjs';
 
 // THE FROZEN ENGINE CONTRACT (docs/TOWER.md; captured by
 // tools/steps/tower-contract-capture.mjs). Read from disk rather than imported
@@ -29924,6 +29925,15 @@ export const scenarios = [
       }
       await t.dbg("tuneSet({'cards.flourish': 'full'})");
       await settled();
+
+      const weave = await t.eval(`(${probeCelticWeave.toString()})()`);
+      assert.equal(weave.samples.length, 24, 'crossings on both braids and both rows are sampled');
+      for (const sample of weave.samples) {
+        const where = `Celtic crossing ${JSON.stringify(sample)}`;
+        assert.ok(sample.bridge > 220, `${where}: the overpass remains solid after minification`);
+        assert.ok(sample.gaps.every(a => a < 100), `${where}: both underpass gaps show the ground`);
+        assert.ok(sample.returns.every(a => a > 210), `${where}: the under-strand resumes on both sides`);
+      }
 
       // The actual developer controls write through the binder, re-fit long
       // names, and survive export/reset. Eight styles share these controls.
