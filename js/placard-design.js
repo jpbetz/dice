@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Shared by the developer controls and the canvas painter; no browser imports.
-export const STYLES = Object.freeze(['tent', 'plate', 'inlay', 'stamp', 'embossed', 'parchment', 'arcane']);
+export const STYLES = Object.freeze(['tent', 'plate', 'inlay', 'stamp', 'embossed', 'parchment', 'arcane', 'celtic']);
 export const FONTS = Object.freeze(['theme', 'serif', 'book', 'sans', 'mono']);
 export const WEIGHTS = Object.freeze(['regular', 'bold']);
 export const PALETTES = Object.freeze(['theme', 'custom']);
@@ -29,7 +29,7 @@ const FAMILIES = {
 };
 export function fontCSS(dress, px) {
   const family = dress.font.family === 'theme'
-    ? (dress.style === 'parchment' ? 'book' : dress.style === 'arcane' ? 'sans' : 'serif')
+    ? (dress.style === 'parchment' ? 'book' : ['arcane', 'celtic'].includes(dress.style) ? 'sans' : 'serif')
     : dress.font.family;
   return `${dress.font.weight === 'regular' ? 400 : 700} ${px}px ${FAMILIES[family] || FAMILIES.serif}`;
 }
@@ -42,7 +42,8 @@ export function paletteFor(dress) {
     case 'stamp': return { text: '#38281f', accent: '#493326', surface: '#805b43' };
     case 'embossed': return { text: chalk ? '#c0ccdc' : '#c89741', accent: chalk ? '#c0ccdc' : '#c89741', surface: '#78543c' };
     case 'parchment': return { text: '#483127', accent: '#995444', surface: '#e0c697' };
-    case 'arcane': return { text: '#d3f4ed', accent: '#7bc7c1', surface: '#233c50' };
+    case 'arcane':
+    case 'celtic': return { text: '#d3f4ed', accent: '#7bc7c1', surface: '#233c50' };
     default: return { text: chalk && dress.style === 'inlay' ? '#efe6d2' : '#5a4632', accent: '#b98f4a', surface: '#e3d8bd' };
   }
 }

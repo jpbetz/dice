@@ -65,6 +65,59 @@ function sprig(ctx, length, height) {
   }
 }
 
+// A closed Celtic plait: two winding strands return into one another at
+// the ends. Alternate crossings have real gaps in the underpassing strand,
+// rather than a dark stroke that would paint a false background on the mat.
+// The knot is built on the reusable scratch canvas, then laid over the halo.
+function knotBand(ctx, x0, x1, y, height, crossings, color) {
+  const pitch = (x1 - x0) / crossings;
+  const stroke = 3.6;
+  const strand = (sign, from, to) => {
+    ctx.beginPath();
+    for (let x = from; x < to; x += 1) {
+      const py = y + sign * height * Math.cos((x - x0) / pitch * Math.PI);
+      if (x === from) ctx.moveTo(x, py); else ctx.lineTo(x, py);
+    }
+    ctx.lineTo(to, y + sign * height * Math.cos((to - x0) / pitch * Math.PI));
+    ctx.stroke();
+  };
+  ctx.save(); ctx.lineCap = ctx.lineJoin = 'round';
+  ctx.strokeStyle = color; ctx.lineWidth = stroke;
+  strand(1, x0, x1); strand(-1, x0, x1);
+  // An even number of crossings puts both returning ends on the same side.
+  ctx.beginPath(); ctx.arc(x0, y, height, Math.PI / 2, Math.PI * 1.5); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x1, y, height, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+  for (let i = 0; i < crossings; i++) {
+    const x = x0 + (i + .5) * pitch, over = i % 2 ? -1 : 1;
+    ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = stroke + 3.5;
+    strand(over, x - 10, x + 10);
+    ctx.globalCompositeOperation = 'source-over'; ctx.lineWidth = stroke;
+    strand(over, x - 13, x + 13);
+  }
+  ctx.restore();
+}
+
+// Four returning loops with alternating crossings: a compact central knot
+// gives the long plaits a recognisable interlaced figure at table distance.
+function knotSeal(ctx, x, y, color) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.strokeStyle = color; ctx.lineWidth = 3.6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.roundRect(-24, -8, 48, 16, 8); ctx.stroke();
+  ctx.beginPath(); ctx.roundRect(-8, -24, 16, 48, 8); ctx.stroke();
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    const horizontal = sx === sy;
+    const cross = (half) => {
+      ctx.beginPath();
+      ctx.moveTo(sx * 8 - (horizontal ? half : 0), sy * 8 - (horizontal ? 0 : half));
+      ctx.lineTo(sx * 8 + (horizontal ? half : 0), sy * 8 + (horizontal ? 0 : half));
+      ctx.stroke();
+    };
+    ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = 7.1; cross(4);
+    ctx.globalCompositeOperation = 'source-over'; ctx.lineWidth = 3.6; cross(6);
+  }
+  ctx.restore();
+}
+
 export class ToolingPainter {
   constructor(w, h) {
     this.w = w; this.h = h;
@@ -236,12 +289,37 @@ export class ToolingPainter {
         }
       }
     } else {
-      // Celestial ink: open orbital rules and compass stars around the name.
+      // Arcane and Celtic share the same cool ink and quiet blue ground.
       // The centre stays quiet, and the entire inscription stays scene-lit.
       const halo = target.createRadialGradient(w / 2, h / 2, 12, w / 2, h / 2, w * .45);
       halo.addColorStop(0, palette.surface + '80'); halo.addColorStop(1, palette.surface + '00');
       target.fillStyle = halo; target.fillRect(left, top, w - left * 2, h - top * 2);
-      if (flourish !== 'none') {
+      if (style === 'celtic' && flourish !== 'none') {
+        // Scottish Celtic-inspired interlace, outside the name's fitting box.
+        // Full pairs the central four-loop knot with returning plaits;
+        // rule keeps just the central knot and fine rules.
+        const c = this.ctx;
+        c.clearRect(0, 0, w, h);
+        for (const sy of [-1, 1]) {
+          const y = h / 2 + sy * 96;
+          knotSeal(c, w / 2, y, palette.accent);
+          if (flourish === 'full') {
+            for (const sx of [-1, 1]) {
+              const centre = w / 2 + sx * 160;
+              knotBand(c, centre - 99, centre + 99, y, 11, 4, palette.accent);
+            }
+          }
+          if (flourish === 'rule') {
+            c.save(); c.strokeStyle = palette.accent; c.lineWidth = 1.5;
+            for (const sx of [-1, 1]) {
+              c.beginPath(); c.moveTo(w / 2 + sx * 45, y);
+              c.lineTo(w / 2 + sx * 264, y); c.stroke();
+            }
+            c.restore();
+          }
+        }
+        target.drawImage(this.mask, 0, 0);
+      } else if (style === 'arcane' && flourish !== 'none') {
         target.strokeStyle = target.fillStyle = palette.accent; target.lineWidth = 2;
         for (const sy of [-1, 1]) {
           const y = h / 2 + sy * 91;

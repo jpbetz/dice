@@ -11,6 +11,32 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Celtic knotwork placards (2026-09-08)
+
+The owner requested another style with Arcane's color and feel, embellished
+with Scottish Celtic knots. `cards.style: celtic` shares Arcane's cool mint
+lettering, teal accent, blue ground and default sans face. The inherited
+assumption was that each style needed its own palette; here the interlace
+alone supplies the new identity.
+
+`cards.flourish: full` draws a four-loop knot above and below the name,
+flanked by continuous plaits with closed returning ends and alternating
+over-under crossings. `rule` keeps the central knots between fine rules; `none` removes the ornament.
+Underpasses are cut from a reusable scratch canvas, so their gaps reveal
+the actual ground. The name keeps its full fitting width. All existing font,
+custom palette, size, inset, opacity and ghost controls apply. There are no
+new textures, meshes or shared-state fields. The saved file still selects
+inlay and no ornament; choose **celtic + full** to see the new knotwork.
+
+Visual review: `node tools/drive.mjs tools/steps/placard-tooling.mjs
+tools/out/placard-celtic` captures the panel, full and small knots in the
+1600×900 table view at the saved scale/opacity/inset, phone views, and the
+native atlas alongside Arcane. Validation uses `npm test` and
+`node tests/e2e/run.mjs --only placard-styles,scene-draw-budget`; the style
+walk now includes Celtic with its knot painter active. All unit/fuzz checks,
+60 smoke scenarios and both targeted scenarios passed; the placard scenario
+was rerun successfully after adding the central four-loop knots.
+
 ## Placard themes, type and palette controls (2026-09-07)
 
 The owner asked for more developer control over name placards, at least two

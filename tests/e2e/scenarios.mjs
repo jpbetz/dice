@@ -29823,7 +29823,7 @@ export const scenarios = [
         .map((st) => [st.place, st.theta, st.yaw, st.world.x, st.world.z,
           Math.hypot(st.world.x, st.world.z)]);
 
-      const STYLES = ['tent', 'plate', 'inlay', 'stamp', 'embossed', 'parchment', 'arcane'];
+      const STYLES = ['tent', 'plate', 'inlay', 'stamp', 'embossed', 'parchment', 'arcane', 'celtic'];
       const STYLES_ALL = STYLES;
       // THE LIST IS PINNED FROM BOTH SIDES — every word the tree offers is
       // worn below, and a word it does not offer is refused here. Between the
@@ -29845,6 +29845,7 @@ export const scenarios = [
       const seen = {};
       const seenText = {};   // what the plain inlay prints, per station
       for (const style of STYLES) {
+        if (style === 'celtic') await t.dbg("tuneSet({'cards.flourish': 'full'})");
         // AT UNIT SIZE, because the density below is a claim about the
         // MECHANISM and not about the owner's current taste: `cards.scale` is
         // a dial he moves (1.8 as of `08153a3`), and a band scaled up is
@@ -29894,7 +29895,7 @@ export const scenarios = [
       }
 
       // ---- the read: the CARD row's density, not the floor atlas's ---------
-      for (const style of ['plate', 'inlay', 'stamp', 'embossed', 'parchment', 'arcane']) {
+      for (const style of ['plate', 'inlay', 'stamp', 'embossed', 'parchment', 'arcane', 'celtic']) {
         const band = seen[style].band;
         assert.ok(band, `${style}: reports its band`);
         assert.ok(band.pxPerUnit >= 150 && band.pxPerUnitDown >= 150,
@@ -29906,7 +29907,7 @@ export const scenarios = [
       }
 
       // The actual developer controls write through the binder, re-fit long
-      // names, and survive export/reset. Seven styles share these controls.
+      // names, and survive export/reset. Eight styles share these controls.
       const custom = {
         'cards.palette.mode': 'custom', 'cards.palette.text': '#cceeff',
         'cards.palette.accent': '#bb7799', 'cards.palette.surface': '#243954',

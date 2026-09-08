@@ -8113,9 +8113,14 @@ the hooks and the harness door: [TESTING.md](TESTING.md).
 
 ### 7.65 Three dresses for a name (2026-09-04)
 
-**Current finish and controls, 2026-09-07:** seven styles, including
+**Current finish and controls, 2026-09-08:** eight styles, including
 `parchment` (worn manuscript paper) and `arcane` (celestial ink and orbital
-rules). Stamp now uses matte hide, dark blind tooling, and fine irregular
+rules), and `celtic` (Scottish Celtic-inspired interlace in Arcane’s cool
+palette). Celtic’s `full` ornament has four-loop knots and endless plaits;
+`rule` has small central knots, and `none` leaves the name alone.
+[Shipped record](SHIPPED.md#celtic-knotwork-placards-2026-09-08).
+
+Stamp now uses matte hide, dark blind tooling, and fine irregular
 pores; its theme ignores chalk tone so it cannot become pale metal. The
 style and font family use readable dropdowns. `cards.font` offers `family`
 (`theme | serif | book | sans | mono`), `weight` (`regular | bold`) and
@@ -8125,10 +8130,10 @@ style and font family use readable dropdowns. `cards.font` offers `family`
 and `surface` color swatches. Editing a swatch automatically starts a custom
 palette from the currently worn theme, preserving its other colors. Choosing
 `theme` restores that style's palette. Theme fonts choose book serif for
-parchment, sans for arcane, and the existing serif elsewhere; explicit fonts
+parchment, sans for arcane/Celtic, and the existing serif elsewhere; explicit fonts
 override that choice. Font stacks use local system fallbacks without network
 font loads. `full | rule | none` ornament now applies to stamp, embossed,
-parchment and arcane. Existing size, inset, opacity, ghost and wash controls
+parchment, arcane and Celtic. Existing size, inset, opacity, ghost and wash controls
 still apply. Details and validation: [the shipped expansion](SHIPPED.md#placard-themes-type-and-palette-controls-2026-09-07).
 
 The older exact-copy ornament, crest-only gold, and bronze-like cartouche

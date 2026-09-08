@@ -1370,7 +1370,7 @@ export const DIALS = {
     // deleted — it is the control this was judged against and it is one word
     // away in the panel.
     style: pick('style', 'inlay', PLACARD_STYLES, 'look', 'apply',
-      'inlay · folded tent · low plate · matte leather stamp · raised metal · parchment manuscript · arcane sigils'),
+      'inlay · folded tent · low plate · matte leather stamp · raised metal · parchment manuscript · arcane sigils · Celtic knotwork'),
     // THE SIZE OF THE PRINTED THING, which the three dials above have never
     // been (Joe, 2026-09-04: "give me more control of the size of the
     // placards"). `width`/`depth` are the HOLDER's footprint — film, because
@@ -1382,9 +1382,9 @@ export const DIALS = {
     scale: look('size', 1, [0.2, 4, 0.01], 'apply',
       'the printed thing\'s size — the tent\'s card panels, the flat styles\' band. '
       + 'Not the holder: that is width/depth'),
-    // Ornament is shared by the tooled finishes and the two new themes.
+    // Ornament is shared by the tooled finishes and the flat themes.
     flourish: pick('flourish', 'full', PLACARD_FLOURISHES, 'look', 'apply',
-      'themed ornament: full decoration · simple rules · no ornament; applies to stamp, emboss, parchment and arcane'),
+      'themed ornament: full decoration · simple rules · no ornament; applies to stamp, emboss, parchment, arcane and Celtic (full braid or small rule knots)'),
     font: {
       family: pick('family', 'theme', FONTS, 'look', 'apply', 'theme chooses its typeface · serif · book serif · sans · monospace'),
       weight: pick('weight', 'bold', WEIGHTS, 'look', 'apply', 'regular or bold lettering; the name is fitted again after each change'),
@@ -1394,7 +1394,7 @@ export const DIALS = {
       mode: pick('colors', 'theme', PALETTES, 'look', 'apply', 'theme uses the style’s palette; custom uses the three color swatches below'),
       text: look('text color', '#efe6d2', null, 'apply', 'custom palette: lettering, including the face of pressed or raised letters'),
       accent: look('accent color', '#bba170', null, 'apply', 'custom palette: ornament and holder trim'),
-      surface: look('surface color', '#78543c', null, 'apply', 'custom palette: leather, parchment, card stock or the arcane tint; plain inlay has no ground'),
+      surface: look('surface color', '#78543c', null, 'apply', 'custom palette: leather, parchment, card stock or the arcane/Celtic tint; plain inlay has no ground'),
     },
     inset: look('inlay inset', 0.60, [-1.5, 4, 0.01], 'apply',
       'the styles on the mat: how far INSIDE the rim the ink lies, on the chair\'s own ray (0 is the rim)'),
@@ -1410,7 +1410,7 @@ export const DIALS = {
       tone: pick('ink tone', 'ink', PLACARD_INK_TONES, 'look', 'apply',
         'the hand of the styles printed straight onto the felt: warm sepia, authored against bone '
         + 'paper, or pale chalk, authored against the cloth. On the emboss it is which METAL — gold '
-        + 'leaf or silver. Leather, parchment and arcane keep their theme palette. Custom colors override tone'),
+        + 'leaf or silver. Leather, parchment, arcane and Celtic keep their theme palette. Custom colors override tone'),
     },
     // THE ARC UNDER THE CARD WHILE ITS OWNER'S DICE ARE IN THE AIR (Joe,
     // 2026-09-04: "control of the light up of the placard that happens when

@@ -787,7 +787,7 @@ export class PlacardRig {
     // of what `flourish: none` is for.
     const reserve = (fp) => (tracked && this.dress.flourish === 'full'
       ? 2 * fp * EMBOSS_LOZENGE : 0);
-    const floor = isPressed(this.dress.style) || ['parchment', 'arcane'].includes(this.dress.style) ? FONT_MIN_TOOLING : FONT_MIN;
+    const floor = isPressed(this.dress.style) || ['parchment', 'arcane', 'celtic'].includes(this.dress.style) ? FONT_MIN_TOOLING : FONT_MIN;
     while (f > floor && wide(name) > room - reserve(f)) {
       f -= 2;
       x.font = fontCSS(this.dress, f);
@@ -825,7 +825,7 @@ export class PlacardRig {
         { crop: INK_CROP, gutter: INK_GUTTER, palette, flourish: this.dress.flourish });
     } else if (this.dress.style === 'embossed') {
       this._paintEmboss(slot, shown, f, this.dress.ink.tone);
-    } else if (this.dress.style === 'parchment' || this.dress.style === 'arcane') {
+    } else if (['parchment', 'arcane', 'celtic'].includes(this.dress.style)) {
       this._toolingPainter().theme(x, U_CARD[0] * ATLAS_W, y, glyphs,
         { style: this.dress.style, palette, flourish: this.dress.flourish, crop: INK_CROP, gutter: INK_GUTTER });
     } else if (!clear) {
