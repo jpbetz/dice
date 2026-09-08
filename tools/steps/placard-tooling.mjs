@@ -83,7 +83,7 @@ export default async function run(stage, [dir = 'tools/out/placard-tooling']) {
       [3, 'embossed', 'chalk', 'full', 'RAISED SILVER'],
       [4, 'parchment', 'ink', 'full', 'PARCHMENT / BOOK SERIF'],
       [5, 'arcane', 'ink', 'full', 'ARCANE / CELESTIAL INK'],
-      [6, 'celtic', 'ink', 'full', 'CELTIC / ENDLESS PLAIT'],
+      [6, 'celtic', 'ink', 'full', 'CELTIC / WOVEN MEDALLION'],
       [7, 'celtic', 'ink', 'rule', 'CELTIC / SMALL KNOTS'],
     ]) {
       rig.dress.style = style; rig.dress.flourish = flourish; rig.dress.ink.tone = tone;

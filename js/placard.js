@@ -297,6 +297,9 @@ const INK_LIFT = 0.004;
 // stretching a single letter. (Stretching is the failure v2 wrote the 1:2
 // atlas proportion to kill; it would be silly to re-introduce it here.)
 const INK_CROP = 0.78;
+// Full Celtic ornament uses more of the existing atlas row. This gives the
+// ribbons room above/below the name without shrinking or stretching its type.
+const inkCrop = (dress) => dress.style === 'celtic' && dress.flourish === 'full' ? .95 : INK_CROP;
 // The plate's printed band inside its own top face, per side.
 const INK_MARGIN = 0.14;
 // Texels of the card region the ink band does NOT reach, so a mip level cannot
@@ -827,7 +830,7 @@ export class PlacardRig {
       this._paintEmboss(slot, shown, f, this.dress.ink.tone);
     } else if (['parchment', 'arcane', 'celtic'].includes(this.dress.style)) {
       this._toolingPainter().theme(x, U_CARD[0] * ATLAS_W, y, glyphs,
-        { style: this.dress.style, palette, flourish: this.dress.flourish, crop: INK_CROP, gutter: INK_GUTTER });
+        { style: this.dress.style, palette, flourish: this.dress.flourish, crop: inkCrop(this.dress), gutter: INK_GUTTER });
     } else if (!clear) {
       x.fillStyle = inkColor;
       letters.draw(x, cx, cy);
@@ -1234,7 +1237,8 @@ export class PlacardRig {
     }
 
     // the band's world size, at the cropped row's aspect and never stretched
-    const aspect = CARD_PX / (ROW_PX * INK_CROP);      // 2.564
+    const crop = inkCrop(this.dress);
+    const aspect = CARD_PX / (ROW_PX * crop);
     let iw, id, iy, iz;
     const k = this.scale();
     if (style === 'plate') {
@@ -1263,7 +1267,7 @@ export class PlacardRig {
     }
     rec.inkSize = {
       w: iw, d: id, y: iy, inset: isBare(style) ? this.dress.inset : 0,
-      pxPerUnit: CARD_PX / iw, pxPerUnitDown: (ROW_PX * INK_CROP) / id,
+      pxPerUnit: CARD_PX / iw, pxPerUnitDown: (ROW_PX * crop) / id, crop,
     };
 
     const { x: ox, z: oz, azim } = rec.anchor;
@@ -1280,9 +1284,9 @@ export class PlacardRig {
       this.inkNrm[o] = 0; this.inkNrm[o + 1] = 1; this.inkNrm[o + 2] = 0;
       o += 3;
     }
-    // the row's middle INK_CROP, in v, so the band keeps the atlas proportion
+    // The selected share of the row, in v, at the same atlas proportion.
     const mid = 1 - (slot + 0.5) / PLACE_MAX;
-    const half = INK_CROP / (2 * PLACE_MAX);
+    const half = crop / (2 * PLACE_MAX);
     // …AND A GUTTER OFF THE EDGE IN U, which is not a rounding nicety. The card
     // region ends at u 0.625 and the BRASS begins there, so a band that
     // samples to the boundary catches brass along its whole edge — on the tent
@@ -1430,8 +1434,8 @@ export class PlacardRig {
       // initialiser at that point, and an inkBox built from it reported every
       // name as a box of no height. `placardFrame` prefers this where it
       // exists; the tent has no crop, no inkBox, and reads `row.ink` as ever.
-      rec.inkBox = !isFlat(this.dress.style) || !rec.ink ? null
-        : { w: rec.ink.w, h: Math.min(1, rec.ink.h / INK_CROP) };
+      rec.inkBox = !isFlat(this.dress.style) || !rec.ink || !rec.inkSize ? null
+        : { w: rec.ink.w, h: Math.min(1, rec.ink.h / rec.inkSize.crop) };
     }
     this.rows = next;
     this.occupied = live.length;
@@ -1841,7 +1845,7 @@ export class PlacardRig {
   // that was written rather than computed from the dials a second time.
   _bandInfo() {
     for (const r of this.rows) {
-      if (r && r.inkSize) return { ...r.inkSize, crop: INK_CROP };
+      if (r && r.inkSize) return { ...r.inkSize };
     }
     return null;
   }

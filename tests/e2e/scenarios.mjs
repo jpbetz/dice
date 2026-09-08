@@ -29906,6 +29906,25 @@ export const scenarios = [
           + `(${band.pxPerUnit.toFixed(1)} vs ${band.pxPerUnitDown.toFixed(1)})`);
       }
 
+      // Full Celtic uses more atlas height for the ornament, never a smaller
+      // name. Catch a crop applied only to UVs, geometry or the text readout.
+      const fullInk = (await t.dbg('placardFrame(0)')).ink.flat();
+      const fullWord = await t.dbg('placardText(0)');
+      await t.dbg("tuneSet({'cards.flourish': 'rule'})");
+      await settled();
+      const ruleBand = (await t.dbg('placardBudget()')).band;
+      const ruleInk = (await t.dbg('placardFrame(0)')).ink.flat();
+      assert.ok(seen.celtic.band.d > ruleBand.d * 1.15, 'full has room for larger knots');
+      assert.equal(seen.celtic.band.w, ruleBand.w, 'the name keeps its width');
+      assert.equal(await t.dbg('placardText(0)'), fullWord, 'the same letters fit');
+      assert.equal(ruleInk.length, fullInk.length);
+      for (let i = 0; i < fullInk.length; i++) {
+        assert.ok(Math.hypot(ruleInk[i].x - fullInk[i].x, ruleInk[i].y - fullInk[i].y) < .05,
+          'ornament height does not move or resize the name on screen');
+      }
+      await t.dbg("tuneSet({'cards.flourish': 'full'})");
+      await settled();
+
       // The actual developer controls write through the binder, re-fit long
       // names, and survive export/reset. Eight styles share these controls.
       const custom = {
@@ -30072,9 +30091,11 @@ export const scenarios = [
       // the arc is still computed on the film's clock, only the mesh stops
       // being drawn. Checked here rather than argued: the pair is the one
       // combination a reader would doubt.
+      const shippedWash = await t.dbg("tuneGet('cards.wash.state')");
       assert.equal((await t.dbg('placardBudget()')).wash.peak,
-        await t.dbg("tuneGet('cards.wash.peak')"), 'the arc follows the saved brightness');
-      await t.dbg(`tuneSet({'cards.wash.peak': 0.2})`);
+        shippedWash === 'disabled' ? 0 : await t.dbg("tuneGet('cards.wash.peak')"),
+        'the arc follows the saved state and brightness');
+      await t.dbg(`tuneSet({'cards.wash.state': 'enabled', 'cards.wash.peak': 0.2})`);
       await settled();
       assert.equal((await t.dbg('placardBudget()')).wash.peak, 0.2, 'turned down');
       await t.dbg(`tuneSet({'cards.wash.state': 'disabled'})`);
@@ -30137,7 +30158,7 @@ export const scenarios = [
       const back = await t.dbg('placardDress()');
       assert.equal(back.worn.style, shipped,
         'reset puts the table back in the dress the file ships');
-      assert.equal(back.worn.wash.state, 'enabled', 'and lights the arc again');
+      assert.equal(back.worn.wash.state, shippedWash, 'and restores the saved wash choice');
       assert.equal(back.worn.scale, await t.dbg(`tuneGet('cards.scale')`), 'at the shipped size');
       assert.deepEqual(t.page.consoleErrors, []);
     },

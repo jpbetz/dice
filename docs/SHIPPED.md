@@ -11,6 +11,38 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Fuller Celtic ornament (2026-09-08)
+
+The owner found the first full embellishment plain and hard to see. The
+inherited assumption was that a tiny four-loop symbol and hairline plaits
+would carry the motif at table distance. They mostly reduced to two rules.
+
+`celtic + full` now has a larger woven medallion, dense interlaced side
+ribbons with pale central detailing, and pierced terminals. Ribbon width
+rises from 3.6 to 6.5 atlas pixels. Crossings are calculated once from the
+closed curves and alternate along each strand; transparent underpasses keep
+the actual mat showing through. The palette still comes from Arcane and
+respects custom colors. `rule` retains its original small knot and fine lines;
+`none` and the other styles retain their finishes.
+
+The full ornament now uses 95% of the existing atlas row's height instead of
+78%, enlarging the flat band's depth by about 22% at the same width and text
+density. UVs, geometry and the name's projected measurement use that same
+crop. This deliberately sets aside the fixed flat-band crop from §7.65:
+there is room in the existing atlas, and the owner's request benefits from
+using it. Names, their font size, the anchors and the GPU budget stay the
+same. The geometric crossing work is cached and is not part of animation.
+
+Visual review is reproduced with
+`node tools/drive.mjs tools/steps/placard-tooling.mjs tools/out/celtic-ornate`:
+actual desktop captures at saved settings, a native material study and phone
+captures (with the existing phone framing limit). `placard-styles` also
+compares the name's actual projected corners between full and rule, ensuring
+the larger decoration neither shrinks nor moves the lettering. `npm test`
+passed (unit/fuzz and all 60 smoke scenarios), as did `placard-styles` and
+`scene-draw-budget`. The wash assertions now respect the saved disabled
+state and explicitly enable the arc before testing its brightness.
+
 ## Celtic knotwork placards (2026-09-08)
 
 The owner requested another style with Arcane's color and feel, embellished
