@@ -102,7 +102,8 @@ encoder — its own decision).
 own name, having seen enough before joining to know it is the right one.
 *Surfaces:* the pre-join peek, the seat picker, `&as=`.
 *Proof:* `prepared-seat`, `prepared-seat-chairs`, `prepared-seat-declined`,
-`seat-resume`, `room-linger`.
+`seat-resume`, `room-linger`, `front-door-is-a-table`,
+`failed-join-has-a-retry`, `unnamed-table-has-a-label`.
 **MOSTLY SHIPPED.** ROADMAP `L2` holds the remaining judgment call: whether
 the peek should say how many people are already here.
 
@@ -112,7 +113,7 @@ the peek should say how many people are already here.
 **Done when:** leaving is a verb, and the tables they have visited are
 listed to go back to.
 *Surfaces:* the lobby's recents, `Leave table`.
-*Proof:* `leave-to-lobby`, `lobby-exits`.
+*Proof:* `leave-to-lobby`, `lobby-exits`, `joining-another-table-keeps-your-pools`.
 **SHIPPED** (ROADMAP `L3`, `765b7da`).
 
 ### CUJ5 — "We need to split into two groups for a bit, then come back."

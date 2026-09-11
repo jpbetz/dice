@@ -371,21 +371,10 @@ const { room: ROOM, arrivedByLink: ARRIVED_BY_LINK } = (() => {
 })();
 const IN_LOBBY = ROOM === null;
 
-// AT THE DOOR — dismissed the picker, or (since 2026-08-30) landed at a table
-// this boot minted with no stored name: looking rather than sitting (C12).
-// Read by renderPresenceExits, which offers the way back in, and by
-// updateIdentityChip, which is what dragged it up here from beside the other
-// seat state: setSound() → syncSettingsUI() → updateIdentityChip runs during
-// MODULE EVALUATION, so a declaration left down at line ~29479 is in TDZ when
-// the chip reads it and the whole module dies at eval. Measured, not guessed:
-// the page still rendered a canvas and a 329-key __diceDebug, and the tell was
-// a LATER `let` throwing "cannot access before initialization" from a debug
-// getter. Same trap the ROOM/IN_LOBBY pair above carries its own note about.
+// An explicitly dismissed invitation stays local until the player joins.
+// These live above module-time UI rendering to avoid temporal dead zones.
 let seatDeclined = false;
-// Spent by the FIRST initNet (see its gate). Everything after the boot — the
-// presence row's 'Take a seat', ensureTableLive behind the invite doors — is a
-// person deliberately asking to join, and a deliberate ask always gets the
-// prompt.
+let connectionState = 'idle';
 let bootArrival = true;
 
 // THE STABILITY CHANNEL (js/stability.js — read its header for the law).
@@ -19419,8 +19408,7 @@ window.__diceDebug = {
   },
   // U25 — THE NAMEPLATE'S OWN RULE, ASSERTABLE. `name` is what the plate and
   // the tab title show; `minted` says whether the ?room= key was minted (and
-  // therefore is not a chosen name). An unnamed table with a minted key must
-  // show NOTHING in both channels.
+  // therefore uses a short fallback label until somebody names it).
   get tablePlate() {
     const el = document.getElementById('table-name');
     return {
@@ -22692,6 +22680,10 @@ function renderGroups() {
   const poolsHead = document.getElementById('pools-head');
   const foreign = !!poolsOwner;
   const owner = foreign ? poolsOwnerPlayer() : null;
+  document.getElementById('pools-scope').textContent = foreign
+    ? `These are ${owner.name}'s pools. Copying them leaves theirs unchanged.`
+    : 'Saved in this browser. Yours at every table.';
+  sectionBarEl.querySelector('[data-sec="pools"]').textContent = foreign ? 'Their pools' : 'Your pools';
   poolsHead.classList.toggle('foreign', foreign);
   groupsListEl.classList.toggle('foreign', foreign);
   poolsHead.querySelector('.ph-word').textContent = foreign ? `${owner.name}'s pools` : 'Saved pools';
@@ -23061,7 +23053,7 @@ function renderRailColumn() {
     // width so the switch never changes shape under you.
     b.disabled = b.dataset.rm === 'pools' && !groups.length;
     b.title = b.disabled ? 'No saved pools yet'
-      : b.dataset.rm === 'dice' ? 'Loose dice' : 'Your saved pools';
+      : b.dataset.rm === 'dice' ? 'Loose dice' : 'Your saved pools come with you to every table';
   }
   poolsEl.classList.toggle('rail-list-off', mode !== 'pools');
   diceEl.classList.toggle('rail-list-off', mode !== 'dice');
@@ -26327,42 +26319,32 @@ function rerenderInterpretation() {
   }
 }
 
-// THE QUIET NAMEPLATE (anatomy pass, Joe 2026-08-04): the table's name,
-// top-right of the rail — the mirror of YOU top-left. Renders the
-// room-wide tableName, else the ?room= key when someone CHOSE one (a
-// non-default key is a chosen name), else NOTHING: an unnamed table
-// wears no placeholder — a standing generic word is the chrome the
-// removed 'Pools' title taught us to kill. Content, not chrome: renders
-// as typed, never uppercased. The name also rides document.title (the
-// cheapest identity surface in the app — tabs, history, link previews).
+// Friends need to distinguish tables even when neither organizer named one.
+// The name and connection state stand together; event notices have their own slot.
 function renderTableName() {
   const el = document.getElementById('table-name');
-  // The lobby has no table, so it wears no name — and crucially it cannot
-  // INHERIT one. roomSettings.tableName is restored from LS_ROOMSETTINGS (the
-  // solo settings copy), so before L0 a roomless page rendered the name of
-  // whatever table this browser last configured, on the plate AND in the tab
-  // title. `tableName` is room state; it has no business surviving into a
-  // roomless session. clearTableIdentity() below is what enforces that at boot;
-  // this guard is the render-side belt to its braces.
-  // …AND A MINTED KEY IS NOT A CHOSEN NAME (U25, audit E4). The rule above
-  // is this function's own — "else the ?room= key when someone CHOSE one…
-  // else NOTHING" — and it had no test for "chose", so `+ New table` minted
-  // `drive-<16 random>` and the unnamed table wore `drive egw19x` on the
-  // plate and in the tab title: a placeholder, and precisely the standing
-  // generic word the removed 'Pools' title taught us to kill. The marginal
-  // secrecy cost of showing it is nil (the address bar has it either way);
-  // it is wrong as PRESENTATION, by the rule written directly above it.
-  const chosenKey = !IN_LOBBY && netOnline && !isMintedKey(ROOM);
-  const key = chosenKey ? ROOM.replace(/[-_]+/g, ' ') : '';
-  const name = IN_LOBBY ? '' : (roomSettings.tableName || key);
+  const name = IN_LOBBY ? '' : tableLabel(netOnline ? roomSettings.tableName : '');
   el.textContent = name;
-  // No title in the lobby: 'this table, solo' asserts a table where there is
-  // none. Hidden today (no name means no plate) — but the plate is exactly the
-  // surface that grows a name the moment one exists, so the lie must not sit
-  // waiting behind it.
-  el.title = IN_LOBBY ? '' : (netOnline ? `room: ${ROOM}` : 'this table, solo');
+  el.title = IN_LOBBY ? '' : `room: ${ROOM}`;
   el.classList.toggle('hidden', !name);
   document.title = name ? `${name} — Dice Table` : 'Dice Table';
+  const state = document.getElementById('table-connection');
+  const text = IN_LOBBY ? 'Solo · your rolls stay here'
+    : seatDeclined ? 'Not joined · your rolls stay here'
+    : connectionState === 'connecting' ? 'Joining…'
+    : netOnline && connectionState === 'online' ? `Connected · ${players.length} at table`
+    : netOnline ? 'Reconnecting…'
+    : connectionState === 'offline' ? 'Not connected · playing solo' : 'Not joined';
+  if (state.textContent !== text) state.textContent = text;
+  document.getElementById('table-retry').hidden = IN_LOBBY || seatDeclined
+    || netOnline || connectionState !== 'offline';
+}
+
+// A short label lets friends compare unnamed tables; the complete link is
+// still the address. Never persist this fallback as a chosen table name.
+function tableLabel(name = '') {
+  return name || (isMintedKey(ROOM) ? `Table ${ROOM.slice(-6).toUpperCase()}`
+    : String(ROOM || '').replace(/[-_]+/g, ' '));
 }
 
 // The lobby's table identity is NOT the last table's. Felt, system and zoom are
@@ -33722,6 +33704,7 @@ const ROSTER_MAX = 6; // pills shown before the tail folds into +N — raised
 // gap in ROADMAP §2k.
 function renderPlayers() {
   rosterEl.innerHTML = '';
+  renderTableName();
   repaintAwayVerbs(); // a departure can make a roll on screen clearable (U19)
   // …and the roster IS where the table's characters come from since C17, so
   // someone arriving with a library, or leaving with one, changes the offer.
@@ -34521,7 +34504,7 @@ function updateIdentityChip() {
   const atHome = poolsOwner === null;
   chip.setAttribute('aria-pressed', String(atHome));
   chip.title = atHome
-    ? 'You — right-click for name, seat, invite'
+    ? 'Your pools — right-click to change your name, switch tables or invite friends'
     : 'Back to your pools — right-click for name, seat, invite';
 }
 
@@ -34542,7 +34525,7 @@ function openIdentityMenu() {
   // the privacy read lives here rather than standing on screen.
   document.getElementById('idm-room').textContent = IN_LOBBY
     ? 'not at a table — your rolls stay on this device'
-    : (info.online ? `room: ${ROOM}` : 'no server — playing solo');
+    : `${tableLabel(info.online ? roomSettings.tableName : '')} · ${document.getElementById('table-connection').textContent}`;
   // A surface that speaks about YOU keeps working; a surface that speaks about
   // THE TABLE is ABSENT in the lobby — not greyed, not a refusal on click.
   // There is no link to copy, no seat to change, and no table to leave.
@@ -34812,6 +34795,11 @@ async function ensureTableLive() {
   const conn = await netReady;
   return !!(conn && conn.online);
 }
+
+document.getElementById('table-retry').addEventListener('click', () => {
+  if (IN_LOBBY || netOnline || connectionState !== 'offline') return;
+  netReady = initNet();
+});
 
 async function copyInviteLink(btn, restoreLabel) {
   const url = inviteUrl();
@@ -35363,6 +35351,8 @@ function handleNetEvent(type, data) {
 }
 
 function handleNetStatus(status) {
+  connectionState = status;
+  renderTableName();
   if (!netOnline) return; // solo mode keeps its own pill
   setPill(status === 'online' ? null : 'reconnecting…', 'offline');
 }
@@ -35840,8 +35830,8 @@ function renderSeatChoices() {
   const list = document.getElementById('seat-list');
   const divider = document.getElementById('seat-someone');
   const tn = seatPeekInfo && typeof seatPeekInfo.name === 'string' ? seatPeekInfo.name.trim() : '';
-  nameLine.textContent = tn; // user text: textContent only
-  nameLine.classList.toggle('hidden', !tn);
+  nameLine.textContent = tableLabel(tn); // user text: textContent only
+  nameLine.classList.remove('hidden');
   list.textContent = '';
   seatDefaultPick(); // before the rows paint — it decides which one is marked
   renderSeatMine();
@@ -36399,31 +36389,17 @@ async function initNet() {
     return { online: false };
   };
 
-  // NOBODY IS HERE TO ADDRESS YOU YET (2026-08-30, the link-sharing pass).
-  // Minting a room key gave every page a table address, which is what makes
-  // one link enough — but it must not also give every first-time visitor the
-  // modal the lobby was built to remove. The question that separates the two
-  // cases is not "is there a room key", it is ARRIVED_BY_LINK: somebody sent
-  // you here, so you are joining PEOPLE and a name is what they address you
-  // by. At a table this boot minted there is no one to address you, so the
-  // honest answer is no prompt at all — take the door state, roll instantly,
-  // and name yourself if and when you want company. CUJ1 is preserved by the
-  // same mechanism that now serves CUJ2, rather than at its expense.
-  //
-  // A STORED NAME SKIPS ALL OF IT and joins below, which is the case that
-  // makes a blind copy of the address bar work: a returning host is live at
-  // their own address from the first frame, so the link they paste already
-  // has somebody behind it.
-  //
-  // THE BOOT ONLY, and getting this wrong shut the door it was holding open.
-  // `Take a seat` and ensureTableLive re-enter this function precisely to ask
-  // the question — an unconditional gate answered them with the door they were
-  // trying to open, so at a minted table BOTH the ghost and the invite key did
-  // nothing at all. The suite could not see it: the scenario asserted the ghost
-  // EXISTS, which it did. Found by pressing it.
+  // A bare visit already has a shareable address. Its host must be seated
+  // there, even without a stored name (Joe/Jacob field report, 2026-09-11).
+  // An invited newcomer still chooses their name; dismissing stays local.
   const firstBoot = bootArrival;
   bootArrival = false;
-  if (!name && firstBoot && !ARRIVED_BY_LINK) return atTheDoor();
+  if (!name && firstBoot && !ARRIVED_BY_LINK) {
+    // The address bar is already an invite. Seat its host without blocking
+    // the first roll; a guest name can be changed through the identity menu.
+    name = `Guest ${mintRoomKey('').slice(-4).toUpperCase()}`;
+    try { localStorage.setItem(LS_NAME, name); } catch { /* session only */ }
+  }
 
   // A PER-SEAT LINK OUTRANKS A STORED NAME (U3, 2026-08-08). `dice.name.v1`
   // is origin-GLOBAL, so this gate skipped the picker for anyone who had ever
@@ -36471,6 +36447,8 @@ async function initNet() {
     try { localStorage.setItem(LS_NAME, name); } catch { /* ignore */ }
   }
 
+  connectionState = 'connecting';
+  renderTableName();
   const conn = await connect({
     room: ROOM,
     name,

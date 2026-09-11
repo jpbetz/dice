@@ -97,17 +97,12 @@ limitations under the License.
         <span id="identity-name" class="identity-name">…</span>
       </button>
       <div id="rail-roster"></div>
-      <!-- THE QUIET NAMEPLATE (anatomy pass, Joe 2026-08-04: "does it have
-           a name? It should"): the table's name rides the rail's RIGHT
-           edge — the mirror of YOU top-left, so row one reads "these
-           people, at this table". Renders the room-wide tableName setting,
-           else the ?room= key when someone chose one, else NOTHING: an
-           unnamed table wears no placeholder (a standing generic word is
-           the chrome the removed 'Pools' title taught us to kill).
-           Content, not chrome — as-typed case, never a button (renaming
-           lives in Settings; the invite link keeps its one home in the
-           identity menu). -->
-      <span id="table-name" class="table-name hidden"></span>
+      <!-- Keep the table identity and connection state beside its roster. -->
+      <div id="table-context">
+        <span id="table-name" class="table-name hidden"></span>
+        <span id="table-connection" role="status"></span>
+        <button id="table-retry" class="btn tiny ghost" hidden>Retry</button>
+      </div>
       <!-- role=status (U5): every table event — "Alice changed the table", a
            refusal, "Bo left" — was a 3-second unannounced string, and
            collapsed the pill folds to a 10px colorless dot. The visual
@@ -173,7 +168,7 @@ limitations under the License.
          `#left-panel :is(.section-seg, #rail-mode)` block in css/style.css. -->
     <div id="rail-mode" class="seg rail-seg" role="group" aria-label="Show dice or saved pools">
       <button data-rm="dice" type="button" title="Loose dice">Dice</button>
-      <button data-rm="pools" type="button" title="Your saved pools">Pools</button>
+      <button data-rm="pools" type="button" title="Your saved pools come with you to every table">Yours</button>
     </div>
     <div id="rail-pools"></div>
     <!-- The dice list is the pool list's twin, deliberately: same 86px row,
@@ -288,7 +283,7 @@ limitations under the License.
       <div id="section-bar" class="seg section-seg" role="group" aria-label="Panel sections">
         <button data-sec="dice" aria-pressed="true" title="Build by tapping dice">Dice</button>
         <button data-sec="notation" aria-pressed="false" title="Type dice notation — 2d6+3, 4d6dl1, 1d20 adv dc15, 6d6 t3">2d6</button>
-        <button data-sec="pools" aria-pressed="true" title="Your saved pools">Pools</button>
+        <button data-sec="pools" aria-pressed="true" title="Your saved pools come with you to every table">Your pools</button>
       </div>
 
       <div id="die-buttons"></div>
@@ -402,6 +397,7 @@ limitations under the License.
         <button id="storage-download" class="btn tiny confirm"
                 title="Write your whole library to a file before you lose it">Download my data</button>
       </div>
+      <p id="pools-scope">Saved in this browser. Yours at every table.</p>
       <div id="pools-head" class="hidden">
         <span class="ph-word">Saved pools</span>
         <!-- The picker's first anchor (PROFILES §11.5 ②). Hidden until there is
@@ -1458,8 +1454,10 @@ limitations under the License.
       <!-- NAMED, because the door is a dialog (U22). openModal points
            aria-labelledby here; a blocking overlay with no accessible name
            announces as "dialog" and nothing else. -->
-      <h2 id="seat-title">Join</h2>
+      <h2 id="seat-title">Join table</h2>
       <p id="seat-table-name" class="hint seat-table-name hidden"></p>
+      <p class="hint">Your saved pools come with you. You’ll share rolls with the people at this table.
+        People here can see and copy your pools; your copies stay yours.</p>
       <div id="seat-pick">
         <!-- THE NAME COMES FIRST (Joe 2026-08-09). It used to sit at the
              bottom under the profile lists, so the first thing a new player

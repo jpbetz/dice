@@ -11,6 +11,47 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Joining the table behind the link (2026-09-11)
+
+Joe reported that he and Jacob followed the same room link but could not see
+each other; moving to Walter's link brought everyone together. Jacob then
+expected his pools to be isolated by table. The inherited assumption was that
+a shareable address could stand over a local, unjoined host and a quiet UI
+would explain the difference. Two fresh browser identities reproduced that
+failure: identical room keys, host offline, guest online, both rosters empty.
+This establishes a matching failure path, not the cause of that particular
+session; the devices and connection state from the session are unknown.
+
+A bare visit now seats its host under an editable `Guest XXXX` name without
+opening a modal. Invited newcomers still choose a name and may decline to join.
+The table label and connection state stand beside the roster; unnamed tables
+use `Table XXXXXX`, derived from the room key without changing it or saving a
+chosen name. Failed joins say that play is local and offer Retry. A transient
+notice cannot replace this connection readout.
+
+The pool switch says **Your pools**, and the rack explains that they are saved
+in this browser and remain yours at every table. Browsing another player's rack
+changes both labels. The join screen names the destination and explains that
+saved pools travel with you and are visible/copyable at the table. Storage,
+publication, profile selection, and room isolation are unchanged.
+
+This deliberately supersedes UX §7.20a's unjoined first-time host, §7.43's
+unnamed-table silence, and §7.23's generic Pools label: the September field
+report shows why those reductions hid information players need. CUJ2/3 now
+include a host without a stored name; CUJ4 includes the same browser following
+a second link, retaining its pools and leaving the first table's log behind.
+Scenarios: `front-door-is-a-table`, `joining-another-table-keeps-your-pools`,
+`failed-join-has-a-retry`, `the-door-opens`, `unnamed-table-has-a-label`.
+
+Validation: unit and fuzz suites passed. The initial smoke run passed 59/60
+and the join/seat run 34/35; their only failures pinned the old rail child ID
+and `Join` heading. Both assertions were updated and both scenarios passed
+on rerun. Screenshots were inspected at 1440×1000 and 390×844. The connection
+readout measured 123×13 px on desktop and 86×26 px in the phone's collapsed
+column, with no horizontal clipping. The phone check caught and removed an
+inherited rule hiding the table context in compact view. No deployment or
+changes to the live preview server were made.
+
 ## Authored Celtic crossings (2026-09-08)
 
 The owner pointed out that the breaks at overlaps were missing. The inherited

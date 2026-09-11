@@ -788,7 +788,7 @@ html, body {
    manage bar are one section, and leaving any of them behind would strand
    chrome over nothing. #cmd is HIDDEN, never removed: paintCmd keeps syncing
    into it, so §1.3's projection stays true while the box is off screen. */
-#builder-panel.sec-off-pools :is(#profile-banner, #pools-head, #groups-list, #pools-toolbar) {
+#builder-panel.sec-off-pools :is(#profile-banner, #pools-scope, #pools-head, #groups-list, #pools-toolbar) {
   display: none;
 }
 
@@ -3337,6 +3337,37 @@ html, body {
 }
 .table-name.hidden { display: none; }
 #left-panel.collapsed .table-name { display: none; }
+
+/* Table identity and liveness remain visible even when nobody named it.
+   A transient event notice must not erase the answer to "am I with them?". */
+#table-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  width: 100%;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+#table-context .table-name {
+  margin-left: 0;
+  margin-right: auto;
+  color: var(--ivory);
+}
+#table-retry[hidden] { display: none; }
+#left-panel.collapsed #table-context { gap: 3px; }
+#left-panel.collapsed #table-context .table-name {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+#pools-scope {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
 
 /* ---------- status pill ---------- */
 #status-pill {

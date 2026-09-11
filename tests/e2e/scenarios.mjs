@@ -3666,8 +3666,8 @@ export const scenarios = [
       await dm.settle();
 
       const p = await ctx.newTable({ origin: 'localhost', anon: true });
-      assert.equal(await p.eval(`document.querySelector('#name-panel h2').textContent`), 'Join',
-        'the door says Join');
+      assert.equal(await p.eval(`document.querySelector('#name-panel h2').textContent`), 'Join table',
+        'the door says Join table');
       // NAME FIRST: the field the modal cannot proceed without precedes the
       // list of characters, in DOM order, which is reading and tab order too.
       assert.equal(await p.eval(`(() => {
@@ -5623,7 +5623,7 @@ export const scenarios = [
       // wrapping to its own line BELOW you instead of shoving you down.
       assert.deepEqual(
         await a.eval(`[...document.getElementById('rail').children].map((el) => el.id)`),
-        ['identity-chip', 'rail-roster', 'table-name', 'status-pill'],
+        ['identity-chip', 'rail-roster', 'table-context', 'status-pill'],
         'the top rail is PRESENCE, anchored on you (you · roster · table · status)',
       );
       // Foot: configure → consult → act, then the gap, then the contextual
@@ -5663,6 +5663,12 @@ export const scenarios = [
       for (const id of RAIL.filter((x) => x !== 'rail-help')) {
         assert.ok(await visible(id), `#${id} still visible all-collapsed`);
       }
+      const connectionBox = await a.eval(`(() => {
+        const el = document.getElementById('table-connection');
+        return {height: el.getBoundingClientRect().height, clipped: el.scrollWidth > el.clientWidth};
+      })()`);
+      assert.ok(connectionBox.height > 0, 'the compact view still says whether you joined');
+      assert.equal(connectionBox.clipped, false, 'the connection state fits its actual narrow column');
       assert.equal(await visible('rail-help'), false,
         '? Help is the one control the collapsed foot gives up — by decision, for room');
       // …and the foot it gives that room to is a ROW at the column's foot,
@@ -12964,93 +12970,117 @@ export const scenarios = [
   {
     name: 'front-door-is-a-table',
     tags: ['smoke', 'journey', 'lobby', 'cuj1', 'cuj2'],
-    // THE BARE URL MINTS A TABLE (2026-08-30). It used to be the lobby, which
-    // fixed CUJ1 by removing the seat modal and broke CUJ2 by making the link
-    // a host naturally shares a link to NOTHING — four remote players each got
-    // their own private felt. This scenario holds both halves at once, because
-    // the two have been traded for each other twice now and the trade is what
-    // has to stop.
-    //
-    // WHAT IT CATCHES: the front door is the ONE path no other scenario can
-    // exercise. Every other tab in this file opens the url it already means to
-    // be at — `?room=` from ctx.room, or `?lobby` — so a front door that
-    // silently went back to being roomless would leave all 237 of them green.
+    // A fresh host must be in the table whose address they share (CUJ2/3).
+    // The previous scenario explicitly required an unjoined host and tested
+    // sharing only with a returning one. Field report: Joe/Jacob, 2026-09-11.
     async fn(ctx) {
-      const a = await bootTab(ctx, {
-        recordApi: true,
-        origin: '127.0.0.21',
+      const host = await bootTab(ctx, {
+        origin: '127.0.0.21', path: '/',
         clean: ['dice.name.v1', 'dice.tables.v1', 'dice.roomsettings.v1'],
-        path: '/',
-        readyExpr: `!!window.__diceDebug && !!(window.__diceDebug.identity || {}).room`,
-        readyDesc: 'the front door mints a table',
+        readyExpr: `!!window.__diceDebug && window.__diceDebug.netReady`,
       });
-
-      // ① THE ADDRESS BAR IS THE INVITE. Minted shape, not a chosen name: 16
-      // base36 chars is the door itself (js/tables.js), and `?room=table`
-      // would be a door anyone holding the deployment's URL could walk.
-      const search = await a.eval('location.search');
-      assert.match(search, /^\?room=[a-z0-9]{16}$/,
-        `the bare url writes a minted key into the bar (got: ${search})`);
-      const id = await a.dbg('identity');
-      assert.equal(id.lobby, false, 'the front door is not the lobby any more');
-      assert.equal(`?room=${encodeURIComponent(id.room)}`, search,
-        'the bar and the app name the same table');
-      assert.equal(id.inviteUrl, await a.eval('location.href'),
-        'the invite link IS the address bar — that is the whole fix');
-
-      // ② AND CUJ1 IS UNTOUCHED. A minted table has nobody to address you, so
-      // there is no prompt and — the sharper claim — not one API call. The
-      // key cost a crypto.getRandomValues and nothing else.
-      assert.equal(await a.eval(`document.getElementById('name-modal').classList.contains('hidden')`),
-        true, 'no "Take a seat" modal at a table this boot minted');
-      assert.equal((await a.dbg('seatPicker')).open, false, 'the seat picker agrees');
-      assert.equal((await a.dbg('seatPicker')).declined, true,
-        'it rests at the door — the shipped fourth presence state, not a new one');
-      // '…' is the JOIN's placeholder and means "a name is coming". At the
-      // front door none is. Found by LOOKING: every debug field above was
-      // already correct while the chip sat there promising a name that was
-      // never going to arrive.
-      assert.equal(await a.eval(`document.getElementById('identity-name').textContent`), 'You',
-        'the chip says the honest word, not the join placeholder');
-      assert.deepEqual(await a.eval('window.__apiCalls'), [],
-        'minting is not joining: no /api/join, no /api/table peek, no stream');
-
-      // ③ The dice are live right now, which is what CUJ1 actually asks for.
-      await a.roll('2d6');
-      assert.equal(await a.diceCount(), 2, 'two dice on the felt');
-      const st = await a.entryState();
-      assert.ok(st && typeof st.total === 'number' && st.total >= 2 && st.total <= 12,
-        `the roll resolved locally (got ${JSON.stringify(st && st.total)})`);
-      assert.deepEqual(await a.eval('window.__apiCalls'), [],
-        'and it stayed a solo roll — rolling is not joining either');
-
-      // ④ The door is standing open, and answering it is what opens the table.
-      await a.waitFor(`[...document.querySelectorAll('#rail-roster .rail-ghost')]`
-        + `.some((b) => b.textContent.includes('Take a seat'))`,
-        { desc: "the 'Take a seat' ghost offers the way in" });
+      await host.waitOnline();
+      const id = await host.dbg('identity');
+      assert.match(id.name, /^Guest [A-Z0-9]{4}$/);
+      assert.equal(id.inviteUrl, await host.eval('location.href'));
+      assert.equal((await host.dbg('seatPicker')).open, false, 'no setup blocks the first roll');
+      const search = await host.eval('location.search');
+      assert.match(search, /^\?room=[a-z0-9]{16}$/);
+      const guest = await bootTab(ctx, {
+        origin: '127.0.0.26', path: search,
+        seed: { 'dice.name.v1': 'Jacob' },
+        readyExpr: `!!window.__diceDebug && window.__diceDebug.netReady`,
+      });
+      await guest.waitOnline();
+      await host.waitFor(`window.__diceDebug.players.some(p => p.name === 'Jacob')`);
+      assert.ok((await guest.dbg('players')).some(p => p.name === id.name));
+      assert.equal((await host.dbg('tablePlate')).name, (await guest.dbg('tablePlate')).name);
+      await host.waitFor(`document.getElementById('table-connection').textContent === 'Connected · 2 at table'`);
+      await host.roll('2d6');
+      await guest.settle();
+      assert.equal(await guest.logTop(), await host.logTop(),
+        'the host’s first roll belongs to the shared table');
+      await host.dbg(`changeName('Joe')`);
+      await guest.waitFor(`window.__diceDebug.players.some(p => p.name === 'Joe')`);
+    },
+  },
+  {
+    name: 'joining-another-table-keeps-your-pools',
+    tags: ['lobby', 'seat', 'cuj3', 'cuj4', 'pools'],
+    async fn(ctx) {
+      const joe = await ctx.newTable({ name: 'Joe' });
+      const jacob = await ctx.newTable({ origin: '127.0.0.27', name: 'Jacob' });
+      await jacob.dbg(`setGroups([{name:'Jacob’s lucky dice', notation:'3d6'}])`);
+      const ownPools = await jacob.dbg('groups');
+      await joe.roll('1d20');
+      await jacob.settle();
+      assert.equal((await jacob.dbg('logExport')).rolls, 1);
+      const otherRoom = `${ctx.room}-walter`;
+      const walter = await bootTab(ctx, {
+        origin: '127.0.0.28', path: `/?room=${otherRoom}`,
+        seed: { 'dice.name.v1': 'Walter' },
+        readyExpr: `!!window.__diceDebug && window.__diceDebug.netReady`,
+      });
+      await walter.waitOnline();
+      // The same tab follows the second link, preserving its browser storage.
+      await jacob.page.navigate(`http://127.0.0.27:${ctx.port}/?room=${otherRoom}`);
+      await jacob.waitOnline();
+      await walter.waitFor(`window.__diceDebug.players.some(p => p.name === 'Jacob')`);
+      assert.deepEqual((await jacob.dbg('players')).map(p => p.name).sort(), ['Jacob', 'Walter']);
+      assert.deepEqual(await jacob.dbg('groups'), ownPools, 'the saved pools belong to Jacob');
+      assert.equal((await jacob.dbg('logExport')).rolls, 0, 'the first table’s rolls stay there');
+      assert.equal(await jacob.eval(`document.querySelector('[data-sec="pools"]').textContent`), 'Your pools');
+      assert.match(await jacob.eval(`document.getElementById('pools-scope').textContent`), /Yours at every table/);
+      assert.notEqual((await jacob.dbg('tablePlate')).name, (await joe.dbg('tablePlate')).name);
+      await jacob.roll('3d6');
+      await walter.settle();
+      assert.equal(await walter.logTop(), await jacob.logTop());
+      assert.notEqual(await joe.logTop(), await jacob.logTop());
+    },
+  },
+  {
+    name: 'failed-join-has-a-retry',
+    tags: ['lobby', 'seat', 'cuj3', 'net'],
+    async fn(ctx) {
+      const page = await ctx.browser.newPage();
+      await page.addInitScript(`window.__diceTestMode = true;
+        localStorage.setItem('dice.schema.v1', '2'); localStorage.setItem('dice.name.v1', 'Jacob');`);
+      await ctx.browser.send('Network.enable', {}, page.sessionId);
+      await ctx.browser.send('Network.setBlockedURLs', { urls: ['*/api/join'] }, page.sessionId);
+      const url = `http://127.0.0.29:${ctx.port}/?room=${ctx.room}`;
+      const t = new Table(page, url);
+      ctx.tables.push(t);
+      await page.navigate(url);
+      await t.waitFor(`!!window.__diceDebug && window.__diceDebug.netReady`);
+      assert.equal(await t.eval(`window.__diceDebug.netReady.then(r => r.online)`), false);
+      assert.equal(await t.eval(`document.getElementById('table-connection').textContent`),
+        'Not connected · playing solo');
+      assert.equal(await t.eval(`document.getElementById('table-retry').hidden`), false);
+      await ctx.browser.send('Network.setBlockedURLs', { urls: [] }, page.sessionId);
+      await t.eval(`document.getElementById('table-retry').click()`);
+      await t.waitOnline();
+      await t.waitFor(`document.getElementById('table-connection').textContent === 'Connected · 1 at table'`);
+      assert.equal(await t.eval(`document.getElementById('table-retry').hidden`), true);
     },
   },
   {
     name: 'the-door-opens',
     tags: ['lobby', 'seat', 'cuj1', 'cuj2'],
-    // THE GATE THAT KEEPS THE BOOT QUIET MUST NOT ANSWER A DELIBERATE ASK
-    // WITH THE SAME SILENCE. A table this boot minted asks an unnamed visitor
-    // nothing (§7.20a) — and the first spelling of that gate was
-    // unconditional, so the two surfaces whose entire job is to re-enter the
-    // join flow and ASK were handed back the door they were trying to open.
-    // Both the 'Take a seat' ghost and the invite key did nothing at all.
-    //
-    // WHAT MADE IT INVISIBLE: `front-door-is-a-table` asserted the ghost
-    // EXISTS, and it did. Found by pressing it. So this scenario presses both
-    // doors, and asserts the PICKER, not the button.
+    // Dismissing an invitation is still an explicit choice to roll locally.
+    // Both the standing join action and the invite shortcut reopen that door.
     async fn(ctx) {
-      const doorTab = (origin) => bootTab(ctx, {
-        origin,
-        clean: ['dice.name.v1', 'dice.tables.v1'],
-        path: '/',
-        readyExpr: `!!window.__diceDebug && window.__diceDebug.seatPicker.declined === true`,
-        readyDesc: `at the door (${origin})`,
-      });
+      const doorTab = async (origin) => {
+        const t = await bootTab(ctx, {
+          origin, clean: ['dice.name.v1', 'dice.tables.v1'],
+          path: `/?room=${ctx.room}`,
+          readyExpr: `!!window.__diceDebug && window.__diceDebug.seatPicker.open`,
+        });
+        await t.dbg('dismissSeatPicker()');
+        await t.waitFor(`window.__diceDebug.seatPicker.declined`);
+        assert.equal(await t.eval(`document.getElementById('table-connection').textContent`),
+          'Not joined · your rolls stay here');
+        return t;
+      };
 
       // ① The presence row's ghost — the standing door, always on screen.
       const a = await doorTab('127.0.0.24');
@@ -24674,21 +24704,10 @@ export const scenarios = [
     },
   },
   {
-    name: 'unnamed-table-wears-no-plate',
+    name: 'unnamed-table-has-a-label',
     tags: ['chrome', 'lobby'],
-    // A MINTED KEY IS NOT A CHOSEN NAME (U25, audit E4). The nameplate's own
-    // rule is "the tableName, else the ?room= key when someone CHOSE one, ELSE
-    // NOTHING" — and it had no way to tell chosen from minted, so '+ New table'
-    // with no name put `drive egw19x` on the plate and in the tab title: a
-    // placeholder, which is exactly the standing generic word §7.9 kills.
-    //
-    // READ THIS BEFORE EDITING: `panel-anatomy` asserts the OTHER half of this
-    // rule ("a chosen key IS a chosen name") against the HARNESS's room key —
-    // and tools/stage.mjs mints `drive-<6 base36>` while production mints a
-    // sixteen-character tail, so that scenario passes only because a harness key
-    // is not minted-shaped. A test for this rule written against a harness-shaped
-    // key proves nothing at all. Both keys below are built to the shape
-    // js/tables.js actually writes: KEY_RANDOM_LEN = 16.
+    // Two unnamed tables must be distinguishable when friends share two links.
+    // The fallback is derived from the room, never stored as a chosen name.
     async fn(ctx) {
       const tail = () => Array.from({ length: 16 },
         () => 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 36)]).join('');
@@ -24706,15 +24725,10 @@ export const scenarios = [
       assert.equal(plate.room, minted, 'the tab really is at the minted key');
       assert.equal(plate.minted, true,
         `and the app recognises the shape it mints (got: ${JSON.stringify(plate)})`);
-      assert.equal(plate.name, '', 'an unnamed table puts nothing on the plate');
-      assert.equal(plate.hidden, true, 'and the plate is not standing there empty');
-      assert.equal(plate.title, 'Dice Table',
-        `the tab title says the app, not a random string (got: ${JSON.stringify(plate.title)})`);
-      // The key is still the door and is still in the address bar — this is a
-      // PRESENTATION rule, not a secrecy one, and asserting that keeps the two
-      // from being confused the next time someone reads the comment.
-      assert.ok((await m.dbg('identity')).inviteUrl.includes(encodeURIComponent(minted)),
-        'the link still carries the key — nothing was hidden, only unprinted');
+      assert.equal(plate.name, `Table ${minted.slice(-6).toUpperCase()}`);
+      assert.equal(plate.hidden, false);
+      assert.equal(plate.title, `${plate.name} — Dice Table`);
+      assert.ok((await m.dbg('identity')).inviteUrl.includes(encodeURIComponent(minted)));
 
       // …and a key a PERSON typed is a name, and stands.
       const chosen = await bootTab(ctx, {
