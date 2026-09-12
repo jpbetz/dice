@@ -92,38 +92,30 @@ export default async function run(stage) {
     }
   }
 
-  // THE CLASSIC CORE, socketed. towerContractSnapshot is the only hook that
-  // reads the volumes at contract precision (it exists for the freeze golden
-  // and deliberately refuses to round), and its `bodies` are non-null only
-  // while a tower stands.
-  await a.dbg(`setTower('heartwood')`);
-  await a.waitFor(`window.__diceDebug.tower === 'heartwood'`, { desc: 'heartwood socketed' });
+  // Exercise the unchanged reference through the existing proof override.
+  // The production model supplies a socket; every measured volume comes from
+  // DEFAULT_PORTALS, independently of the catalogue's chosen declarations.
+  const classic = await a.dbg('towerDefaultPortalSpec()');
+  await a.dbg(`towerProbePortals(${JSON.stringify(classic.portals)})`);
+  await a.dbg("setTower('none')");
+  await a.waitFor("window.__diceDebug.tower === 'none'", { desc: 'reference unsocket' });
+  await a.dbg("setTower('wickroot')");
+  await a.waitFor("window.__diceDebug.tower === 'wickroot'", { desc: 'reference socket' });
   const snap = JSON.parse(await a.eval('JSON.stringify(window.__diceDebug.towerContractSnapshot())'));
   const tune = await a.dbg('towerTune()');
-  const classic = await a.dbg(`towerPortalSpec('heartwood')`);
-  if (classic.source !== 'default') {
-    console.log(`BAD: heartwood no longer resolves to DEFAULT_PORTALS (source=${classic.source}) — `
-      + 'the classic core is not what this file says it is');
-    process.exitCode = 1;
-    return;
-  }
 
   const z0 = snap.z0;
   const dz = (z) => z - z0;
   const boxRel = (b) => ({ c: [b.c[0], b.c[1], dz(b.c[2])], s: b.s, ...(b.rx === undefined ? {} : { rx: b.rx }) });
 
-  // THE SIX SHIPPED EYES. ZOOM_PRESETS' own eyeFull/eyeMini pairs are not
-  // exposed; the occlusion probe is where they surface, already translated
-  // into the tower's world (each preset's eye rebased through its own
-  // z0 + matExtra), which is the form a ray-shooting tool wants anyway.
-  await a.dbg('holdClock(true)');
-  await a.dbg('towerCore(true)');
-  const occ = await a.dbg('towerOcclusionCheck()');
-  const eyes = occ.eyes.map((e) => ({ id: e.id, x: e.eye[0], y: e.eye[1], zRelZ0: e.eye[2] - occ.z0 }));
+  // Read the camera projection at full precision. The occlusion report rounds
+  // world coordinates for humans; it must not become modelling source data.
+  const eyes = await a.dbg('towerShippedEyeSpec()');
 
   // PER-MODEL, from each row's own declared portals: the eight numbers, the
   // door the engine cut for them, the despawn line and the cowl band. A forge
   // recipe reasons about its OWN tower, not about the classic one.
+  await a.dbg('towerProbePortals(null)');
   const towers = {};
   for (const row of registry) {
     const s = await a.dbg(`towerPortalSpec('${row.id}')`);
@@ -200,18 +192,15 @@ export default async function run(stage) {
     // "absent because somebody forgot" will assume the second and re-type the
     // constant, which is the whole disease.
     gaps: [
-      "leans: each skin's TILT is a module const in js/towerskin.js (0.7°), "
-      + 'js/towerbastion.js (0.2°), js/toweranvil.js (0.15°) and the Hollow Bole bake '
-      + '(0.45°), applied as group.rotation.z. No debug hook reports it, so '
-      + "check.py's --tower-tilt-deg stays hand-passed until one exists.",
-      'ZOOM_PRESETS.eyeFull/eyeMini are not exposed directly; `eyes` carries them '
-      + 'as the occlusion probe hands them over — already translated into the '
-      + "tower's world and rebased on z0 here.",
+      'Model transforms live in each baked GLB. Forge recipes declare any tilt; '
+      + 'the app adds no per-model lean.',
+      'Camera entries are the preset eyes rebased to the socket plane. '
+      + 'Per-viewer framing, orbit and easing are render-only and not stored here.',
       'POUR (speeds, tempo, the exit guarantee\'s retry budget) is not here: no '
       + 'hook exposes it and no forge tool needs it yet.',
       "towerEye's lookAt is fixed at (0, 5.2*S, z0-1.4) and is not exposed, so a "
       + 'tool that wants to FRAME a named feature cannot aim — it can only choose a '
-      + 'standoff. dress-look works around this by searching poses and measuring the '
+      + 'standoff. Framing tools can search poses and measure the '
       + 'result through worldToScreen; a hook returning the eye pose would remove the '
       + 'search.',
     ],

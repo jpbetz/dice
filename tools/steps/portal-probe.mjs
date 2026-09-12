@@ -26,25 +26,19 @@ limitations under the License.
 //   node tools/drive.mjs tools/steps/portal-probe.mjs sweep
 //     → the knee search: per-axis candidates, JSON line per pour.
 //
-// Output: `ENV {...}` JSON lines on stdout; aggregate offline. Heartwood
-// carries the probe (code skin — instant socket; the physics is the
-// engine's, not the model's).
+// Output: `ENV {...}` JSON lines on stdout; aggregate offline. A production
+// row supplies the socket; the proof override supplies every measured portal.
 
-const S = 1.25;
-const CLASSIC = {
-  in: { x: 0, z: -1.6 * S, rimY: 7.0 * S, clearR: 1.7 * S },
-  out: { x: 0, sillY: 0.8 * S, w: 4.0 * S, clearH: 3.6 * S },
-};
 const POOLS = {
   heavy: ['d20', 'd20', 'd20', 'd20'],
   congest: ['d6', 'd6', 'd6', 'd6', 'd6', 'd6', 'd6', 'd6'],
   mixed: ['d20', 'd12', 'd10', 'd8', 'd6', 'd6', 'd4', 'd12'],
 };
 
-function candidates() {
+function candidates(classic) {
   const list = [];
   const mk = (name, mut) => {
-    const spec = JSON.parse(JSON.stringify(CLASSIC));
+    const spec = JSON.parse(JSON.stringify(classic));
     mut(spec);
     list.push({ name, spec });
   };
@@ -68,9 +62,9 @@ function candidates() {
 // The proposed floors, exactly as they would ship — run `confirm` before
 // changing TOWER_PORTAL_LIMITS. Interactions and the historical worst case
 // (40d6 once spent all five bakes at the CLASSIC door) are the point.
-function confirmMatrix() {
+function confirmMatrix(classic) {
   const at = (mut) => {
-    const spec = JSON.parse(JSON.stringify(CLASSIC));
+    const spec = JSON.parse(JSON.stringify(classic));
     mut(spec);
     return spec;
   };
@@ -79,10 +73,10 @@ function confirmMatrix() {
     // historical note says 40d6 exhausted the guarantee at 4.5 too, and
     // without this row the floor gets blamed for a cost it may not own.
     { name: 'classicCtl', spec: at(() => {}) },
-    // TEMP-CTL { name: 'floorH', spec: at((s) => { s.out.clearH = 2.7 * S; }) },
-    // TEMP-CTL { name: 'floorH+w4', spec: at((s) => { s.out.clearH = 2.7 * S; s.out.w = 3.2 * S; }) },
+    // TEMP-CTL { name: 'floorH', spec: at((s) => { s.out.clearH = 2.7 * 1.25; }) },
+    // TEMP-CTL { name: 'floorH+w4', spec: at((s) => { s.out.clearH = 2.7 * 1.25; s.out.w = 3.2 * 1.25; }) },
     { name: 'floorALL', spec: at((s) => {
-      s.out.clearH = 2.7 * S; s.out.w = 3.2 * S; s.in.clearR = 1.6 * S;
+      s.out.clearH = 2.7 * 1.25; s.out.w = 3.2 * 1.25; s.in.clearR = 1.6 * 1.25;
     }) },
   ];
 }
@@ -91,13 +85,15 @@ export default async function run(stage, args) {
   const mode = args[0] || 'baseline';
   const a = await stage.tab('localhost', 'PortalProbe');
   await a.dbg('holdClock(true)');
+  const classic = (await a.dbg('towerDefaultPortalSpec()')).portals;
+  await a.dbg(`towerProbePortals(${JSON.stringify(classic)})`);
 
   const socket = async () => {
     await a.dbg(`setTower('none')`);
     await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'towerless' });
     await a.dbg('sim(20)');
-    await a.dbg(`setTower('heartwood')`);
-    await a.waitFor(`window.__diceDebug.tower === 'heartwood'`, { desc: 'heartwood up' });
+    await a.dbg(`setTower('wickroot')`);
+    await a.waitFor(`window.__diceDebug.tower === 'wickroot'`, { desc: 'wickroot up' });
     await a.dbg('sim(20)');
   };
 
@@ -133,7 +129,7 @@ export default async function run(stage, args) {
   } else if (mode === 'confirm') {
     const mega = { c20: Array.from({ length: 20 }, () => 'd6'),
       c40: Array.from({ length: 40 }, () => 'd6') };
-    for (const { name, spec } of confirmMatrix()) {
+    for (const { name, spec } of confirmMatrix(classic)) {
       await a.eval(`window.__diceDebug.towerProbePortals(${JSON.stringify(spec)})`);
       await socket();
       for (const [poolName, types] of Object.entries(POOLS)) {
@@ -153,7 +149,7 @@ export default async function run(stage, args) {
     }
     await a.eval('window.__diceDebug.towerProbePortals(null)');
   } else {
-    for (const { name, spec } of candidates()) {
+    for (const { name, spec } of candidates(classic)) {
       await a.eval(`window.__diceDebug.towerProbePortals(${JSON.stringify(spec)})`);
       await socket(); // colliders re-derive from the candidate at socket
       for (const [poolName, types] of Object.entries({ heavy: POOLS.heavy, congest: POOLS.congest })) {
@@ -167,6 +163,7 @@ export default async function run(stage, args) {
     await a.eval('window.__diceDebug.towerProbePortals(null)');
   }
 
+  await a.dbg('towerProbePortals(null)');
   await a.dbg(`setTower('none')`);
   console.log('\nDONE');
 }

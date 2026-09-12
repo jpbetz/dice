@@ -32,7 +32,7 @@ export default async function run(stage, args) {
   const n = Number(args[0]) || 8;
   const seed = Number(args[1]) || 42;
   const secs = Number(args[2]) || 14;
-  const tower = args[3] || 'heartwood';
+  const tower = args[3] || 'wickroot';
   const a = await stage.tab('localhost', 'TowerProbe');
 
   await a.dbg('holdClock(true)');

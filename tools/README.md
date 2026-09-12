@@ -243,7 +243,7 @@ retaken the first time an app frame existed.
 | `portal-probe.mjs baseline\|sweep` | what dice actually use of a portal, and where the physics pushes back below the floors | **simulates**, heavily (the floors campaign) | changing `TOWER_PORTAL_LIMITS` — and nothing else |
 | `forge/promote.mjs <slug…>` / `--check` | SHIPS a baked model: the bytes, the served-file list and the digest baseline as ONE reviewed diff. `--check` verifies every shipped model is still the file its recipe writes | **edits the repo** — no browser, no Blender | after a bake is accepted. Not run by `bake.sh` on purpose: promotion is a main-session act (ROADMAP T7) |
 | `tower-contract-capture.mjs` | re-captures `tests/e2e/fixtures/tower-contract.golden.json` | **measures**, and WRITES a golden | only a deliberate renegotiation of the engine contract; never to fix a red freeze |
-| `engine-contract.mjs` | emits `tools/forge/engine_contract.json` — the constants the forge tools must stop re-typing | **measures**, and WRITES the file | an engine constant, volume or limit moved |
+| `engine-contract.mjs` | emits `tools/forge/engine_contract.json` — the reference read by Blender and file gates, including exact socket-relative camera eyes | **measures**, and WRITES the file | an engine constant, volume, limit, camera or table dimension moved |
 | `dress-bake-ab.mjs [--redcheck]` | byte-identity of a kit's baked canvases across a refactor | **measures** (canvas compare) | a bake function moved or was re-plumbed |
 
 ## THE SITTING — every open LOOK and LISTEN on one page

@@ -34,7 +34,7 @@ limitations under the License.
 // row that has one.
 
 export default async function run(stage, args) {
-  const tower = args[0] || 'heartwood';
+  const tower = args[0] || 'wickroot';
   const t = await stage.tab('localhost', 'RoomTower');
   await t.page.browser.send('Emulation.setDeviceMetricsOverride',
     { width: 1500, height: 950, deviceScaleFactor: 2, mobile: false }, t.page.sessionId);

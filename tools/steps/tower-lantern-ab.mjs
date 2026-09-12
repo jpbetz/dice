@@ -21,7 +21,7 @@ limitations under the License.
 //   node tools/drive.mjs tools/steps/tower-lantern-ab.mjs [id ...]
 
 export default async function run(stage, args) {
-  const ids = args.length ? args : ['blackanvil', 'bastion'];
+  const ids = args.length ? args : ['cinderbell', 'cairnwatch'];
   const a = await stage.tab('localhost', 'LanternAB');
   await a.settle();
   for (const id of ids) {

@@ -23,103 +23,51 @@ Everything is APP-FRAME with z0 = 0: y up, +z toward the player, z = 0 the
 back-wall socket plane. That is the frame a tower model is authored in and
 the frame its portal nodes are quoted in, so no conversion happens here.
 """
+import json
 import math
+from pathlib import Path
 
 import numpy as np
 
 # --------------------------------------------------------------------------
-# ENGINE_MIRROR — every number copied out of js/main.js, in ONE place
-# --------------------------------------------------------------------------
-# PROVISIONAL BY CONSTRUCTION. These are the engine's own constants, and the
-# only reason they are re-typed here is that a bake has no JS runtime. Round 2
-# of the tower-contract work replaces this dict with an `engine_contract.json`
-# EMITTED by js/main.js, so that "the mirror drifted" stops being a failure
-# mode the way it already stopped being one for the portal numbers. Until then
-# the rule is: no engine number gets a second copy anywhere in tools/forge —
-# it goes in here and everything reads it from here.
-#
-# `check.py` imports this dict rather than restating it, and `engine_volumes()`
-# below mirrors towerVolumes()'s DELTA ARITHMETIC rather than its outputs, so a
-# tower with off-default portals gets the volumes the engine would actually
-# build for it instead of the classic ones.
+# ENGINE_MIRROR — the app's emitted reference, read by Blender and check.py.
+# Camera positions are already rebased to the socket plane. Keeping another
+# copy here let the old rectangular-table eyes survive the larger round table
+# and incorrectly pass the first Foundry bakes. Regenerate the file with
+# tools/steps/engine-contract.mjs when app dimensions or cameras change.
+# engine_volumes below retains the portal delta arithmetic, not camera data.
+_ENGINE = json.loads(Path(__file__).with_name("engine_contract.json").read_text())
+_LIMITS = _ENGINE["portalLimits"]
 ENGINE_MIRROR = {
-    # TOWER_S — every core dimension is quoted in it, and it is also a d20's
-    # radius, which is why the aperture floors are quoted in it too.
-    "S": 1.25,
-    # TOWER_DIE_R — world-fixed, and NOT the same fact as S even though it is
-    # the same number: the occlusion contract ("a die vanishes when its centre
-    # crosses despawnY, so nothing below despawnY + a radius may be seen")
-    # needs a die's radius, not a scale factor.
-    "dieR": 1.25,
-    # TOWER_LIP_TILT — the shipped constant, not TOWERLAB.tune.lipTilt.
-    "lipTilt": 0.1,
-    # matExtra: socketing a tower DEEPENS the mat by this, and every camera
-    # follows. The occlusion eyes below are quoted against the undeepened
-    # preset, so this is how they get to where they actually stand.
-    "matExtra": 4.5,
-    # DEFAULT_PORTALS: the classic core written back out in portal terms. Every
-    # delta in engine_volumes() is `spec - this`.
-    "defaultPortals": {
-        "in": {"x": 0.0, "z": -1.6 * 1.25, "rimY": 7.0 * 1.25, "clearR": 1.7 * 1.25},
-        "out": {"x": 0.0, "sillY": 0.8 * 1.25, "w": 4.0 * 1.25, "clearH": 3.6 * 1.25},
-    },
-    # THE SIX SHIPPED EYES: (id, that preset's table depth, its eye position).
-    # The app anchors each eye to the LIVE back wall — eye.z = z0 + (e.z -
-    # z0_of_that_preset) — so in a model's own frame (z = 0 at the socket
-    # plane) the z0s cancel and the eye stands at e.z + (depth + matExtra)/2,
-    # whatever zoom the table is wearing.
-    "zoomEyes": [
-        ("wide.full", 8.6, (0.0, 13.3, 7.7)), ("wide.mini", 8.6, (0.0, 11.0, 6.2)),
-        ("medium.full", 6.7, (0.0, 10.4, 6.0)), ("medium.mini", 6.7, (0.0, 8.6, 4.8)),
-        ("close.full", 5.2, (0.0, 8.1, 4.7)), ("close.mini", 5.2, (0.0, 6.7, 3.8)),
-    ],
-    # TOWER_PORTAL_LIMITS. The aperture floors are MEASURED, not inherited
-    # (2026-08-13 portal-floors campaign, tools/steps/portal-probe.mjs;
-    # evidence in docs/TOWER.md "THE MINIMUMS"): entry is a scripted fall with
-    # an exact 1.816 worst-case reach (clearR floor 2.0 keeps a reserve); the
-    # exit's binding case is dice climbing dice at the doorway, not the lone
-    # d20 (solo need 2.85, retries turn up at 3.0, floor 3.375); jambs channel
-    # rather than jam (width floor 4.0 keeps shed room under a low lintel).
+    "S": _ENGINE["constants"]["S"],
+    "dieR": _ENGINE["constants"]["dieR"],
+    "lipTilt": _ENGINE["defaultCore"]["lip"]["rx"],
+    "matExtra": _ENGINE["constants"]["matExtra"],
+    "defaultPortals": _ENGINE["defaultPortals"],
+    "zoomEyes": _ENGINE["eyes"],
     "portalLimits": {
         "In": {
-            "clearR_min": 1.6 * 1.25,
-            "rimY": (5.8 * 1.25, 8.2 * 1.25),
-            "x": (-1.0 * 1.25, 1.0 * 1.25),
-            "z": (-2.6 * 1.25, -1.0 * 1.25),
+            "clearR_min": _LIMITS["in"]["clearRMin"],
+            "rimY": _LIMITS["in"]["rimY"],
+            "x": _LIMITS["in"]["x"],
+            "z": _LIMITS["in"]["z"],
         },
         "Out": {
-            "w_min": 3.2 * 1.25,
-            "clearH_min": 2.7 * 1.25,
-            "sillY": (0.5 * 1.25, 1.1 * 1.25),
-            "x": (-0.6 * 1.25, 0.6 * 1.25),
-            # portalOut carries NO z knob (2026-08-13, Joe's ruling). The
-            # engine reads exactly two things off portalOut — x and sillY —
-            # and derives the doorway plane from the socket, so a model that
-            # declared z 0.8 moved nothing but check.py's own exit probe,
-            # which anchored 25 rays to a number the engine discards. Pinned
-            # to 0.0 by forge.tower_portals and refused here if it is not.
-            "z": (0.0, 0.0),
+            "w_min": _LIMITS["out"]["wMin"],
+            "clearH_min": _LIMITS["out"]["clearHMin"],
+            "sillY": _LIMITS["out"]["sillY"],
+            "x": _LIMITS["out"]["x"],
+            "z": (0.0, 0.0),  # the output marker is on the socket plane
         },
     },
-    # despawnY = rimY - this. The column above it must be clear (the entry is
-    # a scripted fall) and the region below it must be hidden (the vanish).
-    "despawnDrop": 1.4 * 1.25,
-    # THE SOCKET, and it is NOT portal-derived: it is the room the tower is
-    # allowed to occupy, a fact about the mat and the back wall. c/s are
-    # towerVolumes' own, with z0 = 0.
-    "socket": {"c": (0.0, 5.0 * 1.25, -2.0 * 1.25),
-               "s": (5.2 * 1.25, 10.0 * 1.25, 4.4 * 1.25)},
-    # towerModelAudit's classification thresholds, coarsely. A mesh box that
-    # leaves the socket must be a backward VENUE-GROUNDS spender or a CLADDING
-    # piece sunk under the felt; anything else comes back UNCLASSIFIED and
-    # tower-fit is red. The app's audit remains the judge — these exist so
-    # that "bake gates green" and "the model fits" stop being different
-    # sentences.
+    "despawnDrop": _ENGINE["constants"]["despawnDrop"],
+    "socket": _ENGINE["defaultCore"]["socket"],
+    # Coarse mesh-box classifier margins are gate tuning, not film inputs.
     "auditClasses": {
-        "footDip": -0.145,       # the audit's foot-dip floor is -0.15
-        "venueZBack": -8.0,      # venueOnly towers may spend glade this far back
-        "cladMinY": -0.5,        # the cladding classes require dipping this far
-        "cladMaxZ": 3.85,        # lip front is 3.9
+        "footDip": -0.145,
+        "venueZBack": -8.0,
+        "cladMinY": -0.5,
+        "cladMaxZ": 3.85,
         "cladMaxY": 3.4,
     },
 }
@@ -331,9 +279,8 @@ def exit_ray_start_z(py, sill_y, oz, spec=None):
 
 def shipped_eyes():
     """Where the six shipped cameras stand, in the model's own frame."""
-    extra = ENGINE_MIRROR["matExtra"]
-    return [(eid, (e[0], e[1], e[2] + (depth + extra) / 2.0))
-            for eid, depth, e in ENGINE_MIRROR["zoomEyes"]]
+    return [(e["id"], (e["x"], e["y"], e["zRelZ0"]))
+            for e in ENGINE_MIRROR["zoomEyes"]]
 
 
 def tilt_frame(tilt_deg):

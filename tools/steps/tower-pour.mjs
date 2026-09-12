@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // THE SHIPPED POUR, read off the baked film (docs/TOWER.md). Sockets the
-// heartwood tower as a room setting, rolls a set of pools through it, and
+// wickroot tower as a room setting, rolls a set of pools through it, and
 // prints what the bake produced per pool: how many bakes the exit guarantee
 // spent, how many dice ended delivered, the hidden windows, and the clunks.
 // This is the diagnostic loop for the pour the way tower-probe is for the lab.
@@ -26,8 +26,8 @@ export default async function run(stage, args) {
   const pools = (args[0] || '1d20,1d8+1d6+1d10,8d6').split(',');
   // args[1] is a tower id — the shipped pour must be runnable against every
   // registered model, not just the first one built (parameterised 2026-08-13;
-  // it hard-coded heartwood until then, the same debt resting-eye carried).
-  const tower = args[1] || 'heartwood';
+  // it hard-coded wickroot until then, the same debt resting-eye carried).
+  const tower = args[1] || 'wickroot';
   const a = await stage.tab('localhost', 'TowerPour');
   await a.dbg('holdClock(true)');
   await a.dbg(`setTower(${JSON.stringify(tower)})`);

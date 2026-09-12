@@ -39,7 +39,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SHOTS = join(ROOT, 'shots');
 
 export default async function run(stage, args) {
-  const tower = args[0] || 'blackanvil';
+  const tower = args[0] || 'cinderbell';
   mkdirSync(SHOTS, { recursive: true });
 
   const t = await stage.tab('localhost', 'FamilyShots');

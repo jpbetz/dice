@@ -21,7 +21,7 @@ limitations under the License.
 //   node tools/drive.mjs tools/steps/mood-ab.mjs [towerId]
 
 export default async function run(stage, args) {
-  const tower = args[0] || 'bastion';
+  const tower = args[0] || 'cairnwatch';
   const a = await stage.tab('localhost', 'MoodAB');
   await a.settle();
 

@@ -22,7 +22,7 @@ limitations under the License.
 //   node tools/drive.mjs tools/steps/motes-look.mjs [towerId]
 
 export default async function run(stage, args) {
-  const tower = args[0] || 'heartwood';
+  const tower = args[0] || 'wickroot';
   const a = await stage.tab('localhost', 'MotesLook');
   await a.settle();
 

@@ -59,8 +59,8 @@ export default async function run(stage, args) {
   for (const venue of ['moonrise', 'foxfire']) {
     await t.dbg(`setVenue('${venue}')`);
     await t.waitFor(`window.__diceDebug.venue === '${venue}'`, { desc: `${venue} staged` });
-    await t.dbg(`setTower('hollowbole')`);
-    await t.waitFor(`window.__diceDebug.tower === 'hollowbole'`, { desc: 'tower up' });
+    await t.dbg(`setTower('wickroot')`);
+    await t.waitFor(`window.__diceDebug.tower === 'wickroot'`, { desc: 'tower up' });
     await t.dbg('sim(1500)');
     await shot(`glade-${tag}${venue}-resting.png`);
     // W4: the venue's own dice — the roll is MADE with the staged set

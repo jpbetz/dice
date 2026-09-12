@@ -21,7 +21,7 @@ limitations under the License.
 
 export default async function run(stage, args) {
   const patch = JSON.parse(args[0] || '{}');
-  const tower = args[1] || 'heartwood';
+  const tower = args[1] || 'wickroot';
   const a = await stage.tab('localhost', 'MotesDial');
   await a.settle();
   await a.dbg(`motesTune(${JSON.stringify(patch)})`);

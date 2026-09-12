@@ -52,11 +52,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # trimesh; this file runs on the forge venv, which has no bpy. Neither can
 # import the other, both can import a module that imports neither.
 #
-# Round 2 of the tower-contract work replaces ENGINE_MIRROR with an
-# `engine_contract.json` emitted by js/main.js itself. Until then: no engine
-# number gets a second copy anywhere under tools/forge — it goes in that dict
-# and everything reads it from there. That includes this file: the names below
-# are BINDINGS into the mirror, not copies of it.
+# Constants and cameras come from the app-emitted engine_contract.json.
+# The names below bind to the shared adapter, never a second copied camera.
 from towergates import (ENGINE_MIRROR, APPROACH_START, EXIT_FRONT,  # noqa: E402
                         THROAT_MARGIN, EXIT_CLAD_ALLOW, EXIT_BACK,
                         disc_probes, exit_ray_start_z, hit_distance,

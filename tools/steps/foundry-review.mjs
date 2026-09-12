@@ -1,16 +1,15 @@
 // Copyright 2026 The Dice Table Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Review the exploratory collection in the real table without promoting rows
-// or changing the server allowlist. Uses the same solo registry seam as the
-// established tower-glb-loader scenario. Run with tools/drive.mjs; it creates
+// Review the permanent collection through its real registry rows and lights.
+// Run with tools/drive.mjs; it creates
 // an ephemeral server and a private Chrome process, never port 8123.
 //   node tools/drive.mjs tools/steps/foundry-review.mjs [id|all] [look|full]
 // Existing fit, occlusion and film witnesses are reused; no proxy geometry.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { Table } from '../../tests/e2e/harness.mjs';
-import { STUDIES, modelUrl, previewOptions } from '../../models/tower-foundry/catalogue.mjs';
+import { STUDIES } from '../../models/tower-foundry/catalogue.mjs';
 
 const VIEWS = [
   ['front', 18, 7, 0.6], ['three-quarter', 17, 8, 9],
@@ -34,14 +33,16 @@ export default async function run(stage, [id = 'all', mode = 'full']) {
     await table.dbg("setZoom('medium')"); await table.dbg("setTower('none')");
     await table.dbg('sim(30)');
     const before = await table.dbg('towerBodies()');
-    assert.ok(await table.dbg(`towerRegisterGlb(${JSON.stringify(study.id)},${JSON.stringify(modelUrl(study.id))},${JSON.stringify(previewOptions(study))})`));
+    const registry = await table.dbg('towerRegistry()');
+    assert.deepEqual(registry.map((r) => r.id), ['none', 'wickroot', 'cairnwatch', 'cinderbell']);
+    assert.equal(registry.find((r) => r.id === study.id).glb, true);
     await table.dbg(`setTower(${JSON.stringify(study.id)})`);
     await table.waitFor(`window.__diceDebug.towerModelStatus('${study.id}')?.ready && window.__diceDebug.tower === '${study.id}'`, { timeout: 30000, desc: `${study.id} loaded and socketed` });
     await table.dbg('sim(200)');
     const portal = await table.dbg(`towerPortalSpec('${study.id}')`);
     assert.equal(portal.source, 'model', 'measure the declared model core');
     const fit = await table.dbg('towerModelAudit()');
-    const occlusion = await table.dbg('towerOcclusionCheck()');
+    const occlusion = await table.dbg(`towerOcclusionCheck('${study.id}')`);
     const leaks = (occlusion.eyes || []).flatMap((eye) => ['shaft', 'cowl'].filter((b) => eye[b].blocked !== eye[b].n).map((b) => `${eye.id}/${b}:${eye[b].blocked}/${eye[b].n}`));
     const unclassified = (fit.outs || []).filter((o) => o.cls.includes('UNCLASSIFIED'));
     const report = { id: study.id, portal, fit, occlusion, leaks, unclassified, pours: [] };

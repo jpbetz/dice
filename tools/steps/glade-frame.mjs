@@ -493,8 +493,8 @@ export default async function run(stage, args = []) {
   await t.dbg('holdClock(true)');
   await t.dbg(`setVenue('${venue}')`);
   await t.waitFor(`window.__diceDebug.venue === '${venue}'`, { desc: `${venue} staged` });
-  await t.dbg(`setTower('hollowbole')`);
-  await t.waitFor(`window.__diceDebug.tower === 'hollowbole'`, { desc: 'tower up' });
+  await t.dbg(`setTower('wickroot')`);
+  await t.waitFor(`window.__diceDebug.tower === 'wickroot'`, { desc: 'tower up' });
   // The resting eye is an EASE, not a jump: measuring before it lands grades a
   // camera halfway between two frames (the venue-life sim-clock lesson).
   await t.dbg('sim(1500)');
@@ -504,27 +504,23 @@ export default async function run(stage, args = []) {
   if (!info.stage) { fail('no stage layout — the glade did not rise'); return; }
   const s = info.stage;
 
-  // THE HERO. Its footprint comes off the BUILT shell (groundGaps reports the
-  // world bounding box of the socketed mesh) rather than off a remembered
-  // number, so a re-baked trunk moves this gate with it. Its silhouette is
-  // sampled at the felt and again at the declared rim, because the trunk leans
-  // and the crown is what the eye reads against.
-  const shell = JSON.parse(await t.eval(
-    'JSON.stringify(window.__diceDebug.groundGaps(\'towerSkinBoleShell\'))') || 'null');
-  const spec = await t.dbg('towerPortalSpec(\'hollowbole\')');
+  // The full built model bounds supply both footprint axes. A renamed mesh
+  // or a new root arrangement follows the production asset automatically.
+  const audit = await t.dbg('towerModelAudit()');
+  const spec = await t.dbg("towerPortalSpec('wickroot')");
   let hero = null;
-  if (shell && shell.all.length) {
-    const m = shell.all[0];
-    const f = { id: 'hero', x: m.x, z: m.z, rx: m.w / 2, rz: m.w / 2 };
-    const pts = [...rimPoints(f, 0), ...rimPoints(f, spec ? spec.derived.rimY : 9.4)];
+  if (audit && spec) {
+    const { x, z } = audit.hull;
+    const f = { id: 'hero', x: (x[0] + x[1]) / 2,
+      z: spec.derived.z0 + (z[0] + z[1]) / 2,
+      rx: (x[1] - x[0]) / 2, rz: (z[1] - z[0]) / 2 };
+    const pts = [...rimPoints(f, 0), ...rimPoints(f, spec.derived.rimY)];
     const proj = JSON.parse(await t.eval(
       `JSON.stringify(${JSON.stringify(pts)}`
       + '.map((p) => window.__diceDebug.worldToScreen(p[0], p[1], p[2])))'));
     hero = { ...f, box: boxOf(proj) };
-    console.log(`\nTHE HERO IS PINNED. Portal door.x ${spec ? spec.derived.door.x : '?'}, shell centre `
-      + `x ${m.x} — it projects to frame x ${hero.box.cx.toFixed(3)}, i.e. the centreline. `
-      + 'No composition move can take it off, so every gate below excludes its position\n'
-      + 'and spends the rest of the scene instead.\n');
+    console.log(`Hero portal door.x ${spec.derived.door.x}, model centre x ${f.x}; `
+      + `projected frame x ${hero.box.cx.toFixed(3)}. Composition gates keep the socket fixed.`);
   }
 
   const layouts = {

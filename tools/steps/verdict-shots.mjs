@@ -25,7 +25,7 @@ limitations under the License.
 //           390px phone and a 1600px desktop, for 3d6 / 6d6 / 40d6. The
 //           option is inert as shipped; this is the picture of what turning
 //           it on would buy and what it would cost.
-//   stump   hollowbole round 6 — the berm, the root-flare fingers and the
+//   stump   Wickroot — the berm, the root-flare fingers and the
 //           moss creep, at two low eyes under both palettes. The verdict is
 //           "grown, not placed": does the model own its transition to the
 //           ground, or is it still an item set on a table (W2c, Joe).
@@ -138,7 +138,7 @@ async function shootCrop(stage, t) {
 }
 
 // ---------------------------------------------------------------------------
-// hollowbole round 6 — the grounded stump
+// Wickroot — the rooted sanctuary
 // ---------------------------------------------------------------------------
 
 // [id, dist, height, xoff] in towerEye's own arguments, and BOTH ARE HIGH —
@@ -163,18 +163,15 @@ async function shootStump(stage, t) {
   for (const venue of ['moonrise', 'foxfire']) {
     await t.dbg(`setVenue('${venue}')`);
     await t.waitFor(`window.__diceDebug.venue === '${venue}'`, { desc: `${venue} staged` });
-    await t.dbg(`setTower('hollowbole')`);
-    await t.waitFor(`window.__diceDebug.tower === 'hollowbole'`, { desc: 'tower up' });
+    await t.dbg(`setTower('wickroot')`);
+    await t.waitFor(`window.__diceDebug.tower === 'wickroot'`, { desc: 'tower up' });
     await t.dbg('sim(1500)');
     for (const [id, dist, height, xoff] of STUMP_EYES) {
       await t.dbg(`towerEye(${dist}, ${height}, ${xoff})`);
       await t.eval('window.__diceDebug.tick(0, true, false)');
       await stage.shot(t, join(SHOTS, `v-stump-${venue}-${id}.png`));
     }
-    // The palette flip is the bug this round shipped a fix for (towerReskin):
-    // the moonrise model stood in the foxfire world for two rounds. Recording
-    // WHICH skin is live under each venue is what makes these two frames a
-    // pair rather than two photographs of the same object.
+    // One approved model under both venue lighting rigs.
     const audit = await t.dbg('towerModelAudit()');
     seen.push({ venue, tower: audit && audit.tower, meshes: audit && audit.meshes });
     console.log(`  stump ${venue}: tower=${audit && audit.tower} meshes=${audit && audit.meshes}`);
@@ -195,7 +192,7 @@ export default async function run(stage, args = []) {
   if (run1('crop') || run1('stump')) {
     const t = await stage.tab('localhost', 'Verdict');
     if (run1('crop')) { console.log('\n— C27, the cropped felt —'); await shootCrop(stage, t); }
-    if (run1('stump')) { console.log('\n— hollowbole round 6, the grounded stump —'); await shootStump(stage, t); }
+    if (run1('stump')) { console.log('\n— Wickroot, the rooted sanctuary —'); await shootStump(stage, t); }
   }
   console.log(`\nwrote ${SHOTS}/v-*.png and ${DATA}`);
 }

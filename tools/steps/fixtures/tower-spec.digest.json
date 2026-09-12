@@ -8,10 +8,10 @@
       "hash": "74234e98afe7498f",
       "spec": null
     },
-    "heartwood": {
-      "hash": "5635191ee545badb",
+    "wickroot": {
+      "hash": "b2170823d9584ea5",
       "spec": {
-        "id": "heartwood",
+        "id": "wickroot",
         "limits": {
           "in": {
             "clearRMin": 2,
@@ -43,163 +43,13 @@
         },
         "portals": {
           "in": {
-            "clearR": 2.125,
-            "rimY": 8.75,
+            "clearR": 2,
+            "rimY": 7.7,
             "x": 0,
-            "z": -2
+            "z": -2.6
           },
           "out": {
-            "clearH": 4.5,
-            "sillY": 1,
-            "w": 5,
-            "x": 0
-          }
-        },
-        "source": "default"
-      }
-    },
-    "bastion": {
-      "hash": "9716df6b7f06aade",
-      "spec": {
-        "id": "bastion",
-        "limits": {
-          "in": {
-            "clearRMin": 2,
-            "rimY": [
-              7.25,
-              10.25
-            ],
-            "x": [
-              -1.25,
-              1.25
-            ],
-            "z": [
-              -3.25,
-              -1.25
-            ]
-          },
-          "out": {
-            "clearHMin": 3.375,
-            "sillY": [
-              0.625,
-              1.375
-            ],
-            "wMin": 4,
-            "x": [
-              -0.75,
-              0.75
-            ]
-          }
-        },
-        "portals": {
-          "in": {
-            "clearR": 2.125,
-            "rimY": 8.75,
-            "x": 0,
-            "z": -2
-          },
-          "out": {
-            "clearH": 4.5,
-            "sillY": 1,
-            "w": 5,
-            "x": 0
-          }
-        },
-        "source": "default"
-      }
-    },
-    "blackanvil": {
-      "hash": "b97105f266391392",
-      "spec": {
-        "id": "blackanvil",
-        "limits": {
-          "in": {
-            "clearRMin": 2,
-            "rimY": [
-              7.25,
-              10.25
-            ],
-            "x": [
-              -1.25,
-              1.25
-            ],
-            "z": [
-              -3.25,
-              -1.25
-            ]
-          },
-          "out": {
-            "clearHMin": 3.375,
-            "sillY": [
-              0.625,
-              1.375
-            ],
-            "wMin": 4,
-            "x": [
-              -0.75,
-              0.75
-            ]
-          }
-        },
-        "portals": {
-          "in": {
-            "clearR": 2.125,
-            "rimY": 8.75,
-            "x": 0,
-            "z": -2
-          },
-          "out": {
-            "clearH": 4.5,
-            "sillY": 1,
-            "w": 5,
-            "x": 0
-          }
-        },
-        "source": "default"
-      }
-    },
-    "nullstone": {
-      "hash": "03ceb72ce02443f8",
-      "spec": {
-        "id": "nullstone",
-        "limits": {
-          "in": {
-            "clearRMin": 2,
-            "rimY": [
-              7.25,
-              10.25
-            ],
-            "x": [
-              -1.25,
-              1.25
-            ],
-            "z": [
-              -3.25,
-              -1.25
-            ]
-          },
-          "out": {
-            "clearHMin": 3.375,
-            "sillY": [
-              0.625,
-              1.375
-            ],
-            "wMin": 4,
-            "x": [
-              -0.75,
-              0.75
-            ]
-          }
-        },
-        "portals": {
-          "in": {
-            "clearR": 2.2,
-            "rimY": 9.4,
-            "x": 0,
-            "z": -2.55
-          },
-          "out": {
-            "clearH": 3.5,
+            "clearH": 3.375,
             "sillY": 1,
             "w": 4.2,
             "x": 0
@@ -208,10 +58,10 @@
         "source": "model"
       }
     },
-    "hollowbole": {
-      "hash": "103be128c3be0992",
+    "cairnwatch": {
+      "hash": "ebf74b32dc6635f4",
       "spec": {
-        "id": "hollowbole",
+        "id": "cairnwatch",
         "limits": {
           "in": {
             "clearRMin": 2,
@@ -243,15 +93,65 @@
         },
         "portals": {
           "in": {
-            "clearR": 2.2,
-            "rimY": 9.4,
+            "clearR": 2.03,
+            "rimY": 9.1,
             "x": 0,
-            "z": -2.55
+            "z": -2.5
           },
           "out": {
-            "clearH": 3.5,
+            "clearH": 3.7,
             "sillY": 1,
-            "w": 4.2,
+            "w": 4.35,
+            "x": 0
+          }
+        },
+        "source": "model"
+      }
+    },
+    "cinderbell": {
+      "hash": "4926e6d465ab0149",
+      "spec": {
+        "id": "cinderbell",
+        "limits": {
+          "in": {
+            "clearRMin": 2,
+            "rimY": [
+              7.25,
+              10.25
+            ],
+            "x": [
+              -1.25,
+              1.25
+            ],
+            "z": [
+              -3.25,
+              -1.25
+            ]
+          },
+          "out": {
+            "clearHMin": 3.375,
+            "sillY": [
+              0.625,
+              1.375
+            ],
+            "wMin": 4,
+            "x": [
+              -0.75,
+              0.75
+            ]
+          }
+        },
+        "portals": {
+          "in": {
+            "clearR": 2.03,
+            "rimY": 9.6,
+            "x": 0,
+            "z": -2.6
+          },
+          "out": {
+            "clearH": 3.8,
+            "sillY": 1,
+            "w": 4.4,
             "x": 0
           }
         },

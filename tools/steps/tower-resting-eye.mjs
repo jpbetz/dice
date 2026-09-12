@@ -24,19 +24,19 @@ limitations under the License.
 // and since C27 shipped `preferDice` ON (2026-08-18) that matters: three dice
 // on the felt now come back `dice`, not `mat`, and a step that had pinned the
 // rung would have reddened for a reason with nothing to do with towers.
-// Measured on heartwood after the flip: `tower → dice → tower → mat-overflow`,
+// Measured on wickroot after the flip: `tower → dice → tower → mat-overflow`,
 // CLEAN. The three empty-felt legs cannot be touched by C27 at all — with no
 // dice, `diceFramingPoints()` is null and the dice rung is unreachable.
 //
 // It takes a TOWER ID, like every other proof step, and defaults to
-// heartwood. It did not until the third tower was built: the skill says all
+// wickroot. It did not until the third tower was built: the skill says all
 // four tools are parameterised and this one was not, so "run the resting-eye
 // proof for your model" was a thing a builder could not do.
 //
 //   node tools/drive.mjs tools/steps/tower-resting-eye.mjs [towerId]
 
 export default async function run(stage, args) {
-  const tower = args && args[0] ? args[0] : 'heartwood';
+  const tower = args && args[0] ? args[0] : 'wickroot';
   const a = await stage.tab('localhost', 'RestingEye');
   await a.settle();
 

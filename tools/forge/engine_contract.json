@@ -48,7 +48,8 @@
     "despawnY": 7,
     "door": {
       "h": 4.5,
-      "w": 5
+      "w": 5,
+      "x": 0
     },
     "exit": {
       "pRelZ0": [
@@ -142,45 +143,45 @@
     {
       "id": "wide.full",
       "x": 0,
-      "y": 13.3,
-      "zRelZ0": 14.25
+      "y": 33.25,
+      "zRelZ0": 39.125
     },
     {
       "id": "wide.mini",
       "x": 0,
-      "y": 11,
-      "zRelZ0": 12.75
+      "y": 27.5,
+      "zRelZ0": 35.375
     },
     {
       "id": "medium.full",
       "x": 0,
-      "y": 10.4,
-      "zRelZ0": 11.6
+      "y": 26,
+      "zRelZ0": 31
     },
     {
       "id": "medium.mini",
       "x": 0,
-      "y": 8.6,
-      "zRelZ0": 10.4
+      "y": 21.5,
+      "zRelZ0": 28
     },
     {
       "id": "close.full",
       "x": 0,
-      "y": 8.1,
-      "zRelZ0": 9.55
+      "y": 20.25,
+      "zRelZ0": 24.75
     },
     {
       "id": "close.mini",
       "x": 0,
-      "y": 6.7,
-      "zRelZ0": 8.65
+      "y": 16.75,
+      "zRelZ0": 22.5
     }
   ],
   "gaps": [
-    "leans: each skin's TILT is a module const in js/towerskin.js (0.7°), js/towerbastion.js (0.2°), js/toweranvil.js (0.15°) and the Hollow Bole bake (0.45°), applied as group.rotation.z. No debug hook reports it, so check.py's --tower-tilt-deg stays hand-passed until one exists.",
-    "ZOOM_PRESETS.eyeFull/eyeMini are not exposed directly; `eyes` carries them as the occlusion probe hands them over — already translated into the tower's world and rebased on z0 here.",
+    "Model transforms live in each baked GLB. Forge recipes declare any tilt; the app adds no per-model lean.",
+    "Camera entries are the preset eyes rebased to the socket plane. Per-viewer framing, orbit and easing are render-only and not stored here.",
     "POUR (speeds, tempo, the exit guarantee's retry budget) is not here: no hook exposes it and no forge tool needs it yet.",
-    "towerEye's lookAt is fixed at (0, 5.2*S, z0-1.4) and is not exposed, so a tool that wants to FRAME a named feature cannot aim — it can only choose a standoff. dress-look works around this by searching poses and measuring the result through worldToScreen; a hook returning the eye pose would remove the search."
+    "towerEye's lookAt is fixed at (0, 5.2*S, z0-1.4) and is not exposed, so a tool that wants to FRAME a named feature cannot aim — it can only choose a standoff. Framing tools can search poses and measure the result through worldToScreen; a hook returning the eye pose would remove the search."
   ],
   "portalLimits": {
     "in": {
@@ -212,17 +213,18 @@
     }
   },
   "towers": {
-    "bastion": {
+    "cairnwatch": {
       "cowlY": [
-        5.4,
-        6.75,
-        8.1
+        5.75,
+        7.1,
+        8.45
       ],
-      "despawnY": 7,
+      "despawnY": 7.35,
       "door": {
-        "h": 4.5,
+        "h": 3.7,
         "sill": 1,
-        "w": 5
+        "w": 4.35,
+        "x": 0
       },
       "exitPitch": -0.48996,
       "exitRelZ0": [
@@ -233,32 +235,33 @@
       "lipFrontDz": 3.9,
       "portals": {
         "in": {
-          "clearR": 2.125,
-          "rimY": 8.75,
+          "clearR": 2.03,
+          "rimY": 9.1,
           "x": 0,
-          "z": -2
+          "z": -2.5
         },
         "out": {
-          "clearH": 4.5,
+          "clearH": 3.7,
           "sillY": 1,
-          "w": 5,
+          "w": 4.35,
           "x": 0
         }
       },
-      "rimY": 8.75,
-      "source": "default"
+      "rimY": 9.1,
+      "source": "model"
     },
-    "blackanvil": {
+    "cinderbell": {
       "cowlY": [
-        5.4,
-        6.75,
-        8.1
+        6.25,
+        7.6,
+        8.95
       ],
-      "despawnY": 7,
+      "despawnY": 7.85,
       "door": {
-        "h": 4.5,
+        "h": 3.8,
         "sill": 1,
-        "w": 5
+        "w": 4.4,
+        "x": 0
       },
       "exitPitch": -0.48996,
       "exitRelZ0": [
@@ -269,32 +272,33 @@
       "lipFrontDz": 3.9,
       "portals": {
         "in": {
-          "clearR": 2.125,
-          "rimY": 8.75,
+          "clearR": 2.03,
+          "rimY": 9.6,
           "x": 0,
-          "z": -2
+          "z": -2.6
         },
         "out": {
-          "clearH": 4.5,
+          "clearH": 3.8,
           "sillY": 1,
-          "w": 5,
+          "w": 4.4,
           "x": 0
         }
       },
-      "rimY": 8.75,
-      "source": "default"
+      "rimY": 9.6,
+      "source": "model"
     },
-    "heartwood": {
+    "wickroot": {
       "cowlY": [
-        5.4,
-        6.75,
-        8.1
+        4.35,
+        5.7,
+        7.05
       ],
-      "despawnY": 7,
+      "despawnY": 5.95,
       "door": {
-        "h": 4.5,
+        "h": 3.375,
         "sill": 1,
-        "w": 5
+        "w": 4.2,
+        "x": 0
       },
       "exitPitch": -0.48996,
       "exitRelZ0": [
@@ -305,55 +309,19 @@
       "lipFrontDz": 3.9,
       "portals": {
         "in": {
-          "clearR": 2.125,
-          "rimY": 8.75,
+          "clearR": 2,
+          "rimY": 7.7,
           "x": 0,
-          "z": -2
+          "z": -2.6
         },
         "out": {
-          "clearH": 4.5,
-          "sillY": 1,
-          "w": 5,
-          "x": 0
-        }
-      },
-      "rimY": 8.75,
-      "source": "default"
-    },
-    "hollowbole": {
-      "cowlY": [
-        6.05,
-        7.4,
-        8.75
-      ],
-      "despawnY": 7.65,
-      "door": {
-        "h": 3.5,
-        "sill": 1,
-        "w": 4.2
-      },
-      "exitPitch": -0.48996,
-      "exitRelZ0": [
-        0,
-        2.875,
-        -0.875
-      ],
-      "lipFrontDz": 3.9,
-      "portals": {
-        "in": {
-          "clearR": 2.2,
-          "rimY": 9.4,
-          "x": 0,
-          "z": -2.55
-        },
-        "out": {
-          "clearH": 3.5,
+          "clearH": 3.375,
           "sillY": 1,
           "w": 4.2,
           "x": 0
         }
       },
-      "rimY": 9.4,
+      "rimY": 7.7,
       "source": "model"
     }
   }

@@ -240,8 +240,8 @@ export default async function run(stage, args) {
   for (const venue of venues) {
     await t.dbg(`setVenue('${venue}')`);
     await t.waitFor(`window.__diceDebug.venue === '${venue}'`, { desc: `${venue} staged` });
-    await t.dbg(`setTower('hollowbole')`);
-    await t.waitFor(`window.__diceDebug.tower === 'hollowbole'`, { desc: 'tower up' });
+    await t.dbg(`setTower('wickroot')`);
+    await t.waitFor(`window.__diceDebug.tower === 'wickroot'`, { desc: 'tower up' });
     await t.dbg('sim(1500)');
 
     // THE SHADOW IS THERE AT ALL, asserted before anything is graded: a step

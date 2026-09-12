@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from '/vendor/GLTFLoader.js';
-import { STUDIES, modelUrl, previewOptions } from './catalogue.mjs';
+import { STUDIES, modelUrl } from './catalogue.mjs';
 
 const canvas = document.querySelector('#canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -66,8 +66,7 @@ function select(id) {
 choices.onclick = (e) => { if (e.target.dataset.id) select(e.target.dataset.id); };
 
 async function openTable(study) {
-  // This is a deliberately SOLO review session, using the existing temporary
-  // registry hook. Nothing is added to the game's catalogue or room protocol.
+  // Open the registered production tower on a fresh solo table.
   const tab = window.open('/?lobby=1&stability=beta', '_blank');
   if (!tab) { alert('Allow a new tab to open the table preview.'); return; }
   const start = Date.now();
@@ -76,7 +75,6 @@ async function openTable(study) {
     if (tab.closed) return;
     const dbg = tab.__diceDebug;
     if (!dbg || !dbg.identity?.lobby) continue;
-    dbg.towerRegisterGlb(study.id, modelUrl(study.id), previewOptions(study));
     dbg.setZoom('medium'); dbg.setTower(study.id);
     while (!dbg.towerModelStatus(study.id)?.ready && Date.now() - start < 45000) {
       await new Promise((resolve) => setTimeout(resolve, 200));

@@ -23,7 +23,7 @@ limitations under the License.
 // Writes tools/out/tower-<tower>-*.png.
 //
 // IT TAKES A TOWER, AND IT SAYS WHICH ONE IN EVERY FILENAME. It did neither:
-// it shot whatever the bench boots wearing (heartwood) under names like
+// it shot whatever the bench boots wearing (wickroot) under names like
 // `tower-look-front.png`, so running it for a new model produced a complete,
 // plausible, entirely WRONG review sheet — of the reference tower, filed
 // under the reviewer's belief that it was the new one. That is the same
@@ -35,7 +35,7 @@ limitations under the License.
 // the ask is polled and a bench wearing the wrong thing ABORTS. Half a review
 // set is recoverable; a wrong one is not.
 
-export default async function run(stage, [tower = 'heartwood', seed = '42']) {
+export default async function run(stage, [tower = 'wickroot', seed = '42']) {
   const t = await stage.tab('localhost', 'TowerLook');
   await t.page.browser.send('Emulation.setDeviceMetricsOverride',
     { width: 1500, height: 950, deviceScaleFactor: 2, mobile: false }, t.page.sessionId);

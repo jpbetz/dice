@@ -81,7 +81,7 @@ function classify(eye, p, { z0, head, halfW, cx }) {
 }
 
 export default async function run(stage, args) {
-  const tower = args[0] || 'heartwood';
+  const tower = args[0] || 'wickroot';
   const a = await stage.tab('localhost', 'TowerOcclusion');
   await a.dbg('holdClock(true)');
   await a.dbg('towerEcho(false)');

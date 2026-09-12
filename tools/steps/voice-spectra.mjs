@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// THE TEN VOICES, MEASURED THROUGH THE RUNNING APP.
+// THE CURRENT VOICES, MEASURED THROUGH THE RUNNING APP.
 //
 //   node tools/drive.mjs tools/steps/voice-spectra.mjs
 //
@@ -122,32 +122,38 @@ export default async function run(stage) {
       + `  |  texture: ${Object.entries(d.texture).filter(([, v]) => v).map(([k]) => k).join(' ') || 'level-matched'}`);
   }
 
-  // ---- B. the five tower voices ---------------------------------------
-  // Judged in the grounded room so every ground multiplier is 1 — §9's rule,
-  // and the reason B5 has an asterisk (Hollow Bole cannot stand here).
+  // ---- B. the three tower voices ---------------------------------------
+  // Measure all three on felt so the venue's ground multiplier is 1.
   await a.dbg('setVenue("table")');
   await a.dbg('sim(4)');
-  console.log('\nB. THE FIVE TOWER VOICES — on felt, all ground trims at 1\n');
+  console.log('\nB. THE THREE TOWER VOICES — on felt, all ground trims at 1\n');
   const rowsB = [];
-  const towers = [['B1', 'heartwood'], ['B2', 'bastion'], ['B3', 'blackanvil'],
-    ['B4', 'nullstone'], ['B5', 'hollowbole']];
+  const towers = [['wood', 'wickroot'], ['stone', 'cairnwatch'], ['metal', 'cinderbell']];
   for (const [id, tower] of towers) {
+    await a.dbg(`setTower('${tower}')`);
+    await a.waitFor(`window.__diceDebug.tower === '${tower}'`, { desc: `${tower} socketed` });
     const cv = CLUNK_VOICES[tower];
+    const row = (await a.dbg('towerRegistry()')).find((r) => r.id === tower);
+    if (JSON.stringify(row.clunkVoice) !== JSON.stringify(cv)) {
+      console.log(`MISMATCH ${tower}: registry voice differs from palette`); bad++;
+    }
     // The app's own answer for a baffle knock wearing this tower's voice.
     const vo = await a.dbg(
       `impactVoicingFor(50, 'std', ${JSON.stringify({ clunk: 'baffle' })})`);
-    // …which resolves the SET's body, not the tower's, unless a tower is
-    // socketed — so the row's own numbers are what is measured and the app's
-    // answer is used for the seam check on the neutral ground.
+    // A socketed tower supplies the baffle voice; compare its resolved centre
+    // against the declared palette as well as the neutral ground multiplier.
+    near(vo.centre, 1 - 0.5 * cv.weight, `${tower} baffle centre`);
     near(vo.ground.centre, 1, 'a baffle knock takes the neutral ground');
     const s = impactSpectrum(IMPACT_VOICES[cv.body], 1 - 0.5 * cv.weight);
     rowsB.push([id, tower, `${cv.body} ${cv.weight}/${cv.sustain}`,
       `${s.fcHz} Hz`, `${s.centroidHz} Hz`, `${Math.round(s.aboveBoundary * 100)}%`,
       s.partialHz ? `${s.partialHz} Hz` : '-', `${s.attackMs} ms`,
-      `${cv.shaft.delayS * 1000} ms comb`, VERDICTS[id]]);
+      `${cv.shaft.delayS * 1000} ms comb`, 'declared palette']);
   }
   table(['#', 'tower', 'voice', 'band', 'centroid',
-    `>${MATERIAL_BOUNDARY_HZ}Hz`, 'partial', 'attack', 'shaft', 'his word'], rowsB);
+    `>${MATERIAL_BOUNDARY_HZ}Hz`, 'partial', 'attack', 'shaft', 'status'], rowsB);
+  await a.dbg("setTower('none')");
+  await a.waitFor("window.__diceDebug.tower === 'none'", { desc: 'neutral ground' });
 
   // ---- C. the venue's dice on the venue's ground -----------------------
   console.log('\nC. THE STAGED SET ON THE VENUE\'S GROUND — one voice, three contexts\n');
