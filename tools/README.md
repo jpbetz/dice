@@ -1,3 +1,5 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # tools/ — the shared headless driver
 
 One way to drive the app outside the e2e suite (debug sessions, repros,
@@ -161,6 +163,14 @@ to `buildBeveledGeometry`; the first two are the proof, the third is the look.
 
 ## The tower steps
 
+The current production IDs are `wickroot`, `cairnwatch` and `cinderbell`
+(plus `none`); both fae venues use Wickroot. The Foundry replacement retired
+all old tower assets and the exclusive `bole-audit`, `flare-look`,
+`flare-probe`, `hollow-look`, `dress-bake-ab` and `dress-look` tools.
+Use the generic geometry, pour and room-view tools below, or
+`foundry-review.mjs` for the three-model review. The accepted bake ceiling
+for this catalogue is 22k triangles; see [the review](../models/tower-foundry/REVIEW.md).
+
 There are a dozen of them and until now this file indexed none, so "which
 proofs does my change owe?" was answered by reading `ls`. Each row says what
 the step COSTS — whether it **measures** the built world (geometry, counts,
@@ -202,7 +212,7 @@ together, and both halves of the fix are here):
 
 ```bash
 ~/opt/dice-forge/venv/bin/python tools/forge/towerplan.py --recipe <recipe>.py
-tools/forge/bake.sh <recipe>.py --tower --expect-colors --max-tris 15000
+tools/forge/bake.sh <recipe>.py --tower --expect-colors --max-tris 22000
 node tools/drive.mjs tools/steps/tower-try.mjs tools/forge/out/<slug>.glb
 ```
 
@@ -223,10 +233,9 @@ retaken the first time an app frame existed.
 | `tower-dress.mjs [tower…]` | triangles, draw calls, sways, ember, lights per group against the dressing budget | **measures** | dressing added, merged or retired |
 | `tower-try.mjs <glb\|id>` | what a bake looks like IN THE ROOM, six views on one sheet, with its fit and occlusion verdicts printed above it | **looks** — no dice; sockets the model and renders through the shipped path | **the look loop for a new tower.** Takes a raw `tools/forge/out/*.glb`, so nothing is promoted or committed to be judged |
 | `tower-shots.mjs [tower] [seed]` | the model from four look-only eyes plus a lab pour, for a human | **looks** (+ a lab pour, offline) | any visual change to a skin |
-| `dress-look.mjs [tower]` | does each prop earn its triangles, with the subject located and its on-screen size printed | **looks** + **measures** (projection) | dressing changes; a prop moved or retired |
 | `tower-room-shots.mjs [tower]` | the same tower from the PLAYER's cameras, across the zoom ladder and a real pour | **looks** + **simulates** (three pours) | camera/framing changes, a venue change, the first review of a new model |
 | `tower-family-shots.mjs [tower] [sibling…]` | does it belong to the family — the same idle frame of every model | **looks** + **simulates** (one pour) | a new model, or a family-wide material/lighting change |
-| `hollow-look.mjs [tower]` / `glade-look.mjs [probe]` | the Hollow Bole and the glade under both palettes, in the venue they actually live in | **looks** + **simulates** | changes to hollowbole, the fae palettes, or the venue |
+| `glade-look.mjs [probe]` | Wickroot and the glade under both venue palettes | **looks** + **simulates** | changes to Wickroot, the fae palettes, or the venue |
 | `tower-lantern-ab.mjs [tower…]` | does the raking lantern wake the baked normals; does the ember warm the tray | **looks** | lighting, lantern or ember changes |
 | `tower-resting-eye.mjs [tower]` | the camera rests on the tower on an empty felt, hands the frame back when dice land, and the towerless table is unchanged | **simulates** (one roll) | camera/framing changes; a new model inherits it free |
 | `tower-probe.mjs [n] [seed] [secs] [tower]` | the lab pour, die by die: delivered, parked, hidden, rescues, every collision | **simulates** | engine/collider/pour changes. A cosmetic change must leave this IDENTICAL — that is the claim, not the gate |

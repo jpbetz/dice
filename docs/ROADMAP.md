@@ -1,3 +1,5 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # Roadmap
 
 > **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
@@ -162,6 +164,13 @@ ordering means; their key is an identifier, not a rank.
 ---
 
 ## THE ORDER
+
+**Tower catalogue replacement, 2026-09-12:** Joe approved the three Foundry
+models in place of every old tower. This work is recorded in
+[SHIPPED.md](SHIPPED.md#the-foundry-replaces-the-tower-catalogue-2026-09-12).
+Wickroot also replaces Hollow Bole in both fae venues. Old tower art rounds
+and their model-specific follow-ups below are archival; this replacement
+does not complete the separate round-table venue and place-camera work.
 
 | # | Item | Why it is here | Size | Track |
 | --- | --- | --- | --- | --- |
@@ -2310,4 +2319,3 @@ because four causes are indistinguishable from a client.
 | U28b | two shipped; the near-miss size families still open with their reasons |
 | C1, C3 | the composed-scenario half — see Tier C |
 | ~20 claims in this file | **verified FALSE against the tree** — the table in SHIPPED.md is the durable record |
-

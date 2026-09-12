@@ -3,6 +3,8 @@ name: new-tower
 description: Ship a new dice tower — a forge-baked GLB MODEL with declared dice-in/dice-out portals, a registry row, and a sound palette — at contract rigor. The portal contract, the bake gates, the four proofs, the agent split, the review gate, and the traps, in order.
 ---
 
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # Shipping a new dice tower (v2 — the portal + GLB path)
 
 > **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
@@ -25,9 +27,12 @@ its doorway and receives a consistent tower around them. docs/TOWER.md's
 changes, stop: either the contract has a gap (fix docs/TOWER.md first,
 separately) or the design is wrong.
 
-The three CLASSIC towers (heartwood, bastion, blackanvil) are code-built
-skins on `DEFAULT_PORTALS` from before this contract; they are maintained,
-not imitated — see the appendix. NEW towers take this path.
+**Current catalogue, 2026-09-12:** Wickroot, Cairnwatch and Cinderbell replace
+all five old towers. Both fae venues use Wickroot. Their approved triangle
+ceiling is 22k, with measured counts 18,294 / 17,722 / 21,576. The old
+classic, Nullstone and Hollow Bole builders/assets are retired. Model-specific
+lessons below are historical; use the current recipes and docs/TOWER.md
+STATUS for present structure, and preserve similarly named dice sets.
 
 ## 0. Read first, in this order
 
@@ -40,15 +45,17 @@ not imitated — see the appendix. NEW towers take this path.
    a limit).
 2. tools/forge/README.md ("Tower portals" + the trap list) and the
    `/forge-model` skill — the bake pipeline your model goes through.
-   tools/forge/recipes/hollowbole.py is the worked organic example;
-   tools/forge/recipes/tower_fixture.py is the minimal portal example.
+   `tools/forge/recipes/wickroot.py`, `cairnwatch.py` and `cinderbell.py` are
+   the current organic, masonry and metal examples; `tower_fixture.py` is
+   the minimal portal test asset. Do not reuse model geometry when the user
+   requests a greenfield design.
 3. js/towerglb.js (the loader: extras → portals, validation, house-rules
    pass, the z0 seat) and the TOWERS registry in js/main.js (search
    `const TOWERS`) with its theme-family pairing comment.
 4. The proof surface: `__diceDebug.towerPortalSpec(id)` (the numbers tools
    read), `towerModelStatus(id)`, the step tools (tower-fit, tower-occlusion,
    tower-probe, tower-pour, tower-resting-eye, tower-family-shots,
-   tower-dress, dress-look — all take a tower id; fit/dress default to the
+   tower-dress, tower-room-shots — all take a tower id; fit/dress default to the
    whole registry), and scenarios `tower-roll`, `tower-glb-loader`,
    `tower-contract-freeze` in tests/e2e/scenarios.mjs.
 
@@ -56,9 +63,8 @@ not imitated — see the appendix. NEW towers take this path.
 
 Write the tower's one-paragraph identity first: material, silhouette
 (three parts — base, shaft/body, crown — readable at the resting eye), and
-its theme-family pairing (towers are named for a die in a theme house; the
-pairing list lives in the TOWERS registry comment — extending it is part
-of the deliverable). Then:
+its theme-family relationship (the current relationships live in the TOWERS
+registry comment). A tower may have its own name; the new catalogue does. Then:
 
 **1.5 Plan the PORTALS before you sculpt** — this replaced the old "measure
 the free volume" step, and it is cheaper: you are not fitting a skin around
@@ -201,7 +207,7 @@ The loop is the thing to make cheap.
 # 1. what does this spec leave me room to BUILD?      (seconds, no Blender)
 ~/opt/dice-forge/venv/bin/python tools/forge/towerplan.py --recipe <recipe>.py
 # 2. bake + the nine refusals                          (~30 s)
-tools/forge/bake.sh <recipe>.py --tower --expect-colors --max-tris 15000
+tools/forge/bake.sh <recipe>.py --tower --expect-colors --max-tris 22000
 # 3. six views IN THE ROOM, one sheet, gates printed   (~40 s)
 node tools/drive.mjs tools/steps/tower-try.mjs tools/forge/out/<slug>.glb
 ```
@@ -239,14 +245,15 @@ node tools/drive.mjs tools/steps/tower-try.mjs tools/forge/out/<slug>.glb
 
 ## 2. The build, agent-shaped
 
-- Model builder agent (opus) iterates the RECIPE in a worktree via the
+- Model builder agent iterates the RECIPE in a worktree via the
   `/forge-model` skill: brief → **towerplan** → recipe → `bake.sh <recipe>
-  --tower --expect-colors --max-tris 15000` → **tower-try sheet in the room**
+  --tower --expect-colors --max-tris 22000` → **tower-try sheet in the room**
   → repeat (§1.9 — the preview is for geometry, never for value). A recipe is
   a SHAPE and a PAINT: the battery comes from `towerkit.run_battery`, which
   returns the gates it ran so nothing is asserted by a hand-kept manifest.
   Budget:
-  hero ≤ 8k tris including liner/roots/cladding; min feature 0.07 u.
+  choose and measure a budget for the design; the accepted Foundry trio uses
+  ≤22k triangles including roots/cladding. Min feature guidance is 0.07 u.
   Digest-stable across consecutive bakes. The chute may be skinned INTO the
   model (the exit gate is ramp-aware); a model may clad the engine apron/lip
   for its own declared sillY by mirroring the engine slope arithmetic.
@@ -262,7 +269,7 @@ node tools/drive.mjs tools/steps/tower-try.mjs tools/forge/out/<slug>.glb
   `sha` is what notices a STALE one: `static-cache` refuses a shipped model
   that is not what the recipe writes. A promote is a MAIN-SESSION act and
   `bake.sh` deliberately does not do it.
-- The main session (Fable) holds the review gate and never delegates it.
+- The main session holds the review gate and never delegates it.
 - The dogfood order is fixed: bake gates green BEFORE integration; the
   review gate LOOKs at preview sheets BEFORE the app sees the model, and at
   in-app frames before anything merges.
@@ -432,7 +439,7 @@ colors arrive final.
   hook the second question is how you conclude a curtain is load-bearing
   when it is not.
 
-## Appendix — the classic code-skin path (maintenance only)
+## Appendix — retired classic code-skin path (historical only)
 
 heartwood/bastion/blackanvil are code-built skins (`build*Skin(v)`) on
 `DEFAULT_PORTALS`, sharing the exported towerskin.js kit (seeded canvas
@@ -444,6 +451,6 @@ parameter sets, red-checked by moving one channel); the front of a classic
 tower is a flat facade (0.125 of relief); battlements need a closed
 occluder behind them; measure ExtrudeGeometry's bevel (it pushes OUTWARD by
 bevelSize/sin(θ/2)). The full v1 text lives in git history
-(`git log --follow .Codex/skills/new-tower/SKILL.md`) and docs/TOWER.md's
+(`git log --follow .agents/skills/new-tower/SKILL.md`) and docs/TOWER.md's
 classic-spec section carries every number's reasoning. Do NOT build a new
 tower this way.

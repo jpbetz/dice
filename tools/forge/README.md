@@ -1,3 +1,5 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # forge — baking complex GLB models for the table
 
 Author a model as a Python recipe, bake it headlessly through Blender, gate
@@ -6,6 +8,14 @@ This replaces writing inline three.js geometry code for anything beyond
 simple primitives. The `forge-model` skill (`.claude/skills/forge-model/`)
 is the working procedure; this file is the tool reference and the decision
 record.
+
+**Current towers, 2026-09-12:** `wickroot.py`, `cairnwatch.py` and
+`cinderbell.py` build the entire production catalogue. The five old tower
+assets and their exclusive recipes/builders are retired. The generic kit,
+B1–B7 battery, `tower_fixture.py`, and non-tower scenery recipes remain.
+The [Foundry review](../../models/tower-foundry/REVIEW.md) records the owner
+approval, editable scenes, measured geometry and rendered evidence. Older
+model-specific examples below are historical lessons.
 
 ## Quick start
 
@@ -96,8 +106,10 @@ which round 2 replaces with an `engine_contract.json` the app emits. The gate
 implementations live beside it because a bake RECIPE has to run the same
 questions and runs inside Blender's Python (no trimesh) while check.py runs
 on the venv (no bpy) — neither can import the other, both import
-`towergates`. Tower models bake to a 15000-tri budget (Joe, 2026-08-13); the
-hero-prop numbers above are for props.
+`towergates`. The three current towers use an owner-approved 22000-triangle
+ceiling (2026-09-12), replacing the earlier 15000 guidance for these models.
+Their measured counts are Wickroot 18294, Cairnwatch 17722 and Cinderbell
+21576. The hero-prop numbers above are for props.
 
 **Plan before you model.** `towerplan.py` takes a portal spec (or reads one
 out of a recipe) and prints what it leaves you room to build: the socket, the
@@ -183,7 +195,7 @@ exist in 4.5; forge.smooth_by_angle writes `sharp_edge` flags directly.
     of n-gons shares a diagonal (or one n-gon claims a segment that already
     exists as an edge); EAR_CLIP triangulation makes it worse, not better →
     poke only the hazard faces (find them by indexing non-adjacent vertex
-    pairs; the hollowbole recipe carries the working implementation). And
+    pairs; the Wickroot recipe carries a working implementation). And
     clean_slivers' default dist=2e-5 is below what a displaced organic shell
     produces — the same build needed 3e-4.
 

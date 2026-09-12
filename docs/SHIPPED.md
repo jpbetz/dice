@@ -1,3 +1,5 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # Shipped
 
 Historical detail for work that's landed. Split from
@@ -10,6 +12,40 @@ Ordering is by tier (matches GOALS.md's priority ladder: core mechanics →
 organization → secrecy → systems literacy → effects → customization).
 
 ---
+
+## The Foundry replaces the tower catalogue (2026-09-12)
+
+Joe asked for entirely new Blender towers, rejected reuse of the existing
+models, then approved replacing the whole old catalogue with the results.
+The registry now contains only **None, Wickroot, Cairnwatch and Cinderbell**.
+The five retired tower IDs are Heartwood, Bastion, Black Anvil, Nullstone and
+Hollow Bole; their builders and model assets are removed. Existing dice sets
+with the same names remain. Both Moonrise Glade and Foxfire Hollow use
+Wickroot.
+
+Each replacement is a deterministic, portal-bearing GLB with an editable
+Blender scene and its own sound palette. Wickroot is a cedar sanctuary stump;
+Cairnwatch a broken coastal abbey watchtower; Cinderbell a bronze bell
+foundry. Their measured triangle counts are **18,294 / 17,722 / 21,576**.
+The owner accepted the 22k ceiling in place of the older 15k guidance so
+fractured masonry, organic surfaces and cast-metal details survived the
+visual review. No GOALPOST promise was set aside.
+
+The first Wickroot read as a corrugated pipe, Cairnwatch needed a supported
+broken crown, and Cinderbell's bronze needed to be judged under the room's
+lighting. Those were changed after looking at rendered frames. The final
+authoring review independently rebaked the three recipes, compared geometry,
+colour and complete GLB bytes, inspected the Blender scenes, and exercised
+all three model loading/fit paths in the app. Each delivered `1d20`,
+`1d8+1d6+1d10`, and `8d6` in one bake attempt. The
+[Foundry review](../models/tower-foundry/REVIEW.md) retains those measurements
+and screenshots; [TOWER.md](TOWER.md) is the current catalogue entry point.
+
+The replacement uses normal shared-room settings and production asset
+paths. The existing beta offering rule still applies; a stable viewer renders
+the tower selected by their room. Legacy tower art and palette decisions
+elsewhere in this file are historical. The broader round-table venue and
+place-camera work remains separate roadmap work.
 
 ## Joining the table behind the link (2026-09-11)
 

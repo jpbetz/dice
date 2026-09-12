@@ -1,3 +1,5 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # TOWER_CORE — the tower geometry contract
 
 > **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
@@ -7,6 +9,38 @@
 > that may NOT be set aside are in [GOALPOST.md](GOALPOST.md) — where this file
 > and that one disagree, this file is history.
 
+
+## Current catalogue — replaced with the Foundry models, 2026-09-12
+
+Joe approved replacing every old tower with the three original Blender
+models. The registry is exactly `none`, `wickroot`, `cairnwatch`, and
+`cinderbell`. Heartwood, Bastion, Black Anvil, Nullstone and Hollow Bole are
+retired: their tower assets, builders and catalogue entries are removed.
+Die sets with those names are separate content and remain available.
+
+| Tower | Material and silhouette | Triangles | Entry `(x, z; rim; radius)` | Exit `(sill; width × height)` |
+| --- | --- | ---: | --- | --- |
+| Wickroot | An old cedar sanctuary, fractured crown, gripping roots and an amber votive | 18,294 | `(0, −2.6; 7.7; 2.0)` | `(1; 4.2 × 3.375)` |
+| Cairnwatch | A coastal abbey watchtower with broken masonry and a tended beacon | 17,722 | `(0, −2.5; 9.1; 2.03)` | `(1; 4.35 × 3.7)` |
+| Cinderbell | A bronze bell foundry, iron collars and a sheltered furnace | 21,576 | `(0, −2.6; 9.6; 2.03)` | `(1; 4.4 × 3.8)` |
+
+All exit centres are x = 0. All three use the GLB portal path and distinct
+sound palettes. Moonrise Glade and Foxfire Hollow both stage Wickroot.
+The existing stability channel still controls which settings are offered;
+every client can render its room's selected tower. Production GLBs live in
+`models/towers/`; the [Foundry](../models/tower-foundry/README.md) retains
+editable Blender scenes, recipes and [review evidence](../models/tower-foundry/REVIEW.md).
+
+The accepted 22k triangle ceiling supersedes the earlier 15k guidance for
+these models: the measured geometry preserves fractured masonry, bark
+shapes and cast-metal detail. The result read, shared film, portal proofs
+and measured in-app appearance remain the criteria. See
+[the replacement record](SHIPPED.md#the-foundry-replaces-the-tower-catalogue-2026-09-12).
+
+**Historical catalogue descriptions below are superseded.** The portal
+contract and its arithmetic remain useful; old STATUS blocks, model-specific
+dressing, palette variants and classic builder instructions describe retired
+assets. `DEFAULT_PORTALS` remains an engine/test reference, not a live model.
 
 ## THE PORTAL CONTRACT — v2, 2026-08-13 (supersedes the fixed six volumes as LAW; the numbers survive as the CLASSIC SPEC)
 

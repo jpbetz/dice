@@ -1,12 +1,13 @@
 <!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
 
-# Foundry review — 11 September 2026
+# Foundry review — authored 11 September, adopted 12 September 2026
 
-Three new Blender tower studies are complete in the isolated foundry
-worktree. Each includes its recipe, editable scene, GLB, a working solo
-table preview, and rendered evidence. No existing tower geometry or tower
-recipe geometry was used. Shared export, loader and physics utilities are
-the integration surface.
+Joe approved all three Blender models as the production tower catalogue and
+asked to remove every old tower. The registry is now `none`, `wickroot`,
+`cairnwatch`, and `cinderbell`; both fae venues use Wickroot. Every model
+includes its recipe, editable scene, GLB, table integration and rendered
+evidence. No existing tower geometry or tower recipe geometry was used.
+Shared export, loader and physics utilities remain the integration surface.
 
 ![The three studies](previews/foundry-gallery-desktop.png)
 
@@ -50,15 +51,14 @@ combining it with the tall lip made the envelope audit infer a wide crown
 that did not exist. Fine bronze wear is subtler under the room lighting
 than under the gallery studio lights.
 
-## Verified on the final packaged files
+## Authoring verification on the final packaged files
 
 - The main session independently rebaked all three recipes. Geometry and
   colors match the builders' repeat bakes; complete GLB bytes also reproduce.
 - Every bake passes watertightness, winding, degenerate-face, vertex-color,
   budget, portal, approach, exit, lane cladding, occlusion and socket checks.
 - All three loaded into the actual app with model-authored portals, zero
-  unclassified fit overruns, no off-policy materials, and every shaft/cowl
-  sample hidden at all six shipped eyes.
+  unclassified fit overruns and no off-policy materials.
 - Each final model delivered `1d20`, `1d8+1d6+1d10`, and `8d6`: nine pours,
   all delivered on the first bake attempt, no unseen or stranded dice.
   The completed values stayed visible; removing a tower restored the
@@ -74,20 +74,31 @@ than under the gallery studio lights.
 Evidence is retained in [previews/](previews/): the gallery, normal sheet,
 individual hero/crown views, six-view app sheets, and mid-pour screenshots.
 
+**Instrument correction during production integration:** the original room
+review called the occlusion hook without a model ID, so that result could
+describe the bench's default tower. It is not accepted as proof for these
+models. The review now names each registered ID explicitly; model-specific
+regression checks cover the permanent catalogue. The forge ray checks were
+already against each exported GLB. Final replacement evidence must use the
+explicit-ID room checks as well.
+
 ## Scope and guidance departures
 
-The 15k triangle guidance was increased for these art studies to preserve
+The 15k triangle guidance was increased for these models to preserve
 broken masonry, organic surface shapes and cast-metal details. The measured
-totals above remain under the chosen 22k prototype ceiling. No GOALPOST
+totals above remain under the owner-approved 22k ceiling. No GOALPOST
 promise was set aside.
 
-These are completed model studies, not permanent catalogue additions.
-Production registration, family pairing, distinct final sound palettes,
-shared-room distribution and a full release sweep are outside this pass.
-Existing sound shapes are temporary preview plumbing. The study directory
-is excluded from Cloud Build uploads.
+The September 11 review began as isolated studies; that scope was superseded
+by the owner's September 12 replacement approval. Production registration,
+three distinct sound palettes and normal shared-room distribution are part
+of the replacement. The five old towers and their exclusive model/build
+code are retired. Their names still used by dice sets remain valid.
 
-The trial tooling uses a solo lobby intentionally: new IDs cannot pass the
-room server's fixed tower allowlist. It serves models from `models/` because
-the app server does not serve raw `tools/forge/out/` paths. No server or
-production-registry changes were needed, and port 8123 was never used.
+Production GLBs ship from `models/towers/`. This authoring gallery and its
+editable scenes remain excluded from Cloud Build uploads. The trial tooling
+originally used a temporary solo registry hook; production uses the ordinary
+registry and server allowlist. [TOWER.md](../../docs/TOWER.md) records the
+current model contract, and [SHIPPED.md](../../docs/SHIPPED.md#the-foundry-replaces-the-tower-catalogue-2026-09-12)
+records the replacement. Review tools use private ephemeral servers and
+browser processes; the owner's live port 8123 is not a test surface.

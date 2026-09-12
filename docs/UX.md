@@ -1,3 +1,5 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # UX Design: Notation, Roll Moments, Visibility, Dice Sets
 
 > **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
@@ -1320,6 +1322,7 @@ a stale row is worse than no table.
 | ± popover | **§7.43** — the visibility sub-lines, and the whisper rung's amended words (§3.2's old quotation is struck there) · §7.10 — a pure editor, and where an edit lands by source · §7.14.2 — Done, click-away, the ring · §7.9's SHEET PASS identity strip · **§7.24** — only **Modifier** folds under a per-die lens; Target, d20 pairing, keep/drop and reroll/exploding are authorable under every system, and the rim reads `± Modify` in both | §7.10's "reroll and explode stay… behind the sysnote's *Show anyway*" — superseded 2026-08-06, no note and no disclosure; the accurate record is the comment over the popover's sections in `index.html` · any account of the fold in which Target or keep/drop hides under a per-die system: that was `usesMods`, deleted 2026-08-08 · ROADMAP U11's `± Moment` — its rule survived, its word did not (§7.24) |
 | Identity chip · roster · nameplate | **§7.20a, amended 2026-09-11** — guest host, table label, persistent connection state and retry · **§7.43** — a MINTED `?room=` key is not a chosen name (`isMintedKey`, so an unnamed table wears no plate and no tab title), the roster's 76px pill floor and its two differently-worded folds, and the invite link's four doors · §7.17 — the rail pill is the one per-player surface, left-click toggles the rack, right-click / long-press opens the menu, and the quiet nameplate · §7.9's ORDER IS THE CONTRACT · §7.22 for the collapsed dress | §7.9's "Identity is on the table" paragraph, where left-click opened the menu |
 | Settings | No single section. **§7.43** for the Table destination's `Copy invite link` row and the pool-broadcast disclosure over *At this table* · §7.9 for the *Just you* scope (chips off by default, the dice-set select) · §7.13 for *Your data* · §7.17 for the table name; the room-wide keys are `SETTING_SPECS` in `server.js` | §2.1 / §2.3's experience record and its editor — never built, and `/api/table` refuses the key |
+| Tower catalogue and fae venue tower | **§7.31, amended 2026-09-12** — None, Wickroot, Cairnwatch and Cinderbell; both fae venues use Wickroot · §7.38 retains the settings channel rule | §7.31's archived classic catalogue and dressing; TOWER.md's old STATUS blocks and Hollow Bole palette variants |
 | **Any control's ON / OFF / UNAVAILABLE dress** (not a surface — the rule that governs all of them) | **§7.41** — the token layer. THE KIND OF CHOICE PICKS THE DRESS: switch / pick / dial, three degrees of not-active, and the override rule that makes a disagreement one greppable line. The values of record are the `:root` block in `css/style.css` | Copying the nearest neighbour's numbers, which is what produced nine `[aria-pressed="true"]` dresses across four hue families (audit C3) · any reading in which `#left-panel` scoping is what makes a dress right — 2i-C and U6 both had to un-scope a law twice for the same reason |
 | Camera / framing | **§7.62** — the roll frames itself BEFORE it moves, so the flight frame and the settled frame are one; an unsatisfiable mat fit is refunded and the mat is fitted cropped square instead; the fog floor rides the camera's pose · §7.55 for the dice-first rung and its two gate conditions · §5.4a for the fog invariant, as amended there | §7.55's "where the eye ends up once the dice have STOPPED" — the reframe moved to frame zero on 2026-08-31, and a settle-time reframe is now a no-op · §5.4a's floor measured from the zoom's preset eye · any reading in which `mat-overflow` is a frame somebody chose (it was the fit scan's give-up position) |
 
@@ -4524,6 +4527,27 @@ noise. The full pricing history is ROADMAP C30a–e; the engine-swap reserve
 position is C32.
 
 ### 7.31 The tower, and what a poured roll looks like (2026-08-12; second tower 2026-08-13; third 2026-08-14)
+
+**Current catalogue — owner-approved replacement, 2026-09-12.** The Tower
+picker offers **None**, **Wickroot**, **Cairnwatch**, and **Cinderbell**.
+Wickroot is an old cedar sanctuary, Cairnwatch a coastal stone watchtower,
+and Cinderbell a bronze bell foundry. Every model has a warm focal light
+and its own impact palette. Moonrise Glade and Foxfire Hollow both raise
+Wickroot. This replaces all five old towers, including the venue-only Hollow
+Bole; similarly named dice sets are unchanged.
+
+The choice remains room-wide, applied at roll boundaries, and imported or
+restored through the existing table settings path. The stability channel
+in §7.38 gates the picker, not the ability to see a room's tower. Each new
+GLB declares its own entry and exit; the engine derives the pour from those
+portals. [TOWER.md](TOWER.md#current-catalogue--replaced-with-the-foundry-models-2026-09-12)
+holds the current dimensions and [the Foundry review](../models/tower-foundry/REVIEW.md)
+records the visual decisions and measurements.
+
+**Archive below.** The classic catalogue, named props, old sound comparisons
+and model-specific measurements in the following paragraphs describe the
+retired towers. Their account of the pour explains the feature's origin;
+use the current registry and proofs for its present behaviour.
 
 A **Tower** picker joins Felt in the settings modal's "Everyone at the table"
 section: *None* (default), *Heartwood*, *Bastion* and *Black Anvil*. Room-wide,

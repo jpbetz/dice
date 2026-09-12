@@ -3,6 +3,8 @@ name: forge-model
 description: Bake a complex 3D model to GLB through the forge pipeline (Blender headless + gates + preview) instead of writing inline three.js geometry. Use when asked to build/bake a sophisticated mesh, prop, scenery piece, or model asset — anything beyond simple primitives. The procedure, the budgets, the traps, and the look-before-done gate.
 ---
 
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # Forging a model
 
 > **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
@@ -25,12 +27,16 @@ re-derive what they already prove.
 
 ## 0. Scope check
 
-- A dice TOWER is not a forge job by default: towers are code-built skins
-  under the TOWER_CORE contract (`/new-tower`, docs/TOWER.md). Forge a tower
-  component only if the new-tower process explicitly sends you here.
-- The app loads no GLBs yet. A forged asset's deliverable is the GLB + its
-  recipe + renders; wiring it into the app is a separate feature with its
-  own proofs (README "Integration note").
+- Dice towers are forge-baked GLBs with declared portals. Use `/new-tower`
+  with this skill for their registry, sound and app proofs. The current
+  recipes are `wickroot.py`, `cairnwatch.py` and `cinderbell.py`; all five old
+  tower assets/builders were retired on 2026-09-12.
+- The app loads GLBs through `js/towerglb.js`. Deliver the recipe, GLB,
+  editable `.blend` and inspected renders. Production promotion also updates
+  the digest and static-cache record (README “Integration”).
+- The owner accepted a 22k triangle ceiling for the three current towers
+  after visual review. Other props keep their own measured budgets. The
+  model-specific old tower examples below are historical lessons.
 
 ## 1. Brief before code
 
