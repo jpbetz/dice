@@ -52,6 +52,7 @@ import { parseNotation } from './js/notation.js';
 // across every re-read; `setDeclaration` is the one caller.
 import { SET_IDS, installCatalogue } from './js/themes.js';
 import { SYSTEM_IDS } from './js/meanings.js';
+import { TOWER_IDS } from './js/towerids.js';
 // A place at the table (docs/UX.md §7.63). The station arithmetic is written
 // ONCE, in js/places.js, and this process and every browser import the same
 // file — the js/rollspec.js precedent. PLACE_MAX is the ladder's own ceiling:
@@ -570,7 +571,7 @@ const SETTING_SPECS = {
   tower: {
     default: 'none',
     validate: (v) => typeof v === 'string'
-      && ['none', 'heartwood', 'bastion', 'blackanvil', 'nullstone', 'hollowbole'].includes(v),
+      && TOWER_IDS.includes(v),
   },
   // The venue (GOALS goals 13–15): the whole staging of the table as ONE
   // room-wide choice — 'table' is the grounded room everyone knows; a

@@ -32,11 +32,10 @@ limitations under the License.
 //   "Just use a normal sound I think.. The idea you had was fun but
 //    unfortunately is just not working."
 //
-// EIGHT VOICES ARE NOW APPROVED and it is the first sign-off this palette has
-// ever had: A1/A2/A3, the three room beds — including the fae drips and the
-// ×5 level fix — and B1..B5, all five tower clunks. **Every table in this file
-// that those eight rows read is FROZEN by `tests/voices.test.mjs` and must not
-// drift.** Not one of them changed on the second pass.
+// The room beds keep that approved palette. On 2026-09-12 the owner
+// replaced all five tower models with three Blender-built models; their
+// wood, stone and metal voices reuse the established full material timbres.
+// Tests pin the surviving three palettes and the unchanged room beds.
 //
 // WHAT DIED IS NOT IN THIS FILE, and that is worth knowing before you go
 // looking: the ringing die. The C rows are the Witchlight set's `sound` recipe
@@ -316,77 +315,23 @@ export const IMPACT_SOFT_CENTRE = 0.85;
 export const IMPACT_SOFT_LENGTH = 1.3;
 
 // ---------------------------------------------------------------------------
-// 3. THE FIVE TOWER VOICES (docs/AUDIO.md §2.4)
+// 3. THE THREE TOWER VOICES (docs/AUDIO.md §2.4)
 // ---------------------------------------------------------------------------
-//
-// Keyed by tower id and referenced by the TOWERS registry rows in js/main.js,
-// which is a change of ADDRESS and not of ownership: a row still declares its
-// palette, the palette is still resolved in the sound drain and nowhere else,
-// and `towerCos(row).clunkVoice` still answers by value.
-//
-// It lives here because of B1/B2. Joe: *"I'd probably switch the bastion and
-// heartwood sounds, they feel reversed to what I'd expect"* — and he is right
-// about the physics. A dice tower made of PLANKS is a resonant box: a die
-// hits it and you get a low hollow tok with body. A STONE turret is a wall
-// with effectively infinite mass behind it: almost nothing transmits, and
-// what you hear is a short bright tick off the surface. The table had it the
-// other way round — wood bright and short, stone low and long — because the
-// rows were reasoned from the MATERIALS in the abstract ("stone is heavy") and
-// nobody had heard a die hit either one.
-//
-// SO THIS IS A SWAP AND NOTHING ELSE. Heartwood and Bastion exchanged their
-// whole voices, body and shaft row together, on 2026-08-18. Not one number in
-// the set of five changed; only which tower wears which. That is why it can
-// be reverted by exchanging two keys, and why the palette's aggregate
-// measurements (centroids, comb delays, mode frequencies) are conserved
-// exactly — anything that moved would be a redesign wearing a swap's clothes.
+// These are complete material voices, including the chute's comb and modes.
+// The foundry models keep the established wood/stone/metal timbres while
+// retiring the old tower identities. Ordinary die impact voices stay intact.
 export const CLUNK_VOICES = {
-  // WAS BASTION'S. A wooden tower is a drum: a `thud` body at stone weight
-  // over the longest comb of the pair, which is the low hollow knock a plank
-  // box gives back. (Before the swap this row was `clack 0.35/20`.)
-  heartwood: {
-    body: 'thud', weight: 0.7, sustain: 40,
-    shaft: { delayS: 0.0055, combGain: 0.5, mode1Hz: 300, mode2Hz: 600 },
+  wickroot: {
+    body: 'thud', weight: 0.5, sustain: 35,
+    shaft: { delayS: 0.004, combGain: 0.5, mode1Hz: 360, mode2Hz: 720 },
   },
-  // WAS HEARTWOOD'S. Stone gives a die almost nothing back: a short,
-  // narrow-band `clack` over the tightest comb of the pair — the tick off a
-  // surface with a turret behind it. (Before the swap: `thud 0.7/40`.)
-  bastion: {
+  cairnwatch: {
     body: 'clack', weight: 0.35, sustain: 20,
     shaft: { delayS: 0.0032, combGain: 0.55, mode1Hz: 430, mode2Hz: 860 },
   },
-  // METAL, and the only voice in the palette that is not a knock. Joe,
-  // 2026-08-18: *"Slightly to shrill / clanky for me.."* — SLIGHTLY, so this
-  // is a small move and it is deliberately not taken all the way to the two
-  // he liked. `chime` at weight 0.85 put its band at 2.16 kHz with a Q-2.8
-  // ring and no attack at all; `bell` at weight 0.55 puts it at 1.69 kHz with
-  // the ring opened out and 5 ms of rise, at the same loudness. The shaft row
-  // is untouched — the flue's colour was never what he named.
-  blackanvil: {
+  cinderbell: {
     body: 'bell', weight: 0.55, sustain: 70,
     shaft: { delayS: 0.0025, combGain: 0.6, mode1Hz: 520, mode2Hz: 1040 },
-  },
-  // "sounds good" (Joe, 2026-08-18). DO NOT TOUCH. A subtracted click through
-  // the deadest comb in the set — a bore through solid rock returns almost
-  // nothing. One of exactly two rows in this whole file with a human verdict
-  // on it, which makes it a REFERENCE and not merely a row that is finished.
-  nullstone: {
-    body: 'hush', weight: 0.75, sustain: 25,
-    shaft: { delayS: 0.0045, combGain: 0.34, mode1Hz: 240, mode2Hz: 430 },
-  },
-  // "sounds good" (Joe, 2026-08-18). DO NOT TOUCH. A dead drum over the
-  // longest comb in the set — 4 ms is a metre of hollow log, and the two low
-  // modes are the note an empty trunk gives back.
-  //
-  // NOTE FOR THE RE-LISTEN: after the B1/B2 swap, Heartwood is also a `thud`,
-  // one step heavier (0.7 against 0.5) over a comb 1.5 ms longer. The two are
-  // now the closest pair in the palette — a solid plank box and a hollow
-  // trunk, which is honest, but they were never A/B'd side by side. If they
-  // read as the same tower, THIS row is the one that stays and Heartwood's is
-  // the one that moves.
-  hollowbole: {
-    body: 'thud', weight: 0.5, sustain: 35,
-    shaft: { delayS: 0.004, combGain: 0.5, mode1Hz: 360, mode2Hz: 720 },
   },
 };
 
