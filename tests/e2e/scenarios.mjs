@@ -39,6 +39,10 @@ import { probeCelticWeave } from './placard-knot-probe.mjs';
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 const TOWER_CONTRACT_GOLDEN = JSON.parse(
   readFileSync(join(FIXTURES, 'tower-contract.golden.json'), 'utf8'));
+const TOWER_DEFAULT_CORE_GOLDEN = JSON.parse(
+  readFileSync(join(FIXTURES, 'tower-default-core.golden.json'), 'utf8'));
+const TOWER_DEFAULT_CORE_LEGACY = JSON.parse(
+  readFileSync(join(FIXTURES, 'tower-default-core-legacy.golden.json'), 'utf8'));
 
 // The ONE expression the capture tool and the check both evaluate, so the
 // golden and the assertion can never drift into asking different questions.
@@ -10723,9 +10727,9 @@ export const scenarios = [
       assert.ok(empty.calls < 10,
         `an empty table is nearly free (got ${empty.calls} draw calls)`);
 
-      // blackanvil is the heaviest registry tower — the budget's worst case.
-      await a.dbg(`setTower('blackanvil')`);
-      await a.waitFor(`window.__diceDebug.tower === 'blackanvil'`
+      // Cairnwatch exercises the masonry model under the scene draw budget.
+      await a.dbg(`setTower('cinderbell')`);
+      await a.waitFor(`window.__diceDebug.tower === 'cinderbell'`
         + ` && window.__diceDebug.towerBodies().length > 0`,
       { desc: 'the heaviest tower is socketed' });
       await a.roll('4d6');
@@ -12681,7 +12685,7 @@ export const scenarios = [
     // SHAPE and the apply site checks the CATALOGUE, against the registry the
     // reader actually has.
     //
-    // THE ASSERTION THAT MATTERS is `tower === 'bastion'` AND
+    // THE ASSERTION THAT MATTERS is `tower === 'cairnwatch'` AND
     // `towerBodies().length > 0`, together. `currentTower` is written only
     // inside `towerSocket` and `towerBodies()` is empty unless `towerRig` is
     // live, so the pair says the tower is UP WITH ITS COLLIDERS IN THE WORLD.
@@ -12717,26 +12721,26 @@ export const scenarios = [
       // ---- (1) the whole prepared table, tower included ----
       const v = await push(a, file([
         "name: 'Forge night'", "felt: 'obsidian'", "system: 'dnd'",
-        "zoom: 'wide'", "tower: 'bastion'",
+        "zoom: 'wide'", "tower: 'cairnwatch'",
       ]));
-      assert.equal((await a.dbg('portable.table()')).tower, 'bastion',
+      assert.equal((await a.dbg('portable.table()')).tower, 'cairnwatch',
         'the FILE carried the tower — the parse took an id it does not enumerate');
       assert.equal(v.ok, true, `the push lands (got ${v.status})`);
       assert.match(v.status, /^✓ table prepared/, 'in the shared verdict grammar');
       assert.doesNotMatch(v.status, /left behind/, 'and nothing was dropped on the way');
 
-      await a.waitFor(`window.__diceDebug.settings.tower === 'bastion'`,
+      await a.waitFor(`window.__diceDebug.settings.tower === 'cairnwatch'`,
         { desc: 'the ROOM took the tower' });
       // POLLED, not asserted once: `queueTower` defers a change across a roll
       // boundary and the model has to load, so a non-null `pendingTower` means
       // "still coming" rather than failure.
-      await a.waitFor(socketed('bastion'),
+      await a.waitFor(socketed('cairnwatch'),
         { desc: 'the tower is socketed with its colliders in the world' });
       assert.equal(await a.dbg('pendingTower'), null, 'with nothing left queued');
 
       // ---- (2) THE CUJ3 HALF: a joiner who never saw the file ----
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
-      await b.waitFor(socketed('bastion'),
+      await b.waitFor(socketed('cairnwatch'),
         { desc: 'the person who followed the link finds the tower up' });
 
       // ---- (3) AN ID THIS BUILD CANNOT RAISE COSTS ONLY THE TOWER ----
@@ -12754,7 +12758,7 @@ export const scenarios = [
         { desc: 'the rest of the push arrived' });
       assert.equal((await a.dbg('schemaState.table')).seats, 1,
         'seat and all — this is what a 400 on the whole push would have cost');
-      assert.equal(await a.dbg('tower'), 'bastion',
+      assert.equal(await a.dbg('tower'), 'cairnwatch',
         'and the standing tower is untouched, not lowered');
 
       // ---- (4) `'none'` is an id, and it is the only way a file LOWERS one ----
@@ -12767,13 +12771,13 @@ export const scenarios = [
       // ---- (5) AN ABSENT KEY IS SILENCE, NOT `'none'` ----
       // `table:` is a PATCH over the room's furniture — the same thing an
       // absent felt has always meant.
-      await a.dbg(`setTower('bastion')`);
-      await a.waitFor(socketed('bastion'), { desc: 're-raised by hand' });
+      await a.dbg(`setTower('cairnwatch')`);
+      await a.waitFor(socketed('cairnwatch'), { desc: 're-raised by hand' });
       const v4 = await push(a, file(["felt: 'sand'"], false));
       assert.equal(v4.ok, true, v4.status);
       await a.waitFor(`window.__diceDebug.settings.felt === 'sand'`,
         { desc: 'a file naming only a felt lands' });
-      assert.equal(await a.dbg('tower'), 'bastion',
+      assert.equal(await a.dbg('tower'), 'cairnwatch',
         'and the tower it said nothing about is still standing');
 
       // ---- (6) THE ROUND TRIP, and the compat rule inside it ----
@@ -12782,7 +12786,7 @@ export const scenarios = [
       // inside `table:`, so writing `tower: 'none'` on every export would make
       // every file this build writes unreadable by every older one — for a
       // default value on a closed-beta feature.
-      assert.match(await a.dbg('portable.snapshot()'), /\n {2}tower: 'bastion'\n/,
+      assert.match(await a.dbg('portable.snapshot()'), /\n {2}tower: 'cairnwatch'\n/,
         'a raised tower travels in the file');
       await a.dbg(`setTower('none')`);
       await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'lowered' });
@@ -14167,59 +14171,80 @@ export const scenarios = [
     },
   },
   {
+    name: 'tower-default-core-freeze',
+    tags: ['tower', 'glb'],
+    // Reference portals stay independent of the replacement catalogue. The
+    // current pose golden records the earlier square-table scale change;
+    // historical local dimensions still prove the core arithmetic unchanged.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin:'localhost', name:'Reference' });
+      const ports = TOWER_DEFAULT_CORE_LEGACY['wide.none'].portals;
+      assert.deepEqual(ports, {
+        in: {x:0,z:-2,rimY:8.75,clearR:2.125}, out:{x:0,sillY:1,w:5,clearH:4.5},
+      }, 'the fixture holds the historical default portals');
+      assert.deepEqual((await a.dbg('towerDefaultPortalSpec()')).portals, ports,
+        'the engine still declares exactly DEFAULT_PORTALS');
+      await a.dbg(`towerProbePortals(${JSON.stringify(ports)})`);
+      for (const [key,want] of Object.entries(TOWER_DEFAULT_CORE_GOLDEN)) {
+        const [preset,logicalTower]=key.split('.');
+        const tower=logicalTower==='defaultcore'?'wickroot':'none';
+        await a.dbg(`setZoom('${preset}')`);
+        await a.waitFor(`window.__diceDebug.zoom === '${preset}'`,{desc:key+' zoom'});
+        await a.dbg(`setTower('${tower}')`);
+        await a.waitFor(`window.__diceDebug.tower === '${tower}'`,{desc:key+' socket'});
+        const live=JSON.parse(await a.eval(TOWER_SNAP));
+        assert.deepEqual(live,want,`${key}: current pose, core, and collider order`);
+        assert.equal(JSON.stringify(live),JSON.stringify(want),`${key}: identical full-double serialization`);
+        assert.deepEqual((await a.dbg('towerDefaultPortalSpec()')).portals,ports,
+          'the reference default is independent of the selected model');
+
+        const old=TOWER_DEFAULT_CORE_LEGACY[key], local=structuredClone(live), legacy=structuredClone(old);
+        // Only subtraction of a moved world origin needs an ulp allowance.
+        // Sizes, directions, portal numbers, flight and POUR stay exact.
+        const relativeZ=(now,was,path)=>{
+          const x=now[2]-live.z0, y=was[2]-old.z0;
+          const ulp=4*Number.EPSILON*Math.max(1,Math.abs(now[2]),Math.abs(was[2]),Math.abs(live.z0),Math.abs(old.z0));
+          assert.ok(Math.abs(x-y)<=ulp,`${key}/${path}: origin-relative center ${x} = ${y}`);
+          now[2]=was[2]=0;
+        };
+        for(const k of ['socket','apron','shaft','aim','cowl','hood','lip']) relativeZ(local[k].c,legacy[k].c,k);
+        relativeZ(local.exit.p,legacy.exit.p,'exit');
+        if(local.bodies) {
+          const width=(await a.dbg('tableExtents()')).w;
+          for(let i=0;i<local.bodies.length;i++) {
+            const body=local.bodies[i], prior=legacy.bodies[i];
+            relativeZ(body.position,prior.position,body.name);
+            if(body.name==='doorL'||body.name==='doorR') {
+              // Jambs bridge the live table edge to the unchanged doorway.
+              const sign=body.name==='doorL'?-1:1;
+              assert.equal(body.half[0],(width-live.door.w)/4,`${key}/${body.name}: spans new mat`);
+              assert.equal(body.position[0],sign*(width+live.door.w)/4,`${key}/${body.name}: abuts doorway`);
+              body.half[0]=prior.half[0]=0;
+              body.position[0]=prior.position[0]=0;
+            }
+          }
+        }
+        // Flight derives travel by subtracting that same world-space exit.
+        // Its downstream arithmetic can retain the same cancellation ulp.
+        for(const k of ['travel','spawnY','bottom','halfW','top']) {
+          const x=local.flight[k],y=legacy.flight[k];
+          assert.ok(Math.abs(x-y)<=4*Number.EPSILON*Math.max(1,Math.abs(x),Math.abs(y)),
+            `${key}/flight.${k}: historical arithmetic within four ulps`);
+          local.flight[k]=legacy.flight[k]=0;
+        }
+        delete local.z0; delete legacy.z0; delete local.source; delete legacy.source;
+        assert.deepEqual(local,legacy,`${key}: historical core dimensions/directions/flight/POUR and collider order unchanged`);
+      }
+      await a.dbg('towerProbePortals(null)');
+      await a.dbg("setTower('none')");
+    },
+  },
+  {
     name: 'tower-contract-freeze',
     tags: ['tower'],
-    // THE ENGINE CONTRACT, TO THE BIT (docs/TOWER.md, "The six engine-owned
-    // volumes"). towerVolumes() is being turned from six fixed literals into a
-    // function of a per-tower PORTAL SPEC, and the promise of that seam is that
-    // a CLASSIC tower comes out the other side unchanged. Not "close enough" —
-    // unchanged, on the same double, because every one of these numbers feeds
-    // a BAKE: the film is a pure function of the core and the seed, and a
-    // despawn line 1e-9 lower is two clients rendering one seed as two films.
-    //
-    // So the check is a byte comparison against a golden captured BEFORE the
-    // refactor (tools/steps/tower-contract-capture.mjs), not a tolerance. An
-    // epsilon here would pass exactly the change this exists to catch, because
-    // "algebraically equivalent" is precisely what a rearranged floating-point
-    // expression is not.
-    //
-    // TWO AXES (see the capture tool's header). Z0: three zoom presets ×
-    // {unsocketed, heartwood} — the preset moves z0 and every volume hangs off
-    // it, socketing moves it again and is the only state in which the eight
-    // collider bodies exist to be read at all. SPEC: every other registered
-    // tower at one preset, which freezes the PORTAL SPEC each one asks for and
-    // the core derived from it. Until the spec axis existed this scenario
-    // watched one spec six times and Hollow Bole was frozen nowhere.
-    //
-    // AND A NEW TOWER MUST BE FROZEN TOO. The registry is read live and every
-    // id has to have a row, so registering a tower without capturing its
-    // contract is RED. That re-capture is the one routine kind — purely
-    // ADDITIVE: every number the two fixtures SHARE is identical and only new
-    // keys appear. Establish that with a key-by-key walk, not with the line
-    // count; a key added inside a nested object reflows its neighbours (adding
-    // `door.x` read as 20 insertions and 10 deletions, with no value moved).
-    // A moved value can still be right — T1's ulp fix moved 13 on purpose —
-    // but it is a change to what every client bakes, and it is named in the
-    // commit rather than absorbed into a fixture chore.
-    //
-    // THE GOLDEN IS GUARDED BEFORE IT IS TRUSTED. A fixture that got truncated
-    // to `{}`, or whose rows are copies of one row, compares green against
-    // anything — this project's dominant failure mode wearing a new hat. So the
-    // shape, the body list, the z0 spread and the spec spread are asserted
-    // first, and only then is the live snapshot held against it.
-    //
-    //   RED CHECKS (each run, seen red, reverted, seen green again):
-    //   · despawnY `5.6 * S` → `5.61 * S` in towerVolumes: RED on all six rows
-    //     — `despawnY: got 7.0125, golden 7`. Reverted: green.
-    //   · a stray field added to the snapshot's projection: RED with
-    //     "present live and not in the golden", which is the guard that keeps
-    //     the projection honest in the other direction.
-    //   · deleting a row from the golden: RED on the shape guard, before any
-    //     comparison runs — and deleting `wide.hollowbole` specifically is RED
-    //     on the registry sweep, which is the new-tower gate.
-    //   · every spec-axis row's portals hand-edited to the classic numbers:
-    //     RED on the spec-spread guard, which is what stops the axis from
-    //     being six more photographs of the same tower.
+    // Freeze the current registry declarations and derived cores. Retiring
+    // old models changes rows; tower-default-core-freeze separately retains
+    // every numeric baseline for none and DEFAULT_PORTALS.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.settle();
@@ -14242,10 +14267,10 @@ export const scenarios = [
         }
       }
 
-      // The Z0 axis: three presets × {unsocketed, heartwood}, six distinct anchors.
+      // The Z0 axis: three presets × {unsocketed, Wickroot}, six distinct anchors.
       const z0Keys = [];
       for (const preset of ['wide', 'medium', 'close']) {
-        for (const tower of ['none', 'heartwood']) z0Keys.push(`${preset}.${tower}`);
+        for (const tower of ['none', 'wickroot']) z0Keys.push(`${preset}.${tower}`);
       }
       for (const key of z0Keys) {
         assert.ok(TOWER_CONTRACT_GOLDEN[key], `the golden holds the z0-axis row ${key}`);
@@ -14263,7 +14288,7 @@ export const scenarios = [
       assert.deepEqual(unfrozen, [],
         `every registered tower is frozen: ${unfrozen.join(', ')} ${unfrozen.length === 1 ? 'is' : 'are'} not. `
         + `A new tower re-captures the golden (tools/steps/tower-contract-capture.mjs) — `
-        + `an ADDITIVE diff, 0 deletions, or the classic core moved and this is not a re-pin`);
+        + `while the separate default-core golden protects the original engine arithmetic`);
       assert.ok(specs.size >= 2,
         `and the golden holds more than one portal spec (${specs.size}) — one spec `
         + `photographed N times cannot catch a spec that stopped propagating`);
@@ -14633,12 +14658,12 @@ export const scenarios = [
       await beta.dbg('closeSettingsModal()');
 
       // ---- ③ THE LAW: the gate never reaches the film --------------------
-      await beta.dbg("setTower('heartwood')");
-      await beta.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+      await beta.dbg("setTower('wickroot')");
+      await beta.waitFor(`window.__diceDebug.tower === 'wickroot'`,
         { desc: 'the beta host sockets a tower' });
       // The stable client is IN THIS ROOM and must follow it. Nothing about
       // its channel may be visible in what it renders.
-      await prod.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+      await prod.waitFor(`window.__diceDebug.tower === 'wickroot'`,
         { desc: 'the production client sockets the room\'s tower anyway' });
 
       await beta.dbg("commandRoll('6d6')");
@@ -14649,7 +14674,7 @@ export const scenarios = [
       const films = await Promise.all([beta, prod].map(async (t) => JSON.parse(
         await t.eval('JSON.stringify(window.__diceDebug.towerFilmInfo())'))));
       for (const [i, f] of films.entries()) {
-        assert.equal(f.filmTower, 'heartwood',
+        assert.equal(f.filmTower, 'wickroot',
           `${i ? 'the production' : 'the beta'} client BAKED against the tower `
           + `(film ${f.filmTower}) — 'tower' says what is standing, 'filmTower' says `
           + 'what the dice were computed through, and only the second one is the law');
@@ -14874,220 +14899,38 @@ export const scenarios = [
   {
     name: 'tower-dressing',
     tags: ['tower', 'look'],
-    // THE COSMETIC LANE (ROADMAP T4). Every claim here is about GEOMETRY,
-    // GROUPS and DECLARATIONS — what the model brought, what it named it, what
-    // it costs — and not one of them needs a die. That is not an accident of
-    // how it happens to be written: the charter says physics and the pour film
-    // are a function of (portal spec, engine constants, seed) and the mesh is
-    // not an input, so a mesh change owes measurements and LOOK sheets and
-    // owes simulation NOTHING. These claims used to live inside `tower-roll`,
-    // which pours; a pure dressing change could only be proved by paying for
-    // a physics scenario, which is how a cosmetic edit ends up costing 38
-    // seconds instead of eight.
-    //
-    // The `look` tag is enforced, not documented: runScenarios reads
-    // __diceDebug.diceEverMade() from every tab afterwards and fails the
-    // scenario if a single die body was built — or if the counter cannot be
-    // read at all. See noDiceGuard in harness.mjs.
-    //
-    // WHAT MOVED, AND WHAT IS NEW. The four claims below came over from
-    // tower-roll unchanged in substance (the two biconditionals keep their
-    // full reasoning there). Two are new:
-    //   · THE BUDGET IS AN ASSERTION. "≤ 4k triangles and ≤ 8 draw calls of
-    //     dressing" has been the rule since the dressing pass and lived as a
-    //     printed number in tools/steps/tower-dress.mjs, which is a wish. A
-    //     budget nobody fails is not a budget.
-    //   · THE COSMETIC CLAIM IS AN AGGREGATE. What is asserted is the total
-    //     over the `towerSkin*` subtree, not the presence of one named mesh —
-    //     `venue-set` breaking the day somebody deleted a berm is the
-    //     precedent, and a suite that names individual meshes turns every
-    //     legitimate re-massing into a test edit.
+    // Static GLB inventory is the replacement for the retired animated skins.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.settle();
-
       const registry = await a.dbg('towerRegistry()');
-      const skinned = registry.filter((t) => t.skin);
-      assert.ok(skinned.length >= 4,
-        `every skinned row is walked (${skinned.map((t) => t.id).join(', ')}) — `
-        + 'and there are enough of them that this is a sweep, not a spot check');
-
-      for (const model of skinned) {
-        const id = model.id;
-        await a.dbg(`setTower('${id}')`);
-        await a.waitFor(`window.__diceDebug.tower === '${id}'`,
-          { desc: `${model.label} is up (a baked row waits for its model)` });
-
+      assert.deepEqual(registry.map((r) => r.id), ['none', 'wickroot', 'cairnwatch', 'cinderbell'],
+        'the permanent catalogue has exactly the three greenfield towers');
+      for (const model of registry.filter((t) => t.skin)) {
+        await a.dbg(`setTower('${model.id}')`);
+        await a.waitFor(`window.__diceDebug.tower === '${model.id}'`, { desc: `${model.id} loaded` });
         const dr = await a.dbg('towerDressAudit()');
-        const names = dr.groups.map((g) => g.name);
-
-        // (1) THE SKIN IS THERE AT ALL, as an aggregate. A model that failed
-        // to build, or a loader that dropped the geometry on the floor, leaves
-        // an audit that answers politely with nothing — and every claim after
-        // it would be vacuously true. Triangles across the whole subtree, so
-        // re-massing a tower is not a test edit.
-        assert.ok(dr.tris > 0 && dr.draws > 0,
-          `${id}: the audit SEES a skin — ${dr.tris} tris in ${dr.draws} draws. `
-          + `Zero here makes every line below vacuous`);
-
-        // (2) THE DRESS GROUP, exactly where the row declares one. Biconditional
-        // in both directions — the reasoning is in tower-roll's history: a
-        // baked row that bakes its props into the GLB declares dress:false and
-        // must then carry NO group, so an empty group cannot hide behind the
-        // declaration either.
-        const dressed = !model.glb || !!model.dress;
-        assert.equal(names.includes('towerSkinDress'), dressed,
-          `${id}: declares dress=${!!model.dress} (glb=${model.glb}), so it must `
-          + `${dressed ? 'carry' : 'carry NO'} towerSkinDress (groups: ${names.join(', ')})`);
-        if (dressed) {
-          const dg = dr.groups.find((g) => g.name === 'towerSkinDress');
-          assert.ok(dg.meshes > 0 && dg.tris > 0,
-            `${id}: …and it carries geometry (${dg.meshes} meshes, ${dg.tris} tris)`);
-        }
-
-        // (3) THE DRESSING BUDGET, as an assertion (NEW). The budget is on the
-        // DRESSING, not on the model — a hero tower is allowed to be a hero —
-        // so it is measured over the two dress groups only.
-        //
-        // AND THE FIRST THING IT FOUND WAS TWO OVERRUNS. "≤ 4k triangles and
-        // ≤ 8 draw calls" has been the written rule since the dressing pass
-        // and lived as a printed number in a tool; the day it became an
-        // assertion, heartwood measured 11 draws and bastion 9. Triangles are
-        // fine everywhere (the worst is hollowbole's 2644). Nobody knew,
-        // because a printed number is a wish.
-        //
-        // THE DRAW BUDGET MOVED TO THE WHOLE TOWER (2026-08-14, T14 resolved).
-        // The dress-only rule was policing the wrong noun and the measurement
-        // said so plainly:
-        //
-        //     tower        total  skin  dress
-        //     nullstone        5     5      0
-        //     hollowbole      16     4      7
-        //     heartwood       49    30     11
-        //     bastion         61    46      9
-        //     blackanvil      88    75      5   <- PASSED the old rule
-        //
-        // THAT LAST ROW IS THE ARGUMENT. blackanvil's dressing is 5 draws, so
-        // the dress-only budget waved through the most expensive tower in the
-        // app — 88 draws, 75 of them in one skin group — while refusing
-        // heartwood over three prop meshes. It was found the moment the rule
-        // moved to the right noun, by a scenario that had been green all along.
-        //
-        // A rule that refused heartwood's 11 while saying nothing about the 30
-        // beside it was arguing about 22% of the cost. Merging the kits to 8
-        // would have bought 3 draws out of 49 — and could not have been done
-        // anyway: T14's plan rested on "the kit already knows how to bake a
-        // shared canvas", and it does not (bakeWood/bakeStone/bakeEmber each
-        // bake ONE canvas for one purpose; the props carry five distinct
-        // materials and only hang+coil share one, so a same-material merge
-        // saves ONE of the three draws needed). A budget whose stated fix is
-        // impossible is worse than no budget, so the budget moved instead.
-        //
-        // FRAME COST IS TOTAL DRAWS, so that is what is gated. 20 is set from
-        // the evidence: the most expensive HONEST tower is hollowbole at 16
-        // (four skin meshes, seven dress), which leaves room for one more
-        // dress group without leaving room for a code skin's dozens.
-        //
-        // The two classics keep the waiver DISCIPLINE on the new noun — named,
-        // valued, may not grow, self-cleaning. What changed is that their line
-        // now shows the real number, so nobody reads "11" and thinks the tower
-        // costs eleven draws. Their fix is not a prop merge; it is the forge
-        // (ROADMAP T15).
-        const DRAW_WAIVER = { heartwood: 49, bastion: 61, blackanvil: 88 };
-        const DRAW_BUDGET = 20;
-        const dressGroups = dr.groups.filter(
-          (g) => g.name === 'towerSkinDress' || g.name === 'towerDressFx');
-        const dTris = dressGroups.reduce((n, g) => n + g.tris, 0);
-        // The dressing TRIANGLE budget stays where it was and on the dress
-        // groups: that one is about art restraint — how much stuff a prop pass
-        // may add — not about frame cost, and every tower has always met it.
-        assert.ok(dTris <= 4000,
-          `${id}: the dressing is inside its triangle budget (${dTris} <= 4000, `
-          + `over ${dressGroups.map((g) => g.name).join(' + ') || 'no dress groups'})`);
-        if (id in DRAW_WAIVER) {
-          assert.ok(dr.draws > DRAW_BUDGET,
-            `${id}: is listed as a declared draw overrun but measures `
-            + `${dr.draws} <= ${DRAW_BUDGET} — it is inside the budget now, so `
-            + 'delete its line from DRAW_WAIVER rather than leave a waiver nobody needs');
-          assert.ok(dr.draws <= DRAW_WAIVER[id],
-            `${id}: a DECLARED overrun of the ${DRAW_BUDGET}-draw tower budget, and `
-            + `it may not grow (${dr.draws} <= ${DRAW_WAIVER[id]}). A code-built skin `
-            + 'is dozens of meshes where a baked one is a handful — ROADMAP T15');
-        } else {
-          assert.ok(dr.draws <= DRAW_BUDGET,
-            `${id}: the whole tower is inside its draw budget (${dr.draws} <= `
-            + `${DRAW_BUDGET}, skin + dress + linings)`);
-        }
-
-        // (4) THE FAMILY TRAITS. An ember on the row (somebody lit it tonight),
-        // and no light in the skin — the tower's one warm light is the
-        // engine's, built against the socketed core.
-        assert.ok(dr.ember,
-          `${id}: the registry row carries the family trait — a warm focal light`);
-        assert.equal(dr.lights, 0, `${id}: and the skin still brings zero lights`);
-        // …AND THE ROW'S LAMPS ARE READABLE, by value. Nothing could read
-        // these back until 2026-08-14, which is exactly how towerRegisterGlb
-        // spent a day replacing a shipped row's whole light story with a warm
-        // default and nobody saw: tower-try, the tool documented as "the only
-        // honest place to judge light", was lighting the cold nullstone with
-        // an orange point lamp at full rake. It was found by two people
-        // looking at a picture. A value nobody can read is a value nobody can
-        // check, so the sweep reads them.
-        assert.ok(model.ember && model.ember.color,
-          `${id}: the ember is readable AS A VALUE, not just as a boolean `
-          + `(${JSON.stringify(model.ember)})`);
-        // The lantern is OPTIONAL and its absence is a real declaration:
-        // `spec.lantern.rake` is a SCALE on the room's rake, so a row without
-        // one runs at 1.0 — which is heartwood, the pale original the rake was
-        // tuned against. The three dark towers lower it (0.4/0.45/0.5) because
-        // a black surface is mostly reflection. So the claim is that a
-        // declared rake is a NUMBER, not that every row declares one.
+        assert.ok(model.glb && !model.dress, `${model.id}: all static detail belongs to its GLB`);
+        assert.ok(dr.tris > 0 && dr.draws > 0, `${model.id}: the audit sees actual geometry`);
+        assert.ok(dr.draws <= 20, `${model.id}: ${dr.draws} draws fit the measured tower budget`);
+        assert.equal(dr.lights, 0, `${model.id}: GLB carries no lights`);
+        assert.equal(dr.sways + dr.smokes, 0, `${model.id}: no retired animated dress survived`);
+        assert.ok(!dr.groups.some((g) => ['towerSkinDress', 'towerDressFx'].includes(g.name)),
+          `${model.id}: no legacy dress groups`);
+        assert.ok(dr.ember && model.ember && model.ember.color, `${model.id}: the registry owns its focal light`);
         assert.ok(model.lantern === null || typeof model.lantern.rake === 'number',
-          `${id}: a declared lantern carries a numeric rake `
-          + `(${JSON.stringify(model.lantern)})`);
-
-        // (5) IDLE MOTION, where the row declares it. Same biconditional shape
-        // as (2): a row that declares no dress must have nothing moving.
-        const expectMotion = !model.glb || !!model.dress;
-        assert.equal(dr.sways + dr.smokes > 0, expectMotion,
-          `${id}: declares dress=${!!model.dress} (glb=${model.glb}), so it must `
-          + `${expectMotion ? 'have' : 'have NO'} idle motion when nobody is touching it `
-          + `(${dr.sways} sways, ${dr.smokes} plumes)`);
+          `${model.id}: lantern scaling is an explicit value`);
+        assert.equal((await a.dbg('motesInfo()')).count, 0,
+          `${model.id}: its reviewed silhouette carries no legacy dust layer`);
       }
-
-      // ---- A RE-BAKE OF A ROW THAT EXISTS INHERITS ITS LIGHT --------------
-      // The regression itself, and the reason it is here rather than in a
-      // tool's printed output. `tower-try` mints a throwaway row for a raw
-      // `tools/forge/out/<slug>.glb` and the slug is the FILENAME — so baking
-      // `nullstone.glb` mints over the shipped nullstone row. Before the fix
-      // that replaced its ember (#cfe98c cold, at the doorway) with the plain
-      // default (#ff9a44 warm, on the bore axis) and dropped its 0.45 rake to
-      // 1.0, which is how a day of value judgements got taken through a lamp
-      // nobody chose.
-      const lit = registry.find((t) => t.id === 'nullstone');
-      assert.ok(lit && lit.ember, 'nullstone is the witness and it declares an ember');
-      await a.dbg(`towerRegisterGlb('nullstone', '/models/towers/nullstone.glb', `
+      const lit = registry.find((t) => t.id === 'cairnwatch');
+      await a.dbg(`towerRegisterGlb('cairnwatch', '/models/towers/cairnwatch.glb', `
         + `{ label: 'remint', title: 'tower-dressing' })`);
-      const after = (await a.dbg('towerRegistry()')).find((t) => t.id === 'nullstone');
-      assert.deepEqual(after.ember, lit.ember,
-        're-minting a REGISTERED id keeps its ember — a bake is looked at in the '
-        + `room it will stand in, or the tool is lying (was ${JSON.stringify(lit.ember)}, `
-        + `now ${JSON.stringify(after.ember)})`);
-      assert.deepEqual(after.lantern, lit.lantern,
-        '…and its lantern rake, which is a SCALE on the room\'s and so silently '
-        + 'doubles the key light when it goes missing');
-      assert.equal(after.label, 'remint',
-        'while the parts the caller DID state still take effect — inheritance is a '
-        + 'fallback, not an override, or a fixture could never be given its own lamps');
-
-      // And the lane's own promise, stated where a reader will meet it: this
-      // whole sweep socketed every model in the registry, read its geometry,
-      // its groups, its budget and its declarations — and rolled nothing. The
-      // runner is what proves it (noDiceGuard); this is the reminder that the
-      // number is supposed to be zero.
-      assert.equal(await a.dbg('diceEverMade()'), 0,
-        'the cosmetic lane simulated no dice — asserted here as well as by the '
-        + 'runner, so the promise is visible in the scenario that makes it');
+      const after = (await a.dbg('towerRegistry()')).find((t) => t.id === 'cairnwatch');
+      assert.deepEqual(after.ember, lit.ember, 'reminting preserves the existing focal light');
+      assert.deepEqual(after.lantern, lit.lantern, 'and the existing lantern scaling');
+      assert.equal(after.label, 'remint', 'explicit fields still override inherited fields');
+      assert.equal(await a.dbg('diceEverMade()'), 0, 'static model inspection simulates no dice');
     },
   },
   {
@@ -15204,14 +15047,16 @@ export const scenarios = [
       // The GLB row is held against THIS rather than against numbers typed
       // here: matExtra is engine-fixed, and the claim is that a baked model
       // consumes exactly the room a code-built one does.
-      await a.dbg(`setTower('heartwood')`);
-      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`, { desc: 'a classic tower, for scale' });
-      const classicExtents = await a.dbg('tableExtents()');
-      assert.ok(classicExtents.d > wasExtents.d, 'which deepens the mat');
-      assert.deepEqual(await a.dbg(`towerModelStatus('heartwood')`),
+      assert.deepEqual(await a.dbg(`towerModelStatus('none')`),
         { ready: true, status: null, url: null, portals: false, retries: 0 },
-        'a row with no model is READY BY DEFINITION — that is what keeps the '
-        + 'four shipped towers on the path they had before the loader existed');
+        'the towerless row needs no model');
+      await a.dbg(`setTower('wickroot')`);
+      await a.waitFor(`window.__diceDebug.tower === 'wickroot'`, { desc: 'permanent GLB loaded, for scale' });
+      const classicExtents = await a.dbg('tableExtents()');
+      assert.ok(classicExtents.d > wasExtents.d, 'a tower deepens the mat');
+      const permanent = await a.dbg(`towerModelStatus('wickroot')`);
+      assert.ok(permanent.ready && permanent.portals && permanent.status === 'ready',
+        'a permanent tower is ready only after its model and portals load');
       await a.dbg(`setTower('none')`);
       await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'and back down' });
 
@@ -15479,8 +15324,8 @@ export const scenarios = [
       assert.ok(await warnsMatching('badtower') > 0, 'naming the row, not just the url');
 
       // …and a classic id still recovers, over the top of the stuck pending one.
-      await a.dbg(`setTower('bastion')`);
-      await a.waitFor(`window.__diceDebug.tower === 'bastion'`,
+      await a.dbg(`setTower('cairnwatch')`);
+      await a.waitFor(`window.__diceDebug.tower === 'cairnwatch'`,
         { desc: 'a classic tower recovers the table' });
       assert.equal(await a.dbg('pendingTower'), null, 'and the queue is clear');
 
@@ -15520,7 +15365,7 @@ export const scenarios = [
       assert.deepEqual(downExtents, wasExtents,
         `the mat is the preset again, to the bit — width and depth `
         + `(${JSON.stringify(downExtents)} vs ${JSON.stringify(wasExtents)})`);
-      assert.equal(downExtents.d, 6.7,
+      assert.equal(downExtents.d, 27.5,
         'and it is the literal preset depth, not a value that merely rounds to it');
       const downWorld = await a.dbg('worldBodies()');
       assert.deepEqual(downWorld.named, [], 'not one collider left in the WORLD');
@@ -15647,7 +15492,7 @@ export const scenarios = [
     name: 'tower-roll',
     tags: ['roll', 'physics', 'tower', 'settings', 'cuj8'],
     // THE TOWER AS A ROOM SETTING (docs/TOWER.md, shipped 2026-08-12). With
-    // `tower: 'heartwood'` a roll is baked as a POUR — scripted entry, hidden
+    // `tower: 'wickroot'` a roll is baked as a POUR — scripted entry, hidden
     // transit behind the skin, exit through the doorway — instead of a throw.
     //
     // Each assertion below has a way to fail, and it is named, because "the
@@ -15692,9 +15537,9 @@ export const scenarios = [
       // ---- socketed ------------------------------------------------------
       // Through the settings path, so this exercises the same code a chip
       // click does: POST → server validation → 'settings-changed' echo.
-      await a.dbg(`setTower('heartwood')`);
+      await a.dbg(`setTower('wickroot')`);
       for (const t of [a, b]) {
-        await t.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+        await t.waitFor(`window.__diceDebug.tower === 'wickroot'`,
           { desc: 'the tower goes up on both tabs' });
       }
       const upExtents = await a.dbg('tableExtents()');
@@ -15892,8 +15737,7 @@ export const scenarios = [
       //     own. There is one collider builder and skins add nothing.
       //   · voice — fails if the palette is not resolved from the SOCKETED
       //     TOWER. Red-checked by pointing the resolver at the die set: the
-      //     assertion goes red because bastion's thud becomes heartwood's
-      //     clack the moment the tower stops being the thing that is asked.
+      //     assertion goes red when the die-set voice wins over the tower.
       //   · pour — fails if a skin swap changed the film at all; the knocks
       //     are baked from the seed and the tower is not in the bake.
       //
@@ -15913,8 +15757,8 @@ export const scenarios = [
       // The sound palette (docs/TOWER.md §6) is asked of the drain's OWN
       // resolver, with a die set that HAS a voice of its own — otherwise "the
       // tower won" and "there was nothing to win against" look identical.
-      // emberforge.blackanvil on purpose: it is a thud, and bastion is ALSO a
-      // thud, so a resolver that reached for the die set would fail on the
+      // emberforge.blackanvil on purpose: it is a thud, and Wickroot is ALSO
+      // a thud, so a resolver that reached for the die set would fail on the
       // weight and the tail rather than on the family. That near-miss is the
       // one worth pinning and it is why the set is not swapped per tower.
       const voices = Object.fromEntries(registry.map((t) => [t.id, t.clunkVoice]));
@@ -15923,8 +15767,8 @@ export const scenarios = [
       assert.equal(voices.none, null, 'no tower, no tower voice');
       assert.ok(setVoice, `${SET} brings a voice of its own to argue with`);
 
-      let from = 'heartwood';
-      for (const model of skinned.filter((t) => t.id !== 'heartwood')) {
+      let from = 'wickroot';
+      for (const model of skinned.filter((t) => t.id !== 'wickroot')) {
         const id = model.id;
         await a.settle();
         await b.settle();
@@ -15962,25 +15806,9 @@ export const scenarios = [
         // number in a tool until then.
 
         // ---- the PORTAL SPEC this model resolves to ------------------------
-        // Every model shipped so far declares no portals and therefore gets
-        // the classic core, and asserting that is not a tautology: `source`
-        // is how a model whose portals silently failed to load tells you so.
-        // A tower reading 'default' when it meant to state its own openings is
-        // a doorway the engine put somewhere the model did not — dice flying
-        // into the wall beside a door that is drawn open. Read off the
-        // registry, so the day a row declares portals this line is what
-        // notices.
+        // Every permanent model owns its openings; a fallback to defaults
+        // would put the engine door somewhere the artist did not declare.
         const ps = await a.dbg(`towerPortalSpec('${id}')`);
-        // V2 ADAPTATION (W3, the day the comment above was written for).
-        // NEW CLAIM: `default` for a classic row, `model` for a baked one.
-        // OLD: `assert.equal(ps.source, 'default')` unconditionally — true
-        // while every registered row was code-built. hollowbole is now a GLB
-        // row and reads 'model', which is the WIN this line exists to notice,
-        // not a regression: the paragraph above says in as many words that
-        // "the day a row declares portals this line is what notices". The
-        // claim is strictly stronger than the old one — each row is now
-        // asserted to resolve from the source it actually has, so a baked row
-        // that silently fell back to the classic core still fails here.
         assert.equal(ps.source, model.glb ? 'model' : 'default',
           `${id}: resolves to the ${model.glb ? 'portals declared by its model' : 'classic portals'} `
           + `(source '${ps.source}')`);
@@ -16061,8 +15889,8 @@ export const scenarios = [
         from = id;
       }
       await a.settle();
-      await a.dbg(`setTower('heartwood')`);
-      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+      await a.dbg(`setTower('wickroot')`);
+      await a.waitFor(`window.__diceDebug.tower === 'wickroot'`,
         { desc: 'back to the wooden tower for the rest of this scenario' });
       // AND THE SECOND TAB TOO — a race this line did not used to be able to
       // lose. Everything below bakes films on BOTH tabs and compares them
@@ -16080,9 +15908,9 @@ export const scenarios = [
       // because a uniform translation of the core moves the despawn line with
       // the dice. Measured, not guessed: Δy 0.649999618 = 9.399999618 - 8.75,
       // Δz -0.549999952 = -2.549999952 + 2.00, to the last digit.
-      await b.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+      await b.waitFor(`window.__diceDebug.tower === 'wickroot'`,
         { desc: 'and the second tab has applied it before any film is compared' });
-      assert.deepEqual(await a.dbg(`impactVoiceFor({clunk:'baffle'}, '${SET}')`), voices.heartwood,
+      assert.deepEqual(await a.dbg(`impactVoiceFor({clunk:'baffle'}, '${SET}')`), voices.wickroot,
         'and the voice follows the tower back');
 
       // ---- A DEBUG DIAL CANNOT REACH A SHIPPED COLLIDER --------------------
@@ -16144,49 +15972,10 @@ export const scenarios = [
           + 'scenario expects it');
       }
 
-      // ---- the dress clock -------------------------------------------------
-      // THE IDLE MOTION IS A FUNCTION OF THE SIM CLOCK AND NOTHING ELSE, which
-      // is what makes a screenshot of a dressed tower deterministic.
-      //
-      // THE FIRST VERSION OF THIS WAS FURNITURE, and it is worth recording
-      // why: it asserted that a HELD clock leaves the sway angle unchanged
-      // across a quarter second of real time. Red-checked by driving the
-      // stepper off Date.now — and it stayed GREEN, because a headless tab
-      // that is not in front gets no requestAnimationFrame at all, so nothing
-      // ticks either way and "frozen" is true for the wrong reason. A green
-      // that cannot go red is not a check.
-      //
-      // So the angle is checked against the FORMULA instead: two sines, 2.63
-      // apart, over the dt-accumulated clock. Any other clock lands somewhere
-      // else immediately, and a stepper that never runs lands on the base
-      // angle while the clock says otherwise.
-      {
-        const before = await a.dbg('towerDressAudit()');
-        await a.dbg('sim(60)');
-        const after = await a.dbg('towerDressAudit()');
-        assert.ok(Math.abs((after.dressClock - before.dressClock) - 1) < 1e-6,
-          `sim(60) advances the dress clock by exactly one second `
-          + `(${before.dressClock} → ${after.dressClock})`);
-        const swayAt = (s, t) => {
-          const w = 2 * Math.PI * s.hz * t + s.phase;
-          return s.base + s.amp * (0.65 * Math.sin(w) + 0.35 * Math.sin(2.63 * w + 1.7));
-        };
-        assert.ok(after.state.sway.length > 0, 'heartwood has something that sways');
-        for (const s of after.state.sway) {
-          assert.ok(Math.abs(s.rot - swayAt(s, after.dressClock)) < 1e-6,
-            `the ${s.axis}-sway is exactly the two-sine idiom over the sim clock `
-            + `at t=${after.dressClock} (rot ${s.rot}, formula ${swayAt(s, after.dressClock).toFixed(8)})`);
-          assert.notEqual(s.rot, s.base,
-            `and it is not sitting at its rest angle (${s.base}) — the stepper ran`);
-        }
-        // …and the clock itself does not run while it is held.
-        await a.dbg('holdClock(true)');
-        const held = await a.dbg('towerDressAudit()');
-        await new Promise((r) => setTimeout(r, 250));
-        assert.equal((await a.dbg('towerDressAudit()')).dressClock, held.dressClock,
-          'and a held clock does not advance on its own');
-        await a.dbg('holdClock(false)');
-      }
+      // All replacement towers are static authored GLBs. Their atmosphere
+      // belongs to the venue; no retired code-side sway or smoke survives.
+      const staticDress = await a.dbg('towerDressAudit()');
+      assert.equal(staticDress.sways + staticDress.smokes, 0, 'Wickroot has no legacy animated dress');
 
       // ---- unseen ---------------------------------------------------------
       // A HIDDEN WINDOW IS HIDDEN ON SCREEN, not merely recorded as such. The
@@ -16295,7 +16084,7 @@ export const scenarios = [
       await a.roll('3d6');
       await b.settle();
       await b.reload();
-      await b.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+      await b.waitFor(`window.__diceDebug.tower === 'wickroot'`,
         { desc: 'the reloaded tab comes back with the tower up' });
       assert.deepEqual(await b.dbg('tableExtents()'), upExtents,
         'and on the deepened mat, not the preset one');
@@ -16320,7 +16109,7 @@ export const scenarios = [
       await a.dbg(`setTower('none')`);
       await a.waitFor(`window.__diceDebug.settings.tower === 'none'`,
         { desc: 'the change reached the client' });
-      assert.equal(await a.dbg('tower'), 'heartwood',
+      assert.equal(await a.dbg('tower'), 'wickroot',
         'the tower does NOT come down under a film that was baked with it');
       assert.equal(await a.dbg('pendingTower'), 'none', 'it is queued for the boundary');
       await a.dbg('holdClock(false)');
@@ -16347,414 +16136,112 @@ export const scenarios = [
     },
   },
   {
-    name: 'tower-hollowbole',
-    tags: ['tower', 'fx'],
-    // THE FAE VENUE'S TOWER (ROADMAP W3, docs/TOWER.md): a rotted hollow
-    // trunk with a crown moot on it. tower-roll's registry loop already
-    // covers everything a fourth row shares with the other three — the
-    // swap, the socket, the voice, the pour. What is NEW about this one is
-    // the three things no sibling has, and this scenario is only those:
-    //
-    //   · VENUE-ONLY. It has no chip and it must still socket. Both halves
-    //     matter: the picker assertion in tower-roll would be just as green
-    //     if the row had quietly stopped existing, and a row that cannot be
-    //     set is a venue that cannot be entered. Also proves the SERVER
-    //     allowlist, because setTower goes POST → validate → echo and a
-    //     missing id in SETTING_SPECS is a patch the server refuses.
-    //   · THE VALUE LADDER. Every emissive tier on this model is authored
-    //     as `target / linearLuma(hue)` against post.js's bloom threshold,
-    //     because there is no post-hoc bloom dial (fae grammar rule 3).
-    //     The attendants are TERTIARY and must never cross the threshold;
-    //     the caps are secondary; nothing in the skin may carry
-    //     `userData.bloom`, which would disable the post-stack bypass for
-    //     the whole app (techniques.md T2).
-    //   · TWO SKIES, ONE MODEL. The same skin is built under both fae
-    //     palettes, and the point of dividing by the hue's own luminance is
-    //     that the two come out at the same VALUE with different colour. If
-    //     a palette ever changes the value, the venue has two towers.
+    name: 'tower-foundry-models',
+    tags: ['tower', 'glb', 'look'],
     async fn(ctx) {
-      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
-      await a.settle();
-
-      const wasWorld = await a.dbg('worldBodies()');
-
-      // ---- venue-only: no chip, and it sockets anyway ---------------------
-      await a.dbg('openSettings("staging")');
-      const registry = await a.dbg('towerRegistry()');
-      const row = registry.find((t) => t.id === 'hollowbole');
-      assert.ok(row, 'hollowbole is a registered tower');
-      assert.equal(row.venueOnly, true, 'and it is flagged venue-only');
-      assert.ok(row.skin, 'with a skin builder');
-      const chipIds = JSON.parse(await a.eval(
-        `JSON.stringify([...document.querySelectorAll('#tower-picker [data-tower]')]
-          .map((b) => b.dataset.tower))`));
-      assert.ok(!chipIds.includes('hollowbole'),
-        `a venue tower takes no chip of its own (${chipIds.join(', ')})`);
-      await a.eval(`document.getElementById('settings-modal').classList.add('hidden')`);
-
-      // Through the settings path, so the SERVER has to accept the id.
-      await a.dbg(`setTower('hollowbole')`);
-      await a.waitFor(`window.__diceDebug.tower === 'hollowbole'`,
-        { desc: 'the server accepts the venue tower and it goes up' });
-
-      // ---- the fit report, re-derived here rather than trusted -------------
-      // tower-fit prints this for a human; the scenario gates on the same
-      // audit, because "a human ran the tool once" is not a regression test.
-      // The classifier's UNCLASSIFIED bucket is what fails: three real
-      // overruns on this model's first cut landed in it (a root leaning out
-      // of the socket sideways, a moot cap hanging in front of the socket's
-      // face, and a bracket sized as if a unit sphere were a unit wide).
-      const fit = await a.dbg('towerModelAudit()');
-      assert.equal(fit.tower, 'hollowbole', 'the audit is looking at the right model');
-      // Mesh COUNT measured the box-kit placeholder (a stack is many
-      // meshes); the shipped shell is ONE displaced surface plus liner,
-      // roots and dressing — fewer meshes because it is MORE organic, so
-      // the placeholder-era bar of 20 inverted into a lie. What still
-      // deserves gating: the skin is substantial (several parts) and the
-      // organic shell itself is present by name.
-      assert.ok(fit.meshes >= 10,
-        `the skin is a substantial model (${fit.meshes} occluder meshes)`);
-      assert.equal(fit.lights, 0, 'the skin brings zero lights');
-      assert.deepEqual(fit.offPolicy, [],
-        `and no off-policy material (${fit.offPolicy.join('; ')})`);
-      const unclassified = fit.outs.filter((o) => o.cls === 'UNCLASSIFIED');
-      assert.deepEqual(unclassified.map((o) => o.over.join(',')), [],
-        `every overrun of the socket is a named legal class `
-        + `(${fit.outs.length} overruns; hull x[${fit.hull.x}] y[${fit.hull.y}])`);
-      // X HAS NO SLACK: the mat's own physics wall stands at 3.35 behind the
-      // socket's 3.25, so a sideways overrun is a prop through the side of
-      // the room whatever class it claims. Asserted separately from the
-      // classifier because the classifier is allowed to forgive y and z.
-      assert.ok(fit.hull.x[0] >= -3.25 && fit.hull.x[1] <= 3.25,
-        `and nothing leaves the socket SIDEWAYS (hull x[${fit.hull.x}] `
-        + `against ±3.25)`);
-      const w = await a.dbg('worldBodies()');
-      assert.equal(w.count - wasWorld.count, 8,
-        `the skin adds no physics — the eight engine bodies and nothing else `
-        + `(${wasWorld.count} → ${w.count})`);
-
-      // ---- THE CHEAT IS HIDDEN, ON THE SHIPPED VENUE TOWER ------------------
-      // This scenario audited the model's FIT and its dressing and never once
-      // asked the question the model exists to answer: can a player watch a die
-      // vanish? The round-8 arc turned on that number for four commits
-      // (fe1987c, 63f2e9d) and the only e2e carrying it was `tower-glb-loader`,
-      // whose subject is a test FIXTURE — a plain monolith authored to satisfy
-      // the gate. A fixture proves the engine can grade a baked model; it
-      // proves nothing about the one that goes up when the glade does.
-      //
-      // Both hard bands, all six shipped eyes, exact. The bands are hard for
-      // this model in particular: its crown is BROKEN OPEN, so the cowl band is
-      // carried by an interior liner seen through the notches rather than by
-      // any wall, and its front is built to `front_height_needed` rather than
-      // to its own mouth. Red-checked by restoring the pre-cap band in
-      // towerVolumes (the object the arc deleted): 37/99 at the wide eye.
-      const occH = await a.dbg(`towerOcclusionCheck('hollowbole')`);
-      assert.ok(occH && !occH.pending && Array.isArray(occH.eyes)
-        && occH.eyes.length === 6,
-        `the probe ran against the LOADED venue tower (six shipped eyes, got `
-        + `${occH && (occH.pending ? 'pending' : occH.eyes && occH.eyes.length)})`);
-      for (const e of occH.eyes) {
-        assert.equal(e.shaft.blocked, e.shaft.n,
-          `${e.id}: the fall is unwatchable (${e.shaft.blocked}/${e.shaft.n})`);
-        assert.equal(e.cowl.blocked, e.cowl.n,
-          `${e.id}: and so is the VANISH (${e.cowl.blocked}/${e.cowl.n}) — the `
-          + `band a splintered crown has to answer with liner, not with a lid`);
-      }
-
-      // ---- the moot: the value ladder, read off the live materials --------
-      const moot = await a.dbg('towerMootAudit()');
-      assert.ok(moot && moot.spec, 'the skin publishes what its moot is');
-      assert.equal(moot.spec.paletteId, 'moonrise',
-        'the table venue builds it under the default sky');
-      assert.equal(moot.spec.gap, 1, 'the ring has exactly one gap');
-      assert.equal(moot.spec.fallen, 1, 'and exactly one fallen member in it');
-      assert.ok(moot.spec.caps >= 7 && moot.spec.caps <= 9,
-        `an odd, small cap count — a moot, not a fairy light (${moot.spec.caps})`);
-      assert.equal(moot.attendants, 4,
-        `four attendants hover over it (${moot.attendants})`);
-      assert.equal(moot.bloomFlags, 0,
-        'and NOTHING in this skin carries userData.bloom — an always-on bloom '
-        + 'source disables the post-stack bypass for the whole app (T2)');
-
-      const attend = moot.roles.filter((r) => r.role === 'moot-attendant');
-      assert.equal(attend.length, 2,
-        `the attendants are merged into two swaying pairs (${attend.length} meshes)`);
-      for (const r of attend) {
-        // TERTIARY, and the bar is the one grammar rule 3 sets: the field
-        // tier never exceeds 0.25 linear, which is well under the bloom
-        // threshold read from post.js rather than retyped here.
-        assert.ok(r.lum <= 0.25,
-          `an attendant sits in the tertiary tier (${r.lum} linear, ceiling 0.25)`);
-        assert.ok(r.lum < moot.bloomThreshold,
-          `and nowhere near the bloom threshold (${r.lum} < ${moot.bloomThreshold})`);
-      }
-      const caps = moot.roles.find((r) => r.role === 'moot-caps');
-      const gills = moot.roles.find((r) => r.role === 'moot-gills');
-      const door = moot.roles.find((r) => r.role === 'door-hearth');
-      assert.ok(caps && gills && door, 'the caps, the gills and the door are all lit');
-      for (const [what, r, target] of [['caps', caps, moot.spec.tier.caps],
-        ['gills', gills, moot.spec.tier.gills], ['door', door, moot.spec.tier.door]]) {
-        assert.ok(Math.abs(r.lum - target) < 0.02,
-          `${what}: the rendered emissive lands on its authored tier `
-          + `(${r.lum} against ${target})`);
-        assert.ok(r.lum < moot.bloomThreshold,
-          `${what}: and stays under the bloom threshold (${r.lum} < ${moot.bloomThreshold})`);
-      }
-      // TIER SEPARATION (grammar rule 3): a tier may not overlap the tier
-      // above it, and the attendants are two full stops below the caps. A
-      // secondary source that crossed into primary has been promoted by
-      // accident, and that is what this catches.
-      assert.ok(caps.lum / attend[0].lum >= 3,
-        `the attendants are two stops under the caps (${attend[0].lum} vs ${caps.lum})`);
-
-      // ---- the idle motion is the sim clock and nothing else ---------------
-      // Same instrument tower-roll uses on Heartwood and for the same
-      // reason: "it moved" is satisfied by a wall clock, so the angle is
-      // checked against the FORMULA. Here it is the moot's attendants, which
-      // are the only thing on this tower that moves.
-      {
-        const after = await a.dbg('towerDressAudit()');
-        const swayAt = (s, t) => {
-          const wv = 2 * Math.PI * s.hz * t + s.phase;
-          return s.base + s.amp * (0.65 * Math.sin(wv) + 0.35 * Math.sin(2.63 * wv + 1.7));
-        };
-        assert.equal(after.state.sway.length, 4,
-          `two attendant pivots, two registrations each (${after.state.sway.length})`);
-        for (const s of after.state.sway) {
-          assert.ok(Math.abs(s.rot - swayAt(s, after.dressClock)) < 1e-6,
-            `the ${s.axis}-sway is the two-sine idiom over the sim clock at `
-            + `t=${after.dressClock} (rot ${s.rot}, formula ${swayAt(s, after.dressClock).toFixed(8)})`);
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Models' });
+      const bakeContract=JSON.parse(readFileSync(join(FIXTURES,'../../../tools/forge/engine_contract.json'),'utf8'));
+      assert.deepEqual(bakeContract.eyes,await a.dbg('towerShippedEyeSpec()'),
+        'Blender gates use the exact current six shipped eyes');
+      const leaks = [];
+      for (const tower of ['wickroot','cairnwatch','cinderbell']) {
+        const row={tower};
+        await a.dbg(`setTower('${tower}')`);
+        await a.waitFor(`window.__diceDebug.tower === '${tower}'`, {desc:tower+' ready for geometry proof'});
+        const fit = await a.dbg('towerModelAudit()');
+        assert.ok(fit.meshes > 0 && fit.lights === 0, `${row.tower}: visible mesh, no imported lights`);
+        assert.deepEqual(fit.offPolicy, [], `${row.tower}: house material policy`);
+        assert.deepEqual(fit.outs.filter((o)=>o.cls==='UNCLASSIFIED'), [], `${row.tower}: socket envelope`);
+        const occ = await a.dbg(`towerOcclusionCheck('${row.tower}')`);
+        assert.equal(occ.eyes.length, 6, 'all shipped eyes tested');
+        for (const e of occ.eyes) for (const band of ['shaft','cowl']) {
+          assert.ok(e[band].n > 0, `${row.tower}/${e.id}: real ${band} probes`);
+          if(e[band].blocked !== e[band].n) leaks.push(`${row.tower}/${e.id}/${band}: ${e[band].blocked}/${e[band].n}`);
         }
       }
-
-      // ---- a pour actually completes through it ---------------------------
-      await a.dbg(`commandRoll('8d6')`);
-      await a.waitFor(
-        '!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.landings)',
-        { desc: 'the pour reached the client' });
-      await a.dbg('holdClock(true)');
-      const f0 = JSON.parse(await a.eval(
-        'JSON.stringify(window.__diceDebug.towerFilmInfo())'));
-      await a.dbg(`sim(${f0.frames + 240})`);
-      const f = JSON.parse(await a.eval(
-        'JSON.stringify(window.__diceDebug.towerFilmInfo())'));
-      await a.dbg('holdClock(false)');
-      assert.ok(f.pour, 'the roll was baked as a POUR');
-      assert.equal(f.rest.length, 8, `all eight dice are accounted for (${f.rest.length})`);
-      for (const r of f.rest) {
-        assert.ok(r.delivered,
-          `d${r.i} (${r.type}): delivered onto open felt at (${r.p.join(', ')}) — `
-          + `the hidden zone is z < ${(f.z0 + f.hidZone).toFixed(2)}`);
-        assert.ok(r.visible, `d${r.i}: and on screen when the film ends`);
-      }
-      f.hidden.forEach((gaps, i) => {
-        const longest = gaps.reduce((m, g) => Math.max(m, g[1] - g[0] + 1), 0);
-        assert.ok(gaps.length >= 1 && longest >= 15,
-          `d${i}: went through the trunk — a hidden window of ${longest} frames`);
-      });
-      await a.dbg('clearTable()');
-      await a.dbg('sim(400)');
-      await a.settle();
-
-      // ---- TWO SKIES, ONE MODEL -------------------------------------------
-      // The palette is baked into the materials at build time, so this
-      // re-sockets. What must NOT change is the value: the tiers are
-      // `target / linearLuma(hue)`, so a colder or paler sky moves the HUE
-      // and leaves the luminance where the grammar put it. Without the
-      // division, foxfire's near-white cap hue would land the moot two
-      // thirds brighter than moonrise's teal and the venue would have two
-      // different moots.
-      const before = moot.roles.find((r) => r.role === 'moot-caps');
-      // NEW CLAIM (W3 GLB rebuild): the palette now swaps the MODEL, not just
-      // the materials. OLD: this block re-socketed and compared emissive
-      // luminance only, because one code-built skin was tinted two ways.
-      // WHY IT MOVED: the trunk is baked, so moonrise and foxfire are two
-      // FILES, and "two skies, one model" has a second half that can now
-      // break — the row must resolve to the other url while both stay loaded
-      // and while the portals stay identical. A palette flip that re-entered
-      // the loading wait, or that quietly kept the first file, would still
-      // pass every luminance assertion below it.
-      const vMoon = await a.dbg(`towerVariants('hollowbole')`);
-      assert.equal(vMoon.variant, 'moonrise', 'the row reports the live variant');
-      assert.match(vMoon.active, /hollowbole_moonrise\.glb$/,
-        `and resolves to the moonrise file (${vMoon.active})`);
-      assert.equal(vMoon.urls.length, 2, 'the row names both palettes');
-      assert.deepEqual(vMoon.statuses, ['ready', 'ready'],
-        `and BOTH are loaded before either is needed — a venue flip must not `
-        + `re-enter a wait the player already served (${vMoon.statuses.join(', ')})`);
-      assert.deepEqual(vMoon.mismatch, [],
-        'and the two bakes declare identical portals — a mismatch is a BAKE '
-        + 'error, and half the venues would deliver dice through a doorway the '
-        + 'other half\'s engine never cut');
-      const psMoon = await a.dbg(`towerPortalSpec('hollowbole')`);
-      assert.equal(psMoon.source, 'model',
-        'the engine reads its core from the MODEL now, not from the classic '
-        + 'defaults (source \'' + psMoon.source + '\')');
-      assert.deepEqual(psMoon.portals.in, { x: 0, rimY: 9.399999618530273, z: -2.549999952316284, clearR: 2.2 },
-        'the mouth is the one the recipe declared, read off the glTF empties');
-
-      await a.dbg(`faeTowerPalette('foxfire')`);
-      await a.waitFor(`window.__diceDebug.tower === 'hollowbole'`,
-        { desc: 'the tower comes back up under the other sky' });
-      const vFox = await a.dbg(`towerVariants('hollowbole')`);
-      assert.match(vFox.active, /hollowbole_foxfire\.glb$/,
-        `the flip resolved to the OTHER file (${vFox.active})`);
-      assert.notEqual(vFox.active, vMoon.active, 'which is a different url, not the same one');
-      // The portals are the engine's whole core, so they must come out
-      // identical across the flip — same geometry, different paint. Captured
-      // BEFORE the flip (psMoon, above the faeTowerPalette call) and compared
-      // after, because a spec compared against itself is a green check that
-      // cannot fail.
-      assert.deepEqual(await a.dbg(`towerPortalSpec('hollowbole')`), psMoon,
-        'and the engine core is identical across the swap — the flip changes '
-        + 'the paint, never the doorway');
-      const fox = await a.dbg('towerMootAudit()');
-      assert.equal(fox.spec.paletteId, 'foxfire', 'built under the foxfire palette');
-      const foxCaps = fox.roles.find((r) => r.role === 'moot-caps');
-      assert.ok(Math.abs(foxCaps.lum - before.lum) < 0.02,
-        `the moot is the same VALUE under both skies (${before.lum} → ${foxCaps.lum})`);
-      assert.notEqual(foxCaps.intensity, before.intensity,
-        `and it got there by a different intensity, which is what proves the `
-        + `division happened (${before.intensity} → ${foxCaps.intensity})`);
-      assert.equal(fox.bloomFlags, 0, 'still nothing flagged for bloom');
-      for (const r of fox.roles.filter((x) => x.role === 'moot-attendant')) {
-        assert.ok(r.lum <= 0.25,
-          `and the attendants are still tertiary under the other sky (${r.lum})`);
-      }
-      await a.dbg(`faeTowerPalette(null)`);
-
-      // ---- and the first law, on the way out -------------------------------
-      await a.dbg(`setTower('none')`);
-      await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'unsocketed' });
-      const end = await a.dbg('worldBodies()');
-      assert.deepEqual(end.named, [], 'not one collider is left behind');
-      assert.equal(end.count, wasWorld.count,
-        `the body list is the towerless one again, exactly `
-        + `(${wasWorld.count} before, ${end.count} after)`);
+      assert.deepEqual(leaks, [], 'all permanent models hide the shaft and vanish: '+leaks.join('; '));
     },
   },
-
   {
-    name: 'tower-hollowbole-replay',
-    tags: ['tower', 'glb', 'fx'],
-    // THE HELD REPLAY, ON A REAL ROW (js/main.js towerReleaseHeldReplay).
-    //
-    // tower-roll pins the hello-ordering law for a CODE tower: on a reload,
-    // hello.settings sockets the tower and THEN the newest on-felt roll is
-    // replayed, because getting that backwards rebuilds the table's pour as a
-    // THROW against walls 4.5 units shallower than everybody else's. For a
-    // code tower the law is free — both steps happen in one hello handler, in
-    // source order, and nothing can get between them.
-    //
-    // A BAKED tower breaks it without reordering anything: it makes the first
-    // step UNFINISHED when the second runs. So the replay is HELD, with a
-    // deadline, and released when the model lands. That is a genuinely
-    // asynchronous path and this scenario is the only thing that walks it with
-    // a shipped row — tower-glb-loader proves the loader on a minted fixture in
-    // a SOLO tab, which cannot reload into a room.
-    //
-    // AND IT COVERS A CHANGE THE TWO-VARIANT ROW MADE: the release now fires
-    // once per url rather than once, because hollowbole ensures two files.
-    // Releasing twice must be a no-op, not a second stashed replay.
+    name: 'tower-foundry-shared',
+    tags: ['tower', 'glb', 'settings'],
+    // Permanent assets must work through the real room/hello path, including
+    // a cold reload. Generic fixture loading alone cannot prove this.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
-      await a.settle();
-      const wasExtents = await a.dbg('tableExtents()');
-
-      // The venue is how this tower goes up — it has no chip of its own.
-      await a.dbg(`setVenue('moonrise')`);
-      for (const t of [a, b]) {
-        await t.waitFor(`window.__diceDebug.tower === 'hollowbole'`,
-          { desc: 'the venue raises its tower on both tabs' });
+      const ids = ['none', 'wickroot', 'cairnwatch', 'cinderbell'];
+      const ORDER = ['doorL', 'doorR', 'lintel', 'towerBack', 'towerL', 'towerR', 'ramp', 'lip'];
+      assert.deepEqual((await a.dbg('towerRegistry()')).map((r) => r.id), ids,
+        'all five retired models are absent and every replacement is registered');
+      const baseBodies = (await a.dbg('worldBodies()')).count;
+      const snapshot = `(() => {
+        const d = window.__diceDebug, r = d.currentRoll;
+        if (!r || !r.pour || !r.keyframes) return null;
+        const text = JSON.stringify({ keyframes: r.keyframes.map((a) => a.map((s) =>
+          [s.pos.x,s.pos.y,s.pos.z,s.quat.x,s.quat.y,s.quat.z,s.quat.w])),
+          spans: r.pour.spans, rough: (r.rough || []).map((a) => Array.from(a)) });
+        let h = 2166136261;
+        for (let i=0;i<text.length;i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+        const f = d.towerFilmInfo();
+        return { seed:r.seed, rollId:r.rollId, hash:(h>>>0).toString(16), bytes:text.length,
+          frames:r.frames, filmTower:f.filmTower, values:f.rest.map((x)=>x.declared),
+          shows:f.rest.map((x)=>x.shows), delivered:f.rest.every((x)=>x.delivered && x.visible) };
+      })()`;
+      const cases = [
+        { tower:'wickroot', venue:'table' }, { tower:'cairnwatch', venue:'table' },
+        { tower:'cinderbell', venue:'table' }, { tower:'wickroot', venue:'moonrise' },
+        { tower:'wickroot', venue:'foxfire' },
+      ];
+      let wickPortals, wickUrl;
+      for (const row of cases) {
+        for (const t of [a,b]) await t.settle();
+        await a.dbg(`setVenue('${row.venue}')`);
+        if (row.venue === 'table') await a.dbg(`setTower('${row.tower}')`);
+        for (const t of [a,b]) {
+          await t.waitFor(`window.__diceDebug.tower === '${row.tower}' && window.__diceDebug.venue === '${row.venue}'`,
+            { desc:`${row.venue}/${row.tower} shared` });
+          const st = await t.dbg(`towerModelStatus('${row.tower}')`);
+          assert.ok(st.ready && st.portals && st.status === 'ready', `${row.tower}: model ready before rolling`);
+          assert.match(st.url, new RegExp('/models/towers/' + row.tower + '\\.glb$'),
+            `${row.tower}: a permanent asset, not a foundry/debug path`);
+          assert.equal((await t.dbg(`towerPortalSpec('${row.tower}')`)).source, 'model', 'portals come from GLB');
+          assert.deepEqual((await t.dbg('worldBodies()')).named, ORDER, 'only the eight engine colliders');
+          if (row === cases[0]) assert.equal((await t.dbg('worldBodies()')).count, baseBodies + 8,
+            'the first permanent model adds exactly the eight colliders before any dice exist');
+        }
+        if (row.tower === 'wickroot') {
+          const ps = (await a.dbg(`towerPortalSpec('wickroot')`)).portals;
+          const url = (await a.dbg(`towerModelStatus('wickroot')`)).url;
+          if (wickPortals) {
+            assert.deepEqual(ps, wickPortals, 'both fae venues use the same Wickroot portals');
+            assert.equal(url, wickUrl, 'both fae venues use the same Wickroot asset');
+          }
+          wickPortals=ps; wickUrl=url;
+        }
+        await a.roll('3d6'); await b.settle();
+        const one=await a.eval(snapshot), two=await b.eval(snapshot);
+        assert.ok(one && one.frames > 0 && one.bytes > 1000, 'a nonempty physics film was baked');
+        assert.equal(one.filmTower,row.tower,'film uses the selected tower');
+        assert.deepEqual(one.values,one.shows,'physical faces show the declared server values');
+        assert.equal(one.delivered,true,'every die reaches readable open felt');
+        assert.deepEqual(two,one,'both clients share values, seed, hidden windows and keyframe hash');
+        assert.equal(await a.logTop(),await b.logTop(),'both clients show the same attributed result');
+        const extents=await a.dbg('tableExtents()');
+        await b.reload();
+        await b.waitFor(`window.__diceDebug.tower === '${row.tower}' && window.__diceDebug.tableDice.length === 3`,
+          { desc:`${row.venue}/${row.tower}: reload waits for model before rebuilding roll` });
+        await b.settle();
+        assert.deepEqual(await b.eval(snapshot),one,'room reload reproduces the same values and film hash');
+        assert.deepEqual(await b.dbg('tableExtents()'),extents,'reload bakes against the deepened mat');
+        assert.deepEqual((await b.dbg('worldBodies()')).named,ORDER,'reload sockets colliders before playback');
+        await a.dbg('clearTable()'); await a.dbg('sim(400)'); await b.settle();
       }
-      const upExtents = await a.dbg('tableExtents()');
-      assert.notDeepEqual(upExtents, wasExtents,
-        'and the mat deepened for it, so the reload has something to get wrong');
-      const ORDER = (await a.dbg('towerBodies()')).map((x) => x.name);
-      assert.equal(ORDER.length, 8, 'eight engine colliders are standing');
-
-      // A pour on the felt, which is what the reloading tab has to rebuild.
-      await a.roll('3d6');
-      await b.settle();
-      assert.ok(await a.eval('!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.pour)'),
-        'the roll on the table is a POUR');
-
-      // ---- the reload, which is where the model is not there yet -----------
-      await b.reload();
-      await b.waitFor(`window.__diceDebug.tower === 'hollowbole'`,
-        { desc: 'the reloaded tab raises the tower once its model arrives' });
-      const st = await b.dbg(`towerModelStatus('hollowbole')`);
-      assert.equal(st.ready, true, 'and the row reports ready');
-      assert.equal(st.status, 'ready',
-        `with BOTH variants loaded, not just the one standing (${st.status})`);
-      const vars = await b.dbg(`towerVariants('hollowbole')`);
-      assert.deepEqual(vars.statuses, ['ready', 'ready'],
-        `both files present after a cold boot (${vars.statuses.join(', ')})`);
-      assert.deepEqual(vars.mismatch, [],
-        'and they agree about where the doorway is');
-
-      // THE ORDER, asserted the way tower-roll asserts it — on the walls and
-      // on the film, because those are what the ordering actually decides.
-      assert.deepEqual(await b.dbg('tableExtents()'), upExtents,
-        'the replay ran against the DEEPENED mat, not the preset one');
-      assert.deepEqual((await b.dbg('worldBodies()')).named, ORDER,
-        'with the colliders socketed before the replay ran');
-      await b.waitFor('window.__diceDebug.tableDice.length === 3',
-        { desc: 'the on-felt roll is rebuilt after the model lands' });
-      assert.ok(await b.eval('!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.pour)'),
-        'and the rebuild was baked as a POUR — which is only true if the socket '
-        + 'ran BEFORE playRoll. A replay released early would rebuild it as a '
-        + 'THROW and nothing else on this tab would look wrong');
-      const f = JSON.parse(await b.eval('JSON.stringify(window.__diceDebug.towerFilmInfo())'));
-      assert.equal(f.filmTower, 'hollowbole',
-        `the film names the tower it was baked with (${f.filmTower})`);
-      assert.equal(f.z0, (await a.eval('window.__diceDebug.towerFilmInfo().z0')),
-        'and both tabs baked against the same back wall');
-
-      // LEAVING A FANTASY VENUE DOES NOT LOWER ITS TOWER, and that is the
-      // shipped rule rather than an oversight: selectVenue patches
-      // {venue, tower} only for the FANTASY register (js/main.js), so going
-      // back to the table changes the room and leaves the tower the player is
-      // looking at standing. Asserted rather than worked around — the first
-      // draft of this scenario waited for 'none' here and timed out, which is
-      // how the rule got read.
-      await a.dbg('clearTable()');
-      await a.dbg('sim(400)');
-      await a.dbg(`setVenue('table')`);
-      for (const t of [a, b]) {
-        await t.waitFor(`window.__diceDebug.venue === 'table'`,
-          { desc: 'both tabs are back in the table room' });
-      }
-      assert.equal(await a.dbg('tower'), 'hollowbole',
-        'and the tower it raised is still standing — only the fantasy register '
-        + 'patches the tower with the venue');
-
-      await a.dbg(`setTower('none')`);
-      for (const t of [a, b]) {
-        await t.waitFor(`window.__diceDebug.tower === 'none'`,
-          { desc: 'and it comes down when it is actually asked to' });
-      }
-      assert.deepEqual((await a.dbg('worldBodies()')).named, [],
-        'not one collider is left behind');
+      await a.dbg(`setVenue('table')`); await a.dbg(`setTower('none')`);
+      for (const t of [a,b]) await t.waitFor(`window.__diceDebug.tower === 'none'`,{desc:'tower removed'});
+      assert.deepEqual((await a.dbg('worldBodies()')).named,[],'no collider survives removal');
     },
   },
-
-  // ---------------------------------------------------------------------------
-  // V1 AUDIO (docs/AUDIO.md)
-  //
-  // What makes any of this testable headless: the harness runs Chrome with
-  // `--mute-audio` and WITHOUT `--autoplay-policy=no-user-gesture-required`
-  // (tests/e2e/cdp.mjs), so the graph is built and observable while the
-  // hardware stays silent, and the suspended-until-gesture state that a real
-  // browser imposes reproduces exactly.
-  //
-  // Measured while writing these, and worth recording because it dictates the
-  // shape of every assertion below: an AudioContext created with no user
-  // gesture comes up 'suspended', and its resume() promise NEVER SETTLES —
-  // not resolved, not rejected. So nothing on a boot path may await it, and a
-  // scenario must poll the state rather than await the call.
-  // ---------------------------------------------------------------------------
   {
     name: 'audio-graph',
     tags: ['fx', 'audio', 'roll'],
@@ -17089,8 +16576,8 @@ export const scenarios = [
       // reappears at the doorway; a central difference straddling that gap
       // reads as tens of units per second, and every level derived from it is
       // wrong for exactly the frames a player is watching the exit.
-      await a.dbg(`setTower('heartwood')`);
-      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+      await a.dbg(`setTower('wickroot')`);
+      await a.waitFor(`window.__diceDebug.tower === 'wickroot'`,
         { desc: 'the tower goes up' });
       await a.dbg('holdClock(true)');
       await a.dbg(`commandRoll('6d6')`);
@@ -17523,8 +17010,8 @@ export const scenarios = [
 
       // ---- and a pour actually builds it -----------------------------------
       await a.settle();
-      await a.dbg(`setTower('heartwood')`);
-      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+      await a.dbg(`setTower('wickroot')`);
+      await a.waitFor(`window.__diceDebug.tower === 'wickroot'`,
         { desc: 'back to the wooden tower' });
       await a.roll('6d6');
       g = await a.dbg('audioGraphInfo()');
@@ -17956,98 +17443,6 @@ export const scenarios = [
   },
 
   {
-    name: 'mood-motes',
-    tags: ['fx', 'tower'],
-    // DUST IN THE LAMPLIGHT (js/motes.js, ROADMAP Tier V2). The air is
-    // HEARTWOOD'S family trait (TOWERS registry `motes: true`, Joe
-    // 2026-08-15): a shedding wooden tower has dust; the bare felt, stone
-    // and the forge do not. Then four claims: it MOVES on the sim clock and
-    // freezes with it (holdClock discipline — the screenshot contract), it
-    // stays inside the bounds its dials declare, and mood-off REMOVES it —
-    // count comes from a scene-attached buffer, so zero means the object is
-    // gone, not that a flag went false.
-    async fn(ctx) {
-      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
-
-      // ---- the bare room has still air; Heartwood brings the dust ---------
-      let m = await a.dbg('motesInfo()');
-      assert.equal(m.count, 0, 'no tower, no dust — the air is a tower trait');
-      await a.dbg(`setTower('heartwood')`);
-      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`, { desc: 'Heartwood up' });
-      m = await a.dbg('motesInfo()');
-      assert.ok(m.count > 0, `Heartwood's air carries motes (${m.count} points)`);
-      assert.equal(m.draws, 1, 'as a single Points draw call');
-
-      // ---- it moves on the sim clock, and ONLY on it ----------------------
-      await a.dbg('holdClock(true)');
-      const before = await a.dbg('motesInfo([0,3,7])');
-      await a.dbg('sim(60)');
-      const after = await a.dbg('motesInfo([0,3,7])');
-      assert.notDeepEqual(after.sample, before.sample,
-        'a second of sim time visibly drifts the dust');
-      // Frozen clock, ticked hard: rendering without dt must not move air.
-      // Without this, a Date.now() hiding in the step passes every drift
-      // check above — the same trap the audio gate caught.
-      const frozen1 = await a.dbg('motesInfo([0,3,7])');
-      await a.dbg('sim(0)');
-      await a.dbg('sim(0)');
-      const frozen2 = await a.dbg('motesInfo([0,3,7])');
-      assert.deepEqual(frozen2.sample, frozen1.sample,
-        'under a held clock the air is a photograph');
-      await a.dbg('holdClock(false)');
-
-      // ---- it lives in the bounds the dials declare -----------------------
-      // Sample a spread of motes; every one must sit inside the fall band
-      // and the radial cap — both READ from the live tune, not hardcoded,
-      // because the dials are Joe's (2026-08-15 widened rMax 4→9) and this
-      // claim is "the field obeys its dials", not "the dials are these". A
-      // regression that scatters dust past its own settings fails here, not
-      // in a screenshot.
-      const tune = await a.dbg('motesTune({})');
-      const wide = await a.dbg('motesInfo([0,10,20,40,80,120])');
-      for (const [x, y, z] of wide.sample) {
-        assert.ok(y > tune.yMin - 0.5 && y < tune.yMax + 1.5,
-          `mote height ${y.toFixed(2)} stays in the band [${tune.yMin}, ${tune.yMax}]`);
-        const r = Math.hypot(x, z - 1.5 * (1 - y / 19)); // distance to the lamp axis
-        assert.ok(r < tune.rMax + tune.wander + 0.2,
-          `mote radius ${r.toFixed(2)} stays inside the cap (rMax ${tune.rMax})`);
-      }
-
-      // ---- mood off means NO air, object-gone, and back again -------------
-      await a.dbg('mood(false)');
-      m = await a.dbg('motesInfo()');
-      assert.equal(m.count, 0, 'the flat room has still, empty air');
-      await a.dbg('mood(true)');
-      m = await a.dbg('motesInfo()');
-      assert.ok(m.count > 0, 'and the mood brings the dust back with it');
-
-      // ---- the switch under the mood --------------------------------------
-      const tuned = await a.dbg('motesTune({on: false})');
-      assert.equal(tuned.live, false, 'motesTune({on:false}) takes the layer down alone');
-      m = await a.dbg('motesInfo()');
-      assert.equal(m.count, 0, 'gone from the scene, not dimmed');
-      await a.dbg('motesTune({on: true})');
-
-      // ---- other towers refuse the trait; the dust leaves with its tower --
-      // Registry-keyed, so this is one claim per family: stone has no idle
-      // dust, and a tower->tower swap carries the air out through the same
-      // socket that brought it in.
-      await a.dbg(`setTower('bastion')`);
-      await a.waitFor(`window.__diceDebug.tower === 'bastion'`, { desc: 'Bastion up' });
-      m = await a.dbg('motesInfo()');
-      assert.equal(m.count, 0, `Bastion's air is clean (${m.count})`);
-      await a.dbg(`setTower('heartwood')`);
-      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`, { desc: 'Heartwood again' });
-      m = await a.dbg('motesInfo()');
-      assert.ok(m.count > 0, 'returning to Heartwood restores its air');
-      await a.dbg(`setTower('none')`);
-      await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'tower down' });
-      m = await a.dbg('motesInfo()');
-      assert.equal(m.count, 0, 'and taking the tower down stills the room');
-    },
-  },
-
-  {
     name: 'venue-set',
     tags: ['settings', 'fx', 'tower'],
     // THE VENUE TOGGLE (GOALS goals 13–15, ROADMAP W1). Five claims: the
@@ -18070,9 +17465,9 @@ export const scenarios = [
         'and the picker offers all three venues');
 
       // ---- a tower first, so the venue has something to replace -----------
-      await a.dbg(`setTower('heartwood')`);
-      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`, { desc: 'Heartwood up on A' });
-      await b.waitFor(`window.__diceDebug.tower === 'heartwood'`, { desc: 'Heartwood up on B' });
+      await a.dbg(`setTower('wickroot')`);
+      await a.waitFor(`window.__diceDebug.tower === 'wickroot'`, { desc: 'Heartwood up on A' });
+      await b.waitFor(`window.__diceDebug.tower === 'wickroot'`, { desc: 'Heartwood up on B' });
 
       // ---- one write moves the whole set ----------------------------------
       await a.dbg(`setVenue('moonrise')`);
@@ -18143,7 +17538,7 @@ export const scenarios = [
       }
 
       // The venue's OWN tower, not a hardcoded 'none': today the fae tower
-      // has not shipped so venueTower reports 'none'; the day 'hollowbole'
+      // has not shipped so venueTower reports 'none'; the day 'wickroot'
       // lands in TOWERS this same line starts asserting that the venue
       // sockets it — the assertion tracks the contract, not the moment.
       await a.waitFor(
@@ -18155,7 +17550,7 @@ export const scenarios = [
 
       // ---- W2c: a palette change re-dresses the STANDING tower ------------
       // NEW CLAIMS 2026-08-13. The two fae venues share tower id
-      // 'hollowbole', so applyRoomSettings never queues a socket for a
+      // 'wickroot', so applyRoomSettings never queues a socket for a
       // palette flip — the moonrise model stood in the foxfire world for
       // two rounds before a baked-in-palette mesh made it visible.
       // towerReskin now swaps the skin in place (visual-only: variants
@@ -18167,26 +17562,20 @@ export const scenarios = [
       // the shell — the one mesh every variant must carry. Lesson for
       // the contract: a physics-adjacent claim should never anchor to a
       // deletable cosmetic mesh.)
-      const woodMoon = await a.dbg(`meshColors('towerSkinBoleShell')`);
-      assert.ok(woodMoon && woodMoon.colors, 'the shell reports baked colors');
+      const wickMoon = await a.dbg(`towerModelStatus('wickroot')`);
+      const portalsMoon = (await a.dbg(`towerPortalSpec('wickroot')`)).portals;
+      assert.ok(wickMoon.ready && wickMoon.portals, 'Wickroot is loaded for Moonrise');
       await a.dbg(`setVenue('foxfire')`);
-      await a.waitFor(`window.__diceDebug.venue === 'foxfire'`, { desc: 'foxfire staged on A' });
-      await a.waitFor(
-        `(() => { const c = window.__diceDebug.meshColors('towerSkinBoleShell');
-           return c && c.colors && c.mean.join(',') !== ${JSON.stringify(woodMoon.mean.join(','))}; })()`,
-        { desc: 'the shell re-dresses — foxfire bakes different wood (the reskin landed)' });
-      const woodFox = await a.dbg(`meshColors('towerSkinBoleShell')`);
-      assert.ok(woodFox.mean.join(',') !== woodMoon.mean.join(','),
-        `the two skies bake different wood (moonrise ${woodMoon.mean} vs `
-        + `foxfire ${woodFox.mean}) — identical means is exactly this bug`);
-      assert.deepEqual((await a.dbg('worldBodies()')).named, [...(await b.dbg('worldBodies()')).named],
-        'and the reskin moved NO bodies — both tabs still share one collider list');
+      for (const t of [a,b]) await t.waitFor(`window.__diceDebug.venue === 'foxfire' && window.__diceDebug.tower === 'wickroot'`,
+        { desc: 'Foxfire shares Wickroot' });
+      assert.equal((await a.dbg(`towerModelStatus('wickroot')`)).url, wickMoon.url,
+        'the venue lighting changes around the same baked asset');
+      assert.deepEqual((await a.dbg(`towerPortalSpec('wickroot')`)).portals, portalsMoon,
+        'and the same model keeps the same core');
+      assert.deepEqual((await a.dbg('worldBodies()')).named, (await b.dbg('worldBodies()')).named,
+        'both clients keep the same collider list');
       await a.dbg(`setVenue('moonrise')`);
-      await a.waitFor(`window.__diceDebug.venue === 'moonrise'`, { desc: 'moonrise restored on A' });
-      await a.waitFor(
-        `(() => { const c = window.__diceDebug.meshColors('towerSkinBoleShell');`
-        + ` return c && c.colors && c.mean.join(',') === ${JSON.stringify(woodMoon.mean.join(','))}; })()`,
-        { desc: 'and back — the moonrise wood returns' });
+      await a.waitFor(`window.__diceDebug.venue === 'moonrise'`, { desc: 'moonrise restored' });
 
       // ---- goal 13's replacement is PRODUCTION chrome (2026-08-14) --------
       // This tab is a harness tab and every harness tab is BETA — and beta
@@ -21139,8 +20528,8 @@ export const scenarios = [
       const c = await ctx.newTable({ origin: '127.0.0.76', name: 'Late' });
       await c.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy && window.__diceDebug.tableDice.length === 6)`,
         { desc: 'the newcomer rebuilds both pools the ordinary way first', timeout: 60000 });
-      assert.deepEqual(await c.dbg(`towerModelStatus('nullstone')`).then((s) => s.ready), false,
-        'and its nullstone model is not ready — nothing has fetched it');
+      assert.deepEqual(await c.dbg(`towerModelStatus('cairnwatch')`).then((s) => s.ready), false,
+        'and its Cairnwatch model is not ready — nothing has fetched it');
 
       // The snapshot the room hands a joiner right now, wearing the tower it
       // is about to be given.
@@ -21148,7 +20537,7 @@ export const scenarios = [
       assert.equal(joined.ok, true, 'a bare client can ask the room what it holds');
       const open = joined.data.log.filter((r) => !r.cleared && !r.collected).map((r) => r.rollId).sort();
       assert.deepEqual(open, [a.rollId, b.rollId].sort(), 'the snapshot carries BOTH open rolls');
-      const snap = JSON.stringify({ ...joined.data, settings: { ...(joined.data.settings || {}), tower: 'nullstone' } });
+      const snap = JSON.stringify({ ...joined.data, settings: { ...(joined.data.settings || {}), tower: 'cairnwatch' } });
 
       // Lose the felt (the aftermath of a blip) and take the hello, in ONE
       // eval, reading the hold and everything asserted about it before the
@@ -21166,20 +20555,20 @@ export const scenarios = [
         `BOTH rolls are held for the model, in log order (got ${JSON.stringify(at.held)})`);
       assert.equal(at.held.held, a.rollId, 'the oldest first');
       assert.equal(at.held.armed, true, 'with the holdMaxMs deadline armed');
-      assert.equal(at.pending, 'nullstone', 'because the tower is queued on a model still loading');
+      assert.equal(at.pending, 'cairnwatch', 'because the tower is queued on a model still loading');
       assert.equal(at.dice, 0, 'and nothing was rebuilt against the wrong interior');
 
       // The room really gets the tower now, so the fixture and the room agree
       // from here on (a settings change sweeps nothing — six dice stay up).
-      const set = await ctx.api('/api/settings', { playerId: frontId, settings: { tower: 'nullstone' } });
+      const set = await ctx.api('/api/settings', { playerId: frontId, settings: { tower: 'cairnwatch' } });
       assert.equal(set.status, 200, `set tower: ${JSON.stringify(set.data)}`);
-      await front.waitFor(`window.__diceDebug.tower === 'nullstone'`, { desc: 'the tower goes up for the room' });
+      await front.waitFor(`window.__diceDebug.tower === 'cairnwatch'`, { desc: 'the tower goes up for the room' });
       assert.equal(await front.dbg('tableDice.length'), 6, 'the standing pools survive the socket');
 
       // …AND BOTH LAND. The model arrives, the tower sockets, the hold drains
       // in log order — each replay fast-forwarded before the next begins.
       await c.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy
-        && window.__diceDebug.tower === 'nullstone'
+        && window.__diceDebug.tower === 'cairnwatch'
         && window.__diceDebug.towerHeldReplay().heldAll.length === 0
         && window.__diceDebug.tableDice.length === 6)`,
       { desc: 'both held rolls are rebuilt once the model lands', timeout: 60000 });
@@ -22676,7 +22065,7 @@ export const scenarios = [
         assert.equal(house.stations.filter((s) => s.mine).length, 1, 'exactly one card is mine');
 
         // ---- the gap, and the wall, per zoom × tower ------------------------
-        for (const tower of ['none', 'blackanvil']) {
+        for (const tower of ['none', 'cinderbell']) {
           await a.dbg(`setTower(${JSON.stringify(tower)})`);
           await a.waitFor(`window.__diceDebug.tower === ${JSON.stringify(tower)}`,
             { desc: `tower ${tower}` });
@@ -22710,7 +22099,7 @@ export const scenarios = [
                 `${tower}/${z}: station ${s.place} stands OUTBOARD of the rim (r `
                 + `${Math.hypot(s.world.x, s.world.z).toFixed(2)} - ${box.hd.toFixed(2)} vs rim ${(ext.w / 2).toFixed(2)})`);
             }
-            if (tower === 'blackanvil') {
+            if (tower === 'cinderbell') {
               // THE TOWER ARC (DESIGN-RING §9): the machine owns the back edge,
               // so all eight chairs move onto the front-facing 300° arc at an
               // equal pitch of 2·TOWER_ARC/8 = 37.5° — every card is
@@ -22723,7 +22112,7 @@ export const scenarios = [
                   `${z}: chair ${s.seat} is off the machine's back edge (${(s.theta * 180 / Math.PI).toFixed(2)}°)`);
               }
             }
-            if (tower === 'blackanvil' && z === 'medium') {
+            if (tower === 'cinderbell' && z === 'medium') {
               // S8 DEBT, RECORDED RATHER THAN LATENT. The tower's resting
               // frame (applyCameraFraming's first rung) pins orbit 0 for
               // EVERY chair, so framingInfo()'s "orbit is placeOrbit or
@@ -24017,8 +23406,8 @@ export const scenarios = [
         await t.dbg('holdClock(true)');
         await t.dbg(`setVenue('moonrise')`);
         await t.waitFor(`window.__diceDebug.venueInfo().staged`, { desc: 'the glade rises' });
-        await t.dbg(`setTower('hollowbole')`);
-        await t.waitFor(`window.__diceDebug.tower === 'hollowbole'`, { desc: 'the hero is up' });
+        await t.dbg(`setTower('wickroot')`);
+        await t.waitFor(`window.__diceDebug.tower === 'wickroot'`, { desc: 'the hero is up' });
         // THE RESTING EYE IS AN EASE, NOT A JUMP. Measuring before it lands
         // grades a camera halfway between two frames — the venue-life lesson.
         await t.dbg('sim(1500)');
@@ -24031,9 +23420,9 @@ export const scenarios = [
         // re-baked trunk moves the gates with it. Sampled at the felt and again
         // at the declared rim, because the trunk leans and the crown is what
         // the eye reads against.
-        const shell = await t.dbg(`groundGaps('towerSkinBoleShell')`);
-        assert.ok(shell && shell.all.length, 'the hollowbole shell is in the scene');
-        const spec = await t.dbg(`towerPortalSpec('hollowbole')`);
+        const shell = await t.dbg(`groundGaps('towerSkinWickrootLivingTrunk')`);
+        assert.ok(shell && shell.all.length, 'the Wickroot living trunk is in the scene');
+        const spec = await t.dbg(`towerPortalSpec('wickroot')`);
         const m = shell.all[0];
         const heroF = { id: 'hero', x: m.x, z: m.z, rx: m.w / 2, rz: m.w / 2 };
         const hero = {

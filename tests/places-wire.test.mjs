@@ -72,6 +72,7 @@ import { dirname, join } from 'node:path';
 
 import { projectEntryFor } from '../server.js';
 import { PLACE_MAX } from '../js/places.js';
+import { TOWER_IDS, migrateSavedTowerId } from '../js/towerids.js';
 
 // server.js installs a swallow-and-continue uncaughtException handler for its
 // own resilience; a test run must crash loudly instead.
@@ -252,6 +253,26 @@ const leaveForGood = (at, room, me) =>
 // ---------------------------------------------------------------------------
 // 1. The ladder — lowest free, in order, and nobody is renumbered
 // ---------------------------------------------------------------------------
+
+await t('tower wire accepts the replacement registry and refuses every retired identity', async () => {
+  assert.deepEqual(TOWER_IDS,['none','wickroot','cairnwatch','cinderbell']);
+  const room='wire-tower-registry', ann=await seat(base,room,'Ann');
+  for(const tower of TOWER_IDS) {
+    const r=await postTo(base,'/api/settings',{room,playerId:ann.playerId,settings:{tower}});
+    assert.equal(r.status,200,`${tower}: ${r.text}`);
+    const peek=await joinRoom(room,'Peek-'+tower);
+    assert.equal(peek.data.settings.tower,tower,'hello carries the permanent identity');
+  }
+  for(const [retired,current] of Object.entries({
+    heartwood:'wickroot',hollowbole:'wickroot',bastion:'cairnwatch',nullstone:'cairnwatch',blackanvil:'cinderbell',
+  })) {
+    assert.equal(migrateSavedTowerId(retired),current,'saved choices migrate at import boundaries');
+    const r=await postTo(base,'/api/settings',{room,playerId:ann.playerId,settings:{tower:retired}});
+    assert.equal(r.status,400,`${retired} cannot re-enter room state`);
+  }
+  for(const id of [...TOWER_IDS,'unknown','wildwood.heartwood','emberforge.blackanvil'])
+    assert.equal(migrateSavedTowerId(id),id,'migration touches only retired tower identities');
+});
 
 await t('five arrivals take stations 0-4, lowest free, in join order', async () => {
   const room = 'wire-ladder';
@@ -615,7 +636,7 @@ await t('a re-throw is re-stamped from the live table — the tower arc included
   // and Bram's SECOND throw must say so — the arc flag, read off the room's
   // own live setting, never a client's.
   const set = await postTo(base, '/api/settings',
-    { room, playerId: ann.playerId, settings: { tower: 'blackanvil' } });
+    { room, playerId: ann.playerId, settings: { tower: 'cinderbell' } });
   assert.equal(set.status, 200, set.text.slice(0, 200));
   const again = await postTo(base, '/api/rethrow',
     { room, playerId: bram.playerId, rollId: first.data.roll.rollId, keep: [0] });
@@ -717,7 +738,7 @@ await t('a roller\'s own prior is swept even when its stamp changed under a towe
   const ann = await seat(base, room, 'Ann');     // place 0
   const bram = await seat(base, room, 'Bram');   // place 1
   const cass = await seat(base, room, 'Cass');   // the witness
-  const up = await postTo(base, '/api/settings', { room, playerId: ann.playerId, settings: { tower: 'blackanvil' } });
+  const up = await postTo(base, '/api/settings', { room, playerId: ann.playerId, settings: { tower: 'cinderbell' } });
   assert.equal(up.status, 200, up.text.slice(0, 200));
   const flanked = (await postTo(base, '/api/roll', { room, playerId: bram.playerId, notation: '2d6' })).data.roll;
   assert.deepEqual({ seat: flanked.seat, seats: flanked.seats, arc: flanked.arc }, { seat: 1, seats: 3, arc: 1 }, 'the pour wears the arc');
@@ -734,7 +755,7 @@ await t('under a tower the whole felt is swept, as before (row 15 owns the tower
   const ann = await seat(base, room, 'Ann');
   const bram = await seat(base, room, 'Bram');
   const cass = await seat(base, room, 'Cass');
-  const set = await postTo(base, '/api/settings', { room, playerId: ann.playerId, settings: { tower: 'blackanvil' } });
+  const set = await postTo(base, '/api/settings', { room, playerId: ann.playerId, settings: { tower: 'cinderbell' } });
   assert.equal(set.status, 200, set.text.slice(0, 200));
   const a = (await postTo(base, '/api/roll', { room, playerId: ann.playerId, notation: '2d6' })).data.roll;
   const b = (await postTo(base, '/api/roll', { room, playerId: bram.playerId, notation: '2d6' })).data.roll;

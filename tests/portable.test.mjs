@@ -685,24 +685,24 @@ t('tower round-trips in table:, bare or quoted, and stays a fixed point', () => 
     'table:',
     "  name: 'Session 3'",
     "  felt: 'obsidian'",
-    '  tower: blackanvil',   // hand-written bare scalar
+    '  tower: cinderbell',   // hand-written bare scalar
   ].join('\n'));
   assert.equal(parsed.ok, true, parsed.error);
-  assert.deepEqual(parsed.table, { name: 'Session 3', felt: 'obsidian', tower: 'blackanvil' });
+  assert.deepEqual(parsed.table, { name: 'Session 3', felt: 'obsidian', tower: 'cinderbell' });
   const text = exportYaml({ table: parsed.table });
-  assert.ok(text.includes("  tower: 'blackanvil'\n"), text);
+  assert.ok(text.includes("  tower: 'cinderbell'\n"), text);
   assert.deepEqual(parsePortable(text).table, parsed.table);
   assert.equal(exportYaml({ table: parsePortable(text).table }), text, 'export → parse → export');
 });
 
 t('a whole prepared table with a tower is a fixed point', () => {
-  const table = { name: 'Foxfire night', felt: 'obsidian', system: 'soul-deal', zoom: 'close', tower: 'hollowbole' };
+  const table = { name: 'Foxfire night', felt: 'obsidian', system: 'soul-deal', zoom: 'close', tower: 'wickroot' };
   const text = exportYaml({ groups: [{ id: 1, name: 'Damage', notation: '3d4' }], table });
   const parsed = parsePortable(text);
   assert.equal(parsed.ok, true, parsed.error);
   assert.deepEqual(parsed.table, table);
   // key ORDER is TABLE_KEYS' order — the tower reads last, after the zoom
-  assert.match(text, /table:\n {2}name: .*\n {2}felt: .*\n {2}system: .*\n {2}zoom: .*\n {2}tower: 'hollowbole'\n/);
+  assert.match(text, /table:\n {2}name: .*\n {2}felt: .*\n {2}system: .*\n {2}zoom: .*\n {2}tower: 'wickroot'\n/);
   assert.equal(exportYaml({
     groups: flat(parsed).map((p) => ({ name: p.name, notation: p.notation })),
     settings: parsed.settings,
@@ -734,8 +734,8 @@ t('a dotted tower id parses — dice-set ids in this format already carry dots',
 refuses("table:\n  tower: 'the big one'\n", 'tower', 'a tower id with spaces refuses');
 refuses("table:\n  tower: ''\n", 'tower', "an empty tower value refuses — 'none' is the spelling for no tower");
 refuses(`table:\n  tower: '${'x'.repeat(40)}'\n`, 'tower', 'an over-long tower id refuses');
-refuses("table:\n  tower: 'bastion'\n  tower: 'heartwood'\n", 'twice', 'a repeated tower key refuses');
-refuses("table:\n  tower: 'bastion' extra\n", 'one value', 'trailing text after a tower value refuses');
+refuses("table:\n  tower: 'cairnwatch'\n  tower: 'wickroot'\n", 'twice', 'a repeated tower key refuses');
+refuses("table:\n  tower: 'cairnwatch' extra\n", 'one value', 'trailing text after a tower value refuses');
 
 t("the unknown-table-key refusal names tower, so the file says what it accepts", () => {
   const parsed = parsePortable("table:\n  venue: 'moonrise'\n");

@@ -15,6 +15,9 @@ limitations under the License.
 */
 
 // tests/voices.test.mjs — JOE'S VERDICTS, AS ARITHMETIC.
+// 2026-09-12: old models retired; new wood/stone/metal towers retain the
+// approved Hollow Bole/Bastion/Black Anvil timbres. Historical tables below
+// remain evidence; runtime IDs are Wickroot/Cairnwatch/Cinderbell only.
 //
 // TWO SITTINGS ON 2026-08-18. The second one is the one that decides what this
 // file is now for, so it goes first:
@@ -315,98 +318,61 @@ t('the eight approved voices are exactly what he approved', () => {
       `${id}: and its Q, which reads as "clanky" on paper and was judged fine `
       + 'by the only ear that counts');
   }
-  // B1..B5 — the five tower clunks, as ROWS, because "which tower wears which
-  // voice" is what the B verdicts were about.
-  for (const [id, want] of Object.entries(APPROVED_2026_08_18.clunk)) {
-    const got = CLUNK_VOICES[id];
-    assert.equal(got.body, want.body, `${id}: approved body`);
-    assert.equal(got.weight, want.weight, `${id}: approved weight`);
-    assert.equal(got.sustain, want.sustain, `${id}: approved sustain`);
+  // The new models retain the approved material timbres under new IDs.
+  const sources = { wickroot: 'hollowbole', cairnwatch: 'bastion', cinderbell: 'blackanvil' };
+  assert.deepEqual(Object.keys(CLUNK_VOICES), Object.keys(sources),
+    'only the three permanent tower voices remain');
+  for (const [id, old] of Object.entries(sources)) {
+    const want = APPROVED_2026_08_18.clunk[old], got = CLUNK_VOICES[id];
+    for (const k of ['body', 'weight', 'sustain']) assert.equal(got[k], want[k], `${id}: approved ${k}`);
   }
-  // The palette still spans what it spanned: the approval covers the SET of
-  // five as a set, so a change that kept every row legal while collapsing the
-  // range would slip past the row checks above.
-  const centroids = Object.keys(APPROVED_2026_08_18.clunk)
-    .map((k) => spectrumOf(CLUNK_VOICES[k]).centroidHz);
+  const centroids = Object.keys(sources).map((k) => spectrumOf(CLUNK_VOICES[k]).centroidHz);
   assert.ok(Math.max(...centroids) / Math.min(...centroids) > 4,
-    `and the five are still five different towers `
-    + `(${Math.min(...centroids)}..${Math.max(...centroids)} Hz)`);
+    `the three material voices remain distinct (${Math.min(...centroids)}..${Math.max(...centroids)} Hz)`);
+
 });
 
 // ---------------------------------------------------------------------------
 // B4 / B5 — "sounds good". THE TWO ROWS NOTHING MAY TOUCH.
 // ---------------------------------------------------------------------------
 
-t('B4 Nullstone and B5 Hollow Bole are byte-identical to what he approved', () => {
-  // These are the only two data points in this whole file of Joe's taste
-  // being SATISFIED, which makes them the reference for the others and makes
-  // any drift in them a loss of information rather than a change of sound.
-  assert.deepEqual(CLUNK_VOICES.nullstone, {
-    body: 'hush', weight: 0.75, sustain: 25,
-    shaft: { delayS: 0.0045, combGain: 0.34, mode1Hz: 240, mode2Hz: 430 },
-  }, 'B4 "sounds good" — Joe, 2026-08-18');
-  assert.deepEqual(CLUNK_VOICES.hollowbole, {
+t('Wickroot preserves the approved hollow wood voice', () => {
+  assert.deepEqual(CLUNK_VOICES.wickroot, {
     body: 'thud', weight: 0.5, sustain: 35,
     shaft: { delayS: 0.004, combGain: 0.5, mode1Hz: 360, mode2Hz: 720 },
-  }, 'B5 "sounds good" — Joe, 2026-08-18');
-  // …and their BODIES are untouched too, which is the half a deepEqual on the
-  // row cannot see: `hush` and `thud` are shared with die sets.
-  for (const [k, base] of [['nullstone', BASELINE_2026_08_17.clunk.nullstone],
-    ['hollowbole', BASELINE_2026_08_17.clunk.hollowbole]]) {
-    const s = spectrumOf(CLUNK_VOICES[k]);
-    assert.equal(s.fcHz, base.fcHz, `${k}'s band did not move`);
-    assert.equal(s.centroidHz, base.centroidHz, `${k}'s centroid did not move`);
-    assert.equal(s.attackMs, 0, `${k} kept its transient`);
-  }
+  }, 'the new tree carries the previously approved hollow wood timbre');
+  const base = BASELINE_2026_08_17.clunk.hollowbole;
+  const now = spectrumOf(CLUNK_VOICES.wickroot);
+  assert.equal(now.fcHz, base.fcHz, 'the band did not move');
+  assert.equal(now.centroidHz, base.centroidHz, 'the centroid did not move');
+  assert.equal(now.attackMs, 0, 'it keeps its transient');
 });
 
 // ---------------------------------------------------------------------------
 // B1 / B2 — "they feel reversed to what I'd expect". A SWAP, AND ONLY A SWAP.
 // ---------------------------------------------------------------------------
 
-t('B1/B2 is literally the two voices exchanging rows — no number moved', () => {
-  // Joe's word was "switch", and the finding is that he is right about the
-  // physics: a plank box is a resonant drum (low, hollow, with body) and a
-  // stone turret is a wall with a turret's mass behind it (short, bright,
-  // almost nothing transmitted). The table had wood bright and stone low.
-  //
-  // The strongest possible statement that this is a swap and not a redesign
-  // is that the SET of five voices is conserved exactly. If anybody ever
-  // "improves" one of them while swapping, this fails.
-  const before = BASELINE_2026_08_17.clunk;
-  assert.equal(CLUNK_VOICES.heartwood.body, before.bastion.body,
-    'Heartwood now wears what Bastion wore');
-  assert.equal(CLUNK_VOICES.bastion.body, before.heartwood.body,
-    'and Bastion wears what Heartwood wore');
-  const now = spectrumOf(CLUNK_VOICES.heartwood);
-  assert.equal(now.fcHz, before.bastion.fcHz,
-    `Heartwood's band is Bastion's old band exactly (${now.fcHz} Hz)`);
-  assert.equal(now.centroidHz, before.bastion.centroidHz);
-  const now2 = spectrumOf(CLUNK_VOICES.bastion);
-  assert.equal(now2.fcHz, before.heartwood.fcHz,
-    `Bastion's band is Heartwood's old band exactly (${now2.fcHz} Hz)`);
-  assert.equal(now2.centroidHz, before.heartwood.centroidHz);
-  // The SHAFT travelled with the body — "the sounds", not "the bodies".
-  assert.deepEqual(CLUNK_VOICES.heartwood.shaft,
-    { delayS: 0.0055, combGain: 0.5, mode1Hz: 300, mode2Hz: 600 },
-    'Heartwood took the longer comb and the lower modes with it');
-  assert.deepEqual(CLUNK_VOICES.bastion.shaft,
+t('wood stays low and stone stays bright on the new models', () => {
+  const wood = spectrumOf(CLUNK_VOICES.wickroot);
+  const stone = spectrumOf(CLUNK_VOICES.cairnwatch);
+  assert.equal(CLUNK_VOICES.wickroot.body, 'thud', 'Wickroot is a hollow wood thud');
+  assert.equal(CLUNK_VOICES.cairnwatch.body, 'clack', 'Cairnwatch is a short stone clack');
+  assert.equal(stone.fcHz, BASELINE_2026_08_17.clunk.heartwood.fcHz,
+    'the approved bright stone band is unchanged');
+  assert.deepEqual(CLUNK_VOICES.cairnwatch.shaft,
     { delayS: 0.0032, combGain: 0.55, mode1Hz: 430, mode2Hz: 860 },
-    'and Bastion took the tighter, brighter one');
-  // The direction, stated in the words the complaint used: wood is now the
-  // LOW one and stone the BRIGHT one.
-  assert.ok(now.centroidHz < now2.centroidHz,
-    `the wooden tower is now the lower-voiced of the pair `
-    + `(${now.centroidHz} Hz vs ${now2.centroidHz} Hz)`);
+    'and the stone shaft retains its tighter modes');
+  assert.ok(wood.centroidHz < stone.centroidHz,
+    `wood remains lower than stone (${wood.centroidHz} vs ${stone.centroidHz} Hz)`);
 });
 
 // ---------------------------------------------------------------------------
 // B3 — "Slightly to shrill / clanky". A SMALL MOVE, AND MEASURABLY SMALL.
 // ---------------------------------------------------------------------------
 
-t('B3 Black Anvil got less shrill, and only slightly', () => {
+t('Cinderbell retains the approved softer metal ring', () => {
   const was = BASELINE_2026_08_17.clunk.blackanvil;
-  const now = spectrumOf(CLUNK_VOICES.blackanvil);
+  const now = spectrumOf(CLUNK_VOICES.cinderbell);
   const d = pct(now.centroidHz, was.centroidHz);
   assert.ok(now.centroidHz < was.centroidHz,
     `"shrill" is a centroid claim and it came down (${was.centroidHz} → ${now.centroidHz} Hz)`);
@@ -418,21 +384,21 @@ t('B3 Black Anvil got less shrill, and only slightly', () => {
     + `above it (${was.aboveBoundary} → ${now.aboveBoundary} of power above it)`);
   // "CLANKY" IS THE RESONANCE, and it is a separate number from "shrill":
   // a high-Q band rings on one note, which is what a clank is.
-  assert.ok(IMPACT_VOICES[CLUNK_VOICES.blackanvil.body].q < 2.8,
+  assert.ok(IMPACT_VOICES[CLUNK_VOICES.cinderbell.body].q < 2.8,
     `"clanky" is Q, and the ring opened out `
-    + `(2.8 → ${IMPACT_VOICES[CLUNK_VOICES.blackanvil.body].q})`);
+    + `(2.8 → ${IMPACT_VOICES[CLUNK_VOICES.cinderbell.body].q})`);
   // …and the third axis: a strike that begins at full gain on sample one.
   assert.ok(now.attackMs >= 4,
     `and the transient got a rise instead of an edge (${now.attackMs} ms)`);
   // IT DID NOT GET QUIETER TO GET DULLER. Loudness is gainScale × the body's
   // broadband gain; holding it is what stops "less shrill" being "turned down".
-  const loud = IMPACT_VOICES[CLUNK_VOICES.blackanvil.body].gainScale * now.noiseGain;
+  const loud = IMPACT_VOICES[CLUNK_VOICES.cinderbell.body].gainScale * now.noiseGain;
   assert.ok(Math.abs(20 * Math.log10(loud / was.loudness)) < 0.5,
     `and it is the same loudness it was, within half a dB `
     + `(${was.loudness.toFixed(6)} → ${loud.toFixed(6)})`);
   // AND IT DID NOT LAND IN B4/B5's LAP. Those two he liked; over-correcting
   // this one into their register would have thrown away the palette's range.
-  const bole = spectrumOf(CLUNK_VOICES.hollowbole);
+  const bole = spectrumOf(CLUNK_VOICES.wickroot);
   assert.ok(now.centroidHz > bole.centroidHz * 3,
     `it is still unmistakably the ringing tower, not a drum `
     + `(${now.centroidHz} Hz against Hollow Bole's ${bole.centroidHz} Hz)`);
