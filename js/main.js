@@ -13864,7 +13864,7 @@ function towerShippedEyes(z0, extra) {
 // ever get, which is the exact failure the lab exists to prevent. There is
 // one draw now, and it is the product's.
 function towerLabDrop(n = 8, seed = 42) {
-  if (!TOWERLAB.on) towerLabSet(true);
+  if (!TOWERLAB.on && !towerLabSet(true)) return { pending: true, id: TOWERLAB.skinId };
   let s = (seed >>> 0) || 1;
   const rng = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32);
   const v = towerLabVolumes();
@@ -15824,9 +15824,11 @@ window.__diceDebug = {
     // WRONG answer under the id that was asked for. A pass on the previous
     // tower is worse than no answer at all: it is the one result nobody would
     // think to re-check. Say pending, kick the preload, let the caller poll.
-    if (id && TOWERS[id] && towerGlbUrls(TOWERS[id]).length && !towerModelReady(id)) {
-      towerModelEnsure(id);
-      return { pending: true, id };
+    const targetId = id || TOWERLAB.skinId;
+    if (!towerCos(TOWERS[targetId]).skin) return { error: 'unknown tower model', id: targetId };
+    if (!towerModelReady(targetId)) {
+      towerModelEnsure(targetId);
+      return { pending: true, id: targetId };
     }
     if (id) towerLabSkin(id);
     // THE BENCH IS NOT OURS TO KEEP (A6 BLOCKER). towerLabSet(true) deepens the
@@ -15848,7 +15850,7 @@ window.__diceDebug = {
     // tool does: `towerCore(true)` first) is left standing, which is what
     // keeps the mute-and-re-run workflow working.
     const labWas = TOWERLAB.on;
-    if (!labWas) towerLabSet(true);
+    if (!labWas && !towerLabSet(true)) return { pending: true, id: targetId };
     // RAYCASTS READ matrixWorld, AND A FRESH BUILD HAS NOT BEEN RENDERED YET.
     // Measured: asking for a skin and checking it in the same call — which is
     // what parameterising this on a tower id made possible — read the matrices
@@ -16597,6 +16599,13 @@ window.__diceDebug = {
   // The unchanged engine reference, independently of whichever models ship.
   towerDefaultPortalSpec() {
     return towerPortalProjection('default', DEFAULT_PORTALS, 'default');
+  },
+  // Full-precision modelling eyes in socket-relative coordinates. Reading
+  // the camera contract does not require opening or moving the lab bench.
+  towerShippedEyeSpec() {
+    return towerShippedEyes(0, TOWER_MAT_EXTRA).map(({ id, at }) => ({
+      id, x: at[0], y: at[1], zRelZ0: at[2],
+    }));
   },
   // THE MAIN WORLD ITSELF, not the rig's idea of it. `towerBodies()` reads
   // towerRig, which is nulled on unsocket — so it says "clean" whether or not
