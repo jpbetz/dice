@@ -12,7 +12,9 @@ read or used. Generic forge/tower measurement helpers are the only reuse.
 
 Plan: 22000 prototype triangle ceiling; x within +/-3.25; socket z -5.25..0.25;
 portal in (0,9.6,-2.6), clear radius 2.03; out (0,1), 4.4 x 3.8.
-Towerplan requires the front to reach 10.171. The built rim reaches 10.30.
+Current-eye towerplan requires the front to reach 11.462 at socket z = 0.
+The bronze rim reaches 10.30; its iron inner fireback reaches 11.40 at
+z = -0.48, sufficient to hide the whole band from the exact current eyes.
 The editable .blend retains named, separate castings and vertex paint.
 
 Guidance departure: deliberately expressive bronze and worn iron materials,
@@ -22,9 +24,15 @@ This is an art prototype; table-pour and live-room proofs belong to review.
 Second LOOK raises the prototype budget to 22k to spend on continuous cast
 silhouettes, separate lifting lugs, and actual vertex density for local wear.
 The first 13k version's rear cuts and smooth paint were visibly inadequate.
-Measured second study: 21,576 triangles, forty editable component meshes,
+The shipped round-table eyes were scaled up before the old forge eye mirror
+was retired; the first study passed that obsolete mirror. A front-only
+392-triangle iron fireback corrects the actual sightlines while preserving
+the bronze silhouette, open approach, and both portal declarations. This
+sets aside the old generic "never raise a curtain" advice: the casting now
+needs a visibly integrated lip insert to hide the fall at current eyes.
+Measured final: 21,968 triangles, forty-one editable component meshes,
 seven exported meshes/primitives (material x envelope partition). Built bounds
-[-3.182,-0.560,-5.240]..[3.182,10.300,3.760] in app axes. The entry is
+[-3.182,-0.560,-5.240]..[3.182,11.400,3.760] in app axes. The entry is
 25/25 clear, exit 25/25 clear, cowl and shaft 99/99 hidden from six eyes,
 apron/lip cladding 81/81 and 162/162, below-sill leaks 0/2304.
 """
@@ -246,6 +254,27 @@ for index, deg in enumerate((63, -63, 135, -135)):
 # A cast ferrule traces the lip, giving the opening a strong dark edge.
 revolve("towerSkinCinderLipFerrule",[(9.96,2.631),(10.00,2.666),(10.065,2.666),(10.095,2.601)],"iron",zs=.955)
 
+# A cast inner fireback grows out of the lip on the player's side. Current
+# round-table eyes see deeper into the mouth than the obsolete forge eyes;
+# this front-only collar closes those sightlines without changing a portal
+# or the outer bronze double roll. Its rear ends bury in the existing lip,
+# and the whole approach column remains open inside the 2.12 inner radius.
+segments = 32
+v = []
+for level, radius in ((0,2.12),(0,2.23),(.91,2.23),(1,2.19),(1,2.12),(.91,2.12)):
+    for i in range(segments + 1):
+        a = math.radians(-110 + 220 * i / segments)
+        top = 10.18 + 1.22 * max(0,math.cos(a)) ** .5
+        y = 9.85 + (top - 9.85) * level
+        v.append((radius*math.sin(a),y,CENTER+radius*math.cos(a)))
+s = segments + 1
+f = []
+for j in range(6):
+    for i in range(segments):
+        f.append((j*s+i,j*s+i+1,((j+1)%6)*s+i+1,((j+1)%6)*s+i))
+f += [tuple(j*s for j in range(5,-1,-1)),tuple(j*s+segments for j in range(6))]
+mesh("towerSkinCinderInnerFireback",v,f,"iron")
+
 
 def seam(name, y, radius, halfangle, zs):
     seg=40
@@ -380,7 +409,7 @@ lo=alltris.reshape(-1,3).min(axis=0)
 hi=alltris.reshape(-1,3).max(axis=0)
 print("[cinderbell] built app bounds",lo.tolist(),hi.tolist())
 assert max(abs(lo[0]),abs(hi[0])) <= 3.25
-assert 10.29 <= hi[1] <= 10.31
+assert 11.39 <= hi[1] <= 11.41
 K.gate_approach(PARTS,SPEC,"cinderbell")
 K.gate_throat(PARTS,SPEC,"cinderbell")
 
