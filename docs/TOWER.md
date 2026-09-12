@@ -20,7 +20,7 @@ Die sets with those names are separate content and remain available.
 
 | Tower | Material and silhouette | Triangles | Entry `(x, z; rim; radius)` | Exit `(sill; width × height)` |
 | --- | --- | ---: | --- | --- |
-| Wickroot | An old cedar sanctuary, fractured crown, gripping roots and an amber votive | 18,294 | `(0, −2.6; 7.7; 2.0)` | `(1; 4.2 × 3.375)` |
+| Wickroot | An old cedar sanctuary, fractured crown, gripping roots and an amber votive | 18,468 | `(0, −2.6; 7.7; 2.0)` | `(1; 4.2 × 3.375)` |
 | Cairnwatch | A coastal abbey watchtower with broken masonry and a tended beacon | 17,722 | `(0, −2.5; 9.1; 2.03)` | `(1; 4.35 × 3.7)` |
 | Cinderbell | A bronze bell foundry, iron collars and a sheltered furnace | 21,576 | `(0, −2.6; 9.6; 2.03)` | `(1; 4.4 × 3.8)` |
 

@@ -11,27 +11,33 @@ forge export/measurement utilities are reused. No existing tower geometry
 or tower recipe was read. Prototype family pairing: warm wood / amber dice.
 
 Design inputs: <=22,000 study triangles, |x|<=3.25, crown<=10.5, entry clearR2,
-rim7.7, exit4.2x3.375 over sill1. Towerplan binding front height8.564.
-Measured final shape: 18,294 triangles, 563.7 KiB GLB, 16 mesh primitives;
-app bounds (-3.182,-0.560,-5.190)..(3.208,9.866,3.798). Both portals
+rim7.7, exit4.2x3.375 over sill1. Final crown clears the six emitted app eyes.
+Measured final shape: 18,468 triangles, 566.4 KiB GLB, 16 mesh primitives;
+app bounds (-3.182,-0.560,-5.190)..(3.208,10.199,3.798). Both portals
 25/25 clear; cowl/shaft99/99 at all6 eyes; no below-sill leaks (0/2304);
-ramp81/81 and lip162/162 clad. The closest vanish is y8.02 at wide.full.
+ramp81/81 and lip162/162 clad. Explicit-ID room tests also block all shaft
+and cowl samples at every current app eye; single, mixed and 8d6 pours pass.
 The first doorway split at y5.84 exposed one close.mini cowl sample in the
 exported-file gate; lowering its apex closed it. The final lower entry exposed
 the low door/cowl overlap, so the door adopted the measured3.375 clear height
 and rim settled at7.7. A sill0.75 experiment exposed a kit inconsistency:
 the physical ramp's y-intercept1.047 contradicts throat rays based on sill0.75;
 the final model retains sill1 and needs no checker exception. After its CSG
-cut,120 shared-diagonal hazard faces are poked before triangulation to prevent
+cut,114 shared-diagonal hazard faces are poked before triangulation to prevent
 four-face edges. No weld/sliver or decimation repair is used.
 The final visible threshold sliver was embedded under the heartwood by
 compressing its below-sill vertex columns to the measured ramp plane.
-Consecutive final bake digests: set eb06f22ec8c8f180, order846a2d7e33f61889.
+Production review caught stale forge camera coordinates and an app check
+that omitted the model ID. Raising only the front crown shoulder closes
+the actual upper-bore sight lines while leaving both portals untouched;
+overall height changes from 9.866 to 10.199. Repeated final exports match:
+set 6f67e33b11ecc9d3, order c07a6cb1fa046839.
 
 Intentional guidance departures: main's first LOOK rejected flute-like bark
 and the rectangular tongue. The study allows22k instead of the15k tower
 budget for flowing nonperiodic bark, real knot shoulders, and heartwood grain;
-main explicitly authorized18–22k for a more convincing prototype.
+main explicitly authorized18–22k for a more convincing prototype, then the
+owner accepted the three models as the replacement production catalogue.
 The .blend is retained so this is an editable Blender model, not only a GLB.
 """
 
@@ -82,7 +88,10 @@ def gauss_angle(a, b, width):
 def crown(a):
     # Deliberately no regular battlement rhythm: a principal lightning spur,
     # a broad rear blade, and a short opposite tooth surrounding the split.
+    # The front shoulder masks the upper bore from the actual round-table
+    # cameras; its rise preserves the clear entry column and both portals.
     return (8.70 + .85 * gauss_angle(a, -1.34, 0.42)
+            + 1.45 * gauss_angle(a, -0.04, 0.80)
             + 1.23 * gauss_angle(a, 2.18, 0.45)
             + 0.78 * gauss_angle(a, 0.81, 0.34)
             + 0.085 * math.sin(8 * a + 0.4)

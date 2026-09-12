@@ -108,7 +108,7 @@ questions and runs inside Blender's Python (no trimesh) while check.py runs
 on the venv (no bpy) — neither can import the other, both import
 `towergates`. The three current towers use an owner-approved 22000-triangle
 ceiling (2026-09-12), replacing the earlier 15000 guidance for these models.
-Their measured counts are Wickroot 18294, Cairnwatch 17722 and Cinderbell
+Their measured counts are Wickroot 18468, Cairnwatch 17722 and Cinderbell
 21576. The hero-prop numbers above are for props.
 
 **Plan before you model.** `towerplan.py` takes a portal spec (or reads one

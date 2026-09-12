@@ -4,15 +4,15 @@
   "blender": "4.5.12 LTS",
   "studies": {
     "wickroot": {
-      "glb_sha256": "b89e38e840c2d4fda2606dff20ac3a4a10385fe4b147032e330dda27c322f60f",
+      "glb_sha256": "4ff218206a3181130e48062165a5e5def32b8d63a2aa3e937347cbcae5adfebe",
       "digest": {
-        "order": "846a2d7e33f61889",
-        "set": "eb06f22ec8c8f180",
-        "sha": "b89e38e840c2d4fd",
-        "tris": 18294
+        "order": "c07a6cb1fa046839",
+        "set": "6f67e33b11ecc9d3",
+        "sha": "4ff218206a318113",
+        "tris": 18468
       },
-      "glb_bytes": 577224,
-      "blend_bytes": 1687002,
+      "glb_bytes": 579996,
+      "blend_bytes": 1697877,
       "mesh_nodes": 16,
       "primitives": 16,
       "in_app_meshes": 6,
@@ -140,7 +140,7 @@
           "stranded": 0
         }
       ],
-      "six_eye_occlusion": "all shaft and cowl samples blocked",
+      "six_eye_occlusion": "explicit wickroot ID; all 99 shaft and 99 cowl samples blocked at each of six current app eyes",
       "unclassified_fit_overruns": 0
     },
     "cairnwatch": {

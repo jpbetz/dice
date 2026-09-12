@@ -13,7 +13,7 @@ Shared export, loader and physics utilities remain the integration surface.
 
 | Study | Triangles | Editable mesh objects | In-app meshes | Entry rim | Exit width × height |
 | --- | ---: | ---: | ---: | ---: | --- |
-| Wickroot | 18,294 | 16 | 6 | 7.70 | 4.20 × 3.375 |
+| Wickroot | 18,468 | 16 | 6 | 7.70 | 4.20 × 3.375 |
 | Cairnwatch | 17,722 | 5 | 6 | 9.10 | 4.35 × 3.70 |
 | Cinderbell | 21,576 | 40 | 7 | 9.60 | 4.40 × 3.80 |
 
@@ -31,7 +31,11 @@ and remeasured. The final threshold sliver was an actual mesh protrusion;
 compressing its vertex columns below the ramp removed it without collapsing
 the small triangles. The final hero, normal view and in-app sheet were
 inspected after that correction. The bark remains deliberately stylized;
-its broad exit tongue is still the most visibly functional part.
+its broad exit tongue is still the most visibly functional part. The explicit
+production camera check required a higher front crown shoulder; overall
+height rose from 9.866 to 10.199 while both portals stayed unchanged. The
+updated hero and in-app sheet were inspected, and all six actual cameras
+now block 99/99 shaft and 99/99 cowl samples; all three pour pools pass.
 
 **Cairnwatch** uses full-thickness broken masonry at the crown, stacked
 buttresses, a stone arch and jointed threshold. A smooth sloping crown and
@@ -79,8 +83,10 @@ review called the occlusion hook without a model ID, so that result could
 describe the bench's default tower. It is not accepted as proof for these
 models. The review now names each registered ID explicitly; model-specific
 regression checks cover the permanent catalogue. The forge ray checks were
-already against each exported GLB. Final replacement evidence must use the
-explicit-ID room checks as well.
+against each exported GLB but used obsolete camera coordinates. They now
+read the app-emitted camera contract. Wickroot was rebaked and passed both
+the corrected forge rays and the explicit-ID full room review; final
+replacement evidence uses these corrected instruments.
 
 ## Scope and guidance departures
 

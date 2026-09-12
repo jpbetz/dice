@@ -26,7 +26,7 @@ Wickroot.
 Each replacement is a deterministic, portal-bearing GLB with an editable
 Blender scene and its own sound palette. Wickroot is a cedar sanctuary stump;
 Cairnwatch a broken coastal abbey watchtower; Cinderbell a bronze bell
-foundry. Their measured triangle counts are **18,294 / 17,722 / 21,576**.
+foundry. Their measured triangle counts are **18,468 / 17,722 / 21,576**.
 The owner accepted the 22k ceiling in place of the older 15k guidance so
 fractured masonry, organic surfaces and cast-metal details survived the
 visual review. No GOALPOST promise was set aside.
