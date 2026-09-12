@@ -277,21 +277,10 @@ try {
     assert.equal(buf.toString('ascii', 0, 4), 'glTF', 'and the bytes are a GLB container');
   });
 
-  // THE FIRST SHIPPED TOWER MODEL, and the reason this test exists at all.
-  // server.js has no manifest: safeResolve serves anything under ROOT, so
-  // models/towers/ needed no server change to be reachable — which is exactly
-  // why nothing but a test would notice the day one of these files failed to
-  // get committed. The registry row names both urls; a 404 on either is a
-  // venue that never raises its tower, reported only as a console warning.
-  //
-  // Both palettes are asserted separately and BY BYTES, not by listing a
-  // directory: the two-variant row is the thing that can half-ship.
-  // Nullstone rides the same list: one file, no palettes, and the same way to
-  // half-ship it (a registry row pointing at a url nobody committed).
-  // Maintained by tools/forge/promote.mjs, which appends a slug when it ships
-  // one. Kept as a literal list rather than a directory read for the reason
-  // above: a directory read is green on an empty directory.
-  const PROMOTED = ['hollowbole_moonrise', 'hollowbole_foxfire', 'nullstone'];
+  // The approved Blender collection must ship as real GLBs. Keep this list
+  // literal: a directory enumeration passes vacuously when assets are missing.
+  // Maintained by tools/forge/promote.mjs.
+  const PROMOTED = ['wickroot', 'cairnwatch', 'cinderbell'];
   for (const pal of PROMOTED) {
     await t(`/models/towers/${pal}.glb is served as a GLB`, async () => {
       const res = await fetch(`${base}/models/towers/${pal}.glb`);
@@ -306,6 +295,26 @@ try {
       assert.ok(buf.byteLength > 100000, `and the real model (${buf.byteLength} bytes), not a stub`);
     });
   }
+
+  await t('retired tower assets and builders are absent', async () => {
+    const retired = [
+      '/models/towers/hollowbole_moonrise.glb',
+      '/models/towers/hollowbole_foxfire.glb',
+      '/models/towers/nullstone.glb',
+      '/js/towerskin.js',
+      '/js/towerbastion.js',
+      '/js/toweranvil.js',
+      '/js/towerhollow.js',
+      '/js/towerbole.js',
+      '/js/towerdress.js',
+      '/js/towerglbshell.js'
+    ];
+    for (const path of retired) {
+      const res = await fetch(`${base}${path}`);
+      assert.equal(res.status, 404, `${path} was retired with the old catalogue`);
+      await res.arrayBuffer();
+    }
+  });
 
   // THE SERVED FILE IS THE FILE THE RECIPE WROTE (ROADMAP T7). Everything
   // above proves a model is REACHABLE; none of it proves it is CURRENT, and
@@ -370,7 +379,7 @@ try {
     ['/js/main.js', 'js/ — the app tree'],
     ['/css/style.css', 'css/'],
     ['/vendor/three.module.js', 'vendor/ — the frozen third-party tree'],
-    ['/models/towers/nullstone.glb', 'models/ — baked GLB towers'],
+    ['/models/towers/wickroot.glb', 'models/ — baked GLB towers'],
     // Not part of the deployed app (.gcloudignore drops tests/ from the upload),
     // but the tower-glb-loader scenario fetches it THROUGH THE PAGE ORIGIN, so
     // a 404 here is a red e2e suite rather than a production change.

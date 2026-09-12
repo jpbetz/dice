@@ -1,26 +1,26 @@
 {
- "hollowbole_foxfire": {
-  "order": "a9b59fde766f22e1",
-  "set": "8567ad355b03cb01",
-  "sha": "5dc75b473efb1d75",
-  "tris": 7284
+ "cairnwatch": {
+  "order": "0a903194f52ba25e",
+  "set": "b8bb5620ed9f8956",
+  "sha": "a5d6f42fdeac5125",
+  "tris": 17722
  },
- "hollowbole_moonrise": {
-  "order": "1438e229a771a27e",
-  "set": "8567ad355b03cb01",
-  "sha": "f33298c8117d9a1b",
-  "tris": 7284
- },
- "nullstone": {
-  "order": "84b02ebd1e968c5d",
-  "set": "c6e4211a22e26256",
-  "sha": "86a2e5615b0a1919",
-  "tris": 4304
+ "cinderbell": {
+  "order": "c85e696c6a9178c4",
+  "set": "170813391a19b00b",
+  "sha": "b55237afbdd81d7c",
+  "tris": 21576
  },
  "tower_fixture": {
-  "order": "0ccccec51e49dbd8",
-  "set": "c3443932f647f83f",
-  "sha": "e2e9445c568eacc3",
+  "order": "8d0b6b1359278bd2",
+  "set": "8905e6f5b43dec2e",
+  "sha": "29dc1c5447b8989f",
   "tris": 912
+ },
+ "wickroot": {
+  "order": "c07a6cb1fa046839",
+  "set": "6f67e33b11ecc9d3",
+  "sha": "4ff218206a318113",
+  "tris": 18468
  }
 }
