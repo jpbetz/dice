@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Tower Foundry · three new studies</title>
+  <link rel="stylesheet" href="./gallery.css">
+  <script type="importmap">{"imports":{"three":"/vendor/three.module.js"}}</script>
+</head>
+<body>
+  <header>
+    <a class="wordmark" href="./index.html">THE DICE TABLE <span>/</span> FOUNDRY</a>
+    <span class="edition">Three original Blender studies · September 2026</span>
+  </header>
+  <main>
+    <div class="intro">
+      <div><p class="eyebrow">WOOD. STONE. FIRE.</p><h1>Something worth rolling through.</h1></div>
+      <p class="intro-note">Three towers, made from scratch.<br>Turn them around. Get close. Find your favourite.</p>
+    </div>
+    <nav aria-label="Choose a tower">
+      <div id="choices"><button data-id="all" aria-pressed="true">The collection</button></div>
+      <div class="view-options">
+        <label class="sr-only" for="surface">Surface</label>
+        <select id="surface"><option value="lit">Materials</option><option value="clay">Clay</option><option value="normal">Normals</option><option value="wire">Wireframe</option></select>
+        <button id="rotate" aria-pressed="false">Auto-rotate</button>
+        <button id="reset">Reset view</button>
+      </div>
+    </nav>
+    <section id="stage" aria-label="Interactive 3D tower models">
+      <canvas id="canvas" aria-label="Drag to rotate the models, scroll to zoom. Use the front and crown buttons for keyboard-accessible views."></canvas>
+      <div class="stage-label"><span id="view-label">THE COLLECTION</span><span>All three at the same scale</span></div>
+      <div id="loading" role="status">Opening the foundry…</div>
+      <div class="camera-controls"><button data-view="front">Front</button><button data-view="hero" aria-pressed="true">¾ view</button><button data-view="crown">Crown</button><button data-view="back">Back</button></div>
+      <p class="gesture">Drag to orbit <span>·</span> Scroll to zoom</p>
+    </section>
+    <section id="descriptions" aria-label="The studies"></section>
+  </main>
+  <footer><span>Original geometry · Editable Blender scenes · Open GLB files</span><span>Exploration collection / 001</span></footer>
+  <script type="module" src="./gallery.mjs"></script>
+</body>
+</html>

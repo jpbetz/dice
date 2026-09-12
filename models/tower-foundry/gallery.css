@@ -1,0 +1,62 @@
+/* Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 */
+:root { color-scheme: dark; font-family: ui-sans-serif, system-ui, sans-serif; background: #141617; color: #e6e2d8; --muted: #a5a7a4; --line: #363b3b; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+header, main, footer { max-width: 1760px; margin: auto; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 27px 44px; border-bottom: 1px solid var(--line); gap: 20px; }
+a { color: inherit; text-underline-offset: 4px; }
+.wordmark { text-decoration: none; font-size: 11px; font-weight: 600; letter-spacing: 2.4px; }
+.wordmark span { color: #a38358; margin: 0 15px; }
+.edition, .intro-note, footer { font-size: 12px; color: var(--muted); line-height: 1.7; }
+main { padding: 0 44px; }
+.intro { display: flex; justify-content: space-between; align-items: end; padding: 37px 0 27px; gap: 28px; }
+.eyebrow { font-size: 10px; letter-spacing: 2.5px; color: #c3a071; margin: 0 0 13px; }
+h1 { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(27px, 3.1vw, 46px); font-weight: 400; margin: 0; letter-spacing: -1.2px; }
+.intro-note { margin: 0 0 2px; }
+nav { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding: 12px 0; gap: 12px; }
+#choices, .view-options { display: flex; align-items: center; gap: 5px; }
+button, select { background: transparent; color: #a5aaa6; border: 1px solid transparent; border-radius: 3px; padding: 9px 11px; cursor: pointer; font: inherit; font-size: 11px; }
+button:hover, select:hover { color: #fff8e9; background: #ffffff08; }
+button[aria-pressed=true] { color: #f0debb; background: #ffffff08; border-color: #6d604c; }
+button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid #e4bc81; outline-offset: 4px; }
+select { background: #202425; }
+#stage { position: relative; height: clamp(440px, 53vw, 690px); overflow: hidden; border: 1px solid #373b38; background: radial-gradient(ellipse at 50% 42%, #363d3d 0%, #232929 50%, #1c2021 100%); }
+#canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#canvas:active { cursor: grabbing; }
+.stage-label { position: absolute; inset: 22px 24px auto; display: flex; justify-content: space-between; pointer-events: none; color: #b2b9b3; font-size: 10px; letter-spacing: 1px; }
+.stage-label span:last-child { color: #8e9993; font-size: 10px; letter-spacing: 0; }
+.camera-controls { position: absolute; bottom: 16px; left: 20px; display: flex; gap: 4px; }
+.camera-controls button { background: #181d1cd0; }
+.gesture { position: absolute; bottom: 16px; right: 24px; color: #94a09a; font-size: 10px; pointer-events: none; }
+.gesture span { margin: 0 6px; }
+#loading { position: absolute; top: 44%; text-align: center; width: 100%; color: #d1b587; font: italic 22px Georgia, serif; }
+#descriptions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; padding: 28px 0 34px; }
+article { padding: 0 27px; border-left: 1px solid var(--line); }
+article:first-child { padding-left: 0; border-left: 0; }
+article:last-child { padding-right: 0; }
+.model-title { display: flex; align-items: baseline; gap: 14px; }
+.number { font-size: 10px; color: var(--accent); }
+h2 { font: 400 27px Georgia, serif; margin: 0 0 8px; }
+.material { font-size: 10px; letter-spacing: .7px; color: var(--accent); margin: 0 0 13px; }
+.description { max-width: 370px; font-size: 12px; color: #aeb3ad; line-height: 1.7; margin: 0 0 17px; min-height: 41px; }
+.links { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; font-size: 11px; }
+.links button { padding: 0; color: #eadac0; font-size: 11px; text-decoration: underline; text-underline-offset: 4px; }
+.links a { color: #adb8b1; }
+.stats { margin-top: 16px; color: #819087; font-size: 10px; }
+footer { display: flex; justify-content: space-between; padding: 20px 44px 26px; border-top: 1px solid var(--line); font-size: 10px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+@media (max-width: 800px) {
+  header, footer { padding-left: 20px; padding-right: 20px; }
+  main { padding: 0 20px; }
+  .edition { display: none; }
+  .intro { align-items: start; flex-direction: column; gap: 15px; padding: 28px 0 24px; }
+  .intro-note br { display: none; }
+  nav { flex-direction: column; align-items: start; }
+  .view-options { width: 100%; justify-content: end; }
+  #stage { height: 490px; }
+  #descriptions { grid-template-columns: 1fr; gap: 24px; }
+  article, article:first-child, article:last-child { padding: 0 0 24px; border-left: 0; border-bottom: 1px solid var(--line); }
+  .description { max-width: none; min-height: 0; }
+  .gesture, .stage-label span:last-child { display: none; }
+  footer { gap: 20px; }
+}
