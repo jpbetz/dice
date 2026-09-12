@@ -16155,7 +16155,7 @@ export const scenarios = [
         const occ = await a.dbg(`towerOcclusionCheck('${row.tower}')`);
         assert.equal(occ.eyes.length, 6, 'all shipped eyes tested');
         for (const e of occ.eyes) for (const band of ['shaft','cowl']) {
-          assert.ok(e[band].n > 0, `${row.tower}/${e.id}: real ${band} probes`);
+          assert.equal(e[band].n,99,`${row.tower}/${e.id}: full ${band} grid`);
           if(e[band].blocked !== e[band].n) leaks.push(`${row.tower}/${e.id}/${band}: ${e[band].blocked}/${e[band].n}`);
         }
       }
