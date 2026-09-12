@@ -10,10 +10,14 @@ bronze gives the eye two deliberate accents. No prior tower geometry is used.
 
 Design envelope: x +/-3.25, z -5.25..0.25, crown <=12.5; entry clearR 2.03,
 rim 9.1; exit 4.35 by 3.7 at sill 1.0. Planned with towerplan before geometry.
-Measured revision 2: 17722 triangles, x +/-3.141, top 12.49; the 15k guidance
+Measured revision 3: 18166 triangles, x +/-3.141, top 12.49; the 15k guidance
 is set aside for individually fractured stone faces and the full-depth broken
 crown (main LOOK requested the extra geometry). Built bounds, approach, exit
 and light-blocking are measured from finished vertices; blend accompanies GLB.
+The final front has one extra ashlar course and a raised recessed inner bed:
+current square-table camera rays required 10.962u at the front, whereas the
+old bake reference falsely accepted the lower course. Portals and rear ruin
+remain unchanged; all six current eyes now hide both 99-sample bands.
 """
 import math
 import os
@@ -115,10 +119,13 @@ def oct_point(angle, radius, y):
     return (radius*math.sin(angle), y, AZ+radius*math.cos(angle))
 
 
-RUIN_HEIGHTS=[(10.12,10.27,10.12),(10.15,10.64,10.37),
+# The square table's actual wide eye needs a 10.96 front silhouette. Keep
+# the rear ruin intact; one short front course covers the vanish sightline.
+# The lighter stone crown remains above the recessed structural bed.
+RUIN_HEIGHTS=[(11.10,11.25,11.10),(11.10,10.95,10.72),
               (10.62,11.17,10.76),(10.77,10.52,10.21),
               (10.47,11.13,10.43),(11.14,11.83,11.23),
-              (11.83,12.02,11.83),(11.83,11.12,10.43)]
+              (11.83,12.02,11.83),(11.83,11.27,11.10)]
 
 
 angles=[math.radians(-22.5)+i*math.pi/4 for i in range(8)]
@@ -162,7 +169,7 @@ def carve(ob):
     return ob
 
 
-core=ring('towerSkinCairnCore',2.865,2.255,.02,[9.98]*8)
+core=ring('towerSkinCairnCore',2.865,2.255,.02,[10.95,10.95,10.52,9.98,9.98,9.98,9.98,10.52])
 carve(core)
 def core_color(poly,p):
     rr=math.hypot(p.x,-p.y-AZ)
