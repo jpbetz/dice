@@ -140,19 +140,20 @@
           "stranded": 0
         }
       ],
-      "six_eye_occlusion": "explicit wickroot ID; all 99 shaft and 99 cowl samples blocked at each of six current app eyes",
-      "unclassified_fit_overruns": 0
+      "six_eye_occlusion": "explicit model ID: shaft and cowl 99/99 at each of six current eyes",
+      "unclassified_fit_overruns": 0,
+      "editable_mesh_objects": 16
     },
     "cairnwatch": {
-      "glb_sha256": "a5d6f42fdeac51254dfe189423c19cda7e2646556e40f826b97f85b839385b2b",
+      "glb_sha256": "f4251f2d21803c1daa67d7c8fc7eea69c739ecb906ddce3d76790ddbb60175cf",
       "digest": {
-        "order": "0a903194f52ba25e",
-        "set": "b8bb5620ed9f8956",
-        "sha": "a5d6f42fdeac5125",
-        "tris": 17722
+        "order": "133f4c4ec8f13c54",
+        "set": "56e1ccf1d03604ac",
+        "sha": "f4251f2d21803c1d",
+        "tris": 18166
       },
-      "glb_bytes": 1536192,
-      "blend_bytes": 1705582,
+      "glb_bytes": 1575648,
+      "blend_bytes": 1735316,
       "mesh_nodes": 5,
       "primitives": 6,
       "in_app_meshes": 6,
@@ -280,19 +281,20 @@
           "stranded": 0
         }
       ],
-      "six_eye_occlusion": "all shaft and cowl samples blocked",
-      "unclassified_fit_overruns": 0
+      "six_eye_occlusion": "explicit model ID: shaft and cowl 99/99 at each of six current eyes",
+      "unclassified_fit_overruns": 0,
+      "editable_mesh_objects": 5
     },
     "cinderbell": {
-      "glb_sha256": "b55237afbdd81d7c59794f5a734c582a72160ee5753b38907e62bd6d68b5c5e5",
+      "glb_sha256": "ac2b59db3bd27f7e1cfccd934b9369399362e9c1b0c6e9825accdb7d03948aeb",
       "digest": {
-        "order": "c85e696c6a9178c4",
-        "set": "170813391a19b00b",
-        "sha": "b55237afbdd81d7c",
-        "tris": 21576
+        "order": "c4fdb17d3648736c",
+        "set": "e02390f7271feb52",
+        "sha": "ac2b59db3bd27f7e",
+        "tris": 21968
       },
-      "glb_bytes": 720740,
-      "blend_bytes": 1684103,
+      "glb_bytes": 735980,
+      "blend_bytes": 1705600,
       "mesh_nodes": 7,
       "primitives": 7,
       "in_app_meshes": 7,
@@ -420,8 +422,20 @@
           "stranded": 0
         }
       ],
-      "six_eye_occlusion": "all shaft and cowl samples blocked",
-      "unclassified_fit_overruns": 0
+      "six_eye_occlusion": "explicit model ID: shaft and cowl 99/99 at each of six current eyes",
+      "unclassified_fit_overruns": 0,
+      "editable_mesh_objects": 41
     }
+  },
+  "production_verification": {
+    "date": "2026-09-12",
+    "smoke_scenarios": 60,
+    "tower_scenarios": 15,
+    "main_session_rebakes": "complete GLB SHA-256 matches production and downloadable files for all three",
+    "camera_reference": "exact live towerShippedEyeSpec; each model explicitly named",
+    "rays_per_model": 1188,
+    "final_model_pours": 9,
+    "gallery": "desktop, phone, six downloads, live table button",
+    "player_views": "desktop and phone with pools folded; deciding die stays in frame; both fae venues"
   }
 }

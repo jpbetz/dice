@@ -29,7 +29,7 @@ separately) or the design is wrong.
 
 **Current catalogue, 2026-09-12:** Wickroot, Cairnwatch and Cinderbell replace
 all five old towers. Both fae venues use Wickroot. Their approved triangle
-ceiling is 22k, with measured counts 18,468 / 17,722 / 21,576. The old
+ceiling is 22k, with measured counts 18,468 / 18,166 / 21,968. The old
 classic, Nullstone and Hollow Bole builders/assets are retired. Model-specific
 lessons below are historical; use the current recipes and docs/TOWER.md
 STATUS for present structure, and preserve similarly named dice sets.

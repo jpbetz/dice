@@ -1,15 +1,15 @@
 {
  "cairnwatch": {
-  "order": "0a903194f52ba25e",
-  "set": "b8bb5620ed9f8956",
-  "sha": "a5d6f42fdeac5125",
-  "tris": 17722
+  "order": "133f4c4ec8f13c54",
+  "set": "56e1ccf1d03604ac",
+  "sha": "f4251f2d21803c1d",
+  "tris": 18166
  },
  "cinderbell": {
-  "order": "c85e696c6a9178c4",
-  "set": "170813391a19b00b",
-  "sha": "b55237afbdd81d7c",
-  "tris": 21576
+  "order": "c4fdb17d3648736c",
+  "set": "e02390f7271feb52",
+  "sha": "ac2b59db3bd27f7e",
+  "tris": 21968
  },
  "tower_fixture": {
   "order": "8d0b6b1359278bd2",

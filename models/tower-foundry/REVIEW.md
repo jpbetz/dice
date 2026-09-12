@@ -14,8 +14,8 @@ Shared export, loader and physics utilities remain the integration surface.
 | Study | Triangles | Editable mesh objects | In-app meshes | Entry rim | Exit width × height |
 | --- | ---: | ---: | ---: | ---: | --- |
 | Wickroot | 18,468 | 16 | 6 | 7.70 | 4.20 × 3.375 |
-| Cairnwatch | 17,722 | 5 | 6 | 9.10 | 4.35 × 3.70 |
-| Cinderbell | 21,576 | 40 | 7 | 9.60 | 4.40 × 3.80 |
+| Cairnwatch | 18,166 | 5 | 6 | 9.10 | 4.35 × 3.70 |
+| Cinderbell | 21,968 | 41 | 7 | 9.60 | 4.40 × 3.80 |
 
 Dimensions are app units. All three sills are 1.0. Full bounds, portal
 derivations, geometry/color digests, complete GLB SHA-256 hashes, file sizes
@@ -49,7 +49,7 @@ photorealistic surface erosion.
 pierced lifting eyes, large fasteners and a small maker's mark. The first
 arch cut opened unintended rear holes; its depth was shortened and the
 rear view checked. Bronze was brightened after inspection in the room,
-with oxide concentrated at seams. The forty editable pieces are batched
+with oxide concentrated at seams. The forty-one editable pieces are batched
 into seven exported meshes. The low skirt belt stays separate because
 combining it with the tall lip made the envelope audit infer a wide crown
 that did not exist. Fine bronze wear is subtler under the room lighting
@@ -78,15 +78,25 @@ than under the gallery studio lights.
 Evidence is retained in [previews/](previews/): the gallery, normal sheet,
 individual hero/crown views, six-view app sheets, and mid-pour screenshots.
 
-**Instrument correction during production integration:** the original room
-review called the occlusion hook without a model ID, so that result could
-describe the bench's default tower. It is not accepted as proof for these
-models. The review now names each registered ID explicitly; model-specific
-regression checks cover the permanent catalogue. The forge ray checks were
-against each exported GLB but used obsolete camera coordinates. They now
-read the app-emitted camera contract. Wickroot was rebaked and passed both
-the corrected forge rays and the explicit-ID full room review; final
-replacement evidence uses these corrected instruments.
+**Camera correction during production integration:** the original room
+review called the occlusion hook without a model ID, and the forge mirror
+still carried the older rectangular table's camera positions. The final
+review names each permanent model explicitly; Blender and file gates now
+read the app's full-precision camera reference. A regression requires those
+six eyes to match the running app exactly. Small front crown refinements
+close the new sightlines: a raised bark shoulder, an extra broken masonry
+course, and an iron fireback inside the bronze lip. All eight declared
+portal numbers remain unchanged for every model.
+
+The main session independently rebaked these corrected recipes and compared
+complete GLB SHA-256 hashes with the production and downloadable files:
+all three are identical. Each model blocks all 99 shaft and 99 cowl samples
+at every one of the six eyes. All nine final model pours deliver on their
+first attempt. The final suite passes `npm test` (60 smoke scenarios),
+all 15 tower scenarios, shared values and film hashes, cold room reloads,
+both fae venues, static asset retirement, and the gallery download/preview
+flow. Player-camera frames cover desktop, phone with the pools rail folded,
+and both fae floors. The packaged screenshots show the corrected assets.
 
 ## Scope and guidance departures
 

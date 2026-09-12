@@ -55,6 +55,7 @@ update the file served to players.
 ```sh
 node tools/drive.mjs tools/steps/foundry-gallery.mjs
 node tools/drive.mjs tools/steps/foundry-review.mjs all full
+node tools/drive.mjs tools/steps/foundry-table.mjs
 npm test
 ```
 
@@ -67,5 +68,5 @@ The inherited assumption being challenged: a tower must be a decorated tube
 or box. A technically valid mouth is only the start. Silhouette, material,
 wear, and a sense of someone having built or tended the object are the art
 review. The accepted triangle ceiling is 22k for these models: 18,468 for
-Wickroot, 17,722 for Cairnwatch and 21,576 for Cinderbell. Their silhouette and
+Wickroot, 18,166 for Cairnwatch and 21,968 for Cinderbell. Their silhouette and
 material work justify that measured departure from the earlier 15k guidance.

@@ -17,6 +17,15 @@ The [Foundry review](../../models/tower-foundry/REVIEW.md) records the owner
 approval, editable scenes, measured geometry and rendered evidence. Older
 model-specific examples below are historical lessons.
 
+The gate reference comes from `engine_contract.json`, emitted from the
+running app with `node tools/drive.mjs tools/steps/engine-contract.mjs`.
+Regenerate it when cameras or table dimensions change as well as when
+physics constants change. The September 12 integration caught a stale
+camera copy that passed models against the old rectangular table. Every
+room ray check must also name its model ID; an implicit default can grade
+the wrong bench. Cold lab tools use `tools/tower-lab.mjs` to await GLB
+readiness before opening the bench or dropping dice.
+
 ## Quick start
 
 ```bash
