@@ -64,6 +64,8 @@ limitations under the License.
 //
 //   node tools/drive.mjs tools/steps/tower-occlusion.mjs [towerId]
 
+import { openTowerLab } from '../tower-lab.mjs';
+
 const r2 = (n) => Number(n.toFixed(2));
 
 // Where the eye→point ray meets the back-wall plane, and what that says about
@@ -85,7 +87,7 @@ export default async function run(stage, args) {
   const a = await stage.tab('localhost', 'TowerOcclusion');
   await a.dbg('holdClock(true)');
   await a.dbg('towerEcho(false)');
-  await a.dbg('towerCore(true)');
+  await openTowerLab(a, tower);
   let res = await a.dbg(`towerOcclusionCheck(${JSON.stringify(tower)})`);
   // A BAKED ROW MAY NOT BE HERE YET (C6). The probe answers {pending} rather
   // than grading whatever the bench is wearing, so this waits for the model

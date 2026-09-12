@@ -30,10 +30,11 @@ limitations under the License.
 // failure towerOcclusionCheck's `pending` guard exists to stop, and it needs
 // the same two things: ask for the skin, then prove you got it.
 //
-// A BAKED ROW MAY NOT BE HERE YET (C6). towerLabSkin returns what the bench
-// is ACTUALLY wearing — for a GLB row still in flight, the PREVIOUS skin — so
-// the ask is polled and a bench wearing the wrong thing ABORTS. Half a review
-// set is recoverable; a wrong one is not.
+// The lab opens only after its model is loaded and selected; a matching id
+// alone does not prove the default model has finished its first load.
+
+import assert from 'node:assert/strict';
+import { openTowerLab } from '../tower-lab.mjs';
 
 export default async function run(stage, [tower = 'wickroot', seed = '42']) {
   const t = await stage.tab('localhost', 'TowerLook');
@@ -56,25 +57,8 @@ export default async function run(stage, [tower = 'wickroot', seed = '42']) {
   // What the bench is wearing, asked without changing it (towerLabSkin with
   // no legal id is a read).
   const worn = () => t.dbg('towerLabSkin()');
-  const wear = async (id) => {
-    let got = await t.dbg(`towerLabSkin(${JSON.stringify(id)})`);
-    for (let i = 0; got !== id && i < 40; i++) {
-      await new Promise((r) => setTimeout(r, 250));
-      got = await t.dbg(`towerLabSkin(${JSON.stringify(id)})`);
-    }
-    return got;
-  };
-
   await zoom('medium');
-  await t.dbg('towerCore(true)');
-  const got = await wear(tower);
-  if (got !== tower) {
-    const st = await t.dbg(`towerModelStatus(${JSON.stringify(tower)})`);
-    console.log(`BAD: asked for '${tower}', the bench is wearing '${got}' `
-      + `(${JSON.stringify(st)}) — refusing to shoot a review sheet of the wrong tower`);
-    process.exitCode = 1;
-    return;
-  }
+  const got = await openTowerLab(t, tower);
   console.log(`skin=${got} seed=${seed}`);
 
   // The eye is re-parked INSIDE the shot: a reframe armed a frame earlier
@@ -86,13 +70,15 @@ export default async function run(stage, [tower = 'wickroot', seed = '42']) {
     // produce exactly the mislabelled sheet this step exists to refuse.
     const now = await worn();
     if (now !== tower) throw new Error(`the bench changed to '${now}' mid-sheet (wanted ${tower})`);
+    assert.equal(await t.dbg('towerCore(true)'), true, 'lab open for capture');
     await t.page.browser.send('Page.bringToFront', {}, t.page.sessionId);
     if (eye) await t.dbg(`towerEye(${eye})`);
     await t.eval('window.__diceDebug.tick(0, true, false)');
     console.log(await stage.shot(t, `tower-${tower}-${name}`));
   };
   const pour = async (n) => {
-    await t.dbg(`towerDrop(${n}, ${Number(seed)})`);
+    const drop = await t.dbg(`towerDrop(${n}, ${Number(seed)})`);
+    assert.equal(drop?.dropped, n, 'capture pour actually started');
     await t.eval('(() => { for (let i = 0; i < 420; i++)'
       + ' window.__diceDebug.tick(1/60, false, false); return 1; })()');
   };
