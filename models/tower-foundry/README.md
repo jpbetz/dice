@@ -16,6 +16,9 @@ These are art studies, with temporary solo table previews. They do not change
 the game's catalogue, room protocol, voices, physics, existing assets or the
 owner's live table. Full multiplayer product integration is outside this pass.
 
+The completed [visual review and verification record](REVIEW.md) includes
+the final measurements, design decisions, evidence and remaining art limits.
+
 ## View and edit
 
 From this worktree, run the existing server on a free port other than 8123:

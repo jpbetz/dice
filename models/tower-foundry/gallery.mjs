@@ -60,6 +60,7 @@ function select(id) {
   document.querySelector('#view-label').textContent = id === 'all' ? 'THE COLLECTION' : STUDIES.find((s) => s.id === id).label.toUpperCase();
   document.querySelectorAll('article').forEach((a) => { a.hidden = id !== 'all' && a.dataset.id !== id; });
   document.querySelector('#descriptions').style.gridTemplateColumns = id === 'all' ? '' : '1fr';
+  document.querySelector('#descriptions').classList.toggle('single', id !== 'all');
   render();
 }
 choices.onclick = (e) => { if (e.target.dataset.id) select(e.target.dataset.id); };
@@ -181,7 +182,8 @@ function animate(now) {
   if (rotating && !dragging) { azimuth += Math.min(now - previous, 50) * 0.00015; render(); }
   previous = now; requestAnimationFrame(animate);
 }
-requestAnimationFrame(animate); render();
+requestAnimationFrame(animate);
+select(innerWidth < 640 ? 'wickroot' : 'all');
 // Repeated visual checks use this explicit render path, including in hidden
 // tabs where requestAnimationFrame may not run.
 window.__foundry = { ready: loaded.length === STUDIES.length, stats: loaded.map((m) => m.stats),

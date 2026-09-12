@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { Table } from '../../tests/e2e/harness.mjs';
+import { Page } from '../../tests/e2e/cdp.mjs';
 import { STUDIES } from '../../models/tower-foundry/catalogue.mjs';
 
 export default async function run(stage) {
@@ -45,7 +46,26 @@ export default async function run(stage) {
   await page.eval("window.__foundry.select('wickroot'); window.__foundry.render()");
   assert.equal(await page.eval('document.documentElement.scrollWidth <= innerWidth'), true, 'phone layout does not overflow');
   await stage.shot(table, 'foundry-gallery-phone.png');
+  // Exercise the actual review button, including its cross-tab loading path.
+  await page.browser.send('Runtime.evaluate', {
+    expression: "document.querySelector('article[data-id=wickroot] .table').click()",
+    userGesture: true,
+  }, page.sessionId);
+  let popup;
+  for (let i = 0; i < 50 && !popup; i++) {
+    const { targetInfos } = await page.browser.send('Target.getTargets');
+    popup = targetInfos.find((t) => t.openerId === page.targetId && t.url.includes('lobby=1'));
+    if (!popup) await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(popup, 'the gallery opens a real table tab');
+  const { sessionId } = await page.browser.send('Target.attachToTarget', { targetId: popup.targetId, flatten: true });
+  const preview = new Page(page.browser, popup.targetId, sessionId); await preview.init();
+  const previewTable = new Table(preview, popup.url); stage.ctx.tables.push(previewTable);
+  await previewTable.waitFor("window.__diceDebug?.tower === 'wickroot' && window.__diceDebug.towerModelStatus('wickroot')?.ready", { timeout: 45000, desc: 'gallery button loads the selected study at the table' });
+  assert.equal((await previewTable.dbg("towerPortalSpec('wickroot')")).source, 'model');
+  assert.equal((await previewTable.dbg('identity')).lobby, true, 'preview remains solo');
+  await previewTable.close();
   assert.deepEqual(page.errors, []); assert.deepEqual(page.consoleErrors, []);
   console.log(JSON.stringify(stats, null, 2));
-  console.log('Gallery: desktop, phone, hero/crown/normal views and all six downloads passed.');
+  console.log('Gallery: desktop, phone, hero/crown/normal views, six downloads, and the live table preview button passed.');
 }

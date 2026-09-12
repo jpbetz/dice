@@ -37,6 +37,7 @@
 docs/
 tests/
 tools/
+models/tower-foundry/
 deploy/
 Makefile
 CLAUDE.md

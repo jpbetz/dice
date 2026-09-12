@@ -34,6 +34,7 @@ select { background: #202425; }
 article { padding: 0 27px; border-left: 1px solid var(--line); }
 article:first-child { padding-left: 0; border-left: 0; }
 article:last-child { padding-right: 0; }
+#descriptions.single article { border-left: 0; padding-left: 0; }
 .model-title { display: flex; align-items: baseline; gap: 14px; }
 .number { font-size: 10px; color: var(--accent); }
 h2 { font: 400 27px Georgia, serif; margin: 0 0 8px; }

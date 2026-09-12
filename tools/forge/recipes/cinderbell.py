@@ -389,6 +389,8 @@ K.gate_throat(PARTS,SPEC,"cinderbell")
 for ob in PARTS:
     F.smooth_by_angle(ob,27)
 os.makedirs(F.OUT_DIR,exist_ok=True)
+import foundry_scene
+foundry_scene.prepare('Cinderbell')
 bpy.ops.wm.save_as_mainfile(filepath=str(Path(F.OUT_DIR)/"cinderbell.blend"))
 print("[cinderbell] editable",str(Path(F.OUT_DIR)/"cinderbell.blend"))
 groups={}

@@ -346,5 +346,7 @@ F.finish('cairnwatch',all_objects,budget=BUDGET,smooth_deg=14,vertex_colors=True
 K.run_battery(meshes,SPEC,tag='cairnwatch',x_lim=3.25,crown_max=12.5,
               clad={apron.name},occluder=[core,ashlar],front_top=None)
 K.gate_front_carries_the_dark([core,ashlar],SPEC,'cairnwatch',None)
+import foundry_scene
+foundry_scene.prepare('Cairnwatch', height=6)
 bpy.ops.wm.save_as_mainfile(filepath=str(Path(F.OUT_DIR)/'cairnwatch.blend'))
 print('[cairnwatch] editable blend saved; stop for contact-sheet LOOK before long app battery')
