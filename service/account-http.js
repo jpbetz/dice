@@ -69,12 +69,21 @@ function send(res, status, value, headers = {}) {
   res.end(JSON.stringify(value));
 }
 
+function homeRoute(suffix, method) {
+  if (suffix === '/homes') return { action: method === 'GET' ? 'list' : 'create', read: method === 'GET' };
+  if (suffix === '/homes/capture') return { action: 'capture', read: false };
+  const match = /^\/homes\/(h_[A-Za-z0-9_-]{43})(?:\/(reconcile|leave|versions\/(v_[A-Za-z0-9_-]{8,80})))?$/.exec(suffix);
+  if (!match) return null;
+  if (match[3]) return { action: 'read', read: true, id: match[1], revision: match[3] };
+  return { action: match[2] || (method === 'GET' ? 'read' : 'save'), id: match[1], read: !match[2] && method === 'GET' };
+}
+
 /** Optional router. Construction never throws and never delays live-room
  * routing. All exceptions are caught here before server.js's generic logger.
  * No credentials/config values or user data are passed to an error logger.
  */
 export function createOptionalAccountApi({ env = process.env, service = null,
-  now = Date.now, storeOptions = {} } = {}) {
+  now = Date.now, storeOptions = {}, homeBridge = null } = {}) {
   const mode = env.DICE_ACCOUNT_STORE || 'off';
   const enabled = mode !== 'off';
   let settings;
@@ -91,7 +100,7 @@ export function createOptionalAccountApi({ env = process.env, service = null,
         namespace: env.DICE_ACCOUNT_NAMESPACE, tokenSupplier: metadataTokenSupplier(), ...storeOptions,
       });
       else throw new StoreError('invalid');
-      return createAccountService({ store, now });
+      return createAccountService({ store, now, homeBridge });
     })().catch(() => null);
   } else ready = Promise.resolve(null);
 
@@ -116,8 +125,9 @@ export function createOptionalAccountApi({ env = process.env, service = null,
       try {
         const versionId = /^\/library\/versions\/([vo]_[A-Za-z0-9_-]{8,80})$/.exec(suffix)?.[1];
         const library = suffix === '/library' || suffix === '/library/reconcile' || suffix === '/library/archive' || !!versionId;
-        if (!known.has(suffix) && !versionId) { send(res, 404, { ok: false, code: 'not_found', message: 'No such account action.' }); return true; }
-        const read = ['/status', '/session'].includes(suffix) || !!versionId || (suffix === '/library' && req.method === 'GET');
+        const home = homeRoute(suffix, req.method);
+        if (!known.has(suffix) && !versionId && !home) { send(res, 404, { ok: false, code: 'not_found', message: 'No such account action.' }); return true; }
+        const read = ['/status', '/session'].includes(suffix) || !!versionId || (suffix === '/library' && req.method === 'GET') || home?.read;
         if (req.method !== (read ? 'GET' : 'POST')) {
           send(res, 405, { ok: false, code: 'method_not_allowed', message: 'Use the account action in the app.' }); return true;
         }
@@ -139,7 +149,8 @@ export function createOptionalAccountApi({ env = process.env, service = null,
                 && req.headers['sec-fetch-site'] !== 'none')) {
             send(res, 403, { ok: false, code: 'origin_refused', message: 'Open the account panel in the app.' }); return true;
           }
-          const result = library ? await account.library(token, req.headers['x-dice-person'], versionId || null)
+          const result = home ? await account.home(token, null, req.headers['x-dice-person'], home.action, home)
+            : library ? await account.library(token, req.headers['x-dice-person'], versionId || null)
             : await account.session(token);
           const { status, ...value } = result;
           send(res, status || 200, value); return true;
@@ -160,6 +171,7 @@ export function createOptionalAccountApi({ env = process.env, service = null,
         else if (suffix === '/recover') result = await account.recover(body.value);
         else if (suffix === '/logout') result = await account.logout(token, csrf);
         else if (suffix === '/revoke-others') result = await account.revokeOthers(token, csrf);
+        else if (home) result = await account.home(token, csrf, req.headers['x-dice-person'], home.action, { ...home, input: body.value });
         else if (suffix === '/library/archive') result = await account.archiveLibrary(token, csrf, req.headers['x-dice-person'], body.value);
         else if (library) result = await account.saveLibrary(token, csrf, req.headers['x-dice-person'], body.value, suffix === '/library/reconcile');
         else result = await account.rotateKey(token, csrf, body.value);
@@ -178,6 +190,14 @@ export function createOptionalAccountApi({ env = process.env, service = null,
         else send(res, 503, unavailable);
       }
       return true;
+    },
+    async resolveHomeRoom(roomKey) {
+      if (!enabled) return { ok: true, enabled: false, home: null };
+      try {
+        const account = await ready;
+        if (!account) return { ...unavailable, status: 503 };
+        return { enabled: true, ...await account.resolveHomeRoom(roomKey) };
+      } catch { return { ...unavailable, status: 503 }; }
     },
     async close() { const account = await ready; if (account) await account.close(); },
   });

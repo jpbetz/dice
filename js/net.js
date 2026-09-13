@@ -15,6 +15,8 @@ limitations under the License.
 */
 
 // Networking for multiplayer Dice Table.
+
+import { mintRoomKey } from './tables.js';
 //
 // This module owns every fetch and the EventSource stream; nothing else in the
 // app talks to the server. It is deliberately dumb about dice: it ships die
@@ -81,6 +83,21 @@ async function postJson(path, body, timeout) {
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+/** New-table UI uses this explicit action rather than asking a cold address
+ * to double as creation. The server can create a guest while home storage is
+ * down. Static/older hosts retain the existing locally minted room behavior.
+ */
+export async function createGuestTable(name = '') {
+  const response = await postJson('/api/new-room', { name }, POST_TIMEOUT_MS);
+  if (response.ok && typeof response.data?.room === 'string') return { ok: true, room: response.data.room };
+  if (response.status === 404) {
+    try { return { ok: true, room: mintRoomKey(name), local: true }; }
+    catch { return { ok: false, code: 'secure_random_unavailable', message: 'This browser cannot create a table address.' }; }
+  }
+  return { ok: false, code: response.data?.code || 'table_unavailable',
+    message: response.data?.error || 'A new table could not be created. Try again.' };
 }
 
 // -- the seat, remembered ----------------------------------------------------
@@ -292,6 +309,15 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     joined = await postJson('/api/join', joinBodyFor(room, name), JOIN_TIMEOUT_MS);
   }
   if (!joined.ok || !joined.data || !joined.data.playerId) {
+    const homeRefusal = ['home_not_found', 'home_closed', 'home_unavailable', 'homes_unavailable', 'account_unavailable'].includes(joined.data?.code)
+      || (typeof room === 'string' && room.startsWith('h_') && !joined.ok);
+    if (homeRefusal) {
+      const info = { path: '/api/join', status: joined.status,
+        code: joined.data?.code || 'home_unavailable',
+        message: joined.data?.error || 'This saved table is unavailable. Retry it later or create a new guest table.' };
+      report('unavailable'); refused(info);
+      return { online: false, unavailableHome: true, joinRefusal: info };
+    }
     // No server (or it refused us): the caller falls back to solo play.
     // Say why on the console — a silent solo fallback against a live server
     // is otherwise undiagnosable from inside the app.
@@ -331,6 +357,7 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     log: joined.data.log || [],
     offers: joined.data.offers || [],
     settings: joined.data.settings || {},
+    savedHome: joined.data.savedHome === true,
     // The room's prepared table as of this join — {rev, table, profiles, at}
     // (ROADMAP §G4) — or null when nobody has pushed one. A SNAPSHOT, exactly
     // like `players`/`log`/`settings` above: net.js does not keep it current,
@@ -674,6 +701,7 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
         setStatus('online');
         let data = null;
         try { data = ev.data ? JSON.parse(ev.data) : null; } catch { return; }
+        if (type === 'hello') conn.savedHome = data?.savedHome === true;
         emit(type, data);
       });
     }
@@ -778,6 +806,7 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
       // one we saw. §G6's re-push is what heals that, and it can only notice
       // the gap if the gap is visible here.
       conn.setup = res.data.setup || null;
+      conn.savedHome = res.data.savedHome === true;
       // Same rule for the sub-table wiring: absent means the room genuinely
       // holds none (a restarted server forgot the split), so it falls to
       // empty rather than keeping what we last saw.

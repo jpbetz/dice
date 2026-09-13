@@ -69,7 +69,7 @@ export function createAccountClient({ fetch: fetcher = globalThis.fetch,
           ...(nonce ? { 'X-Dice-CSRF': nonce } : {}) }) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: controller.signal,
       });
-      if (response.status === 404 && !action.startsWith('library')) return { ok: false, code: 'not_available', enabled: false };
+      if (response.status === 404 && !action.startsWith('library') && !action.startsWith('homes')) return { ok: false, code: 'not_available', enabled: false };
       const value = await response.json();
       if (!value || typeof value !== 'object') return unavailable();
       if (!response.ok) return { ...value, ok: false };
@@ -128,6 +128,14 @@ export function createAccountClient({ fetch: fetcher = globalThis.fetch,
     saveLibrary: (expectedPersonId, input, { reconcile = false } = {}) =>
       libraryRequest(expectedPersonId, reconcile ? 'library/reconcile' : 'library', input),
     archiveLibrary: (expectedPersonId, input) => libraryRequest(expectedPersonId, 'library/archive', input),
+    homes: expectedPersonId => libraryRequest(expectedPersonId, 'homes'),
+    home: (expectedPersonId, id, revision = null) => libraryRequest(expectedPersonId,
+      `homes/${encodeURIComponent(id)}${revision ? `/versions/${encodeURIComponent(revision)}` : ''}`),
+    captureHome: (expectedPersonId, input) => libraryRequest(expectedPersonId, 'homes/capture', input),
+    createHome: (expectedPersonId, input) => libraryRequest(expectedPersonId, 'homes', input),
+    saveHome: (expectedPersonId, id, input, { reconcile = false } = {}) => libraryRequest(expectedPersonId,
+      `homes/${encodeURIComponent(id)}${reconcile ? '/reconcile' : ''}`, input),
+    leaveHome: (expectedPersonId, id, input) => libraryRequest(expectedPersonId, `homes/${encodeURIComponent(id)}/leave`, input),
     logout() {
       // Freeze the local namespace before awaiting a server that may be down.
       const epoch = ++identityEpoch;

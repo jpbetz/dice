@@ -176,7 +176,7 @@ test('origin/CSRF refusal, revocation, logout and key rotation preserve account 
   assert.equal((await b.request('session')).value.person.id, created.value.person.id);
 });
 
-test('off, malformed configuration and unavailable storage keep guest API available', async t => {
+test('off, malformed configuration and unavailable storage keep explicit new guest tables available', async t => {
   const dirs = [];
   const servers = [];
   t.after(async () => { for (const app of servers) await app.stop(); for (const dir of dirs) await fs.rm(dir, { recursive: true, force: true }); });
@@ -192,12 +192,16 @@ test('off, malformed configuration and unavailable storage keep guest API availa
     assert.equal(status.value.available, false);
     assert.equal(status.value.enabled, mode !== 'off');
     assert.equal((await guest.request('register', { recoveryKey: key(), displayName: 'Sam', recoveryAcknowledged: true })).status, 503);
+    const created = await fetch(app.origin + '/api/new-room', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'New guest table' }) });
+    assert.equal(created.status, 200);
+    const room = (await created.json()).room;
     const join = await fetch(app.origin + '/api/join', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room: 'service-unavailable-guest', name: 'Guest' }) });
+      body: JSON.stringify({ room, name: 'Guest' }) });
     assert.equal(join.status, 200);
     const seat = await join.json();
     const roll = await fetch(app.origin + '/api/roll', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room: 'service-unavailable-guest', playerId: seat.playerId, notation: '1d6' }) });
+      body: JSON.stringify({ room, playerId: seat.playerId, notation: '1d6' }) });
     assert.equal(roll.status, 200);
     assert.equal(app.logs().includes('private damaged bytes'), false);
   }

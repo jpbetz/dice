@@ -87,7 +87,10 @@ import { createOptionalAccountApi } from './service/account-http.js';
 
 // Account durability is optional and isolated from the live room path. The
 // router catches its own errors before they can reach request diagnostics.
-const accountApi = createOptionalAccountApi();
+const accountApi = createOptionalAccountApi({ homeBridge: {
+  capture: captureHomeSnapshot, validate: validateHomeSnapshot, fresh: freshHomeSnapshot,
+  saved: ({ roomKey }) => { const room = rooms.get(roomKey); if (room) room.savedHome = true; },
+} });
 
 const PORT = Number(process.env.PORT) || 8123;
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -622,6 +625,7 @@ function defaultSettings() {
  * }
  */
 const rooms = new Map();
+const homeLoads = new Map();
 
 function getRoom(name) {
   let room = rooms.get(name);
@@ -667,6 +671,7 @@ function getRoom(name) {
     log(`room created: ${logField('room', name)}`);
     return room;
   }
+  if (room.freshGuestTimer) { clearTimeout(room.freshGuestTimer); room.freshGuestTimer = null; }
   // Someone walked up to a room that may have been lingering on its setup TTL
   // (§G6). The TTL only ever measured "nobody is here", so it ends now and the
   // room resumes exactly as prepared — same settings, same setup, same rev, so
@@ -1288,6 +1293,7 @@ function roomSnapshot(room, viewerId) {
     log: room.log.map((r) => projectEntryFor(r, viewerId)).filter((r) => r !== null),
     offers: room.offers,
     settings: { ...room.settings },
+    ...(room.savedHome ? { savedHome: true } : {}),
     ...(room.setup ? { setup: room.setup } : {}),
     ...(room.parent ? { parent: room.parent } : {}),
     ...(room.children.length ? { children: room.children } : {}),
@@ -1550,6 +1556,70 @@ function resumableSeatFor(room, who) {
   return lapsed;
 }
 
+// The durable service takes only this public furniture projection. No player
+// identity, published/private rack, log, offer, value or unfinished turn is in it.
+function captureHomeSnapshot(input) {
+  const found = lookup(input || {});
+  if (found.error) return { ok: false, status: 403, code: 'live_seat_required',
+    message: 'Join this table before saving its shared setup.' };
+  return { ok: true, roomKey: found.room.name, document: { schema: 1,
+    settings: structuredClone(found.room.settings), setup: found.room.setup ? structuredClone(found.room.setup) : null } };
+}
+
+function validateHomeSnapshot(raw) {
+  const invalid = () => ({ ok: false, status: 400, code: 'invalid_home', message: 'The saved setup cannot be restored without changing it.' });
+  try {
+    if (!raw || raw.schema !== 1 || !raw.settings || typeof raw.settings !== 'object' || Array.isArray(raw.settings)
+        || Object.keys(SETTING_SPECS).some(key => !Object.hasOwn(raw.settings, key))) return invalid();
+    const settings = validateSettingsPatch(raw.settings);
+    if (settings.error) return invalid();
+    let setup = null;
+    if (raw.setup !== null) {
+      const value = raw.setup;
+      if (!value || !Number.isInteger(value.rev) || value.rev < 1 || !Number.isFinite(value.at)
+          || !value.table || typeof value.table !== 'object' || Array.isArray(value.table)
+          || Object.hasOwn(value.table, 'experiences')
+          || (Object.hasOwn(value, 'ver') && (typeof value.ver !== 'string' || !parseStamp(value.ver)))) return invalid();
+      const table = Object.keys(value.table).length ? validateSettingsPatch(value.table) : { patch: {} };
+      const profiles = sanitizeProfiles(value.profiles);
+      if (table.error || profiles.error) return invalid();
+      setup = { rev: value.rev, ...(Object.hasOwn(value, 'ver') ? { ver: value.ver } : {}),
+        table: table.patch, profiles: profiles.profiles, at: value.at };
+    }
+    return { ok: true, document: { schema: 1, settings: settings.patch, setup } };
+  } catch { return invalid(); }
+}
+
+function freshHomeSnapshot(name) {
+  const tableName = SETTING_SPECS.tableName.normalize(name);
+  if (!tableName) return { ok: false, status: 400, code: 'home_name_required', message: 'Give this table a name.' };
+  return { ok: true, document: { schema: 1, settings: { ...defaultSettings(), tableName }, setup: null } };
+}
+
+// Explicit new guest tables get a server-minted address and a short-lived
+// reservation. This path never consults durable storage: unlike an arbitrary
+// cold URL, the freshly minted address cannot stand for an older saved home.
+async function handleNewGuest(req, res) {
+  const body = await readJsonBody(req);
+  if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
+  if (!body.value || typeof body.value !== 'object' || Array.isArray(body.value)
+      || Object.keys(body.value).some(key => key !== 'name')) return sendError(res, 400, 'invalid new-table request', 'bad_request');
+  const name = SETTING_SPECS.tableName.normalize(body.value.name === undefined ? '' : body.value.name);
+  if (name === null) return sendError(res, 400, 'invalid table name', 'bad_name');
+  if (!takeRoomCreateBudget(req)) return sendError(res, 429, 'too many new rooms — try again later', 'room_rate_limited');
+  if (rooms.size >= MAX_ROOMS && !evictLingeringRoom()) return sendError(res, 503, 'too many rooms', 'server_full');
+  let key;
+  do { key = `g_${crypto.randomBytes(32).toString('base64url')}`; } while (rooms.has(key));
+  const room = getRoom(key);
+  room.settings.tableName = name;
+  room.freshGuestTimer = setTimeout(() => {
+    room.freshGuestTimer = null;
+    if (rooms.get(key) === room && room.players.size === 0) dropRoomIfEmpty(room);
+  }, JOIN_GRACE_MS);
+  room.freshGuestTimer.unref();
+  return sendJson(res, 200, { ok: true, room: key, name });
+}
+
 async function handleJoin(req, res) {
   const body = await readJsonBody(req);
   if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
@@ -1614,6 +1684,25 @@ async function handleJoin(req, res) {
     return sendError(res, 429, 'too many new rooms from this address — try again in a minute', 'room_rate_limited');
   }
 
+  // Cold addresses may be durable homes. Share the lookup between first
+  // joiners, then recheck the live map after the await. No live room ever
+  // reloads older saved settings, and an outage cannot mint an empty stand-in.
+  let restored = null;
+  if (!rooms.has(roomName)) {
+    if (!homeLoads.has(roomName)) {
+      const lookup = accountApi.resolveHomeRoom(roomName).finally(() => homeLoads.delete(roomName));
+      homeLoads.set(roomName, lookup);
+    }
+    const result = await homeLoads.get(roomName);
+    if (!rooms.has(roomName)) {
+      if (!result.ok) return sendError(res, result.status || 503,
+        'saved table lookup is unavailable — retry this address later', result.code || 'home_unavailable');
+      if (roomName.startsWith('h_') && !result.home) return sendError(res, 410,
+        'saved table is unavailable — this address was not replaced', 'home_not_found');
+      restored = result.home?.document || null;
+    }
+  }
+
   // Entity caps: an unauthenticated client must not be able to allocate
   // unbounded rooms/players. Lingering rooms (§G6) occupy slots like any
   // other, and give one up rather than let a live table be refused — see
@@ -1628,6 +1717,11 @@ async function handleJoin(req, res) {
   }
 
   const room = getRoom(roomName);
+  if (restored && !existing) {
+    room.settings = structuredClone(restored.settings);
+    room.setup = restored.setup ? structuredClone(restored.setup) : null;
+    room.savedHome = true;
+  }
   // WHOEVER HAS BEEN WAITING LONGEST SITS FIRST (§7.63). A station freed by a
   // stub lapsing is handed to the next thing that reads the ladder, and that
   // must never be this arrival: a placeless player who has been at the table
@@ -4805,6 +4899,7 @@ const server = http.createServer((req, res) => {
       return handleHealth(req, res);
     }
     if (route.startsWith('/api/account/')) return accountApi.handle(req, res, route);
+    if (route === '/api/new-room' && req.method === 'POST') return handleNewGuest(req, res);
     if (route === '/api/join' && req.method === 'POST') return handleJoin(req, res);
     if (route === '/api/events' && req.method === 'GET') return handleEvents(req, res, url);
     if (route === '/api/pong' && req.method === 'POST') return handlePong(req, res);

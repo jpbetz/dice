@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { cutText } from '../js/notation.js';
 import { StoreError } from './store.js';
 import { readLibrary, prepareLibraryWrite, writeLibrary, archiveLibrary } from './library.js';
+import { createHomeDomain } from './homes.js';
 
 export const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_SESSIONS = 12;
@@ -31,7 +32,7 @@ const checkPerson = person => {
 // Domain refusals are values, so adapters can safely sanitize every thrown
 // exception without converting an expected validation/conflict into a 503.
 export function createAccountService({ store, now = Date.now, sessionMs = SESSION_MS,
-  maxAccounts = 1000, registrationsPerDay = 100 } = {}) {
+  maxAccounts = 1000, registrationsPerDay = 100, homeBridge = null } = {}) {
   if (!store || typeof store.transact !== 'function' || typeof now !== 'function'
       || !Number.isFinite(sessionMs) || sessionMs < 1 || sessionMs > SESSION_MS
       || !Number.isSafeInteger(maxAccounts) || maxAccounts < 1
@@ -64,11 +65,13 @@ export function createAccountService({ store, now = Date.now, sessionMs = SESSIO
     sessionToken: session.token });
   const expectedPerson = (found, expected) => found.person.id === expected ? null
     : outcome(409, 'identity_changed', 'The signed-in person changed. Reopen the account before syncing.');
+  const homes = createHomeDomain({ bridge: homeBridge, now });
 
   return Object.freeze({
     async status() {
       await store.get('meta/accounts');
-      return { enabled: true, available: true, recoveryMethods: ['key'], schema: 1 };
+      return { enabled: true, available: true, recoveryMethods: ['key'], schema: 1,
+        capabilities: ['library', ...(homes ? ['homes'] : [])] };
     },
     async register(input) {
       if (!input || !validRecoveryKey(input.recoveryKey) || input.recoveryAcknowledged !== true
@@ -155,6 +158,28 @@ export function createAccountService({ store, now = Date.now, sessionMs = SESSIO
         if (!found.ok) return found;
         return expectedPerson(found, expected) || archiveLibrary(tx, found.person, input);
       });
+    },
+    async home(token, csrf, expected, action, { id, revision = null, input } = {}) {
+      if (!homes || !['capture', 'list', 'read', 'create', 'save', 'reconcile', 'leave'].includes(action)) {
+        return outcome(503, 'homes_unavailable', 'Saved tables are unavailable. Your live table still works.');
+      }
+      const result = await store.transact(async tx => {
+        const found = await authenticated(tx, token, csrf, now(), !['list', 'read'].includes(action));
+        if (!found.ok) return found;
+        const refused = expectedPerson(found, expected);
+        if (refused) return refused;
+        if (action === 'capture' || action === 'create') return homes[action](tx, found.person, input);
+        if (action === 'list') return homes.list(tx, found.person);
+        if (action === 'read') return homes.read(tx, found.person, id, revision);
+        if (action === 'leave') return homes.leave(tx, found.person, id, input);
+        return homes.save(tx, found.person, id, input, action === 'reconcile');
+      });
+      if (result.ok && result.home && typeof homeBridge.saved === 'function') homeBridge.saved(result.home);
+      return result;
+    },
+    async resolveHomeRoom(roomKey) {
+      if (!homes) return outcome(503, 'homes_unavailable', 'Saved tables are unavailable. Try this address again later.');
+      return store.transact(tx => homes.resolve(tx, roomKey));
     },
     async logout(token, csrf) {
       return store.transact(async tx => {

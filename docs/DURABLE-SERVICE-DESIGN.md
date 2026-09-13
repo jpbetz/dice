@@ -3,7 +3,7 @@
 # Optional durable service
 
 **R1-D0/D1.1 · design decision, 2026-09-13 · adapters and optional recovery
-API and private-library protocol implemented; account/sync UI and home proofs pending.** Implements the account, library, home and social boundaries in
+API, private-library and saved-home protocols implemented; composed UI and social proofs pending.** Implements the account, library, home and social boundaries in
 [People, personal dice, and persistent tables](PEOPLE-DICE-TABLES.md).
 This record enables local implementation; it does not claim a cloud service
 has been provisioned or a recovery prototype has passed.
@@ -456,3 +456,11 @@ comparison, conflict resolution, sign-out with pending edits, unavailable
 saved home, and received invitation → explicit Join now. Capture the moment,
 not merely its green test. Real-device observation and cloud provisioning
 remain separately identified evidence until performed.
+
+
+**D2 saved-home protocol is implemented**, with API/network contracts and the
+precise cold-address outage boundary in
+[SAVED-HOME-PROTOCOL.md](SAVED-HOME-PROTOCOL.md). This includes explicit same-URL
+capture, immutable competing revisions, new guest creation independent of home
+storage, and restart hydration. The main UI seams listed there remain for the
+Tables/account integration slice; no production deployment is implied.
