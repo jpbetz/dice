@@ -22,6 +22,7 @@ import * as CANNON from 'cannon-es';
 import { bakeFilm } from './film-bake.js';
 import { captureFilm, rngFromState, mergeFilmState, unpackFilm } from './film-wire.js';
 import { FilmClient } from './film-client.js';
+import { ROUND_NORMALS, roundApothem, roundSpawnLine, roundSpawnPoint, roundClearance } from './round-table.js';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, bustDie, SHADER_TIME, FACE_SHAPES } from './dice.js';
 import { dieArtURL, bustArt } from './diceart.js';
 import { connect, createGuestTable, forgetSeat, peekTable, prejoinSeat, LS_WHO } from './net.js';
@@ -3921,6 +3922,29 @@ const walls = {
 };
 addStaticPlane(wallMat, [0, T.table.ceilingY, 0], [Math.PI / 2, 0, 0]);      // ceiling — the declaration's `table.ceilingY`; a plane is placed once (reload-class)
 
+// The portalless table is physically round, independent of optional scenery.
+// Keep these engine-owned bodies in one fixed order for their whole lifetime.
+// Towers retain their original four walls/doorway; a closed polygon would
+// seal that corridor. Neither model downloads nor venue selection touch this.
+const roundWalls = ROUND_NORMALS.map(n => addStaticPlane(wallMat,
+  [n.x * roundApothem(TABLE_W), 0, n.z * roundApothem(TABLE_W)],
+  [0, Math.atan2(-n.x, -n.z), 0]));
+let roundTableOn = true;
+function syncRoundTable(on) {
+  roundTableOn = on;
+  const apothem = roundApothem(TABLE_W);
+  for (const body of Object.values(walls)) body.collisionFilterMask = on ? 0 : -1;
+  roundWalls.forEach((body, i) => {
+    body.collisionFilterMask = on ? -1 : 0;
+    body.position.set(ROUND_NORMALS[i].x * apothem, 0, ROUND_NORMALS[i].z * apothem);
+    body.aabbNeedsUpdate = true;
+  });
+  // The cardinal planes can also have moved during zoom/tower depth changes.
+  for (const body of Object.values(walls)) body.aabbNeedsUpdate = true;
+  world.broadphase.dirty = true;
+}
+syncRoundTable(true);
+
 // ---------------------------------------------------------------------------
 // Sound — the audio graph (docs/AUDIO.md)
 //
@@ -5994,7 +6018,7 @@ function laneAndLine(laneSlot, pool, count) {
 }
 
 function spawnDie(type, index, count, side, rng, shrouded = false, set = null,
-  lane = 0, spreadOverride = null, aim = AIM_ZERO, ring = null) {
+  lane = 0, spreadOverride = null, aim = AIM_ZERO, ring = null, roundLine = null) {
   const variant = dieVariant(shrouded, set);
   const mesh = createDieMesh(type, variant);
   const body = dieBody(type);
@@ -6033,7 +6057,7 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null,
   // override IS the line then — for the offsets and for the instrument row
   // both. Null on every unstamped roll, so `??` leaves the shipped expression
   // untouched to the bit.
-  const spread = spreadOverride ?? Math.min(extent - SPAWN.pad, count * SPAWN.per);
+  const spread = roundLine?.spread ?? spreadOverride ?? Math.min(extent - SPAWN.pad, count * SPAWN.per);
   const offset = count === 1 ? 0 : -spread / 2 + (spread * index) / (count - 1);
   const lateral = SPAWN.axis === 'own' ? offset : offset * 0.5;
   const jitter = () => (rng() - 0.5) * 1.2;
@@ -6052,7 +6076,19 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null,
   // the spawn HEIGHT for a stamped throw (js/places.js PLACE_AIM.h — a toss
   // from a low hand is what keeps a pool in its region; the drop, not the
   // hurl, was the scatter) and is 1 on AIM_ZERO, an exact multiply.
-  if (ring) {
+  if (roundLine) {
+    // The unstamped Z-aligned legacy branches drew height before jitter.
+    // Preserve both that assignment and the overall PRNG position.
+    let p, height;
+    if (!ring && side >= 2) {
+      height = (6 + rng() * 4 + index * 0.9) * aim.h;
+      p = roundSpawnPoint(roundLine, index, count, jitter());
+    } else {
+      p = roundSpawnPoint(roundLine, index, count, jitter());
+      height = (6 + rng() * 4 + index * 0.9) * aim.h;
+    }
+    body.position.set(p.x, height, p.z);
+  } else if (ring) {
     // THE TOSS (js/places.js seatToss): the line is the tangent at the
     // roller's spawn point, the dice spread along it, each clamped inside the
     // walls on both axes. Same draws in the same order as the four edges.
@@ -6084,6 +6120,7 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null,
       lane: Math.round(lane * 100) / 100,
       from: throwOrigin ? throwOrigin.from : 'seed',
       clear: Math.round((half - Math.abs(at) - r) * 100) / 100,
+      roundClear: roundLine ? roundClearance(TABLE_W, body.position.x, body.position.z, r) : null,
     });
   }
 
@@ -7244,6 +7281,19 @@ function playRoll(roll, rethrow = null, options = {}) {
   // double — so a payload without a stamp bakes the film this table baked
   // before places existed.
   const aim = ring ? tossAim(ring, TABLE_W, TABLE_D) : AIM_ZERO;
+  let roundLine = null;
+  if (!pouring && roundTableOn) {
+    const hull = types.reduce((max, type, i) => keptByIndex.has(i) ? max : Math.max(max, restCeiling(type)), 0);
+    const alongZ = side >= 2, sign = side === 1 || side === 2 ? -1 : 1;
+    const extent = SPAWN.axis === 'own' && alongZ ? TABLE_D : TABLE_W;
+    const spread = spreadOverride ?? Math.min(extent - SPAWN.pad, throwCount * SPAWN.per);
+    const line = ring ? { ...ring, spread } : {
+      x: alongZ ? sign * (TABLE_W / 2 - 2.2) : laneWorld,
+      z: alongZ ? 0 : sign * (TABLE_D / 2 - 2.2), tx: alongZ ? 0 : 1, tz: alongZ ? 1 : 0,
+      spread: spread * (alongZ && SPAWN.axis !== 'own' ? 0.5 : 1),
+    };
+    roundLine = roundSpawnLine(line, TABLE_W, hull);
+  }
   // THE OTHER HALF OF THE ATTRIBUTION RULE (UX §7.63, §6.3). While this film
   // plays, a soft arc of the roller's hue lies on the ground under THEIR
   // placard. It is read from `roll.entry` — the payload stamp — and NOT from
@@ -7292,7 +7342,7 @@ function playRoll(roll, rethrow = null, options = {}) {
       const held = keptByIndex.get(i);
       if (held) return held;
       return spawnDie(t, rethrow ? throwOrdinal.get(i) : i, throwCount, side, rng,
-        shrouded, rollDieSet(roll, i), laneWorld, spreadOverride, aim, ring);
+        shrouded, rollDieSet(roll, i), laneWorld, spreadOverride, aim, ring, roundLine);
     });
   if (rethrow) {
     // The dice being thrown again leave the table as objects — their meshes
@@ -12864,6 +12914,7 @@ function towerLabSet(on = true) {
     TOWERLAB.on = false;
     towerMatDepth('lab', 0);
   }
+  syncRoundTable(currentTower === 'none' && !TOWERLAB.on);
   return TOWERLAB.on;
 }
 
@@ -13142,6 +13193,7 @@ function towerSocket(id) {
   // that owns every other piece of the room's atmosphere.
   MOOD.moteHost = towerCos(spec).motes ? spec.id : null;
   applyMood();
+  syncRoundTable(currentTower === 'none' && !TOWERLAB.on);
   return currentTower;
 }
 
@@ -16038,6 +16090,11 @@ window.__diceDebug = {
   get system() { return currentSystemId; },
   get tablePreview() { return tablePreview?.state || null; },
   get tableDesign() { return tableDesign.state; },
+  tableBoundary() {
+    return { round: roundTableOn, radius: TABLE_W / 2, apothem: roundApothem(TABLE_W),
+      planes: roundWalls.length, active: roundWalls.filter(b => b.collisionFilterMask !== 0).length,
+      ids: roundWalls.map(b => b.id), bodies: world.bodies.length };
+  },
   tableDesignSurface(points) {
     const model = tableDesign.object;
     if (!model) return null;
@@ -29289,6 +29346,7 @@ function applyZoom(level) {
   refitView();         // camera framing + particle/post + chip anchors
   if (towerWasOn) towerLabSet(true);
   if (socketed !== 'none') towerSocket(socketed);
+  syncRoundTable(currentTower === 'none' && !TOWERLAB.on);
   placardRelay();      // §7.63: the walls moved, so the cards outboard of them did
 }
 
