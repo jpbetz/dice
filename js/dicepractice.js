@@ -62,7 +62,8 @@ export function createDicePractice(host, report) {
     // Maintain the whole practice area in both the desktop and phone viewport.
     if (!rolling && body) {
       // The same close read for every resting die, independent of its value.
-      camera.position.set(body.position.x, body.position.y + 3.5, body.position.z + 3.2);
+      const fit = Math.max(1, 1 / camera.aspect);
+      camera.position.set(body.position.x, body.position.y + 3.5 * fit, body.position.z + 3.2 * fit);
       camera.lookAt(body.position.x, body.position.y, body.position.z);
     } else {
       camera.position.set(0, 9 * Math.max(1, 1.8 / camera.aspect), 8 * Math.max(1, 1.8 / camera.aspect));

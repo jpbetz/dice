@@ -24,6 +24,12 @@ update browser titles and recents. This implements the local setup portion
 of R1-B3. The wider destination shell, prepared-material organization, Quick
 dice, practice, persistent homes and in-app invitations remain open.
 
+The [expanded dice workspace](SHIPPED.md#expanded-dice-workspace-2026-09-13)
+implements the owner's distinction between economical persistent controls
+and generous focused views: a searchable catalogue beside a desktop preview,
+and full-screen phone browsing/detail with a return to the same list position.
+This advances the gallery part of R1-B2; practice and the broader shell remain.
+
 ## 1. The experience to build
 
 A new visitor rolls immediately with familiar dice. They can see where to
@@ -147,8 +153,9 @@ resembles a generated rack. “Start another kit” adds; it does not reset.
 ## 4. Personal dice that visibly take effect
 
 The gallery uses large, labelled previews of actual catalogue sets, with
-All / Favorites, a current-selection indicator, and a focused detail view.
-Search or filters can follow demonstrated catalogue-navigation needs.
+All / Favorites, search by name and collection, a current-selection indicator,
+and a focused detail view. Desktop browsing and preview stay side by side;
+the phone detail returns to the same position in the catalogue.
 Load preview images as needed and allow at most one active 3D practice
 viewport; opening the gallery must not instantiate the catalogue's meshes.
 

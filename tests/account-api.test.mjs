@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { openFileStore } from '../service/store-file.js';
 import { createAccountService } from '../service/account.js';
 import { createAccountClient } from '../js/account.js';
+import { document } from './fixtures/library-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const key = () => 'dt1_' + crypto.randomBytes(32).toString('base64url');
@@ -74,6 +75,30 @@ function browser(origin, requestOrigin = origin) {
     },
   };
 }
+
+test('private library survives a process restart and is recovered by a clean cookie jar', async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'dice-library-restart-'));
+  const servers = [];
+  t.after(async () => { for (const entry of servers) await entry.stop(); await fs.rm(dir, { recursive: true, force: true }); });
+  const first = await server(dir); servers.push(first);
+  const a = browser(first.origin);
+  const recoveryKey = key();
+  const registered = await a.request('register', { recoveryKey, displayName: 'Sam', recoveryAcknowledged: true });
+  const personId = registered.value.person.id;
+  const input = { operationId: crypto.randomUUID(), baseRevision: null, document: document('Private recovered wizard') };
+  const saved = await a.request('library', input, { headers: { 'X-Dice-Person': personId } });
+  assert.equal(saved.status, 200);
+  assert.equal((await first.stop()).code, 0);
+  const restarted = await server(dir); servers.push(restarted);
+  const clean = browser(restarted.origin);
+  assert.equal((await clean.request('library', undefined, { headers: { 'X-Dice-Person': personId } })).status, 401);
+  assert.equal((await clean.request('recover', { recoveryKey })).value.person.id, personId);
+  const loaded = await clean.request('library', undefined, { headers: { 'X-Dice-Person': personId } });
+  assert.deepEqual(loaded.value.document, input.document);
+  assert.equal(loaded.value.headRevision, saved.value.revision);
+  assert.deepEqual((await clean.request('library', input, { headers: { 'X-Dice-Person': personId } })).value, saved.value);
+  assert.equal(servers.some(entry => entry.logs().includes('Private recovered wizard')), false);
+});
 
 test('clean browsers recover one person after a real process restart; no library uploads or room authority', async t => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'dice-account-api-'));

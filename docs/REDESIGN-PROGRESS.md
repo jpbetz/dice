@@ -14,12 +14,12 @@ priority order. R1, R2 and R3 remain open until their composed proofs pass.
 | Direct identity, gallery/favorites, personal selection | Initial slice committed as `b064b07`; preserve the subsequent owner correction asking for compact controls. |
 | Compact controls and transactional table setup | Integrated owner-session commit `85da885`. Follow-up fixes restore keyboard radio arrows inside the sheet and clear conflicts when a peer restores the base; targeted desktop/phone proofs pass. True 3D appearance preview remains open. |
 | Gallery practice | Committed as `f67d1df`; local/shared isolation and lifecycle tests plus desktop/phone captures pass. First combined unit/fuzz/smoke run passed (61/61 smoke). |
-| R1-C: Quick dice and explicit starter kits | Integrated `605b4f6` / `ab8e003` as `d6efcbb` / `5291b00`. Focused tests preserve empty/legacy libraries, occupied interpretation, drafts and unfinished private/shared/solo turns. Update old Soul Deal fixtures during composed validation. |
-| Explicit profile publication | Implemented and focused raw-network proof passes; see PROFILE-SHARING.md. Connect the namespace-reset hook before account recovery can adopt a library. |
-| R1-D0: durable service | Design selects optional recovery keys, private local atomic store and a Firestore REST adapter; adapter implementation/proofs underway in `codex/durable-service`. No cloud storage is provisioned. |
+| R1-C: Quick dice and explicit starter kits | Integrated `605b4f6` / `ab8e003` as `d6efcbb` / `5291b00`. Focused tests preserve empty/legacy libraries, occupied interpretation, drafts and unfinished private/shared/solo turns. Old tests explicitly select Soul Deal profiles/lenses and the composer; fresh-visit proofs retain the new empty/Numbers-only default. |
+| Explicit profile publication | Committed as `002b115`; focused raw-network proof and composed smoke pass; see PROFILE-SHARING.md. Connect the namespace-reset hook before account recovery can adopt a library. |
+| R1-D0: durable service | Local atomic store and Firestore REST adapter integrated as `046f9a7` / `0c121fa`; optional account API/client integrated as `a2037ee`. Adapter/account tests pass, including cookie races and restart recovery. Agent now implementing immutable private library revisions, IndexedDB namespaces and explicit conflicts. No cloud storage is provisioned. |
 | R3: compressed public text | Agent commit `8e44250` reviewed and integrated as `feb5f79`; combined suite passes. Production lacked compression; local six-file transfer shrinks approximately 72% with Brotli. |
-| R3: dice-face draw consolidation | Agent investigating/implementing in `codex/r3-materials`; require measured draw savings and art/physics parity. |
-| R1 destinations + R2 phone surface | Agent implementing one coherent workspace and full-width phone with bottom roll tray from the compact/quick integration base. Review actual four-person dice bounds and preserve draft/open turns. |
+| R3: dice-face draw consolidation | Integrated as `354b965`: two real draws per compatible die, reviewed face sheets and exact geometry/film checks. Worker branch now proves original film parity; main-thread responsiveness measurements and lifecycle review underway. |
+| R1 destinations + R2 phone surface | Integrated as `55c42d7`: three destinations, content-sized desktop workspaces, full-width phone scene and bottom tray. Agent now implementing persistent result seats and fixing open-turn card overlap on phone. |
 
 The root's integration checkout is `/tmp/dice-redesign-integration` on
 `codex/redesign-integration`. Agents use isolated worktrees so reviews and
@@ -30,8 +30,7 @@ cherry-picks are explicit and another ongoing session's edits survive.
 Finish R1-B3's recognizable names and real appearance preview; implement
 the destination shell and phone layout; deliver recovery APIs, explicit
 profile publication, safe library synchronization, saved homes, contacts,
-invitations, and permitted presence. Fix the existing history-cap eviction
-of unfinished turns after sufficiently many later rolls. Then exercise the full guest/recovered
+invitations, and permitted presence. History-cap eviction is fixed as `c775622` / `98f72e4`: 100 unfinished turns are protected beside 100 completed entries, new-turn capacity refuses without deleting work, and batch DOM pruning is verified. Then exercise the full guest/recovered
 return loop after restart without a prior client repushing state.
 
 R2 owes one complete multiplayer composition, readable per-player latest
@@ -57,3 +56,22 @@ integration tree at `feb5f79` passed all unit/fuzz tests and 61/61 smoke,
 including die-pick; that intermittent earlier surface report still needs
 characterization if it recurs, not a weakened probe. Use the harness's
 ephemeral ports. Port 8123 remains untouched.
+
+## Composed checkpoint — 2026-09-13
+
+At `354b965`, all unit/fuzz checks and **67/67 browser smoke scenarios pass**.
+The numeric default exposed real symbol-face and push-scoring omissions;
+`d39651c` fixes the actual breakdown and tests both old chosen lenses and the
+new default. Desktop/phone numeric captures were inspected after the shell
+merge. A large open push-turn card still overlaps the phone dice and its
+keyboard hint crosses the header; this is assigned to the result-layout slice.
+
+The history fix adds passing shared/private/solo long-session proofs (three
+browser scenarios plus server capacity/retention/claim retry). The root has
+started the first forge-baked Copper Lantern table in `codex/r2-art`; its
+7,996-triangle model passes manifold/color/bounds gates, but app composition
+and material review are still underway. No artwork completion is claimed.
+
+The owner's main checkout has newer uncommitted gallery workspace edits.
+They are left intact; integrate their committed result and retain the local
+practice throw when reconciling the gallery. The live preview is untouched.

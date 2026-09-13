@@ -8,6 +8,21 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## 2026-09-13 — Shared results and playable phone turns
+
+Each player’s latest visible result now has a persistent named seat, using
+redacted settled data and real face glyphs. Result seats and active turn
+controls reserve scene space; the phone push card no longer conceals dice.
+Complete results remain one action away, and People retains keyboard focus
+through arrivals. Scope and inspected proof: [PLAYER-RESULTS.md](PLAYER-RESULTS.md).
+
+## 2026-09-13 — Unfinished work survives history eviction
+
+History trims completed entries while keeping unfinished turns playable.
+An explicit new-turn capacity gate bounds anonymous storage without deleting
+existing work or blocking ordinary rolls. Server, late-viewer privacy, claim
+retry, and a 105-roll static-solo session are proved in [ROLL-HISTORY.md](ROLL-HISTORY.md).
+
 ## 2026-09-13 — Three workspaces and a full-width phone table
 
 Tables / My dice & rolls / People now reuse the live workbench and library,
@@ -29,6 +44,20 @@ Ordering is by tier (matches GOALS.md's priority ladder: core mechanics →
 organization → secrecy → systems literacy → effects → customization).
 
 ---
+
+## Ordinary throw simulation worker — R3 third slice (2026-09-13)
+
+The actual physics bake for non-turn throws runs in a reusable module worker.
+Authoritative values and face correction stay on the main thread; both
+execution paths share the extracted solver. Cancellation terminates abandoned
+work, while FIFO, deferred reveals and skips keep their existing semantics.
+Turns, towers and reconstruction remain inline pending the next bounded slice.
+
+Twelve seated desktop/phone films match the pre-worker build exactly. Normal
+40d20 input handling falls from 263–292 ms to 4.8–5.8 ms on the verified GPU
+rig; the solver still takes roughly the same time off-thread. No warmed
+stress sample records a main task over 50 ms. Cold rendering still stalls.
+See [boundary, measurements and limitations](redesign/2026-09-13-film-worker.md).
 
 ## Explicit per-table profile sharing (2026-09-13)
 
@@ -128,6 +157,51 @@ binary delivery and immediately readable SSE. The existing stale-validator
 test now compares decoded bytes to decoded bytes because fetch automatically
 decompresses its response while preserving the encoded Content-Length.
 All servers used ephemeral ports. The owner’s live table was untouched.
+
+## Expanded dice workspace (2026-09-13)
+
+Joe clarified that the space budget applies to the root UI that stays on
+display; the task a player opens can occupy most or all of the screen. The
+dice collection now uses that space. Its compact launcher remains beside the
+personal name, while desktop browsing opens a centered workspace with the
+catalogue and preview side by side. Selecting a card keeps catalogue scroll
+and focus in place. Arrow keys compare adjacent sets; the grid has one Tab
+stop, so reaching the preview actions does not require tabbing through every
+set. Search matches names and collections, including `seaglass` for
+`Sea-glass`, and an empty search has a Show all dice action.
+
+On phones, the collection fills the viewport. Selecting a set opens its
+detail page; Back or Escape returns to the same catalogue position and card.
+Use stays outside the scrolling preview. Short screens put the image beside
+the name and description. The current set has a direct preview entry in the
+footer, alongside the return to saved rolls. Choosing remains explicit,
+favorites remain local, and browsing never authors a shared roll.
+
+The expanded view contains local focus on both desktop and phone; other
+players keep rolling and unfinished turns survive. Resize moves focus when
+the phone-only Back control disappears. This replaces the first gallery's
+510 px desktop drawer, stacked preview/catalogue and scroll-to-top selection.
+The change uses the existing lazy module, styles and baked portraits, adds
+no renderer, and adds no permanent table controls.
+
+At 1440 × 900, the opened workspace measures 1240 × 852 px, with a 525 × 306 px
+preview area. At 390 × 844, six complete cards fit the initial catalogue view.
+The root rail stays at 112 px on desktop and 111 px in the compact layout.
+Reproduce with `node tools/drive.mjs tools/steps/dice-workspace-look.mjs`.
+
+Visual proof: [desktop comparison](redesign/2026-09-13-dice-workspace-desktop.png),
+[phone catalogue](redesign/2026-09-13-dice-workspace-phone.png),
+[phone preview](redesign/2026-09-13-dice-workspace-phone-preview.png),
+and [short-screen preview](redesign/2026-09-13-dice-workspace-short-preview.png).
+Also inspected 1000 × 760 and 844 × 390 layouts. These are desktop Chromium
+captures with a GPU backend and touch emulation, not physical-device proof.
+
+The focused checks cover explicit selection, authored dice and late joiners,
+lazy loading, search recovery, keyboard comparison, catalogue return,
+focus/resize, incoming play and unfinished-turn preservation. Existing table
+controls, saved-roll overrides, stability offerings and venue/dice behavior
+also pass. `npm test` passes unit and fuzz checks and all 63 browser smoke
+scenarios. Practice throws and the broader destination shell remain open.
 
 ## Compact table controls and setup (2026-09-13)
 
@@ -7091,5 +7165,6 @@ The twelve previously failing composed scenarios now pass targeted checks
 composer tests select the lens/workspace they exercise; fresh-visit tests still
 assert an empty library and Numbers only. The repeatable visual probe is
 `tools/steps/numbers-evidence-look.mjs`; desktop symbol/push captures were
-inspected. The resized old desktop rail still squeezes the phone view; its
-composed visual proof follows integration of the new phone workspace.
+inspected. The composed phone workspace now shows this evidence at full width. The
+large push-turn card still overlaps dice; the result-layout slice must fix
+that remaining layout issue.

@@ -48,6 +48,7 @@ import { composeRoll, composeThrow, validateMods, validateSpec, DIE_MAX,
   scoringIndices, pushTally, drawBag, MAX_PUSH_THROWS, turnIsOpen } from './js/rollspec.js';
 import { parseNotation } from './js/notation.js';
 import { TABLE_DESIGNS } from './js/table-designs.js';
+import { HISTORY_CAP as LOG_HISTORY_CAP, OPEN_TURN_CAP, TURN_CAP_MESSAGE, canStartTurn, trimRollHistory } from './js/rollhistory.js';
 // The dice catalogue. `SET_IDS` is EMPTY until `installCatalogue` fills it
 // from the declaration's `houses:` (phase D1) — js/themes.js holds the recipe
 // grammar and dice.yaml holds the recipes, and this process reads the same
@@ -126,8 +127,9 @@ const MAX_ROOM = 64;
 // Per-entry size is bounded by rollspec.js MAX_PHYSICAL_DICE=40 (the hard
 // ceiling composeRoll enforces once explosion children are counted; the
 // per-starting-die EXPLODE_CHAIN_CAP=3 only bounds depth). Multiplied by
-// LOG_CAP that gives the worst-case log footprint per room.
-const LOG_CAP = 100;              // rolls kept per room (client also caps at 100; keep in lockstep — ROADMAP §0b)
+// HISTORY_CAP + OPEN_TURN_CAP bounds retained entries. Active turns are kept
+// outside history; starting more is refused without deleting existing work.
+const LOG_CAP = LOG_HISTORY_CAP;
 const MAX_ROOMS = 500;            // live rooms across the server
 const MAX_PLAYERS_PER_ROOM = 40;
 // A PLACE AT THE TABLE (docs/UX.md §7.63) — the server-side kill switch, and
@@ -2619,27 +2621,14 @@ function executeRoll(room, player, spec) {
   collectEntries(room, arrivalSweep(room, roll));
 
   room.log.push(roll);
-  if (room.log.length > LOG_CAP) {
-    // HISTORY THAT FALLS OFF THE LOG FALLS OFF THE TABLE. Until v2 this trim
-    // could never touch a live roll: every arrival collected the whole felt,
-    // so an open roll was always the newest entry and a shelved one at most
-    // six rolls old. A placed player's open roll now outlives every roll the
-    // OTHER chairs make, so a hundred rolls later it is the oldest entry in
-    // the log — and a client that still had its dice up would keep them
-    // forever (nothing would ever collect a roll the server had forgotten),
-    // while a late joiner, rebuilding from the log, would never see it (goal
-    // 8). So a trimmed entry that is still on the table is CLEARED first and
-    // the room told, existence-gated like every roll-cleared. LOG_CAP is
-    // thereby a hard bound on how long any roll lives on the felt or shelf.
-    for (const old of room.log.slice(0, room.log.length - LOG_CAP)) {
-      if (old.cleared) continue;
-      old.cleared = true;
-      logDebug(() => `trim    ${logField('room', room.name)} rollId=${old.rollId} (fell off the log while ${old.collected ? 'shelved' : 'on the felt'})`);
-      const data = { rollId: old.rollId };
-      broadcast(room, 'roll-cleared', data, (viewerId) => (entryExistsFor(old, viewerId) ? data : null));
-    }
-    room.log = room.log.slice(-LOG_CAP);
+  const trimmed = trimRollHistory(room.log);
+  for (const old of trimmed.dropped) {
+    if (old.cleared) continue;
+    old.cleared = true;
+    const data = { rollId: old.rollId };
+    broadcast(room, 'roll-cleared', data, (viewerId) => (entryExistsFor(old, viewerId) ? data : null));
   }
+  room.log = trimmed.kept;
 
   // stdout is a disclosure surface too: a non-open roll logs its stakes and
   // mode, never its values (an operator tailing the log must not out-read the
@@ -2777,6 +2766,7 @@ async function handleRoll(req, res) {
   }
   if (sets.sets) spec.sets = sets.sets;
 
+  if (!canStartTurn(room.log, spec.mods)) return sendError(res, 409, TURN_CAP_MESSAGE, 'turn_capacity');
   const roll = executeRoll(room, player, spec);
   // The roller's own response is projected like every other egress: a held
   // roll is face down for its roller too, so even this reply carries no
@@ -3459,6 +3449,7 @@ async function handleClaim(req, res) {
   // offer stages the moment, but whoever picks it up throws their own dice.)
   const set = readSetField(body.value);
   if (set.error) return sendError(res, ...set.error);
+  if (!canStartTurn(room.log, offer.mods)) return sendError(res, 409, TURN_CAP_MESSAGE, 'turn_capacity');
   room.offers.splice(idx, 1);
 
   logDebug(() => `claim   ${logField('room', room.name)} ${logField('name', player.name)} offerId=${offerId} ${logField('by', offer.byName)}`);

@@ -53,8 +53,12 @@ are in [DEPLOY → Static delivery](DEPLOY.md#static-delivery-2026-09-13).
 The [dice-face atlas slice](redesign/2026-09-13-dice-materials.md) now reduces
 standard d20s from 21 actual draw groups to two, preserving face art and
 physics. Procedural flow/dissolve keeps its established rendering path.
-Physical-device baselines, simulation stalls, idle work and Battery saver
-remain open; no battery or faster-frame-rate claim has been established.
+The [ordinary-throw worker slice](redesign/2026-09-13-film-worker.md) now moves
+the real solver off the main thread. Seated 40d20 input return falls from
+263–292 ms to 4.8–5.8 ms in desktop/phone emulation, with identical films.
+Turns, towers and reconstruction retain the shared inline bake. Physical
+devices, turn-event queue preservation, rendering startup, idle work and
+Battery saver remain open; no battery or faster-frame-rate claim is made.
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable

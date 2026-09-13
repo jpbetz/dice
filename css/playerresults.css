@@ -1,0 +1,64 @@
+/* Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 */
+:root { --table-results-height:0px; --table-results-right:0px; --table-turn-height:0px; }
+#table-results { position:fixed; z-index:var(--z-table-labels); top:0; left:var(--table-left); right:var(--table-results-right); display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,260px)); gap:8px; padding:10px 12px; max-height:202px; overflow:auto; background:linear-gradient(#151312f2,#151312c9); }
+.result-seat { min-width:0; height:82px; padding:9px 11px 8px; display:grid; grid-template-columns:28px minmax(0,1fr) auto; grid-template-rows:20px 22px 17px; column-gap:8px; text-align:left; font-family:var(--font-ui); color:var(--ivory); border:1px solid #786b4d; border-top:2px solid var(--seat-color); border-radius:9px 9px 15px 15px; background:linear-gradient(150deg,#352e24,#201e1b 78%); box-shadow:inset 0 0 0 3px #0003,0 4px 10px #0005; cursor:pointer; }
+.result-seat:hover { background:linear-gradient(150deg,#45392a,#27231c 78%); }
+.result-seat:focus-visible { outline:2px solid var(--ivory); outline-offset:1px; }
+.result-seat-crest { grid-row:1 / 3; align-self:center; width:28px; height:32px; display:grid; place-items:center; clip-path:polygon(0 0,100% 0,100% 65%,50% 100%,0 65%); background:var(--seat-color); color:#171410; font-size:11px; font-weight:800; }
+.result-seat-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; font-weight:600; }
+.result-seat-value { grid-column:3; grid-row:1 / 3; font:32px/1.1 var(--font-display); align-self:center; max-width:160px; }
+.result-seat-value.is-word { font:12px/1.2 var(--font-ui); max-width:140px; }
+.result-seat-faces { display:flex; gap:4px; align-items:center; overflow:hidden; min-width:0; }
+.result-face { flex:none; display:inline-flex; align-items:center; justify-content:center; font-size:13px; min-width:15px; height:19px; }
+.result-face.is-discarded { text-decoration:line-through; opacity:.5; }
+.result-face.is-scored { border-bottom:2px solid var(--gold-bright); }
+.result-face .chip-glyph { width:16px; height:16px; }
+.result-face-more,.result-modifier { font-size:11px; white-space:nowrap; }
+.result-seat-state { grid-column:2 / 4; color:#bfb3a0; font-size:10px; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+.is-rolling .result-seat-value { color:#d3b66f; }
+body.has-table-result #result-banner { display:none; }
+#scene-container { top:var(--table-results-height); bottom:var(--table-turn-height); }
+#pick-hint { top:calc(var(--table-results-height) + 8px); }
+.table-turn-bar { position:fixed; bottom:0; left:var(--table-left); right:var(--table-results-right); z-index:var(--z-panel); display:flex; align-items:center; justify-content:center; gap:12px; min-height:66px; padding:10px 12px; background:#201f1c; border-top:1px solid #766643; }
+.table-turn-bar[hidden] { display:none; }
+.table-turn-bar .btn { min-height:44px; }
+.table-turn-state { font-size:12px; color:var(--muted); }
+.player-result-detail { position:fixed; z-index:var(--z-modal); top:12px; right:12px; bottom:12px; width:min(480px,calc(100vw - 24px)); overflow:auto; background:#191b1e; border:1px solid var(--hair); border-radius:12px; padding:16px; color:var(--ivory); }
+.player-result-detail.hidden { display:none; }
+.player-result-detail h2 { font:26px var(--font-display); }
+.player-result-read { font-size:16px; line-height:1.7; }
+.player-result-read .result-detail-total { font:46px var(--font-display); margin:12px 0; }
+.player-result-read .result-detail-context { color:var(--muted); font-size:12px; }
+.player-result-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }
+.player-result-actions .reveal-tier { opacity:1; }
+.player-result-actions .banner-foot { display:flex; flex-wrap:wrap; gap:7px; }
+.player-result-actions .pool-roll { min-height:44px; }
+@media(min-width:641px) {
+  body.workspace-open:not([data-workspace="dice"]) { --table-results-right:calc(var(--workspace-width) + 24px); }
+}
+@media(max-width:640px) {
+  #table-results { top:var(--phone-head); grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; padding:7px 8px; max-height:186px; }
+  #scene-container { top:calc(var(--phone-head) + var(--table-results-height)); bottom:var(--phone-foot); }
+  #pick-hint { display:none; }
+  body.has-table-turn #phone-quick-dice { visibility:hidden; }
+  .table-turn-bar { bottom:88px; left:0; right:0; height:96px; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) auto auto; grid-template-rows:24px 44px; gap:5px 8px; padding:4px 10px 8px; border:0; }
+  #table-turn-read { grid-column:1 / 4; grid-row:1; justify-self:start; padding:0; min-height:24px; font-size:11px; }
+  .table-turn-state { grid-column:1; grid-row:2; font-size:11px; line-height:1.4; }
+  #table-turn-again { grid-column:2; grid-row:2; font-size:12px; padding:6px 10px; }
+  #table-turn-bank { grid-column:3; grid-row:2; min-height:44px; padding:0 10px; font-size:12px; }
+  .result-seat { height:78px; padding:7px 8px; grid-template-columns:22px minmax(0,1fr) auto; column-gap:5px; grid-template-rows:18px 23px 17px; }
+  .result-seat-crest { width:22px; height:27px; font-size:9px; }
+  .result-seat-name { font-size:12px; }
+  .result-seat-value { font-size:28px; max-width:52px; }
+  .result-seat-value.is-word { font-size:11px; max-width:66px; }
+  .result-seat-faces { gap:2px; }
+  .result-face { min-width:13px; font-size:12px; }
+  .result-seat-state { font-size:10px; }
+  .player-result-detail { inset:0; width:100%; height:100dvh; border:0; border-radius:0; }
+}
+
+.player-result-detail .turn-odds { margin-top:16px; }
+
+#table-results[hidden], .player-result-actions[hidden] { display:none; }
+
+.result-face.is-blank { border:1px solid #aa9874; border-radius:2px; }

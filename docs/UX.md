@@ -1321,11 +1321,29 @@ a stale row is worse than no table.
 | Shelf | **RETIRED as a place.** §7.27 — a put-away roll lives in the log and its ROW is the door · **§7.42** — what it looks like at rest, open and closed · §7.7 for the collect/clear state machine, which is wire and survives verbatim | §7.7's slots, geometry and marker read · §7.7.1's compaction · ROADMAP U20/C13's "decide how much read the shelf owes" — answered by §7.42 |
 | ± popover | **§7.43** — the visibility sub-lines, and the whisper rung's amended words (§3.2's old quotation is struck there) · §7.10 — a pure editor, and where an edit lands by source · §7.14.2 — Done, click-away, the ring · §7.9's SHEET PASS identity strip · **§7.24** — only **Modifier** folds under a per-die lens; Target, d20 pairing, keep/drop and reroll/exploding are authorable under every system, and the rim reads `± Modify` in both | §7.10's "reroll and explode stay… behind the sysnote's *Show anyway*" — superseded 2026-08-06, no note and no disclosure; the accurate record is the comment over the popover's sections in `index.html` · any account of the fold in which Target or keep/drop hides under a per-die system: that was `usesMods`, deleted 2026-08-08 · ROADMAP U11's `± Moment` — its rule survived, its word did not (§7.24) |
 | Identity chip · roster · nameplate | **[Compact table controls](#compact-table-controls-2026-09-13)** for header layout and the table setup entry. **[R1 personal kit](#r1-personal-kit-2026-09-13)** — normal click/tap/keyboard opens the name editor; explicit My saved rolls returns to your rack. **§7.20a, amended 2026-09-11** — guest host, table label, persistent connection state and retry. §7.43 for table naming and roster folds; §7.17 for teammate browsing; §7.22 for compact layout | §7.17's own-name click-to-rack and secondary-gesture-only personal menu |
-| Personal dice collection | **[Compact table controls](#compact-table-controls-2026-09-13)** places My Dice beside the personal name. [R1 personal kit](#r1-personal-kit-2026-09-13) for gallery previews, favorites, explicit selection and venue suggestions | The first personal-kit release's standalone launcher card and duplicate Preferences link; §7.36's venue-controlled personal dice |
+| Personal dice collection | **[Expanded dice workspace](#expanded-dice-workspace-2026-09-13)** for side-by-side browsing/preview, search, keyboard comparison, full-screen phone detail and catalogue return. **[Compact table controls](#compact-table-controls-2026-09-13)** places My Dice beside the personal name. | The first gallery's narrow desktop drawer and scroll-to-top selection; the standalone launcher card and duplicate Preferences link; §7.36's venue-controlled personal dice |
 | Settings | **[Compact table controls](#compact-table-controls-2026-09-13)** — Table setup from the table label; compact device Preferences from the gear; Saved rolls from the personal menu. Preview then Apply for shared choices; scope, conflict and retry states stay visible. | §7.37's four peer destinations, immediate setting/blur commits, and nested mat scroller |
 | Tower catalogue and fae venue tower | **§7.31, amended 2026-09-12** — None, Wickroot, Cairnwatch and Cinderbell; both fae venues use Wickroot · §7.38 retains the settings channel rule | §7.31's archived classic catalogue and dressing; TOWER.md's old STATUS blocks and Hollow Bole palette variants |
 | **Any control's ON / OFF / UNAVAILABLE dress** (not a surface — the rule that governs all of them) | **§7.41** — the token layer. THE KIND OF CHOICE PICKS THE DRESS: switch / pick / dial, three degrees of not-active, and the override rule that makes a disagreement one greppable line. The values of record are the `:root` block in `css/style.css` | Copying the nearest neighbour's numbers, which is what produced nine `[aria-pressed="true"]` dresses across four hue families (audit C3) · any reading in which `#left-panel` scoping is what makes a dress right — 2i-C and U6 both had to un-scope a law twice for the same reason |
 | Camera / framing | **§7.62** — the roll frames itself BEFORE it moves, so the flight frame and the settled frame are one; an unsatisfiable mat fit is refunded and the mat is fitted cropped square instead; the fog floor rides the camera's pose · §7.55 for the dice-first rung and its two gate conditions · §5.4a for the fog invariant, as amended there | §7.55's "where the eye ends up once the dice have STOPPED" — the reframe moved to frame zero on 2026-08-31, and a settle-time reframe is now a no-op · §5.4a's floor measured from the zoom's preset eye · any reading in which `mat-overflow` is a frame somebody chose (it was the fit scan's give-up position) |
+
+### Expanded dice workspace (2026-09-13)
+
+The compact name-row launcher opens a generous focused workspace: a desktop
+catalogue beside a persistent preview, or full-screen catalogue/detail views
+on a phone. Search combines name and collection words and ignores punctuation
+and diacritics. Favorites filter the same catalogue. Card selection preserves
+desktop scroll and focus; arrow keys compare neighbors and the grid has one
+Tab stop. Phone Back/Escape restores the list position and selected card.
+Use remains explicit and visible outside the preview's scroll. Short views
+put the image beside the name; resize transfers focus off disappearing controls.
+
+Both desktop and phone contain local focus while the shared session continues.
+Close returns to the launcher; Back to my rolls closes and returns to the
+personal rack. The footer also previews the current set. The existing lazy
+module and baked images remain; this view adds no standing root UI or renderer.
+The [shipped record](SHIPPED.md#expanded-dice-workspace-2026-09-13) contains
+measurements and screenshots. Practice remains future work.
 
 ### Compact table controls (2026-09-13)
 
@@ -1373,9 +1391,9 @@ rolls** explicitly returns to your own rack; teammate pills still browse theirs.
 
 **My dice** remains visible in both sidebar layouts. Its placement and the
 Preferences shortcut are superseded by the compact table-controls pass above;
-the personal menu reaches the same collection. It opens as a
-nonmodal desktop drawer or a phone sheet with background inertness, Tab
-containment and focus restoration; changing viewport width updates that scope.
+the personal menu reaches the same collection. Its original desktop drawer
+and phone sheet are superseded by the expanded workspace above, which contains
+focus on both devices and preserves browsing position.
 The footer closes the gallery and returns to your rolls in one action.
 
 Each card previews actual dice using an offline WebP portrait. Gallery code,

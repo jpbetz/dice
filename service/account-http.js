@@ -4,12 +4,13 @@ import { openFileStore } from './store-file.js';
 import { openFirestoreStore, metadataTokenSupplier } from './store-firestore.js';
 import { createAccountService, SESSION_MS } from './account.js';
 import { StoreError } from './store.js';
+import { MAX_LIBRARY_BYTES } from '../js/library-document.js';
 
 const ROOT = '/api/account';
 const MAX_BODY = 8192;
 const unavailable = { ok: false, code: 'account_unavailable', message: 'Account service is unavailable. Your table still works.' };
 const disabled = { enabled: false, available: false, recoveryMethods: [], schema: 1 };
-const known = new Set(['/status', '/session', '/register', '/recover', '/logout', '/revoke-others', '/rotate-key']);
+const known = new Set(['/status', '/session', '/register', '/recover', '/logout', '/revoke-others', '/rotate-key', '/library', '/library/reconcile', '/library/archive']);
 
 function originConfig(raw) {
   let parsed;
@@ -29,7 +30,7 @@ function cookieToken(req, name) {
   return /^[A-Za-z0-9_-]{43}$/.test(token) ? token : null;
 }
 
-function readBody(req) {
+function readBody(req, maximum = MAX_BODY) {
   return new Promise(resolve => {
     let size = 0;
     const chunks = [];
@@ -44,7 +45,7 @@ function readBody(req) {
     };
     const data = chunk => {
       size += chunk.length;
-      if (size > MAX_BODY) { finish({ status: 413 }); req.resume(); }
+      if (size > maximum) { finish({ status: 413 }); req.resume(); }
       else chunks.push(chunk);
     };
     const end = () => {
@@ -113,8 +114,10 @@ export function createOptionalAccountApi({ env = process.env, service = null,
       const suffix = pathname.startsWith(ROOT + '/') ? pathname.slice(ROOT.length) : null;
       if (suffix === null) return false;
       try {
-        if (!known.has(suffix)) { send(res, 404, { ok: false, code: 'not_found', message: 'No such account action.' }); return true; }
-        const read = ['/status', '/session'].includes(suffix);
+        const versionId = /^\/library\/versions\/([vo]_[A-Za-z0-9_-]{8,80})$/.exec(suffix)?.[1];
+        const library = suffix === '/library' || suffix === '/library/reconcile' || suffix === '/library/archive' || !!versionId;
+        if (!known.has(suffix) && !versionId) { send(res, 404, { ok: false, code: 'not_found', message: 'No such account action.' }); return true; }
+        const read = ['/status', '/session'].includes(suffix) || !!versionId || (suffix === '/library' && req.method === 'GET');
         if (req.method !== (read ? 'GET' : 'POST')) {
           send(res, 405, { ok: false, code: 'method_not_allowed', message: 'Use the account action in the app.' }); return true;
         }
@@ -136,7 +139,10 @@ export function createOptionalAccountApi({ env = process.env, service = null,
                 && req.headers['sec-fetch-site'] !== 'none')) {
             send(res, 403, { ok: false, code: 'origin_refused', message: 'Open the account panel in the app.' }); return true;
           }
-          send(res, 200, await account.session(token)); return true;
+          const result = library ? await account.library(token, req.headers['x-dice-person'], versionId || null)
+            : await account.session(token);
+          const { status, ...value } = result;
+          send(res, status || 200, value); return true;
         }
         if (req.headers.origin !== settings.origin || req.headers['x-dice-account'] !== '1'
             || !/^application\/json(?:;|$)/i.test(String(req.headers['content-type'] || ''))) {
@@ -145,7 +151,7 @@ export function createOptionalAccountApi({ env = process.env, service = null,
         if (!budget(['/register', '/recover'].includes(suffix))) {
           send(res, 429, { ok: false, code: 'attempt_limit', message: 'Too many attempts. Wait a minute and try again.' }); return true;
         }
-        const body = await readBody(req);
+        const body = await readBody(req, library ? MAX_LIBRARY_BYTES * 2 + MAX_BODY : MAX_BODY);
         if (body.status) { send(res, body.status, { ok: false, code: 'invalid_request', message: 'Check the account details and try again.' },
           { Connection: 'close' }); return true; }
         const csrf = req.headers['x-dice-csrf'];
@@ -154,6 +160,8 @@ export function createOptionalAccountApi({ env = process.env, service = null,
         else if (suffix === '/recover') result = await account.recover(body.value);
         else if (suffix === '/logout') result = await account.logout(token, csrf);
         else if (suffix === '/revoke-others') result = await account.revokeOthers(token, csrf);
+        else if (suffix === '/library/archive') result = await account.archiveLibrary(token, csrf, req.headers['x-dice-person'], body.value);
+        else if (library) result = await account.saveLibrary(token, csrf, req.headers['x-dice-person'], body.value, suffix === '/library/reconcile');
         else result = await account.rotateKey(token, csrf, body.value);
         const { sessionToken, clearCookie, status, ...publicResult } = result;
         const headers = {};
