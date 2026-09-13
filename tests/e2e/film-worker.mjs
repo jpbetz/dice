@@ -64,7 +64,7 @@ export const filmWorkerScenarios = [
     assert.equal(await t.dbg('currentRoll.done'),true,'skip during bake is honored when the film arrives');
     const completed=await t.dbg('filmWorker.completed');
     await t.roll('4d6 t3');
-    assert.equal(await t.dbg('filmWorker.completed'),completed,'first turn throw retains the shared inline path');
+    assert.equal(await t.dbg('filmWorker.completed'),completed+1,'first turn throw now uses the worker');
     assert.deepEqual(t.page.consoleErrors,[]);
     const fallback=await ctx.newTable({origin:'127.0.0.123',name:'Fallback'});
     await fallback.eval(`window.Worker=undefined;window.__diceDebug.clearTable();window.__diceDebug.useFilmWorker(true);window.__diceDebug.throwSeeded(['d20'],42)`);

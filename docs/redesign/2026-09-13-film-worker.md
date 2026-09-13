@@ -2,6 +2,9 @@
 
 # Ordinary throws bake off the main thread
 
+Follow-up: [complete turn events and worker baking](2026-09-13-film-turns.md)
+now includes turns and rethrows. The measurements below describe the first slice.
+
 R3's third engineering slice moves the actual Cannon solver loop to a module
 worker for ordinary non-turn throws, including held/whispered films. Authored
 values and their final face correction stay on the main thread. No server,
@@ -50,11 +53,11 @@ arrives. Workers are reused between throws; unavailable workers, load/errors
 or a 15-second timeout run the captured snapshot through the inline fallback.
 Unsupported collider types also keep the original inline path.
 
-Towers, **all multi-throw turns including their first throw**, rethrows, and
-late-join reconstruction stay inline. Turn events currently queue a plain
-roll payload, which loses keep metadata if a rethrow arrives while the prior
-film is still playing. Moving complete turn events through that queue is a
-required follow-up before async turn baking or concurrent presentation.
+This first slice kept towers, turns, rethrows and late-join reconstruction
+inline. The turn queue lost keep metadata when a rethrow arrived during prior
+playback. The [turn follow-up](2026-09-13-film-turns.md) fixes that complete-event
+queue and moves turns/rethrows to the worker; towers and reconstruction remain
+inline.
 Existing synchronous `throwSeeded` probes remain inline unless they explicitly
 opt in with `useFilmWorker(true)`; the seeded developer bench uses the product
 worker path.

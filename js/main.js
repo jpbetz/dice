@@ -5506,8 +5506,8 @@ function stepRollingAudio(roll, i0, realtime) {
 // ---------------------------------------------------------------------------
 // Roll engine: simulate-ahead + keyframe playback + face correction
 //
-// playRoll(roll) bakes an ordinary non-turn throw in a module worker. The
-// shared inline fallback handles turns, towers and reconstruction. Both
+// playRoll(roll) bakes throws and rethrows in a module worker. The
+// shared inline fallback handles towers and settled reconstruction. Both
 // fast-forward the cannon world for the roll's
 // dice (all randomness seeded via mulberry32(roll.seed)), recording per-die
 // keyframes and collision-sound events. It then computes a per-die corrective
@@ -5524,7 +5524,40 @@ let filmProbeWorker = false;
 let filmAuditEnabled = false;
 let lastFilmInput = null;
 let currentRoll = null;    // active playback state (see playRoll)
-const rollQueue = [];      // rolls waiting while a playback is in flight (FIFO)
+// Complete events, including rethrow seed/kept indices and reveal position.
+// The queue owns timing only; each event still uses its normal application path.
+const rollQueue = [];
+let applyingQueuedEvent = false;
+let drainingRollQueue = false;
+const queuedFilm = e => e.kind === 'roll' || e.kind === 'rethrow';
+const rollEventPending = id => (currentRoll?.rollId === id && !currentRoll.done)
+  || rollQueue.some(e => e.roll.rollId === id);
+function queueRollEvent(event) {
+  rollQueue.push(event);
+  tableResults?.refresh();
+  if (queuedFilm(event) && currentRoll?.ceremony) skipCeremony();
+}
+function drainRollQueue() {
+  if (drainingRollQueue) return;
+  drainingRollQueue = true;
+  try {
+    while (rollQueue.length && (!currentRoll || currentRoll.done)) {
+      const e = rollQueue.shift();
+      applyingQueuedEvent = true;
+      try {
+        if (e.kind === 'roll') playRoll(e.roll, e.rethrow, e.options);
+        else if (e.kind === 'rethrow') applyRethrow(e.data);
+        else if (e.kind === 'banked') applyBanked(e.data);
+        else if (e.kind === 'snapshot') replaySettledRoll(e.roll);
+        else if (e.kind === 'reveal') applyReveal(e.roll.rollId, e.full);
+        else if (e.kind === 'collect') applyRollCollected(e.roll.rollId, e.seq, e.animate);
+        else if (e.kind === 'clear') applyClearRoll(e.roll.rollId);
+      } finally { applyingQueuedEvent = false; }
+    }
+  } finally { drainingRollQueue = false; }
+  tableResults?.refresh();
+  if (!rollQueue.length && (!currentRoll || currentRoll.done)) tryFlushRoomChanges();
+}
 
 // Per-roll Done (§7.5): dice leaving the table depart over ~300 ms before
 // their meshes are dropped. Bodies leave the physics world immediately —
@@ -5571,14 +5604,8 @@ let clearStyle = 'lift';
 // cluster with no dice left on the felt) rides the same sink timer to keep
 // its chip fade dt-driven without stealing another record's mesh ref.
 let sinking = [];
-const pendingClears = new Set(); // rollIds whose removal is deferred
 
-// Reveal (goal 11): a reveal landing while its roll is still mid-playback or
-// queued defers exactly like pendingClears/pendingCollects (the 7f9cdf5 race
-// class) and lands from the completion paths. Value: the full entry the
-// 'reveal' event carried (null when the event was id-only — solo, or a roll
-// whose values this client already holds).
-const pendingReveals = new Map(); // rollId -> full entry | null
+// Reveals wait in the event FIFO when their roll is still playing.
 const REVEAL_FLIP_S = 0.45;       // staged correction rotation on reveal
 let revealing = [];               // {die, rollId, t, fromQuat, toQuat}
 
@@ -6204,19 +6231,16 @@ function removeRollDice(rollId, instant = false) {
 // completion paths (stepPlayback's showResults / ceremonyFinish).
 function applyClearRoll(rollId) {
   if (!rollId) return;
+  if (!applyingQueuedEvent && rollEventPending(rollId)) {
+    queueRollEvent({ kind: 'clear', roll: { rollId } });
+    return;
+  }
   // cleared implies off-shelf (§7.7): the state row flips first so a
   // roll-collected landing later in the same burst becomes a silent no-op.
   rollState(rollId).cleared = true;
   const historyEntry = log.find(e => e.rollId === rollId);
   if (historyEntry) { historyEntry.cleared = true; if (!netOnline) save(LS_LOG, log); }
-  pendingCollects.delete(rollId);
-  pendingReveals.delete(rollId);
   revealing = revealing.filter((rv) => rv.rollId !== rollId); // dying dice stop flipping
-  const inFlight = currentRoll && !currentRoll.done && currentRoll.rollId === rollId;
-  if (inFlight || rollQueue.some((r) => r.rollId === rollId)) {
-    pendingClears.add(rollId);
-    return;
-  }
   removeRollDice(rollId);
   // Leaving the collected set is bookkeeping now: no cluster to sink, no slot
   // for the survivors to close up into, no marker to fade. An open card on
@@ -6228,14 +6252,6 @@ function applyClearRoll(rollId) {
   if (currentRoll && currentRoll.rollId === rollId && currentRoll.ceremony
       && !ceremonyLayer.classList.contains('hidden')) {
     dismissCeremonyUI();
-  }
-}
-
-// Completion hook: a clear that arrived mid-playback lands now.
-function runPendingClear(roll) {
-  if (roll.rollId && pendingClears.has(roll.rollId)) {
-    pendingClears.delete(roll.rollId);
-    applyClearRoll(roll.rollId);
   }
 }
 
@@ -6270,7 +6286,6 @@ function requestClearRoll(rollId) {
 const rollStates = new Map();         // rollId -> {collected: seq|null, cleared}
 // `collected` (rollId -> {rollId, seq}) and COLLECT_CAP are declared up in the
 // felt section, where the shelf's geometry used to live.
-const pendingCollects = new Map();    // rollId -> seq, deferred like pendingClears
 let soloCollectSeq = 0;               // solo mirror of the server's room counter
 
 // Every roll that ever touched this table gets a state row (playRoll seeds
@@ -6702,28 +6717,17 @@ document.addEventListener('pointerdown', (e) => {
 // A roll was collected ('roll-collected' event, the solo mirror, or a hello
 // resync with animate=false). Mid-playback / queued rolls defer their whisk
 // exactly as clears defer — always-interruptible playback keeps the stage,
-// and the collect lands from the completion paths (runPendingCollect).
+// and the collect lands from the ordered event queue at completion.
 function applyRollCollected(rollId, seq, animate = true) {
   if (!rollId || !Number.isInteger(seq) || seq < 1) return;
+  if (!applyingQueuedEvent && rollEventPending(rollId)) {
+    queueRollEvent({ kind: 'collect', roll: { rollId }, seq, animate });
+    return;
+  }
   const st = rollState(rollId);
   st.collected = seq;
   if (st.cleared) return; // evicted in the same burst: nothing to show
-  const inFlight = currentRoll && !currentRoll.done && currentRoll.rollId === rollId;
-  if (inFlight || rollQueue.some((r) => r.rollId === rollId)) {
-    pendingCollects.set(rollId, seq);
-    return;
-  }
   shelveRoll(rollId, seq, animate);
-}
-
-// Completion hook, the collect twin of runPendingClear. A pending clear wins:
-// the roll goes straight down, never onto the shelf for one frame.
-function runPendingCollect(roll) {
-  if (roll.rollId && pendingCollects.has(roll.rollId)) {
-    const seq = pendingCollects.get(roll.rollId);
-    pendingCollects.delete(roll.rollId);
-    if (!pendingClears.has(roll.rollId)) shelveRoll(roll.rollId, seq, true);
-  }
 }
 
 // Solo mirror of the server's collectEntries: same monotonic seq, same cap,
@@ -6765,7 +6769,7 @@ function soloAutoCollect(arriving = null) {
   const seen = new Set();
   const push = (id) => {
     const entry = liveTurns.get(id) || log.find(r => r.rollId === id)
-      || (currentRoll?.rollId === id ? currentRoll : rollQueue.find(r => r.rollId === id));
+      || (currentRoll?.rollId === id ? currentRoll : rollQueue.find(e => e.roll.rollId === id)?.roll);
     if (turnIsOpen(entry)) return;
     if (id && !seen.has(id) && rollStates.has(id)) {
       seen.add(id);
@@ -6774,7 +6778,7 @@ function soloAutoCollect(arriving = null) {
   };
   for (const e of log) push(e.rollId);
   if (currentRoll && currentRoll.rollId) push(currentRoll.rollId);
-  for (const r of rollQueue) push(r.rollId);
+  for (const e of rollQueue) push(e.roll.rollId);
   // …AND ONE ROLL PER PLACE WHEN THE ARRIVAL CARRIES A STAMP (server.js
   // arrivalSweep, mirrored in js/demo.js demoArrivalSweep for the one caller
   // that has no server behind it: a demo tab's own throw). `arriving` is null
@@ -6797,6 +6801,24 @@ const liveTurns = new Map();
 // and reserved control geometry in the rolling phase throughout that handoff.
 const resultPreparing = new Set();
 
+// A same-turn snapshot can arrive after its next event was already queued.
+// Revision is authored progress, with reveal and bank as monotonic updates
+// within one throw. Never downgrade a known turn to an older hello payload.
+function turnRevision(a, b) {
+  return (a?.throws?.used || 0) - (b?.throws?.used || 0)
+    || Number(!!a?.revealed) - Number(!!b?.revealed)
+    || Number(!!a?.push?.banked) - Number(!!b?.push?.banked);
+}
+function latestTurnPayload(id, filmsOnly = false) {
+  let latest = liveTurns.get(id);
+  for (const e of rollQueue) {
+    if (filmsOnly && !queuedFilm(e) && e.kind !== 'snapshot') continue;
+    const r = e.kind === 'reveal' ? e.full : e.roll;
+    if (r?.rollId === id && r.throws && (!latest || turnRevision(r, latest) > 0)) latest = r;
+  }
+  return latest;
+}
+
 // THROW AGAIN. Every client runs this, including the one whose click caused
 // it: the values are the server's and the film is a function of the seed, so
 // a roller who applied it optimistically would watch a different tumble from
@@ -6805,6 +6827,12 @@ function applyRethrow(data) {
   const payload = data && data.roll;
   if (!payload || !payload.rollId) return;
   if (!Array.isArray(data.thrown) || !data.thrown.length) return;
+  if (!applyingQueuedEvent && (latestTurnPayload(payload.rollId)?.throws?.used || 0)
+      >= (payload.throws?.used || 0)) return;
+  if (!applyingQueuedEvent && currentRoll && !currentRoll.done) {
+    queueRollEvent({ kind: 'rethrow', roll: payload, data });
+    return;
+  }
   resultPreparing.add(payload.rollId);
   liveTurns.set(payload.rollId, payload);
   // The record has to be REPLACED, not appended: addLogEntry dedupes by
@@ -6883,6 +6911,10 @@ function requestThrowAgain(rollId) {
 function applyBanked(data) {
   const payload = data && data.roll;
   if (!payload || !payload.rollId) return;
+  if (!applyingQueuedEvent && rollEventPending(payload.rollId)) {
+    queueRollEvent({ kind: 'banked', roll: payload, data });
+    return;
+  }
   const live = liveTurns.get(payload.rollId);
   if (live) liveTurns.set(payload.rollId, payload);
   if (currentRoll && currentRoll.rollId === payload.rollId) currentRoll.push = payload.push || null;
@@ -6968,11 +7000,28 @@ function requestCollectRoll(rollId) {
 // before wiping the table. (addLogEntry dedupes by rollId, so a later hello
 // resync can never double-count these.)
 function flushPendingRollLog() {
+  const record = roll => {
+    const entry = entryFromRoll(roll), i = log.findIndex(e => e.rollId === roll.rollId);
+    if (i < 0) addLogEntry(entry);
+    else if ((entry.throws?.used || 0) >= (log[i].throws?.used || 0)) log[i] = entry;
+  };
   if (currentRoll && !currentRoll.done) {
-    currentRoll.done = true; // stepPlayback must not showResults it later
-    addLogEntry(entryFromRoll(currentRoll));
+    currentRoll.done = true;
+    record(currentRoll);
   }
-  while (rollQueue.length) addLogEntry(entryFromRoll(rollQueue.shift()));
+  for (const e of rollQueue.splice(0)) {
+    if (queuedFilm(e) || e.kind === 'banked' || e.kind === 'snapshot') record(e.roll);
+    else if (e.kind === 'reveal' && e.full) record({ ...e.full, revealed: true });
+    else {
+      const entry = log.find(r => r.rollId === e.roll.rollId);
+      if (!entry) continue;
+      if (e.kind === 'reveal') entry.revealed = true;
+      else if (e.kind === 'collect') entry.collected = e.seq;
+      else if (e.kind === 'clear') entry.cleared = true;
+    }
+  }
+  if (!netOnline) save(LS_LOG, log);
+  renderLog();
 }
 
 // The corner ✕ sweep: felt, shelf, and every surface, gone. The §7.7 state
@@ -6983,9 +7032,6 @@ function flushPendingRollLog() {
 function clearTable() {
   filmClient.cancel();
   flushPendingRollLog();
-  pendingClears.clear();
-  pendingCollects.clear();
-  pendingReveals.clear();
   for (const st of rollStates.values()) st.cleared = true;
   for (const entry of log) entry.cleared = true;
   if (!netOnline) save(LS_LOG, log);
@@ -7058,9 +7104,7 @@ function playRoll(roll, rethrow = null, options = {}) {
   }
 
   if (currentRoll && !currentRoll.done) {
-    rollQueue.push(roll);
-    tableResults?.refresh();
-    if (currentRoll.ceremony) skipCeremony();
+    queueRollEvent({ kind: 'roll', roll, rethrow, options });
     return;
   }
   // No whole-table overflow wipe here anymore (§7.7 retires it): auto-collect
@@ -7071,6 +7115,13 @@ function playRoll(roll, rethrow = null, options = {}) {
   chipsLayer.innerHTML = '';
   hideBanner();
   dismissCeremonyUI(); // a lingering verdict card/decal yields to the new roll
+
+  // A queued reveal before this rethrow must finish its flip before kept
+  // meshes join the next film. Other players' reveal animations keep running.
+  if (rethrow && revealing.some(rv => rv.rollId === roll.rollId)) {
+    for (const rv of revealing) if (rv.rollId === roll.rollId) rv.t = REVEAL_FLIP_S;
+    stepRevealing(0);
+  }
 
   // A TURN keeps its payload while it is on the felt (MECHANICS M2): the film
   // of throw two is built from it, and solo has no server holding a copy.
@@ -7242,16 +7293,16 @@ function playRoll(roll, rethrow = null, options = {}) {
     DIE_DEFS, readValue, restCeiling, towerVolumes, towerPortalsOf, currentTower,
     pourPlan, mulberry32, POUR, T, TABLE_W, TABLE_D, pourBody };
   // Spawn and authored values stay here. Only the immutable solver snapshot
-  // crosses the worker boundary. Towers, turns and reconstruction retain
-  // the shared inline bake until their separate lifecycle is moved too.
-  const input = !pouring && !roll.throws && (!options.inline || filmAuditEnabled) && !rethrow
+  // crosses the worker boundary. A kept die is already a static, pre-frozen
+  // member of the captured cast. Towers and reconstruction remain inline.
+  const input = !pouring && (!options.inline || filmAuditEnabled)
     ? captureFilm(bakeContext, getDie) : null;
   if (filmAuditEnabled) lastFilmInput = input;
   if (input && !options.inline) {
     const reservation = currentRoll = { ...roll, dice, values, redacted: !values,
       baking: true, done: false, time: 0, frames: 0, duration: 0, sounds: [],
       keyframes: [], ceremony: null };
-    for (const d of dice) d.mesh.visible = false;
+    for (const d of dice) if (keptByIndex.get(d.dieIndex) !== d) d.mesh.visible = false;
     filmClient.run(input).then((reply) => {
       // A clear ends both the real work and its right to alter the table.
       if (!reply || currentRoll !== reservation) return;
@@ -7510,7 +7561,7 @@ function pourVisibleAt(spans, f) {
 // (rollspec.composeRoll), then play. opts: {mods, faceDown, dc} per the contract.
 function rollDice(types, label, opts = {}) {
   if (opts.mods?.throws > 1 || opts.mods?.push) {
-    const active = new Map([...log, ...liveTurns.values(), ...rollQueue].map(e => [e.rollId, {
+    const active = new Map([...log, ...liveTurns.values(), ...rollQueue.filter(queuedFilm).map(e => e.roll)].map(e => [e.rollId, {
       ...e, cleared: e.cleared || rollStates.get(e.rollId)?.cleared,
     }]));
     if (!canStartTurn([...active.values()], opts.mods)) { setPill(TURN_CAP_MESSAGE, 'error'); announce(TURN_CAP_MESSAGE); return false; }
@@ -7863,11 +7914,7 @@ function stepPlayback(dt, tempo = 1, curve = false, realtime = curve) {
     // desktop the mat still fits and this is a no-op.
     applyCameraFraming(true);
     showResults(roll);
-    runPendingReveal(roll);  // a reveal that arrived mid-playback lands now
-    runPendingCollect(roll); // a collect that arrived mid-playback lands now
-    runPendingClear(roll);   // …and a clear wins over it
-    if (rollQueue.length) playRoll(rollQueue.shift());
-    else tryFlushRoomChanges(); // a room-wide zoom/tower that arrived mid-roll lands here
+    drainRollQueue();
   }
 }
 
@@ -9731,7 +9778,7 @@ function refreshRevealSurfaces(rollId) {
   if (entry && lastEntry && lastEntry.rollId === rollId) lastEntry = entry;
   if (lastEntry && lastEntry.rollId === rollId) {
     // A reveal landing while a ceremony is mid-flight stays log-only (the
-    // ceremony owns the stage; pendingReveals defers to its finish anyway).
+    // ceremony owns the stage; the event FIFO defers to its finish anyway).
     // A banner the viewer already dismissed stays dismissed — but the DICE do
     // not: their '?' chips are the shared table (one shared truth).
     const ceremonyActive = currentRoll && currentRoll.ceremony && !currentRoll.done;
@@ -9848,18 +9895,21 @@ function skipRevealFx() {
 // absent when this client already holds the values (solo / legacy face-down).
 function applyReveal(rollId, full) {
   if (!rollId) return;
-  // Mid-playback or queued: defer until the shrouded roll settles (the same
-  // pendingClears/pendingCollects pattern — never race the playback).
-  const inFlight = currentRoll && !currentRoll.done && currentRoll.rollId === rollId;
-  if (inFlight || rollQueue.some((r) => r.rollId === rollId)) {
-    pendingReveals.set(rollId, full || pendingReveals.get(rollId) || null);
+  // Keep the reveal BETWEEN the exact throws that surround it on the wire.
+  if (!applyingQueuedEvent && rollEventPending(rollId)) {
+    queueRollEvent({ kind: 'reveal', roll: { rollId }, full });
     return;
   }
   if (currentRoll && currentRoll.rollId === rollId) mergeReveal(currentRoll, full);
+  const live = liveTurns.get(rollId);
+  if (live) mergeReveal(live, full);
 
   const idx = log.findIndex((e) => e.rollId === rollId);
   let entry = idx >= 0 ? log[idx] : null;
-  const wasHidden = entry ? entryHidden(entry) : false;
+  // hello already replaced the log row; the live meshes can still carry
+  // its prior shroud. Those dice also need the legitimate reveal applied.
+  const wasHidden = (entry ? entryHidden(entry) : false)
+    || tableDice.some(d => d.rollId === rollId && d.shrouded);
   const wasUnrevealed = entry ? entry.revealed === false : false;
   if (entry) {
     if (full && Array.isArray(full.values)) {
@@ -9900,16 +9950,6 @@ function applyReveal(rollId, full) {
     beginRevealFlip(rollId, entry); // staged: surfaces fill at flip end
   } else {
     refreshRevealSurfaces(rollId);
-  }
-}
-
-// Completion hook, the reveal twin of runPendingClear. A pending clear wins:
-// dice about to sink have nothing left to reveal.
-function runPendingReveal(roll) {
-  if (roll.rollId && pendingReveals.has(roll.rollId)) {
-    const full = pendingReveals.get(roll.rollId);
-    pendingReveals.delete(roll.rollId);
-    if (!pendingClears.has(roll.rollId)) applyReveal(roll.rollId, full || undefined);
   }
 }
 
@@ -10224,12 +10264,7 @@ function ceremonyFinish(roll) {
   if (cer.phase === 'done') return;
   cer.phase = 'done';
   roll.done = true;
-  runPendingReveal(roll);  // a reveal that arrived mid-ceremony lands now
-  runPendingCollect(roll); // a collect that arrived mid-ceremony lands now
-  runPendingClear(roll);   // …and a clear wins over it
-  // AFTER the pendings: a collect/clear that just landed dismissed the card
-  // (stagedVerdict null → the arm no-ops), and a landed reveal means the
-  // clock arms against the readable entry.
+  // A following queued clear/collect dismisses this card and its timer.
   armCeremonyRetire(roll);
   // The word has to catch up with the beat: while the moment ran, the card's
   // primary said SKIP. It has just stopped running, so repaint before the
@@ -10237,7 +10272,7 @@ function ceremonyFinish(roll) {
   // stagedVerdict, and a repaint after that either no-ops or paints a
   // superseded roll's verdict over the incoming one.
   if (stagedVerdict) renderVerdictCard(stagedVerdict.roll, stagedVerdict.entry);
-  if (rollQueue.length) playRoll(rollQueue.shift());
+  drainRollQueue();
 }
 
 // Jump to the completed verdict (<150 ms — §2.4). Any click on the cards or
@@ -16474,7 +16509,7 @@ window.__diceDebug = {
   // per-roll Done (§7.5): the roller-side entry point + sink observability
   clearRoll(rollId) { return requestClearRoll(rollId); },
   get sinkingCount() { return sinking.length; },
-  get pendingClears() { return [...pendingClears]; },
+  get pendingClears() { return rollQueue.filter(e => e.kind === 'clear').map(e => e.roll.rollId); },
   // HOW a die leaves (see CLEAR_STYLES). 'lift' ships; 'fold' and 'sink' are
   // here to be judged against it in a live tab, and for the pin below to
   // assert what each one actually does rather than what its name suggests.
@@ -16504,7 +16539,7 @@ window.__diceDebug = {
       .sort((a, b) => a.seq - b.seq)
       .map((c) => ({ rollId: c.rollId, seq: c.seq }));
   },
-  get pendingCollects() { return [...pendingCollects.keys()]; },
+  get pendingCollects() { return rollQueue.filter(e => e.kind === 'collect').map(e => e.roll.rollId); },
   // visibility (goal 11): reveal/offer/claim entry points + redaction
   // observability. Everything returned is JSON-safe primitives.
   reveal(rollId) { requestReveal(rollId); },
@@ -18468,7 +18503,7 @@ window.__diceDebug = {
   },
   get shroudedCount() { return tableDice.filter((d) => d.shrouded).length; },
   get revealingCount() { return revealing.length; },
-  get pendingReveals() { return [...pendingReveals.keys()]; },
+  get pendingReveals() { return rollQueue.filter(e => e.kind === 'reveal').map(e => e.roll.rollId); },
   // peek cards (§7.7.1): open for a shelved rollId / close with null, plus
   // the open card's state for content assertions.
   peek(rollId) {
@@ -34169,8 +34204,14 @@ function deferIdleReplay(r) {
 
 function replaySettledRoll(r) {
   if (!r || !r.rollId) return;
-  if (tableDice.some((d) => d.rollId === r.rollId)) return;
-  if (rollQueue.some((q) => q.rollId === r.rollId)) return;
+  const known = applyingQueuedEvent ? liveTurns.get(r.rollId) : latestTurnPayload(r.rollId, true);
+  const newerTurn = r.throws && known && r.throws.used > known.throws.used;
+  if (newerTurn && !applyingQueuedEvent && replayStageBusy()) {
+    queueRollEvent({ kind: 'snapshot', roll: r });
+    return;
+  }
+  if (!newerTurn && tableDice.some(d => d.rollId === r.rollId)) return;
+  if (!applyingQueuedEvent && rollQueue.some(e => e.roll.rollId === r.rollId)) return;
   // A LIVE PLAYBACK OUTRANKS A REPLAY — BUT OUTRANKING IS NOT CANCELLING.
   // This used to `return`, and the roll was gone for good: hello is a one-shot
   // and nothing re-sends it, so a stream blip that reconnected while an older
@@ -34180,7 +34221,7 @@ function replaySettledRoll(r) {
   // and a playback runs ~4. Stash and re-attempt instead; the guards above run
   // again on the retry, so a roll that arrived by some other route in the
   // meantime is still dropped rather than doubled.
-  if (replayStageBusy()) { deferIdleReplay(r); return; }
+  if (!applyingQueuedEvent && replayStageBusy()) { deferIdleReplay(r); return; }
   // …and AFTER those, because a roll this client already holds must be dropped
   // rather than held: stashing one would arm a deadline whose only effect is to
   // run the same three guards again ten seconds later.
@@ -34196,6 +34237,13 @@ function replaySettledRoll(r) {
       heldReplayTimer = setTimeout(towerReleaseHeldReplay, TOWERGLB.holdMaxMs);
     }
     return;
+  }
+  // The server stores latest values and the original seed, not rethrow film
+  // history. A missed throw therefore converges through the same silent
+  // reconstruction as a fresh join; it cannot recreate historical kept poses.
+  if (newerTurn) {
+    revealing = revealing.filter(rv => rv.rollId !== r.rollId);
+    removeRollDice(r.rollId, true);
   }
   playRoll({
     rollId: r.rollId,
@@ -34290,6 +34338,9 @@ function resyncTable(snapshot) {
     if (r.revealed && (r.faceDown || r.redacted || r.visMode || r.visibility)) {
       applyReveal(r.rollId, r);
     }
+    const known = latestTurnPayload(r.rollId, true);
+    if (r.push?.banked && known?.throws?.used === r.throws?.used
+        && !latestTurnPayload(r.rollId)?.push?.banked) applyBanked({ roll: r });
     if (r.cleared) applyClearRoll(r.rollId);
   }
   // §7.7: the server's present-or-absent flags are the one truth about where
@@ -34332,6 +34383,10 @@ function handleNetEvent(type, data) {
   if (!data) return;
   switch (type) {
     case 'hello': // initial state + re-sync after a reconnect
+      data = { ...data, log: (data.log || []).map(r => {
+        const known = r?.throws && latestTurnPayload(r.rollId);
+        return known && turnRevision(known, r) > 0 ? known : r;
+      }) };
       players = data.players || [];
       // NOT rendered here — the presence row now draws the prepared table's
       // unclaimed chairs, and `roomSetup` is not adopted until below. Rendering
@@ -35969,7 +36024,7 @@ window.__diceDebug.phoneFrame = () => {
 // absent from its seats and activity indicators too.
 function resultBusy(id) {
   return !!id && (resultPreparing.has(id) || (currentRoll?.rollId===id&&!currentRoll.done)
-    || rollQueue.some(r=>r.rollId===id) || revealing.some(r=>r.rollId===id));
+    || rollQueue.some(e=>e.roll.rollId===id) || revealing.some(r=>r.rollId===id));
 }
 function resultState(entry) {
   const mode=entryVis(entry)?.mode, labels=[];
@@ -36010,7 +36065,7 @@ function resultSeatRows() {
     const mine=!netOnline||p.id===net?.playerId;
     const e=log.findLast(e=>netOnline?e.playerId===p.id:!e.playerId||e.playerId===p.id);
     const rolling=(currentRoll&&!currentRoll.done&&(netOnline?currentRoll.playerId===p.id:mine))
-      ||rollQueue.some(r=>netOnline?r.playerId===p.id:mine)||resultBusy(e?.rollId);
+      ||rollQueue.some(e=>queuedFilm(e)&&(netOnline?e.roll.playerId===p.id:mine))||resultBusy(e?.rollId);
     return {id:p.id,name:p.name,color:p.color,mine,rolling:!!rolling,result:rolling?null:resultDisplay(e)};
   });
 }

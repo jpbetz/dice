@@ -36,6 +36,7 @@ import { workspaceScenarios } from './workspaces.mjs';
 import { playerResultScenarios } from './player-results.mjs';
 import { rollHistoryScenarios } from './roll-history.mjs';
 import { filmMutationScenarios } from "./film-mutations.mjs";
+import { filmTurnScenarios } from './film-turns.mjs';
 import { filmWorkerScenarios } from "./film-worker.mjs";
 import { profileSharingScenarios } from './profile-sharing.mjs';
 import { assert, Table, freePort, startServer } from './harness.mjs';
@@ -782,6 +783,7 @@ export const scenarios = [
   ...rollHistoryScenarios,
   ...profileSharingScenarios,
   ...filmWorkerScenarios,
+  ...filmTurnScenarios,
   ...filmMutationScenarios,
   {
     name: 'shared-roll',
@@ -9124,6 +9126,9 @@ export const scenarios = [
       // Chips are off by default (P1); this scenario asserts on their '?' →
       // real-face flip, so both seats opt in.
       for (const t of [a, b]) assert.equal(await t.dbg('setChipsVisible(true)'), true, 'chips on');
+      // This assertion is specifically about a per-die lens; fresh tables now
+      // start with familiar summed rolls rather than Soul Deal.
+      for (const t of [a, b]) await t.dbg("setSystem('soul-deal')");
       await a.roll('d20 held');
       const rid = await a.rollId();
       assert.ok(rid, 'held roll has a rollId');
@@ -24914,6 +24919,8 @@ export const scenarios = [
       assert.ok(verbs.again && !verbs.again.hidden,
         'and Throw again stands beside it — the two ARE the decision');
       await a.eval(`document.querySelector('.bank-turn').click()`);
+      await a.waitFor(`window.__diceDebug.pushState(${JSON.stringify(rid)}).state?.banked`,
+        { desc: 'authoritative bank event arrives' });
       await a.dbg('sim(30)');
       const banked = await push(rid);
       assert.equal(banked.state.banked, true, 'and is marked banked');
