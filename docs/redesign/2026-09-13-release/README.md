@@ -45,6 +45,13 @@ Clear](peek-cleared.png) were inspected. Clear removes that historical roll's
 physical/table record while the log still records its result; Bram's current
 result remains. `tools/steps/peek-retirement-look.mjs` reproduces these moments.
 
+The final candidate's local delivery probe also passes all six assets' first
+and repeated identity/Brotli/gzip requests, with identical decoded bytes.
+[Recorded totals](delivery-8a577e5.json): **3,980,032** identity bytes,
+**1,112,013** Brotli bytes and **1,150,248** gzip bytes. This is the existing
+six-entry-asset subset on an owned ephemeral production-mode server, not the
+whole application graph, deployed traffic, page-load time or a battery result.
+
 Final candidate verification is pending. Physical-phone, midrange-device and
 uncoached player results remain unobserved; use the
 [validation sheet](../../REDESIGN-VALIDATION-SHEET.md) for those sessions.

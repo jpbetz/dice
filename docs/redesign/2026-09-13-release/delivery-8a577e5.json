@@ -1,0 +1,158 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "measuredAt": "2026-09-13T23:31:13.906Z",
+  "node": "v24.14.1",
+  "origin": "own ephemeral server, production mode",
+  "scope": "Six entry assets only; wire body bytes and individual sequential request time, not whole-page loading or device performance.",
+  "totals": {
+    "identity": 3980032,
+    "br": 1112013,
+    "gzip": 1150248
+  },
+  "rows": [
+    {
+      "path": "/",
+      "offered": "identity",
+      "encoding": "identity",
+      "bytes": 97777,
+      "firstMs": 2.24,
+      "warmMs": 0.73
+    },
+    {
+      "path": "/",
+      "offered": "br",
+      "encoding": "br",
+      "bytes": 32386,
+      "firstMs": 4.21,
+      "warmMs": 0.47
+    },
+    {
+      "path": "/",
+      "offered": "gzip",
+      "encoding": "gzip",
+      "bytes": 31957,
+      "firstMs": 3.74,
+      "warmMs": 0.67
+    },
+    {
+      "path": "/js/main.js",
+      "offered": "identity",
+      "encoding": "identity",
+      "bytes": 1893511,
+      "firstMs": 6.02,
+      "warmMs": 3.46
+    },
+    {
+      "path": "/js/main.js",
+      "offered": "br",
+      "encoding": "br",
+      "bytes": 628476,
+      "firstMs": 27.18,
+      "warmMs": 1.5
+    },
+    {
+      "path": "/js/main.js",
+      "offered": "gzip",
+      "encoding": "gzip",
+      "bytes": 665864,
+      "firstMs": 56.96,
+      "warmMs": 1.55
+    },
+    {
+      "path": "/css/style.css",
+      "offered": "identity",
+      "encoding": "identity",
+      "bytes": 327765,
+      "firstMs": 2.08,
+      "warmMs": 0.79
+    },
+    {
+      "path": "/css/style.css",
+      "offered": "br",
+      "encoding": "br",
+      "bytes": 105228,
+      "firstMs": 4.56,
+      "warmMs": 0.6
+    },
+    {
+      "path": "/css/style.css",
+      "offered": "gzip",
+      "encoding": "gzip",
+      "bytes": 105884,
+      "firstMs": 9.45,
+      "warmMs": 0.58
+    },
+    {
+      "path": "/js/tunables.js",
+      "offered": "identity",
+      "encoding": "identity",
+      "bytes": 41751,
+      "firstMs": 0.81,
+      "warmMs": 0.5
+    },
+    {
+      "path": "/js/tunables.js",
+      "offered": "br",
+      "encoding": "br",
+      "bytes": 13958,
+      "firstMs": 1.66,
+      "warmMs": 0.35
+    },
+    {
+      "path": "/js/tunables.js",
+      "offered": "gzip",
+      "encoding": "gzip",
+      "bytes": 13565,
+      "firstMs": 1.61,
+      "warmMs": 0.43
+    },
+    {
+      "path": "/vendor/three.module.js",
+      "offered": "identity",
+      "encoding": "identity",
+      "bytes": 1272972,
+      "firstMs": 3.73,
+      "warmMs": 2.46
+    },
+    {
+      "path": "/vendor/three.module.js",
+      "offered": "br",
+      "encoding": "br",
+      "bytes": 255043,
+      "firstMs": 13.79,
+      "warmMs": 0.85
+    },
+    {
+      "path": "/vendor/three.module.js",
+      "offered": "gzip",
+      "encoding": "gzip",
+      "bytes": 257859,
+      "firstMs": 26.41,
+      "warmMs": 0.55
+    },
+    {
+      "path": "/vendor/cannon-es.js",
+      "offered": "identity",
+      "encoding": "identity",
+      "bytes": 346256,
+      "firstMs": 2.1,
+      "warmMs": 1
+    },
+    {
+      "path": "/vendor/cannon-es.js",
+      "offered": "br",
+      "encoding": "br",
+      "bytes": 76922,
+      "firstMs": 3.94,
+      "warmMs": 0.27
+    },
+    {
+      "path": "/vendor/cannon-es.js",
+      "offered": "gzip",
+      "encoding": "gzip",
+      "bytes": 75119,
+      "firstMs": 6.17,
+      "warmMs": 0.26
+    }
+  ]
+}
