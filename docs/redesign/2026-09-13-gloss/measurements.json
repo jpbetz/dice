@@ -1,0 +1,1647 @@
+{
+  "copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "beforeCommit": "1915bd7",
+  "afterCommit": "2b09384",
+  "before": {
+    "label": "before",
+    "rows": [
+      {
+        "setting": "fresh",
+        "frame": {
+          "mode": "mat",
+          "spanPx": 34,
+          "roll": 0,
+          "orbit": 0,
+          "placeOrbit": 0,
+          "placeMine": 0,
+          "matFits": true,
+          "dice": 0,
+          "diceOnScreen": 0,
+          "decidingOnScreen": null,
+          "easing": false,
+          "target": [
+            0,
+            8.8
+          ],
+          "camScale": 1,
+          "camY": 33.3,
+          "eye": [
+            0,
+            33.25,
+            19.25
+          ],
+          "view": "464x493"
+        },
+        "material": {
+          "type": "MeshStandardMaterial",
+          "roughness": 1,
+          "metalness": 0,
+          "vertexColors": true,
+          "hasNormalMap": false,
+          "hasBumpMap": false,
+          "hasRoughnessMap": true,
+          "map": {
+            "uuid": "d7038183-94af-429e-a49f-72effd70ffa6",
+            "repeat": [
+              32,
+              32
+            ],
+            "wrap": [
+              1000,
+              1000
+            ],
+            "colorSpace": "srgb",
+            "anisotropy": 4,
+            "size": [
+              1024,
+              1024
+            ]
+          },
+          "roughnessMap": {
+            "uuid": "f961a494-054e-42e0-b51a-464ea11a456f",
+            "repeat": [
+              1,
+              1
+            ],
+            "wrap": [
+              1001,
+              1001
+            ],
+            "colorSpace": "",
+            "anisotropy": 4,
+            "size": [
+              128,
+              128
+            ]
+          }
+        },
+        "stats": {
+          "px": 128,
+          "min": 0.8,
+          "max": 1,
+          "mean": 0.9020222981770833,
+          "spread": 0.2,
+          "paints": 1,
+          "digest": 423040718
+        },
+        "lamp": {
+          "position": [
+            0,
+            24,
+            1.5
+          ],
+          "intensity": 2.8,
+          "angle": 0.85,
+          "penumbra": 0.75,
+          "color": "#ffe8c4"
+        },
+        "fog": {
+          "near": 54.18746292999882,
+          "far": 85.18746292999882,
+          "depths": []
+        },
+        "null": {
+          "w": 464,
+          "h": 493,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 39.172,
+              "bMean": 39.172,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 6860
+            },
+            {
+              "label": "mid",
+              "aMean": 48.979,
+              "bMean": 48.979,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 6860
+            },
+            {
+              "label": "far",
+              "aMean": 51.685,
+              "bMean": 51.685,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 6860
+            }
+          ]
+        },
+        "gloss": {
+          "w": 464,
+          "h": 493,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 30.761,
+              "bMean": 39.172,
+              "delta": 8.411,
+              "absMeanDelta": 8.411,
+              "p95AbsDelta": 9.068,
+              "changedFrac": 1,
+              "n": 6860
+            },
+            {
+              "label": "mid",
+              "aMean": 38.341,
+              "bMean": 48.979,
+              "delta": 10.639,
+              "absMeanDelta": 10.639,
+              "p95AbsDelta": 11.281,
+              "changedFrac": 1,
+              "n": 6860
+            },
+            {
+              "label": "far",
+              "aMean": 43.548,
+              "bMean": 51.685,
+              "delta": 8.137,
+              "absMeanDelta": 8.137,
+              "p95AbsDelta": 11.068,
+              "changedFrac": 1,
+              "n": 6860
+            }
+          ]
+        },
+        "mottle": {
+          "w": 464,
+          "h": 493,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 40.987,
+              "bMean": 39.172,
+              "delta": -1.814,
+              "absMeanDelta": 1.814,
+              "p95AbsDelta": 2.072,
+              "changedFrac": 1,
+              "n": 6860
+            },
+            {
+              "label": "mid",
+              "aMean": 51.055,
+              "bMean": 48.979,
+              "delta": -2.076,
+              "absMeanDelta": 2.076,
+              "p95AbsDelta": 2.285,
+              "changedFrac": 1,
+              "n": 6860
+            },
+            {
+              "label": "far",
+              "aMean": 53.442,
+              "bMean": 51.685,
+              "delta": -1.757,
+              "absMeanDelta": 1.757,
+              "p95AbsDelta": 2.285,
+              "changedFrac": 1,
+              "n": 6860
+            }
+          ]
+        }
+      },
+      {
+        "setting": "wide",
+        "frame": {
+          "mode": "mat",
+          "spanPx": 63,
+          "roll": 0,
+          "orbit": 0,
+          "placeOrbit": 0,
+          "placeMine": 0,
+          "matFits": true,
+          "dice": 0,
+          "diceOnScreen": 0,
+          "decidingOnScreen": null,
+          "easing": false,
+          "target": [
+            0,
+            8.8
+          ],
+          "camScale": 1,
+          "camY": 33.3,
+          "eye": [
+            0,
+            33.25,
+            19.25
+          ],
+          "view": "1284x900"
+        },
+        "material": {
+          "type": "MeshStandardMaterial",
+          "roughness": 1,
+          "metalness": 0,
+          "vertexColors": true,
+          "hasNormalMap": false,
+          "hasBumpMap": false,
+          "hasRoughnessMap": true,
+          "map": {
+            "uuid": "d7038183-94af-429e-a49f-72effd70ffa6",
+            "repeat": [
+              32,
+              32
+            ],
+            "wrap": [
+              1000,
+              1000
+            ],
+            "colorSpace": "srgb",
+            "anisotropy": 4,
+            "size": [
+              1024,
+              1024
+            ]
+          },
+          "roughnessMap": {
+            "uuid": "f961a494-054e-42e0-b51a-464ea11a456f",
+            "repeat": [
+              1,
+              1
+            ],
+            "wrap": [
+              1001,
+              1001
+            ],
+            "colorSpace": "",
+            "anisotropy": 4,
+            "size": [
+              128,
+              128
+            ]
+          }
+        },
+        "stats": {
+          "px": 128,
+          "min": 0.8,
+          "max": 1,
+          "mean": 0.9020222981770833,
+          "spread": 0.2,
+          "paints": 5,
+          "digest": 423040718
+        },
+        "lamp": {
+          "position": [
+            0,
+            24,
+            1.5
+          ],
+          "intensity": 2.8,
+          "angle": 0.85,
+          "penumbra": 0.75,
+          "color": "#ffe8c4"
+        },
+        "fog": {
+          "near": 54.18746292999882,
+          "far": 85.18746292999882,
+          "depths": []
+        },
+        "null": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 38.662,
+              "bMean": 38.662,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 48.157,
+              "bMean": 48.157,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 51.074,
+              "bMean": 51.074,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            }
+          ]
+        },
+        "gloss": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 30.428,
+              "bMean": 38.662,
+              "delta": 8.234,
+              "absMeanDelta": 8.234,
+              "p95AbsDelta": 9.068,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 37.944,
+              "bMean": 48.157,
+              "delta": 10.213,
+              "absMeanDelta": 10.213,
+              "p95AbsDelta": 11.281,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 43.342,
+              "bMean": 51.074,
+              "delta": 7.733,
+              "absMeanDelta": 7.733,
+              "p95AbsDelta": 11.068,
+              "changedFrac": 1,
+              "n": 34740
+            }
+          ]
+        },
+        "mottle": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 40.464,
+              "bMean": 38.662,
+              "delta": -1.802,
+              "absMeanDelta": 1.802,
+              "p95AbsDelta": 2.072,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 50.195,
+              "bMean": 48.157,
+              "delta": -2.038,
+              "absMeanDelta": 2.038,
+              "p95AbsDelta": 2.285,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 52.78,
+              "bMean": 51.074,
+              "delta": -1.705,
+              "absMeanDelta": 1.705,
+              "p95AbsDelta": 2.285,
+              "changedFrac": 0.992,
+              "n": 34740
+            }
+          ]
+        }
+      },
+      {
+        "setting": "medium",
+        "frame": {
+          "mode": "mat",
+          "spanPx": 80,
+          "roll": 0,
+          "orbit": 0,
+          "placeOrbit": 0,
+          "placeMine": 0,
+          "matFits": true,
+          "dice": 0,
+          "diceOnScreen": 0,
+          "decidingOnScreen": null,
+          "easing": false,
+          "target": [
+            0,
+            6.9
+          ],
+          "camScale": 1,
+          "camY": 26,
+          "eye": [
+            0,
+            26,
+            15
+          ],
+          "view": "1284x900"
+        },
+        "material": {
+          "type": "MeshStandardMaterial",
+          "roughness": 1,
+          "metalness": 0,
+          "vertexColors": true,
+          "hasNormalMap": false,
+          "hasBumpMap": false,
+          "hasRoughnessMap": true,
+          "map": {
+            "uuid": "d7038183-94af-429e-a49f-72effd70ffa6",
+            "repeat": [
+              32,
+              32
+            ],
+            "wrap": [
+              1000,
+              1000
+            ],
+            "colorSpace": "srgb",
+            "anisotropy": 4,
+            "size": [
+              1024,
+              1024
+            ]
+          },
+          "roughnessMap": {
+            "uuid": "f961a494-054e-42e0-b51a-464ea11a456f",
+            "repeat": [
+              1,
+              1
+            ],
+            "wrap": [
+              1001,
+              1001
+            ],
+            "colorSpace": "",
+            "anisotropy": 4,
+            "size": [
+              128,
+              128
+            ]
+          }
+        },
+        "stats": {
+          "px": 128,
+          "min": 0.8,
+          "max": 1,
+          "mean": 0.9020222981770833,
+          "spread": 0.2,
+          "paints": 9,
+          "digest": 423040718
+        },
+        "lamp": {
+          "position": [
+            0,
+            24,
+            1.5
+          ],
+          "intensity": 2.8,
+          "angle": 0.85,
+          "penumbra": 0.75,
+          "color": "#ffe8c4"
+        },
+        "fog": {
+          "near": 42.62936906882963,
+          "far": 73.62936906882963,
+          "depths": []
+        },
+        "null": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 46.653,
+              "bMean": 46.653,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 51.752,
+              "bMean": 51.752,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 50.477,
+              "bMean": 50.477,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            }
+          ]
+        },
+        "gloss": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 36.67,
+              "bMean": 46.653,
+              "delta": 9.983,
+              "absMeanDelta": 9.983,
+              "p95AbsDelta": 10.996,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 41.134,
+              "bMean": 51.752,
+              "delta": 10.618,
+              "absMeanDelta": 10.618,
+              "p95AbsDelta": 11.996,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 43.907,
+              "bMean": 50.477,
+              "delta": 6.57,
+              "absMeanDelta": 6.57,
+              "p95AbsDelta": 9.068,
+              "changedFrac": 1,
+              "n": 34740
+            }
+          ]
+        },
+        "mottle": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 48.691,
+              "bMean": 46.653,
+              "delta": -2.039,
+              "absMeanDelta": 2.039,
+              "p95AbsDelta": 2.285,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 53.809,
+              "bMean": 51.752,
+              "delta": -2.057,
+              "absMeanDelta": 2.057,
+              "p95AbsDelta": 2.787,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 51.991,
+              "bMean": 50.477,
+              "delta": -1.513,
+              "absMeanDelta": 1.513,
+              "p95AbsDelta": 2.072,
+              "changedFrac": 0.993,
+              "n": 34740
+            }
+          ]
+        }
+      },
+      {
+        "setting": "close",
+        "frame": {
+          "mode": "mat",
+          "spanPx": 103,
+          "roll": 0,
+          "orbit": 0,
+          "placeOrbit": 0,
+          "placeMine": 0,
+          "matFits": true,
+          "dice": 0,
+          "diceOnScreen": 0,
+          "decidingOnScreen": null,
+          "easing": false,
+          "target": [
+            0,
+            5.4
+          ],
+          "camScale": 1,
+          "camY": 20.3,
+          "eye": [
+            0,
+            20.25,
+            11.75
+          ],
+          "view": "1284x900"
+        },
+        "material": {
+          "type": "MeshStandardMaterial",
+          "roughness": 1,
+          "metalness": 0,
+          "vertexColors": true,
+          "hasNormalMap": false,
+          "hasBumpMap": false,
+          "hasRoughnessMap": true,
+          "map": {
+            "uuid": "d7038183-94af-429e-a49f-72effd70ffa6",
+            "repeat": [
+              32,
+              32
+            ],
+            "wrap": [
+              1000,
+              1000
+            ],
+            "colorSpace": "srgb",
+            "anisotropy": 4,
+            "size": [
+              1024,
+              1024
+            ]
+          },
+          "roughnessMap": {
+            "uuid": "f961a494-054e-42e0-b51a-464ea11a456f",
+            "repeat": [
+              1,
+              1
+            ],
+            "wrap": [
+              1001,
+              1001
+            ],
+            "colorSpace": "",
+            "anisotropy": 4,
+            "size": [
+              128,
+              128
+            ]
+          }
+        },
+        "stats": {
+          "px": 128,
+          "min": 0.8,
+          "max": 1,
+          "mean": 0.9020222981770833,
+          "spread": 0.2,
+          "paints": 13,
+          "digest": 423040718
+        },
+        "lamp": {
+          "position": [
+            0,
+            24,
+            1.5
+          ],
+          "intensity": 2.8,
+          "angle": 0.85,
+          "penumbra": 0.75,
+          "color": "#ffe8c4"
+        },
+        "fog": {
+          "near": 33.622811209481654,
+          "far": 64.62281120948165,
+          "depths": []
+        },
+        "null": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 51.261,
+              "bMean": 51.261,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 52.322,
+              "bMean": 52.322,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 49.795,
+              "bMean": 49.795,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            }
+          ]
+        },
+        "gloss": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 40.336,
+              "bMean": 51.261,
+              "delta": 10.925,
+              "absMeanDelta": 10.925,
+              "p95AbsDelta": 11.996,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 42.697,
+              "bMean": 52.322,
+              "delta": 9.625,
+              "absMeanDelta": 9.625,
+              "p95AbsDelta": 11.924,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 44.138,
+              "bMean": 49.795,
+              "delta": 5.657,
+              "absMeanDelta": 5.657,
+              "p95AbsDelta": 7.856,
+              "changedFrac": 1,
+              "n": 34740
+            }
+          ]
+        },
+        "mottle": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 53.381,
+              "bMean": 51.261,
+              "delta": -2.12,
+              "absMeanDelta": 2.12,
+              "p95AbsDelta": 2.787,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 54.255,
+              "bMean": 52.322,
+              "delta": -1.933,
+              "absMeanDelta": 1.933,
+              "p95AbsDelta": 2.285,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 51.135,
+              "bMean": 49.795,
+              "delta": -1.341,
+              "absMeanDelta": 1.341,
+              "p95AbsDelta": 2,
+              "changedFrac": 0.987,
+              "n": 34740
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "after": {
+    "label": "after",
+    "rows": [
+      {
+        "setting": "fresh",
+        "frame": {
+          "mode": "table",
+          "spanPx": 34,
+          "roll": 0,
+          "orbit": 0,
+          "placeOrbit": 0,
+          "placeMine": 0,
+          "matFits": true,
+          "dice": 0,
+          "diceOnScreen": 0,
+          "decidingOnScreen": null,
+          "easing": false,
+          "target": [
+            0,
+            8.8
+          ],
+          "camScale": 1,
+          "camY": 33.3,
+          "eye": [
+            0,
+            33.25,
+            19.25
+          ],
+          "view": "464x493"
+        },
+        "material": {
+          "type": "MeshStandardMaterial",
+          "roughness": 1,
+          "metalness": 0,
+          "vertexColors": true,
+          "hasNormalMap": false,
+          "hasBumpMap": false,
+          "hasRoughnessMap": true,
+          "map": {
+            "uuid": "6fbdb5bd-1f5c-4f7b-9c30-9e75b9bdeb09",
+            "repeat": [
+              32,
+              32
+            ],
+            "wrap": [
+              1000,
+              1000
+            ],
+            "colorSpace": "srgb",
+            "anisotropy": 4,
+            "size": [
+              1024,
+              1024
+            ]
+          },
+          "roughnessMap": {
+            "uuid": "3f280647-b031-4ae3-9536-197d418bc1c0",
+            "repeat": [
+              1,
+              1
+            ],
+            "wrap": [
+              1001,
+              1001
+            ],
+            "colorSpace": "",
+            "anisotropy": 4,
+            "size": [
+              128,
+              128
+            ]
+          }
+        },
+        "stats": {
+          "px": 128,
+          "min": 0.8,
+          "max": 1,
+          "mean": 0.9020222981770833,
+          "spread": 0.2,
+          "paints": 1,
+          "digest": 423040718
+        },
+        "lamp": {
+          "position": [
+            0,
+            24,
+            1.5
+          ],
+          "intensity": 2.8,
+          "angle": 0.85,
+          "penumbra": 0.75,
+          "color": "#ffe8c4"
+        },
+        "fog": {
+          "near": 54.18746292999882,
+          "far": 85.18746292999882,
+          "depths": []
+        },
+        "null": {
+          "w": 464,
+          "h": 493,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 39.172,
+              "bMean": 39.172,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 6860
+            },
+            {
+              "label": "mid",
+              "aMean": 48.979,
+              "bMean": 48.979,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 6860
+            },
+            {
+              "label": "far",
+              "aMean": 51.685,
+              "bMean": 51.685,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 6860
+            }
+          ]
+        },
+        "gloss": {
+          "w": 464,
+          "h": 493,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 30.761,
+              "bMean": 39.172,
+              "delta": 8.411,
+              "absMeanDelta": 8.411,
+              "p95AbsDelta": 9.068,
+              "changedFrac": 1,
+              "n": 6860
+            },
+            {
+              "label": "mid",
+              "aMean": 38.341,
+              "bMean": 48.979,
+              "delta": 10.639,
+              "absMeanDelta": 10.639,
+              "p95AbsDelta": 11.281,
+              "changedFrac": 1,
+              "n": 6860
+            },
+            {
+              "label": "far",
+              "aMean": 43.548,
+              "bMean": 51.685,
+              "delta": 8.137,
+              "absMeanDelta": 8.137,
+              "p95AbsDelta": 11.068,
+              "changedFrac": 1,
+              "n": 6860
+            }
+          ]
+        },
+        "mottle": {
+          "w": 464,
+          "h": 493,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 40.987,
+              "bMean": 39.172,
+              "delta": -1.814,
+              "absMeanDelta": 1.814,
+              "p95AbsDelta": 2.072,
+              "changedFrac": 1,
+              "n": 6860
+            },
+            {
+              "label": "mid",
+              "aMean": 51.055,
+              "bMean": 48.979,
+              "delta": -2.076,
+              "absMeanDelta": 2.076,
+              "p95AbsDelta": 2.285,
+              "changedFrac": 1,
+              "n": 6860
+            },
+            {
+              "label": "far",
+              "aMean": 53.442,
+              "bMean": 51.685,
+              "delta": -1.757,
+              "absMeanDelta": 1.757,
+              "p95AbsDelta": 2.285,
+              "changedFrac": 1,
+              "n": 6860
+            }
+          ]
+        }
+      },
+      {
+        "setting": "wide",
+        "frame": {
+          "mode": "table",
+          "spanPx": 63,
+          "roll": 0,
+          "orbit": 0,
+          "placeOrbit": 0,
+          "placeMine": 0,
+          "matFits": true,
+          "dice": 0,
+          "diceOnScreen": 0,
+          "decidingOnScreen": null,
+          "easing": false,
+          "target": [
+            0,
+            8.8
+          ],
+          "camScale": 1,
+          "camY": 33.3,
+          "eye": [
+            0,
+            33.25,
+            19.25
+          ],
+          "view": "1284x900"
+        },
+        "material": {
+          "type": "MeshStandardMaterial",
+          "roughness": 1,
+          "metalness": 0,
+          "vertexColors": true,
+          "hasNormalMap": false,
+          "hasBumpMap": false,
+          "hasRoughnessMap": true,
+          "map": {
+            "uuid": "6fbdb5bd-1f5c-4f7b-9c30-9e75b9bdeb09",
+            "repeat": [
+              32,
+              32
+            ],
+            "wrap": [
+              1000,
+              1000
+            ],
+            "colorSpace": "srgb",
+            "anisotropy": 4,
+            "size": [
+              1024,
+              1024
+            ]
+          },
+          "roughnessMap": {
+            "uuid": "3f280647-b031-4ae3-9536-197d418bc1c0",
+            "repeat": [
+              1,
+              1
+            ],
+            "wrap": [
+              1001,
+              1001
+            ],
+            "colorSpace": "",
+            "anisotropy": 4,
+            "size": [
+              128,
+              128
+            ]
+          }
+        },
+        "stats": {
+          "px": 128,
+          "min": 0.8,
+          "max": 1,
+          "mean": 0.9020222981770833,
+          "spread": 0.2,
+          "paints": 5,
+          "digest": 423040718
+        },
+        "lamp": {
+          "position": [
+            0,
+            24,
+            1.5
+          ],
+          "intensity": 2.8,
+          "angle": 0.85,
+          "penumbra": 0.75,
+          "color": "#ffe8c4"
+        },
+        "fog": {
+          "near": 54.18746292999882,
+          "far": 85.18746292999882,
+          "depths": []
+        },
+        "null": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 38.662,
+              "bMean": 38.662,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 48.157,
+              "bMean": 48.157,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 51.074,
+              "bMean": 51.074,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            }
+          ]
+        },
+        "gloss": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 30.428,
+              "bMean": 38.662,
+              "delta": 8.234,
+              "absMeanDelta": 8.234,
+              "p95AbsDelta": 9.068,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 37.944,
+              "bMean": 48.157,
+              "delta": 10.213,
+              "absMeanDelta": 10.213,
+              "p95AbsDelta": 11.281,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 43.342,
+              "bMean": 51.074,
+              "delta": 7.733,
+              "absMeanDelta": 7.733,
+              "p95AbsDelta": 11.068,
+              "changedFrac": 1,
+              "n": 34740
+            }
+          ]
+        },
+        "mottle": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 40.464,
+              "bMean": 38.662,
+              "delta": -1.802,
+              "absMeanDelta": 1.802,
+              "p95AbsDelta": 2.072,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 50.195,
+              "bMean": 48.157,
+              "delta": -2.038,
+              "absMeanDelta": 2.038,
+              "p95AbsDelta": 2.285,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 52.78,
+              "bMean": 51.074,
+              "delta": -1.705,
+              "absMeanDelta": 1.705,
+              "p95AbsDelta": 2.285,
+              "changedFrac": 0.992,
+              "n": 34740
+            }
+          ]
+        }
+      },
+      {
+        "setting": "medium",
+        "frame": {
+          "mode": "table",
+          "spanPx": 80,
+          "roll": 0,
+          "orbit": 0,
+          "placeOrbit": 0,
+          "placeMine": 0,
+          "matFits": true,
+          "dice": 0,
+          "diceOnScreen": 0,
+          "decidingOnScreen": null,
+          "easing": false,
+          "target": [
+            0,
+            6.9
+          ],
+          "camScale": 1,
+          "camY": 26,
+          "eye": [
+            0,
+            26,
+            15
+          ],
+          "view": "1284x900"
+        },
+        "material": {
+          "type": "MeshStandardMaterial",
+          "roughness": 1,
+          "metalness": 0,
+          "vertexColors": true,
+          "hasNormalMap": false,
+          "hasBumpMap": false,
+          "hasRoughnessMap": true,
+          "map": {
+            "uuid": "6fbdb5bd-1f5c-4f7b-9c30-9e75b9bdeb09",
+            "repeat": [
+              32,
+              32
+            ],
+            "wrap": [
+              1000,
+              1000
+            ],
+            "colorSpace": "srgb",
+            "anisotropy": 4,
+            "size": [
+              1024,
+              1024
+            ]
+          },
+          "roughnessMap": {
+            "uuid": "3f280647-b031-4ae3-9536-197d418bc1c0",
+            "repeat": [
+              1,
+              1
+            ],
+            "wrap": [
+              1001,
+              1001
+            ],
+            "colorSpace": "",
+            "anisotropy": 4,
+            "size": [
+              128,
+              128
+            ]
+          }
+        },
+        "stats": {
+          "px": 128,
+          "min": 0.8,
+          "max": 1,
+          "mean": 0.9020222981770833,
+          "spread": 0.2,
+          "paints": 9,
+          "digest": 423040718
+        },
+        "lamp": {
+          "position": [
+            0,
+            24,
+            1.5
+          ],
+          "intensity": 2.8,
+          "angle": 0.85,
+          "penumbra": 0.75,
+          "color": "#ffe8c4"
+        },
+        "fog": {
+          "near": 42.62936906882963,
+          "far": 73.62936906882963,
+          "depths": []
+        },
+        "null": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 46.653,
+              "bMean": 46.653,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 51.752,
+              "bMean": 51.752,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 50.477,
+              "bMean": 50.477,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            }
+          ]
+        },
+        "gloss": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 36.67,
+              "bMean": 46.653,
+              "delta": 9.983,
+              "absMeanDelta": 9.983,
+              "p95AbsDelta": 10.996,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 41.134,
+              "bMean": 51.752,
+              "delta": 10.618,
+              "absMeanDelta": 10.618,
+              "p95AbsDelta": 11.996,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 43.907,
+              "bMean": 50.477,
+              "delta": 6.57,
+              "absMeanDelta": 6.57,
+              "p95AbsDelta": 9.068,
+              "changedFrac": 1,
+              "n": 34740
+            }
+          ]
+        },
+        "mottle": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 48.691,
+              "bMean": 46.653,
+              "delta": -2.039,
+              "absMeanDelta": 2.039,
+              "p95AbsDelta": 2.285,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 53.809,
+              "bMean": 51.752,
+              "delta": -2.057,
+              "absMeanDelta": 2.057,
+              "p95AbsDelta": 2.787,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 51.991,
+              "bMean": 50.477,
+              "delta": -1.513,
+              "absMeanDelta": 1.513,
+              "p95AbsDelta": 2.072,
+              "changedFrac": 0.993,
+              "n": 34740
+            }
+          ]
+        }
+      },
+      {
+        "setting": "close",
+        "frame": {
+          "mode": "table",
+          "spanPx": 103,
+          "roll": 0,
+          "orbit": 0,
+          "placeOrbit": 0,
+          "placeMine": 0,
+          "matFits": true,
+          "dice": 0,
+          "diceOnScreen": 0,
+          "decidingOnScreen": null,
+          "easing": false,
+          "target": [
+            0,
+            5.4
+          ],
+          "camScale": 1,
+          "camY": 20.3,
+          "eye": [
+            0,
+            20.25,
+            11.75
+          ],
+          "view": "1284x900"
+        },
+        "material": {
+          "type": "MeshStandardMaterial",
+          "roughness": 1,
+          "metalness": 0,
+          "vertexColors": true,
+          "hasNormalMap": false,
+          "hasBumpMap": false,
+          "hasRoughnessMap": true,
+          "map": {
+            "uuid": "6fbdb5bd-1f5c-4f7b-9c30-9e75b9bdeb09",
+            "repeat": [
+              32,
+              32
+            ],
+            "wrap": [
+              1000,
+              1000
+            ],
+            "colorSpace": "srgb",
+            "anisotropy": 4,
+            "size": [
+              1024,
+              1024
+            ]
+          },
+          "roughnessMap": {
+            "uuid": "3f280647-b031-4ae3-9536-197d418bc1c0",
+            "repeat": [
+              1,
+              1
+            ],
+            "wrap": [
+              1001,
+              1001
+            ],
+            "colorSpace": "",
+            "anisotropy": 4,
+            "size": [
+              128,
+              128
+            ]
+          }
+        },
+        "stats": {
+          "px": 128,
+          "min": 0.8,
+          "max": 1,
+          "mean": 0.9020222981770833,
+          "spread": 0.2,
+          "paints": 13,
+          "digest": 423040718
+        },
+        "lamp": {
+          "position": [
+            0,
+            24,
+            1.5
+          ],
+          "intensity": 2.8,
+          "angle": 0.85,
+          "penumbra": 0.75,
+          "color": "#ffe8c4"
+        },
+        "fog": {
+          "near": 33.622811209481654,
+          "far": 64.62281120948165,
+          "depths": []
+        },
+        "null": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 51.261,
+              "bMean": 51.261,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 52.322,
+              "bMean": 52.322,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 49.795,
+              "bMean": 49.795,
+              "delta": 0,
+              "absMeanDelta": 0,
+              "p95AbsDelta": 0,
+              "changedFrac": 0,
+              "n": 34740
+            }
+          ]
+        },
+        "gloss": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 40.336,
+              "bMean": 51.261,
+              "delta": 10.925,
+              "absMeanDelta": 10.925,
+              "p95AbsDelta": 11.996,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 42.697,
+              "bMean": 52.322,
+              "delta": 9.625,
+              "absMeanDelta": 9.625,
+              "p95AbsDelta": 11.924,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 44.138,
+              "bMean": 49.795,
+              "delta": 5.657,
+              "absMeanDelta": 5.657,
+              "p95AbsDelta": 7.856,
+              "changedFrac": 1,
+              "n": 34740
+            }
+          ]
+        },
+        "mottle": {
+          "w": 1284,
+          "h": 900,
+          "bands": [
+            {
+              "label": "near",
+              "aMean": 53.381,
+              "bMean": 51.261,
+              "delta": -2.12,
+              "absMeanDelta": 2.12,
+              "p95AbsDelta": 2.787,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "mid",
+              "aMean": 54.255,
+              "bMean": 52.322,
+              "delta": -1.933,
+              "absMeanDelta": 1.933,
+              "p95AbsDelta": 2.285,
+              "changedFrac": 1,
+              "n": 34740
+            },
+            {
+              "label": "far",
+              "aMean": 51.135,
+              "bMean": 49.795,
+              "delta": -1.341,
+              "absMeanDelta": 1.341,
+              "p95AbsDelta": 2,
+              "changedFrac": 0.987,
+              "n": 34740
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
