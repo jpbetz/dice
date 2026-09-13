@@ -11293,86 +11293,54 @@ export const scenarios = [
     },
   },
   {
-    name: 'linked-press',
-    tags: ['chrome', 'roll', 'cuj8'],
-    // The body stays a clear target — the biggest one on screen — but it is
-    // a SHORTCUT now, not the advertised control. Hovering it lights the
-    // named bar (teaching the word) instead of painting a 72px ✕ watermark
-    // that only a cursor could ever discover.
+    name: 'result-seat-read-and-clear',
+    tags: ['chrome','roll','cuj8'],
+    // The result opens its complete read; Clear has a separate explicit target.
     async fn(ctx) {
-      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
-      await a.roll('d20 # Body');
-      // The retired dress: no role, no tabindex, no watermark.
-      assert.equal(await a.eval(`document.getElementById('banner-main').getAttribute('role')`), null,
-        'the body is no longer announced as a button');
-      assert.equal(await a.eval(`document.getElementById('banner-main').getAttribute('tabindex')`), null,
-        'and no longer holds a tab stop');
-      assert.equal(await a.eval(
-        `getComputedStyle(document.getElementById('banner-main'), '::after').content`),
-        'none', 'the ✕ watermark is gone');
-      // The linked press. Needs a REAL cursor: a synthetic mouseover runs
-      // listeners but never moves the browser's hover state, so the rule
-      // would stay unmatched and the assertion would lie either way.
-      await a.eval(`document.querySelectorAll('.card-act').forEach((el) => { el.style.transition = 'none'; })`);
-      const borderOf = `getComputedStyle(document.querySelector('#banner-actions .card-act')).borderTopColor`;
-      const rest = await a.eval(borderOf);
-      assert.ok(await a.hover('#banner-main'), 'the banner body is on screen to hover');
-      const lit = await a.eval(borderOf);
-      assert.notEqual(lit, rest, 'hovering the body lights the named bar');
-      // …and the body click still clears, because the hand already knows it.
-      await a.eval(`document.getElementById('banner-main').click()`);
-      await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 0)`,
-        { desc: 'the body shortcut still clears' });
+      const a=await ctx.newTable({origin:'localhost',name:'Alice'});
+      await a.roll('d20 # Read this');const id=await a.rollId();
+      await tapControl(a,'#table-results .is-mine');
+      assert.equal(await a.dbg('tableResults.detailId'),id);
+      assert.equal(await a.diceCount(),1,'opening the read preserves the physical die');
+      assert.ok(await a.eval('document.getElementById("player-result-read").innerText.includes("Read this")'));
+      await tapControl(a,'#player-result-close');
+      await tapControl(a,'#table-results .result-seat-clear');
+      await a.waitFor('window.__diceDebug.tableResults.rows.every(r=>!r.result)');await a.settle();
+      assert.equal(await a.diceCount(),0);
+      assert.equal(await a.logCount(),1,'explicit Clear preserves history');
     },
   },
   {
     name: 'named-verb-touch',
-    tags: ['chrome', 'roll', 'cuj8'],
-    // The state the old design failed outright. A phone has no hover, so a
-    // hover-armed affordance is not a quiet affordance — it is no
-    // affordance. Read with ZERO pointer events sent.
+    tags: ['chrome','roll','cuj8'],
     async fn(ctx) {
-      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
-      await a.emulateCoarsePointer(true);
-      try {
-        await a.roll('d20 # Thumb');
-        const v = await a.dbg(`cardActs('banner')`);
-        assert.equal(v.primary.opacity, '1', 'the primary stands on a phone, unhovered');
-        assert.ok(v.primary.minH >= 44,
-          `the primary is a real touch target (got ${v.primary.minH}px)`);
-        assert.ok(v.reroll.minH >= 44,
-          `so is the REROLL strip (got ${v.reroll.minH}px)`);
-      } finally {
-        await a.emulateCoarsePointer(false); // per-tab, outlives the scenario
+      const a=await ctx.newTable({origin:'localhost',name:'Alice'});
+      await a.page.browser.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true},a.page.sessionId);
+      await a.emulateCoarsePointer(true);await a.roll('d20 # Thumb');
+      const measure=selector=>a.eval(`(()=>{const e=document.querySelector(${JSON.stringify(selector)}),r=e.getBoundingClientRect();return {width:r.width,height:r.height,opacity:getComputedStyle(e).opacity};})()`);
+      const clear=await measure('#table-results .result-seat-clear');
+      assert.ok(clear.width>=44&&clear.height>=44&&clear.opacity==='1','the unhovered direct Clear has a full touch target');
+      await tapControl(a,'#table-results .is-mine');
+      for(const selector of ['#player-result-actions .card-act','#player-result-actions .pk-strip']){
+        const r=await measure(selector);assert.ok(r.width>=44&&r.height>=44&&r.opacity==='1',selector+' is visible and touch sized');
       }
     },
   },
   {
     name: 'named-verb-keys',
-    tags: ['chrome', 'roll', 'cuj8'],
-    // The primary is a real <button>, which is what makes the keyboard path
-    // work without a hand-rolled keydown twin: it owns Enter and Space
-    // natively, and the table's global Enter (collect) bails on a focused
-    // button rather than firing underneath it.
+    tags: ['chrome','roll','cuj8'],
     async fn(ctx) {
-      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
-      await a.roll('d20 # Keys');
-      assert.equal(await a.eval(
-        `document.querySelector('#banner-actions .card-act').tagName`), 'BUTTON',
-        'the primary is a native button, not a div wearing role=button');
-      // Focus it and fire Enter FROM it (target = the button, bubbling to
-      // the document handler) — the global collect must decline.
-      await a.eval(`document.querySelector('#banner-actions .card-act').focus()`);
-      assert.ok(await a.eval(
-        `document.activeElement === document.querySelector('#banner-actions .card-act')`),
-        'the primary takes focus');
-      const shelfBefore = (await a.shelf()).length;
-      await a.eval(`document.activeElement.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`);
-      await a.settle();
-      assert.equal((await a.shelf()).length, shelfBefore,
-        'the table’s Enter-collects yields to the focused button');
-      assert.ok(await a.diceCount() > 0, 'and nothing was swept underneath it');
+      const a=await ctx.newTable({origin:'localhost',name:'Alice'});await a.roll('d20 # Keys');
+      await tapControl(a,'#table-results .is-mine');
+      for(const type of ['keyDown','keyUp'])await a.page.browser.send('Input.dispatchKeyEvent',{type,key:'Tab',code:'Tab',windowsVirtualKeyCode:9},a.page.sessionId);
+      assert.equal(await a.eval('document.activeElement===document.querySelector("#player-result-actions .card-act")'),true,'Tab reaches the visible native Clear');
+      assert.equal(await a.eval('document.activeElement.tagName'),'BUTTON');
+      const shelfBefore=(await a.shelf()).length,roll=await a.rollId();
+      for(const type of ['keyDown','keyUp'])await a.page.browser.send('Input.dispatchKeyEvent',{type,key:'Enter',code:'Enter',windowsVirtualKeyCode:13,...(type==='keyDown'?{text:'\r',unmodifiedText:'\r'}:{})},a.page.sessionId);
+      await a.waitFor('window.__diceDebug.tableResults.rows.every(r=>!r.result)');await a.settle();
+      assert.equal(await a.diceCount(),0,'native Enter activates Clear');
+      assert.equal((await a.shelf()).length,shelfBefore,'the table shortcut did not also collect the roll');
+      assert.equal(await a.rollId(),roll,'the key did not throw a second roll');
     },
   },
   {
