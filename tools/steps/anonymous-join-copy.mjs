@@ -14,6 +14,11 @@ export default async function run(stage){
   console.log(await stage.shot(guest,'anonymous-join-desktop.png'));
   await guest.page.browser.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true},guest.page.sessionId);
   await guest.emulateCoarsePointer(true);
+  // Reload without a name or library edits so phone layout initializes at 390px.
+  await guest.eval('window.__reloading = true');
+  await guest.page.browser.send('Page.reload',{},guest.page.sessionId);
+  await guest.waitFor('!window.__reloading && window.__diceDebug?.seatPicker && document.querySelector(".seat-quick.preselected")');
+  assert.equal(await guest.eval('document.querySelector(".seat-deal").classList.contains("preselected")'),false);
   console.log(await stage.shot(guest,'anonymous-join-phone.png'));
   await typeControl(guest,'#name-input','Alice');await tapControl(guest,'#name-join');await guest.waitOnline();
   assert.deepEqual(await guest.dbg('groups'),[],'ordinary anonymous Join preserves product Quick dice');

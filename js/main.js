@@ -35464,6 +35464,7 @@ function seatDefaultPick() {
 // the sub-label on a door that would otherwise say only what it COSTS.
 function seatPickWord() {
   const p = seatProfilePicked;
+  if (p === 'quick' || (!p && !STORED_NAME_AT_BOOT)) return 'with Quick dice';
   if (!p) return 'no character';
   if (p === 'random') return 'with a dealt character';
   if (typeof p === 'string' && p.startsWith('copy:')) return `with ${p.slice(5)}`;
@@ -35480,31 +35481,21 @@ function renderSeatMine() {
   const zone = document.getElementById('seat-mine');
   const rows = document.getElementById('seat-mine-rows');
   const sys = seatSystem();
-  // A FIRST-TIMER HAS NO CHARACTERS, whatever the store says (Joe 2026-08-09:
-  // "it's super weird to be given a link if never played before and see
-  // 'yours'… instead of having random being the selected default").
-  //
-  // Boot deals every browser one profile so CUJ1 — "I just need to roll NOW"
-  // — has dice on the felt immediately. That profile is scaffolding, not a
-  // character: nobody named it, nobody built it, and its owner has never seen
-  // it. Presenting it at a join door under "Yours" introduces a stranger by a
-  // random name and then defaults to them.
-  //
-  // Never having a display name on this origin is the honest test for "has
-  // not played here before" — it is the same signal the picker itself opens
-  // on, and it needs no new state to go stale.
+  // The unnamed guest door starts with Quick dice. A saved display name
+  // enables the returning-player profile list; neither choice makes any
+  // existing library disposable. Random adds a profile only after Join.
   const firstTimer = !STORED_NAME_AT_BOOT;
   const mine = firstTimer ? [] : profilesFor(profileStore, sys);
   const canDeal = !isFull(profileStore);
   // Nothing to choose between and nothing to deal → the whole block is absent.
-  zone.classList.toggle('hidden', !mine.length && !canDeal);
+  zone.classList.toggle('hidden', !mine.length && !canDeal && !firstTimer);
   rows.textContent = '';
   // The keep-name row reads the same pick every other row writes, so whoever
   // changed it refreshes that sub-label (C12). Above the early return: a full
   // library with nothing for this system hides the zone, and 'Stay as ⟨name⟩'
   // is still standing and still has to say what it carries.
   renderSeatKeepSub();
-  if (!mine.length && !canDeal) return;
+  if (!mine.length && !canDeal && !firstTimer) return;
   const chosen = seatProfilePicked || lastUsedFor(profileStore, sys);
   // HEADS, like the switcher over the rack (Joe 2026-08-09: "the selection of
   // the profile should match very close to the drop down to switch
@@ -35523,6 +35514,15 @@ function renderSeatMine() {
     h.textContent = text;
     rows.appendChild(h);
   };
+  if (firstTimer) {
+    const quick = document.createElement('button');
+    quick.className = 'btn seat-btn seat-quick';
+    quick.textContent = 'Quick dice';
+    quick.title = 'Use familiar quick rolls without adding a saved profile';
+    if (!seatProfilePicked || seatProfilePicked === 'quick') quick.classList.add('preselected');
+    quick.addEventListener('click', () => { seatProfilePicked = 'quick'; renderSeatMine(); });
+    rows.appendChild(quick);
+  }
   if (mine.length) groupHead('Yours');
   for (const p of mine) {
     const btn = document.createElement('button');
@@ -35578,13 +35578,13 @@ function renderSeatMine() {
     ct.className = 'seat-count';
     ct.textContent = systemLabel(sys);
     deal.appendChild(ct);
-    deal.title = `Deal a whole ${systemLabel(sys)} profile when you join — dice, names and all`;
+    deal.title = `Add a random ${systemLabel(sys)} profile when you join`;
     // SELECTED, NOT SPENT (Joe 2026-08-09: "don't auto pick a name and show
     // it in this UI, do whatever random does"). This used to MINT on the tap
     // — every press made another profile, to the 32 cap, before you had
     // joined anything, and it is the row a first-timer's Enter aims at. It is
     // now a choice like the others; the deal happens at Join.
-    if (seatProfilePicked === 'random' || (!mine.length && !seatProfilePicked)) {
+    if (seatProfilePicked === 'random') {
       deal.classList.add('preselected');
     }
     deal.addEventListener('click', () => { seatProfilePicked = 'random'; renderSeatMine(); });
@@ -35829,18 +35829,13 @@ function settlePendingPick() {
   const want = seatPending;
   seatPending = null;
   if (!want) return;
+  if (want === 'quick') {
+    setDiceWorkspaceMode('quick');
+    return;
+  }
   if (want === 'random') {
-    // A first-timer's Random REPLACES the scaffolding profile boot dealt them
-    // rather than adding beside it — they came here with nothing and should
-    // leave the door holding one character, not two, one of which they have
-    // never seen. Anyone else gets a new one, which is what Random means.
-    if (!STORED_NAME_AT_BOOT && profilesOf(profileStore).length === 1) {
-      const old = activeProfile(profileStore);
-      const v = dealNewProfile(tableSystem());
-      if (v.ok && old) removeProfileById(old.id);
-      showProfileNote(v);
-      return;
-    }
+    // Random adds what the player asked for. A missing display name never
+    // makes an existing profile disposable, even when it is the only one.
     showProfileNote(dealNewProfile(tableSystem()));
     return;
   }
@@ -36096,7 +36091,7 @@ function promptName(peek) {
     // cannot be made until `hello` brings the real thing. seatPending is read
     // by settlePendingPick() once the roster is up.
     const submit = () => {
-      seatPending = seatProfilePicked;
+      seatPending = seatProfilePicked || (!STORED_NAME_AT_BOOT ? 'quick' : null);
       takeFreeSeat(input.value);
     };
     // A FOCUSED INPUT OWNS Esc (the global ladder returns early on `typing`,

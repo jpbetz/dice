@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { tableDesignScenarios } from './table-designs.mjs';
 import { personalKitScenarios } from './personal-kit.mjs';
 import { tableControlScenarios } from './table-controls.mjs';
+import { joinFirstPlayScenarios } from './join-first-play.mjs';
 import { firstPlayScenarios } from './first-play.mjs';
 import { workspaceScenarios } from './workspaces.mjs';
 import { playerResultScenarios } from './player-results.mjs';
@@ -790,6 +791,7 @@ export const scenarios = [
   ...tableDesignScenarios,
   ...tableControlScenarios,
   ...firstPlayScenarios,
+  ...joinFirstPlayScenarios,
   ...workspaceScenarios,
   ...playerResultScenarios,
   ...rollFlowScenarios,
@@ -3765,8 +3767,8 @@ export const scenarios = [
       assert.match(foreign.text, /Walter/, 'and whose it is');
       assert.match(foreign.title, /copies it into your profiles/, 'and that taking it copies');
 
-      // RANDOM IS PRE-SELECTED with nothing of your own, and MINTS NOTHING
-      // until you join.
+      // Quick dice is the fresh guest default. Explicit Random previews a
+      // choice without adding anything until Join.
       const before = (await p.dbg('profiles.list')).length;
       // A genuinely fresh guest starts with product-provided Quick dice,
       // not a previously kept character under Yours.
@@ -3775,8 +3777,8 @@ export const scenarios = [
         + `.some((h) => h.textContent === 'Yours')`), false,
       'no "Yours" group for someone who has never played here');
       assert.equal(await p.eval(
-        `document.querySelector('#seat-mine-rows .seat-deal').classList.contains('preselected')`),
-      true, 'Random is the pre-selection instead');
+        `document.querySelector('#seat-mine-rows .seat-quick').classList.contains('preselected')`),
+      true, 'Quick dice is the fresh guest pre-selection');
       await tapControl(p,'#seat-mine-rows .seat-deal');
       assert.equal((await p.dbg('profiles.list')).length, before,
         'selecting Random mints nothing — browsing is not committing');
