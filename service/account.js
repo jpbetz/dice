@@ -6,6 +6,7 @@ import { StoreError } from './store.js';
 import { readLibrary, prepareLibraryWrite, writeLibrary, archiveLibrary } from './library.js';
 import { createHomeDomain } from './homes.js';
 import { createSocialDomain } from './social.js';
+import { createPresenceDomain, preparePresenceWithdrawal } from './presence.js';
 
 export const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_SESSIONS = 12;
@@ -68,14 +69,22 @@ export function createAccountService({ store, now = Date.now, sessionMs = SESSIO
     : outcome(409, 'identity_changed', 'The signed-in person changed. Reopen the account before syncing.');
   const homes = createHomeDomain({ bridge: homeBridge, now });
   const social = homes ? createSocialDomain({ now }) : null;
+  const presence = social ? createPresenceDomain({ now, seat: homeBridge.seat }) : null;
+  const previousPresence = async (tx, token) => {
+    if (!presence || !validSessionToken(token)) return () => {};
+    const sessionHash = hash('session', token), session = await tx.get(`sessions/${sessionHash}`);
+    if (session === null) return () => {};
+    if (session.schema !== 1 || typeof session.personId !== 'string') throw new StoreError('corrupt');
+    return preparePresenceWithdrawal(tx, session.personId, sessionHash);
+  };
 
   return Object.freeze({
     async status() {
       await store.get('meta/accounts');
       return { enabled: true, available: true, recoveryMethods: ['key'], schema: 1,
-        capabilities: ['library', ...(homes ? ['homes', 'people'] : [])] };
+        capabilities: ['library', ...(homes ? ['homes', 'people', 'presence'] : [])] };
     },
-    async register(input) {
+    async register(input, previousToken = null) {
       if (!input || !validRecoveryKey(input.recoveryKey) || input.recoveryAcknowledged !== true
           || typeof input.displayName !== 'string' || input.displayName.includes('#')) return invalid();
       const displayName = cutText(input.displayName, 24);
@@ -94,15 +103,17 @@ export function createAccountService({ store, now = Date.now, sessionMs = SESSIO
         const daily = await tx.get(dayPath);
         if (credential) return outcome(409, 'key_registered', 'This key already has an account. Use Recover instead.');
         if ((total?.count || 0) >= maxAccounts || (daily?.count || 0) >= registrationsPerDay) return limited();
+        const withdraw = await previousPresence(tx, previousToken);
         tx.put(`people/${person.id}`, person);
         tx.put(`credentials/${keyHash}`, { schema: 1, personId: person.id, createdAt: at });
         tx.put(`sessions/${session.id}`, session.record);
         tx.put('meta/accounts', { schema: 1, count: (total?.count || 0) + 1 });
         tx.put(dayPath, { schema: 1, count: (daily?.count || 0) + 1 });
+        withdraw();
         return signedIn(person, session);
       });
     },
-    async recover(input) {
+    async recover(input, previousToken = null) {
       if (!input || !validRecoveryKey(input.recoveryKey)) return denied();
       const at = now();
       const keyHash = hash('recovery', input.recoveryKey);
@@ -119,6 +130,7 @@ export function createAccountService({ store, now = Date.now, sessionMs = SESSIO
         const alive = input.revokeOtherSessions === true ? []
           : sessions.filter(([, entry]) => entry && entry.expiresAt > at && entry.generation === person.sessionGeneration);
         if (alive.length >= MAX_SESSIONS) return outcome(429, 'session_limit', 'Recover and sign out other devices to continue.');
+        const withdraw = await previousPresence(tx, previousToken);
         const session = { token: candidate.token, id, record: { schema: 1, personId: person.id,
           generation: person.sessionGeneration, csrfToken: candidate.csrfToken, createdAt: at, expiresAt: at + sessionMs } };
         for (const [saved, entry] of sessions) {
@@ -127,6 +139,7 @@ export function createAccountService({ store, now = Date.now, sessionMs = SESSIO
         }
         tx.put(`people/${person.id}`, { ...person, sessionHashes: [...alive.map(([saved]) => saved), id] });
         tx.put(`sessions/${id}`, session.record);
+        withdraw();
         return signedIn(person, session);
       });
     },
@@ -192,6 +205,14 @@ export function createAccountService({ store, now = Date.now, sessionMs = SESSIO
         return expectedPerson(found, expected) || (read
           ? social.read(tx, found.person, action, input)
           : social.mutate(tx, found.person, action, id, input));
+      });
+    },
+    async presence(token, csrf, expected, { read = false, id = null, input } = {}) {
+      if (!presence) return outcome(503, 'presence_unavailable', 'Presence is unavailable. Your live table still works.');
+      return store.transact(async tx => {
+        const found = await authenticated(tx, token, csrf, now(), !read);
+        if (!found.ok) return found;
+        return expectedPerson(found, expected) || (read ? presence.read(tx, found.person, id) : presence.set(tx, found, input));
       });
     },
     async logout(token, csrf) {

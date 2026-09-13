@@ -94,6 +94,12 @@ function socialRoute(suffix, method, requestUrl) {
   return match ? { action: match[2], id: match[1], read: false } : null;
 }
 
+function presenceRoute(suffix, method) {
+  if (suffix === '/presence') return { read: method === 'GET' };
+  const match = /^\/homes\/(h_[A-Za-z0-9_-]{43})\/presence$/.exec(suffix);
+  return match ? { read: true, id: match[1] } : null;
+}
+
 /** Optional router. Construction never throws and never delays live-room
  * routing. All exceptions are caught here before server.js's generic logger.
  * No credentials/config values or user data are passed to an error logger.
@@ -143,8 +149,9 @@ export function createOptionalAccountApi({ env = process.env, service = null,
         const library = suffix === '/library' || suffix === '/library/reconcile' || suffix === '/library/archive' || !!versionId;
         const home = homeRoute(suffix, req.method);
         const social = socialRoute(suffix, req.method, req.url);
-        if (!known.has(suffix) && !versionId && !home && !social) { send(res, 404, { ok: false, code: 'not_found', message: 'No such account action.' }); return true; }
-        const read = ['/status', '/session'].includes(suffix) || !!versionId || (suffix === '/library' && req.method === 'GET') || home?.read || social?.read;
+        const presence = presenceRoute(suffix, req.method);
+        if (!known.has(suffix) && !versionId && !home && !social && !presence) { send(res, 404, { ok: false, code: 'not_found', message: 'No such account action.' }); return true; }
+        const read = ['/status', '/session'].includes(suffix) || !!versionId || (suffix === '/library' && req.method === 'GET') || home?.read || social?.read || presence?.read;
         if (req.method !== (read ? 'GET' : 'POST')) {
           send(res, 405, { ok: false, code: 'method_not_allowed', message: 'Use the account action in the app.' }); return true;
         }
@@ -166,7 +173,8 @@ export function createOptionalAccountApi({ env = process.env, service = null,
                 && req.headers['sec-fetch-site'] !== 'none')) {
             send(res, 403, { ok: false, code: 'origin_refused', message: 'Open the account panel in the app.' }); return true;
           }
-          const result = social ? await account.social(token, null, req.headers['x-dice-person'], social.action, social)
+          const result = presence ? await account.presence(token, null, req.headers['x-dice-person'], presence)
+            : social ? await account.social(token, null, req.headers['x-dice-person'], social.action, social)
             : home ? await account.home(token, null, req.headers['x-dice-person'], home.action, home)
             : library ? await account.library(token, req.headers['x-dice-person'], versionId || null)
             : await account.session(token);
@@ -185,10 +193,11 @@ export function createOptionalAccountApi({ env = process.env, service = null,
           { Connection: 'close' }); return true; }
         const csrf = req.headers['x-dice-csrf'];
         let result;
-        if (suffix === '/register') result = await account.register(body.value);
-        else if (suffix === '/recover') result = await account.recover(body.value);
+        if (suffix === '/register') result = await account.register(body.value, token);
+        else if (suffix === '/recover') result = await account.recover(body.value, token);
         else if (suffix === '/logout') result = await account.logout(token, csrf);
         else if (suffix === '/revoke-others') result = await account.revokeOthers(token, csrf);
+        else if (presence) result = await account.presence(token, csrf, req.headers['x-dice-person'], { ...presence, input: body.value });
         else if (social) result = await account.social(token, csrf, req.headers['x-dice-person'], social.action, { ...social, input: body.value });
         else if (home) result = await account.home(token, csrf, req.headers['x-dice-person'], home.action, { ...home, input: body.value });
         else if (suffix === '/library/archive') result = await account.archiveLibrary(token, csrf, req.headers['x-dice-person'], body.value);

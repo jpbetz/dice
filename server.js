@@ -89,6 +89,7 @@ import { createOptionalAccountApi } from './service/account-http.js';
 // router catches its own errors before they can reach request diagnostics.
 const accountApi = createOptionalAccountApi({ homeBridge: {
   capture: captureHomeSnapshot, validate: validateHomeSnapshot, fresh: freshHomeSnapshot,
+  seat: input => { const found = lookup(input); return found.error ? { ok: false } : { ok: true, roomKey: found.room.name }; },
   saved: ({ roomKey }) => { const room = rooms.get(roomKey); if (room) room.savedHome = true; },
 } });
 

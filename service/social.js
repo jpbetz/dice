@@ -151,6 +151,9 @@ async function directory(ctx, id) {
 }
 async function person(ctx, id) { return checkPerson(await ctx.get(`people/${id}`), id); }
 async function relationship(ctx, a, b) { return checkRelationship(await ctx.get(pairPath(a, b)), a, b); }
+// Server-only readers for presence permission projection. Relationships remain
+// authoritative; no durable directory is copied into a public room payload.
+export { directory as readSocialDirectory, relationship as readRelationship, checkPerson as checkSocialPerson };
 const add = (array, id) => array.includes(id) ? array : [...array, id];
 const remove = (array, id) => array.filter(value => value !== id);
 const pending = (entries, at) => entries.filter(entry => entry.state === 'pending' && entry.expiresAt > at).length;

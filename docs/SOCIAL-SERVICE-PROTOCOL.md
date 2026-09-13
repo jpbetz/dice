@@ -2,9 +2,8 @@
 
 # Relationships, invitations and permitted presence — D3 design
 
-2026-09-13. D3.1 relationships/inbox API and client transport are implemented.
-Presence below is the next bounded design; social UI and deployment are later
-work. Implementation and tests use newly created fixture accounts only.
+2026-09-13. Relationships/inbox, permitted presence and their client transport
+are implemented (D3.1–D3.3). Social UI and deployment are later work. Implementation and tests use newly created fixture accounts only.
 
 ## Decisions
 
@@ -17,7 +16,7 @@ application, or invitations to real people during development.
 First connections use an intentionally shared contact code, not a global name
 search and never a recovery key. The authenticated owner enables a fresh code;
 another authenticated person submits it to create a recipient-bound friend
-request. The owner sees that person's verified account display name and chooses
+request. The owner sees that person's account-provided display name and chooses
 Accept or Decline. Sharing a code authorizes a request, not immediate friendship.
 The same narrow mechanism can be offered beside an already-known table person;
 the first service does not infer account ownership from a seat name or disclose
@@ -51,7 +50,7 @@ returning a historical receipt.
 | `socialPeople/<person>` | Bounded friend IDs, blocked IDs, incoming/outgoing invitation indexes, contact-code hash/expiry, operation receipt index and per-day send quota. Private to that person. |
 | `relationships/<hash(sorted pair)>` | Pair IDs, friendship state, generation, removal time and private blocker IDs. Both sides' directories change in the same transaction. Generation invalidates older pending social contact after removal. |
 | `contactCodes/<hash(code)>` | Owner, issue/expiry time. One active code per person; rotation removes the old lookup. Only hashes are stored. |
-| `invitations/<derived person+operation ID>` | Kind (`friend`/`home`), verified sender and intended recipient IDs, optional home ID, relationship generation, state, creation/expiry/action times. No live-room snapshot or arbitrary message body. |
+| `invitations/<derived person+operation ID>` | Kind (`friend`/`home`), authenticated sender and intended recipient IDs, optional home ID, relationship generation, state, creation/expiry/action times. No live-room snapshot or arbitrary message body. |
 | `socialOperations/<person>/operations/<operation>` | Request digest and sanitized receipt. Same operation with different input refuses. Exact retry returns the original outcome without duplicating a request or membership. |
 | `presence/<person>` | At most twelve current session markers: session hash/generation, expiry, optional permitted home ID. No seat credential, roll data, private library, or persistent last-seen history. |
 
@@ -96,7 +95,7 @@ sanitized.
 | `POST /people/requests` | `requestFriend(personId,{operationId,code})` → private friend-request receipt addressed to the code owner |
 | `POST /people/:id/remove` | `removeFriend(personId,id,{operationId})` → symmetric removal and relationship-generation advance |
 | `POST /people/:id/block` | `blockPerson(personId,id,{operationId,blocked})` → private block toggle; block also removes friendship |
-| `GET /invitations?direction=incoming&after=...` | `invitations(personId,{direction,after})` → bounded incoming/outgoing page, opaque cursor, named verified cards |
+| `GET /invitations?direction=incoming&after=...` | `invitations(personId,{direction,after})` → bounded incoming/outgoing page, opaque cursor, named account cards |
 | `POST /invitations` | `inviteHome(personId,{operationId,toPersonId,homeId})` → pending home invitation for an existing friend |
 | `POST /invitations/:id/respond` | `respondInvitation(personId,id,{operationId,choice:'accept'|'decline'})` → terminal state; only intended recipient |
 | `POST /invitations/:id/cancel` | `cancelInvitation(personId,id,{operationId})` → pending cancellation; only sender |
@@ -131,7 +130,7 @@ renewing and best-effort withdrawal is only an optimization. Failed reads show
 `unknown`, not a cached “online” assertion. Heartbeats are a bounded replacement
 of the current session marker and do not create operation receipts.
 
-Mutual friends may see a current online signal. A saved-home location requires
+Mutual friends may see a current online signal. A saved-home location (through the separate home-presence route) requires
 an additional explicit choice, current membership and a server-verified current
 live-seat credential for that home at heartbeat time. The stored marker contains
 only the validated home ID. A home member sees only other members who opted to
@@ -143,7 +142,7 @@ session generation/hash membership. Sign-out, recovery that revokes devices,
 key rotation and removal/blocking therefore invalidate a signal immediately,
 without waiting for TTL cleanup. Expired signals reveal no historical last-seen
 timestamp. Twelve markers per person cover the existing session cap. Reading 32
-friends or home members requires at most 64 person/presence records plus the
+friends or home members requires at most 96 relationship/person/presence records plus the
 authenticated directory and home, fitting one bounded transaction.
 
 Service failure never enters the roll path. No-service UI keeps the current
@@ -180,4 +179,32 @@ Its eight tests cover a real process restart and clean cookie jar, two-client
 response/cancellation races, stale acceptance retries after leave/removal,
 rotation/blocking, recipient/CSRF/namespace isolation, corruption and guest play,
 injected-clock expiry/quota, 20-row pagination, archive and a full account home
-directory. Browser UI proof and presence are not claimed by these API tests.
+directory. Browser UI proof is not claimed by these API tests.
+
+D3.2 automated evidence: the five `tests/account-presence.test.mjs` tests are in
+the unit lane. They prove independent online/location consent, membership and
+current-seat checks, removal while a home remains shared, session revocation,
+recovery that revokes other devices, sign-out/key rotation, marker expiry and
+corruption, bounded renewal writes, hidden-tab withdrawal and unknown-on-failure.
+
+Successful register/recover atomically withdraws the previous cookie session's
+presence marker while preserving that old authentication session. A real HTTP
+cookie jar proves the marker is gone even when Set-Cookie arrives and the
+response body is lost. `createPresenceHeartbeat` in `js/presence.js` is off until
+`setSharing({online:true,...})`; it renews only while visible. On account adoption,
+call `close({withdraw:false})` to stop it without enqueueing a request behind the
+account transport callback that is currently adopting the identity. Ordinary
+panel/device shutdown may await `close()` for a best-effort withdrawal. Expiry
+and session validity remain the fallback when a tab cannot send that request.
+
+D3.3 browser evidence: `tests/account-social-browser.test.mjs` is in both e2e
+lanes. Independent Chrome processes establish a connection, take the recipient
+offline, send a fixture invitation, restart the server, and recover from clean
+browsers. A secret three-throw turn keeps its seat and successfully rethrows
+after acceptance. Joining the named home is a later explicit action; its live
+snapshot contains no account identifiers or previous secret turn. Presence is
+absent until an explicit choice and disappears after connection removal.
+These protocol pages do not claim that final People/phone UI is shipped.
+
+Display names are authenticated account-provided labels, not independently
+verified real identities. UI copy must not describe them as “verified people.”

@@ -153,6 +153,9 @@ export function createAccountClient({ fetch: fetcher = globalThis.fetch,
     respondInvitation: (expectedPersonId, id, input) => libraryRequest(expectedPersonId, `invitations/${encodeURIComponent(id)}/respond`, input),
     cancelInvitation: (expectedPersonId, id, input) => libraryRequest(expectedPersonId, `invitations/${encodeURIComponent(id)}/cancel`, input),
     archiveInvitation: (expectedPersonId, id, input) => libraryRequest(expectedPersonId, `invitations/${encodeURIComponent(id)}/archive`, input),
+    presence: expectedPersonId => libraryRequest(expectedPersonId, 'presence'),
+    homePresence: (expectedPersonId, id) => libraryRequest(expectedPersonId, `homes/${encodeURIComponent(id)}/presence`),
+    setPresence: (expectedPersonId, input) => libraryRequest(expectedPersonId, 'presence', input),
     logout() {
       // Freeze the local namespace before awaiting a server that may be down.
       const epoch = ++identityEpoch;
