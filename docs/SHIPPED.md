@@ -8,6 +8,48 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## 2026-09-13 — Mobile roll flows and direct result clearing
+
+Reproduced Joe's failures in Chrome at the iPhone 12 Pro viewport (390 × 844):
+clearing removed dice while leaving their result card behind, and rolling
+from the full-screen builder left the animation covered. Cleared results now
+leave the top display without erasing history or resurrecting an older roll.
+Each own result has a separate 44 px wide, one-tap clear target at the card.
+Accepted rolls and rethrows return from their originating workspace/reader;
+refusals retain the draft and show the error inside its editor. Other players'
+arrivals leave the local task alone. Empty player cards no longer occupy space.
+
+The phone's primary controls are a compact, scrollable list of saved pools,
+with one-tap rolls through the existing pool pipeline (including names, dice
+sets, modifiers and privacy). Quick dice remains the empty-library fallback.
+There is one bottom navigation bar: Tables, Rolls, People and More. Preferences,
+history, notation and help moved into More; dice-set selection stays in the
+expanded builder. A tray resize refits the renderer even without a window
+resize. This supersedes the phone Dice launcher in the earlier September 13
+roll-controls entry.
+
+Workspace and result headers use a 44 × 44 px × close control with consistent
+padding. The tools beneath Roll share one quiet toolbar; result actions use
+matching buttons. Modify and Save as pool editors now belong to the originating
+sheet's layer and focus scope, with working close/Escape behavior. Closing a
+result also retires its old turn forecast.
+
+The reusable `roll-flows` scenarios use real pointer input and hit testing,
+then verify both painted dice bounds and whether another surface covers them.
+Coverage includes lone-roll clearing, reload, multiple players, saved pools,
+builder/reroll/rethrow, modifiers, result saving, refusal/retry, and phone
+navigation. Visual inspection covers 390 × 844, 390 × 664 and desktop;
+`tools/steps/roll-flow-look.mjs` reproduces the screenshots on ephemeral ports.
+Physical iPhone/Safari behavior was not measured in this pass.
+
+Validation: unit and fuzz suites passed; the full browser command passed all
+74 smoke scenarios and its account/library/home UI checks. Seven focused
+phone, pointer, gallery and result-flow scenarios also passed.
+
+[Phone table](redesign/2026-09-13-mobile-flows-table.png) ·
+[Builder](redesign/2026-09-13-mobile-flows-builder.png) ·
+[More](redesign/2026-09-13-mobile-flows-more.png).
+
 ## 2026-09-13 — Dice selection joins the roll controls
 
 Removed the saved-pools subtitle at Joe's request. The name row now contains

@@ -119,6 +119,7 @@ export const personalKitScenarios = [
       await a.eval(`localStorage.removeItem('dice.panels.v1')`);
       await a.reload();
       assert.equal((await a.dbg('panelState')).allCollapsed, true, 'fresh phone starts compact');
+      await a.eval(`document.getElementById('phone-build-roll').click()`);
       await a.eval(`document.getElementById('my-dice').click()`);
       await a.waitFor('window.__diceDebug.diceGallery.open');
       const box = await a.eval(`document.getElementById('dice-gallery').getBoundingClientRect().toJSON()`);
@@ -136,8 +137,10 @@ export const personalKitScenarios = [
       await a.waitFor(`document.getElementById('left-panel').inert`);
       await a.eval(`document.querySelector('.dg-close').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`);
       assert.equal((await a.dbg('diceGallery')).open, false);
-      assert.equal(await a.eval(`document.getElementById('left-panel').inert`), false);
+      assert.equal(await a.eval(`document.getElementById('left-panel').inert`), true,'the phone builder remains open behind the gallery');
       assert.equal(await a.eval('document.activeElement.id'), 'my-dice');
+      await a.dbg('workspaces.close()');
+      assert.equal(await a.eval(`document.getElementById('left-panel').inert`), false);
       await a.eval(`document.getElementById('identity-chip').click()`);
       await a.page.browser.send('Emulation.setDeviceMetricsOverride',
         {width:390,height:440,deviceScaleFactor:1,mobile:true},a.page.sessionId);

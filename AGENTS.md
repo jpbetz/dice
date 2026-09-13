@@ -38,6 +38,10 @@ first is the one that is wrong.
 
 ## Owner UI preferences
 
+- Common result clearing takes one action at the result itself. Expanded
+  screens use a compact × close control with consistent padding. On phones,
+  prioritize a compact pool list and one navigation row; keep dice-set
+  selection and secondary tools in expanded views.
 - Use plain, functional UI copy. Do not add cute or decorative subtitles,
   taglines, or reassurance lines beneath controls and lists. Joe explicitly
   removed “Saved in this browser. Yours at every table.” (2026-09-13).
@@ -53,6 +57,11 @@ first is the one that is wrong.
 - A scripted check is the floor, not the proof: before calling a change done,
   **look at the moment the owner named, on the device they named**
   (GOALPOST 8). Take a screenshot; measure the thing, not a proxy.
+- For UI flows, drive the visible action through its visible consequence.
+  Use debug hooks for setup, then pointer/keyboard input with hit testing;
+  `element.click()` bypasses covered and inert controls. Do not close a panel
+  in a test when the player's Roll action should close it. Include a lone
+  roll, four players, and the named phone viewport for table-layout changes.
 - A scenario per feature is the habit, not a gate; reach app state through
   `window.__diceDebug` rather than scraping DOM. A golden pins the current
   answer, not the right one — re-record it when a better design needs it,

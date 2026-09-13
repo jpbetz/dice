@@ -1220,6 +1220,7 @@ function refreshTurnVerb() {
 // other side.
 function canBankTurn(entry) {
   if (!entry || !entry.rollId || !entry.push) return false;
+  if (entry.cleared || rollStates.get(entry.rollId)?.cleared) return false;
   if (entry.push.busted || entry.push.banked) return false;
   if (collected.has(entry.rollId) || !rollState(entry.rollId)) return false;
   if (entryHidden(entry)) return false;
@@ -6284,6 +6285,8 @@ function applyClearRoll(rollId) {
       && !ceremonyLayer.classList.contains('hidden')) {
     dismissCeremonyUI();
   }
+  if (tableResults?.detailId === rollId) tableResults.close();
+  tableResults?.refresh();
 }
 
 // Roller-side Done. Online the server validates (roller only) and everyone —
@@ -6887,6 +6890,7 @@ function applyRethrow(data) {
 // 403s is worse than not advertising one (U19's rule for Reveal).
 function canThrowAgain(entry) {
   if (!entry || !entry.rollId || !entry.throws) return false;
+  if (entry.cleared || rollStates.get(entry.rollId)?.cleared) return false;
   if (entry.throws.used >= entry.throws.max) return false;
   // MECHANICS M4: a push turn ends when it busts or banks, whatever its
   // budget says — the cap only bounds the felt. Found by LOOKING at a busted
@@ -6992,8 +6996,9 @@ function soloBank(rollId, keep) {
 // server to author the values, so it composes locally through the same shared
 // rollspec — one mechanic, two callers, exactly as composeRoll already is.
 function requestRethrow(rollId, keep) {
-  if (netOnline && net) return net.rethrow(rollId, keep);
-  return Promise.resolve(soloRethrow(rollId, keep));
+  const showTable = returnToRollView();
+  const request = netOnline && net ? net.rethrow(rollId, keep) : Promise.resolve(soloRethrow(rollId, keep));
+  return request.then(ok => { if (ok) showTable(); return ok; });
 }
 
 function soloRethrow(rollId, keep) {
@@ -7082,6 +7087,8 @@ function clearTable() {
   silenceRollingVoices();
   roomDuck(false);
   ROLLING_OUT.length = 0;
+  tableResults?.close();
+  tableResults?.refresh();
 }
 
 // roll = {dice: [types], values: [...], seed, label, dc?, playerName?, color?}
@@ -22910,8 +22917,17 @@ function openPopover(binding) {
   const res = parseNotation(notation);
   if (!res.ok) return;
   closePopover();
+  const opener = document.activeElement;
+  const surface = binding.row?.closest('#workspace, #player-result-detail, #settings-modal')
+    || opener?.closest('#workspace, #player-result-detail, #settings-modal');
+  // Editors opened from a sheet belong to that sheet's layer and focus scope.
+  // Leaving this body sibling inert underneath the sheet made Modify and
+  // Save as pool appear to do nothing on phones.
+  (surface || document.body).append(popEl);
+  popEl.inert = false;
   pop = {
     source: binding.source,
+    opener,
     groupId,
     name,
     row: binding.row || null,
@@ -22959,6 +22975,7 @@ function openPopover(binding) {
   renderPopIdentity(); // the Sheet Pass strip (group popovers only)
   renderPop();
   placePopover();
+  if (surface) document.getElementById('pop-close').focus({preventScroll:true});
 }
 
 // Tray edits while the tray popover is open re-sync it (§7.4): the draft is
@@ -23275,11 +23292,15 @@ function renderPopIdentity() {
 
 function closePopover() {
   if (!pop) return;
+  const opener = pop.opener, focused = popEl.contains(document.activeElement);
   if (pop.row) pop.row.classList.remove('open');
   pop = null;
   popEl.classList.add('hidden');
   closePopSaveMorph(); // a reopened popover always starts on the buttons
   closeSetMenu(); // an identity-strip set menu must not outlive its anchor
+  document.body.append(popEl);
+  popEl.inert = modalStack.length > 0;
+  if (focused && opener?.isConnected) opener.focus({preventScroll:true});
 }
 
 // Anchor the popover to its source, clamped fully on-screen (§7.4: usable in
@@ -24061,8 +24082,12 @@ document.addEventListener('pointerdown', (e) => {
   }
   closePopover();
 });
-// Esc closes the popover only when it is the topmost layer — handled by the
-// central Esc layering in the keyboard-shortcuts section below.
+// A sheet stops table shortcuts, so handle its nested editor before that
+// boundary. Input-local Escape behavior (e.g. cancelling a name) still wins.
+popEl.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); closePopover(); }
+  if (e.key !== 'Tab') e.stopPropagation();
+});
 window.addEventListener('resize', placePopover);
 
 // 'Save' — the ONE commit verb of a pool-bound popover (Trigger Pass):
@@ -29481,7 +29506,7 @@ function openSetMenuFor(anchor, { value, allowDefault, pick }) {
     else if (e.key === 'Escape') closeSetMenu(true);
     else if (e.key === 'Tab') closeSetMenu();
   });
-  document.body.appendChild(menu);
+  (anchor.closest('#workspace, #player-result-detail, #settings-modal') || document.body).appendChild(menu);
   placeAnchored(menu, anchor);
   anchor.setAttribute('aria-expanded', 'true');
   setMenuState = { el: menu, anchor };
@@ -34962,6 +34987,7 @@ function showUnavailableHome(info){
 }
 function handleNetRefusal(info) {
   lastRefusal = info;
+  destinationShell?.notice(info.message);
   if(info.path==='/api/join'&&['home_not_found','home_closed','home_unavailable','homes_unavailable','account_unavailable'].includes(info.code)){clearTimeout(refusalTimer);showUnavailableHome(info);return;}
   clearTimeout(refusalTimer);
   setPill(info.message, 'refused');
@@ -34999,8 +35025,25 @@ function rememberThisTable() {
   rememberTable(ROOM, roomSettings.tableName || '');
 }
 
+// A roll started inside a reader or workspace must expose its animation.
+// Capture the originating surfaces so an accepted response cannot close a
+// different task the player opened while waiting. Refusals keep the editor.
+function returnToRollView() {
+  const workspace = destinationShell?.current, detail = tableResults?.detailId;
+  const popup = pop;
+  const settings = document.getElementById('settings-modal');
+  const library = !settings.classList.contains('hidden') && settings.dataset.dest === 'stuff';
+  return () => {
+    if (popup && pop === popup) closePopover();
+    if (detail && tableResults?.detailId === detail) tableResults.close();
+    if (workspace && destinationShell?.current === workspace) destinationShell.close();
+    if (library && settings.dataset.dest === 'stuff') closeSettingsModal();
+  };
+}
+
 function requestRoll(types, label, opts = {}) {
   if (!types.length) return;
+  const showTable = returnToRollView();
   // THIS is the roll that makes a minted table worth listing — one entry
   // point for every roll this client originates, solo and online both.
   rememberThisTable();
@@ -35071,12 +35114,12 @@ function requestRoll(types, label, opts = {}) {
       wireOpts.notation = canonical;
     }
     // animation waits for the SSE event
-    net.roll(types, label, wireOpts).then((roll) => { if (roll) pushHistory(canonical); });
+    net.roll(types, label, wireOpts).then((roll) => { if (roll) { showTable(); pushHistory(canonical); } });
   } else {
     // Solo/offline (goal 9): there is no server to redact for anyone, so
     // secret/whisper act as OPEN; held keeps the local face-down flow.
     if (validateMods(types, opts.mods || null)) return; // invalid spec: no roll
-    if (rollDice(types, label, { ...opts, faceDown: !!(vis && vis.mode === 'held') }) !== false) pushHistory(canonical);
+    if (rollDice(types, label, { ...opts, faceDown: !!(vis && vis.mode === 'held') }) !== false) { showTable(); pushHistory(canonical); }
   }
 }
 
@@ -36241,15 +36284,25 @@ destinationShell = createWorkspaces({
       latest:p.rolling ? {id:null,text:'Rolling…'} : p.queued ? {id:p.openable?p.result?.id:null,text:`${p.queuePosition===1?'Next':`Queue ${p.queuePosition}`}${p.result?` · previous: ${p.result.headline}`:''}`} : p.result ? {id:p.result.id,text:p.result.headline} : null})),
   }),
   beforeOpen: () => { tableResults?.close(); closeSettingsModal(); closeIdentityMenu(); diceGallery?.close(); closeRailMenu(); },
-  closeMenus: () => { closeRailMenu(); closeSetMenu(); },
+  closeMenus: () => { closePopover(); closeRailMenu(); closeSetMenu(); },
   modalOpen: el => {
-    if (window.innerWidth <= 640) openModal(el, {labelledBy:'workspace-title'});
+    if (window.innerWidth <= 640) openModal(el, {labelledBy:el.id==='phone-more-panel'?'phone-more-title':'workspace-title'});
     else { closeModal(el); el.setAttribute('role','region'); }
   }, modalClose: closeModal,
   layoutChanged: refitView,
   openLibrary: anchor => openSettingsModal('stuff', anchor),
   home: () => { if (poolsOwner) setPoolsOwner(null); },
   quickRoll,
+  build: () => setDiceWorkspaceMode('build'),
+  pools: () => groups.map(g=>({id:g.id,name:g.name,notation:g.notation})),
+  draft: () => cmdInput.value.trim() || formula(tray),
+  rollPool: id => {const g=groups.find(g=>g.id===id);if(g)rollRailPool(g);},
+  tool: (key,anchor) => {
+    if(key==='preferences')openSettingsModal('you',anchor);
+    else if(key==='history')openLogFlyout();
+    else if(key==='notation')openPalette();
+    else if(key==='help')openHelpDialog(null);
+  },
   gallery: openDiceGallery,
   setup: anchor => openSettingsModal('table', anchor),
   create: anchor => {
@@ -36317,7 +36370,7 @@ function hasSymbolFaces(entry) {
     &&SETS[entryDieSet(entry,i)]?.faces?.some(face=>face in FACE_SHAPES));
 }
 function resultDisplay(entry) {
-  if(!entry) return null;
+  if(!entry || entry.cleared || rollStates.get(entry.rollId)?.cleared) return null;
   const hidden=entryHidden(entry);
   // Do not even enumerate face values until the common redaction gate permits.
   const faces=hidden?[]:(entry.parts||[]).map((p,i)=>({type:p.type,label:p.label,
@@ -36347,19 +36400,27 @@ function resultSeatRows() {
     const rolling=(currentRoll&&!currentRoll.done&&(netOnline?currentRoll.playerId===p.id:mine))
       ||resultPreparing.has(e?.rollId)||revealing.some(r=>r.rollId===e?.rollId);
     const busy=rolling||resultBusy(e?.rollId);
+    const previous=resultSeatVisible.get(p.id);
+    if(previous && (rollStates.get(previous.id)?.cleared || log.find(e=>e.rollId===previous.id)?.cleared)) resultSeatVisible.delete(p.id);
     if(!busy&&!waiting.length){
       const read=resultDisplay(e);
       if(read)resultSeatVisible.set(p.id,read);else resultSeatVisible.delete(p.id);
     }
     const result=rolling?null:waiting.length?resultSeatVisible.get(p.id)||null:busy?null:resultDisplay(e);
     return {id:p.id,name:p.name,color:p.color,mine,rolling:!!rolling,
-      queued:waiting.length,queuePosition,result,openable:!!result&&!resultBusy(result.id)};
+      queued:waiting.length,queuePosition,result,openable:!!result&&!resultBusy(result.id),
+      clearable:mine&&!!result&&!resultBusy(result.id)};
   });
 }
 var resultSeatVisible;
 function renderCompleteResult(read,controls,id) {
   const entry=log.find(e=>e.rollId===id); read.replaceChildren();
-  if(!entry) {read.textContent='This completed result is no longer in recent history.';controls.hidden=true;return;}
+  if(!entry) {
+    read.textContent=id?'This completed result is no longer in recent history.':'';
+    controls.hidden=true;controls._entry=null;
+    if(controls._acts?.odds)paintTurnOdds(controls._acts.odds,null);
+    return;
+  }
   if(resultBusy(id)) {read.textContent='Rolling…';controls.hidden=true;if(controls._acts?.odds)controls._acts.odds.hidden=true;return;}
   controls.hidden=false;
   const paragraph=(cls,text)=>{const p=document.createElement('p');p.className=cls;p.textContent=text;read.append(p);return p;};
@@ -36374,18 +36435,21 @@ function renderCompleteResult(read,controls,id) {
   }
   updateCardActions(controls,entry,{
     revealClass:'reveal-verb banner-btn',keepable:true,
-    verbFor:e=>e&&(isMine(e)||rollerAway(e))?'clear':'dismiss',
-    onPrimary:btn=>{const e=controls._entry;if(e&&(isMine(e)||rollerAway(e)))runCardClear(e.rollId,btn,()=>tableResults.close());else tableResults.close();},
+    verbFor:e=>e&&!e.cleared&&(isMine(e)||rollerAway(e))?'clear':'dismiss',
+    onPrimary:btn=>{const e=controls._entry;if(e&&!e.cleared&&(isMine(e)||rollerAway(e)))runCardClear(e.rollId,btn);else tableResults.close();},
   });
+  const cue=controls._acts.strip.querySelector('.cue-word');
+  if(cue.textContent!=='Reroll')cue.textContent='Reroll';
 }
 tableResults=createPlayerResults({
   rows:resultSeatRows, symbol:faceSymbolSvg,
+  clear:runCardClear,
   currentResult:()=>lastEntry?{id:lastEntry.rollId,ceremony:!!(currentRoll?.ceremony&&!currentRoll.done)}:null,
   owner:id=>{const e=log.find(e=>e.rollId===id);return e&&!resultBusy(id)?{id:e.playerId,name:e.playerName||identityInfo().name||'You'}:null;},
   beforeDetail:()=>{destinationShell?.close();closePeek();closeSettingsModal();diceGallery?.close();},
   renderDetail:renderCompleteResult,
   openDetail:el=>{if(window.innerWidth<=640)openModal(el,{labelledBy:'player-result-title'});else {closeModal(el);el.setAttribute('role','region');}},
-  closeDetail:closeModal, layoutChanged:refitView,
+  closeDetail:el=>{if(popEl.parentElement===el)closePopover();closeModal(el);}, layoutChanged:refitView,
   turn:oldId=>{
     if(oldId&&resultBusy(oldId))return {id:oldId,label:'Your turn · complete result',state:'Rolling…',busy:true};
     const e=log.findLast(e=>isMine(e)&&!entryHidden(e)&&unfinished(e)&&!collected.has(e.rollId));

@@ -36,7 +36,9 @@ export const playerResultScenarios=[
     }
     assert.match(await a.eval(`document.querySelector('#table-results [data-player="${others[0].playerId}"] .result-seat-state').textContent`),/Previous · next · \+1/);
     await a.page.browser.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true},a.page.sessionId);await a.emulateCoarsePointer(true);
-    assert.ok(await a.eval(`[...document.querySelectorAll('#table-results .result-seat-state')].every(e=>e.scrollWidth<=e.clientWidth)`),'the previous-result qualification remains fully visible on a phone');
+    await a.page.browser.send('Page.bringToFront',{},a.page.sessionId);await a.waitFor('window.__diceDebug.phoneFrame().view.width===390&&document.getElementById("table-results").getBoundingClientRect().width===390');
+    const states=await a.eval(`[...document.querySelectorAll('#table-results .result-seat-state')].map(e=>({text:e.textContent,width:e.clientWidth,scroll:e.scrollWidth}))`);
+    assert.ok(states.every(e=>e.scroll<=e.width),`the previous-result qualification remains fully visible on a phone: ${JSON.stringify(states)}`);
     const publicState=JSON.stringify(queued);
     await ctx.api('/api/roll',{playerId:others[2].playerId,notation:'6d6 secret'});
     await a.eval('new Promise(r=>setTimeout(r,100))');
