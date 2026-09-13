@@ -34940,6 +34940,7 @@ function showUnavailableHome(info){
   unavailableHomeInfo=info||null;
   document.body.classList.toggle('home-unavailable',!!info);
   let box=document.getElementById('home-connection-notice');
+  if(!box&&!info)return;
   if(!box){
     box=document.createElement('section');box.id='home-connection-notice';box.setAttribute('role','status');
     const text=document.createElement('p');text.textContent='Saved table unavailable. Your local dice still work.';

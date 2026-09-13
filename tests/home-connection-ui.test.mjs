@@ -27,6 +27,6 @@ test('actual app retains a failed-home state while rolling locally and explicitl
   await a.eval('document.getElementById("home-connection-new").click()');await a.waitFor('!!document.querySelector(".rail-menu input.tin")');
   await a.eval('document.querySelector(".rail-menu input.tin").value="Outage guest game";document.querySelector(".rail-menu .btn.confirm").click()');
   for(let n=0;n<100;n++){try{if(await a.eval('location.search.startsWith("?room=g_")&&!!window.__diceDebug?.netReady'))break;}catch{}await new Promise(r=>setTimeout(r,50));}
-  await a.waitOnline();assert.equal((await a.dbg('net')).unavailableHome,false);assert.equal(await a.eval('document.getElementById("home-connection-notice").hidden'),true);
+  await a.waitOnline();assert.equal((await a.dbg('net')).unavailableHome,false);assert.equal(await a.eval('(!document.getElementById("home-connection-notice")||document.getElementById("home-connection-notice").hidden)'),true);
   await a.waitFor('window.__diceDebug.settings.tableName==="Outage guest game"');await a.roll('1d6');assert.deepEqual(a.page.errors,[]);
 });
