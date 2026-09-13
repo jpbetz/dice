@@ -35,6 +35,14 @@ avoid loading the whole art catalogue at startup, serving (3). Small,
 measured delivery improvements can land while the product design develops.
 The identity backend does not delay the first discoverability release.
 
+**R3 delivery slice, 2026-09-13:** production was verified to send six entry
+assets uncompressed even when offered Brotli/gzip. The server now negotiates
+and caches compressed public text responses. The same six local assets fall
+from 3.93 MB to 1.10 MB with Brotli; this is an encoded-byte comparison, not
+a page-load or battery claim. The reproducible probe and operational details
+are in [DEPLOY → Static delivery](DEPLOY.md#static-delivery-2026-09-13).
+Dice-face draws and physical-device baselines remain the next measured work.
+
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable
 names, and each player's latest result as part of that table. Where

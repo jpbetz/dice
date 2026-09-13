@@ -373,6 +373,37 @@ const trees = [];
       etag = res.headers.get('etag');
     });
 
+    await t('both compressed module variants follow live edits and retain the last valid declaration', async () => {
+      const tags = new Map();
+      for (const encoding of ['br', 'gzip']) {
+        const { res } = await getModule(base, { 'Accept-Encoding': `${encoding}, identity;q=0` });
+        assert.equal(res.headers.get('content-encoding'), encoding);
+        tags.set(encoding, res.headers.get('etag'));
+      }
+      const changed = FIXTURE.replace('scale: 2.5', 'scale: 5');
+      await edit(dir, changed);
+      for (const encoding of tags.keys()) {
+        const headers = { 'Accept-Encoding': `${encoding}, identity;q=0`, 'If-None-Match': tags.get(encoding) };
+        const { res, body } = await getModule(base, headers);
+        assert.equal(res.status, 200, 'the old encoded validator must not pin the declaration');
+        assert.equal(res.headers.get('content-encoding'), encoding);
+        assert.notEqual(res.headers.get('etag'), tags.get(encoding));
+        assert.equal((await evalModule(body)).SOURCE, changed);
+        tags.set(encoding, res.headers.get('etag'));
+      }
+      await edit(dir, changed.replace('scale: 5', 'scale: yes'));
+      for (const encoding of tags.keys()) {
+        // Non-canonical spelling must still reach the generated route.
+        const res = await fetch(`${base}/js/%74unables.js`, {
+          headers: { 'Accept-Encoding': `${encoding}, identity;q=0`, 'If-None-Match': tags.get(encoding) },
+        });
+        assert.equal(res.status, 304, 'a broken edit retains the last valid encoded variant');
+        assert.equal(res.headers.get('etag'), tags.get(encoding));
+        assert.equal(res.headers.get('vary'), 'Accept-Encoding');
+        await res.arrayBuffer();
+      }
+    });
+
     await t('nothing about the mode reaches a log line', async () => {
       assertNoModeInLog(proc);
     });

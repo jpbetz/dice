@@ -34,10 +34,12 @@ limitations under the License.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import { request } from 'node:http';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
+import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -104,6 +106,22 @@ const port = await freePort();
 // GIT_SHA in Joe's shell must not decide whether the build-stamp block passes.
 const proc = await startServer(port, { GIT_SHA: '', DICE_ROOM_GUARD: '' });
 const base = `http://127.0.0.1:${port}`;
+
+// Unlike fetch, this sees the actual encoded wire bytes. Content-Length must
+// describe those bytes; an auto-decoding client can hide a broken response.
+function wire(path, headers = {}, method = 'GET') {
+  return new Promise((resolve, reject) => {
+    const req = request(`${base}${path}`, { method, headers }, (res) => {
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('error', reject);
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }));
+    });
+    req.setTimeout(10000, () => req.destroy(new Error('wire request timed out')));
+    req.on('error', reject);
+    req.end();
+  });
+}
 
 const postJoin = (b, room, name = 'probe') => fetch(`${b}/api/join`, {
   method: 'POST',
@@ -181,8 +199,7 @@ try {
 
   await t('a wrong ETag returns 200 with the full body', async () => {
     const first = await fetch(`${base}/js/main.js`);
-    const size = Number(first.headers.get('content-length'));
-    await first.arrayBuffer();
+    const size = (await first.arrayBuffer()).byteLength;
     const res = await fetch(`${base}/js/main.js`, { headers: { 'If-None-Match': '"stale"' } });
     assert.equal(res.status, 200);
     assert.equal((await res.arrayBuffer()).byteLength, size, 'a stale ETag fetches the full body');
@@ -360,6 +377,141 @@ try {
     assert.equal(res.headers.get('cache-control'), 'public, max-age=31536000, immutable');
     const body = await res.arrayBuffer();
     assert.equal(body.byteLength, 0);
+  });
+
+  // ---- R3: compressed public delivery ------------------------------------
+
+  await t('HTML, CSS, JS, vendor and generated tunables compress losslessly on the wire', async () => {
+    for (const path of ['/', '/css/style.css', '/js/main.js', '/vendor/three.module.js', '/js/tunables.js']) {
+      const plain = await wire(path);
+      assert.equal(plain.headers['content-encoding'], undefined, 'no offer stays unencoded');
+      assert.equal(plain.headers.vary, 'Accept-Encoding');
+      for (const encoding of ['br', 'gzip']) {
+        const compressed = await wire(path, { 'Accept-Encoding': encoding });
+        assert.equal(compressed.status, 200, path);
+        assert.equal(compressed.headers['content-encoding'], encoding, path);
+        assert.equal(compressed.headers['content-length'], String(compressed.body.length));
+        assert.equal(compressed.headers.vary, 'Accept-Encoding');
+        assert.equal(compressed.headers['cache-control'], plain.headers['cache-control']);
+        assert.equal(compressed.headers['content-type'], plain.headers['content-type']);
+        const decode = encoding === 'br' ? brotliDecompressSync : gunzipSync;
+        assert.deepEqual(decode(compressed.body), plain.body, `${path}: decoding restores exact source bytes`);
+        assert.ok(compressed.body.length < plain.body.length * 0.75, `${path}: useful byte savings`);
+        assert.notEqual(compressed.headers.etag, plain.headers.etag, 'strong tags distinguish representations');
+        assert.equal(compressed.headers.etag,
+          `"${createHash('sha1').update(compressed.body).digest('base64url').slice(0, 27)}"`);
+      }
+    }
+  });
+
+  await t('negotiation respects weights, exclusions, identity, wildcard and unknown encodings', async () => {
+    for (const [offer, expected] of [
+      ['', null], ['identity', null], ['deflate', null], ['br, gzip', 'br'],
+      ['gzip;q=1, br;q=0.5', 'gzip'], ['br;q=0, gzip;q=0.4', 'gzip'],
+      ['BR ; Q=1, gzip;q=0.5', 'br'], ['br;q=0.8, identity;q=1', null],
+      ['br;q=0, gzip;q=0', null], ['*;q=0.8, br;q=0', 'gzip'],
+      ['*;q=0, identity;q=1', null], ['br;q=0, gzip;q=0, identity;q=0', '406'],
+      ['*;q=0', '406'], ['br;q=garbage', null],
+    ]) {
+      const res = await wire('/css/style.css', { 'Accept-Encoding': offer });
+      assert.equal(res.status, expected === '406' ? 406 : 200, offer);
+      assert.equal(res.headers['content-encoding'] ?? null, expected === '406' ? null : expected, offer);
+      assert.equal(res.headers.vary, 'Accept-Encoding', offer);
+      if (expected === '406') assert.equal(res.body.length, 0);
+    }
+  });
+
+  await t('encoded GET, HEAD and 304 agree; validators never cross representations', async () => {
+    for (const path of ['/js/main.js', '/js/tunables.js', '/vendor/cannon-es.js']) {
+      const variants = await Promise.all(['identity', 'gzip', 'br'].map((encoding) => wire(path, { 'Accept-Encoding': encoding })));
+      assert.equal(new Set(variants.map((r) => r.headers.etag)).size, 3);
+      for (const [i, encoding] of ['identity', 'gzip', 'br'].entries()) {
+        const get = variants[i];
+        const head = await wire(path, { 'Accept-Encoding': encoding }, 'HEAD');
+        for (const name of ['etag', 'content-length', 'content-encoding', 'cache-control', 'vary']) {
+          assert.equal(head.headers[name], get.headers[name], `${path}: HEAD ${name}`);
+        }
+        assert.equal(head.body.length, 0);
+        for (const validator of [get.headers.etag, `W/${get.headers.etag}`, `"stale", ${get.headers.etag}`, '*']) {
+          const cached = await wire(path, { 'Accept-Encoding': encoding, 'If-None-Match': validator });
+          assert.equal(cached.status, 304);
+          assert.equal(cached.headers.etag, get.headers.etag);
+          assert.equal(cached.headers.vary, 'Accept-Encoding');
+          assert.equal(cached.headers['cache-control'], get.headers['cache-control']);
+          assert.equal(cached.headers['content-length'], undefined);
+          assert.equal(cached.body.length, 0);
+        }
+        const other = await wire(path, { 'Accept-Encoding': encoding, 'If-None-Match': variants[(i + 1) % 3].headers.etag });
+        assert.equal(other.status, 200, 'a differently encoded validator does not match');
+      }
+    }
+  });
+
+  await t('compressed variants refresh after a same-length edit with preserved mtime', async () => {
+    const dir = await mkdtemp(join(ROOT, 'tests/e2e/fixtures/compression-'));
+    const file = join(dir, 'index.html');
+    const url = `/tests/e2e/fixtures/${basename(dir)}/`;
+    try {
+      const source = '<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->\n';
+      await writeFile(file, source + 'A'.repeat(4000));
+      const before = await stat(file);
+      const first = await wire(url, { 'Accept-Encoding': 'br' });
+      await sleep(20);
+      await writeFile(file, source + 'B'.repeat(4000));
+      await utimes(file, before.atime, before.mtime);
+      const next = await wire(url, { 'Accept-Encoding': 'br', 'If-None-Match': first.headers.etag });
+      assert.equal(next.status, 200);
+      assert.notEqual(next.headers.etag, first.headers.etag);
+      assert.equal(brotliDecompressSync(next.body).toString(), source + 'B'.repeat(4000));
+      const repeated = await Promise.all(Array.from({ length: 12 }, (_, i) => wire(`${url}?v=${i}`, { 'Accept-Encoding': 'gzip' })));
+      for (const res of repeated) {
+        assert.equal(res.status, 200);
+        assert.deepEqual(gunzipSync(res.body), await readFile(file));
+        assert.equal(res.headers.etag, repeated[0].headers.etag);
+      }
+      await writeFile(file, source);
+      const tiny = await wire(url, { 'Accept-Encoding': 'br' });
+      assert.equal(tiny.headers['content-encoding'], undefined, 'tiny files need no compression');
+      const required = await wire(url, { 'Accept-Encoding': 'br, identity;q=0' });
+      assert.equal(required.headers['content-encoding'], 'br', 'an explicit identity refusal is respected even for tiny text');
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
+
+  await t('compression leaves binary assets, API, health, errors and static guardrails alone', async () => {
+    for (const [path, status] of [
+      ['/tests/e2e/fixtures/tower_fixture.glb', 200], ['/health', 200],
+      ['/api/table?room=compression-probe', 200], ['/api/missing', 404],
+      ['/server.js', 404], ['/deploy/config.mk', 404], ['/.git/config', 403],
+      ['/js/main.js.br', 404], ['/js/main.js.gz', 404],
+    ]) {
+      const res = await wire(path, { 'Accept-Encoding': 'br, gzip' });
+      assert.equal(res.status, status, path);
+      assert.equal(res.headers['content-encoding'], undefined, path);
+    }
+  });
+
+  await t('SSE remains an uncompressed, immediately readable stream', async () => {
+    const joined = await fetch(`${base}/api/join`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Encoding': 'br, gzip' },
+      body: JSON.stringify({ room: 'compression-sse', name: 'wire probe' }),
+    });
+    assert.equal(joined.headers.get('content-encoding'), null);
+    const { playerId } = await joined.json();
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 5000);
+    try {
+      const res = await fetch(`${base}/api/events?room=compression-sse&playerId=${playerId}`, {
+        headers: { 'Accept-Encoding': 'br, gzip' }, signal: abort.signal,
+      });
+      assert.equal(res.status, 200);
+      assert.equal(res.headers.get('content-type'), 'text/event-stream; charset=utf-8');
+      assert.equal(res.headers.get('cache-control'), 'no-cache, no-transform');
+      assert.equal(res.headers.get('content-encoding'), null);
+      const reader = res.body.getReader();
+      const first = await reader.read();
+      assert.match(Buffer.from(first.value).toString(), /retry: 2000/);
+      await reader.cancel();
+    } finally { clearTimeout(timer); abort.abort(); }
   });
 
   // ---- C29: the allowlist -------------------------------------------------

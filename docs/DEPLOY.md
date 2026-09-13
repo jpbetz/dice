@@ -1,3 +1,5 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # Deploying the Dice Table
 
 > **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
@@ -15,6 +17,56 @@ costs. Researched and fact-checked against official pricing/docs pages on
 **The decision: Google Cloud Run, us-central1, one instance, deployed from
 source. Expected hosting bill: $0.00/month (inside the always-free tier).
 Total cost of the whole setup: the domain, ~$11/year.**
+
+## Static delivery (2026-09-13)
+
+The R3 delivery slice serves public HTML, JavaScript, CSS, JSON, YAML and SVG
+with negotiated Brotli or gzip. It uses Node's asynchronous compressors,
+shares concurrent requests for the same variant, and retains at most 16 MiB
+of finished compressed bodies. The 16 MiB is a cache bound, not a bound on
+temporary compression buffers or whole-process memory. Ordinary text below
+1 KiB stays unencoded; files above 8 MiB and binary assets stream unchanged.
+Brotli quality 4 and gzip level 6 keep first-request work modest. The work
+is repeated after a process restart, source edit, or cache eviction.
+
+Every representation has its own content-hash ETag. `Vary: Accept-Encoding`
+accompanies identity, compressed and 304 responses; HEAD advertises the same
+length and encoding as GET. Mutable app files still use `no-cache`; the
+frozen vendor tree keeps its immutable cache policy. Generated tunables use
+the same delivery path and still follow valid live declaration edits. API
+responses, SSE, health and errors are never compressed by this mechanism.
+
+Reproduce the six-entry-asset wire baseline on an owned ephemeral server:
+
+```sh
+node tools/measure-delivery.mjs
+```
+
+Pass an HTTPS origin to inspect a deployment using GETs only:
+
+```sh
+node tools/measure-delivery.mjs https://your-service.run.app
+```
+
+The script requests each entry asset twice with identity, Brotli and gzip,
+counts encoded body bytes, verifies identical decoded bytes, and reports
+first/repeated request duration. It creates no files on the service. It
+never targets port 8123. These are six entry assets, not the entire import
+graph, browser loading time, or physical-device performance.
+
+On 2026-09-13 the existing Cloud Run deployment sent all six assets without
+`Content-Encoding` for both Brotli and gzip offers: **3,945,657 bytes** in
+each case. This establishes that production compression was missing at that
+time; no deployment was performed during the probe.
+
+At local base revision `b064b07`, with this delivery slice on Node v24.14.1,
+the same six local assets total **3,930,135 bytes identity**, **1,099,787
+Brotli** (72.0% less), and **1,138,446 gzip** (71.0% less). Production and
+local asset revisions differ; the reduction compares encodings of the same
+local files. A single local main.js sample took 23.21 ms for its first Brotli
+response and 0.51 ms for the cached response. Server CPU speed and network
+conditions affect timings; byte counts are the delivery proof. Physical
+phone, page-load, idle-rendering and battery measurements remain R3 work.
 
 ## Why Cloud Run
 

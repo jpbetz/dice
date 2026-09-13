@@ -16,7 +16,7 @@ limitations under the License.
 */
 // Dice Table multiplayer server.
 //
-// Zero dependencies: node:http, node:crypto, node:fs, node:path only.
+// Zero dependencies: Node's built-in modules only.
 // Serves the static app AND the room API from the same origin so the client
 // can talk to it with plain relative fetch/EventSource calls.
 //
@@ -41,6 +41,8 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import { brotliCompress, gzip, constants as zlibConstants } from 'node:zlib';
 
 import { composeRoll, composeThrow, validateMods, validateSpec, DIE_MAX,
   scoringIndices, pushTally, drawBag, MAX_PUSH_THROWS } from './js/rollspec.js';
@@ -4261,12 +4263,12 @@ async function serveStatic(req, res, url) {
 //
 // An ETag over the bytes cannot have that failure: it changes when and only
 // when the content does, and it does not care what a build system did to the
-// clock. Hashed once per file per process and cached — the app tree is a few
-// dozen files and a restart is the only thing that invalidates it.
-const etagCache = new Map(); // absolute path -> {size, mtimeMs, tag}
+// clock. Cache hashes until file metadata changes; ctime also catches a
+// same-length edit whose mtime was preserved. A fresh process hashes anew.
+const etagCache = new Map(); // absolute path -> {size, mtimeMs, ctimeMs, tag}
 function etagFor(file, stat) {
   const hit = etagCache.get(file);
-  if (hit && hit.size === stat.size && hit.mtimeMs === stat.mtimeMs) return hit.tag;
+  if (hit && hit.size === stat.size && hit.mtimeMs === stat.mtimeMs && hit.ctimeMs === stat.ctimeMs) return hit.tag;
   let tag;
   try {
     tag = `"${crypto.createHash('sha1').update(fs.readFileSync(file)).digest('base64url').slice(0, 27)}"`;
@@ -4275,12 +4277,108 @@ function etagFor(file, stat) {
     // validator that is at least unique per process rather than per epoch.
     tag = `"p${PROCESS_TAG}-${stat.size}"`;
   }
-  etagCache.set(file, { size: stat.size, mtimeMs: stat.mtimeMs, tag });
+  etagCache.set(file, { size: stat.size, mtimeMs: stat.mtimeMs, ctimeMs: stat.ctimeMs, tag });
   return tag;
 }
 const PROCESS_TAG = Math.random().toString(36).slice(2, 10);
 
-function streamFile(req, res, file, stat) {
+// R3: only public static text uses compression. API, SSE, health and errors
+// never enter this path. Do the work asynchronously once per source/encoding,
+// sharing in-flight requests; keep at most 16 MiB of finished variants. Query
+// strings do not create cache entries. Files above 8 MiB still stream as before.
+const COMPRESS_MIN = 1024;
+const COMPRESS_MAX = 8 * 1024 * 1024;
+const COMPRESS_CACHE_MAX = 16 * 1024 * 1024;
+const compressBrotli = promisify(brotliCompress);
+const compressGzip = promisify(gzip);
+const compressedCache = new Map();
+let compressedCacheBytes = 0;
+
+function textAsset(type) {
+  return type.startsWith('text/') || type.startsWith('application/json') || type === 'image/svg+xml';
+}
+
+// RFC 9110 §12.5.3: explicit exclusions beat '*'; an absent/empty header
+// works unencoded. Prefer br on equal weights, and respect an explicit
+// identity preference. A request excluding every available form gets 406.
+function staticEncoding(req, type, size) {
+  const header = req.headers['accept-encoding'];
+  if (!header) return 'identity';
+  const weights = new Map();
+  for (const part of header.split(',')) {
+    const [token, ...parameters] = part.trim().toLowerCase().split(';');
+    const name = token.trim();
+    if (!name) continue;
+    let q = 1;
+    for (const parameter of parameters) {
+      const match = /^\s*q\s*=\s*(0(?:\.\d{0,3})?|1(?:\.0{0,3})?)\s*$/.exec(parameter);
+      q = match ? Number(match[1]) : 0;
+    }
+    weights.set(name, q);
+  }
+  const identity = weights.get('identity') ?? (weights.get('*') === 0 ? 0 : 1);
+  const canCompress = textAsset(type) && size <= COMPRESS_MAX && (size >= COMPRESS_MIN || identity === 0);
+  const br = canCompress ? (weights.get('br') ?? weights.get('*') ?? 0) : 0;
+  const gz = canCompress ? (weights.get('gzip') ?? weights.get('*') ?? 0) : 0;
+  if (weights.has('identity') && identity > Math.max(br, gz)) return 'identity';
+  if (br > 0 && br >= gz) return 'br';
+  if (gz > 0) return 'gzip';
+  return identity > 0 ? 'identity' : null;
+}
+
+function compressedAsset(file, sourceTag, encoding, read) {
+  const key = `${file}:${sourceTag}:${encoding}`;
+  const hit = compressedCache.get(key);
+  if (hit) {
+    compressedCache.delete(key);
+    compressedCache.set(key, hit);
+    return hit.promise;
+  }
+  const entry = { bytes: 0, promise: null };
+  entry.promise = (async () => {
+    const source = await read();
+    const body = encoding === 'br'
+      ? await compressBrotli(source, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 4 } })
+      : await compressGzip(source, { level: 6 });
+    entry.bytes = body.length;
+    compressedCacheBytes += body.length;
+    for (const [oldKey, old] of compressedCache) {
+      if (compressedCacheBytes <= COMPRESS_CACHE_MAX) break;
+      if (!old.bytes) continue; // do not evict a shared in-flight compression
+      compressedCacheBytes -= old.bytes;
+      compressedCache.delete(oldKey);
+    }
+    // A strong validator names the encoded BYTES, not just their source.
+    return { body, etag: etagOf(body) };
+  })().catch((err) => {
+    compressedCache.delete(key);
+    throw err;
+  });
+  compressedCache.set(key, entry);
+  return entry.promise;
+}
+
+function staticResponse(req, res, { type, size, etag, cacheControl, encoding }) {
+  const headers = { ETag: etag, 'Cache-Control': cacheControl, Vary: 'Accept-Encoding' };
+  if (encoding !== 'identity') headers['Content-Encoding'] = encoding;
+  // Last-Modified remains absent: buildpacks freeze mtime between deploys.
+  const inm = req.headers['if-none-match'];
+  if (inm && inm.split(',').some((t) => ['*', etag, `W/${etag}`].includes(t.trim()))) {
+    res.writeHead(304, headers);
+    res.end();
+    return false;
+  }
+  res.writeHead(200, { ...headers, 'Content-Type': type, 'Content-Length': size });
+  if (req.method === 'HEAD') { res.end(); return false; }
+  return true;
+}
+
+function noStaticEncoding(res) {
+  res.writeHead(406, { 'Cache-Control': 'no-store', Vary: 'Accept-Encoding', 'Content-Length': 0 });
+  res.end();
+}
+
+async function streamFile(req, res, file, stat) {
   const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
   // /vendor/ is immutable (see VENDOR_DIR comment above); the app tree stays
   // no-cache so the browser always revalidates — the win there is answering
@@ -4288,23 +4386,16 @@ function streamFile(req, res, file, stat) {
   // rides the RESOLVED absolute path (not the URL) so %2f / non-canonical
   // smuggling can't reach the vendor bucket.
   const cacheControl = isVendor(file) ? 'public, max-age=31536000, immutable' : 'no-cache';
-  const etag = etagFor(file, stat);
-  // If-None-Match beats If-Modified-Since when both are sent (RFC 9110), and
-  // it is the only one this answers now. `Last-Modified` is deliberately NOT
-  // sent: a header a build system freezes is a validator that lies, and one
-  // absent header is safer than two that disagree.
-  const inm = req.headers['if-none-match'];
-  if (inm && inm.split(',').some((t) => t.trim() === etag || t.trim() === `W/${etag}`)) {
-    res.writeHead(304, { ETag: etag, 'Cache-Control': cacheControl });
-    return res.end();
+  const encoding = staticEncoding(req, type, stat.size);
+  if (!encoding) return noStaticEncoding(res);
+  let etag = etagFor(file, stat);
+  let body;
+  if (encoding !== 'identity') {
+    ({ body, etag } = await compressedAsset(file, etag, encoding, () => fsp.readFile(file)));
+    if (res.destroyed) return;
   }
-  res.writeHead(200, {
-    'Content-Type': type,
-    'Content-Length': stat.size,
-    ETag: etag,
-    'Cache-Control': cacheControl,
-  });
-  if (req.method === 'HEAD') return res.end();
+  if (!staticResponse(req, res, { type, size: body ? body.length : stat.size, etag, cacheControl, encoding })) return;
+  if (body) return res.end(body);
   const stream = fs.createReadStream(file);
   stream.on('error', () => { endStream(res); });
   res.on('close', () => stream.destroy());
@@ -4473,24 +4564,21 @@ function refreshDeclaration() {
   }
 }
 
-function serveTunables(req, res) {
+async function serveTunables(req, res) {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return sendError(res, 405, 'method not allowed', 'method_not_allowed');
   }
   refreshDeclaration();
-  const { body, etag } = declaration;
-  const inm = req.headers['if-none-match'];
-  if (inm && inm.split(',').some((t) => t.trim() === etag || t.trim() === `W/${etag}`)) {
-    res.writeHead(304, { ETag: etag, 'Cache-Control': 'no-cache' });
-    return res.end();
+  let { body, etag } = declaration;
+  const type = 'text/javascript; charset=utf-8';
+  const encoding = staticEncoding(req, type, Buffer.byteLength(body));
+  if (!encoding) return noStaticEncoding(res);
+  if (encoding !== 'identity') {
+    const source = body;
+    ({ body, etag } = await compressedAsset(TUNABLES_ON_DISK, etag, encoding, () => Buffer.from(source)));
+    if (res.destroyed) return;
   }
-  res.writeHead(200, {
-    'Content-Type': 'text/javascript; charset=utf-8',
-    'Content-Length': Buffer.byteLength(body),
-    ETag: etag,
-    'Cache-Control': 'no-cache',
-  });
-  if (req.method === 'HEAD') return res.end();
+  if (!staticResponse(req, res, { type, size: Buffer.byteLength(body), etag, cacheControl: 'no-cache', encoding })) return;
   res.end(body);
 }
 

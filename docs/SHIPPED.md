@@ -41,6 +41,33 @@ Chromium touch emulation, not a physical phone observation.
 [Desktop practice](redesign/2026-09-13-practice-desktop.png) and
 [phone practice](redesign/2026-09-13-practice-phone.png).
 
+## Compressed public delivery — R3 first slice (2026-09-13)
+
+The production origin was measured to send six entry assets without
+compression even when clients offered Brotli or gzip. Public text responses
+now negotiate both encodings, with asynchronous compression shared across
+concurrent requests and a 16 MiB cache of finished variants. ETags identify
+the encoded bytes; GET, HEAD, conditional requests and Vary agree. Static
+allowlists, mutable/immutable cache policies, and generated tunables' live
+edit behavior remain intact. API, SSE, health and errors stay uncompressed.
+
+`node tools/measure-delivery.mjs` reproduces the same-file wire comparison
+on an ephemeral production-mode server: six entry assets total 3,930,135
+bytes identity, 1,099,787 Brotli (72.0% less), and 1,138,446 gzip (71.0% less).
+The [deployment record](DEPLOY.md#static-delivery-2026-09-13) records the
+production probe, cache/CPU tradeoffs, and measurement limits. No deployment
+was performed. These are entry-asset byte savings, not measured page-load,
+physical-phone or battery improvements.
+
+`npm run -s test:unit` passes, including 59 static-cache cases and 29
+generated-tunables cases. New wire proofs cover exact decompression,
+negotiation/exclusion, encoded GET/HEAD/304, cross-encoding validators,
+concurrent requests, source edits, preserved-mtime edits, static refusals,
+binary delivery and immediately readable SSE. The existing stale-validator
+test now compares decoded bytes to decoded bytes because fetch automatically
+decompresses its response while preserving the encoded Content-Length.
+All servers used ephemeral ports. The owner’s live table was untouched.
+
 ## Personal name and dice collection (2026-09-13)
 
 The first bounded implementation of the approved experience redesign makes
