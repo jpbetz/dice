@@ -3949,19 +3949,28 @@ export const scenarios = [
       await a.dbg('profiles.reset()');
       await a.dbg('setPanelState({pools: true})');
 
-      // ① `⚄ Random` honours the name box. It shares one row with `＋ New`,
-      // which read the box while Random did not — and Random is the only one
-      // of the two that deals a PRICED rack, so building six characters meant
-      // Random-then-rename six times.
+      // Named creation now previews a chosen kit before adding. The typed
+      // name still governs the dealt character, without an immediate random save.
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.waitFor(`window.__diceDebug.settings.system==='soul-deal'`);
+      await a.dbg(`openSettings('stuff')`);
+      const beforeNames = (await a.dbg('profiles.list')).map(p=>p.name);
       await a.eval(`(() => { const i = document.getElementById('profile-newname');
         i.value = 'Nessa'; })()`);
       await a.eval(`document.getElementById('profile-deal').click()`);
+      assert.deepEqual((await a.dbg('profiles.list')).map(p=>p.name),beforeNames,'opening starter kits changes no saved character');
+      await a.eval(`document.querySelector('[data-kit="soul-deal"]').click()`);
+      assert.equal(await a.eval(`document.querySelector('.starter-preview h3').textContent`),'Nessa','the preview uses the requested name');
+      const preview=await a.eval(`[...document.querySelectorAll('.starter-pools code')].map(e=>e.textContent)`);
+      await a.eval(`document.querySelector('.starter-add').click()`);
       const names = (await a.dbg('profiles.list')).map((p) => p.name);
       assert.ok(names.includes('Nessa'), `the dealt profile takes the typed name (got ${names})`);
       assert.equal(await a.eval(`document.getElementById('profile-newname').value`), '',
         'and the box empties, like ＋ New');
       const nessa = (await a.dbg('profiles.list')).find((p) => p.name === 'Nessa');
       assert.ok(nessa.pools > 0, 'and it is DEALT — priced pools, not an empty rack');
+      assert.deepEqual((await a.dbg('groups')).map(p=>p.notation),preview,'the added rolls match the preview');
+      await a.eval(`document.getElementById('settings-close').click()`);
 
       // ② The trio is this profile's character sheet, not every game's.
       // PROFILES §11.6 said so and it was never built: a D&D rack stood three

@@ -54,3 +54,10 @@ result is readable. The four-player phone scene still fails to show the dice
 in this captured result; the shared-surface/framing work in R2 remains open.
 These are emulated phone captures, not physical-phone observations. This
 slice does not complete the R1 destination shell or R2 playing surface.
+
+Named character creation retains the entered name when it opens a starter-kit
+preview. Nothing is saved until Add; the displayed rolls and name are the ones
+kept. A successful addition clears the creation name and selects the new
+character in the focused library. `prep-affordances` now exercises that explicit
+preview/add path; first-play tests wait for the authored Quick-dice event before
+settling it, so an idle browser cannot make the check race the network.

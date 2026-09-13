@@ -48,7 +48,7 @@ export function renderQuickRolls(host, {roll, build, compact = false}) {
 
 // One preview is kept until an explicit Add. Merely browsing deals no saved
 // profile and writes no table setting. The displayed pools ARE the added pools.
-export function createStarterKitChooser(host, {add, tableLabel, changed}) {
+export function createStarterKitChooser(host, {add, tableLabel, changed, profileName}) {
   let candidate = null;
   host.innerHTML = `<div class="starter-choices" role="group" aria-label="Starter kits"></div>
     <section class="starter-preview" hidden><h3></h3><p class="starter-description"></p>
@@ -61,6 +61,8 @@ export function createStarterKitChooser(host, {add, tableLabel, changed}) {
     candidate = previewStarterKit(id);
     $('.starter-preview').hidden = !candidate;
     if (!candidate) return;
+    const requestedName = profileName?.()?.trim();
+    if (requestedName) candidate.profileName = requestedName;
     $('.starter-status').textContent='';
     $('.starter-preview h3').textContent=candidate.profileName;
     $('.starter-description').textContent=`${candidate.name} · ${candidate.pools.length} saved rolls. ${candidate.description}`;

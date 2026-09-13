@@ -31533,6 +31533,11 @@ document.getElementById('profile-newname').addEventListener('keydown', (e) => {
 });
 // Random generation is a preview-and-add choice, never an implicit boot act.
 var starterKitChooser = createStarterKitChooser(document.getElementById('starter-kit-chooser'), {
+  profileName: () => document.getElementById('profile-newname').value,
+  changed: () => {
+    document.getElementById('profile-newname').value = '';
+    librarySelectedId = profileStore.activeId; renderProfileLibrary();
+  },
   tableLabel: () => systemLabel(tableSystem()),
   add: candidate => makeProfile({name:uniqueName(profileStore,candidate.profileName),
     system:candidate.id, pools:candidate.pools, activate:true}),

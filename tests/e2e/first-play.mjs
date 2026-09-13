@@ -8,6 +8,7 @@ export const firstPlayScenarios = [
     assert.deepEqual(await a.dbg('groups'),[],'product shortcuts are not saved pools');
     assert.deepEqual(await a.eval(`[...document.querySelectorAll('#quick-dice [data-quick]')].map(b=>b.dataset.quick)`),['1d4','1d6','1d8','1d10','1d12','1d20','2d6','d100']);
     await a.eval(`document.querySelector('#quick-dice [data-quick="2d6"]').click()`);
+    await a.waitFor('!!window.__diceDebug.currentRoll?.rollId');
     await a.settle();
     assert.equal(await a.eval('window.__diceDebug.currentRoll.dice.length'),2);
     assert.deepEqual(await a.dbg('groups'),[],'a quick roll does not silently save a pool');
