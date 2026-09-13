@@ -17292,9 +17292,10 @@ export const scenarios = [
       let v = await a.dbg('venueInfo()');
       assert.equal(v.id, 'table', 'the table boots grounded');
       assert.equal(v.staged, false, 'with no stage in the scene');
-      assert.equal(await a.eval(
-        `document.querySelectorAll('#venue-picker [data-venue]').length`), 3,
-        'and the picker offers all three venues');
+      assert.deepEqual(await a.eval(
+        `[...document.querySelectorAll('#venue-picker [data-venue]')].map(e=>e.dataset.venue).sort()`),
+        ['copper', 'foxfire', 'moonrise', 'navigation', 'stone', 'table'],
+        'the picker offers the three baked tables beside the original and experimental venues');
 
       // ---- a tower first, so the venue has something to replace -----------
       await a.dbg(`setTower('wickroot')`);
@@ -17637,11 +17638,24 @@ export const scenarios = [
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
 
+      const click = async selector => {
+        await a.page.browser.send('Page.bringToFront', {}, a.page.sessionId);
+        const at = await a.eval(`(() => {
+          const el=document.querySelector(${JSON.stringify(selector)});
+          if(!el || el.disabled || el.closest('[inert]')) return null;
+          el.scrollIntoView({block:'center',inline:'nearest'});
+          const r=el.getBoundingClientRect(), x=r.left+r.width/2, y=r.top+r.height/2;
+          if(!r.width || !r.height || x<0 || y<0 || x>=innerWidth || y>=innerHeight || !el.contains(document.elementFromPoint(x,y))) return null;
+          return {x,y};
+        })()`);
+        assert.ok(at, `${selector} is reachable by a pointer`);
+        await realTap(a, at.x, at.y);
+      };
       await a.dbg('openDiceGallery(null)');
       assert.equal(await a.eval(`!!document.querySelector('.dg-card[data-set="moonmoot.witchlight"]')`), false,
         'venue-only dice are not advertised outside that venue');
       assert.ok(await a.eval(`document.querySelectorAll('.dg-card').length`) > 3);
-      await a.eval(`document.querySelector('.dg-close').click()`);
+      await click('.dg-close');
 
       // ---- your own set, chosen honestly, before the venue ----------------
       await a.dbg(`setDiceSet('tidewrack.seaglass')`);
@@ -17667,11 +17681,14 @@ export const scenarios = [
       { desc: "Bob's copy of the record agrees — the wire carried it" });
 
       // An explicitly dressed saved roll keeps its own dice in the venue.
+      // Fresh visitors now start with Quick dice, so this case owns its saved-roll fixture.
+      await a.dbg(`setGroups([{name:'Saved appearance',notation:'1d6'}])`);
       const pool = (await a.dbg('groups'))[0];
       await a.dbg(`editPool(${JSON.stringify(pool.id)}, {notation:'1d6',set:'emberforge.blackanvil'})`);
-      await a.eval(`document.getElementById('clear-tray').click()`);
+      await click('#workspace-nav [data-workspace="dice"]');
       const before = await a.logCount();
-      await a.eval(`document.querySelector('[data-group-id="${pool.id}"] .tile-stage').click(); document.getElementById('tray-roll').click()`);
+      await click(`[data-group-id="${pool.id}"] .tile-stage`);
+      await click('#tray-roll');
       await a.waitFor(`(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${before} && !window.__diceDebug.busy)`);
       await b.settle();
       assert.equal(await b.eval('window.__diceDebug.currentRoll.set'), 'emberforge.blackanvil',
@@ -17681,9 +17698,9 @@ export const scenarios = [
       // A matching suggestion is a preview until Alice explicitly uses it.
       await a.dbg('openDiceGallery(null)');
       assert.equal(await a.eval(`document.querySelector('.dg-suggestion').hidden`), false);
-      await a.eval(`document.querySelector('.dg-suggestion').click()`);
+      await click('.dg-suggestion');
       assert.equal(await a.dbg('diceSet'), 'tidewrack.seaglass');
-      await a.eval(`document.querySelector('.dg-use').click(); document.querySelector('.dg-close').click()`);
+      await click('.dg-use'); await click('.dg-close');
       await a.roll('2d6'); await b.settle();
       assert.equal(await b.eval('window.__diceDebug.currentRoll.set'), 'moonmoot.witchlight',
         'the explicit matching choice reaches the other player');

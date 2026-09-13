@@ -97,6 +97,15 @@ Quick-dice first visit no longer supplies. Those fixtures and the associated
 legacy composition review are outside this loading change. No assertion was
 weakened to obtain a passing result.
 
+Subsequent fixture reconciliation follows the implemented design rather than
+restoring the old first visit: `venue-set` now checks all six distinct IDs,
+and `venue-dice` explicitly creates its own saved-roll fixture. The saved-roll
+and gallery actions use hit-tested browser pointer input, including opening
+the real builder before staging. Both cases pass with their original shared
+appearance and venue lifecycle assertions retained. `venue-life` still needs
+its current-size composition review; the historical zero-clamp/rectangular-box
+expectation is not silently relaxed here.
+
 ## Remaining R3 work
 
 The startup audit found another concrete seam: `towerglb.js` eagerly imports
