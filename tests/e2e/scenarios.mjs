@@ -7161,6 +7161,10 @@ export const scenarios = [
     // and Offer's REAL hidden state offline.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      // This geometry first exercises one profile. Earlier localhost scenarios
+      // keep their libraries; setGroups alone does not remove extra profiles.
+      assert.equal((await a.dbg("profiles.reset('none')")).ok,true);
+      assert.equal((await a.dbg('profiles.list')).length,1);
 
       // (i) STANDING FURNITURE (Joe 2026-08-03, supersedes the contextual
       // rail): the rail never leaves — its verbs gray on an empty draft
@@ -7317,6 +7321,34 @@ export const scenarios = [
       assert.equal(stuck.zoneTop, stuck.bodyTop,
         `the well stands flush with the scrollport (zone ${stuck.zoneTop}, body ${stuck.bodyTop})`);
       assert.equal(stuck.leaks, false, 'and nothing scrolls through above it');
+      // With multiple profiles, ownership is the sticky heading and category
+      // heads intentionally scroll beneath it. Pin that alternative explicitly.
+      const active=await a.dbg('profiles.active.id'),kept=await a.dbg('groups');
+      await tapControl(a,'#identity-chip');await tapControl(a,'#idm-library');
+      await tapControl(a,`.library-card[data-profile="${active}"]`);await tapControl(a,'#library-duplicate');
+      const extra=(await a.dbg('profiles.list')).find(p=>p.id!==active);
+      assert.ok(extra,'Duplicate adds a kept character');
+      await tapControl(a,'#settings-close');
+      const profiled=await a.eval(`(()=>{
+        const body=document.querySelector('#builder-panel > .panel-body');body.scrollTop=400;
+        const head=document.getElementById('pools-head'),category=document.querySelector('#groups-list .pool-sec-head');
+        return {scrolled:body.scrollTop,profiled:head.classList.contains('profiled'),
+          head:head.getBoundingClientRect().top,zoneBottom:document.getElementById('draft-zone').getBoundingClientRect().bottom,
+          headPosition:getComputedStyle(head).position,categoryPosition:getComputedStyle(category).position,categoryBottom:category.getBoundingClientRect().bottom};
+      })()`);
+      assert.ok(profiled.scrolled>0&&profiled.profiled,'the second profile makes ownership visible in the scrolling rack');
+      assert.equal(profiled.headPosition,'sticky');assert.equal(profiled.categoryPosition,'static');
+      assert.ok(profiled.categoryBottom<=profiled.head,'category text scrolls completely past the pinned profile heading');
+      assert.ok(Math.abs(profiled.head-profiled.zoneBottom)<=1,
+        `the profile heading pins below the well (${JSON.stringify(profiled)})`);
+      assert.equal(await a.dbg('profiles.active.id'),active);assert.deepEqual(await a.dbg('groups'),kept);
+      await tapControl(a,'#identity-chip');await tapControl(a,'#idm-library');
+      await tapControl(a,`.library-card[data-profile="${extra.id}"]`);await tapControl(a,'#library-delete-open');
+      await tapControl(a,'#library-delete-confirm');await tapControl(a,'#settings-close');
+      assert.equal((await a.dbg('profiles.list')).length,1);
+      assert.equal(await a.dbg('profiles.active.id'),active);assert.deepEqual(await a.dbg('groups'),kept);
+      assert.equal(await a.eval(`document.getElementById('pools-head').classList.contains('profiled')`),false,'removing the inactive second profile retires its ownership heading');
+      assert.equal(await a.eval(`getComputedStyle(document.querySelector('#groups-list .pool-sec-head')).position`),'sticky','the one-profile rack returns to sticky category headings');
       await a.eval(`document.querySelector('#builder-panel > .panel-body').scrollTop = 0`);
 
       // (v) The anchor pin: the well dress must not zero the ± popover's

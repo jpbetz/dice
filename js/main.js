@@ -20693,7 +20693,11 @@ function makeProfile({ name, system, pools = [], set = null, activate = true }) 
     return pv(false, '✗ couldn’t save the new profile (storage unavailable?) — nothing was added');
   }
   if (activate) adoptRack(added.profile);
-  else renderProfileLibrary();
+  else {
+    // Another kept profile makes the active rack's ownership heading visible.
+    renderGroups();
+    renderProfileLibrary();
+  }
   const n = added.profile.pools.length;
   return { ...pv(true, `✓ '${added.profile.name}' added — ${n} pool${n === 1 ? '' : 's'}${activate ? ', and it is in your hands' : ''}`), id: added.id, name: added.profile.name };
 }
@@ -20771,7 +20775,10 @@ function removeProfileById(id) {
     return pv(false, '✗ couldn’t save the deletion (storage unavailable?) — nothing was removed');
   }
   if (wasActive) adoptRack(activeProfile(profileStore));
-  else renderProfileLibrary();
+  else {
+    renderGroups();
+    renderProfileLibrary();
+  }
   const left = profilesOf(profileStore).length;
   return pv(true, `✓ deleted '${rec.name}' — ${left} profile${left === 1 ? '' : 's'} left${wasActive ? `, '${activeProfileName()}' is in your hands` : ''}`);
 }
@@ -22063,6 +22070,7 @@ function renderGroups() {
   const showPick = !foreign && !!mineNow && (many || poolsEdit);
   pick.classList.toggle('hidden', !showPick);
   poolsHead.classList.toggle('profiled', showPick);
+  groupsListEl.classList.toggle('profiled', showPick);
   if (showPick) {
     const off = mineNow.system !== tableSystem();
     // The system word appears ONLY when it differs — a label the player needs
