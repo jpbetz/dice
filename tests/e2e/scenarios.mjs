@@ -29467,3 +29467,6 @@ export const scenarios = [
     },
   },
 ];
+
+// Reuse the exact existing composition measures in characterization tools.
+export {frameGates, rimPoints, boxOf, projectPoints, W2C_LAYOUT};
