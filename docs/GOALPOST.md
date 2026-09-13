@@ -21,7 +21,7 @@ durable storage those features require. This revises the former “no access
 control, ever” and “server holds no durable state” mechanisms explicitly;
 equal participation in live play, private rolls, and safe capture remain
 promises. The direction is approved; local durable services and account/library
-workflows are implemented, with saved-home/social UI and deployment still in
+workflows and saved-home management are implemented, with People UI and deployment still in
 progress.*
 
 ## What this is

@@ -11,7 +11,9 @@ now delivers direct name editing and a visual dice collection. The
 [compact table-controls follow-up](SHIPPED.md#compact-table-controls-and-setup-2026-09-13)
 fits that entry into the name row and reuses the table label for shared setup,
 following his instruction to conserve the rolling area's space. The larger
-release remains in progress; its detailed design is in
+release remains in progress. Joe then authorized autonomous implementation
+through all three priorities, with agents and reviewed increments;
+[REDESIGN-PROGRESS.md](REDESIGN-PROGRESS.md) records execution. The detailed R1 design is in
 [PEOPLE-DICE-TABLES.md](PEOPLE-DICE-TABLES.md).
 
 The product direction is approved. Release boundaries and technical choices
@@ -60,11 +62,18 @@ The [turn-worker follow-up](redesign/2026-09-13-film-turns.md) now retains
 complete ordered turn/reveal/collection events and moves rethrows off-thread,
 with 24 complete first/rethrow films matching the pre-worker baseline. Towers
 and silent reconstruction retain the shared inline bake. Physical devices,
-rendering startup and Battery saver remain open. The [on-demand render
+rendering startup and remaining optional loading remain open. The [on-demand render
 loop](redesign/2026-09-13-idle-render.md) now draws zero settled frames for
 Table and all three baked designs on desktop/phone emulation (previously
 60 fps), with audio continuing independently and all 24 films unchanged.
 No physical-device battery or active-frame-rate claim is made.
+The [Battery saver](redesign/2026-09-13-battery-presentation.md) and
+[Instant results](redesign/2026-09-13-instant-results.md) preferences are now
+implemented independently. Battery keeps baked artwork and responsive 3D dice,
+reduces post effects and stops animated rest; Instant completes the same prepared
+film without early reveals. Eight composed preference/turn/privacy/fallback
+checks pass. Full remains the default; Auto is deferred until measurements can
+support an automatic choice instead of guessing a device's capability.
 
 **R2 first composition, 2026-09-13:** [player results](PLAYER-RESULTS.md) now
 keep upright names, crests and the group’s latest visible reads together. The
@@ -73,7 +82,9 @@ Table and Stone Circle, a real setup preview and inspected four-player
 desktop/phone views. The [compact arrival experiment](PLAYER-RESULTS.md#rolls-arriving-together)
 shows who is rolling, who is next, and waiting players' previously displayed
 results. It keeps sequential films and adds no scene-space cost; simultaneous
-physical playback is not implemented.
+physical playback is not implemented. Model size now follows shared zoom;
+the inherited square collision envelope still needs a round-table correction
+for stress throws. The actual GLB support probe records that open gap.
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable
@@ -87,7 +98,7 @@ art directions.
 
 For **R3**, Battery saver should have its own attractive presentation:
 illustrated or baked surroundings with responsive 3D dice and adaptive
-effects. Personal Auto / Full / Battery saver choices and optional instant
+effects. Personal Full / Battery saver choices and optional instant
 results serve different devices and preferences without changing shared
 values or revealing them early. Idle rendering, static shadows, pixel
 ratio, and effects are candidates for measurement; a visually richer table

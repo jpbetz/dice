@@ -6,7 +6,8 @@ Shipped slice of R1-A/B and R2, 2026-09-13. This implements the approved
 economical persistent controls and generous opened tasks.
 
 Tables, My dice & rolls, and People open from a compact navigation row. Tables
-shows the active table and this browser’s recents. Browsing it never leaves a
+shows the active table, optional saved-home cards and this browser’s recents.
+Capture/retained-version comparison expands into a focused task. Browsing it never leaves a
 room; only an explicit Go or completed New table action navigates. People
 shows the live roster, each person’s latest result from this viewer’s redacted
 history, shared-roll browsing, and the existing invite link/share action.
@@ -20,8 +21,8 @@ returns that same node when closed. Saved rolls & starter kits opens the
 [focused library](UX.md#focused-library-workspace-2026-09-13), after restoring
 the builder. The full task owns its search, publication choices and import
 preview; it keeps the original library DOM and state. Gallery, favorites, and
-practice remain the existing gallery’s responsibility. Name/Dice, table
-setup, and the Preferences gear keep their compact entry points.
+practice remain the existing gallery’s responsibility. Identity, Dice beside the roll controls, table setup, and the Preferences gear
+keep their compact entry points.
 
 The first 390×844 phone slice gave the scene 390×550, starting at 68px.
 [Persistent results](PLAYER-RESULTS.md) now reserve a top band: four players

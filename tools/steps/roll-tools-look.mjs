@@ -6,6 +6,7 @@ export default async function run(stage) {
   const size=async(width,height,coarse=false)=>{
     await a.page.browser.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<=640},a.page.sessionId);
     await a.emulateCoarsePointer(coarse);
+    await a.eval("new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))");await a.settle();
   };
   const shot=async(name)=>{
     console.log(await stage.shot(a,`roll-tools-${name}.png`));

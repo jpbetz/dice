@@ -115,3 +115,32 @@ cherry-picks. Before updating the main checkout, its untracked initial service
 draft is preserved at `docs/handoff/2026-09-13-durable-service-initial-draft.md`.
 The maintained design remains `docs/DURABLE-SERVICE-DESIGN.md`. No production
 deployment or preview-port process change accompanies this checkpoint.
+
+## Saved-home and presentation checkpoint
+
+`9c7a176` adds saved-home cards, public capture, retained-version comparison,
+exact durable retries and deliberate Join. Three composed actual-app cases pass,
+including clean recovery after restart without a library repush. A review
+follow-up is tightening close-during-save and explicit refused-copy cleanup.
+`c637f7b` adds opt-in expiring presence; five presence tests and the independent
+browser invitation/return proof pass. People UI is now the active R1 work.
+
+Battery saver (`06eb3d8`) and Instant results (`6794d8b`) are integrated.
+All eight composed preference/Instant cases pass. The phone fixture measures
+actual viewport fit as preferences grow; the owner's subsequent hidden-library
+selector fix and Dice launcher placement are composed as `639effb`.
+`9b975e8` adds a validated `paused` maintenance mode and concrete operating plan;
+all three composed configuration/pause/restore checks pass. Cloud resources and
+production traffic remain unchanged.
+
+`1a20aa0` makes each baked table follow shared size. Six design/zoom checks pass
+and all 27 sampled films equal the unchanged baseline. Actual support rays
+exposed the remaining square-collision/round-art mismatch on stress throws;
+that is active R2 work. Optional scenery loading is the active R3 slice.
+Main's later owner commit `cd69c20` is preserved in the merge ancestry, including
+its plain-copy and roll-control placement instructions in AGENTS.md.
+
+The composed owner controls, workspaces, touch targets and rail pass together
+(7/7). The actual desktop/phone launcher and expanded Preferences were inspected;
+help now explains saved-home capture and personal Battery/Instant behavior.
+Both scripted visual passes complete without browser errors.
