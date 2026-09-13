@@ -11,11 +11,11 @@ priority order. R1, R2 and R3 remain open until their composed proofs pass.
 
 | Work | State and next action |
 | --- | --- |
-| Identity, personal dice and first rolls | Direct name editing, full gallery/favorites/practice, focused libraries, explicit starter kits and Quick dice are implemented. Owner controls through `cd69c20` are composed; subsequent owner roll-flow edits remain in main until committed and reviewed. |
+| Identity, personal dice and first rolls | Direct name editing, full gallery/favorites/practice, focused libraries, explicit starter kits and Quick dice are implemented. Owner controls through `c90fd42` are composed, including compact phone saved rolls, direct result Clear and returning from accepted rolls. All 14 composed flow/workspace/gallery checks pass. |
 | Table setup and saved homes | Named setup with actual Preview/Apply, durable public capture, retained-version comparison and deliberate Join are implemented. Four final actual-app home cases and five account cases pass, including restart, independent recovery, busy account replacement and real device-write failure before HTTP. |
-| People | Recipient-bound contacts/invitations, blocked-name pagination and opt-in expiring presence APIs are integrated. The People workspace and its independent private action journal are under implementation/review. Acceptance must preserve the current table and turn; joining is a separate explicit action. |
-| Shared surface and phone | Three reproducibly baked tables, full-width phone tray, persistent visible results and compact queued arrivals are implemented. Model size follows the shared table. A round physical envelope is integrated as `e67da2c`; support/cost/golden evidence is being completed. Actual inspection found desktop stress dice cropped by the viewport, queued as a separate camera fix. |
-| Shared film ordering | Ordinary rolls and kept-die rethrows use the worker with complete ordered events. `f4e20c0` orders size changes between films, including held reveals and clear. Tower changes have a reproduced different-speed-viewer divergence; ordered readiness and an honest unavailable-asset escape are active work. |
+| People | Recipient-bound contacts/invitations, blocked-name pagination and opt-in expiring presence APIs are integrated. The People workspace and its independent private action journal are integrated; all seven composed actual-app cases pass, including restart, account replacement, offline acceptance and real device-write failure. Acceptance must preserve the current table and turn; joining is a separate explicit action. |
+| Shared surface and phone | Three reproducibly baked tables, full-width phone tray, persistent visible results and compact queued arrivals are implemented. Model size follows the shared table. The round physical envelope and full support/golden proofs are integrated as `e67da2c`/`04aafbf`; all six composed geometry proofs pass, with cost and collision profiling retained. Actual inspection found desktop stress dice cropped by the viewport, queued as a separate camera fix. |
+| Shared film ordering | Ordinary rolls and kept-die rethrows use the worker with complete ordered events. `f4e20c0` orders size changes between films, including held reveals and clear. Warm tower changes now use the ordered FIFO (`cf0e48a`); six composed ordering/readiness cases pass. Required-model failure handling and an honest unavailable-asset escape remain active work. |
 | Lightweight play | Compressed delivery, face-material consolidation, idle sleep, Battery saver and independent Instant results are implemented. Optional scenery and the model parser now load on demand (`70d623b`, `530982b`); all eight composed loading/cancel/failure cases pass. Towers and silent reconstruction retain the inline solver. |
 | Operations and release | File/Firestore adapters, configuration preflight, safe maintenance pause and a concrete account operating plan are implemented. No cloud resources or production traffic changed. Complete composed release checks, then verify the external staging/restore/deployment work described in ACCOUNT-OPERATIONS.md. |
 
@@ -25,8 +25,7 @@ cherry-picks are explicit and another ongoing session's edits survive.
 
 ## Remaining campaign work
 
-Finish and review People, tower event ordering/failure handling and the camera
-fit, then exercise the complete guest/recovered return loop on the composed
+Finish and review tower failure handling and the camera fit, then exercise the complete guest/recovered return loop on the composed
 app. Preserve unfinished and private turns through each visible action. The
 final full sweep must reconcile superseded fixtures with current behavior;
 a passing old geometry proxy is not a substitute for supported, visible dice.
@@ -170,3 +169,26 @@ Nine composed size/design/readiness/order cases pass. Actual Copper stress
 inspection confirms phone support and exposes the desktop viewport crop; the
 round proof and camera fix remain separate work. No final full sweep or cloud
 enablement is claimed by this checkpoint.
+
+## People and owner roll-flow composition
+
+`c68dadb` preserves the owner's `c90fd42` mobile flow changes. Fourteen composed
+workspace/gallery/result-flow checks pass, and actual phone saved-roll, builder,
+result, short-height and custom-category Undo captures were inspected.
+`8378a40` fixes the real last-category Undo defect. `7251487` contains later-created
+startup controls behind the name dialog; eight targeted modal/workspace/flow
+checks pass, with actual phone keyboard and pointer inspection.
+
+People UI is integrated through `123077a`; all seven actual People cases pass
+on the composed tree with the modal fix, including private unfinished-turn
+preservation through account recovery and invitation acceptance. The inspected
+phone invitation uses separate Accept and Join actions. No real-person
+invitations or production service changes were made.
+
+The 346-case preflight runs on a frozen older snapshot (`4d9518c`) to identify
+regressions and superseded assumptions. Its failures are being characterized in
+small groups; it is not a final release pass. Several cases assumed automatic
+profile publication, the former Soul Deal first run, or square/camera constants.
+Actual defects are fixed separately; assertions are retained where they still
+prove the approved behavior. A late accepted roll response can also close a new
+visit to the same editor; that reproduced defect is under correction.

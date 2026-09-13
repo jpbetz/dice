@@ -33,7 +33,8 @@ have been inspected with four players on desktop and phone.
 This sets aside the old venue guidance's back-corridor placement and
 tower-centred diorama: a circular multiplayer table is the main composition,
 and its decorative pieces sit outside the intended circular rolling area.
-The inherited physics boundary is square; the stress-roll gap below remains open.
+The inherited square boundary is now replaced by the shared round envelope;
+[actual model support and camera limits](ROUND-TABLE-PHYSICS.md) are recorded separately.
 It preserves readable dice, shared authored values and interruptible play.
 The forge shape and normal checks are followed by an actual app-lighting
 look; a studio preview alone cannot establish tabletop contrast or framing.
@@ -134,7 +135,7 @@ Review captures: [desktop](redesign/2026-09-13-copper-desktop.png),
 [phone](redesign/2026-09-13-copper-phone.png),
 [phone setup](redesign/2026-09-13-table-preview-phone.png).
 
-## Shared table size and the remaining collision gap
+## Shared table size and round physical support
 
 The original models stayed at their authored medium size while the actual
 rolling area changed with zoom. A reproducible ordinary `4d20` throw (seed 4,
@@ -156,11 +157,15 @@ include original films and actual support rays. The reproducible probe is
 and [Navigation desktop](redesign/2026-09-13-sized-navigation-desktop.png) were
 inspected after the composed resize, alongside single-player close views.
 
-**Still open:** the inherited four infinite wall planes enclose a square,
-while the artwork is round. The `40d20` samples (seeds 90090 and 32676) still
-leave 3–7 body centres outside actual artwork, even with correct scale. A
-centre ray also does not prove the whole die footprint has support. This is
-an R2 collision/spawn follow-up; enlarging the board to hide square corners
-would erase the requested edge composition. The correction above is not a
-claim that every stress die is now physically supported. Emulated screenshots
-are not physical-device performance evidence.
+The size-only change exposed a second defect: the former square walls still
+left 3–7 stress-die centres outside the round artwork. The subsequent
+[round physical envelope](ROUND-TABLE-PHYSICS.md) now fits the complete spawn
+line and checks complete corrected hulls against actual GLB surfaces. All
+1,476 dice in 45 sampled ordinary/stress casts have support and avoid raised
+landmarks; complete films agree across all three designs. This intentionally
+changes the former square collision paths while preserving authored values.
+
+**Still open:** actual desktop stress captures crop frontmost supported dice.
+The camera follow-up measures painted hulls through entry, tumble, reveal and
+rest, including the phone tray. Physical support alone does not prove visible
+dice. Emulated screenshots are not physical-device performance evidence.

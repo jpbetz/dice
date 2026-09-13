@@ -84,8 +84,8 @@ desktop/phone views. The [compact arrival experiment](PLAYER-RESULTS.md#rolls-ar
 shows who is rolling, who is next, and waiting players' previously displayed
 results. It keeps sequential films and adds no scene-space cost; simultaneous
 physical playback is not implemented. Model size now follows shared zoom;
-a round collision envelope is now integrated, with its full support and cost
-record in progress. Actual stress views also exposed a desktop camera crop;
+a [round collision envelope](ROUND-TABLE-PHYSICS.md) is now integrated with full
+model-support proof and a retained cost record. Actual stress views also exposed a desktop camera crop;
 R2 stays open until the supported dice fit the visible playing surface.
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as

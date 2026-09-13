@@ -69,8 +69,10 @@ scaling was introduced to satisfy that proxy.
 
 `node tools/drive.mjs tools/steps/round-table-look.mjs` captures actual
 server-authored four-player rolls at 1440×900 and 390×844. The measured run
-is under `tools/out/round-table-look/`, including its JSON report and eight
-PNGs. The ordinary Copper medium 4d20, Copper medium 40d20, Navigation wide
+has a [retained report](redesign/2026-09-13-round-table-look.json),
+[phone stress capture](redesign/2026-09-13-round-copper-stress-phone.png) and
+[desktop stress capture](redesign/2026-09-13-round-copper-stress-desktop.png).
+The complete eight-picture set remains under `tools/out/round-table-look/`. The ordinary Copper medium 4d20, Copper medium 40d20, Navigation wide
 40d20 and Stone close 40d4 pictures were opened and inspected. The recorded
 server seeds were 4286105394, 2823258449, 3079731984 and 1999492911 respectively.
 Their 7,395 footprint samples all had support and no raised landmark overlap.
@@ -87,9 +89,8 @@ dice bounds through the film, including the phone tray and all three sizes.
 
 The same `tools/steps/film-worker.mjs` fixture ran against pristine application
 baseline `639effb` and this mechanism; only the fixture's render/body reporting
-line was added to the baseline checkout. Reports are
-`/tmp/dice-round-baseline/tools/out/film-worker-round-before/report.json` and
-`tools/out/film-worker-round-after/report.json`. These are individual local
+line was added to the baseline checkout. The [baseline report](redesign/2026-09-13-round-worker-before.json) and
+[round report](redesign/2026-09-13-round-worker-after.json) are retained. These are individual local
 samples using **ANGLE SwiftShader software Vulkan**, not hardware-GPU or
 representative-player benchmarks. Desktop is 1440×900, phone 390×844. CPU
 throttling applies to the page, not a claim of equally throttled worker time.
@@ -117,8 +118,10 @@ All twelve feedback callbacks ran while the bake was pending. The stress
 bake is more expensive: seed 90090 costs roughly another 210–280 ms in these
 samples, and seed 32676 roughly another 55–95 ms. Contact density, paths and
 film lengths changed: the two stress recordings changed from 162/394 to
-319/193 frames. The fixed planes and resulting contact work warrant a later
-measured optimization; the change is not described as cost-neutral.
+319/193 frames. The change is not cost-neutral. A subsequent
+[isolated collision profile](redesign/2026-09-13-round-collision-profile.md)
+finds die-to-die work dominates these stress samples; a plane-only shortcut
+did not establish enough consistent improvement to adopt in app runtime.
 
 The DTO has exactly **16 more bodies**: 10→26 for 4d6 and 46→62 for 40d20.
 Serialized input grows by approximately 46–53 KB (about 173–178→223–231 KB
@@ -154,7 +157,9 @@ its replacement and the two live-worker mutation checks subsequently passed
 the intentionally re-recorded pose golden passed separately.
 
 General room geometry-setting ordering was separately reproduced before this
-change and is owned by the ordered-geometry work. Round physics itself does
+change. Size and warm tower changes now share the complete event FIFO;
+see [tower ordering](redesign/2026-09-13-tower-settings-order.md).
+Exceptional required-model failures remain a separate active delivery task. Round physics itself does
 not add per-roll settings or depend on asynchronous model state. Exhaustive
 seed coverage, camera closure and round-wall bake optimization are not claimed
 by the sampled support proof.

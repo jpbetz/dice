@@ -8,6 +8,18 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## Undo after deleting the last roll in a custom category — 2026-09-13
+
+Deleting a category's final roll used to remove its section along with Undo.
+While editing, the section now remains with its Undo action; it contributes no
+live pools or dice value. Restoring the roll keeps its original identity and
+category. Leaving edit mode retires the existing temporary Undo state.
+
+`pool-undo` passes. The actual 390 × 844 pointer flow in
+`tools/steps/empty-category-undo.mjs` was run and inspected after composition
+with the owner's mobile controls: [Undo remains visible](redesign/2026-09-13-empty-category-phone-undo.png),
+then [the roll is restored](redesign/2026-09-13-empty-category-phone-restored.png).
+
 ## 2026-09-13 — People, received invitations and explicit presence
 
 The optional People task now offers contact-code friend requests, named saved
