@@ -57,3 +57,20 @@ uncoached player results remain unobserved; use the
 [validation sheet](../../REDESIGN-VALIDATION-SHEET.md) for those sessions.
 Cloud provisioning, HTTPS/IAM/restore checks and production traffic are separate
 unperformed actions in the [enablement handoff](../../ACCOUNT-ENABLEMENT-CHECKLIST.md).
+
+
+## Correction found by the final frozen run
+
+`terminology` failed on Help's new “bottom tray” phrase and an inherited
+Numbers-only profile named “Dice tray.” The latter is a deliberately retained
+profile title, not a reason to rename kept user data. The chrome scan now creates
+and names its own explicit neutral profile fixture; its populated-root and full
+banned-word checks stay intact. Help now says “bottom roll controls.”
+
+The paired `draft-bench,terminology` run passes **2/2** after this correction
+(`2283a24`, composed after the frozen candidate). All five existing actual-input
+Help captures pass; the selected-topic driver waits for the visible consequence
+of its pointer action before measuring. The [current 390px Help
+view](help-phone-current.png) was inspected. This is the only application change
+after the frozen candidate: one Help sentence. Its results will be reported as a
+targeted follow-up, not retroactively counted as a passing frozen full case.
