@@ -12,7 +12,7 @@ export function createPlayerResults(actions) {
   const root=el('section','table-results'); root.id='table-results';
   root.setAttribute('aria-label','Latest rolls at the table'); document.body.append(root);
   const seats=new Map();
-  let lastRows=[], detailId=null, detailOpener=null, turnId=null;
+  let lastRows=[], detailId=null, detailOpener=null, turnId=null, viewEpoch=0;
   const turn=el("section","table-turn-bar"); turn.id="table-turn-bar"; turn.hidden=true;
   turn.setAttribute("aria-label","Your unfinished turn");
   const turnRead=el("button","btn ghost"); turnRead.id="table-turn-read"; turnRead.type="button";
@@ -127,7 +127,7 @@ export function createPlayerResults(actions) {
   }
   function open(id,anchor) {
     const row=lastRows.find(r=>r.result?.id===id&&r.openable) || actions.owner(id); if(!row) return false;
-    actions.beforeDetail(); detailId=id; detailOpener=anchor||seats.get(row.id)?.button;
+    actions.beforeDetail(); viewEpoch++; detailId=id; detailOpener=anchor||seats.get(row.id)?.button;
     title.textContent=`${row.name}’s roll`;
     actions.renderDetail(read,controls,id); detail.classList.remove('hidden');
     actions.openDetail(detail); back.focus({preventScroll:true}); return true;
@@ -150,5 +150,5 @@ export function createPlayerResults(actions) {
   }
   window.matchMedia('(max-width:640px)').addEventListener('change',()=>{if(detailId) actions.openDetail(detail);});
   refresh();
-  return {refresh,open,close,get detailId(){return detailId;},get rows(){return lastRows;}};
+  return {refresh,open,close,get detailId(){return detailId;},get viewEpoch(){return viewEpoch;},get rows(){return lastRows;}};
 }

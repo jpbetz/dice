@@ -30,6 +30,41 @@ async function tapRoll(a,selector) {
   await a.dbg('sim(12)');await rollViewVisible(a);await a.settle();await rollViewVisible(a);
 }
 export const rollFlowScenarios=[
+  {name:'roll-flow-delayed-response-keeps-reopened-task',tags:['roll-flows','workspaces'],async fn(ctx){
+    const a=await ctx.newTable({origin:'127.0.0.154',name:'Alice'});await phone(a);
+    async function hold(path){
+      await a.eval(`(()=>{
+        const original=window.fetch;window.flowHeld=false;window.flowConsumed=false;
+        let release;const gate=new Promise(r=>release=r);window.releaseFlow=release;
+        window.fetch=async(url,opts)=>{
+          const response=await original(url,opts);
+          if(String(url).includes(${JSON.stringify(path)})){
+            window.flowHeld=true;await gate;window.fetch=original;
+            const json=response.json.bind(response);response.json=async()=>{const value=await json();window.flowConsumed=true;return value;};
+          }
+          return response;
+        };
+      })()`);
+    }
+    async function release(){
+      await a.eval('window.releaseFlow()');await a.waitFor('window.flowConsumed');
+      await a.eval('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+    }
+    await tapControl(a,'#phone-build-roll');await tapControl(a,'#die-buttons .die-btn:nth-child(2)');
+    await hold('/api/roll');await tapControl(a,'#tray-roll');await a.waitFor('window.flowHeld');
+    await tapControl(a,'#workspace-back');await tapControl(a,'#phone-build-roll');
+    await release();
+    assert.equal(await a.dbg('workspaces.current'),'dice','late accepted roll cannot close a new visit to the same builder');
+    await tapControl(a,'#workspace-back');await a.settle();
+    await a.roll('3d6 t3');const turn=await a.rollId();await a.settle();
+    await tapControl(a,'#table-turn-read');await hold('/api/rethrow');
+    await tapControl(a,'#player-result-actions .throw-again');await a.waitFor('window.flowHeld');
+    await a.waitFor(`window.__diceDebug.turnState(${JSON.stringify(turn)})?.throws.used===2`);await a.settle();
+    await tapControl(a,'#player-result-close');await tapControl(a,'#table-turn-read');
+    await release();
+    assert.equal(await a.dbg('tableResults.detailId'),turn,'late accepted rethrow cannot close a new visit to the same result');
+    assert.deepEqual(a.page.errors,[]);
+  }},
   {name:'roll-flow-mobile-pools-and-navigation',tags:['smoke','roll-flows','workspaces'],async fn(ctx){
     const a=await ctx.newTable({origin:'127.0.0.153',name:'Alice'});await phone(a);
     await a.dbg(`setGroups([{name:'Perception',notation:'1d20+5'},{name:'Longsword',notation:'1d20+7'},{name:'Damage',notation:'2d6+4'},{name:'Private check',notation:'2d6+2 secret'}])`);

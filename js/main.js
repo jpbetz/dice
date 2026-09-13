@@ -35276,16 +35276,18 @@ function rememberThisTable() {
 
 // A roll started inside a reader or workspace must expose its animation.
 // Capture the originating surfaces so an accepted response cannot close a
-// different task the player opened while waiting. Refusals keep the editor.
+// different task the player opened while waiting, including a new visit to
+// the same builder or result. Refusals keep the editor.
 function returnToRollView() {
   const workspace = destinationShell?.current, detail = tableResults?.detailId;
+  const workspaceVisit = destinationShell?.viewEpoch, detailVisit = tableResults?.viewEpoch;
   const popup = pop;
   const settings = document.getElementById('settings-modal');
   const library = !settings.classList.contains('hidden') && settings.dataset.dest === 'stuff';
   return () => {
     if (popup && pop === popup) closePopover();
-    if (detail && tableResults?.detailId === detail) tableResults.close();
-    if (workspace && destinationShell?.current === workspace) destinationShell.close();
+    if (detail && tableResults?.detailId === detail && tableResults.viewEpoch === detailVisit) tableResults.close();
+    if (workspace && destinationShell?.current === workspace && destinationShell.viewEpoch === workspaceVisit) destinationShell.close();
     if (library && settings.dataset.dest === 'stuff') closeSettingsModal();
   };
 }

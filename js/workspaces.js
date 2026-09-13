@@ -94,7 +94,7 @@ export function createWorkspaces(actions) {
   // without a window resize. Keep the renderer fitted to that real rectangle.
   new ResizeObserver(()=>actions.layoutChanged()).observe(tray);
 
-  let current = null, opener = null, borrowed = [];
+  let current = null, opener = null, borrowed = [], viewEpoch = 0;
   // One launcher follows the visible roll controls, including the borrowed
   // builder. Moving the node preserves its handlers and gallery return target.
   function positionDiceControl() {
@@ -186,7 +186,7 @@ export function createWorkspaces(actions) {
     if(current==='account'&&key!=='account')actions.accountClosed?.();
     if(current==='tables'&&key!=='tables')actions.homesClosed?.();
     if(current==='people'&&key!=='people')actions.peopleClosed?.();
-    current = key; root.dataset.workspace = key; title.textContent = names[key];
+    viewEpoch++; current = key; root.dataset.workspace = key; title.textContent = names[key];
     if (key === 'dice' && !browsing) actions.home();
     for (const [k, section] of Object.entries({ tables, dice, people, account })) section.hidden = k !== key;
     for (const b of [...nav.children, ...tabs.children]) b.setAttribute('aria-pressed', String(b.dataset.workspace === key));
@@ -253,6 +253,6 @@ export function createWorkspaces(actions) {
     if (current) actions.modalOpen(root);
     actions.layoutChanged();
   });
-  return { open, close, get current() { return current; }, library, positionDiceControl,
+  return { open, close, get current() { return current; }, get viewEpoch() { return viewEpoch; }, library, positionDiceControl,
     notice(message){if(current){status.textContent=message||'';status.hidden=!message;}} };
 }

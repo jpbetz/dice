@@ -20,6 +20,21 @@ category. Leaving edit mode retires the existing temporary Undo state.
 with the owner's mobile controls: [Undo remains visible](redesign/2026-09-13-empty-category-phone-undo.png),
 then [the roll is restored](redesign/2026-09-13-empty-category-phone-restored.png).
 
+## Delayed roll responses preserve reopened tasks — 2026-09-13
+
+A successful roll response used to dismiss a newly reopened builder or result
+when its destination key matched the original task. Each workspace/result visit
+now has its own sequence, so the accepted request closes only its originating
+visit. A late response cannot dismiss a new visit to the same result or builder.
+Normal accepted rolls still expose the table; refusals retain their editor.
+
+A held real HTTP response reproduces the builder failure before the fix. All
+five `roll-flows` cases now pass, including a kept-turn rethrow returning after
+the same result was reopened. The actual 390 × 844 pointer flow is reproducible
+with `tools/steps/roll-response-look.mjs`: the [reopened result remains](redesign/2026-09-13-roll-response-phone-reopened-result.png),
+and its own close [returns to the table](redesign/2026-09-13-roll-response-phone-return.png).
+Both captures were opened and inspected.
+
 ## 2026-09-13 — People, received invitations and explicit presence
 
 The optional People task now offers contact-code friend requests, named saved
