@@ -16,6 +16,14 @@ test('actual app retains a failed-home state while rolling locally and explicitl
   assert.equal((await a.dbg('net')).unavailableHome,true);assert.equal((await a.dbg('net')).online,false);
   assert.equal(await a.eval('document.getElementById("home-connection-notice").hidden'),false);
   await a.roll('1d6');assert.equal(await a.eval('document.getElementById("home-connection-notice").hidden'),false);
+  let held=null;browser.on('Fetch.requestPaused',p=>{if(!held)held=p.requestId;else browser.send('Fetch.continueRequest',{requestId:p.requestId},a.page.sessionId).catch(()=>{});},a.page.sessionId);
+  await browser.send('Fetch.enable',{patterns:[{urlPattern:'*/api/new-room',requestStage:'Response'}]},a.page.sessionId);
+  await a.eval('document.getElementById("home-connection-new").click();document.querySelector(".rail-menu input.tin").value="Cancelled guest";document.querySelector(".rail-menu .btn.confirm").click()');
+  for(let n=0;n<100&&!held;n++)await new Promise(r=>setTimeout(r,20));assert.ok(held);
+  const originalUrl=await a.eval('location.href');await a.dbg('workspaces.open("people")');
+  await browser.send('Fetch.continueRequest',{requestId:held},a.page.sessionId);await new Promise(r=>setTimeout(r,150));
+  assert.equal(await a.eval('location.href'),originalUrl);assert.equal(await a.dbg('workspaces.current'),'people','a cancelled reservation cannot surprise-join after opening another task');
+  await browser.send('Fetch.disable',{},a.page.sessionId);await a.dbg('workspaces.close()');
   await a.eval('document.getElementById("home-connection-new").click()');await a.waitFor('!!document.querySelector(".rail-menu input.tin")');
   await a.eval('document.querySelector(".rail-menu input.tin").value="Outage guest game";document.querySelector(".rail-menu .btn.confirm").click()');
   for(let n=0;n<100;n++){try{if(await a.eval('location.search.startsWith("?room=g_")&&!!window.__diceDebug?.netReady'))break;}catch{}await new Promise(r=>setTimeout(r,50));}

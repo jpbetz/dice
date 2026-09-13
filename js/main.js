@@ -33611,7 +33611,11 @@ function openTableMint(anchor, { verb, placeholder, reserveGuest = false }, onCr
       if(go.disabled)return;
       const name = cutText(input.value.trim(), 28);
       go.disabled=true;error.textContent='';
+      const request={workspace:destinationShell?.current,url:location.href,
+        identity:librarySession?.info?`${librarySession.info.namespace}:${librarySession.info.boundaryEpoch}`:null};
       const result=reserveGuest?await createGuestTable(name):{ok:true,room:mintRoomKey(name)};
+      const identity=librarySession?.info?`${librarySession.info.namespace}:${librarySession.info.boundaryEpoch}`:null;
+      if(!railMenuState||railMenuState.el!==el||destinationShell?.current!==request.workspace||location.href!==request.url||identity!==request.identity)return;
       if(!result.ok){go.disabled=false;error.textContent=result.message||'The guest table could not be created. Try again.';return;}
       const key=result.room;
       try { sessionStorage.setItem(pendingNameKey(key), name); } catch { /* a nameless table still works */ }
