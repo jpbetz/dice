@@ -163,3 +163,16 @@ Exceptional required-model failures remain a separate active delivery task. Roun
 not add per-roll settings or depend on asynchronous model state. Exhaustive
 seed coverage, camera closure and round-wall bake optimization are not claimed
 by the sampled support proof.
+
+
+### Full-suite time allowance
+
+The 45-cast `round-table-footprints` proof exceeded the harness’s default
+90-second scenario limit during the composed release sweep. The same complete
+proof, with every support ray, full-film hash and spawn-clearance assertion
+unchanged, passed in 96.9 seconds alongside the release/browser work (earlier
+isolated/composed runs were 47.1/50.6 seconds). Its outer harness allowance is
+now 180 seconds; individual readiness/settle waits remain bounded. This is a
+geometry proof over three designs, three sizes and five films per combination,
+not a product latency budget. The runtime performance measurements above
+remain the separate cost record.

@@ -138,7 +138,9 @@ export const roundTableScenarios = [
     await a.dbg('clearTable()');assert.equal((await a.dbg('tableBoundary()')).bodies,before.bodies,'no accumulated collider or worker input growth');
     assert.deepEqual(a.page.consoleErrors,[]);
   }},
-  { name:'round-table-footprints',tags:['round-table','physics','table-designs'],async fn(ctx) {
+  // Forty-five complete films and dense GLB support rays; wall time is not
+  // a product budget. Keep each film's readiness/settle waits bounded separately.
+  { name:'round-table-footprints',tags:['round-table','physics','table-designs'],timeout:180000,async fn(ctx) {
     const a=await ctx.newTable({origin:'127.0.0.134',name:'Footprints'});
     await a.dbg('devOpen()');await a.dbg('devFold(true)');await a.dbg('holdClock(true)');
     for(const zoom of ['wide','medium','close']) {
