@@ -37,7 +37,7 @@ import { firstPlayScenarios } from './first-play.mjs';
 import { workspaceScenarios } from './workspaces.mjs';
 import { playerResultScenarios } from './player-results.mjs';
 import { rollFlowScenarios } from './roll-flows.mjs';
-import {click as tapControl} from '../fixtures/visible-input.mjs';
+import {click as tapControl, hover as hoverControl} from '../fixtures/visible-input.mjs';
 import { shareProfiles, typeControl, pickOfferedProfile } from './explicit-library-fixture.mjs';
 import { rollHistoryScenarios } from './roll-history.mjs';
 import { filmMutationScenarios } from "./film-mutations.mjs";
@@ -18549,99 +18549,71 @@ export const scenarios = [
     name: 'peek-retires',
     tags: ['log', 'shelf', 'chrome', 'cuj9'],
     timeout: 150000,
-    // WHAT THIS CATCHES: the peek closed on NOTHING a player expects — not a
-    // new roll, not a ceremony, not the log — while sitting at z 30 above all
-    // three. A card standing over the table for a roll two rolls ago is the
-    // same staleness a new roll retires the banner for, and it is how two cards
-    // came to wear `✕ Clear` for two different rolls with nothing marking which
-    // was live.
-    //
-    // Four legs, and the fourth is the one a naive "close it on everything"
-    // fix breaks: a card with its ± popover OPEN is being EDITED, and a new
-    // roll landing behind it must not pull the editor out from under the
-    // player's hands.
+    // Historical cards retire with their anchor or a new read. A remote roll
+    // must preserve a pinned editor; an accepted local Roll returns to play.
     async fn(ctx) {
-      const a = await ctx.newTable({ origin: '127.0.0.53', name: 'Ada' });
-      const peekOpen = () => a.eval(
-        `!document.getElementById('peek-card').classList.contains('hidden')`);
-
-      const putAway = async (label) => {
-        await a.roll(`2d6 # ${label}`);
-        const rid = await a.rollId();
+      const a=await ctx.newTable({origin:'127.0.0.53',name:'Ada'});
+      const remote=await ctx.rawPlayer('Bram');
+      const peekOpen=()=>a.eval(`!document.getElementById('peek-card').classList.contains('hidden')`);
+      const show=async rid=>{
+        await hoverControl(a,`#log-list .log-entry[data-roll-id="${rid}"]`);
+        await a.waitFor(`window.__diceDebug.peekState?.rollId===${JSON.stringify(rid)}`);
+        assert.equal(await peekOpen(),true,'the exact historical row opens its visible card');
+      };
+      const putAway=async label=>{
+        await a.roll(`2d6 # ${label}`);const rid=await a.rollId();
         await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
-        await a.waitFor(`(window.__diceDebug.sim(240),
-          window.__diceDebug.record.ranks.some((r) => r.rollId === ${JSON.stringify(rid)}))`,
-        { desc: `'${label}' reaches the record` });
+        await a.waitFor(`(window.__diceDebug.sim(240),window.__diceDebug.record.ranks.some(r=>r.rollId===${JSON.stringify(rid)}))`);
         return rid;
       };
-      const first = await putAway('First');
-      await a.dbg('setLogFlyout(true)');
+      const remoteRoll=async notation=>{
+        const response=await ctx.api('/api/roll',{playerId:remote.playerId,notation});
+        assert.equal(response.ok,true);const rid=response.data.roll.rollId;
+        await a.waitFor(`window.__diceDebug.currentRoll?.rollId===${JSON.stringify(rid)}`);
+        await a.settle();return rid;
+      };
+      const first=await putAway('First');await tapControl(a,'#rail-log');
+      await show(first);await a.roll('1d4 # Second');await a.settle();
+      assert.equal(await a.dbg('peekState'),null,'a new local roll retires an older card');
+      assert.equal(await peekOpen(),false);
 
-      // (i) A NEW ROLL RETIRES A STALE CARD…
-      assert.equal(await a.dbg(`peek(${JSON.stringify(first)})`), first, 'the card is up');
-      assert.equal(await peekOpen(), true, 'and on screen');
-      await a.roll('1d4 # Second');
-      await a.settle();
-      assert.equal(await a.dbg('peekState'), null,
-        'a new roll retires a card that was about an older one');
-      assert.equal(await peekOpen(), false, 'and it is gone from the screen, not merely forgotten');
+      // A real Reroll act completes and retires the replaced historical card.
+      const own=await a.rollId();await a.dbg(`collectRoll(${JSON.stringify(own)})`);
+      await a.waitFor(`(window.__diceDebug.sim(240),window.__diceDebug.record.ranks.some(r=>r.rollId===${JSON.stringify(own)}))`);
+      await show(own);await tapControl(a,'#peek-card .pk-again');
+      await a.waitFor(`window.__diceDebug.currentRoll?.rollId!==${JSON.stringify(own)}&&!!window.__diceDebug.currentRoll`);
+      await a.settle();assert.equal(await peekOpen(),false,'reroll completion leaves no stale parent card');
 
-      // (ii) …BUT NOT THE ROLL'S OWN CARD. A reroll landing under its parent's
-      // card is not a stale card.
-      const own = await a.rollId();
-      await a.dbg(`collectRoll(${JSON.stringify(own)})`);
-      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.some(
-        (r) => r.rollId === ${JSON.stringify(own)}))`, { desc: 'Second is put away' });
-      assert.equal(await a.dbg(`peek(${JSON.stringify(own)})`), own, 'its own card is up');
-      await a.eval(`document.querySelector('#peek-card .pk-again').click()`);
-      await a.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy
-        && window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.rollId !== ${JSON.stringify(own)})`,
-      { desc: 'the reroll lands' });
-      await a.settle();
+      const third=await putAway('Third');await show(third);
+      await a.dbg("commandRoll('1d20 check # Steady')");
+      await a.waitFor(`(window.__diceDebug.sim(30),['declare','tumble'].includes(window.__diceDebug.ceremonyState?.phase))`);
+      assert.equal(await peekOpen(),false,'a ceremony retires the historical card');
+      await a.waitFor(`(window.__diceDebug.skipCeremony(),window.__diceDebug.sim(60),window.__diceDebug.ceremonyState?.phase==='done')`);
+      await a.dbg('retireCeremony()');await a.settle();
 
-      // (iii) A CEREMONY RAISES A LAYER OVER THE WHOLE TABLE, and the card must
-      // let go the moment that layer appears — every path that raises it (roll,
-      // offer claim, resync replay) converges on the one class this watches.
-      const third = await putAway('Third');
-      assert.equal(await a.dbg(`peek(${JSON.stringify(third)})`), third, 'the card is up again');
-      await a.dbg(`commandRoll('1d20 check # Steady')`);
-      await a.waitFor(
-        `(window.__diceDebug.sim(30), ['declare','tumble'].includes((window.__diceDebug.ceremonyState || {}).phase))`,
-        { desc: 'the ceremony declares' });
-      assert.equal(await peekOpen(), false, 'the card let go when the ceremony rose over it');
-      await a.waitFor(`(window.__diceDebug.skipCeremony(), window.__diceDebug.sim(60),
-        (window.__diceDebug.ceremonyState || {}).phase === 'done')`, { desc: 'ceremony done' });
-      await a.dbg('retireCeremony()');
-      await a.settle();
+      await show(third);await tapControl(a,'#log-close');
+      assert.equal(await a.dbg('peekState'),null,'closing history removes the card’s anchor');
+      await tapControl(a,'#rail-log');await show(third);
+      await tapControl(a,'#peek-card .pk-main',{button:'right'});
+      await a.waitFor('window.__diceDebug.popover?.open===true');
+      assert.equal(await a.dbg('popover.source'),'shelf');
+      await tapControl(a,'#pop-seg-exp [data-v="check"]');
+      await typeControl(a,'#pop-comment','Kept while Bram rolls');
+      const draft=await a.dbg('popover.canonical');
+      await remoteRoll('1d4 # Interrupting');
+      assert.equal((await a.dbg('popover'))?.open,true,'another player’s arrival preserves the editor');
+      assert.equal(await a.dbg('popover.canonical'),draft,'the typed edit survives that arrival');
+      assert.equal((await a.dbg('peekState')).rollId,third,'the editor keeps its exact historical anchor');
 
-      // (iv) THE CARD GOES WITH THE LOG. It anchors to a row inside that panel,
-      // so closing the panel takes its anchor away — a card floating over the
-      // felt with a ✕ that acts on a roll you can no longer see is worse than
-      // no card.
-      assert.equal(await a.dbg(`peek(${JSON.stringify(third)})`), third, 'up once more');
-      await a.dbg('setLogFlyout(false)');
-      assert.equal(await a.dbg('peekState'), null, 'closing the record closes the card');
-
-      // (v) A PINNED ± POPOVER IS AN EDITOR, AND A NEW ROLL MUST NOT TAKE IT.
-      // The peek pins while its own popover lives; closePeek returns early on
-      // a pinned card precisely so this leg is true. Without it, "retire the
-      // card on every new roll" would be a fix that closes an open editor
-      // mid-keystroke every time somebody else at the table rolls.
-      await a.dbg('setLogFlyout(true)');
-      await a.dbg(`peek(${JSON.stringify(third)})`);
-      await a.eval(`document.querySelector('#log-list .log-entry.collected')
-        .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`);
-      await a.waitFor(`window.__diceDebug.popover.open === true`,
-        { desc: 'the card’s ± popover opens' });
-      assert.equal(await peekOpen(), true, 'with the card standing as its anchor');
-      await a.roll('1d4 # Interrupting');
-      await a.settle();
-      assert.equal(await a.dbg('popover.open'), true,
-        'a roll landing behind an open editor does NOT close it');
-      assert.equal(await peekOpen(), true, 'nor the card it is anchored to');
-      await a.dbg('closePopover()');
-      await a.dbg('peek(null)');
-      await a.dbg('setLogFlyout(false)');
+      await tapControl(a,'#pop-done');assert.equal(await a.dbg('popover'),null,'Done releases the editor');
+      const live=await remoteRoll('1d4 # After editing');
+      assert.equal(await a.dbg('peekState'),null,'the next arrival retires the unpinned card');
+      await show(third);await tapControl(a,'#peek-card .card-act');
+      await a.waitFor(`!window.__diceDebug.peekState&&!window.__diceDebug.record.ranks.some(r=>r.rollId===${JSON.stringify(third)})`);
+      assert.ok(!(await a.dbg('onTable')).some(r=>r.rollId===third),'Clear removes the selected historical roll from table state');
+      assert.equal(await a.rollId(),live,'clearing history leaves the current roll in place');
+      assert.ok((await a.dbg('record.ranks')).some(r=>r.rollId===first),'another kept historical roll remains');
+      await tapControl(a,'#log-close');assert.deepEqual(a.page.errors,[]);
     },
   },
 
