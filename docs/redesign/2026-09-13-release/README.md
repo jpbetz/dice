@@ -52,7 +52,17 @@ and repeated identity/Brotli/gzip requests, with identical decoded bytes.
 six-entry-asset subset on an owned ephemeral production-mode server, not the
 whole application graph, deployed traffic, page-load time or a battery result.
 
-Final candidate verification is pending. Physical-phone, midrange-device and
+The frozen `8a577e5` complete scenario run finished **364/368** in 1,840.3s,
+with a recorded child exit **1**, signal **null**. Its exact failures are
+`felt-gloss`, `terminology`, `venue-life`, and `venue-frame`; the
+[complete output](full-8a577e5.txt) is retained. All eight corrections from the
+preceding preflight passed in full order, including 42.6s for the unchanged
+support matrix and 114.0s for the pointer camera matrix. These are test durations,
+not application performance claims. The additional account/UI/scripted-return
+tail is being run independently because the package script stops on the scenario
+failure. The post-freeze terminology correction is recorded below.
+
+Physical-phone, midrange-device and
 uncoached player results remain unobserved; use the
 [validation sheet](../../REDESIGN-VALIDATION-SHEET.md) for those sessions.
 Cloud provisioning, HTTPS/IAM/restore checks and production traffic are separate
