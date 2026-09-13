@@ -788,7 +788,7 @@ html, body {
    manage bar are one section, and leaving any of them behind would strand
    chrome over nothing. #cmd is HIDDEN, never removed: paintCmd keeps syncing
    into it, so §1.3's projection stays true while the box is off screen. */
-#builder-panel.sec-off-pools :is(#profile-banner, #pools-scope, #pools-head, #groups-list, #pools-toolbar) {
+#builder-panel.sec-off-pools :is(#profile-banner, #pools-head, #groups-list, #pools-toolbar) {
   display: none;
 }
 
@@ -1152,7 +1152,7 @@ html, body {
 .draft-actions {
   margin-top: 0;
   padding: 0 7px 10px;
-  gap: 6px;
+  gap: 4px;
   justify-content: flex-start;
   align-items: stretch;
   min-height: 36px;
@@ -1169,7 +1169,7 @@ html, body {
   align-items: center;
   justify-content: center;
   font-size: 11.5px;
-  padding: 5px 11px;
+  padding: 5px 8px;
   border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.13);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
@@ -1206,7 +1206,7 @@ html, body {
    its popover is open: the field being edited and the tool editing it
    light together. */
 #tray-mods {
-  padding: 5px 13px;
+  padding: 5px 9px;
   border-color: rgba(212, 175, 55, 0.28);
   background: linear-gradient(180deg, rgba(212, 175, 55, 0.11), rgba(212, 175, 55, 0.035));
   box-shadow: inset 0 1px 0 rgba(255, 215, 102, 0.08);
@@ -1232,33 +1232,13 @@ html, body {
 #clear-tray { margin-left: auto; }         /* the right rail, under ± */
 /* The split verb reads as ONE verb with a chooser. */
 #offer-draft { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-#offer-pick  { margin-left: -7px; padding: 4px 6px;
+#offer-pick  { margin-left: -5px; padding: 4px 6px;
                border-top-left-radius: 0; border-bottom-left-radius: 0; }
-/* THE RIM'S COARSE BUMP, AND THE TWO SELECTORS IT WAS MISSING (U28 /
-   audit T7). The bump was real and landed on two of the rim's four tools;
-   both misses are cascade faults rather than taste, and both are worth
-   naming because the same shape can happen again anywhere in this file.
-     · `#tray-mods` carries NO class="btn" (index.html:215), so
-       `.draft-actions .btn` never matched it. It reached row height only
-       because `.draft-actions { align-items: stretch }` dragged it there —
-       accidental, and it would have died the moment the rim stopped
-       stretching. Adding the class is an index.html edit; naming the id
-       here costs one selector and cannot drift.
-     · `#offer-pick { padding: 4px 6px }` above is (1,0,0) and the old
-       coarse rule was (0,2,0). MEDIA QUERIES ADD NO SPECIFICITY — a
-       @media block is not a selector — so the id won regardless of source
-       order and the targeted-offer chooser stayed ≈21px wide no matter
-       where this block was moved. This is the ONE place in the file where
-       an id beat a coarse bump; the fix is to answer it at id weight.
-   Sizes, all border-box: the three .btn tools 26 → 36 tall, `± Modify` 26
-   → 36 (its 13px horizontal survives so its width does not move), and
-   `▾` ≈21×26 → 37×36. Horizontal padding lands at 10px rather than 12
-   deliberately: the rim is a no-wrap flex row and the four tools plus
-   gaps come to ~240px of the expanded panel's 260 — 12px would have made
-   the row overflow on the narrowest phone the panel still expands on. */
+/* Touch targets share one row: Modify, Dice, Offer and its audience picker,
+   then Clear. Compact padding keeps all five buttons inside a 252px rim. */
 @media (pointer: coarse) {
-  .draft-actions .btn { padding: 10px 10px; }
-  #tray-mods, #offer-pick { padding: 10px 13px; }
+  .draft-actions .btn, #tray-mods { padding: 10px 7px; min-width: 34px; }
+  #offer-pick { padding: 10px 9px; }
 }
 /* (the tray save morph's rules retired 2026-08-04 with the rim's Save) */
 
@@ -2784,12 +2764,14 @@ html, body {
 /* the selection's verb: gold rolls */
 #rail-roll-wrap {
   flex: none;
-  display: flex; gap: 4px; align-items: center;
+  display: flex; flex-direction: column; gap: 4px; align-items: stretch;
   /* Heads the column now, directly under the chip — no border-top, because
      it no longer divides the list from the foot; it IS the destination the
      list feeds, the same job and the same place as the expanded well. */
   padding: 4px 6px 2px;
 }
+#rail-roll-wrap #my-dice { min-height: 28px; padding: 4px; font-size: 11px; }
+@media (pointer: coarse) { #rail-roll-wrap #my-dice { min-height: 34px; } }
 #rail-roll-wrap[hidden], #rail-note[hidden] { display: none; }
 #left-panel:not(.collapsed) #rail-roll-wrap,
 #left-panel:not(.collapsed) #rail-note { display: none; }
@@ -2900,16 +2882,12 @@ html, body {
   max-width: 170px;
 }
 .identity-caret { color: #b9b3a7; font-size: 13px; margin-left: 2px; }
-/* Personal controls share one existing header row; no featured dice card. */
+/* The personal row contains identity; dice selection belongs to the roll tools. */
 #personal-controls { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; }
 #personal-controls #identity-chip { flex: 0 1 auto; min-width: 0; max-width: none; justify-content: flex-start; }
-#my-dice { flex: none; min-height: 32px; padding: 4px 10px; border: 0; border-left: 1px solid var(--hair); background: none; color: var(--ivory); font: 12px var(--font-ui); cursor: pointer; }
-#my-dice:hover { background: #ffffff0a; }
 #my-dice:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
-#left-panel.collapsed #personal-controls { gap: 2px; }
-#left-panel.collapsed #personal-controls #identity-chip { flex: 1; gap: 4px; padding: 4px 2px; }
-#left-panel.collapsed #personal-controls .identity-caret, #left-panel.collapsed .my-dice-prefix { display: none; }
-#left-panel.collapsed #my-dice { padding: 4px; }
+#left-panel.collapsed #personal-controls #identity-chip { flex: 1; gap: 7px; padding: 4px 2px; }
+#left-panel.collapsed #personal-controls .identity-caret { display: none; }
 #left-panel.collapsed #personal-controls .identity-dot { width: 6px; height: 6px; }
 .identity-dot {
   flex: none;
@@ -3348,12 +3326,6 @@ html, body {
 #left-panel.collapsed #table-open { width: 100%; min-height: 32px; }
 #left-panel.collapsed #table-context .table-name { display: block; min-width: 0; max-width: 100%; }
 #left-panel.collapsed #table-connection { margin-left: 0; font-size: 10px; }
-#pools-scope {
-  margin: 8px 0 0;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--muted);
-}
 
 /* ---------- status pill ---------- */
 #status-pill {
@@ -3974,7 +3946,7 @@ body.seated #result-banner { left: calc(var(--table-left) + 24px); transform: no
 /* A destination is DISPLAY-NONE when it is not the one in hand, not merely
    transparent: the whole point of the split is that the other two cost no
    scroll. */
-.settings-dest.hidden { display: none; }
+.settings-dest.hidden, #dest-stuff.hidden { display: none; }
 /* What a fantasy venue took, said out loud. GOALS goal 13 hides felt, tower
    and dice set while a venue is staging them; until this pass they simply
    vanished, which is a control disappearing with no account of itself. */

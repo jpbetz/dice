@@ -59,6 +59,18 @@ export function createWorkspaces(actions) {
   document.body.append(tray);
 
   let current = null, opener = null, borrowed = [];
+  // One launcher follows the visible roll controls, including the borrowed
+  // builder. Moving the node preserves its handlers and gallery return target.
+  function positionDiceControl() {
+    const launcher = $('my-dice');
+    const atBuilder = current === 'dice';
+    const host = !atBuilder && window.innerWidth <= 640 ? trayHead
+      : !atBuilder && $('left-panel').classList.contains('collapsed') ? $('rail-roll-wrap') : $('draft-actions');
+    if (launcher.parentElement === host) return;
+    const focused = launcher === document.activeElement;
+    host.insertBefore(launcher, host === $('draft-actions') ? $('offer-draft') : null);
+    if (focused) launcher.focus({preventScroll:true});
+  }
   const borrow = (el, host) => {
     const place = document.createComment('workspace return point'); el.before(place);
     borrowed.push({el, place, hidden: el.classList.contains('hidden')}); host.append(el); el.classList.remove('hidden');
@@ -144,6 +156,7 @@ export function createWorkspaces(actions) {
     if (key === 'people') renderPeople();
     if(key==='account')actions.account(account);
     if (key === 'dice') diceView();
+    positionDiceControl();
     document.body.classList.add('workspace-open'); document.body.dataset.workspace = key; actions.layoutChanged();
     back.focus({preventScroll:true});
   }
@@ -153,6 +166,7 @@ export function createWorkspaces(actions) {
     if(current==='account')actions.accountClosed?.();
     if(current==='tables')actions.homesClosed?.();
     current = null; actions.modalClose(root); root.classList.add('hidden'); restore();
+    positionDiceControl();
     document.body.classList.remove('workspace-open'); delete document.body.dataset.workspace; actions.layoutChanged();
     for (const b of [...nav.children, ...tabs.children]) b.setAttribute('aria-pressed', 'false');
     if (opener?.isConnected) opener.focus({preventScroll:true});
@@ -173,9 +187,11 @@ export function createWorkspaces(actions) {
   for (const el of [$('rail-roster'), $('table-name'), $('log-list')]) observer.observe(el, {childList:true, subtree:true, characterData:true});
   observer.observe($('tray-roll'), {attributes:true, attributeFilter:['disabled']});
   update();
+  positionDiceControl();
   window.matchMedia('(max-width:640px)').addEventListener('change', () => {
+    positionDiceControl();
     if (current) actions.modalOpen(root);
     actions.layoutChanged();
   });
-  return { open, close, get current() { return current; }, library };
+  return { open, close, get current() { return current; }, library, positionDiceControl };
 }

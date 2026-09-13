@@ -98,6 +98,11 @@ Review the resting table for permanent clutter and the opened task for
 readability, useful preview size, and ease of completion. Return to play stays
 clear and preserves the player's place.
 
+**Later owner correction, same day:** remove the saved-pools subtitle and
+move Dice from beside the player name to the roll controls. Use plain,
+functional labels; avoid cute subtitles, taglines and reassurance lines under
+routine controls. This supersedes the name-row Dice placement described above.
+
 Initial relocation map, read from `index.html` and the handlers at the
 baseline revision. These move existing capabilities; they do not require
 rewriting their domain logic. Validate the map in R1-A's layouts.

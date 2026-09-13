@@ -36,6 +36,15 @@ the WHAT IS TRUE TODAY table (U4, shipped). And GOALS wins ties, so where the
 audit found GOALS itself stale (the launcher carve-out), the doc you read
 first is the one that is wrong.
 
+## Owner UI preferences
+
+- Use plain, functional UI copy. Do not add cute or decorative subtitles,
+  taglines, or reassurance lines beneath controls and lists. Joe explicitly
+  removed “Saved in this browser. Yours at every table.” (2026-09-13).
+  Explain an action or state only where that information helps a decision.
+- The personal-name row is for identity. Dice selection belongs with the
+  roll controls, not beside the player's name (2026-09-13).
+
 ## Validation — docs/TESTING.md is guidance; GOALPOST 8 is the rule
 
 - Repeated validation is **scripted**: `npm test` (unit + fuzz + e2e smoke,

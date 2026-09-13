@@ -4197,6 +4197,7 @@ export const scenarios = [
         await a.dbg('setPanelState({pools: false})');
         await atLeast('a source-switch cell', '#rail-mode button', 34, 34);
         await a.dbg(`setRailMode('dice')`);
+        await a.eval(`document.querySelector('#rail-dice .dice-mode-link')?.click()`);
         await a.dbg(`railTapDie('d6')`);
         await a.waitFor(`document.querySelector('#rail-dice .rd-x') !== null`,
           { desc: 'a counted dice row exists' });
@@ -5650,8 +5651,8 @@ export const scenarios = [
       );
       assert.deepEqual(
         await a.eval(`[...document.getElementById('personal-controls').children].map((el) => el.id)`),
-        ['identity-chip', 'my-dice'],
-        'the dice collection shares your existing personal row',
+        ['identity-chip'],
+        'the personal row only contains identity',
       );
       // Foot: configure → consult → act, then the gap, then the contextual
       // ✕ alone in the right corner (the same corner ✕ Clear owns on the
@@ -13072,7 +13073,6 @@ export const scenarios = [
       assert.deepEqual(await jacob.dbg('groups'), ownPools, 'the saved pools belong to Jacob');
       assert.equal((await jacob.dbg('logExport')).rolls, 0, 'the first table’s rolls stay there');
       assert.equal(await jacob.eval(`document.querySelector('[data-sec="pools"]').textContent`), 'Your pools');
-      assert.match(await jacob.eval(`document.getElementById('pools-scope').textContent`), /Yours at every table/);
       assert.notEqual((await jacob.dbg('tablePlate')).name, (await joe.dbg('tablePlate')).name);
       await jacob.roll('3d6');
       await walter.settle();

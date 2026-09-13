@@ -8,6 +8,26 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## 2026-09-13 — Dice selection joins the roll controls
+
+Removed the saved-pools subtitle at Joe's request. The name row now contains
+identity only. Dice selection sits beside Modify, Offer and Clear in the
+expanded builder, below Roll in the compact desktop rail, and in the existing
+phone roll-tray row. One button follows the visible builder and preserves its
+handlers and focus return. It stays enabled for an empty draft. Clear drops
+its redundant × so all five touch targets fit a 252 px action row.
+
+The layout check also found the hidden library overriding the destination's
+hide rule and appearing inside Preferences. The selector now hides it;
+phone Preferences measures 281 px high instead of 672 px. Owner preferences
+against cute/decorative subtitles are recorded in AGENTS.md and UX.md.
+
+All 13 focused gallery, table-control, workspace, touch and joining checks pass.
+Desktop, compact desktop, touch and phone screenshots were inspected using
+`tools/steps/roll-tools-look.mjs` (Chromium viewport/touch emulation).
+[Desktop](redesign/2026-09-13-roll-tools-desktop.png) ·
+[Phone](redesign/2026-09-13-roll-tools-phone.png).
+
 ## 2026-09-13 — Saved table homes in Tables
 
 Optional accounts can now save the current public setup at its existing
