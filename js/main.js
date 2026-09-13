@@ -5577,10 +5577,14 @@ function drainRollQueue() {
   drainingRollQueue = true;
   try {
     while (rollQueue.length && (!currentRoll || currentRoll.done)) {
+      if (rollQueue[0].kind === 'zoom' && revealing.length) break;
       const e = rollQueue.shift();
       applyingQueuedEvent = true;
       try {
-        if (e.kind === 'roll') playRoll(e.roll, e.rethrow, e.options);
+        if (e.kind === 'zoom') {
+          pendingZoom = rollQueue.findLast(e => e.kind === 'zoom')?.level || null;
+          applyZoom(e.level);
+        } else if (e.kind === 'roll') playRoll(e.roll, e.rethrow, e.options);
         else if (e.kind === 'rethrow') applyRethrow(e.data);
         else if (e.kind === 'banked') applyBanked(e.data);
         else if (e.kind === 'snapshot') replaySettledRoll(e.roll);
@@ -7047,6 +7051,7 @@ function flushPendingRollLog() {
     record(currentRoll);
   }
   for (const e of rollQueue.splice(0)) {
+    if (e.kind === 'zoom') continue; // pendingZoom retains the latest target for the cleared table
     if (queuedFilm(e) || e.kind === 'banked' || e.kind === 'snapshot') record(e.roll);
     else if (e.kind === 'reveal' && e.full) record({ ...e.full, revealed: true });
     else {
@@ -7142,7 +7147,7 @@ function playRoll(roll, rethrow = null, options = {}) {
     });
   }
 
-  if (currentRoll && !currentRoll.done) {
+  if ((currentRoll && !currentRoll.done) || (!applyingQueuedEvent && rollQueue.length)) {
     queueRollEvent({ kind: 'roll', roll, rethrow, options });
     return;
   }
@@ -15994,6 +15999,7 @@ window.__diceDebug = {
   get currentRoll() { return currentRoll; },
   get busy() { return !!(currentRoll && !currentRoll.done) || rollQueue.length > 0; },
   get queueLength() { return rollQueue.length; },
+  get queuedFilmCount() { return rollQueue.filter(queuedFilm).length; },
   // Tier 0 §0e endurance: the delegated ⟳ handler resolves the entry by
   // rollId — this hook lets the scenario prove requestRoll fires with the
   // right entry AFTER many rebuilds (a stale closure was the pre-fix bug).
@@ -25758,10 +25764,15 @@ function queueZoom(level) {
   if (!ZOOM_PRESETS[level]) return;
   pendingZoom = level;
   if (tableIsBusyForZoom()) {
-    // A quiet 'later' note only when the wait was actually forced — a same-
-    // frame flush is invisible and never needs to say so. Uses the modal's
-    // own note surface when the modal is open, otherwise the status pill.
+    // A change belongs between the exact authored events that surround it,
+    // regardless of how quickly this viewer watches them. Keeping only the
+    // last pending size until the whole queue drains made Instant and normal
+    // viewers bake later rolls against different tables.
+    const last = rollQueue.at(-1);
+    if (last?.kind === 'zoom') last.level = level;
+    else queueRollEvent({kind:'zoom',roll:{rollId:null},level});
     if (level !== currentZoom) showSettingsNote('zoom applies after this roll');
+    invalidateTable();
     return;
   }
   tryFlushZoom();
@@ -29225,6 +29236,7 @@ function demoRollEveryone(notation = DEMO_POOL) {
 // Places last, so the cards are restood against the mat both of the above
 // just finished moving.
 function tryFlushRoomChanges() {
+  if (rollQueue.length && (!currentRoll || currentRoll.done) && !drainingRollQueue) drainRollQueue();
   tryFlushZoom();
   tryFlushTower();
   tryFlushPlaces();
@@ -29345,7 +29357,7 @@ function applyRoomSettings(settings) {
   }
   if (typeof settings.zoom === 'string' && ZOOM_PRESETS[settings.zoom]) {
     roomSettings.zoom = settings.zoom;
-    if (settings.zoom !== currentZoom) queueZoom(settings.zoom);
+    if (settings.zoom !== (pendingZoom || currentZoom)) queueZoom(settings.zoom);
     renderZoomPicker();
   }
   // The tower (docs/TOWER.md), exactly the zoom shape: an unknown id is

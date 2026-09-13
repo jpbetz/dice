@@ -36,6 +36,7 @@ import { workspaceScenarios } from './workspaces.mjs';
 import { playerResultScenarios } from './player-results.mjs';
 import { rollHistoryScenarios } from './roll-history.mjs';
 import { filmMutationScenarios } from "./film-mutations.mjs";
+import { filmSettingsScenarios } from './film-settings.mjs';
 import { filmTurnScenarios } from './film-turns.mjs';
 import { idleRenderScenarios } from './idle-render.mjs';
 import { presentationScenarios } from './presentation.mjs';
@@ -794,6 +795,7 @@ export const scenarios = [
   ...optionalSceneryScenarios,
   ...towerPendingCancelScenarios,
   ...filmMutationScenarios,
+  ...filmSettingsScenarios,
   ...libraryWorkspaceScenarios,
   {
     name: 'shared-roll',
@@ -19474,7 +19476,7 @@ export const scenarios = [
     tags: ['settings', 'zoom', 'roll', 'ceremony', 'cuj12'],
     timeout: 150000,
     // WHAT THIS CATCHES, and it is the one ROADMAP C28 ② names: a zoom that
-    // arrives while a CEREMONY is running. `queueLength === 0` is the assertion
+    // arrives while a CEREMONY is running. `queuedFilmCount === 0` is the assertion
     // that makes it specific — the queue is empty, so the only thing holding
     // the change back is the ceremony's own in-flight roll, and a flush hung
     // off the roll QUEUE draining would fire immediately and land the new walls
@@ -19499,8 +19501,8 @@ export const scenarios = [
       await a.waitFor(`window.__diceDebug.pendingZoom === 'close'`,
         { desc: 'and PARKS on Ada rather than landing mid-film' });
 
-      assert.equal(await a.dbg('queueLength'), 0,
-        'nothing is queued — the ceremony itself is what is holding the change');
+      assert.equal(await a.dbg('queuedFilmCount'), 0,
+        'no film is queued — the ceremony itself holds the ordered size change');
       assert.equal(await a.dbg('zoom'), 'wide', 'so Ada is still on the old preset…');
       const wide = await a.dbg(`zoomPreset('wide')`);
       let wp = await a.dbg('wallPositions()');
@@ -19547,7 +19549,7 @@ export const scenarios = [
       await b.dbg(`setZoom('close')`);
       await a.waitFor(`window.__diceDebug.pendingZoom === 'close'`,
         { desc: 'the zoom parks behind it' });
-      assert.equal(await a.dbg('queueLength'), 0, 'with nothing queued behind it either');
+      assert.equal(await a.dbg('queuedFilmCount'), 0, 'with no second film queued behind it');
 
       // Bram is watching the same roll, so HIS zoom is parked behind his own
       // copy of it — which is the deferral working per client, and the reason
@@ -19604,7 +19606,7 @@ export const scenarios = [
 
       // The discriminator: nothing else is busy. A flush wired to "a roll
       // ended" would have fired already and moved the walls under the flip.
-      assert.equal(await a.dbg('queueLength'), 0, 'no queued roll is holding it');
+      assert.equal(await a.dbg('queuedFilmCount'), 0, 'no queued roll is holding it');
       assert.equal(await a.eval(`(window.__diceDebug.currentRoll || { done: true }).done`), true,
         'and no roll is in flight — the flip is the only thing holding it');
       assert.equal(await a.dbg('zoom'), 'wide', 'so Ada is still on the old preset');
