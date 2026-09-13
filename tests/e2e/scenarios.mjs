@@ -12909,40 +12909,41 @@ export const scenarios = [
     // outcome pinned here would be a lucky seed, and at `close` the bar
     // resolves 1 crowded throw in 24.
     //
-    // Poses are deliberately not compared, out of humility rather than need:
-    // the ~5e-6 rest-pose wander once blamed on the broadphase's axis-list
-    // history was cannon's sleep decision all along (C31), and shipping
-    // allowSleep=false removed it. Duration and frame count remain the
-    // observables that mean "a different throw".
+    // Compare all recorded film channels for the off/shipped bar pair. The
+    // same flat throw must stay untouched, including poses and contact audio.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
       await a.dbg("setZoom('close')");
+      await a.waitFor("window.__diceDebug.zoom === 'close'",
+        { desc: 'the measured close table is active' });
       await a.dbg('sim(200)');
       const pool = Array(6).fill('d6');
-      // Both land flat with nothing above the bar, so any nudge seen below is
-      // the mechanism and not the pool being unlucky.
-      //
-      // THESE SEEDS PIN A FILM AND WERE RE-PICKED WHEN ONE MOVED (2026-08-18).
-      // They were 127704 and 175218, chosen because they landed flat under the
-      // tuning of the day; the felt tuning (ROADMAP C30) piles both — 127704
-      // now rests a die at maxY 1.91 and spends 3 nudge rounds, so claim 1
-      // went red on a scenario whose subject had not changed. A seed picked
-      // for an OUTCOME is a recorded film, and it is re-picked from a fresh
-      // run rather than argued with:
-      //   node tools/drive.mjs tools/steps/pile-seed.mjs 24 close 6d6
-      // Both of these read maxY 0.67 with the bar off — six dice flat on the
-      // felt, the widest margin in the sweep — so they are the least likely to
-      // move again.
-      const seeds = [16838, 103947];
+      // Both land flat with the pile bar off on the round portalless core.
+      // Re-measured 2026-09-13: the former 103947 now stacks a die at Y=2.022,
+      // so its nudge is legitimate. 16838/24757 end at Y=0.675; off and shipped
+      // bars preserve every recorded film channel, while forced 0.5 nudges
+      // both and terminates in <2s. No threshold or solver tuning changed.
+      // Evidence: docs/redesign/2026-09-13-physics-carriers.md.
+      const seeds = [16838, 24757];
 
       const throwOne = async (seed) => {
         await a.dbg(`throwSeeded(${JSON.stringify(pool)}, ${seed})`);
         await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
           { desc: `6d6/${seed} plays out`, timeout: 30000 });
         const p = await a.dbg('settleProfile()');
+        const film = await a.eval(`(async () => {
+          const r = window.__diceDebug.currentRoll;
+          const bytes = new TextEncoder().encode(JSON.stringify({
+            keyframes: r.keyframes, sounds: r.sounds, rough: r.rough,
+            landings: r.landings, lastLanding: r.lastLanding, nudges: r.nudges,
+            frames: r.frames, simFrames: r.simFrames, values: r.values,
+          }));
+          return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
+            .map(v => v.toString(16).padStart(2, '0')).join('');
+        })()`);
         await a.dbg('clearTable()');
         await a.dbg('sim(60)');
-        return { seed, ...p };
+        return { seed, ...p, film };
       };
       const sig = (p) => `${p.duration}|${p.frames}|${p.nudged}`;
 
@@ -12997,6 +12998,8 @@ export const scenarios = [
         assert.equal(sig(back[i]), sig(off[i]),
           `seed ${s}: pileScale 0 vs the shipped 1.05 differ on a flat throw `
           + `(${sig(off[i])} -> ${sig(back[i])})`);
+        assert.equal(back[i].film, off[i].film,
+          `seed ${s}: the off and shipped pile bars preserve every film channel`);
         assert.notEqual(sig(on[i]), sig(off[i]),
           `seed ${s}: the bar at 0.5 changed nothing, so claim 3 proves nothing`);
       });
@@ -15629,6 +15632,9 @@ export const scenarios = [
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
       await a.dbg('holdClock(true)');
+      await a.dbg("setZoom('medium')");
+      await a.waitFor("window.__diceDebug.zoom === 'medium'",
+        { desc: 'the measured medium table is active' });
 
       // ---- 1. a rolling phase EXISTS ---------------------------------------
       // Before the machine landed the answer was zero, always, on every film:
@@ -15661,43 +15667,18 @@ export const scenarios = [
       await a.dbg('clearTable()');
       await a.dbg('sim(60)');
 
-      // CLAIMS 2-4 RUN ON 8d6 AT SEED 64352, and the cell was chosen by a
-      // measured margin rather than by being the first one that worked.
-      //
-      // They were on 4d6/4242, and claim 3's last line — a die still over the
-      // rolling EXIT bar after its recorded landing, which is what makes the
-      // absorbing rule load-bearing rather than decorative — stopped being
-      // true there when the felt tuning shipped: a calmer mat retires dice
-      // with less left in them. The obvious repair, 4d6/16838, clears the exit
-      // bar at 1.24 rad/s and then breaks a DIFFERENT line, drifting at 1.075
-      // u/s against claim 3's "under 1 u/s".
-      //
-      // So the grid was measured rather than sampled — 4 pools x 10 seeds,
-      // scoring every cell against all of claim 3's bars at once. Eleven cells
-      // satisfy all of them. This one has the best margins of those that also
-      // clear claim 4:
-      //   worst post-settle angular speed  1.068 rad/s — 19% clear of the 0.9
-      //     exit bar it must EXCEED, 29% under the 1.5 enter bar it must not
-      //     reach
-      //   worst post-settle drift          0.465 u/s — 54% under the 1.0 bar
-      //   worst speed anywhere             54.9 u/s — under claim 4's 60
-      //   longest rolling run              15 frames; 7 dice carry film past
-      //     their settle, so claim 3 has a sample rather than an anecdote
-      //
-      // THREE READINGS FROM THAT GRID THAT ARE NOT GUARANTEED, and every one
-      // is a bar this scenario leans on:
-      //   · worst post-settle angular speed anywhere on the grid was 1.466
-      //     against an enter bar of 1.5. A 2% margin — cross it and a die
-      //     genuinely re-enters the rolling phase after the bake called it
-      //     landed.
-      //   · worst post-settle drift was 1.281 u/s, so claim 3's "under 1 u/s"
-      //     is a property of the chosen film and not a law of the table.
-      //   · claim 4's comment says 60 u/s is "far above anything this table's
-      //     gravity can produce". Measured, 20d6 reaches **74.2** u/s — the
-      //     spawn line hurls a crowded pool harder — so that sentence is true
-      //     of the pools this scenario rolls and false in general. It is why
-      //     20d6/32676, which scored better on claim 3, was rejected.
-      await a.dbg(`throwSeeded(${JSON.stringify(Array(8).fill('d6'))}, 64352)`);
+      // Claims 2-4 use a measured film, not universal speed bounds. The
+      // round portalless core changed the old 64352 carrier, and the scenario
+      // never declared its zoom: fresh joined rooms use wide, on both the
+      // pre-redesign and current builds. Pin medium for the measured carrier.
+      // A 24-seed medium-table grid (2026-09-13) selects 8d6/175218:
+      // post-settle angular speed 1.206 rad/s (above 0.9 exit, below 1.5 enter),
+      // drift 0.843 u/s (<1), top speed 53.39 u/s (<60), seven dice with a tail.
+      // All existing thresholds and phase assertions remain unchanged.
+      // Evidence: docs/redesign/2026-09-13-physics-carriers.md.
+      // These bounds describe this carrier: larger pools can exceed 60 u/s,
+      // and other films drift above 1 u/s after their recovered landing.
+      await a.dbg(`throwSeeded(${JSON.stringify(Array(8).fill('d6'))}, 175218)`);
       await a.dbg('sim(1)');
       let scan = await a.dbg('audioFilmScan()');
       assert.ok(scan, 'the film claims 2 to 4 read is baked and scannable');
