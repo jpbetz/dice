@@ -15,10 +15,10 @@ priority order. R1, R2 and R3 remain open until their composed proofs pass.
 | Compact controls and transactional table setup | Integrated owner-session commit `85da885`. Follow-up fixes restore keyboard radio arrows inside the sheet and clear conflicts when a peer restores the base; targeted desktop/phone proofs pass. Actual grounded-table 3D preview is now integrated as `00557f3`; six setup/design/channel tests and desktop/phone views pass. |
 | Gallery practice | Committed as `f67d1df`; local/shared isolation and lifecycle tests plus desktop/phone captures pass. Owner expanded gallery integrated as `8fe35cc`; `64035a4` keeps practice inside that preview on phones. Four gallery checks, the strengthened phone practice check, and desktop/phone/short-workspace captures pass. |
 | R1-C: Quick dice and explicit starter kits | Integrated `605b4f6` / `ab8e003` as `d6efcbb` / `5291b00`. Focused tests preserve empty/legacy libraries, occupied interpretation, drafts and unfinished private/shared/solo turns. Old tests explicitly select Soul Deal profiles/lenses and the composer; fresh-visit proofs retain the new empty/Numbers-only default. |
-| Explicit profile publication | Committed as `002b115`; focused raw-network proof and composed smoke pass; see PROFILE-SHARING.md. Connect the namespace-reset hook before account recovery can adopt a library. |
-| R1-D0: durable service | Local atomic store and Firestore REST adapter integrated as `046f9a7` / `0c121fa`; optional account API/client integrated as `a2037ee`. Adapter/account tests pass, including cookie races and restart recovery. Private immutable library revisions, transactional IndexedDB namespaces, explicit conflicts and cleanup integrated as `838f86a`, cleanup protection follow-up `6ea70cf`. Saved-home protocol integrated as `e923893`; real restart/outage/corruption/concurrent-save proofs pass. UI agent completes account adoption and visible sync before home UI; service agent now implements contacts/invitations/presence. No cloud storage is provisioned. |
+| Explicit profile publication | Committed as `002b115`; focused raw-network proof and composed smoke pass; see PROFILE-SHARING.md. Account adoption now withdraws publication before switching; blocked or uncertain transitions disable the visible sharing choice. |
+| R1-D0: durable service | Local atomic store and Firestore REST adapter integrated as `046f9a7` / `0c121fa`; optional account API/client integrated as `a2037ee`. Adapter/account tests pass, including cookie races and restart recovery. Private immutable library revisions, transactional IndexedDB namespaces, explicit conflicts and cleanup integrated as `838f86a`, cleanup protection follow-up `6ea70cf`. Saved-home protocol integrated as `e923893`; real restart/outage/corruption/concurrent-save proofs pass. Account adoption and visible sync are integrated (`c12fdd5` plus `93fdd13`); five actual-app cases pass. Home UI is in progress. Recipient-bound contacts/inbox API is integrated as `eeb9d13`; presence and composed browser handoff are next. No cloud storage is provisioned. |
 | R3: compressed public text | Agent commit `8e44250` reviewed and integrated as `feb5f79`; combined suite passes. Production lacked compression; local six-file transfer shrinks approximately 72% with Brotli. |
-| R3: dice-face draw consolidation | Integrated as `354b965`: two real draws per compatible die, reviewed face sheets and exact geometry/film checks. Ordinary film worker integrated as `2490b07` / `fb47593`; complete event FIFO and worker rethrows as `f783874`. Full-film parity, input-return measurements, live clear/collect/reveal and next-film collider preservation pass. Fourteen combined turn/worker/result checks pass. Idle rendering is in progress. |
+| R3: dice-face draw consolidation | Integrated as `354b965`: two real draws per compatible die, reviewed face sheets and exact geometry/film checks. Ordinary film worker integrated as `2490b07` / `fb47593`; complete event FIFO and worker rethrows as `f783874`. Full-film parity, input-return measurements, live clear/collect/reveal and next-film collider preservation pass. Fourteen combined turn/worker/result checks pass. Idle rendering is integrated as `df3f970`: zero settled renderer frames, with 24 matching original films. Four actual idle/wakeup/effect cases also pass after composition. Battery saver/instant are in progress. |
 | R1 destinations + R2 phone surface | Integrated as `55c42d7`: three destinations, content-sized desktop workspaces, full-width phone scene and bottom tray. Persistent result seats and reserved turn controls integrated as `955b2be`; composed desktop/phone/four-player/privacy/turn proofs pass. Copper Lantern, Navigation Table and Stone Circle plus actual appearance preview are integrated and visually inspected; Navigation/Stone are `0952007`. Both final recipes reproduce complete GLB bytes, and shared preview/application/restore, delivery and stable-channel checks pass. |
 
 The root's integration checkout is `/tmp/dice-redesign-integration` on
@@ -27,8 +27,9 @@ cherry-picks are explicit and another ongoing session's edits survive.
 
 ## Remaining campaign work
 
-Complete optional account/recovery and visible library synchronization, saved
-homes, contacts, invitations and permitted presence. Then exercise the complete
+Complete saved-home management and the contacts, invitations and permitted
+presence interfaces. Optional account/recovery and visible library sync are
+implemented and verified in the actual app. Then exercise the complete
 guest/recovered return loop after restart without a previous client repushing
 setup. Profile publication, named-table controls, familiar first rolls,
 destinations and the initial phone layout are implemented. History protects
@@ -43,7 +44,7 @@ Three complete compositions, actual setup preview and persistent result seats
 are implemented. Simultaneous physical playback was not chosen for this slice;
 the compact experiment preserves the established films and collider ordering.
 R3 next:
-load remaining optional features on demand, reduce idle rendering, and implement
+load remaining optional features on demand and implement
 Battery saver and optional instant results. Complete ordered turn events and
 worker parity for first/rethrows are implemented; towers and silent snapshot
 reconstruction still use the inline solver.
@@ -85,9 +86,32 @@ suite passes 14/14. Both additional art directions have inspected desktop/phone
 views, reproducible bakes, three lifecycle scenarios, stable-channel check and
 60 static delivery assertions. Saved-home integration passes 16 library/home
 checks, two real browser recovery/helper checks and seven combined table,
-result/privacy/burst/FIFO scenarios. Account/home UI and social features are
-still active work.
+result/privacy/burst/FIFO scenarios. Home/social UI and presence remain active work.
 
 The owner’s committed gallery is preserved. Main’s untracked initial service
 design draft remains untouched; the complete reviewed work is in the integration
 checkout. Port 8123 and the owner’s browser have not been used for validation.
+
+## Main-checkout checkpoint after owner-library composition
+
+The owner’s focused library is composed as `ca71c21`: its full task is shared
+by the personal menu and My dice & rolls; starter kits, explicit sharing and
+account review retain their boundaries. Seven library/first-play/task checks
+and five actual-account scenarios pass; composed desktop and phone, short
+creation/rename and kit views were inspected. Named kit creation additionally
+retains its requested name through explicit preview/Add.
+
+At `b918e22`, the full unit/fuzz and both two-case protocol-browser suites pass,
+with 70/71 smoke scenarios passing. The sole failure was an unused saved-home
+notice added to the normal rail. `a317896` creates it only when needed; the
+control-rail rerun, four actual idle scenarios and help proof pass together
+(6/6), as do all five actual-account scenarios and the held-reservation/home
+outage/new-guest scenario. This records the targeted correction, not a claim
+that a second full 71-case sweep has run.
+
+Owner-session controls/gallery/library history through `2925e34` has been
+reviewed and incorporated; `efb002f` records that ancestry after the composed
+cherry-picks. Before updating the main checkout, its untracked initial service
+draft is preserved at `docs/handoff/2026-09-13-durable-service-initial-draft.md`.
+The maintained design remains `docs/DURABLE-SERVICE-DESIGN.md`. No production
+deployment or preview-port process change accompanies this checkpoint.
