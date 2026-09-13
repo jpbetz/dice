@@ -8,6 +8,14 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## 2026-09-13 — Shared results and playable phone turns
+
+Each player’s latest visible result now has a persistent named seat, using
+redacted settled data and real face glyphs. Result seats and active turn
+controls reserve scene space; the phone push card no longer conceals dice.
+Complete results remain one action away, and People retains keyboard focus
+through arrivals. Scope and inspected proof: [PLAYER-RESULTS.md](PLAYER-RESULTS.md).
+
 ## 2026-09-13 — Unfinished work survives history eviction
 
 History trims completed entries while keeping unfinished turns playable.

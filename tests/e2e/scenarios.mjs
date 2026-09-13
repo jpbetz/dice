@@ -32,6 +32,7 @@ import { personalKitScenarios } from './personal-kit.mjs';
 import { tableControlScenarios } from './table-controls.mjs';
 import { firstPlayScenarios } from './first-play.mjs';
 import { workspaceScenarios } from './workspaces.mjs';
+import { playerResultScenarios } from './player-results.mjs';
 import { rollHistoryScenarios } from './roll-history.mjs';
 import { filmMutationScenarios } from "./film-mutations.mjs";
 import { filmWorkerScenarios } from "./film-worker.mjs";
@@ -775,6 +776,7 @@ export const scenarios = [
   ...tableControlScenarios,
   ...firstPlayScenarios,
   ...workspaceScenarios,
+  ...playerResultScenarios,
   ...rollHistoryScenarios,
   ...profileSharingScenarios,
   ...filmWorkerScenarios,

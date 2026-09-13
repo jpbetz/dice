@@ -20,7 +20,9 @@ preview, then returns the same nodes when closed. Gallery, favorites, and
 practice remain the existing gallery’s responsibility. Name/Dice, table
 setup, and the Preferences gear keep their compact entry points.
 
-On a 390×844 phone the scene is 390×550, with its top at 68px. The 112px side
+The first 390×844 phone slice gave the scene 390×550, starting at 68px.
+[Persistent results](PLAYER-RESULTS.md) now reserve a top band: four players
+leave a 390×374 scene starting at 244px. The 112px side
 rail is gone. A bottom tray offers familiar quick rolls and the normal staged
 draft Roll; My dice & rolls, People, and Tables open as full-screen workspaces.
 One Back to table action restores the scene without changing the seat, draft,
@@ -29,7 +31,7 @@ phone workspaces use the app’s modal focus containment.
 
 The old phone framing refunded an unsuccessful mat fit to the close camera,
 then skipped every fallback for placed rooms. The phone now fits the occupied
-ring and all dice positions with space for the result card, using no values,
+ring and all dice positions inside the reserved scene, using no values,
 outcomes, or deciding-die choice. The viewport’s top offset is carried through
 chips, placard bounds, and screen projections. The result card’s entry
 animation also respects its left-aligned phone position.
@@ -43,8 +45,8 @@ rest, and after closing a sheet. Desktop proof measures all eight dice beside
 the People drawer with the scene interactive. `tools/steps/workspaces-look.mjs`
 reproduces the populated desktop and phone captures in `tools/out/workspaces-*`.
 
-This is the layout foundation, not the complete R2 visual design. Permanent
-readable player results on the shared surface, larger/more legible phone dice,
+This is the layout foundation, not the complete R2 visual design. [Persistent player results](PLAYER-RESULTS.md) and reserved turn controls are
+now implemented. Larger/more legible phone dice,
 new table composition/art, and simultaneous-roll presentation remain work.
 The familiar bottom shortcuts supplement the builder; game-specific profiles
 and starter kits remain explicit library choices.

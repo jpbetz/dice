@@ -60,7 +60,8 @@ import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealRack, dealName } from './seed.js';
 import { NEW_TABLE_SYSTEM, renderQuickRolls, createStarterKitChooser } from './firstplay.js';
 import { createWorkspaces } from './workspaces.js';
-import { HISTORY_CAP as LOG_HISTORY_CAP, TURN_CAP_MESSAGE, canStartTurn, trimRollHistory } from './rollhistory.js';
+import { createPlayerResults } from './playerresults.js';
+import { HISTORY_CAP as LOG_HISTORY_CAP, TURN_CAP_MESSAGE, canStartTurn, trimRollHistory, unfinished } from './rollhistory.js';
 import { resolveChannel, PARAM as STABILITY_PARAM } from './stability.js';
 import { EPOCH as SCHEMA_EPOCH, STAMP as SCHEMA_STAMP, judgeStamp, convert as schemaConvert } from './schema.js';
 import { exportYaml, parsePortable, planImport, profileToImport, declareFelts } from './portable.js';
@@ -1181,6 +1182,7 @@ function toggleDiePick(d) {
 // dice picked — and `document.querySelector` finds whichever is first. Same
 // registry `repaintAwayVerbs` uses, for the same reason it exists.
 function refreshTurnVerb() {
+  tableResults?.refresh();
   refreshPushLine(); // MECHANICS M4: its tally follows the selection too
   for (const holder of mountedActionHolders) {
     if (!holder.isConnected || !holder._acts || !holder._acts.again) continue;
@@ -6778,6 +6780,9 @@ function soloAutoCollect(arriving = null) {
 // server holding one, and online this is what a second throw is filmed from.
 // Cleared when the dice leave, beside every other per-roll state.
 const liveTurns = new Map();
+// A rethrow replaces history before playRoll constructs its film. Keep readers
+// and reserved control geometry in the rolling phase throughout that handoff.
+const resultPreparing = new Set();
 
 // THROW AGAIN. Every client runs this, including the one whose click caused
 // it: the values are the server's and the film is a function of the seed, so
@@ -6787,6 +6792,7 @@ function applyRethrow(data) {
   const payload = data && data.roll;
   if (!payload || !payload.rollId) return;
   if (!Array.isArray(data.thrown) || !data.thrown.length) return;
+  resultPreparing.add(payload.rollId);
   liveTurns.set(payload.rollId, payload);
   // The record has to be REPLACED, not appended: addLogEntry dedupes by
   // rollId and would silently drop the update, leaving the log row showing
@@ -6797,7 +6803,8 @@ function applyRethrow(data) {
     if (!netOnline) save(LS_LOG, log);
     renderLog();
   }
-  playRoll(payload, { thrown: data.thrown, seed: data.seed });
+  try { playRoll(payload, { thrown: data.thrown, seed: data.seed }); }
+  finally { resultPreparing.delete(payload.rollId); tableResults?.refresh(); }
 }
 
 // MECHANICS M2b — the gesture. Three questions the surfaces ask.
@@ -7039,6 +7046,7 @@ function playRoll(roll, rethrow = null, options = {}) {
 
   if (currentRoll && !currentRoll.done) {
     rollQueue.push(roll);
+    tableResults?.refresh();
     if (currentRoll.ceremony) skipCeremony();
     return;
   }
@@ -7473,6 +7481,7 @@ function playRoll(roll, rethrow = null, options = {}) {
   // shows the held state (+ Reveal for the authority) instead of downgrading
   // the whole roll to Plain.
   if (currentRoll.exp) beginCeremony(currentRoll);
+  tableResults?.refresh();
   }
 }
 
@@ -8305,7 +8314,7 @@ let lastEntry = null; // the roll currently shown on the banner/chips
 // dice and three ordinary ones and each chip answers for its own die.
 function faceSymbolFor(entry, i, part) {
   if (!part || typeof part.value !== 'number') return null;
-  const setId = rollDieSet(entry, i);
+  const setId = entryDieSet(entry, i);
   const skin = setId ? SETS[setId] : null;
   if (!skin || !Array.isArray(skin.faces)) return null;
   if (part.type !== 'd6') return null; // faces are a d6 table; see js/dice.js
@@ -29359,7 +29368,7 @@ function buildSetSelect({ value = null, allowDefault = false, onPick, title }) {
 // Hoisted because boot calls renderDiceSetPicker before this part of the module.
 var diceGallery;
 var diceGalleryLoading;
-var destinationShell;
+var destinationShell, tableResults;
 function galleryEntries() {
   return [{id: 'std', name: 'Standard', house: 'The originals',
     description: 'A different color for every die. Familiar, easy to find.'},
@@ -31853,12 +31862,13 @@ function framingFor(orbit) {
   // A phone's full-width table has a finite usable scene. The old placed-room
   // branch refunded failed mat fits to the close preset and then skipped all
   // fallback, putting every die off screen. Fit the whole occupied ring plus
-  // all dice, with room for the result card. This does not inspect faces,
+  // all dice inside the scene remaining after reserved controls. This inspects no
+  // faces,
   // scoring, or a deciding die. The desktop ladder keeps its existing policy.
   if (window.innerWidth <= 640) {
-    const pts = fp.map(q => ({...q, mx:0.08, my:0.28}));
+    const pts = fp.map(q => ({...q, mx:0.08, my:0.08}));
     const dp = diceFramingPoints(1.25);
-    if (dp) pts.push(...dp.map(q => ({...q, mx:0.08, my:0.28})));
+    if (dp) pts.push(...dp.map(q => ({...q, mx:0.08, my:0.08})));
     const target = fp.centre || home;
     fitCameraTo(pts, target, 1, false, 12);
     const pose = {pos:camera.position.clone(), tgt:target.clone(), mode:'phone-table', orbit,
@@ -32540,6 +32550,7 @@ document.addEventListener('keydown', (e) => {
     else if (isPaletteOpen()) closePalette();
     else if (diceGallery?.isOpen) diceGallery.close();
     else if (!settingsModal.classList.contains('hidden')) closeSettingsModal();
+    else if (tableResults?.detailId) tableResults.close();
     else if (destinationShell?.current) destinationShell.close();
     else if (isSeatPickerOpen()) dismissSeatPicker(); // C12: the door was the one overlay with no way out
     else if (isIdentityMenuOpen()) closeIdentityMenu();
@@ -35848,15 +35859,10 @@ destinationShell = createWorkspaces({
     table: { room: ROOM, name: document.getElementById('table-name').textContent || 'Solo table',
       connection: document.getElementById('table-connection').textContent, invitable: !!(netOnline && net && !IN_LOBBY) },
     recent: recentTables(),
-    people: players.map(p => {
-      const e = log.findLast(e => e.playerId === p.id);
-      return { id:p.id, name:p.name, color:p.color, mine:p.id===net?.playerId, blocked:poolsEdit,
-        latest:e ? { id:e.rollId, text:entryHidden(e) ? heldWord(e)
-          : activeSystem().usesTotal ? String(e.total ?? '')
-          : (e.parts || []).filter(p => p.counts).map(p => p.label).join(' · ') } : null };
-    }),
+    people: resultSeatRows().map(p => ({...p,blocked:poolsEdit,
+      latest:p.rolling ? {id:null,text:'Rolling…'} : p.result ? {id:p.result.id,text:p.result.headline} : null})),
   }),
-  beforeOpen: () => { closeSettingsModal(); closeIdentityMenu(); diceGallery?.close(); closeRailMenu(); },
+  beforeOpen: () => { tableResults?.close(); closeSettingsModal(); closeIdentityMenu(); diceGallery?.close(); closeRailMenu(); },
   closeMenus: () => { closeRailMenu(); closeSetMenu(); },
   modalOpen: el => {
     if (window.innerWidth <= 640) openModal(el, {labelledBy:'workspace-title'});
@@ -35877,7 +35883,7 @@ destinationShell = createWorkspaces({
   forget: forgetTable,
   invite: anchor => shareInvite(inviteUrl(), anchor, 'Invite to table'),
   browse: id => { if (poolsEdit) return false; setPoolsOwner(id); },
-  result: openPeek,
+  result: id => tableResults?.open(id),
 });
 window.__diceDebug.workspaces = {
   open: key => destinationShell.open(key), close: () => destinationShell.close(),
@@ -35903,3 +35909,98 @@ window.__diceDebug.phoneFrame = () => {
     return {rollId:d.rollId,index:d.dieIndex,...bounds};
   }) };
 };
+
+// The shared read is a projection of local history, never of an incoming roll
+// payload. Rethrows update history ahead of film, so every reader gates it by
+// both playback and reveal state. A private roll absent from this client stays
+// absent from its seats and activity indicators too.
+function resultBusy(id) {
+  return !!id && (resultPreparing.has(id) || (currentRoll?.rollId===id&&!currentRoll.done)
+    || rollQueue.some(r=>r.rollId===id) || revealing.some(r=>r.rollId===id));
+}
+function resultState(entry) {
+  const mode=entryVis(entry)?.mode, labels=[];
+  if(mode==='secret') labels.push('Only you');
+  else if(mode==='whisper') labels.push('Whispered');
+  else if(mode==='held'&&!entry.revealed) labels.push('Face down');
+  if(!entryHidden(entry)) {
+    if(entry.push) {
+      const line=document.createElement('span'); renderPushState(line,entry,false);
+      if(line.textContent) labels.push(line.textContent);
+    } else if(entry.throws) labels.push(`Throw ${entry.throws.used} of ${entry.throws.max}${unfinished(entry)?' · turn open':' · complete'}`);
+    else if(Number.isInteger(entry.dc)) labels.push(`DC ${entry.dc}${activeSystem().usesTotal ? (entry.total>=entry.dc?' · Success':' · Failure'):''}`);
+  }
+  return labels.join(' · ') || entry.label || 'Roll';
+}
+function hasSymbolFaces(entry) {
+  return !entryHidden(entry)&&(entry.parts||[]).some((p,i)=>p.type==='d6'
+    &&SETS[entryDieSet(entry,i)]?.faces?.some(face=>face in FACE_SHAPES));
+}
+function resultDisplay(entry) {
+  if(!entry) return null;
+  const hidden=entryHidden(entry);
+  // Do not even enumerate face values until the common redaction gate permits.
+  const faces=hidden?[]:(entry.parts||[]).map((p,i)=>({type:p.type,label:p.label,
+    symbol:faceSymbolFor(entry,i,p),counts:p.counts,scored:faceScoresIn(entry,p)}));
+  const hasSymbols=!hidden&&hasSymbolFaces(entry), outcomes=entryOutcomes(entry);
+  const headline=hidden?heldWord(entry):hasSymbols?'Symbols':activeSystem().usesTotal?String(entry.total??'—')
+    :outcomes?.filter(o=>o.word&&!o.struck).map(o=>o.word).join(' · ')||faces.filter(f=>f.counts).map(f=>f.label).join(' · ');
+  const state=resultState(entry);
+  return {id:entry.rollId,hidden,faces,headline,worded:hidden||hasSymbols||!activeSystem().usesTotal,
+    modifier:hidden?0:entry.modifier||0,state,spoken:[headline,faces.map(f=>`${f.type} ${f.symbol||f.label}${f.counts?'':' not counted'}${f.scored?' scores':''}`).join(', '),state].filter(Boolean).join(' · ')};
+}
+function resultSeatRows() {
+  if(IN_LOBBY) return [];
+  const identity=identityInfo();
+  const roster=players.length?players:[{id:net?.playerId||'solo',name:identity.name||'You',color:identity.color}];
+  return roster.map(p=>{
+    const mine=!netOnline||p.id===net?.playerId;
+    const e=log.findLast(e=>netOnline?e.playerId===p.id:!e.playerId||e.playerId===p.id);
+    const rolling=(currentRoll&&!currentRoll.done&&(netOnline?currentRoll.playerId===p.id:mine))
+      ||rollQueue.some(r=>netOnline?r.playerId===p.id:mine)||resultBusy(e?.rollId);
+    return {id:p.id,name:p.name,color:p.color,mine,rolling:!!rolling,result:rolling?null:resultDisplay(e)};
+  });
+}
+function renderCompleteResult(read,controls,id) {
+  const entry=log.find(e=>e.rollId===id); read.replaceChildren();
+  if(!entry) {read.textContent='This completed result is no longer in recent history.';controls.hidden=true;return;}
+  if(resultBusy(id)) {read.textContent='Rolling…';controls.hidden=true;if(controls._acts?.odds)controls._acts.odds.hidden=true;return;}
+  controls.hidden=false;
+  const paragraph=(cls,text)=>{const p=document.createElement('p');p.className=cls;p.textContent=text;read.append(p);return p;};
+  const hidden=entryHidden(entry);
+  paragraph('result-detail-context',entry.label||'Roll');
+  if(hidden) paragraph('held',heldWord(entry));
+  else {
+    if(activeSystem().usesTotal&&!hasSymbolFaces(entry)) paragraph('result-detail-total',String(entry.total));
+    const outcome=paragraph('','');
+    if(!renderOutcomeRows(outcome,entry,true)) renderBreakdown(outcome,entry,false,true);
+    paragraph('result-detail-context',resultState(entry));
+  }
+  updateCardActions(controls,entry,{
+    revealClass:'reveal-verb banner-btn',keepable:true,
+    verbFor:e=>e&&(isMine(e)||rollerAway(e))?'clear':'dismiss',
+    onPrimary:btn=>{const e=controls._entry;if(e&&(isMine(e)||rollerAway(e)))runCardClear(e.rollId,btn,()=>tableResults.close());else tableResults.close();},
+  });
+}
+tableResults=createPlayerResults({
+  rows:resultSeatRows, symbol:faceSymbolSvg,
+  currentResult:()=>lastEntry?{id:lastEntry.rollId,ceremony:!!(currentRoll?.ceremony&&!currentRoll.done)}:null,
+  owner:id=>{const e=log.find(e=>e.rollId===id);return e&&!resultBusy(id)?{id:e.playerId,name:e.playerName||identityInfo().name||'You'}:null;},
+  beforeDetail:()=>{destinationShell?.close();closePeek();closeSettingsModal();diceGallery?.close();},
+  renderDetail:renderCompleteResult,
+  openDetail:el=>{if(window.innerWidth<=640)openModal(el,{labelledBy:'player-result-title'});else {closeModal(el);el.setAttribute('role','region');}},
+  closeDetail:closeModal, layoutChanged:refitView,
+  turn:oldId=>{
+    if(oldId&&resultBusy(oldId))return {id:oldId,label:'Your turn · complete result',state:'Rolling…',busy:true};
+    const e=log.findLast(e=>isMine(e)&&!entryHidden(e)&&unfinished(e)&&!collected.has(e.rollId));
+    if(!e||resultBusy(e.rollId))return null;
+    return {id:e.rollId,label:`Your turn · ${e.label} ↗`,state:e.push?resultState(e):`${keptIndicesFor(e.rollId).length} kept · ${e.throws.max-e.throws.used} throws left. Tap dice to keep.`,busy:false};
+  },
+  paintTurn:(again,bank,id,busy)=>{
+    if(busy){again.hidden=false;again.disabled=true;again.textContent='Rolling…';bank.hidden=true;return;}
+    const e=log.find(e=>e.rollId===id);paintThrowAgain(again,e);paintBankTurn(bank,e);
+  },
+  throwAgain:id=>{if(!resultBusy(id))requestThrowAgain(id);},
+  bank:id=>{if(!resultBusy(id))requestBankTurn(id);},
+});
+window.__diceDebug.tableResults={get rows(){return tableResults.rows;},open:id=>tableResults.open(id),close:()=>tableResults.close(),get detailId(){return tableResults.detailId;}};

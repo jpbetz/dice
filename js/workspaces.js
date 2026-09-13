@@ -72,27 +72,39 @@ export function createWorkspaces(actions) {
     libraryTab.setAttribute('aria-pressed', String(view === 'library'));
     if (view === 'library') actions.prepareLibrary();
   }
+  // Arrival repaints keep the control the keyboard user is operating. Stable
+  // action/player keys survive a new result or roster update; draft controls
+  // are the original borrowed nodes and never participate in these repaints.
+  let tablesSignature='', peopleSignature='';
+  const focusKey=host=>host.contains(document.activeElement)?document.activeElement.dataset.focusKey:null;
+  const restoreFocus=(host,key)=>{if(key)host.querySelector(`[data-focus-key="${CSS.escape(key)}"]`)?.focus({preventScroll:true});};
+  const keyed=(b,key)=>{b.dataset.focusKey=key;return b;};
   function renderTables() {
-    const s = actions.snapshot(); tables.replaceChildren();
+    const s = actions.snapshot(), signature=JSON.stringify([s.table,s.recent]);
+    if(signature===tablesSignature)return; tablesSignature=signature;
+    const focused=focusKey(tables); tables.replaceChildren();
     const active = node('article', 'workspace-active');
     active.append(node('span', 'workspace-eyebrow', 'Your active table'), node('h3', '', s.table.name), node('p', 'hint', s.table.connection));
     const row = node('div', 'workspace-actions');
-    row.append(button('Return to table', close), button('Table setup', e => actions.setup(e.currentTarget)));
+    row.append(keyed(button('Return to table', close),'return'), keyed(button('Table setup', e => actions.setup(e.currentTarget)),'setup'));
     active.append(row); tables.append(active);
-    const h = node('div', 'workspace-list-head'); h.append(node('h3', '', 'Recent tables'), button('＋ New table', e => actions.create(e.currentTarget)));
+    const h = node('div', 'workspace-list-head'); h.append(node('h3', '', 'Recent tables'), keyed(button('＋ New table', e => actions.create(e.currentTarget)),'create'));
     tables.append(h);
     const recent = s.recent.filter(t => t.room !== s.table.room);
     if (!recent.length) tables.append(node('p', 'hint', 'Tables you visit in this browser will appear here.'));
     for (const t of recent) {
       const row = node('div', 'workspace-row');
-      row.append(node('span', 'workspace-row-name', t.name || t.room), button('Go to table', () => actions.go(t.room)), button('Forget', () => { actions.forget(t.room); renderTables(); }, 'btn ghost'));
+      row.append(node('span', 'workspace-row-name', t.name || t.room), keyed(button('Go to table', () => actions.go(t.room)),`go:${t.room}`), keyed(button('Forget', () => { actions.forget(t.room); renderTables(); }, 'btn ghost'),`forget:${t.room}`));
       tables.append(row);
     }
+    restoreFocus(tables,focused);
   }
   function renderPeople() {
-    const s = actions.snapshot(); people.replaceChildren();
+    const s = actions.snapshot(), signature=JSON.stringify([s.table,s.people]);
+    if(signature===peopleSignature)return; peopleSignature=signature;
+    const focused=focusKey(people); people.replaceChildren();
     const h = node('div', 'workspace-list-head'); h.append(node('h3', '', `At ${s.table.name}`));
-    if (s.table.invitable) h.append(button('Invite to table', e => actions.invite(e.currentTarget)));
+    if (s.table.invitable) h.append(keyed(button('Invite to table', e => actions.invite(e.currentTarget)),'invite'));
     people.append(h);
     for (const p of s.people) {
       const row = node('article', 'workspace-person'); row.dataset.player = p.id;
@@ -100,13 +112,14 @@ export function createWorkspaces(actions) {
       const detail = node('div', 'workspace-person-detail');
       detail.append(node('h4', '', `${p.name}${p.mine ? ' · you' : ''}`), node('p', 'hint', p.mine ? 'Your seat' : 'Here now'));
       row.append(dot, detail);
-      if (p.latest) row.append(button(p.latest.text, () => { close(); actions.result(p.latest.id); }, 'btn workspace-latest'));
+      if (p.latest) row.append(keyed(button(p.latest.text, () => { close(); actions.result(p.latest.id); }, 'btn workspace-latest'),`result:${p.id}`));
       const browse = button(p.mine ? 'My rolls' : 'Shared rolls', () => {
         if (actions.browse(p.mine ? null : p.id) !== false) { open('dice', null, true); diceView('rolls'); }
       }, 'btn ghost');
-      browse.disabled = p.blocked; row.append(browse); people.append(row);
+      browse.disabled = p.blocked; keyed(browse,`browse:${p.id}`); row.append(browse); people.append(row);
     }
     if (!s.people.length) people.append(node('p', 'hint', 'You’re playing solo. Start a table to invite people.'));
+    restoreFocus(people,focused);
   }
   function open(key, anchor, browsing = false) {
     if (!names[key]) return;
