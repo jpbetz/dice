@@ -17639,20 +17639,16 @@ export const scenarios = [
       // one it races. `landsFor` drives her film forward itself.
       await cass.dbg('setLogFlyout(false)');
       await cass.dbg('holdClock(true)');
-      // The two reads a person at the table actually makes while the dice are
-      // in the air: an arc of somebody's hue on the ground, under a card.
-      const cueUnderCard = async (t, count, who) => {
-        await t.waitFor(`(window.__diceDebug.sim(1), window.__diceDebug.tableDice.length === ${count})`,
-          { desc: `${who}'s dice arrive for the spectator`, timeout: 30000 });
-        await t.dbg('sim(20)');
-        const lit = await t.dbg('washInfo()');
-        const card = (await t.dbg('places()')).stations.find((s) => s.name === who);
-        assert.ok(card, `${who} has a card standing`);
-        assert.equal(lit.active, true, `a wash is lit while ${who}'s dice are in the air`);
-        assert.equal(lit.station, card.place, `and it is under ${who}'s card, not somebody else's`);
-        assert.equal(await t.dbg(`placardText(${card.place})`), who,
-          `and the card it is under has ${who}'s name painted on it`);
-        return card.place;
+      // The upright result seat identifies the roller without opening history.
+      const activeSeat = async (t,count,who) => {
+        await t.waitFor(`window.__diceDebug.tableDice.length===${count}&&window.__diceDebug.currentRoll?.playerName===${JSON.stringify(who)}&&window.__diceDebug.currentRoll?.frames>0&&!window.__diceDebug.filmWorker.baking`,
+          {desc:`${who}'s actual film is prepared for the spectator`});
+        await t.dbg('sim(1)');
+        const row=(await t.dbg('tableResults.rows')).find(r=>r.name===who);
+        assert.ok(row?.rolling&&!row.result,`${who} is named as rolling without early values`);
+        const visible=await t.eval(`(()=>{const e=document.querySelector('#table-results [data-player="'+${JSON.stringify(row.id)}+'"] .result-seat-name');const r=e.getBoundingClientRect();return {name:e.textContent,width:r.width,height:r.height};})()`);
+        assert.equal(visible.name,who);assert.ok(visible.width>0&&visible.height>0,'the name is painted on the table');
+        return row.id;
       };
       // RE-PINNED FOR THE ROUND TABLE (2026-09-02, found running the journey
       // gate for developer mode phase 1; red since the ring shipped 0b762f9,
@@ -17684,14 +17680,14 @@ export const scenarios = [
       // not enough room for two people to roll the dice at the same time").
       await ada.roll('2d8[Wisdom] # Read the room');
       const first = await ada.rollId();
-      const adaCard = await cueUnderCard(cass, 2, 'Ada');
+      const adaCard = await activeSeat(cass, 2, 'Ada');
       await landsFor(cass, first, 2);
       const readFirst = await rollerByEdge(cass);
       assert.equal(readFirst.who, 'Ada',
         `the dice came in over Ada's edge, and the felt says so (${JSON.stringify(readFirst)})`);
       await bram.roll('1d10[Sword] # Cut the rope');
       const second = await bram.rollId();
-      const bramCard = await cueUnderCard(cass, 3, 'Bram');
+      const bramCard = await activeSeat(cass, 3, 'Bram');
       await landsFor(cass, second, 3);
       assert.equal(await cass.eval(diceOf(first, 2)), true,
         "Ada's pair is still on the felt beside Bram's die — the second roll did not put the first away");
@@ -17701,7 +17697,7 @@ export const scenarios = [
       assert.notEqual(readFirst.entry, readSecond.entry,
         'two rollers, two rays — the spectator can tell them apart by where the dice came from');
       assert.notEqual(adaCard, bramCard,
-        'and two cards lit — the wash is a difference claim, not a light that is always on');
+        'two distinct upright seats identify the two active rollers');
       await cass.dbg('holdClock(false)');
       await ada.roll('d20 held # Something behind the screen');
       const hidden = await ada.rollId();
@@ -20000,6 +19996,8 @@ export const scenarios = [
     async fn(ctx) {
       const ann = await ctx.newTable({ origin: '127.0.0.68', name: 'Ann' });
       const bob = await ctx.newTable({ origin: '127.0.0.69', name: 'Bob' });
+      // Exercise the optional arc explicitly; ordinary attribution now uses upright result seats.
+      for (const t of [ann,bob]) await t.dbg("tuneSet({'cards.wash.state':'enabled','cards.wash.peak':0.62})");
       await bob.waitFor('window.__diceDebug.places().stations.length === 2', { desc: 'both seated' });
       const raws = {};
       for (const nm of ['Cass', 'Dev', 'Eluned', 'Fionn', 'Gus', 'Hana']) raws[nm] = await ctx.rawPlayer(nm);
@@ -20012,6 +20010,10 @@ export const scenarios = [
       await ann.dbg('holdClock(true)');
       await bob.dbg('holdClock(true)');
       try {
+        const filmReady = (rid, count) => `window.__diceDebug.currentRoll?.rollId===${JSON.stringify(rid)}`
+          + ` && window.__diceDebug.currentRoll.frames>0 && !window.__diceDebug.filmWorker.baking && ${diceOf(rid,count)}`;
+        const midFilm = (t) => t.dbg('sim(Math.max(1,Math.round(Math.min(6,window.__diceDebug.currentRoll.duration)*30)))');
+
         // Keyed on the roll's OWN dice: Ann, Cass and Eluned all hold places,
         // so each pool stays on the felt while the next chair's arrives
         // (§7.63 v2 — the felt holds one roll per place).
@@ -20029,9 +20031,9 @@ export const scenarios = [
         // attributing, so everything about the cue has to be read while the
         // dice are still in the air; `landsOn` below drives the film to its
         // end and would leave nothing to look at.
-        await bob.waitFor(`(window.__diceDebug.sim(1), ${diceOf(r1.data.roll.rollId, 3)})`,
+        await bob.waitFor(filmReady(r1.data.roll.rollId, 3),
           { desc: 'Ann\'s dice arrive on Bob\'s felt', timeout: 30000 });
-        await bob.dbg('sim(20)');
+        await midFilm(bob);
         const heard = await bob.dbg('throwOrigin()');
         assert.equal(heard.from, 'place', 'Bob\'s film took the stamp');
         assert.equal(heard.ring && heard.ring.seat, 0, 'and it names Ann\'s seat — rank 0');
@@ -20072,9 +20074,9 @@ export const scenarios = [
         for (const [who, place, entry] of [['Cass', 2, 0], ['Eluned', 4, 3]]) {
           const r = await ctx.api('/api/roll', { playerId: raws[who].playerId, notation: `2d6 # ${who}` });
           assert.equal(r.status, 200, JSON.stringify(r.data));
-          await bob.waitFor(`(window.__diceDebug.sim(1), ${diceOf(r.data.roll.rollId, 2)})`,
+          await bob.waitFor(filmReady(r.data.roll.rollId, 2),
             { desc: `${who}'s dice arrive on Bob's felt`, timeout: 30000 });
-          await bob.dbg('sim(20)');
+          await midFilm(bob);
           const org = await bob.dbg('throwOrigin()');
           const card = (await bob.dbg('places()')).stations.find((st) => st.name === who);
           assert.ok(org.ring && org.from === 'place', `${who}'s film is a toss from their own seat`);
@@ -20098,9 +20100,9 @@ export const scenarios = [
         // Sampled MID-FLIGHT, in the same window leg (a) found a wash burning
         // in — an absence checked after the film would be an absence of
         // nothing, which is this repo's signature green-over-nothing failure.
-        await bob.waitFor(`(window.__diceDebug.sim(1), ${diceOf(r2.data.roll.rollId, 2)})`,
+        await bob.waitFor(filmReady(r2.data.roll.rollId, 2),
           { desc: 'Iris\'s dice arrive on Bob\'s felt', timeout: 30000 });
-        await bob.dbg('sim(20)');
+        await midFilm(bob);
         const dark = await bob.dbg('washInfo()');
         assert.equal(dark.active, false,
           'nothing lit mid-flight — a placeless roll wears nobody\'s name');
@@ -20197,7 +20199,7 @@ export const scenarios = [
         // over a settled pile, let alone reach its peak there.
         const r6 = await ctx.api('/api/roll', { playerId: annId, notation: '12d6 # Skipped' });
         assert.equal(r6.status, 200, JSON.stringify(r6.data));
-        await bob.waitFor(`(window.__diceDebug.sim(1), ${diceOf(r6.data.roll.rollId, 12)})`,
+        await bob.waitFor(filmReady(r6.data.roll.rollId, 12),
           { desc: 'the handful arrives on Bob\'s felt', timeout: 30000 });
         await bob.dbg('sim(6)');
         assert.equal((await bob.dbg('washInfo()')).active, true, 'lit while the handful is in the air');
@@ -20213,7 +20215,7 @@ export const scenarios = [
         // bare felt would be attributing nothing to nobody.
         const r7 = await ctx.api('/api/roll', { playerId: annId, notation: '6d6 # Swept' });
         assert.equal(r7.status, 200, JSON.stringify(r7.data));
-        await bob.waitFor(`(window.__diceDebug.sim(1), ${diceOf(r7.data.roll.rollId, 6)})`,
+        await bob.waitFor(filmReady(r7.data.roll.rollId, 6),
           { desc: 'the six arrive on Bob\'s felt', timeout: 30000 });
         await bob.dbg('sim(6)');
         assert.equal((await bob.dbg('washInfo()')).active, true, 'lit mid-throw');
@@ -20232,7 +20234,7 @@ export const scenarios = [
         assert.equal(r4.status, 200, JSON.stringify(r4.data));
         await landsOn(bob, r4.data.roll.rollId, 2, 'the last roll settles for Bob');
         const late = await ctx.newTable({ origin: '127.0.0.70', name: 'Late' });
-        await late.waitFor(`window.__diceDebug.tableDice.length === 2`,
+        await late.waitFor(`window.__diceDebug.tableDice.length === 2 && window.__diceDebug.currentRoll?.done && !window.__diceDebug.filmWorker.baking`,
           { desc: 'the newcomer rebuilds the felt from the snapshot' });
         const cold = await late.dbg('washInfo()');
         assert.equal(cold.active, false,
