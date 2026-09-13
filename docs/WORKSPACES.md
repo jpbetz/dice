@@ -49,10 +49,9 @@ new table composition/art, and simultaneous-roll presentation remain work.
 The familiar bottom shortcuts supplement the builder; game-specific profiles
 and starter kits remain explicit library choices.
 
-## Follow-up: long-session unfinished turns
+## Long-session unfinished turns
 
-The arrival sweep now preserves unfinished shared and private turns. The
-server’s separate `LOG_CAP` eviction still clears the oldest live/open turn
-after enough subsequent rolls. This violates the same no-toil requirement
-and needs a bounded fix with server/solo long-session tests. It is not fixed
-by the workspace presentation or by the earlier arrival-sweep patch.
+The arrival sweep and completed-history trim now preserve unfinished shared
+and private turns. The separate follow-up fixed `LOG_CAP` eviction, bounded
+new turn creation without deleting existing work, and proved a long session
+on server and static solo. Policy and tests: [ROLL-HISTORY.md](ROLL-HISTORY.md).

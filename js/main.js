@@ -57,6 +57,7 @@ import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealRack, dealName } from './seed.js';
 import { NEW_TABLE_SYSTEM, renderQuickRolls, createStarterKitChooser } from './firstplay.js';
 import { createWorkspaces } from './workspaces.js';
+import { HISTORY_CAP as LOG_HISTORY_CAP, TURN_CAP_MESSAGE, canStartTurn, trimRollHistory } from './rollhistory.js';
 import { resolveChannel, PARAM as STABILITY_PARAM } from './stability.js';
 import { EPOCH as SCHEMA_EPOCH, STAMP as SCHEMA_STAMP, judgeStamp, convert as schemaConvert } from './schema.js';
 import { exportYaml, parsePortable, planImport, profileToImport, declareFelts } from './portable.js';
@@ -665,7 +666,7 @@ const MAX_DICE_ON_TABLE = 40;
 // collect arc) read T, so the picture and the physics never disagree about
 // which way is down.
 const GRAVITY = T.throw.physics.gravity;
-const LOG_CAP = 100;
+const LOG_CAP = LOG_HISTORY_CAP;
 // THE PROFILE LIBRARY (docs/PROFILES.md §11) — up to 32 named racks, each
 // bound to a rolling system, exactly one of them in your hands. This is the
 // rack's home as of 2026-08-08; see the boot block by `let groups` for how the
@@ -6247,6 +6248,8 @@ function applyClearRoll(rollId) {
   // cleared implies off-shelf (§7.7): the state row flips first so a
   // roll-collected landing later in the same burst becomes a silent no-op.
   rollState(rollId).cleared = true;
+  const historyEntry = log.find(e => e.rollId === rollId);
+  if (historyEntry) { historyEntry.cleared = true; if (!netOnline) save(LS_LOG, log); }
   pendingCollects.delete(rollId);
   pendingReveals.delete(rollId);
   revealing = revealing.filter((rv) => rv.rollId !== rollId); // dying dice stop flipping
@@ -7019,6 +7022,8 @@ function clearTable() {
   pendingCollects.clear();
   pendingReveals.clear();
   for (const st of rollStates.values()) st.cleared = true;
+  for (const entry of log) entry.cleared = true;
+  if (!netOnline) save(LS_LOG, log);
   resetTableSurface();
   dismissCeremonyUI();
   currentRoll = null;
@@ -8228,6 +8233,12 @@ function pourVisibleAt(spans, f) {
 // Solo path: compose locally with the same shared mechanics the server uses
 // (rollspec.composeRoll), then play. opts: {mods, faceDown, dc} per the contract.
 function rollDice(types, label, opts = {}) {
+  if (opts.mods?.throws > 1 || opts.mods?.push) {
+    const active = new Map([...log, ...liveTurns.values(), ...rollQueue].map(e => [e.rollId, {
+      ...e, cleared: e.cleared || rollStates.get(e.rollId)?.cleared,
+    }]));
+    if (!canStartTurn([...active.values()], opts.mods)) { setPill(TURN_CAP_MESSAGE, 'error'); announce(TURN_CAP_MESSAGE); return false; }
+  }
   if (!types.length) return;
   if (validateMods(types, opts.mods || null)) return; // invalid spec: no-op
   // THE CAST'S LOCAL STAMP (js/demo.js — read its header for why this is
@@ -8989,6 +9000,7 @@ function entryFromRoll(roll) {
   const spec = roll.spec ? (exp ? { ...roll.spec, exp } : roll.spec) : undefined;
   return {
     rollId: roll.rollId || undefined,
+    ...(roll.cleared ? {cleared:true} : {}),
     t: roll.t || Date.now(),
     label: roll.label,
     playerName: roll.playerName || undefined,
@@ -25423,7 +25435,7 @@ function logExportSnapshot() {
   if (logDroppedTotal) {
     head.push(`${logDroppedTotal} earlier roll${logDroppedTotal === 1 ? '' : 's'} rolled off the end of the log and are not here.`);
   } else if (log.length >= LOG_CAP) {
-    head.push(`This is the most recent ${LOG_CAP} rolls — the table may go back further.`);
+    head.push(`Recent finished rolls and unfinished turns — the table may go back further.`);
   }
   head.push('A roll that was face down or whispered is listed without its values.');
   head.push('Plain text, for reading and keeping — not an import file. Pools and settings travel separately: open your name menu → Manage saved rolls → Export / import.');
@@ -25597,10 +25609,12 @@ function addLogEntry(entry) {
   // same roll twice. (Solo entries carry a synthetic 'solo-<ts>-<rand>'
   // rollId from rollDice, so this gate applies to every arrival path.)
   if (entry.rollId && log.some((e) => e.rollId === entry.rollId)) return;
+  if (rollStates.get(entry.rollId)?.cleared) entry.cleared = true;
   log.push(entry);
-  const dropped = log.length > LOG_CAP ? log.length - LOG_CAP : 0;
+  const trimmed = trimRollHistory(log);
+  const dropped = trimmed.dropped.length;
   if (dropped) {
-    log = log.slice(-LOG_CAP);
+    log = trimmed.kept;
     // …and SAY so. This number was computed and discarded, so a long session
     // silently lost its early history and the log looked complete. It is the
     // history's own surface, so the note goes there rather than to the pill.
@@ -25639,9 +25653,10 @@ function addLogEntry(entry) {
     logList.prepend(el);
     // Refresh the parent row's chip in place, then prune from the tail.
     if (entry.rerollOfId) markSuperseded(entry.rerollOfId, entry);
-    for (let i = 0; i < dropped && logList.lastElementChild; i++) {
-      logList.lastElementChild.remove();
-    }
+    // An old unfinished turn may still be the last row. Remove the exact
+    // discarded IDs, not the tail, or the DOM would lose protected work.
+    const discardedIds = new Set(trimmed.dropped.map(e => e.rollId));
+    for (const row of logList.children) if (discardedIds.has(row.dataset.rollId)) row.remove();
   }
   // A filter is a claim about what this list is showing, so an arrival has to
   // be judged by it too — otherwise the one row that ignores the filter is the
@@ -35423,8 +35438,7 @@ function requestRoll(types, label, opts = {}) {
     // Solo/offline (goal 9): there is no server to redact for anyone, so
     // secret/whisper act as OPEN; held keeps the local face-down flow.
     if (validateMods(types, opts.mods || null)) return; // invalid spec: no roll
-    rollDice(types, label, { ...opts, faceDown: !!(vis && vis.mode === 'held') });
-    pushHistory(canonical);
+    if (rollDice(types, label, { ...opts, faceDown: !!(vis && vis.mode === 'held') }) !== false) pushHistory(canonical);
   }
 }
 

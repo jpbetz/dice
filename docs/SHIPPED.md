@@ -8,6 +8,13 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## 2026-09-13 — Unfinished work survives history eviction
+
+History trims completed entries while keeping unfinished turns playable.
+An explicit new-turn capacity gate bounds anonymous storage without deleting
+existing work or blocking ordinary rolls. Server, late-viewer privacy, claim
+retry, and a 105-roll static-solo session are proved in [ROLL-HISTORY.md](ROLL-HISTORY.md).
+
 ## 2026-09-13 — Three workspaces and a full-width phone table
 
 Tables / My dice & rolls / People now reuse the live workbench and library,
