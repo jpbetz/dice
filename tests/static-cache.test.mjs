@@ -384,7 +384,7 @@ try {
       assert.equal(bytes.toString('ascii',0,4),'glTF');
       const jsonLength=bytes.readUInt32LE(12), gltf=JSON.parse(bytes.toString('utf8',20,20+jsonLength));
       const primitives=gltf.meshes.flatMap(m=>m.primitives);
-      if(row.id==='copper') assert.equal(gltf.images.length,1,'the exported table retains its grain image');
+      assert.equal(gltf.images.length,1,'each exported table retains its original surface illustration');
       assert.ok(primitives.length<=3,'one draw per authored material family');
       assert.equal(primitives.reduce((n,p)=>n+gltf.accessors[p.indices].count/3,0),digests[slug].tris);
       for(const p of primitives) {

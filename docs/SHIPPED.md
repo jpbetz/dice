@@ -8,7 +8,7 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
-## 2026-09-13 — First complete table design and real setup preview
+## 2026-09-13 — Three complete table designs and real setup preview
 
 The Copper Lantern is a forge-baked oak-and-brass shared table with a solid
 edge and peripheral lantern, purse, and cup. Grounded designs are stable-channel
@@ -16,7 +16,12 @@ choices; artwork loads on demand with classic fallback and Retry. Table setup
 previews the actual GLB before Apply, without changing live play. The optional
 preview draws only on change and pauses on close. Four-player desktop/phone
 and setup views were inspected; [TABLE-COMPOSITIONS.md](TABLE-COMPOSITIONS.md)
-records the bake, delivery, lifecycle proofs and remaining art directions.
+records the bake, delivery and lifecycle proofs. Navigation adds an illustrated
+chart in a supported shipwright frame; Stone adds twelve radial slabs, cut
+marks and unequal cairns. Both have original packed illustrations, reproducible
+GLBs and inspected four-player desktop/phone compositions. All three share
+local candidate preview and live/late-viewer application. Grouped rolls remain
+an open presentation experiment.
 
 ## 2026-09-13 — Shared results and playable phone turns
 

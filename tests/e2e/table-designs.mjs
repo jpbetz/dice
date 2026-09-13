@@ -30,11 +30,24 @@ export const tableDesignScenarios = [{
     await a.dbg("setVenue('copper')");
     await a.waitFor(`window.__diceDebug.tableDesign.status==='ready'`);
     assert.equal((await a.dbg('tableDesign')).cached,1,'switching reuses a bounded cached scene');
+    for(const id of ['navigation','stone']) {
+      await a.dbg('openSettings("staging")');
+      await a.eval(`document.querySelector('[data-venue="${id}"]').click()`);
+      await a.waitFor(`window.__diceDebug.tablePreview?.status==='ready' && window.__diceDebug.tablePreview?.activeId==='${id}'`);
+      assert.notEqual((await b.dbg('tableDesign')).activeId,id,'trying another design remains private');
+      await a.eval(`document.getElementById('table-edit-apply').click()`);
+      for(const t of [a,b,c]) await t.waitFor(`window.__diceDebug.tableDesign.activeId==='${id}'`);
+      await a.dbg('closeSettingsModal()');
+    }
+    assert.equal((await a.dbg('tableDesign')).cached,3,'all three designs fit the bounded catalogue cache');
+    await a.dbg("setVenue('navigation')");
+    await a.waitFor(`window.__diceDebug.tableDesign.activeId==='navigation'`);
+    assert.equal((await a.dbg('tableDesign')).cached,3,'revisiting another model reuses its scene');
     // Solo restore reads personal staging through the stable channel too.
     // The old key-wide beta filter silently discarded grounded table designs.
-    await a.eval(`localStorage.setItem('dice.roomsettings.v1',JSON.stringify({venue:'copper'}));localStorage.setItem('dice.stability.v1','stable')`);
+    await a.eval(`localStorage.setItem('dice.roomsettings.v1',JSON.stringify({venue:'stone'}));localStorage.setItem('dice.stability.v1','stable')`);
     await a.page.navigate(`http://127.0.0.111:${ctx.port}/?lobby=1&stability=stable`);
-    await a.waitFor(`window.__diceDebug?.identity.lobby && window.__diceDebug.tableDesign.activeId==='copper'`);
+    await a.waitFor(`window.__diceDebug?.identity.lobby && window.__diceDebug.tableDesign.activeId==='stone'`);
   },
 },{
   name:'table-design-failure',tags:['table-designs','settings'],

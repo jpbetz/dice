@@ -10,11 +10,11 @@ The wood grain and plank seams lead across the playing area; the rim makes
 the shared place recognizable even when the camera is high on a phone.
 Readable people and results sit upright around this composition.
 
-The Navigation Table will use a dark shipwright's frame, a low-contrast
-illustrated chart and brass compass details. The Stone Circle will use
+The Navigation Table uses a dark shipwright's frame, a low-contrast
+illustrated chart and brass compass details. The Stone Circle uses
 radial carved slabs with a weathered centre and restrained moss in joints.
-They are complete surfaces, with different edges and landmarks. The first
-table must work with four players on desktop and phone before either ships.
+They are complete surfaces, with different edges and landmarks. All three
+have been inspected with four players on desktop and phone.
 
 ## Copper Lantern model brief
 
@@ -66,8 +66,49 @@ texture, real UV range, material count, normals and vertex colors.
 The combined four-player desktop and 390×844 phone captures were inspected
 with persistent result seats, full-width phone dice, and the bottom roll tray.
 The table has a distinct edge and landmarks, quiet grain below the dice, and
-all four latest reads remain together. This is the first complete model slice;
-Navigation, Stone, and grouped roll presentation remain open.
+all four latest reads remain together. Grouped roll presentation remains open.
+
+## Navigation and Stone (2026-09-13)
+
+Navigation's decagonal shipwright frame supports a quiet original chart,
+with rhumb lines, folded paper, coastlines and a compass rose. A raised compass,
+rule, dividers, brass bindings and rope details sit at its perimeter. The model
+has 3,260 triangles and three material primitives; its packed 1,024-pixel
+illustration and geometry total 783,236 bytes (`ca57971442dd2bb2`). The top
+meets the unchanged physics plane; the foundation reaches −1.15. An explicit
+recipe check keeps every raised fitting inside the supporting decagon.
+
+Stone has a central slab and twelve radial blocks over a continuous solid
+foundation. Cut joints, incised marks, quiet fissures and small moss patches
+give the surface scale. Three unequal cairns occupy the outer edge beyond
+the 13.75-unit playing circle. It has 5,748 triangles and two material
+primitives; the packed 1,024-pixel surface image and geometry total 1,161,984
+bytes (`d4dc9728fddc9d19`). Its foundation reaches −1.4. Each design moves the
+old visual floor just below its own underside, without adding physics bodies.
+
+Recipes and packed editable Blender sources live alongside Copper under
+`tools/forge/recipes/` and `tools/forge/sources/`. Shared closed-solid authoring
+helpers and seeded original illustration generation keep the source editable;
+no remote images or runtime illustration generation are needed. Both final
+recipes bake to byte-identical complete GLBs on two consecutive runs. All
+normal, closed-solid, color, degeneracy and triangle checks pass. Reimported
+hero, detail and normal renders were inspected; early overhanging navigation
+fittings and cairn feet were moved onto their supports before the final bake.
+
+All three designs share actual setup preview, failure/retry and late-load
+cancellation. The browser scenario applies each preview across three clients,
+proves preview isolation, revisits the bounded three-scene cache, and restores
+Stone in a fresh stable solo page. Three design lifecycle scenarios and all
+60 static-cache assertions pass. Static checks compare served bytes and
+content hashes and inspect real texture UV range, normals, vertex colors and
+material count. Four-player desktop and 390×844 phone captures were inspected
+for both new designs; these are emulated phone views, not physical-device
+performance or battery measurements.
+
+Review captures: [Navigation desktop](redesign/2026-09-13-navigation-desktop.png),
+[Navigation phone](redesign/2026-09-13-navigation-phone.png),
+[Stone desktop](redesign/2026-09-13-stone-desktop.png),
+[Stone phone](redesign/2026-09-13-stone-phone.png).
 
 ## Appearance preview
 

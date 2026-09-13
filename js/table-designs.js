@@ -4,9 +4,15 @@
 // The URL changes with baked content; a room carries only the design ID.
 export const TABLE_DESIGNS = Object.freeze({
   copper: Object.freeze({id:'copper', label:'The Copper Lantern', register:'grounded',
-    surfaceCloth:'oak',
+    surfaceCloth:'oak', floorY:-1.12,
     title:'Worn oak, brass joinery and a quiet shared rolling surface',
     model:'models/tables/copper-lantern-table.glb?v=9bd081132494e6cd'}),
+  navigation: Object.freeze({id:'navigation',label:'The Navigation Table',register:'grounded',
+    surfaceCloth:'image',floorY:-1.17,title:'An illustrated chart in a shipwright’s frame',
+    model:'models/tables/navigation-table.glb?v=ca57971442dd2bb2'}),
+  stone: Object.freeze({id:'stone',label:'The Stone Circle',register:'grounded',
+    surfaceCloth:'image',floorY:-1.42,title:'Radial carved slabs, quiet weathered stone and small cairns',
+    model:'models/tables/stone-circle-table.glb?v=d4dc9728fddc9d19'}),
 });
 
 export function createTableDesign({scene, floor, changed = () => {}}) {
@@ -41,7 +47,7 @@ export function createTableDesign({scene, floor, changed = () => {}}) {
       remove(); active = model; activeId = id; scene.add(active);
       // The authored top meets the existing y=0 physics plane. The old broad
       // cloth becomes the room floor below the solid table, not a second top.
-      floor.position.y=-1.12; status='ready'; notify(); return true;
+      floor.position.y=TABLE_DESIGNS[id].floorY; status='ready'; notify(); return true;
     } catch {
       if (token !== epoch) return false;
       remove(); status='failed'; error='Table artwork could not load. The rolling surface is still available.';

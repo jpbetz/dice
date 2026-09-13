@@ -17,6 +17,18 @@
   "sha": "9bd081132494e6cd",
   "tris": 7996
  },
+ "navigation-table": {
+  "order": "2baf2efc71b0460f",
+  "set": "53f77748cc14b4a6",
+  "sha": "ca57971442dd2bb2",
+  "tris": 3260
+ },
+ "stone-circle-table": {
+  "order": "f47a4bd9abcfef7b",
+  "set": "38f2dc277348e476",
+  "sha": "d4dc9728fddc9d19",
+  "tris": 5748
+ },
  "tower_fixture": {
   "order": "8d0b6b1359278bd2",
   "set": "8905e6f5b43dec2e",

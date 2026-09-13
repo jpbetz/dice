@@ -62,9 +62,9 @@ Battery saver remain open; no battery or faster-frame-rate claim is made.
 
 **R2 first composition, 2026-09-13:** [player results](PLAYER-RESULTS.md) now
 keep upright names, crests and the group’s latest visible reads together. The
-[table design slice](TABLE-COMPOSITIONS.md) adds Copper Lantern, a real setup
-preview and inspected four-player desktop/phone views. Navigation, Stone and
-grouped-roll presentation remain open.
+[table design slice](TABLE-COMPOSITIONS.md) adds Copper Lantern, Navigation
+Table and Stone Circle, a real setup preview and inspected four-player
+desktop/phone views. Grouped-roll presentation remains open.
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable

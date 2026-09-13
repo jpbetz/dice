@@ -14414,7 +14414,7 @@ export const scenarios = [
           + 'channel gates');
       }
       assert.notEqual(await prod.eval(`document.getElementById('venue-picker').offsetParent`), null, 'grounded tables are offered on stable');
-      assert.deepEqual(await prod.eval(`[...document.querySelectorAll('#venue-picker [data-venue]')].map(b=>b.dataset.venue)`), ['copper','table'], 'fantasy venues remain beta catalogue choices');
+      assert.deepEqual(await prod.eval(`[...document.querySelectorAll('#venue-picker [data-venue]')].map(b=>b.dataset.venue)`), ['copper','navigation','stone','table'], 'fantasy venues remain beta catalogue choices');
       assert.equal(await prod.eval(
         `getComputedStyle(document.getElementById('staging-beta')).display`), 'none',
       'and the panel does not call itself a beta to somebody who is not in one');
