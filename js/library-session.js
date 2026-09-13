@@ -173,7 +173,23 @@ export function createLibrarySession(actions,{cacheFactory=openLibraryCache,acco
     if(namespace!==owner||sync!==opened)return {ok:false,code:'identity_changed'};
     return receive(result);
   }
-  return Object.freeze({initialize,edit,settled,capture,preview,choose,flush,suspend,get info(){return info();},
+  let homeAccessMemo=null;
+  function homeAccess(){
+    if(blocked||transitioning||!person||namespace!==person.id)return null;
+    const key=`${namespace}:${boundaryEpoch}`;
+    if(homeAccessMemo?.key===key)return homeAccessMemo;
+    const owner=namespace,epoch=boundaryEpoch;
+    const scoped=method=>async(...args)=>{
+      if(blocked||transitioning||namespace!==owner||boundaryEpoch!==epoch)return {ok:false,code:'identity_changed'};
+      const result=await account[method](owner,...args);
+      if(blocked||transitioning||namespace!==owner||boundaryEpoch!==epoch)return {ok:false,code:'identity_changed'};
+      return result;
+    };
+    homeAccessMemo=Object.freeze({key,personId:owner,epoch,homes:scoped('homes'),home:scoped('home'),
+      captureHome:scoped('captureHome'),createHome:scoped('createHome'),saveHome:scoped('saveHome'),leaveHome:scoped('leaveHome')});
+    return homeAccessMemo;
+  }
+  return Object.freeze({initialize,edit,settled,capture,preview,choose,flush,suspend,homeAccess,get info(){return info();},
     status:()=>account.status(),
     refreshAccount:()=>identityAction(()=>account.session()),
     async openDeviceCopy(personId){
