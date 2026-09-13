@@ -95,13 +95,12 @@ limitations under the License.
          BELOW you instead of pushing you down (it led the rail before, which
          is exactly the drift this ordering exists to kill). -->
     <div id="rail">
-      <div id="personal-controls" role="group" aria-label="Your name and dice">
+      <div id="personal-controls">
         <button id="identity-chip" class="btn ghost" title="Your name and personal controls" aria-haspopup="dialog" aria-expanded="false">
           <span id="identity-dot" class="identity-dot"></span>
           <span id="identity-name" class="identity-name">…</span>
           <span class="identity-caret" aria-hidden="true">⌄</span>
         </button>
-        <button id="my-dice" type="button" aria-label="My dice" title="My dice" aria-haspopup="dialog" aria-expanded="false"><span class="my-dice-prefix">My </span>Dice<span id="my-dice-current" class="sr-only">Standard</span></button>
       </div>
       <div id="rail-roster"></div>
       <!-- Keep the table identity and connection state beside its roster. -->
@@ -213,9 +212,9 @@ limitations under the License.
            staged, and the ROLL cue owns a reserved band along its floor
            (before this they shared one box and the tokens sat ON the
            word). The rim below carries every tool that acts on the well's
-           contents: ± shapes it, Save · Offer · ✕ Clear dispose of it.
-           All four arm together, so they are ONE row, not a bronze bar
-           over a steel row. Everything aligns to the well's 7px grid. -->
+           contents: Modify, Dice, Offer and Clear. Dice selection stays
+           available even with an empty draft. The tools share one row
+           aligned to the well's 7px grid. -->
       <div id="draft-zone" class="draft-zone">
       <!-- The WELL: the draft's second editor, peer to #cmd — same warm
            dress (§7.9: one draft, two editors; only one of them looked
@@ -247,6 +246,7 @@ limitations under the License.
              it dispose of it. Bronze-tinted: it belongs to the roll world
              (gold stays reserved for the roll act itself). -->
         <button id="tray-mods" title="Modifiers, target, moment">± Modify</button>
+        <button id="my-dice" class="btn" type="button" aria-label="Choose dice set" title="Choose dice set" aria-haspopup="dialog" aria-expanded="false">Dice<span id="my-dice-current" class="sr-only">Standard</span></button>
         <!-- Offer lives on the DRAFT now (Trigger Pass): the popover's
              'Offer to table' retired with its Roll — one composing surface
              owns both verbs. Hidden solo (offers need a table); targeted
@@ -257,7 +257,7 @@ limitations under the License.
              save"). Split button — the plain verb keeps its one-click
              table-wide muscle memory. Hidden until a teammate exists. -->
         <button id="offer-pick" class="btn offer-pick hidden" title="Offer to one player…" aria-haspopup="menu" aria-expanded="false">▾</button>
-        <button id="clear-tray" class="btn" title="Clear the draft">✕ Clear</button>
+        <button id="clear-tray" class="btn" title="Clear the draft">Clear</button>
       </div>
       <!-- (the tray save morph retired 2026-08-04 with the rim's Save:
            keeping a draft is pool editing's job — the ✎ ghost tiles mint,
@@ -409,7 +409,6 @@ limitations under the License.
         <button id="storage-download" class="btn tiny confirm"
                 title="Write your whole library to a file before you lose it">Download my data</button>
       </div>
-      <p id="pools-scope">Saved in this browser. Yours at every table.</p>
       <div id="pools-head" class="hidden">
         <span class="ph-word">Saved pools</span>
         <!-- The picker's first anchor (PROFILES §11.5 ②). Hidden until there is
@@ -697,7 +696,7 @@ limitations under the License.
             <b>Build dice…</b> to compose a roll such as <code>2d6+3</code>.
             New tables start with <b>Numbers only</b>. A game’s starter kit is
             your choice: preview its saved rolls before adding it to your library.</p>
-          <p>Your name opens its editor. <b>My Dice</b>, beside your name,
+          <p>Your name opens its editor. <b>Dice</b>, beside the roll controls,
             opens the visual collection: browse, favorite, try a private practice
             throw, then choose <b>Use these dice</b>. Practice leaves the shared
             table and your chosen dice unchanged.</p>
@@ -756,7 +755,7 @@ limitations under the License.
             <b>Throw N again</b> for the rest. That is the roll-and-lock
             mechanic — Yahtzee, and the monster-brawl dice game with the
             energy, claw and heart faces. For those faces, pick the
-            <b>Monster</b> set in <b>My Dice</b>, beside your name.</p>
+            <b>Monster</b> set using <b>Dice</b> beside the roll controls.</p>
           <p><code>6d6 push&gt;=5</code> — <b>push-your-luck</b>: you say which
             faces score, keep the ones you like, and throw the rest. A throw
             with nothing scoring in it <b>busts</b> and the turn ends with
@@ -1277,7 +1276,7 @@ limitations under the License.
         </fieldset>
       </section>
 
-      <!-- Device preferences. Personal dice are beside the name and in its menu. -->
+      <!-- Device preferences. Dice selection lives with the roll controls. -->
       <section class="settings-dest hidden" id="dest-you">
         <div class="settings-sec">
           <span class="plabel">Just you</span>

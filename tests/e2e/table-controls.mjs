@@ -94,7 +94,8 @@ export const tableControlScenarios = [
       await size(390,844); await a.emulateCoarsePointer(true);
       await a.eval(`localStorage.removeItem('dice.panels.v1')`); await a.reload();
       const layout=await a.eval(`({dice:document.getElementById('my-dice').getBoundingClientRect().toJSON(),name:document.getElementById('identity-chip').getBoundingClientRect().toJSON(),roll:document.getElementById('rail-roll-wrap').getBoundingClientRect().toJSON(),width:document.body.scrollWidth})`);
-      assert.ok(layout.dice.height<=36 && Math.abs(layout.dice.top-layout.name.top)<=4,'dice shares the personal row');
+      assert.ok(layout.dice.height>=34 && layout.dice.top>layout.name.bottom,'dice selection belongs to the phone roll controls');
+      assert.equal(await a.eval(`document.getElementById('my-dice').closest('#phone-roll-tray')?.id`),'phone-roll-tray');
       assert.ok(layout.roll.top<=125,'management controls do not reclaim the space above Roll');
       assert.equal(layout.width,390);
       await click(a,'#table-open');

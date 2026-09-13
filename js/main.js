@@ -21835,9 +21835,6 @@ function renderGroups() {
   const poolsHead = document.getElementById('pools-head');
   const foreign = !!poolsOwner;
   const owner = foreign ? poolsOwnerPlayer() : null;
-  document.getElementById('pools-scope').textContent = foreign
-    ? `These are ${owner.name}'s pools. Copying them leaves theirs unchanged.`
-    : 'Saved in this browser. Yours at every table.';
   sectionBarEl.querySelector('[data-sec="pools"]').textContent = foreign ? 'Their pools' : 'Your pools';
   poolsHead.classList.toggle('foreign', foreign);
   groupsListEl.classList.toggle('foreign', foreign);
@@ -29592,8 +29589,8 @@ function renderDiceSetPicker() {
   const label = (setSwatchInfo(diceSet) || setSwatchInfo('std')).label;
   document.getElementById('my-dice-current').textContent = label;
   document.getElementById('idm-dice-current').textContent = label;
-  document.getElementById('my-dice').title = `My dice · ${label}`;
-  document.getElementById('my-dice').setAttribute('aria-label', `My dice · ${label}`);
+  document.getElementById('my-dice').title = `Choose dice set · ${label}`;
+  document.getElementById('my-dice').setAttribute('aria-label', `Choose dice set · ${label}`);
   diceGallery?.update();
 }
 document.getElementById('my-dice').addEventListener('click', e => openDiceGallery(e.currentTarget));
@@ -32504,6 +32501,7 @@ function applyPanels(persist = true) {
   for (const [id, def] of Object.entries(PANEL_DEFS)) {
     document.getElementById(def.el).classList.toggle('collapsed', !panelsOpen[id]);
   }
+  destinationShell?.positionDiceControl();
   // Manage mode is transient (P2): collapsing the pools panel exits it, so
   // the panel always reopens read-only.
   if (!panelsOpen.pools && poolsEdit) setPoolsEdit(false);
@@ -34189,7 +34187,7 @@ document.getElementById('idm-profile').addEventListener('click', () => {
   // at the origin, which would park the menu in the corner.
   openRailMenu(document.getElementById('identity-chip'), buildProfileMenu);
 });
-document.getElementById('idm-dice').addEventListener('click', () => openDiceGallery(document.getElementById('my-dice')));
+document.getElementById('idm-dice').addEventListener('click', () => openDiceGallery(document.getElementById('identity-chip')));
 document.getElementById('idm-rolls').addEventListener('click', () => { closeIdentityMenu(); returnToMyRolls(); destinationShell?.open('dice'); });
 document.getElementById('idm-starter-kits').addEventListener('click', () => { destinationShell ? destinationShell.library() : openSettingsModal('stuff'); document.getElementById('starter-kits').open=true; });
 document.getElementById('idm-rename-row').addEventListener('submit', e => {
