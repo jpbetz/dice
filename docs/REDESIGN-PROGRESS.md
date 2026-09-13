@@ -12,11 +12,11 @@ priority order. R1, R2 and R3 remain open until their composed proofs pass.
 | Work | State and next action |
 | --- | --- |
 | Direct identity, gallery/favorites, personal selection | Initial slice committed as `b064b07`; preserve the subsequent owner correction asking for compact controls. |
-| Compact controls and transactional table setup | Existing work is advancing in the owner's main checkout. Review and integrate its commit; do not overwrite uncommitted work. Review found keyboard radio arrows, canonical Apply results and stale conflict flags needing proof. |
-| Gallery practice | Implemented in the integration worktree; local/shared isolation and lifecycle tests plus desktop/phone captures pass. Integration smoke remains to run with the other slices. |
+| Compact controls and transactional table setup | Integrated owner-session commit `85da885`. Follow-up fixes restore keyboard radio arrows inside the sheet and clear conflicts when a peer restores the base; targeted desktop/phone proofs pass. True 3D appearance preview remains open. |
+| Gallery practice | Committed as `f67d1df`; local/shared isolation and lifecycle tests plus desktop/phone captures pass. First combined unit/fuzz/smoke run passed (61/61 smoke). |
 | R1-C: Quick dice and explicit starter kits | Agent implementing in `codex/r1-quick`; review empty-storage defaults, legacy-library retention, and joining a room with an existing interpretation. |
 | R1-D0: durable service | Design selects optional recovery keys, private local atomic store and a Firestore REST adapter; adapter implementation/proofs underway in `codex/durable-service`. No cloud storage is provisioned. |
-| R3: compressed public text | Agent commit `8e44250` reviewed; queue integration. Production lacked compression; local six-file transfer shrinks approximately 72% with Brotli. |
+| R3: compressed public text | Agent commit `8e44250` reviewed and integrated as `feb5f79`; combined suite passes. Production lacked compression; local six-file transfer shrinks approximately 72% with Brotli. |
 | R3: dice-face draw consolidation | Agent investigating/implementing in `codex/r3-materials`; require measured draw savings and art/physics parity. |
 | R1 destinations + R2 phone surface | Next UI design/implementation after integrating the compact controls: one coherent workspace and full-width phone with bottom roll tray. |
 
@@ -50,5 +50,8 @@ The initial main-checkout `npm test` run passed all unit/fuzz checks and
 59/62 smoke scenarios. Failures were the in-flight table-controls recents
 assertion, control-rail markup, and die-pick's ring at y=0.032 under a
 surface at y=1.8308. Those must be resolved or independently characterized
-before release; later edits may already address the first two. Use the
-harness's ephemeral ports. Port 8123 remains untouched.
+before release. The compact-controls commit resolves the first two. The
+integration tree at `feb5f79` passed all unit/fuzz tests and 61/61 smoke,
+including die-pick; that intermittent earlier surface report still needs
+characterization if it recurs, not a weakened probe. Use the harness's
+ephemeral ports. Port 8123 remains untouched.

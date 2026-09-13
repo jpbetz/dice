@@ -23897,7 +23897,7 @@ function segSet(seg, value) {
 
 // …and the arrows a radiogroup owes. Without them a roving tabindex is a
 // trap: one cell reachable, the rest unreachable by keyboard entirely.
-document.addEventListener('keydown', (e) => {
+function handleRadioArrow(e) {
   if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
   const cell = e.target.closest && e.target.closest('[role="radio"]');
   const group = cell && cell.closest('[role="radiogroup"]');
@@ -23910,7 +23910,8 @@ document.addEventListener('keydown', (e) => {
   const next = cells[(i + step + cells.length) % cells.length];
   next.focus();
   next.click(); // a radiogroup selects on arrow, which is what makes it one stop
-});
+}
+document.addEventListener('keydown', handleRadioArrow);
 
 const fmtSigned = (v) => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v);
 
@@ -30346,6 +30347,7 @@ function rebaseTableEdit() {
       tableEdit.values[key] = live[key]; tableEdit.base[key] = live[key];
       tableEdit.dirty.delete(key); tableEdit.conflicts.delete(key);
     } else if (tableEdit.base[key] !== live[key]) tableEdit.conflicts.add(key);
+    else tableEdit.conflicts.delete(key);
   }
   if (document.activeElement !== document.getElementById('set-table-name')) {
     document.getElementById('set-table-name').value = tableEdit.values.tableName;
@@ -30631,6 +30633,9 @@ settingsPhone.addEventListener('change', () => {
   if (!settingsModal.classList.contains('hidden')) syncSettingsModal();
 });
 settingsModal.addEventListener('keydown', e => {
+  // This workspace shields table shortcuts, so its roving radio controls
+  // must handle arrows here before the event stops reaching the document.
+  handleRadioArrow(e);
   e.stopPropagation();
   if (e.key === 'Escape') { e.preventDefault(); closeSettingsModal(); }
 });

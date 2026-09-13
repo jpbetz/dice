@@ -70,6 +70,13 @@ All servers used ephemeral ports. The owner’s live table was untouched.
 
 ## Compact table controls and setup (2026-09-13)
 
+Integration review follow-up: the workspace's shortcut shield now runs the
+shared radio-arrow handler locally, so Table / Appearance and rolling-area
+choices remain keyboard reachable. A peer restoring the original setting
+clears the stale conflict notice while preserving the local candidate.
+Targeted desktop and phone scenarios exercise both transitions; phone Tab
+wrap also works after a keyboard edit enables Apply.
+
 Joe approved table setup next, then corrected the design habit: the new dice
 selector had taken too much valuable space, and another featured block for
 table naming would make it worse. This pass fits both into the existing
