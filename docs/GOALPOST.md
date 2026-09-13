@@ -21,8 +21,10 @@ durable storage those features require. This revises the former “no access
 control, ever” and “server holds no durable state” mechanisms explicitly;
 equal participation in live play, private rolls, and safe capture remain
 promises. The direction is approved; local durable services and account/library
-workflows, saved-home management and People UI are implemented. Composed release
-validation and deployment are still in progress.*
+workflows, saved-home management, Friends/Invitations and opt-in Presence
+are implemented. Composed release validation remains in progress; production
+deployment, physical-device and newcomer observation are not established by
+the local browser proofs.*
 
 ## What this is
 

@@ -7485,3 +7485,21 @@ checks, and inspected desktop/390 × 844 screenshots from
 a real server restart, competing tabs, held HTTP saves and completed IDB
 transactions. [Protocol and evidence details](PRIVATE-LIBRARY-PROTOCOL.md#d13--actual-account-and-library-workspace).
 No deployment, physical-phone or cloud-persistence claim is made by this slice.
+
+
+## Quick dice at the guest join — 2026-09-13
+
+The guest join door now visibly selects Quick dice. Random is an explicit
+choice that adds a profile; a missing display name never makes kept profiles
+disposable. The dialog states that saved rolls remain private until shared.
+`join-quick-or-explicit-random` covers ordinary Join, explicit Random and an
+existing library with no display name through hit-tested input.
+
+The current [390 × 844 guest join](redesign/2026-09-13-guest-join-phone.png)
+was captured and inspected with `tools/steps/anonymous-join-copy.mjs`, which
+also completes Join and verifies no saved pools or publication consent were
+created. Current Help describes phone Rolls/More, Friends/Invitations/Presence,
+and Accept followed by a separate Join now. Its desktop and emulated-phone
+pointer/scroll proof is `tools/steps/redesign-help-look.mjs`:
+[phone People guidance](redesign/2026-09-13-help-phone-people.png).
+These are local browser proofs, not newcomer or physical-phone observations.

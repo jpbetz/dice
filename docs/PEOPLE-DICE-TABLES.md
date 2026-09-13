@@ -2,31 +2,37 @@
 
 # People, personal dice, and persistent tables
 
-**R1 · implementation in progress, 2026-09-13.** This is the detailed design
-for item (1) of the approved [experience redesign](EXPERIENCE-REDESIGN.md).
-The owner authorized autonomous execution of all three priorities with agents.
-The sections below retain the original design and slice identifiers; this
-status is the current execution summary.
+**R1 · implemented; composed validation in progress, 2026-09-13.** This is
+the detailed plan for item (1) of the approved
+[experience redesign](EXPERIENCE-REDESIGN.md). The owner authorized autonomous
+execution of all three priorities with agents. The design and slice identifiers
+below remain the plan of record; the [execution ledger](REDESIGN-PROGRESS.md)
+tracks remaining release work.
 
-Implemented: normal name editing; the three destination shell and full-width
-phone table; the visual gallery with favorites, practice and explicit selection;
-named setup with actual artwork preview and Apply; familiar Quick dice and
-explicit starter kits; the [focused saved-roll library](SHIPPED.md#focused-library-workspace-2026-09-13)
+Implemented: direct name editing; the three destinations and full-width phone
+table; visual gallery, favorites, private practice and explicit selection;
+named setup with actual artwork Preview/Apply; Quick dice and additive starter
+kits; and the [focused saved-roll library](UX.md#focused-library-workspace-2026-09-13)
 with search, preview-before-use and named management actions. Saved profiles
-stay private until individually shared at a table.
+stay private until individually shared at a table. The fresh join door selects
+Quick dice; explicitly choosing Random adds a profile and preserves all kept
+profiles, including a library whose display name is missing.
 
-Optional recoverable identity and the private library now have durable service
-and actual-app workflows: explicit first comparison, offline retry, preserved
-competing versions, account/session boundaries and recovery on another device.
-See [service design](DURABLE-SERVICE-DESIGN.md) and
-[library protocol](PRIVATE-LIBRARY-PROTOCOL.md). The saved-home backend supports
-safe capture and cold restoration after restart; its Tables management UI is
-in progress. [Saved-home contract](SAVED-HOME-PROTOCOL.md).
+Optional recoverable identity and private-library workflows include explicit
+first comparison, offline retry, retained competing versions, account/session
+boundaries and independent-browser recovery. Tables implements named homes,
+public-setup capture, retained comparison, exact retries and deliberate return
+after restart. People implements Friends, an offline invitation inbox and
+opt-in online/home-location presence. Accept preserves the active table and
+turn; joining a home remains a separate action. See the [library
+protocol](PRIVATE-LIBRARY-PROTOCOL.md), [home workflow](SAVED-HOME-PROTOCOL.md),
+[social workflow](SOCIAL-SERVICE-PROTOCOL.md), and
+[workspace map](WORKSPACES.md).
 
-Next: finish saved-home management, durable contacts/invitations and permitted
-presence; inspect the full guest/returning-player journey and update help.
-Physical-phone and actual newcomer observations remain outstanding. No
-production durability or deployment is claimed from the local fixture proofs.
+Remaining: composed release validation and external deployment/restore work,
+plus actual newcomer and physical-device observations. Local fixture accounts,
+process restart and phone emulation do not establish those observations or
+production durability. [Operating plan](ACCOUNT-OPERATIONS.md).
 
 ## 1. The experience to build
 
@@ -51,31 +57,30 @@ Tables must not invoke today's leave-to-lobby behavior.
 
 | Destination | Contains | Primary actions |
 | --- | --- | --- |
-| **Tables** | Active table; saved table homes; browser-local recents, clearly labelled; incoming table invitations when available | Return, create, name, invite, save a home, reopen |
-| **My dice & rolls** | Visual dice gallery, favorites, current dice; Quick dice; saved rolls and character profiles; starter kits; import/export and sync status | Preview, practice, use these dice, roll, save, organize, choose a starter kit |
-| **People** | People at this table, their shared pools and offers; later friends, permitted presence, and invitations | Invite, view shared rolls, offer a roll, accept/decline an invitation |
+| **Tables** | Active table; saved-home cards; browser-local recents | Return, Table setup, capture/save a home, Manage retained versions, explicit Join now or New table |
+| **My dice & rolls** | Quick dice and builder; collection/practice; entry to the focused saved-roll library and account/sync status | Roll, compose, preview/practice/use dice, preview/use saved rolls, share chosen profiles, add a starter kit, import/export |
+| **People** | Current roster and visible results; shared-roll browsing and guest invite link; optional Friends, Invitations and Presence | Invite a guest or friend, accept/decline an invitation, explicitly join a home, remove/block contacts, choose online or home-location sharing |
 
-Personal name/avatar opens an editor with a normal click, tap, or keyboard
-activation. It may contain Preferences and, when implemented, account and
-recovery controls. **My dice & rolls** supplies the old “return to my pools”
-action. Separate display name from character/profile name; editing one
-must not rename the other or change seat ownership.
+A normal click, tap or keyboard activation on your name opens its editor.
+The personal menu also reaches saved-roll management, account/recovery and
+Preferences. My dice & rolls supplies the return to your own saved rolls.
+Display names remain separate from character/profile names; editing one does
+not rename the other or change seat ownership.
 
-**Table setup** is a visible action at the named table header. It gathers
-the table's name, interpretation, appearance, and prepared material.
-**Preferences** contains personal audio, motion, display, and accessibility
-choices. Help and roll history remain directly reachable during play.
-“Table / Staging / You / Your stuff” cease to be the organizing scheme.
+The named table label opens **Table setup** for its name, interpretation,
+appearance and prepared material. The desktop gear opens personal
+**Preferences**. **Dice** is beside the desktop roll controls. On a phone the
+bottom navigation is **Tables · Rolls · People · More**; Rolls opens My dice
+& rolls, while More reaches Preferences, history, notation, Help and clear
+controls. The bottom tray shows saved rolls when available, otherwise Quick
+dice, with the staged draft's Roll and Build a roll actions.
 
-On desktop, use a compact persistent table header and workspaces sized for
-the task the player opens. Expanded panels and full-screen or near-full-screen
-dialogs are valid choices for focused browsing, editing, and organization.
-On a phone, use the full-width scene, a bottom roll tray, and sheets or full
-views. Share these nouns and navigation state with R2; do not create a second
-mobile information architecture. An opened workspace can cover the local
-scene; returning to play restores the same live roll and the server never
-pauses. Keyboard focus returns to the invoking control; selection, focus,
-and connection state are conveyed by text as well as color.
+Opened tasks may expand to the space their content needs. Their direct **×**
+returns to play with the same seat, draft and unfinished turn. Roll returns
+from its originating task when accepted, preserving any task opened after the
+request. An opened phone task can cover the local scene; the server continues
+play. Focus returns to the invoking control. Text conveys selection and
+connection state alongside color. [Current layout and proof](WORKSPACES.md).
 
 **Owner correction, 2026-09-13:** organize the whole interface rather than
 giving each new feature a prominent block. The first My dice card consumed
@@ -262,11 +267,10 @@ old held/secret roll. Preserving or extending private-roll ownership across
 devices needs an explicit projection/authority design before it changes.
 The initial durable slice can retain today's live-session continuity rules.
 
-The existing app publishes all local profiles' names, systems, and pools
-to the table. Before enabling sync, separate the private account library
-from that publication: downloading remote profiles must not automatically
-publish them to everyone in the current room. The working design is an
-explicit per-table profile selection with a visible sharing disclosure,
+The former automatic library publication is replaced by explicit per-table
+profile selection with a visible sharing disclosure. Downloading a private
+account library never grants publication consent at the current table.
+Selected profile names, systems and pools are published as table-facing copies,
 using the existing public field allowlist. Account identifiers, recovery
 data, friends, and library versions are never shared-pool fields. Preserve
 copy/adopt of the selected shared profiles and prepared profiles.
@@ -279,14 +283,16 @@ or historical secret rolls. No promise of roll-session recovery is made.
 
 ## 7. Friends and invitations
 
-People first exposes the current roster and guest link invitation; the
-later social release adds explicit friend connections and an inbox. Start
-connections from a known person at the table or an intentionally shared
-invitation, not a global search directory. Avoid an empty Friends page or
-dead “coming soon” controls in the first release.
+People exposes the current roster and guest link invitation without an
+account. Where the optional service is available, Friends uses deliberately
+shared contact codes and friend requests; Invitations contains received and
+sent requests and home invitations. There is no global people directory.
+Presence is off until chosen, with separate online-status and saved-home
+location controls. Recovery alone enables neither presence nor library sync.
 
-“Sam invited you to The Copper Lantern” contains a verified inviter,
-destination, and Accept / Decline. Acceptance adds the saved home where
+“Sam invited you to The Copper Lantern” contains an account-provided inviter name,
+destination, and Accept / Decline. Account names are not verified real-world
+identities. Acceptance adds the saved home where
 appropriate; **Join now** is deliberate so an incoming invitation cannot
 pull someone out of an active turn. Already-connected friends receive it
 inside the app. Newcomers can still follow a guest room link. A friend need
@@ -295,8 +301,8 @@ not be online at send time; the inbox survives reload and restart.
 Invitation states: pending → accepted, declined, cancelled, or expired.
 Accept is idempotent and authorized for its intended recipient. An inbox
 event contains only allowed invitation/presence data, never a room snapshot
-or roll values. Offline or uncertain occupancy is labelled, not shown as
-“3 people here.” Removing/blocking a social connection stops future social
+or roll values. Unavailable or expired presence reads Unknown; home signals describe only
+members who opted into sharing, not the room’s total occupancy. Removing/blocking a social connection stops future social
 contact and presence sharing; it does not eject a live player or undo a
 room key already shared. Expiring an invitation likewise cannot revoke a
 guest link already learned. Do not imply stronger admission control.
@@ -310,10 +316,10 @@ one another. No durable friend or home roster goes into public room payloads.
 
 ## 8. Releases and implementation slices
 
-Order small commits by the behavior they unlock. R1-A is the next concrete
-planning deliverable. R1-B/C are the first useful product release; account
-infrastructure begins afterward. R1-D0 may be researched earlier without
-delaying those local improvements.
+The original sequence below keeps the approved slice identifiers. R1-A through
+R1-E have implementations and focused proofs; R1-F's composed validation and
+actual observation are tracked in the execution ledger. External deployment
+is separate from local implementation and service-restart tests.
 
 | Slice | Deliverable | Completion evidence |
 | --- | --- | --- |
@@ -357,8 +363,8 @@ Use existing CUJ1 (instant roll), CUJ2/3 (invite/join), CUJ4 (leave/return),
 CUJ6/7 (profiles), CUJ8 (compose/read), CUJ9/11 (legibility/following), CUJ10
 (privacy), CUJ12 (table conventions), and CUJ13 (capture) as named in
 [CUJS.md](CUJS.md). These are references, not new journey numbers. Recovery
-and durable invitations extend those scenarios when built; the audit's
-success claims are not evidence that those features already exist.
+and durable invitations now extend those scenarios through the account, home
+and People browser suites. The original audit is not implementation evidence.
 
 The composed walk: a fresh guest changes their name, chooses and practices
 a set, rolls `2d6+3`, saves a useful roll, names a table, and shares its guest
@@ -397,10 +403,10 @@ roll; do not infer discoverability from click count or scripted completion.
 
 ## 11. What is still a design task
 
-**Next:** finish the saved-home and social interfaces against the implemented
-service boundaries, then run the composed success walk. The destination,
-practice and setup layouts are implemented and inspected in desktop/phone
-emulation; the remaining observation is on actual devices and with players.
+**Next:** complete the composed success walk and release checks, then record
+actual-device and newcomer observations. The destination, practice, setup,
+saved-home and People workflows have implementations and inspected browser
+captures, including 390px phone emulation.
 The recovery/store decisions and conflict-preservation policy are in the
 service/protocol documents linked above. Production provisioning and deployment
 remain separate from local implementation and its restart proofs.
