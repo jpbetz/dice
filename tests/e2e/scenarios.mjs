@@ -26224,6 +26224,7 @@ export const scenarios = [
         cpSync(join(ROOT, 'tools', 'dice-apply.mjs'), join(dir, 'tools', 'dice-apply.mjs'));
         cpSync(join(ROOT, 'js', 'yaml.js'), join(dir, 'js', 'yaml.js'));
         cpSync(join(ROOT, 'js', 'tune.js'), join(dir, 'js', 'tune.js'));
+        cpSync(join(ROOT, 'js', 'placard-design.js'), join(dir, 'js', 'placard-design.js'));
         cpSync(join(ROOT, 'js', 'dice-apply-core.js'), join(dir, 'js', 'dice-apply-core.js'));
         writeFileSync(join(dir, 'dice.yaml'), file);
         writeFileSync(join(dir, 'download.yaml'), exported);
@@ -27667,8 +27668,12 @@ export const scenarios = [
       assert.notEqual(await t.dbg('devStep()'), null, 'frozen, it answers — even with no film to step');
       await t.dbg(`devClock('running')`);
 
+      // Freeze before preparation; the worker finishes asynchronously.
+      await t.dbg(`devClock('frozen')`);
       await t.dbg('devBench(31337)');
-      const froze = await t.dbg(`devClock('frozen')`);
+      await t.waitFor('window.__diceDebug.devClockInfo().live&&!window.__diceDebug.filmWorker.baking',
+        {desc:'the seeded worker film is ready on the frozen clock'});
+      const froze = await t.dbg('devClockInfo()');
       assert.equal(froze.state, 'frozen');
       assert.equal(froze.live, true, 'a film is running');
       assert.ok(froze.frames > 10, `and it has keyframes (${froze.frames})`);
@@ -28916,8 +28921,11 @@ export const scenarios = [
       // the clock frozen, so what is being measured is the GATE and not a race
       // between CDP round trips and rAF.
       await t.dbg('holdClock(true)');
+      const beforeRoll = await t.rollId();
       await t.dbg(`commandRoll('4d6')`);
-      await t.dbg('sim(30)');
+      await t.waitFor(`window.__diceDebug.currentRoll?.rollId!==${JSON.stringify(beforeRoll)}&&window.__diceDebug.currentRoll?.frames>0&&!window.__diceDebug.filmWorker.baking`,
+        {desc:'the authored roll arrives and the worker film is ready'});
+      await t.dbg('sim(1)');
       assert.equal(await t.dbg('busy'), true, 'a film is in flight');
       const mid = await t.dbg(`tuneSet({'cards.width': 6})`);
       assert.deepEqual(mid.refused, [], 'the write lands in the tree at once');

@@ -28059,6 +28059,7 @@ function devClock(state) {
     if (!DEV_CLOCK_STATES.includes(state)) return null;
     clockHeld = state === 'frozen';
     devFroze = clockHeld;
+    invalidateTable();
     devPanelSync();
   }
   return devClockInfo();
