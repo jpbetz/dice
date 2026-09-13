@@ -40,6 +40,7 @@ import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { basename, dirname, join } from 'node:path';
 import { brotliDecompressSync, gunzipSync } from 'node:zlib';
+import { TABLE_DESIGNS } from '../js/table-designs.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -367,6 +368,44 @@ try {
     }
     assert.ok(checked > 0, 'and at least one model carried a sha to check — a '
       + 'baseline with no shas would make this pass by having nothing to say');
+  });
+
+  await t('grounded table models serve their complete baked texture and current bytes', async () => {
+    const digests=JSON.parse(await readFile(new URL('../tools/forge/digests.json',import.meta.url),'utf8'));
+    for(const row of Object.values(TABLE_DESIGNS)) {
+      const response=await fetch(`${base}/${row.model}`);
+      assert.equal(response.status,200);
+      assert.equal(response.headers.get('content-type'),'application/octet-stream');
+      const bytes=Buffer.from(await response.arrayBuffer());
+      const sha=createHash('sha256').update(bytes).digest('hex').slice(0,16);
+      const slug=basename(row.model.split('?')[0],'.glb');
+      assert.equal(sha,digests[slug].sha,'served model matches the recipe digest');
+      assert.equal(new URL(row.model,base).searchParams.get('v'),sha,'catalogue invalidates the whole asset');
+      assert.equal(bytes.toString('ascii',0,4),'glTF');
+      const jsonLength=bytes.readUInt32LE(12), gltf=JSON.parse(bytes.toString('utf8',20,20+jsonLength));
+      const primitives=gltf.meshes.flatMap(m=>m.primitives);
+      if(row.id==='copper') assert.equal(gltf.images.length,1,'the exported table retains its grain image');
+      assert.ok(primitives.length<=3,'one draw per authored material family');
+      assert.equal(primitives.reduce((n,p)=>n+gltf.accessors[p.indices].count/3,0),digests[slug].tris);
+      for(const p of primitives) {
+        assert.ok(p.attributes.NORMAL!==undefined && p.attributes.COLOR_0!==undefined,'authored normals and linear colors survive export');
+        const texture=gltf.materials[p.material].pbrMetallicRoughness?.baseColorTexture;
+        if(!texture) continue;
+        const accessor=gltf.accessors[p.attributes.TEXCOORD_0];
+        assert.ok(accessor,'textured geometry requires UVs, even when the image itself exports successfully');
+        const view=gltf.bufferViews[accessor.bufferView];
+        const offset=20+jsonLength+8+(view.byteOffset||0)+(accessor.byteOffset||0), stride=view.byteStride||8;
+        let minU=Infinity,maxU=-Infinity,minV=Infinity,maxV=-Infinity;
+        for(let i=0;i<accessor.count;i++) {
+          const u=bytes.readFloatLE(offset+i*stride),v=bytes.readFloatLE(offset+i*stride+4);
+          assert.ok(Number.isFinite(u)&&Number.isFinite(v));
+          minU=Math.min(minU,u);maxU=Math.max(maxU,u);minV=Math.min(minV,v);maxV=Math.max(maxV,v);
+        }
+        assert.ok(maxU-minU>.8&&maxV-minV>.8,'grain covers the surface instead of sampling one texel');
+        const img=gltf.images[gltf.textures[texture.index].source];
+        assert.ok(img.bufferView!==undefined && !img.uri,'the table is a self-contained asset');
+      }
+    }
   });
 
   // ---- HEAD requests still behave --------------------------------------

@@ -57,6 +57,7 @@ import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealRack, dealName } from './seed.js';
 import { NEW_TABLE_SYSTEM, renderQuickRolls, createStarterKitChooser } from './firstplay.js';
 import { createWorkspaces } from './workspaces.js';
+import { TABLE_DESIGNS, createTableDesign } from './table-designs.js';
 import { resolveChannel, PARAM as STABILITY_PARAM } from './stability.js';
 import { EPOCH as SCHEMA_EPOCH, STAMP as SCHEMA_STAMP, judgeStamp, convert as schemaConvert } from './schema.js';
 import { exportYaml, parsePortable, planImport, profileToImport, declareFelts } from './portable.js';
@@ -3281,6 +3282,15 @@ const floor = new THREE.Mesh(
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
+const tableDesign = createTableDesign({scene, floor, changed: state => {
+  const note = document.getElementById('table-art-status');
+  note.textContent = state.error || (state.status === 'loading' ? 'Loading table artwork… You can keep rolling.' : '');
+  note.hidden = !note.textContent;
+  document.getElementById('table-art-retry').hidden = state.status !== 'failed';
+  if (state.error) { setPill(state.error, 'error'); announce(state.error); }
+  refitView();
+}});
+document.getElementById('table-art-retry').addEventListener('click', () => tableDesign.select(tableDesign.state.wanted));
 // …and from here an image landing may repaint the table (`onFeltImage`). The
 // flag is the guard, not a comment: this floor's texture and geometry are
 // `const`s, and a reference to one from an image event that arrived early
@@ -4269,6 +4279,8 @@ const GROUND_NEUTRAL = { centre: 1, length: 1, gain: 1 };
 // disc OVER the mat, so in a glade the dice are not on the cloth at all.
 // `clothVoiceFor` owns that rule; this file just asks it.
 function clothId() {
+  const design = TABLE_DESIGNS[tableDesign.state.activeId];
+  if (design?.surfaceCloth) return design.surfaceCloth;
   const t = FELT_THEMES[currentFeltId];
   return (t && t.cloth) || CLOTH_DEFAULT;
 }
@@ -4280,6 +4292,7 @@ function clothId() {
 // function that owns the covering rule owns it for both halves: a row's
 // `sound:` under a glade is as covered as the cloth it modifies.
 function clothVoice() {
+  if (TABLE_DESIGNS[tableDesign.state.activeId]) return clothVoiceFor('table', clothId(), null);
   const t = FELT_THEMES[currentFeltId];
   return clothVoiceFor(venueAudioId(), clothId(), (t && t.sound) || null);
 }
@@ -11767,6 +11780,7 @@ function stepMoodMotes(dt) {
 // both"). Room-wide like the tower, and for the same reason once W3
 // lands a fae tower: the venue will change the film.
 const VENUES = {
+  ...TABLE_DESIGNS,
   table: {
     id: 'table', label: 'The Table', register: 'grounded',
     title: 'The table — felt, lamplight, the room you know',
@@ -12081,8 +12095,11 @@ function stepFaeConcept(dt) {
 // its own queueTower deferral via the settings patch that carries it.
 function applyVenue(id) {
   const spec = VENUES[id] || VENUES.table;
-  if (spec.id === currentVenue) { updateVenueChrome(); diceGallery?.update(); return; }
+  if (spec.id === currentVenue) { updateVenueChrome(); diceGallery?.update();
+    if (tableDesign.state.status === 'failed') tableDesign.select(TABLE_DESIGNS[spec.id] ? spec.id : null);
+    return; }
   currentVenue = spec.id;
+  tableDesign.select(TABLE_DESIGNS[spec.id] ? spec.id : null);
   if (spec.register === 'fantasy') faeConceptStart({ paletteId: spec.paletteId });
   else faeConceptStop();
   // The standing tower follows the sky it is now under: palette variant
@@ -12099,7 +12116,7 @@ function applyVenue(id) {
 // The rows the CLOSED-BETA CHANNEL takes off the panel (js/stability.js).
 // The pickers ARE the offer; taking them away is the whole gate, and nothing
 // about the tower or the venue stops working — see ownSettingsForChannel.
-const BETA_ROWS = ['venue-row', 'venue-picker', 'tower-row', 'tower-picker'];
+const BETA_ROWS = ['tower-row', 'tower-picker'];
 
 // ONE ANSWER TO "IS THIS ROW ON SCREEN", asked by the two things that hide
 // rows for entirely different reasons: the venue (goal 13 — it IS those
@@ -12120,9 +12137,11 @@ const BETA_ROWS = ['venue-row', 'venue-picker', 'tower-row', 'tower-picker'];
 // is currently staging over (felt) simply shows its effect when
 // the venue comes down.
 function panelRowShown(rowId) {
+  if (rowId === 'venue-row' || rowId === 'venue-picker') return true;
   if (!IS_BETA && BETA_ROWS.includes(rowId)) return false;
-  if (IS_BETA) return true;
   const venue = VENUES[tableSettingValue('venue', currentVenue)] || VENUES.table;
+  if (TABLE_DESIGNS[venue.id] && ['felt-label', 'felt-swatches'].includes(rowId)) return false;
+  if (IS_BETA) return true;
   return venue.register !== 'fantasy';
 }
 
@@ -12141,9 +12160,11 @@ function updateVenueChrome() {
   }
   // Explain the hidden staging controls. Beta offers them all, so needs no
   // absence note. Dice selection is personal on both channels.
-  const noted = fantasy && !IS_BETA;
+  const modeled = !!TABLE_DESIGNS[venue.id];
+  const noted = modeled || (fantasy && !IS_BETA);
   const note = document.getElementById('venue-staged');
-  note.textContent = noted ? `${venue.label} stages this — felt and tower are its own.` : '';
+  note.textContent = modeled ? `${venue.label} includes its own tabletop. Choose The Table to use a mat.`
+    : noted ? `${venue.label} stages this — felt and tower are its own.` : '';
   note.classList.toggle('hidden', !noted);
 }
 
@@ -16504,6 +16525,7 @@ window.__diceDebug = {
   setFelt(id) { return selectFelt(id); },
   // interpretation system (goal 6): active profile id + the picker's entry point
   get system() { return currentSystemId; },
+  get tableDesign() { return tableDesign.state; },
   setSystem(id) { return selectSystem(id); },
   // mat-zoom (Joe 2026-08-04): the room-wide preset + world extents for the
   // e2e assertion surface (never scrape the felt).
@@ -16793,7 +16815,7 @@ window.__diceDebug = {
       held: STABILITY_HELD,
       stored,
       mirror: stabilityMirror(),
-      offers: { staging: IS_BETA, tower: IS_BETA, venue: IS_BETA },
+      offers: { staging: true, tower: IS_BETA, venue: true, fantasyVenue: IS_BETA },
       gated: [...BETA_SETTINGS],
       // THE CATALOGUE GATE, which is a different axis from `gated` above and
       // must not be folded into it. `gated` names room-settings KEYS this
@@ -29703,7 +29725,8 @@ function applyZoom(level) {
   placardRelay();      // §7.63: the walls moved, so the cards outboard of them did
 }
 
-// The room settings that belong to the closed beta (js/stability.js).
+// Tower choices and fantasy venue choices belong to the closed beta.
+// Grounded table designs are available on either channel.
 const BETA_SETTINGS = ['tower', 'venue'];
 
 // YOUR OWN saved settings, read through the channel — and ONLY your own.
@@ -29727,7 +29750,10 @@ function ownSettingsForChannel(settings) {
   if (!settings || typeof settings !== 'object') return settings;
   const kept = { ...settings };
   if (typeof kept.tower === 'string') kept.tower = migrateSavedTowerId(kept.tower);
-  if (!IS_BETA) for (const key of BETA_SETTINGS) delete kept[key];
+  if (!IS_BETA) {
+    delete kept.tower;
+    if (kept.venue !== 'table' && !TABLE_DESIGNS[kept.venue]) delete kept.venue;
+  }
   return kept;
 }
 
@@ -30276,7 +30302,7 @@ function renderVenuePicker() {
   const holder = document.getElementById('venue-picker');
   if (!holder) return;
   if (!holder.childElementCount) {
-    for (const v of Object.values(VENUES)) {
+    for (const v of Object.values(VENUES).filter(v => IS_BETA || v.register === 'grounded')) {
       const chip = document.createElement('button');
       chip.className = 'system-chip';
       chip.dataset.venue = v.id;

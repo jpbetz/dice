@@ -28,6 +28,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { tableDesignScenarios } from './table-designs.mjs';
 import { personalKitScenarios } from './personal-kit.mjs';
 import { tableControlScenarios } from './table-controls.mjs';
 import { firstPlayScenarios } from './first-play.mjs';
@@ -769,6 +770,7 @@ const picked = (a) => a.dbg('picked');
 
 export const scenarios = [
   ...personalKitScenarios,
+  ...tableDesignScenarios,
   ...tableControlScenarios,
   ...firstPlayScenarios,
   ...profileSharingScenarios,
@@ -14393,11 +14395,13 @@ export const scenarios = [
       // labelled and `display:none` reads as success to anything that asks
       // the DOM what it holds — instance 2 of the green-check ledger, where a
       // figure was built and never shown for weeks behind a passing test.
-      for (const id of ['venue-row', 'venue-picker', 'tower-row', 'tower-picker']) {
+      for (const id of ['tower-row', 'tower-picker']) {
         assert.equal(await prod.eval(`document.getElementById('${id}').offsetParent`), null,
           `${id} is unreachable — the pickers ARE the offer, and the offer is what a `
           + 'channel gates');
       }
+      assert.notEqual(await prod.eval(`document.getElementById('venue-picker').offsetParent`), null, 'grounded tables are offered on stable');
+      assert.deepEqual(await prod.eval(`[...document.querySelectorAll('#venue-picker [data-venue]')].map(b=>b.dataset.venue)`), ['copper','table'], 'fantasy venues remain beta catalogue choices');
       assert.equal(await prod.eval(
         `getComputedStyle(document.getElementById('staging-beta')).display`), 'none',
       'and the panel does not call itself a beta to somebody who is not in one');
@@ -14551,7 +14555,7 @@ export const scenarios = [
       await prod.waitFor(`window.__diceDebug.venueInfo().id === 'table'`,
         { desc: 'and back out again' });
       await beta.dbg('closeSettingsModal()');
-      for (const id of ['venue-picker', 'tower-picker']) {
+      for (const id of ['tower-picker']) {
         assert.equal(await prod.eval(`document.getElementById('${id}').offsetParent`), null,
           `${id} is STILL gone after a venue came and went — the channel's hide must `
           + 'survive the venue\'s un-hide, which is what one shared predicate buys');

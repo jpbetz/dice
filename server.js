@@ -47,6 +47,7 @@ import { brotliCompress, gzip, constants as zlibConstants } from 'node:zlib';
 import { composeRoll, composeThrow, validateMods, validateSpec, DIE_MAX,
   scoringIndices, pushTally, drawBag, MAX_PUSH_THROWS, turnIsOpen } from './js/rollspec.js';
 import { parseNotation } from './js/notation.js';
+import { TABLE_DESIGNS } from './js/table-designs.js';
 // The dice catalogue. `SET_IDS` is EMPTY until `installCatalogue` fills it
 // from the declaration's `houses:` (phase D1) — js/themes.js holds the recipe
 // grammar and dice.yaml holds the recipes, and this process reads the same
@@ -589,7 +590,7 @@ const SETTING_SPECS = {
   venue: {
     default: 'table',
     validate: (v) => typeof v === 'string'
-      && ['table', 'moonrise', 'foxfire'].includes(v),
+      && (['table', 'moonrise', 'foxfire'].includes(v) || Object.hasOwn(TABLE_DESIGNS, v)),
   },
 };
 

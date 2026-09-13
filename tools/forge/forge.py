@@ -181,7 +181,7 @@ def boolean_collection(target, cutters, op="DIFFERENCE", solver="EXACT",
 # shading
 # --------------------------------------------------------------------------
 
-def canonicalize(obj):
+def canonicalize(obj, preserve_uv=False):
     """Rewrite the mesh in a fixed element order. Shape is untouched.
 
     WHY THIS EXISTS. Blender's EXACT boolean solver emits the same solid with
@@ -209,6 +209,9 @@ def canonicalize(obj):
     # way that dropping them makes finish(vertex_colors=True) export a
     # silently colourless GLB — README trap #4, previously inside this kit).
     attrs = []
+    uvs = [(uv.name, uv.active_render,
+            [[tuple(uv.data[li].uv) for li in p.loop_indices] for p in me.polygons])
+           for uv in me.uv_layers] if preserve_uv else []
     for ca in me.color_attributes:
         if ca.domain == "CORNER":
             per_poly = [[tuple(ca.data[li].color) for li in p.loop_indices]
@@ -251,6 +254,17 @@ def canonicalize(obj):
             flat = per_poly[0]
             for new_i, old_i in enumerate(order):
                 nca.data[new_i].color = flat[old_i]
+
+    # Textured scenery opts into UV export. Rotate corner UVs by the same
+    # face permutation as colors; otherwise canonicalization silently removes
+    # TEXCOORD_0 while the GLB still refers to an image (Copper Lantern).
+    for name, active_render, per_poly in uvs:
+        uv = new_me.uv_layers.new(name=name)
+        uv.active_render = active_render
+        for p, (_, _, pi, k) in zip(new_me.polygons, faces):
+            old = per_poly[pi]
+            for li, value in zip(p.loop_indices, old[k:] + old[:k]):
+                uv.data[li].uv = value
 
     obj.data = new_me
     if me.users == 0:
@@ -656,7 +670,7 @@ def tower_portals(in_spec, out_spec):
 # export
 # --------------------------------------------------------------------------
 
-def export_glb(slug, objs=None, vertex_colors=False):
+def export_glb(slug, objs=None, vertex_colors=False, texcoords=False):
     """Native GLB export. Returns the path."""
     os.makedirs(OUT_DIR, exist_ok=True)
     path = os.path.join(OUT_DIR, f"{slug}.glb")
@@ -693,7 +707,7 @@ def export_glb(slug, objs=None, vertex_colors=False):
         export_apply=True,          # bake any modifier still standing
         export_yup=True,            # Blender Z-up -> glTF Y-up
         export_normals=True,
-        export_texcoords=False,
+        export_texcoords=texcoords,
         export_materials="EXPORT",
         export_vertex_color="MATERIAL" if vertex_colors else "NONE",
         export_extras=True,         # object custom props -> node extras: the
@@ -859,7 +873,7 @@ def assert_budget(objs, max_tris):
 
 
 def finish(slug, objs, *, budget=None, smooth_deg=None, vertex_colors=False,
-           ground=True, repair=False):
+           ground=True, repair=False, texcoords=False):
     """The standard tail of a recipe, in the order the bake-off proved.
 
     canonicalize + triangulate (byte-stable output), optional smooth-by-angle,
@@ -872,7 +886,7 @@ def finish(slug, objs, *, budget=None, smooth_deg=None, vertex_colors=False,
     for ob in objs:
         if ob.type != "MESH":
             continue
-        canonicalize(ob)
+        canonicalize(ob, preserve_uv=texcoords)
         triangulate(ob)
         if smooth_deg is not None:
             smooth_by_angle(ob, smooth_deg)
@@ -887,4 +901,4 @@ def finish(slug, objs, *, budget=None, smooth_deg=None, vertex_colors=False,
         sit_on_ground(objs)
     if budget is not None:
         assert_budget(objs, budget)
-    return export_glb(slug, objs, vertex_colors=vertex_colors)
+    return export_glb(slug, objs, vertex_colors=vertex_colors, texcoords=texcoords)

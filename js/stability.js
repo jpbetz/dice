@@ -16,9 +16,10 @@ limitations under the License.
 
 // THE STABILITY CHANNEL — which unfinished work this browser is offered.
 //
-// Towers and venues are in closed beta (Joe, 2026-08-14). They are shipped,
+// Towers and fantasy venues are in closed beta (Joe, 2026-08-14). They are shipped,
 // they work, and they are not finished being decided; production players
-// should not meet them by accident. So a browser sits on one of two channels
+// should not meet them by accident. Grounded table designs are offered on
+// both channels (experience redesign R2). A browser sits on one of two channels
 // and the channel decides what the SETTINGS PANEL OFFERS.
 //
 // ── THE ONE LAW ────────────────────────────────────────────────────────────
