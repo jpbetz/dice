@@ -16,6 +16,14 @@ and assess them now. R1-B1/B2 remain incomplete: destination state, practice
 throws, and fuller saved-roll override editing still need work. R1-A's
 whole-app desktop/phone structure remains a planning deliverable.
 
+The [compact table-controls slice](SHIPPED.md#compact-table-controls-and-setup-2026-09-13)
+now fits My Dice into the personal row, turns the existing table label into
+setup, and separates compact Preferences from library management. Shared
+choices preview before Apply, with conflict/reset/retry handling; names also
+update browser titles and recents. This implements the local setup portion
+of R1-B3. The wider destination shell, prepared-material organization, Quick
+dice, practice, persistent homes and in-app invitations remain open.
+
 ## 1. The experience to build
 
 A new visitor rolls immediately with familiar dice. They can see where to
@@ -63,6 +71,17 @@ but collapse returns to the same live roll and the server never pauses.
 Keyboard focus returns to the invoking control; selection, focus, and
 connection state are conveyed by text as well as color. Dialogs are reserved
 for decisions such as conflicting saved versions or destructive actions.
+
+**Owner correction, 2026-09-13:** organize the whole interface rather than
+giving each new feature a prominent block. The first My dice card consumed
+valuable rolling space. Replace it with a compact Dice control beside the
+personal name, turn the existing table label into the Table setup entry, and
+reuse one workspace frame for setup, preferences, or saved-roll management.
+The footer gear opens device preferences; the personal menu reaches library
+management. On desktop, setup leaves the scene interactive; on a phone it is
+a sheet. New controls must earn their space against the rolling workflow.
+Measure the start of the composer before and after, with four players and a
+compact phone sidebar; discoverability alone does not justify permanent bulk.
 
 Initial relocation map, read from `index.html` and the handlers at the
 baseline revision. These move existing capabilities; they do not require

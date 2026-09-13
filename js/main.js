@@ -22,7 +22,7 @@ import * as CANNON from 'cannon-es';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, bustDie, SHADER_TIME, FACE_SHAPES } from './dice.js';
 import { dieArtURL, bustArt } from './diceart.js';
 import { connect, forgetSeat, peekTable, prejoinSeat, LS_WHO } from './net.js';
-import { recentTables, rememberTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
+import { recentTables, rememberTable, renameRecentTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
   scoringIndices, pushTally, faceScores, drawBag, MAX_PUSH_THROWS } from './rollspec.js';
@@ -12109,23 +12109,22 @@ const BETA_ROWS = ['venue-row', 'venue-picker', 'tower-row', 'tower-picker'];
 // is currently staging over (felt) simply shows its effect when
 // the venue comes down.
 function panelRowShown(rowId) {
-  if (rowId === 'diceset-row' || rowId === 'diceset-picker') return true;
   if (!IS_BETA && BETA_ROWS.includes(rowId)) return false;
   if (IS_BETA) return true;
-  const venue = VENUES[currentVenue] || VENUES.table;
+  const venue = VENUES[tableSettingValue('venue', currentVenue)] || VENUES.table;
   return venue.register !== 'fantasy';
 }
 
 // A fantasy venue owns its felt and tower; personal dice remain reachable.
 // Elements resolved by id per call (the renderFeltSwatches rule).
 function updateVenueChrome() {
-  const venue = VENUES[currentVenue] || VENUES.table;
+  const venue = VENUES[tableSettingValue('venue', currentVenue)] || VENUES.table;
   const fantasy = venue.register === 'fantasy';
   // venue-row/venue-picker join the list the day a channel can hide them:
   // the venue never hides its own picker, but the channel does, and the loop
   // is where a row's visibility is decided.
   for (const rowId of ['venue-row', 'venue-picker', 'felt-label', 'felt-swatches',
-    'tower-row', 'tower-picker', 'diceset-row', 'diceset-picker']) {
+    'tower-row', 'tower-picker']) {
     const el = document.getElementById(rowId);
     if (el) el.style.display = panelRowShown(rowId) ? '' : 'none';
   }
@@ -16763,6 +16762,7 @@ window.__diceDebug = {
   // doing nothing.
   openSettings(at) { openSettingsModal(at); },
   settingsDest(at) { return at === undefined ? settingsDest : showSettingsDest(at); },
+  get tableEdit() { return tableEdit ? {values:{...tableEdit.values},dirty:[...tableEdit.dirty],conflicts:[...tableEdit.conflicts],busy:tableEdit.busy} : null; },
   // THE CHANNEL, AS THIS BOOT RESOLVED IT (js/stability.js). A REPORT, not a
   // setter: a channel is redeemed at boot from the URL and there is no
   // in-app way to change one, so a hook that flipped it live would be
@@ -25352,7 +25352,7 @@ function logExportSnapshot() {
     head.push(`This is the most recent ${LOG_CAP} rolls — the table may go back further.`);
   }
   head.push('A roll that was face down or whispered is listed without its values.');
-  head.push('Plain text, for reading and keeping — not an import file. Pools and settings travel separately, through Settings → Your data.');
+  head.push('Plain text, for reading and keeping — not an import file. Pools and settings travel separately: open your name menu → Manage saved rolls → Export / import.');
 
   const byId = new Map();
   const supersededIds = new Map();
@@ -25978,9 +25978,11 @@ function rerenderInterpretation() {
 // The name and connection state stand together; event notices have their own slot.
 function renderTableName() {
   const el = document.getElementById('table-name');
-  const name = IN_LOBBY ? '' : tableLabel(netOnline ? roomSettings.tableName : '');
+  const name = IN_LOBBY ? '' : tableLabel(netOnline || connectionState === 'offline' ? roomSettings.tableName : '');
   el.textContent = name;
-  el.title = IN_LOBBY ? '' : `room: ${ROOM}`;
+  el.title = name;
+  document.getElementById('table-open').setAttribute('aria-label', `Table setup and invitations · ${name || 'Solo table'}`);
+  document.getElementById('table-solo-label').hidden = !IN_LOBBY;
   el.classList.toggle('hidden', !name);
   document.title = name ? `${name} — Dice Table` : 'Dice Table';
   const state = document.getElementById('table-connection');
@@ -29663,7 +29665,7 @@ function applyRoomSettings(settings) {
     // the settings modal's rename field follows the echo — unless the
     // player is mid-typing in it (never clobber a focused input)
     const input = document.getElementById('set-table-name');
-    if (document.activeElement !== input) input.value = roomSettings.tableName;
+    if (!tableEdit && document.activeElement !== input) input.value = roomSettings.tableName;
   }
   if (typeof settings.felt === 'string' && FELT_THEMES[settings.felt]) {
     roomSettings.felt = settings.felt;
@@ -29719,6 +29721,7 @@ function applyRoomSettings(settings) {
     if (settings.venue !== currentVenue) applyVenue(settings.venue);
     renderVenuePicker();
   }
+  rebaseTableEdit();
 }
 
 // Build the felt swatch chips once, then only refresh the selected state.
@@ -29805,12 +29808,12 @@ function renderFeltSwatches() {
       nm.textContent = theme.name;
       chip.append(dot, nm);
       chip.title = IN_LOBBY ? `${theme.name} felt` : `${theme.name} felt — everyone at the table sees this`;
-      chip.addEventListener('click', () => selectFelt(id));
+      chip.addEventListener('click', () => pickTableSetting('felt', id, selectFelt));
       holder.appendChild(chip);
     }
   }
   holder.querySelectorAll('.felt-swatch').forEach((b) => {
-    b.setAttribute('aria-pressed', String(b.dataset.felt === currentFeltId));
+    b.setAttribute('aria-pressed', String(b.dataset.felt === tableSettingValue('felt', currentFeltId)));
   });
 }
 
@@ -30070,16 +30073,11 @@ async function openDiceGallery(anchor) {
   }
 }
 function renderDiceSetPicker() {
-  const holder = document.getElementById('diceset-picker');
   const label = (setSwatchInfo(diceSet) || setSwatchInfo('std')).label;
   document.getElementById('my-dice-current').textContent = label;
-  if (!holder.querySelector('button')) {
-    const button = document.createElement('button');
-    button.type = 'button'; button.className = 'dice-gallery-link';
-    button.addEventListener('click', () => openDiceGallery(document.getElementById('my-dice')));
-    holder.append(button);
-  }
-  holder.querySelector('button').textContent = `${label} · Browse my dice →`;
+  document.getElementById('idm-dice-current').textContent = label;
+  document.getElementById('my-dice').title = `My dice · ${label}`;
+  document.getElementById('my-dice').setAttribute('aria-label', `My dice · ${label}`);
   diceGallery?.update();
 }
 document.getElementById('my-dice').addEventListener('click', e => openDiceGallery(e.currentTarget));
@@ -30100,12 +30098,12 @@ function renderSystemPicker() {
       chip.dataset.system = sys.id;
       chip.textContent = sys.label;
       chip.title = IN_LOBBY ? `${sys.label} — how your rolls read` : `${sys.label} — everyone at the table reads rolls this way`;
-      chip.addEventListener('click', () => selectSystem(sys.id));
+      chip.addEventListener('click', () => pickTableSetting('system', sys.id, selectSystem));
       holder.appendChild(chip);
     }
   }
   holder.querySelectorAll('.system-chip').forEach((b) => {
-    b.setAttribute('aria-pressed', String(b.dataset.system === currentSystemId));
+    b.setAttribute('aria-pressed', String(b.dataset.system === tableSettingValue('system', currentSystemId)));
   });
 }
 
@@ -30146,11 +30144,11 @@ function renderZoomPicker() {
       chip.textContent = z.label;
       chip.title = z.title;
       chip.setAttribute('role', 'radio');
-      chip.addEventListener('click', () => selectZoom(z.id));
+      chip.addEventListener('click', () => pickTableSetting('zoom', z.id, selectZoom));
       holder.appendChild(chip);
     }
   }
-  const active = roomSettings.zoom || DEFAULT_ZOOM;
+  const active = tableSettingValue('zoom', roomSettings.zoom || DEFAULT_ZOOM);
   // aria-checked ONLY (U22): `aria-pressed` is not a valid attribute of
   // role="radio", and setting both means one of the two is always wrong. A
   // radio's state is checked; pressed belongs to a toggle button.
@@ -30184,11 +30182,11 @@ function renderTowerPicker() {
       chip.textContent = towerCos(t).label;
       chip.title = towerCos(t).title;
       chip.setAttribute('role', 'radio');
-      chip.addEventListener('click', () => selectTower(t.id));
+      chip.addEventListener('click', () => pickTableSetting('tower', t.id, selectTower));
       holder.appendChild(chip);
     }
   }
-  const active = roomSettings.tower || DEFAULT_TOWER;
+  const active = tableSettingValue('tower', roomSettings.tower || DEFAULT_TOWER);
   holder.querySelectorAll('[data-tower]').forEach((b) => {
     const on = b.dataset.tower === active;
     b.removeAttribute('aria-pressed'); // U22: a radio's state is checked
@@ -30208,11 +30206,11 @@ function renderVenuePicker() {
       chip.textContent = v.label;
       chip.title = v.title;
       chip.setAttribute('role', 'radio');
-      chip.addEventListener('click', () => selectVenue(v.id));
+      chip.addEventListener('click', () => pickTableSetting('venue', v.id, selectVenue));
       holder.appendChild(chip);
     }
   }
-  const active = roomSettings.venue || 'table';
+  const active = tableSettingValue('venue', roomSettings.venue || 'table');
   holder.querySelectorAll('[data-venue]').forEach((b) => {
     const on = b.dataset.venue === active;
     b.removeAttribute('aria-pressed');
@@ -30306,6 +30304,111 @@ function selectFelt(id) {
   return true;
 }
 
+// Table setup is a tentative UI transaction. It never changes the live scene
+// or another player's result until Apply; only edited keys ride the patch.
+// Hoisted for picker calls made during module evaluation.
+var tableEdit;
+var settingsOpener;
+function tableSettingValue(key, fallback) { return tableEdit ? tableEdit.values[key] : fallback; }
+function tableSettingsSnapshot() {
+  return {tableName: roomSettings.tableName || '', felt: roomSettings.felt || currentFeltId,
+    system: roomSettings.system || currentSystemId, zoom: roomSettings.zoom || DEFAULT_ZOOM,
+    tower: roomSettings.tower || DEFAULT_TOWER, venue: roomSettings.venue || 'table'};
+}
+function beginTableEdit() {
+  const values = tableSettingsSnapshot();
+  tableEdit = {values, base:{...values}, dirty:new Set(), conflicts:new Set(), busy:false, note:''};
+  document.getElementById('set-table-name').value = values.tableName;
+  renderTableEdit();
+}
+function pickTableSetting(key, value, immediate) {
+  if (!tableEdit) return immediate?.(value);
+  if (tableEdit.busy) return;
+  tableEdit.values[key] = value;
+  if (value === tableSettingsSnapshot()[key]) {
+    tableEdit.dirty.delete(key); tableEdit.conflicts.delete(key);
+    tableEdit.base[key] = value;
+  } else tableEdit.dirty.add(key);
+  tableEdit.note = '';
+  // A venue's declared tower and its venue travel together, just as they do
+  // through selectVenue. The real table remains untouched until Apply.
+  if (key === 'venue' && VENUES[value]?.register === 'fantasy') {
+    pickTableSetting('tower', venueTowerFor(value));
+  }
+  renderTableEdit();
+}
+function rebaseTableEdit() {
+  if (!tableEdit) return;
+  const live = tableSettingsSnapshot();
+  for (const key of Object.keys(live)) {
+    if (!tableEdit.dirty.has(key) || tableEdit.values[key] === live[key]) {
+      tableEdit.values[key] = live[key]; tableEdit.base[key] = live[key];
+      tableEdit.dirty.delete(key); tableEdit.conflicts.delete(key);
+    } else if (tableEdit.base[key] !== live[key]) tableEdit.conflicts.add(key);
+  }
+  if (document.activeElement !== document.getElementById('set-table-name')) {
+    document.getElementById('set-table-name').value = tableEdit.values.tableName;
+  }
+  renderTableEdit();
+}
+function renderTablePeople() {
+  const list = document.getElementById('table-people');
+  if (!list) return;
+  document.getElementById('table-people-row').hidden = IN_LOBBY;
+  list.replaceChildren();
+  for (const p of players) {
+    const item = document.createElement('span');
+    item.className = 'table-person'; item.setAttribute('role','listitem');
+    const dot = document.createElement('i'); dot.style.backgroundColor = p.color;
+    dot.setAttribute('aria-hidden','true');
+    item.append(dot, document.createTextNode(p.name + (p.id === net?.playerId ? ' (you)' : '')));
+    list.append(item);
+  }
+}
+function renderTableEdit() {
+  if (!tableEdit) return;
+  const e = tableEdit;
+  renderSystemPicker(); renderZoomPicker(); renderFeltSwatches();
+  renderTowerPicker(); renderVenuePicker(); updateVenueChrome();
+  const sample = document.getElementById('table-preview');
+  const swatch = [...document.querySelectorAll('#felt-swatches [data-felt]')].find(b => b.dataset.felt === e.values.felt);
+  const fantasy = VENUES[e.values.venue]?.register === 'fantasy';
+  sample.style.backgroundImage = fantasy ? 'radial-gradient(ellipse at top, #47634e, #132524)' : swatch?.querySelector('.swatch-dot').style.backgroundImage || '';
+  document.getElementById('table-preview-label').textContent = fantasy
+    ? `Venue selection · ${VENUES[e.values.venue].label}`
+    : `Mat preview · ${FELT_THEMES[e.values.felt]?.name || e.values.felt}`;
+  document.getElementById('table-edit-apply').disabled = e.busy || !e.dirty.size;
+  document.getElementById('table-edit-apply').textContent = e.busy ? 'Applying…' : IN_LOBBY ? 'Apply' : 'Apply to table';
+  document.getElementById('table-edit-reset').disabled = e.busy || !e.dirty.size;
+  document.querySelectorAll('.settings-fields').forEach(f => { f.disabled = e.busy; });
+  document.getElementById('table-edit-status').textContent = e.note || (e.conflicts.size
+    ? 'Someone changed a setting you are editing. Review your choices before applying, or Reset to theirs.'
+    : e.dirty.size ? `${e.dirty.size} unapplied ${e.dirty.size === 1 ? 'change' : 'changes'}. The table is unchanged.`
+    : 'Changes stay here until you apply them.');
+}
+async function applyTableEdit() {
+  const e = tableEdit;
+  if (!e || e.busy || !e.dirty.size) return;
+  const patch = Object.fromEntries([...e.dirty].map(key => [key,e.values[key]]));
+  e.busy = true; renderTableEdit();
+  let ok;
+  if (netOnline && net) ok = await net.setSettings(patch);
+  else {
+    applyRoomSettings({...roomSettings,...patch});
+    if (!IN_LOBBY && Object.hasOwn(patch,'tableName')) renameRecentTable(ROOM,roomSettings.tableName);
+    save(LS_ROOMSETTINGS,roomSettings); ok = true;
+  }
+  if (tableEdit !== e) return; // the player may have closed or changed workspaces
+  e.busy = false;
+  e.note = ok ? 'Changes applied.' : 'Couldn’t reach the table. Your changes are still here; try Apply again.';
+  if (ok) {
+    e.dirty.clear(); e.conflicts.clear();
+    e.values = tableSettingsSnapshot(); e.base = {...e.values};
+    document.getElementById('set-table-name').value = e.values.tableName;
+  }
+  renderTableEdit();
+}
+
 const settingsModal = document.getElementById('settings-modal');
 // Separate timers per surface: a modal note must never cancel the pill's
 // pending clear (that would strand a stale note on the pill), and vice versa.
@@ -30364,15 +30467,8 @@ function showSettingsNote(text) {
   }
 }
 
-// THE THREE DESTINATIONS (UX §7.36). The panel holds three kinds of work —
-// staging the table (everyone sees it), your own switches (this device), and
-// the belongings workspace — and they are shown one at a time. `settingsDest`
-// is the one in hand; it is deliberately NOT persisted: a settings panel that
-// opens somewhere different each time because of what you did last week is a
-// panel you have to read before you can use.
-// Room-wide first and together (table, staging), then yours (you, stuff) —
-// the bar's order IS the blast-radius reading, and it is the reason a split
-// into four cells does not cost the structure its first principle.
+// One shared frame with context-specific entry points. Table and Appearance
+// are the only tabs; Preferences and the library open directly from their homes.
 const SETTINGS_DESTS = ['table', 'staging', 'you', 'stuff'];
 let settingsDest = 'table';
 
@@ -30382,6 +30478,17 @@ let settingsDest = 'table';
 function showSettingsDest(dest) {
   if (!SETTINGS_DESTS.includes(dest)) return settingsDest;
   settingsDest = dest;
+  document.getElementById('settings-modal').dataset.dest = dest;
+  const shared = dest === 'table' || dest === 'staging';
+  if (shared && !tableEdit) beginTableEdit();
+  else if (!shared) tableEdit = null;
+  document.getElementById('settings-title').textContent = shared ? 'Table setup' : dest === 'you' ? 'Preferences' : 'Saved rolls';
+  document.getElementById('settings-scope').textContent = shared
+    ? (IN_LOBBY ? 'Your solo table' : 'Shared with everyone here')
+    : dest === 'you' ? 'For this device' : 'Your characters, rolls, and files';
+  document.getElementById('settings-nav').hidden = !shared;
+  document.getElementById('table-edit-footer').hidden = !shared;
+  document.getElementById('table-open').setAttribute('aria-expanded', String(shared));
   for (const d of SETTINGS_DESTS) {
     const sec = document.getElementById(`dest-${d}`);
     if (sec) sec.classList.toggle('hidden', d !== dest);
@@ -30395,7 +30502,7 @@ function showSettingsDest(dest) {
   // A destination change re-tops the scroll: the panel scrolls inside itself,
   // and arriving at a new section already scrolled down is the "map that lies"
   // §7.23 fixed for the pools bar.
-  const panel = document.getElementById('settings-panel');
+  const panel = document.getElementById('settings-scroll');
   if (panel) panel.scrollTop = 0;
   return settingsDest;
 }
@@ -30410,14 +30517,8 @@ document.getElementById('settings-nav').addEventListener('click', (e) => {
 // panelRowShown below — one owner, because there are now two reasons a row
 // leaves this panel and they must not be able to resurrect each other's.
 //
-// FELT STAYS PUT, and that was a measurement, not a preference. Staging owns
-// the felt rows because a fantasy venue TAKES the felt (GOALS goal 13), and
-// with no venue on offer that argument thins — felt is room-wide, so blast
-// radius alone would send it to Table. Moved there it stood 483px against a
-// 459px panel: 24px over, which is precisely the defect §7.36 existed to
-// remove, re-grown one channel across. Left where it is, Staging under the
-// stable channel is a destination holding the felt, which is what staging a
-// table has always meant, and nothing scrolls on either channel.
+// Appearance keeps the channel's offers together. Its catalogues now use
+// the workspace's content scroller while the Apply footer stays visible.
 function applyStabilityChrome() {
   const tag = document.getElementById('staging-beta');
   if (tag) tag.hidden = !IS_BETA;
@@ -30438,21 +30539,24 @@ function syncSettingsUI() {
   updateVenueChrome(); // a fantasy venue keeps the replaced pickers hidden
 }
 
-// `at` names the destination to open on (UX §7.36). It DEFAULTS TO TABLE, and
-// that is a choice with a reason: the panel's title is "Settings" on a shared
-// table, and the room's own state is both the half people come to change
-// together and the half with consequences for everyone. The other two are one
-// click away and named on the bar, which is the whole point of naming them.
-function openSettingsModal(at = 'table') {
+// Programmatic callers retain their existing destination keys. The table
+// label opens setup; the gear opens Preferences; personal controls open the library.
+function openSettingsModal(at = 'table', anchor) {
+  if (settingsModal.classList.contains('hidden')) {
+    const from = anchor instanceof HTMLElement ? anchor : document.activeElement;
+    settingsOpener = identityMenu.contains(from) ? document.getElementById('identity-chip') : from;
+  }
   diceGallery?.close();
+  closeIdentityMenu();
   showSettingsDest(at);
-  renderProfileLibrary(); // §11: the library and 'At this table', fresh per open
+  // Opening three device switches should not rebuild the whole library.
+  if (settingsDest === 'stuff') renderProfileLibrary();
   // The table-name prefill lives HERE, not in syncSettingsUI: setSound()
   // calls syncSettingsUI during module evaluation, before roomSettings'
   // let initializes — the exact eval-order trap the felt-swatch comment
   // below records. A modal can only open long after eval.
   const nameInput = document.getElementById('set-table-name');
-  if (document.activeElement !== nameInput) nameInput.value = roomSettings.tableName || '';
+  if (document.activeElement !== nameInput) nameInput.value = tableSettingValue('tableName', roomSettings.tableName || '');
   // The lobby's honesty pass (§7.20): a heading that claims "everyone at the
   // table" with no table is the section's own lie, and Table name has no
   // roomless meaning. Felt, system and zoom stay — they are yours either way.
@@ -30474,22 +30578,28 @@ function openSettingsModal(at = 'table') {
   // a key cannot be hidden).
   document.getElementById('set-invite-row').style.display = IN_LOBBY ? 'none' : '';
   document.getElementById('portable-push').style.display = IN_LOBBY ? 'none' : '';
-  document.getElementById('set-diceset-sub').textContent = IN_LOBBY
-    ? 'the dice you roll in — from your next roll'
-    : 'the dice everyone sees you roll — from your next roll';
   syncSettingsUI();
   settingsModal.classList.remove('hidden');
-  openModal(settingsModal, { labelledBy: 'settings-title' });
+  renderTablePeople();
+  syncSettingsModal();
+  document.getElementById('settings-close').focus({preventScroll:true});
 }
 
 function closeSettingsModal() {
+  const hadFocus = settingsModal.contains(document.activeElement);
   settingsModal.classList.add('hidden');
+  tableEdit = null;
+  document.getElementById('table-open').setAttribute('aria-expanded','false');
   closeModal(settingsModal);
   document.getElementById('settings-note').textContent = '';
   closeSetMenu(); // the dice-set menu must not outlive its anchor
+  if (hadFocus && settingsOpener?.isConnected) settingsOpener.focus({preventScroll:true});
 }
 
-document.getElementById('toggle-settings').addEventListener('click', openSettingsModal);
+document.getElementById('toggle-settings').addEventListener('click', e => openSettingsModal('you', e.currentTarget));
+document.getElementById('table-open').addEventListener('click', e => openSettingsModal('table', e.currentTarget));
+document.getElementById('idm-preferences').addEventListener('click', () => openSettingsModal('you'));
+document.getElementById('idm-library').addEventListener('click', () => openSettingsModal('stuff'));
 document.getElementById('settings-close').addEventListener('click', closeSettingsModal);
 settingsModal.addEventListener('click', (e) => {
   if (e.target === settingsModal) closeSettingsModal(); // backdrop click
@@ -30497,31 +30607,32 @@ settingsModal.addEventListener('click', (e) => {
 // Esc closes the modal only when it is the topmost layer — see the central
 // Esc layering in the keyboard-shortcuts section below.
 document.getElementById('set-sound').addEventListener('click', () => setSound(!soundOn));
-// Table name (anatomy pass): commit on Enter/blur, room-wide like felt —
-// online the UI applies only on the settings-changed echo (no optimistic
-// divergence); solo applies now and persists the LS copy. Same-value
-// commits are dropped client-side (the server would 200 a no-op anyway).
-{
-  const nameInput = document.getElementById('set-table-name');
-  const commitTableName = () => {
-    const v = nameInput.value.trim();
-    if (v === (roomSettings.tableName || '')) return;
-    if (netOnline && net) {
-      net.setSettings({ tableName: v }).then((ok) => {
-        if (!ok) showSettingsNote('couldn’t rename the table — try again');
-      });
-    } else {
-      roomSettings.tableName = cutText(v, 28);
-      save(LS_ROOMSETTINGS, roomSettings);
-      renderTableName();
-    }
-  };
-  nameInput.addEventListener('keydown', (e) => {
-    e.stopPropagation(); // typing a name must not fire table shortcuts
-    if (e.key === 'Enter') { commitTableName(); nameInput.blur(); }
-  });
-  nameInput.addEventListener('blur', commitTableName);
+// Names join the same explicit transaction as the shared appearance controls.
+document.getElementById('set-table-name').addEventListener('input', e => pickTableSetting('tableName', cutText(e.target.value,28)));
+document.getElementById('set-table-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); applyTableEdit(); }
+});
+document.getElementById('table-edit-apply').addEventListener('click', applyTableEdit);
+document.getElementById('table-edit-reset').addEventListener('click', beginTableEdit);
+document.getElementById('table-edit-cancel').addEventListener('click', closeSettingsModal);
+const settingsPhone = window.matchMedia('(max-width: 640px)');
+function syncSettingsModal() {
+  const focused = settingsModal.contains(document.activeElement) ? document.activeElement : null;
+  if (settingsPhone.matches) openModal(settingsModal, {labelledBy:'settings-title'});
+  else {
+    closeModal(settingsModal);
+    settingsModal.setAttribute('role','dialog');
+    settingsModal.setAttribute('aria-labelledby','settings-title');
+  }
+  focused?.focus({preventScroll:true});
 }
+settingsPhone.addEventListener('change', () => {
+  if (!settingsModal.classList.contains('hidden')) syncSettingsModal();
+});
+settingsModal.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Escape') { e.preventDefault(); closeSettingsModal(); }
+});
 document.getElementById('set-chips').addEventListener('click', () => setChips(!chipsOn));
 document.getElementById('set-ambience').addEventListener('click', () => setAmbience(!ambienceOn));
 
@@ -33427,6 +33538,7 @@ const ROSTER_MAX = 6; // pills shown before the tail folds into +N — raised
 function renderPlayers() {
   rosterEl.innerHTML = '';
   renderTableName();
+  if (tableEdit) renderTablePeople();
   repaintAwayVerbs(); // a departure can make a roll on screen clearable (U19)
   // …and the roster IS where the table's characters come from since C17, so
   // someone arriving with a library, or leaving with one, changes the offer.
@@ -33536,7 +33648,7 @@ function unclaimedSeats() {
 async function shareInvite(url, btn, restoreLabel) {
   if (!url) return;
   if (navigator.share && window.matchMedia('(hover: none)').matches) {
-    try { await navigator.share({ url }); return; } catch (err) {
+    try { await navigator.share({ title: document.title, url }); return; } catch (err) {
       if (err && err.name === 'AbortError') return;
       /* anything else: fall through to the clipboard */
     }
@@ -34231,6 +34343,7 @@ const idmShow = (id, on) => { document.getElementById(id).style.display = on ? '
 
 function openIdentityMenu() {
   diceGallery?.close();
+  closeSettingsModal();
   const info = identityInfo();
   document.getElementById('idm-who').textContent = info.name || 'You';
   // This line used to branch on `online`, which conflated two questions: a
@@ -35016,6 +35129,12 @@ function handleNetEvent(type, data) {
       // the apply overwrites the values it is taken against.
       const verb = settingsChangeVerb(data.settings);
       applyRoomSettings(data.settings);
+      // Only an explicit live rename replaces a remembered label. A fresh
+      // room's empty join snapshot must still allow the existing restore path.
+      if (!IN_LOBBY && typeof data.settings?.tableName === 'string') {
+        if (roomSettings.tableName) rememberThisTable();
+        renameRecentTable(ROOM,roomSettings.tableName);
+      }
       if (data.byId && net && data.byId !== net.playerId) {
         showSettingsNote(`${data.byName || 'someone'} ${verb}`);
       }

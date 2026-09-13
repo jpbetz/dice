@@ -2900,22 +2900,17 @@ html, body {
   max-width: 170px;
 }
 .identity-caret { color: #b9b3a7; font-size: 13px; margin-left: 2px; }
-#my-dice {
-  display: flex; flex: none; align-items: center; gap: 10px;
-  margin: 6px 14px 4px; padding: 9px 12px; min-height: 54px;
-  border: 1px solid #77706070; border-radius: 10px; background: #bda36d0d;
-  color: #f1e6ce; text-align: left; cursor: pointer; font: 600 13px/1.3 var(--font-ui);
-}
-#my-dice:hover { background: #bda36d20; border-color: #bba16b; }
-#my-dice:focus-visible { outline: 2px solid #e8c47e; outline-offset: 2px; }
-.my-dice-icon { font-size: 27px; color: #d7bf92; }
-.my-dice-label { flex: 1; min-width: 0; }
-#my-dice-current { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 400; color: #bfb6a6; margin-top: 2px; }
-.my-dice-arrow { color: #b8a583; }
-#left-panel.collapsed #my-dice { margin: 5px 6px 10px; padding: 8px 7px; gap: 6px; font-size: 12px; }
-#left-panel.collapsed .my-dice-icon { font-size: 19px; }
-#left-panel.collapsed .my-dice-arrow { display: none; }
-#left-panel.collapsed #my-dice-current { font-size: 10px; }
+/* Personal controls share one existing header row; no featured dice card. */
+#personal-controls { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; }
+#personal-controls #identity-chip { flex: 0 1 auto; min-width: 0; max-width: none; justify-content: flex-start; }
+#my-dice { flex: none; min-height: 32px; padding: 4px 10px; border: 0; border-left: 1px solid var(--hair); background: none; color: var(--ivory); font: 12px var(--font-ui); cursor: pointer; }
+#my-dice:hover { background: #ffffff0a; }
+#my-dice:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+#left-panel.collapsed #personal-controls { gap: 2px; }
+#left-panel.collapsed #personal-controls #identity-chip { flex: 1; gap: 4px; padding: 4px 2px; }
+#left-panel.collapsed #personal-controls .identity-caret, #left-panel.collapsed .my-dice-prefix { display: none; }
+#left-panel.collapsed #my-dice { padding: 4px; }
+#left-panel.collapsed #personal-controls .identity-dot { width: 6px; height: 6px; }
 .identity-dot {
   flex: none;
   width: 10px;
@@ -2994,7 +2989,7 @@ html, body {
 #idm-name-save { min-height: 42px; padding: 8px 13px; border: 1px solid #caae77; border-radius: 7px; background: #dec08a; color: #241e16; cursor: pointer; }
 #idm-name-note { font-size: 11px; line-height: 1.5; color: #b9ae99; margin: 8px 0; }
 #identity-menu .idm-item { min-height: 40px; }
-#diceset-picker .dice-gallery-link { min-height: 40px; padding: 8px 12px; border: 1px solid #9a865b; border-radius: 8px; background: #c1a67215; color: #ead6b1; cursor: pointer; }
+#idm-dice-current { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
 
 /* ---------- roll-log flyout (the rail's ≣ / key 'l') ---------- */
 /* The log is information, not workspace (P3): it drops from the rail like
@@ -3324,18 +3319,8 @@ html, body {
 .rail-menu-forget:focus-visible { outline: 1px solid var(--ivory); outline-offset: -1px; }
 @media (pointer: coarse) { .rail-menu-forget { opacity: 1; } }
 
-/* the settings rename row: the input takes a bounded seat beside its
-   label — .tin's block width would crush the prow's label column */
-#set-table-name { flex: 0 0 150px; width: 150px; min-width: 0; }
-
-/* ---------- the table nameplate (anatomy pass 2026-08-04) ---------- */
-/* The table's name rides the rail's right edge — the mirror of YOU
-   top-left (ORDER IS THE CONTRACT: the you-chip keeps its corner; past
-   four players the name wraps below exactly like the status pill always
-   has). Content, not chrome: as-typed case in the display face, ambient
-   muted, non-interactive — renaming lives behind the Settings gate (P6),
-   and the invite link keeps its one home in the identity menu. ABSENT
-   when the table is unnamed: no placeholder ever stands here. */
+/* The existing table context is also its setup entry. A long name truncates
+   within the same row instead of moving the composer down. */
 .table-name {
   margin-left: auto;
   align-self: center;
@@ -3349,32 +3334,20 @@ html, body {
   color: var(--muted);
 }
 .table-name.hidden { display: none; }
-#left-panel.collapsed .table-name { display: none; }
+
 
 /* Table identity and liveness remain visible even when nobody named it.
    A transient event notice must not erase the answer to "am I with them?". */
-#table-context {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  width: 100%;
-  min-width: 0;
-  font-size: 11px;
-  color: var(--muted);
-}
-#table-context .table-name {
-  margin-left: 0;
-  margin-right: auto;
-  color: var(--ivory);
-}
-#table-retry[hidden] { display: none; }
-#left-panel.collapsed #table-context { gap: 3px; }
-#left-panel.collapsed #table-context .table-name {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-}
+#table-context { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 8px; width: 100%; min-width: 0; font-size: 11px; color: var(--muted); }
+#table-open { display: flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; padding: 5px 0; border: 0; background: none; color: var(--muted); cursor: pointer; text-align: left; }
+#table-context .table-name { margin: 0; min-width: 0; max-width: 100%; color: var(--ivory); font: 12px var(--font-ui); letter-spacing: 0; }
+#table-open:hover .table-name { color: var(--gold-bright); }
+#table-connection { margin-left: auto; }
+#table-retry[hidden], #table-context .table-name.hidden { display: none; }
+#left-panel.collapsed #table-context { grid-template-columns: minmax(0, 1fr); gap: 1px; }
+#left-panel.collapsed #table-open { width: 100%; min-height: 32px; }
+#left-panel.collapsed #table-context .table-name { display: block; min-width: 0; max-width: 100%; }
+#left-panel.collapsed #table-connection { margin-left: 0; font-size: 10px; }
 #pools-scope {
   margin: 8px 0 0;
   font-size: 12px;
@@ -3837,69 +3810,59 @@ body.seated #result-banner { left: calc(var(--table-left) + 24px); transform: no
   80% { transform: translate(3px, -2px); }
 }
 
-/* ---------- settings modal (roadmap §2) ---------- */
-#settings-modal {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(10, 8, 5, 0.72);
-  backdrop-filter: blur(4px);
-}
+/* One workspace frame: table setup, personal preferences, or saved rolls.
+   Desktop keeps the scene available; a narrow viewport uses a modal sheet. */
+#settings-modal { position: fixed; inset: 12px 12px 12px auto; z-index: var(--z-popover); width: min(440px, calc(100vw - 24px)); }
 #settings-modal.hidden { display: none; }
-#settings-panel {
-  width: 340px;
-  padding: 0;
-  /* the Your-data zone can make the modal taller than a short window —
-     the panel scrolls inside itself rather than clipping its foot */
-  max-height: calc(100vh - 32px);
-  /* ONE FRAME FOR ALL FOUR DESTINATIONS (§7.36). The destinations are 347 /
-     451 / 331 / 291 tall, and letting the dialog resize under the cursor as
-     you move between them is a new twitch the split would otherwise have
-     introduced — the close button would walk 160px up the screen for pressing
-     "You". Sized to the tallest, and it yields to max-height on a short
-     window, where scrolling one destination is the lesser evil. */
-  min-height: min(470px, calc(100vh - 32px));
-  overflow-y: auto;
-  animation: modal-pop 0.3s cubic-bezier(0.2, 1.4, 0.4, 1);
-}
-.settings-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid var(--hair);
-}
-.settings-head h2 { margin: 0; }
-.settings-sec { padding: 12px 14px; }
-.settings-sec + .settings-sec { border-top: 1px solid var(--hair); }
+#settings-modal[data-dest="you"] { top: auto; height: auto; max-height: calc(100dvh - 24px); width: min(360px, calc(100vw - 24px)); }
+#settings-modal[data-dest="you"] #settings-panel { height: auto; max-height: calc(100dvh - 24px); }
+#settings-modal[data-dest="you"] #settings-scroll { flex: 0 1 auto; }
 
-/* THE DESTINATION BAR (UX §7.36). Three exclusive cells — Table · You · Your
-   stuff — in the app's own `.seg` grammar rather than a new one, so it
-   inherits the ivory pressed dress the C3/U6 audit settled app-wide and no
-   new hue decision is taken here. It is STICKY: the panel scrolls inside
-   itself, and a map that scrolls away is a map you have to go back for. The
-   4px of air above it belongs to the bar's own box, never to the container —
-   §7.23's "no padding above a sticky child", learned the hard way. */
-#settings-nav {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  margin: 0;
-  padding: 10px 14px;
-  border: 0;
-  border-radius: 0;
-  border-bottom: 1px solid var(--hair);
-  /* NEAR-OPAQUE, not var(--panel): the panel colour is translucent (the
-     modal blurs what is behind it), and a translucent sticky bar shows the
-     rows sliding under it. Same fix, same number family as the pool
-     panel's sticky section head. */
-  background: rgba(24, 19, 14, 0.97);
-  gap: 4px;
+#settings-panel { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; max-height: 100%; overflow: hidden; padding: 0; border-radius: 14px; background: #1c2021; border-color: #51504a; box-shadow: 0 18px 60px #0008; }
+.settings-head { display: flex; flex: none; align-items: center; justify-content: space-between; padding: 18px 22px 14px; border-bottom: 1px solid var(--hair); }
+.settings-head h2 { margin: 0; font: 25px/1.2 Georgia, serif; color: #fff1d8; text-transform: none; letter-spacing: 0; }
+#settings-scope { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+#settings-close { min-width: 36px; min-height: 36px; }
+#settings-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: #65625a transparent; }
+.settings-sec { padding: 18px 22px; }
+.settings-sec + .settings-sec { border-top: 1px solid var(--hair); }
+.settings-fields { margin: 0; border: 0; min-width: 0; }
+#settings-nav { flex: none; margin: 0; padding: 8px 22px; border: 0; border-bottom: 1px solid var(--hair); border-radius: 0; background: #ffffff03; gap: 4px; }
+#settings-nav button { padding: 9px 12px; border-radius: 7px; }
+#settings-nav[hidden], #table-edit-footer[hidden] { display: none; }
+#settings-panel .plabel { margin-bottom: 12px; }
+#settings-panel .prow { margin: 10px 0; }
+#settings-panel .prow-label { font-size: 13px; color: #eee4d4; }
+#settings-panel :is(.prow-sub, .hint) { color: #bab5a9; font-size: 12px; line-height: 1.4; }
+#settings-panel :is(.system-chip, .felt-swatch) { min-height: 36px; }
+#settings-panel #set-invite { min-height: 36px; white-space: nowrap; }
+#settings-panel #set-room-label { display: none; }
+#table-solo-label[hidden] { display: none; }
+
+#settings-panel #set-table-name-row { display: flex; flex-direction: column; align-items: stretch; gap: 7px; margin-top: 0; }
+#settings-panel #set-table-name { width: 100%; flex: none; font-size: 16px; padding: 10px; }
+#table-people-row { margin: 20px 0 10px; }
+#table-people { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.table-person { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--hair); border-radius: 20px; padding: 5px 9px; font-size: 12px; }
+.table-person i { width: 7px; height: 7px; border-radius: 50%; }
+#table-preview { height: 112px; border-radius: 10px; border: 1px solid #ffffff20; margin-bottom: 20px; background-size: 192px; display: flex; align-items: flex-end; overflow: hidden; }
+#table-preview-label { padding: 9px 12px; background: #0009; color: #fff; width: 100%; font-size: 12px; }
+#settings-panel #felt-swatches { max-height: none; overflow: visible; }
+#table-edit-footer { flex: none; border-top: 1px solid var(--hair); padding: 12px 22px 16px; }
+#table-edit-status { margin: 0 0 10px; font-size: 12px; color: #c4bdb1; }
+#table-edit-footer > div { display: flex; align-items: center; gap: 8px; }
+#table-edit-reset { margin-right: auto; }
+#table-edit-apply { background: #dfc18a; color: #241e16; border-color: #dfc18a; min-height: 38px; }
+#settings-panel #settings-note { flex: none; padding: 10px 22px; }
+@media (max-width: 640px) {
+  #settings-modal { inset: 24px 0 0; width: 100%; height: calc(100dvh - 24px); }
+  #settings-panel { border-radius: 18px 18px 0 0; }
+  #settings-modal[data-dest="you"] { top: auto; height: auto; width: 100%; }
+  .settings-head { padding: 16px 20px 12px; }
+  .settings-sec { padding: 16px 20px; }
+  #settings-nav { padding: 8px 20px; }
+  #table-edit-footer { padding: 12px 20px max(12px, env(safe-area-inset-bottom)); }
 }
-#settings-nav button { padding: 6px 4px; border-radius: 8px; }
 /* A destination is DISPLAY-NONE when it is not the one in hand, not merely
    transparent: the whole point of the split is that the other two cost no
    scroll. */

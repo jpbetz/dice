@@ -13,6 +13,70 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Compact table controls and setup (2026-09-13)
+
+Joe approved table setup next, then corrected the design habit: the new dice
+selector had taken too much valuable space, and another featured block for
+table naming would make it worse. This pass fits both into the existing
+context header. **My Dice** shares the personal-name row (Dice in the compact
+sidebar), while the existing table label opens setup. Long names truncate in
+the same grid row. There is no new permanent table card or invitation bar.
+
+At a four-person table, the expanded desktop composer starts at **112 px**
+instead of **164.09 px**; the compact phone Roll control starts at **111 px**
+instead of **176.19 px**. That returns **52 px / 65 px** to rolling and saved
+rolls, including a named table in the after measurement. The sidebar's width
+is unchanged; the full-width mobile composition remains R2 work.
+
+Table setup, Preferences, and Saved rolls reuse one workspace frame, reached
+from their own context. Table setup has Table / Appearance tabs, current
+participants, the guest invite link, name, interpretation, rolling area,
+mat, and available venue/tower controls. The gear opens a compact panel with
+only Sound, Show numbers on dice, and Room tone. Library management is in the
+personal menu; My Dice no longer needs a duplicate row in Preferences.
+
+Shared controls now edit a tentative selection. Mat previews reuse the actual
+2D material tile; venue selection is labelled by name, not a full 3D scene
+preview. **Apply to table** sends only changed keys, with venue and its tower
+together. Reset adopts current table settings; Cancel/Escape discards the
+local edit. Other players keep rolling. Unedited fields follow incoming
+changes; conflicting edited fields get a review notice; failed writes retain
+the edit for retry. A successful rename updates peers, browser titles, and
+existing recents without changing the room key. An explicit clear also clears
+the recent label, while the existing fresh-room name recovery still works.
+
+Desktop setup is nonmodal. Phone setup contains focus and returns it to the
+opener; switching viewport width updates that scope. The content has one
+scroller, with Apply and Close outside it. Preferences sizes to its three
+controls. These supersede UX §7.37's four peer destinations and nested mat
+scroll, the automatic setting/blur commits, and the first personal-kit
+release's standalone dice card.
+
+Visual proof: [closed desktop](redesign/2026-09-13-table-controls-desktop.png),
+[closed phone](redesign/2026-09-13-table-controls-phone.png),
+[table setup](redesign/2026-09-13-table-controls-desktop-table.png),
+[compact preferences](redesign/2026-09-13-table-controls-phone-preferences.png),
+and [shorter keyboard viewport](redesign/2026-09-13-table-controls-phone-keyboard.png).
+Reproduce with `node tools/drive.mjs tools/steps/table-controls-look.mjs after`.
+The look uses desktop Chromium, a verified GPU backend, 1440 × 900 and
+390 × 844 viewports, and a 390 × 440 keyboard-sized viewport. This is touch
+emulation, not a physical mobile-keyboard measurement.
+
+Targeted checks pass for pending edits, shared Apply, Cancel, retry, conflict
+reset, focus/resize, library preservation, current-roll preservation, recents,
+the existing name round trip, stability offerings, venue and dice behavior,
+and developer mat editing. Debug hooks add only the `tableEdit` readout.
+`npm test` passed unit and fuzz checks and 61 of 62 smoke scenarios. The
+remaining check pinned the old header's direct children; it now verifies
+the personal row containing name and dice, and passes. The final focused
+run passes all five scenarios: table controls, phone controls, settings
+destinations, control rail, and log export. The changed structural expectation
+records the owner's request to reclaim space, rather than preserving the
+standalone card. The preview adds no second 3D renderer; this is not a
+measurement or completion of the broader performance work.
+The broader R1 destination shell, Quick dice, practice, table homes and
+in-app invitations remain open; this does not implement an identity service.
+
 ## Personal name and dice collection (2026-09-13)
 
 The first bounded implementation of the approved experience redesign makes
