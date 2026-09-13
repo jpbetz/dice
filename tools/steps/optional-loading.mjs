@@ -43,7 +43,7 @@ export default async function run(stage){
    const fox=await t.dbg('lifeInfo()');assert.notDeepEqual(moon.hue,fox.hue,'real loaded palette changes');
    const resources=await snapshot(t),optional=rs=>rs.filter(r=>/\/fae(?:-lab|life)\.js/.test(r.path));
    const backend=await t.eval(`(()=>{const gl=document.querySelector('#scene-container canvas').getContext('webgl2'),ext=gl.getExtension('WEBGL_debug_renderer_info');return ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'unknown';})()`);
-   rows.push({device,backend,initial:{totals:totals(initial),optional:optional(initial),modules:initial.filter(r=>r.path.endsWith('.js')),resources:initial},onUse:{readyMs,totals:totals(newUse),optional:optional(newUse)},allOptional:optional(resources),hash,moon:{flies:moon.flies,wisps:moon.wisps,hue:moon.hue},fox:{flies:fox.flies,wisps:fox.wisps,hue:fox.hue}});
+   rows.push({device,backend,initial:{totals:totals(initial),optional:optional(initial),modules:initial.filter(r=>r.path.endsWith('.js')),resources:initial},onUse:{readyMs,totals:totals(newUse),optional:optional(newUse),modules:newUse.filter(r=>r.path.endsWith('.js'))},allOptional:optional(resources),hash,moon:{flies:moon.flies,wisps:moon.wisps,hue:moon.hue},fox:{flies:fox.flies,wisps:fox.wisps,hue:fox.hue}});
    console.log(device,JSON.stringify({initial:totals(initial),deferred:totals(optional(newUse)),readyMs}));
    assert.deepEqual(t.page.errors,[]);await t.close();
   }

@@ -48,7 +48,6 @@ limitations under the License.
 // automated would notice.
 
 import * as THREE from 'three';
-import { GLTFLoader } from '../vendor/GLTFLoader.js';
 
 // THE HOUSE RULES a tower's materials must satisfy (js/main.js
 // towerModelAudit's offPolicy block, which is what tower-fit gates on):
@@ -148,7 +147,14 @@ export function towerGlbEnsure(url) {
         // harness never sees this class — its profile is always cold.
         // server.js answers the revalidation with a body-less 304 (ETag over
         // bytes), so freshness costs one conditional round-trip per session.
-        const res = await fetch(url, { cache: 'no-cache' });
+        // The parser is optional too: ordinary tables have no model. Fetch
+        // both under the SAME readiness/retry gate; no caller can observe a
+        // ready entry until parsing and portal validation have completed.
+        // Browser module caching shares this graph with table previews/designs.
+        const [{ GLTFLoader }, res] = await Promise.all([
+          import('../vendor/GLTFLoader.js'),
+          fetch(url, { cache: 'no-cache' }),
+        ]);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const buf = await res.arrayBuffer();
         // parse() rather than load(): the fetch is ours (so the retry ladder

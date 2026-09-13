@@ -102,8 +102,9 @@ weakened to obtain a passing result.
 The startup audit found another concrete seam: `towerglb.js` eagerly imports
 `GLTFLoader.js` (109,259 decoded bytes), pulling in `BufferGeometryUtils.js`
 (32,292). This defeats the already-lazy loader in the new table-design
-registry. Defer that graph within the existing tower-model readiness gate,
-with separate failure/cancellation/portal tests.
+registry. The subsequent [model-parser slice](2026-09-13-optional-model-parser.md)
+defers that graph within the existing tower-model readiness gate, with
+separate failure/cancellation/portal tests.
 
 The large main module (1,876,713 decoded bytes in this capture), Three.js and
 Cannon still dominate startup. Further extraction needs an actual consumer
