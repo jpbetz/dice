@@ -39,6 +39,10 @@ export const personalKitScenarios = [
       await a.emulateCoarsePointer(true);
       await a.eval(`document.querySelector('.dg-practice').click()`);
       await a.waitFor(`window.__diceDebug.diceGallery.practice?.rolling`);
+      await a.waitFor(`window.__diceDebug.diceGallery.practice && !window.__diceDebug.diceGallery.practice.rolling`,{timeout:12000});
+      const phonePractice = (await a.dbg('diceGallery')).practice.bounds;
+      assert.ok(phonePractice.left>=-1 && phonePractice.right<=1 && phonePractice.bottom>=-1 && phonePractice.top<=1,'the resting phone die stays entirely inside the preview');
+      assert.equal(await a.eval(`(()=>{const p=document.querySelector('.dg-preview').getBoundingClientRect(), c=document.querySelector('.dg-practice-view canvas').getBoundingClientRect(), u=document.querySelector('.dg-use').getBoundingClientRect();return c.top>=p.top && c.bottom<=p.bottom && c.right<=p.right && c.left>=p.left && c.bottom<=u.top})()`),true,'the practice canvas belongs to the preview and leaves Use reachable');
       await a.eval(`document.querySelector('.dg-card[data-set="std"]').click()`);
       assert.equal((await a.dbg('diceGallery')).practice,null,'another set releases the old renderer');
       assert.equal(await a.eval(`document.querySelectorAll('.dg-practice-view canvas').length`),0);

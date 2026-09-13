@@ -119,6 +119,7 @@ specific language governing permissions and limitations under the License.
 }
 
 /* Local practice shares the selected set preview; actions stay outside scrolling. */
+.dg-preview { position:relative; }
 .dg-practice-view { position:absolute; inset:0; }
 .dg-practice-view canvas { display:block; width:100%; height:100%; }
 .dg-actions { display:flex; gap:8px; }
