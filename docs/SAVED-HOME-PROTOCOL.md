@@ -202,3 +202,6 @@ Inspected captures are reproducible with
 and `homes-card-{desktop,phone}.png`. Capture shows two prepared profiles and
 three shared rolls; private libraries never enter the document. The composed
 release sweep remains a separate integration check.
+
+Reviewed UI captures: [phone capture](redesign/2026-09-13-homes-capture-phone.png)
+and [desktop home cards](redesign/2026-09-13-homes-card-desktop.png).

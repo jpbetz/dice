@@ -144,3 +144,21 @@ The composed owner controls, workspaces, touch targets and rail pass together
 (7/7). The actual desktop/phone launcher and expanded Preferences were inspected;
 help now explains saved-home capture and personal Battery/Instant behavior.
 Both scripted visual passes complete without browser errors.
+
+## Composed retry and loading checks
+
+At `efb85ab`, the full unit/fuzz lane and both protocol-browser suites pass;
+70/71 smoke scenarios pass. The only failure is Help wording in the established
+terminology check. Rephrasing those two terms preserves its meaning; the
+terminology rerun and all four new scenery-loading cases pass together (5/5).
+No second full smoke sweep is claimed by that targeted correction.
+
+All four final saved-home app cases pass together, including close-during-save,
+account replacement while busy, and retained export after a real IDB abort.
+All five actual-account app cases pass on the subsequent composed tree, and
+all ten social API cases pass with the bounded blocked-name page (`938e5c4`).
+The remaining People UI is active. `70d623b` defers both optional scenery
+modules, saving about 36 KB encoded startup bodies in the local capture;
+GLTF parser loading is the next bounded slice. Your main checkout has new
+uncommitted owner-session work, so this checkpoint stays in integration until
+that work is committed and reviewed.
