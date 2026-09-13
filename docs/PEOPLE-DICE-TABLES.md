@@ -317,8 +317,9 @@ one another. No durable friend or home roster goes into public room payloads.
 ## 8. Releases and implementation slices
 
 The original sequence below keeps the approved slice identifiers. R1-A through
-R1-E have implementations and focused proofs; R1-F's composed validation and
-actual observation are tracked in the execution ledger. External deployment
+R1-E have implementations and focused proofs; R1-F's scripted success walk
+and current Help are complete. Final release verification and actual
+observation are tracked in the execution ledger. External deployment
 is separate from local implementation and service-restart tests.
 
 | Slice | Deliverable | Completion evidence |
@@ -405,8 +406,9 @@ roll; do not infer discoverability from click count or scripted completion.
 
 ## 11. What is still a design task
 
-**Next:** complete the composed success walk and release checks, then record
-actual-device and newcomer observations. The destination, practice, setup,
+**Next:** finish release reconciliation, then record actual-device and
+newcomer observations and execute the external enablement handoff. The
+composed success walk and current Help have passed their local proofs. The destination, practice, setup,
 saved-home and People workflows have implementations and inspected browser
 captures, including 390px phone emulation.
 The recovery/store decisions and conflict-preservation policy are in the

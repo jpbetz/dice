@@ -103,7 +103,10 @@ clean browser. Invitation acceptance preserves the current seat and unfinished
 turn; joining the named home is a separate visible action. Contact/location
 sharing stays explicit and presence expires. These are local service and
 browser proofs; production enablement and human observation remain separate.
-The composed success walk and current Help are being completed.
+The [composed success walk](redesign/2026-09-13-r1-success-walk.md) and
+current Help are complete locally. The joined walk passes again on the
+composed code, including guest captures during delayed account startup.
+Final release reconciliation, external enablement and observation remain open.
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable

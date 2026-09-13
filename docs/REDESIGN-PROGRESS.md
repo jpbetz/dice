@@ -25,9 +25,10 @@ cherry-picks are explicit and another ongoing session's edits survive.
 
 ## Remaining campaign work
 
-The tower failure and camera slices are reviewed and integrated. Finish the
-complete guest/recovered return loop on the composed app and current Help. Preserve unfinished and private turns through each visible action. The
-final full sweep must reconcile superseded fixtures with current behavior;
+The tower failure and camera slices are reviewed and integrated. The complete
+guest/recovered return loop and current Help pass on the composed app, including
+unfinished private-turn preservation and loading-time guest captures. The final
+full sweep must reconcile superseded fixtures with current behavior;
 a passing old geometry proxy is not a substitute for supported, visible dice.
 The three baseline legacy venue/material failures retain their gates and
 are characterized separately from redesign regressions.
@@ -224,9 +225,46 @@ accepted-response dismissal, dev-clock idle wakeup, late shared-library offers,
 required-model failure, camera crops and long-history occlusion. Other updates
 make selected kits/publication explicit, wait for real prepared worker films,
 and measure current visible result controls instead of retired geometry.
-The old draft workbench failure does not reproduce on the newer owner controls.
+The old draft workbench failure initially passed on a fresh single-profile
+library. The later full sweep exposed inherited multiple-profile state; the
+follow-up fixes its missing ownership-heading state and proves both layouts.
 
 A fresh immutable checkout at `d6f1529` now runs unit, fuzz and the complete
 release script. Its result is pending. Optional legacy venue/material gates
 remain intact; paired before/redesign evidence is recorded in the relevant
 characterizations. Cloud traffic and the owner's live preview remain untouched.
+
+
+## Joined return and reviewed release corrections
+
+At `65bc428`, all **16** account, home and People app cases pass (5/4/7).
+At `48c2d1e`, the home-connection and independent social-browser cases pass,
+and the joined R1 suite passes **2/2**: the full guest-to-recovered invitation
+walk (260.6s) and held optional-account-module boundary (6.4s). The latter
+restores the private kit exactly while retaining a loading-time guest capture
+as a visibly selectable device alternative. Root review inspected the name
+menu, accepted invitation, shared phone result and retained-copy comparison.
+This proves local composition, not human discoverability or cloud durability.
+
+`70f337d` makes actual-input tests foreground the intended browser before
+waiting for painted controls. `5f86d68` returns focus to the current visible
+task entry after breakpoint changes. `9119d82` mirrors the library's ownership
+state to its scrolling list and refreshes it after inactive profile add/remove.
+Inspected phone controls and real-wheel library transitions are retained in
+[SHIPPED.md](SHIPPED.md#returning-focus-from-personal-tasks-2026-09-13).
+
+`d07c7c7` corrects the ambient wake fixture's incidental fixed-window FPS
+assumption while retaining strict Battery stillness and continued Full motion.
+`65bc428` makes pending worker contact diagnostics distinguishable from a
+completed silent film and proves the distinction with a held real worker reply.
+The 45-cast full support proof passes in 96.9s with a 180s outer allowance.
+The full pointer camera matrix passes in 175.4s; its future outer allowance is
+360s to avoid clipping that test under concurrent browser load. Neither timeout
+change alters a product budget, physical assertion or frame-rate claim.
+
+The durable-service handoff is concrete in
+[ACCOUNT-ENABLEMENT-CHECKLIST.md](ACCOUNT-ENABLEMENT-CHECKLIST.md). Its isolated
+local recovery drill passes seven checks and explicitly proves that restoring
+older data can revive later-revoked sessions and discard later blocks. Public
+restore therefore still needs a reviewed security-reconciliation procedure.
+No cloud resource, production traffic or live-preview process changed.

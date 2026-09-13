@@ -2,11 +2,16 @@
 
 # Optional durable service
 
-**R1-D0/D1.1 · design decision, 2026-09-13 · adapters and optional recovery
-API, private-library and saved-home protocols implemented; composed UI and social proofs pending.** Implements the account, library, home and social boundaries in
+**R1-D0–E · implemented locally, 2026-09-13.** The adapters, optional
+recovery API, private library, saved homes and People workflows have composed
+browser proofs, including the [joined guest/recovered return
+walk](redesign/2026-09-13-r1-success-walk.md). This record describes the account,
+library, home and social boundaries in
 [People, personal dice, and persistent tables](PEOPLE-DICE-TABLES.md).
-This record enables local implementation; it does not claim a cloud service
-has been provisioned or a recovery prototype has passed.
+Local recovery survives a real process restart in an independent browser.
+Cloud provisioning, HTTPS/IAM verification and isolated cloud restore remain
+unperformed; the [enablement handoff](ACCOUNT-ENABLEMENT-CHECKLIST.md) records
+the concrete remaining actions and restore-security limitation.
 
 **Inherited assumption to replace:** browser storage and a prepared room
 can recover a person's kit and group after their browser or server is gone.
@@ -28,8 +33,8 @@ credential, email delivery or paid setup. Default service mode is `off`;
 ordinary live and static solo play do not wait for it.
 
 Read-only inspection on 2026-09-13 found local deployment configuration and
-an accessible Cloud Run service: one maximum instance, concurrency 80,
-timeout 3600 seconds, 1 CPU, 512 MiB, no volumes, and no configured durable
+an accessible Cloud Run service: revision maximum 1 but service maximum 20,
+concurrency 80, timeout 3600 seconds, 1 CPU, 512 MiB, no volumes, and no configured durable
 service/OAuth environment variables. A Firestore inventory request failed
 with `SERVICE_DISABLED`; this establishes missing API availability, not an
 empty database. Configuration values, account names and credentials were
