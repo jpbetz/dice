@@ -7503,3 +7503,27 @@ and Accept followed by a separate Join now. Its desktop and emulated-phone
 pointer/scroll proof is `tools/steps/redesign-help-look.mjs`:
 [phone People guidance](redesign/2026-09-13-help-phone-people.png).
 These are local browser proofs, not newcomer or physical-phone observations.
+
+
+## Returning focus from personal tasks (2026-09-13)
+
+Closing Preferences after a phone/desktop resize now returns keyboard focus
+to the current visible entry. Previously it could leave focus inside the
+hidden settings dialog because the original phone More button had disappeared.
+The same fallback covers a library or table task opened from another workspace.
+Existing visible openers retain focus normally.
+
+The composed checks exercise both breakpoint directions, hidden workspace
+openers, keyboard containment and phone Dice entry through the expanded roll
+controls. The gallery closes back to its actual Dice button. The inspected
+[390px roll workspace](redesign/2026-09-13-task-focus/phone-rolls.png) and
+[gallery](redesign/2026-09-13-task-focus/phone-gallery.png) retain the owner's
+compact table controls. Reproduce with
+`node tools/drive.mjs tools/steps/phone-dice-entry-look.mjs` and the
+`table-controls` targeted scenarios. These are browser-emulated phone checks.
+
+The pointer helper also foregrounds the intended browser before waiting for
+its rendered controls. Its two-person regression returns from Bob's roll to
+Alice's still-open draft through actual pointer input and compares the shared
+values. This prevents a background browser's suspended animation frames from
+being mistaken for an unreachable application control.
