@@ -98,7 +98,9 @@ export const tableCameraScenarios=[
       assertCamera(await a.eval(cameraFilmSample()),count);
     }
   }},
-  {name:'table-camera-pointer-rolls',tags:['table-camera','camera','roll-flows'],timeout:180000,async fn(ctx){
+  // Twelve painted pointer rolls plus a retained-dice arrival; this outer
+  // allowance covers software rendering alongside the full release suite.
+  {name:'table-camera-pointer-rolls',tags:['table-camera','camera','roll-flows'],timeout:360000,async fn(ctx){
     const a=await ctx.newTable({origin:'127.0.0.164',name:'Alice'});const others=[];await a.dbg('holdClock(true)');
     for(const players of [1,4]){
       if(players===4)for(const name of ['Bob','Cora','Sam'])others.push(await ctx.rawPlayer(name));

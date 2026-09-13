@@ -136,3 +136,12 @@ code values (the earlier integration measured about 8.31). Its assertion and
 materials are unchanged; this camera slice does not resolve that separate
 visual issue. Tower corridor geometry, the general shared settings queue,
 cloud enablement and other release failures are outside this camera change.
+
+
+The actual-pointer matrix took 97.6 seconds in its initial composed run and
+175.4 seconds in the full release sweep alongside other Chrome work. A separate
+concurrent helper run exceeded its old 180-second outer timeout. The complete
+matrix now has a 360-second harness allowance; all value, painted-bound, fog,
+occlusion and per-action readiness assertions remain unchanged. This gives
+software-rendered coverage time to finish and is not an active-frame-rate or
+latency acceptance threshold.
