@@ -163,6 +163,20 @@ exports omit the live-seat credential. The device journal caps each person at
 32 records / 16 MiB and never silently evicts originals. Acknowledged removal
 of confirmed device receipts leaves server homes and their versions intact.
 Only an explicit retained-version choice can reconcile a server conflict.
+Known refusals before a write offer a separate Download, acknowledgement and
+**Abandon refused device copy** path, freeing local capacity without changing
+server versions. Uncertain outcomes and server conflicts cannot use that path.
+The journal allocates attempt numbers transactionally, so a second tab's retry
+invalidates an older abandonment choice and a late earlier receipt cannot
+replace the current attempt. Export/acknowledgement is scoped to the person,
+boundary epoch, open view and exact retained attempt.
+
+Closing Tables invalidates its management view while the exact request keeps
+running. A confirmed response updates its card/receipt without reopening the
+old comparison. A failed device write keeps one in-memory original per person,
+labelled unconfirmed and exportable until the page closes, and sends no HTTP.
+Opening Tables for a changed account during an older busy action queues a fresh
+directory load instead of swallowing that first open.
 
 Artwork covers are produced lazily from the existing table preview and cached
 by model version, with at most eight thumbnails and 1 MiB persisted. Listing
@@ -175,8 +189,10 @@ no-sync home creation, same-address conversion, real process restart and clean
 browser recovery, obsolete organizer suppression, occupied live-room return,
 private-pool exclusion, draft/secret-turn preservation, retained conflict and
 capture refusal, offline exact retry after reload, acknowledged cleanup/leave,
-real IndexedDB abort before HTTP, and a held former-account response after a
-second tab changes the actual cookie. `tests/home-connection-ui.test.mjs` proves
+real IndexedDB abort before HTTP, a held former-account response after a
+second tab changes the actual cookie, close during a held save, new-account
+mount during a held durable acknowledgement, and real IDB capacity/attempt
+protection. `tests/home-connection-ui.test.mjs` proves
 local play under persistent home refusal and explicit guest creation during
 service outage, including a cancelled creation's delayed reply. The unit lane
 includes fixed-owner/view completion and exact-request tests.

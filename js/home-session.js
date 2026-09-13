@@ -1,15 +1,16 @@
 /* Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 */
-import {openHomeJournal,exportHomeAction} from './home-journal.js';
+import {openHomeJournal,exportHomeAction,definitiveHomeRefusal,canAbandonHomeAction} from './home-journal.js';
 
 // A management session never enters a room or applies a saved setup to live
 // play. Each request belongs to the exact person/identity boundary it opened.
 export function createHomeSession(actions,{journalFactory=openHomeJournal}={}){
   let owner=null,access=null,journal=null,cards=[],records=[],selected=null,preview=null,error=null,loading=false,view=0;
+  const volatileByPerson=new Map();
   const info=()=>({owner,cards,records,selected,preview,error,loading,view});
   const emit=()=>actions.changed?.(info());
   const changed=()=>({ok:false,code:'identity_changed',message:'The account changed. Reopen saved tables for the current account.'});
   function identity(){const next=actions.access();const key=next?`${next.personId}:${next.epoch}`:null;
-    if(key!==owner){owner=key;access=next;cards=[];records=[];selected=null;preview=null;error=null;loading=false;view++;emit();}else access=next;
+    if(key!==owner){owner=key;access=next;cards=[];records=[...(volatileByPerson.get(next?.personId)?.values()||[])];selected=null;preview=null;error=null;loading=false;view++;emit();}else access=next;
     return access;
   }
   const same=(token,opened)=>{identity();return token===owner&&opened===access;};
@@ -19,7 +20,7 @@ export function createHomeSession(actions,{journalFactory=openHomeJournal}={}){
     const storage=await ready();if(!same(token,opened))return changed();
     const [remote,local]=await Promise.all([opened.homes(),storage.ok?storage.read(opened.personId):Promise.resolve(storage)]);
     if(!same(token,opened))return changed();loading=false;
-    if(remote.ok)cards=remote.homes;if(local.ok)records=local.records;
+    if(remote.ok)cards=remote.homes;if(local.ok){const unkept=[...(volatileByPerson.get(opened.personId)?.values()||[])];records=[...unkept,...local.records.filter(r=>!unkept.some(v=>v.id===r.id))];}
     error=!remote.ok?remote:!local.ok?local:null;emit();return remote;
   }
   async function manage(id){identity();if(!access)return changed();const token=owner,opened=access,request=++view;loading=true;emit();
@@ -44,8 +45,13 @@ export function createHomeSession(actions,{journalFactory=openHomeJournal}={}){
     preview={owner,kind:'reconcile',homeId:home.id,document:result.document,input:{baseRevision:home.headRevision,sourceVersionId:id}};error=null;emit();return {ok:true,preview};
   }
   async function execute(record){const token=owner,opened=access,request=view;if(!opened||record.personId!==opened.personId)return changed();
-    const storage=await ready();if(!same(token,opened))return changed();if(!storage.ok)return storage;
-    const captured=await storage.save(record);if(!same(token,opened))return changed();if(!captured.ok){error=captured;emit();return captured;}
+    const unkept=volatileByPerson.get(record.personId);if(unkept?.size&&!unkept.has(record.id))return {ok:false,code:'journal_unavailable',message:'Retry the previous unconfirmed device save first. Its preview remains available to download.'};
+    const retain=failure=>{const retained={...record,volatile:true};let own=volatileByPerson.get(record.personId);if(!own){own=new Map();volatileByPerson.set(record.personId,own);}own.set(record.id,retained);
+      if(same(token,opened)){records=[retained,...records.filter(r=>r.id!==record.id)];error=failure;emit();}return failure;};
+    const storage=await ready();if(!storage.ok)return retain(storage);if(!same(token,opened))return changed();
+    record={...record};delete record.volatile;
+    record={...record,attempt:(record.attempt||0)+1,status:'pending'};delete record.result;
+    const captured=await storage.save(record);if(!captured.ok)return retain(captured);volatileByPerson.get(record.personId)?.delete(record.id);if(!same(token,opened))return changed();record=captured.record||record;
     records=[record,...records.filter(r=>r.id!==record.id)];loading=true;emit();
     let result;try{result=record.kind==='new'||record.kind==='convert'?await opened.createHome(record.input)
       :record.kind==='leave'?await opened.leaveHome(record.homeId,record.input)
@@ -53,7 +59,7 @@ export function createHomeSession(actions,{journalFactory=openHomeJournal}={}){
     // Record a verified receipt only in its original journal namespace. The
     // scoped transport returns identity_changed after any account replacement.
     if(result.code!=='identity_changed'){
-      const completed={...record,status:result.ok?'saved':result.code==='home_conflict'?'conflict':result.code==='account_unavailable'?'pending':'refused',result};
+      const completed={...record,status:result.ok?'saved':result.code==='home_conflict'?'conflict':definitiveHomeRefusal(result)?'refused':'pending',result};
       const saved=await storage.save(completed);if(saved.ok)record=completed;else result={...saved,receipt:result};
     }
     if(!same(token,opened))return changed();records=[record,...records.filter(r=>r.id!==record.id)];
@@ -66,6 +72,7 @@ export function createHomeSession(actions,{journalFactory=openHomeJournal}={}){
     emit();return result;
   }
   async function submit(){identity();if(!access||!preview||preview.owner!==owner)return changed();const id=crypto.randomUUID(),p=preview;
+    if(records.some(r=>r.volatile))return {ok:false,code:'journal_unavailable',message:'A previous preview is not stored yet. Retry its kept action first; its download remains available until you leave this page.'};
     return execute({schema:1,personId:access.personId,id,at:Date.now(),kind:p.kind,homeId:p.homeId,input:{...p.input,operationId:id},document:p.document,status:'pending'});
   }
   async function retry(id){identity();const record=records.find(r=>r.id===id);if(!record)return changed();return execute(record);}
@@ -76,6 +83,11 @@ export function createHomeSession(actions,{journalFactory=openHomeJournal}={}){
       const result=await storage.forgetConfirmed(opened.personId,ids);if(!same(token,opened))return changed();if(result.ok)records=records.filter(r=>!ids.includes(r.id));else error=result;emit();return result;},
     exportPreview:()=>preview?.document?{schema:1,document:preview.document}:preview?{schema:1,name:preview.input.name}:null,
     exportAction:id=>{const r=records.find(r=>r.id===id);return r?exportHomeAction(r):null;},
+    prepareAbandon(id){identity();const record=records.find(r=>r.id===id);return canAbandonHomeAction(record)?{owner,view,record:JSON.parse(JSON.stringify(record)),data:exportHomeAction(record)}:null;},
+    async abandonRefused(proposal,{acknowledged=false}={}){identity();if(!access||!proposal||proposal.owner!==owner||proposal.view!==view||!acknowledged)return changed();
+      const token=owner,opened=access,storage=await ready();if(!same(token,opened)||proposal.view!==view)return changed();if(!storage.ok)return storage;
+      const result=await storage.abandonRefused(opened.personId,proposal.record);if(!same(token,opened))return changed();
+      if(result.ok){records=records.filter(r=>r.id!==proposal.record.id);error=null;}else error=result;emit();return result;},
     closeView(){view++;selected=null;preview=null;loading=false;emit();},
   };
 }

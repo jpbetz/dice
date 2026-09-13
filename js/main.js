@@ -36606,5 +36606,5 @@ async function ensureHomesWorkspace(){
   return homesWorkspaceLoading;
 }
 window.__diceDebug.homes={open:()=>destinationShell.open('tables'),
-  get state(){const s=homesWorkspace?.info;return s?{owner:s.owner,cards:s.cards,selected:s.selected?.home||null,preview:s.preview?{kind:s.preview.kind,homeId:s.preview.homeId,document:s.preview.document}:null,error:s.error?.code||null,loading:s.loading,records:s.records.map(r=>({id:r.id,kind:r.kind,status:r.status,homeId:r.homeId}))}:null;},
+  get state(){const s=homesWorkspace?.info;return s?{owner:s.owner,cards:s.cards,selected:s.selected?.home||null,preview:s.preview?{kind:s.preview.kind,homeId:s.preview.homeId,document:s.preview.document}:null,error:s.error?.code||null,loading:s.loading,records:s.records.map(r=>({id:r.id,kind:r.kind,status:r.status,homeId:r.homeId,volatile:!!r.volatile}))}:null;},
 };

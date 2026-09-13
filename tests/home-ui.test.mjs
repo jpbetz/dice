@@ -76,8 +76,13 @@ test('actual home UI retains failed captures and exact retries, resolves a compe
   await b.page.browser.send('Network.setBlockedURLs',{urls:[]},b.page.sessionId);await b.eval(`document.querySelector('[data-operation="${pending.id}"] button:nth-of-type(2)').click()`);await idle(b);
   assert.equal((await hs(b)).records.find(r=>r.id===pending.id).status,'saved');assert.equal((await remote(b,home.id)).document.settings.tableName,'A later live change');
   const versionsBefore=(await remote(b,home.id)).versions.map(v=>v.id),keptBefore=(await hs(b)).records.filter(r=>r.status!=='saved').map(r=>r.id);
-  await b.eval("const box=document.querySelector('#home-kept input[type=checkbox]');box.checked=true;box.dispatchEvent(new Event('change'));document.getElementById('home-clear-confirmed').click()");await idle(b);
+  await b.eval("const box=document.getElementById('home-clear-confirmed').previousElementSibling.querySelector('input');box.checked=true;box.dispatchEvent(new Event('change'));document.getElementById('home-clear-confirmed').click()");await idle(b);
   assert.deepEqual((await hs(b)).records.map(r=>r.id).sort(),keptBefore.sort(),'acknowledged device cleanup preserves every refused or conflict original');assert.deepEqual((await remote(b,home.id)).versions.map(v=>v.id),versionsBefore);
+  const refused=(await hs(b)).records.find(r=>r.status==='refused');assert.ok(refused);
+  await b.eval(`document.querySelector('[data-operation="${refused.id}"] button').click()`);
+  assert.equal(await b.eval(`document.querySelector('[data-operation="${refused.id}"] .home-abandon button').disabled`),true,'downloading alone cannot abandon a refused original');
+  await b.eval(`const ack=document.querySelector('[data-operation="${refused.id}"] .home-abandon input');ack.checked=true;ack.dispatchEvent(new Event('change'));document.querySelector('[data-operation="${refused.id}"] .home-abandon button').click()`);await idle(b);
+  assert.equal((await hs(b)).records.some(r=>r.id===refused.id),false);assert.ok((await hs(b)).records.some(r=>r.status==='conflict'));assert.deepEqual((await remote(b,home.id)).versions.map(v=>v.id),versionsBefore,'abandoning a downloaded refused device copy never alters server versions');
   await click(b,'homes-refresh');await idle(b);await manage(b,home.id);const pid=await b.playerId(),url=await b.eval('location.href');
   assert.equal(await b.eval('document.getElementById("home-leave").disabled'),true);await b.eval("document.getElementById('home-leave-ack').checked=true;document.getElementById('home-leave-ack').dispatchEvent(new Event('change'))");await click(b,'home-leave');await idle(b);
   assert.equal((await hs(b)).cards.length,0);assert.equal(await b.playerId(),pid);assert.equal(await b.eval('location.href'),url);await b.dbg('workspaces.close()');await b.roll('1d6');
@@ -87,8 +92,8 @@ test('actual home UI retains failed captures and exact retries, resolves a compe
 test('actual home UI refuses HTTP before durable capture and clears held old-account details after a real shared-cookie change',async t=>{
   const f=await fixture(t),ctx=await f.context('home-app-boundaries'),a=await ctx.newTable({origin:'127.0.0.1',name:'Alice'});await renameTable(ctx,a,'First account home');const firstKey=await account(a);await homes(a);await capture(a);
   await a.eval("window.__homePosts=0;window.__homeOriginalFetch=fetch;window.fetch=function(url,options){if(String(url).includes('/api/account/homes')&&options?.method==='POST')window.__homePosts++;return window.__homeOriginalFetch.call(this,url,options)};window.__homePut=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(...args){const request=window.__homePut.apply(this,args);if(this.name==='actions')this.transaction.abort();return request}");
-  await save(a);assert.equal((await hs(a)).error,'journal_unavailable');assert.equal(await a.eval('window.__homePosts'),0);assert.equal((await hs(a)).preview.document.settings.tableName,'First account home');assert.equal((await hs(a)).records.length,0);
-  await a.eval('IDBObjectStore.prototype.put=window.__homePut;window.fetch=window.__homeOriginalFetch');await save(a);const home=(await hs(a)).cards[0];assert.ok(home);
+  await a.eval("document.getElementById('home-save').click();window.__diceDebug.workspaces.close()");await idle(a);assert.equal((await hs(a)).error,'journal_unavailable');assert.equal(await a.eval('window.__homePosts'),0);assert.equal((await hs(a)).preview,null);assert.equal((await hs(a)).records[0].volatile,true,'closing before failed IDB completion still keeps an exportable in-memory original');
+  await homes(a);assert.equal((await hs(a)).records[0].volatile,true);await a.eval('IDBObjectStore.prototype.put=window.__homePut;window.fetch=window.__homeOriginalFetch');await a.eval("[...document.querySelectorAll('.home-kept-row button')].find(b=>b.textContent==='Retry exact request').click()");await idle(a);const home=(await hs(a)).cards[0];assert.ok(home);
   const b=await ctx.newTable({origin:'127.0.0.1',name:'Second tab'});await b.dbg('privateLibrary.open()');await b.waitFor('!!window.__diceDebug.privateLibrary.state?.person&&!document.getElementById("account-refresh").disabled');
   const separate=await f.context('home-app-other-account'),c=await separate.newTable({origin:'127.0.0.1',name:'Other person'});const secondKey=await account(c);
   await click(a,'home-detail-back');let held=null;const browser=a.page.browser;
@@ -101,5 +106,35 @@ test('actual home UI refuses HTTP before durable capture and clears held old-acc
   assert.equal(await a.eval('document.getElementById("home-detail").hidden'),true);assert.equal(await a.eval('document.getElementById("homes-workspace").textContent.includes("First account home")'),false,'late response cannot restore former account names');
   await account(a,secondKey);await homes(a);assert.equal((await hs(a)).cards.length,0);assert.equal((await hs(a)).records.length,0);
   await account(a,firstKey);await homes(a);assert.equal((await hs(a)).cards[0].id,home.id);assert.equal((await hs(a)).records.length,1,'old account journal remains available only after recovery');
+  const journal=await a.eval(`(async()=>{
+    const {openHomeJournal}=await import('./js/home-journal.js'),store=await openHomeJournal(),personId='p_'+'Z'.repeat(43),kept=[];
+    for(let i=0;i<32;i++){const id=crypto.randomUUID();let r={schema:1,personId,id,at:Date.now(),kind:'new',homeId:null,input:{operationId:id,name:'Kept original '+i},document:null,status:'pending'};r=(await store.save(r)).record;r={...r,status:'refused',result:{ok:false,code:'capture_changed'}};await store.save(r);kept.push(r);}
+    const id=crypto.randomUUID(),fresh={...kept[0],id,input:{operationId:id,name:'Another original'},status:'pending'};delete fresh.result;
+    const full=await store.save(fresh),retry=(await store.save({...kept[0],status:'pending',result:undefined})).record;
+    const oldChoice=await store.abandonRefused(personId,kept[0]),oldReceipt=await store.save(kept[0]);
+    await store.save({...retry,status:'pending',result:{ok:false,code:'account_unavailable'}});
+    const uncertain=await store.abandonRefused(personId,{...retry,status:'pending',result:{ok:false,code:'account_unavailable'}});
+    const conflict=(await store.save({...kept[1],status:'pending',result:undefined})).record;await store.save({...conflict,status:'conflict',result:{ok:false,code:'home_conflict'}});
+    const serverConflict=await store.abandonRefused(personId,{...conflict,status:'conflict',result:{ok:false,code:'home_conflict'}}),abandoned=await store.abandonRefused(personId,kept[2]),room=await store.save(fresh),rows=await store.read(personId);store.close();
+    return {full:full.code,oldChoice:oldChoice.code,oldReceipt:oldReceipt.code,uncertain:uncertain.code,serverConflict:serverConflict.code,abandoned:abandoned.ok,room:room.ok,count:rows.records.length};
+  })()`);
+  assert.deepEqual(journal,{full:'journal_full',oldChoice:'action_protected',oldReceipt:'action_changed',uncertain:'action_protected',serverConflict:'action_protected',abandoned:true,room:true,count:32},'real IDB capacity recovers only by deliberate refusal cleanup; newer attempts and uncertain/server-conflict originals remain protected');
+  assert.deepEqual(a.page.errors,[]);assert.deepEqual(b.page.errors,[]);assert.deepEqual(c.page.errors,[]);
+});
+
+test('closing during a real save does not reopen management, and a new-account mount waits for the old busy action',async t=>{
+  const f=await fixture(t),ctx=await f.context('home-app-held-close'),a=await ctx.newTable({origin:'127.0.0.1',name:'Alice'});await renameTable(ctx,a,'First home');await account(a);await homes(a);await capture(a);
+  let held=null;const browser=a.page.browser;browser.on('Fetch.requestPaused',p=>{if(!held&&p.request.method==='POST')held=p.requestId;else browser.send('Fetch.continueRequest',{requestId:p.requestId},a.page.sessionId).catch(()=>{});},a.page.sessionId);
+  await browser.send('Fetch.enable',{patterns:[{urlPattern:'*/api/account/homes',requestStage:'Response'}]},a.page.sessionId);await click(a,'home-save');
+  for(let n=0;n<100&&!held;n++)await new Promise(r=>setTimeout(r,20));assert.ok(held);await a.dbg('workspaces.close()');await a.dbg('homes.open()');
+  await browser.send('Fetch.continueRequest',{requestId:held},a.page.sessionId);await idle(a);await browser.send('Fetch.disable',{},a.page.sessionId);
+  assert.equal((await hs(a)).cards.length,1);assert.equal((await hs(a)).selected,null);assert.equal((await hs(a)).preview,null);assert.equal(await a.eval('document.getElementById("home-detail").hidden'),true);assert.equal((await hs(a)).records[0].status,'saved');
+  const b=await ctx.newTable({origin:'127.0.0.1',name:'Second tab'});await b.dbg('privateLibrary.open()');await b.waitFor('!!window.__diceDebug.privateLibrary.state?.person&&!document.getElementById("account-refresh").disabled');
+  const separate=await f.context('home-app-next-account'),c=await separate.newTable({origin:'127.0.0.1',name:'Other person'});await renameTable(separate,c,'Second account home');const secondKey=await account(c);await homes(c);await capture(c);await save(c);
+  await capture(a);await a.eval(`window.__homeTransaction=IDBDatabase.prototype.transaction;window.__homeWriteCount=0;IDBDatabase.prototype.transaction=function(...args){const tx=window.__homeTransaction.apply(this,args);if(args[0]==='actions'&&args[1]==='readwrite'&&++window.__homeWriteCount===2){const property=Object.getOwnPropertyDescriptor(IDBTransaction.prototype,'oncomplete');Object.defineProperty(tx,'oncomplete',{set(fn){property.set.call(tx,event=>{window.__releaseHomeCommit=()=>fn(event)})},get(){return property.get.call(tx)}})}return tx}`);
+  await click(a,'home-save');await a.waitFor('typeof window.__releaseHomeCommit==="function"');
+  await account(b,secondKey);await a.waitFor('window.__diceDebug.privateLibrary.state.blocked');await account(a,secondKey);await a.dbg('homes.open()');
+  await a.eval('IDBDatabase.prototype.transaction=window.__homeTransaction;window.__releaseHomeCommit()');await idle(a);
+  assert.equal((await hs(a)).cards.length,1);assert.equal((await hs(a)).cards[0].name,'Second account home','first new-account mount reloads after the old busy request');assert.equal((await hs(a)).selected,null);assert.equal((await hs(a)).preview,null);assert.equal(await a.eval('document.getElementById("homes-workspace").textContent.includes("First home")'),false);
   assert.deepEqual(a.page.errors,[]);assert.deepEqual(b.page.errors,[]);assert.deepEqual(c.page.errors,[]);
 });

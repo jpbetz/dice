@@ -38,3 +38,5 @@
 body.home-managing #workspace-table-overview,body.home-managing #workspace-table-recents { display:none; }
 .home-version .home-cover { height:200px; }
 .home-kept summary { cursor:pointer; padding:9px 0; font-size:13px; }
+.home-abandon { flex:1 0 100%; padding:10px; border:1px solid var(--hair); border-radius:8px; }
+.home-abandon>.btn { margin-top:10px; }
