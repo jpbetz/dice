@@ -8,6 +8,7 @@ import { checkHomeRecord, homeCard } from './homes.js';
 export const SOCIAL_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_FRIENDS = 32, MAX_BLOCKED = 128, MAX_PENDING = 32, MAX_ROWS = 256, MAX_OPS = 2000;
 const PAGE_SIZE = 20;
+const BLOCKED_PAGE_SIZE = 32;
 const personId = value => typeof value === 'string' && /^p_[A-Za-z0-9_-]{43}$/.test(value);
 const homeId = value => typeof value === 'string' && /^h_[A-Za-z0-9_-]{43}$/.test(value);
 const inviteId = value => typeof value === 'string' && /^i_[a-f0-9]{64}$/.test(value);
@@ -342,6 +343,19 @@ export function createSocialDomain({ now = Date.now } = {}) {
         return { ok: true, personId: self.id, friends, blockedPersonIds: [...own.blockedIds],
           contactCode: { enabled: !!own.codeHash && own.codeExpiresAt > at,
             issuedAt: own.codeIssuedAt, expiresAt: own.codeExpiresAt } };
+      }
+      if(action==='blocked-people'){
+        if(!fields(input,['after'])||(input.after!==undefined&&!personId(input.after)))return invalid();
+        const start=input.after===undefined?0:own.blockedIds.indexOf(input.after)+1;
+        if(input.after!==undefined&&start===0)return invalid();
+        const chosen=own.blockedIds.slice(start,start+BLOCKED_PAGE_SIZE),blockedPeople=[];
+        // A page touches at most 99 records including authentication. Resolve
+        // only this owner's blocked IDs, and verify both directory/pair sides.
+        for(const id of chosen){const relation=await relationship(ctx,self.id,id),other=await directory(ctx,id);checkPair(relation,own,other);
+          if(!relation.blockedBy.includes(self.id))throw new StoreError('corrupt');
+          blockedPeople.push(identity(await person(ctx,id)));
+        }
+        return {ok:true,personId:self.id,blockedPeople,next:start+chosen.length<own.blockedIds.length?chosen.at(-1):null};
       }
       if (!fields(input, ['direction', 'after']) || !['incoming', 'outgoing'].includes(input.direction)
           || (input.after !== undefined && !inviteId(input.after))) return invalid();

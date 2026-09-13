@@ -71,6 +71,7 @@ function homeRoute(suffix, method) {
 
 function socialRoute(suffix, method, requestUrl) {
   if (suffix === '/people') return { action: 'people', read: true };
+  if (suffix === '/people/blocked') return { action: 'blocked-people', read: true, input: Object.fromEntries(new URL(requestUrl, 'http://unused').searchParams) };
   if (suffix === '/people/contact-code') return { action: 'code', read: false };
   if (suffix === '/people/requests') return { action: 'request', read: false };
   if (suffix === '/invitations') {

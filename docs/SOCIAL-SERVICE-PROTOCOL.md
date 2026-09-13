@@ -91,6 +91,7 @@ sanitized.
 | Route | Proposed client method / effect |
 | --- | --- |
 | `GET /people` | `people(personId)` → accepted friends and own blocked IDs; explicit allowed identity projections only |
+| `GET /people/blocked?after=...` | `blockedPeople(personId,{after})` → up to 32 blocked account names and a next cursor; only the authenticated person's blocked directory |
 | `POST /people/contact-code` | `setContactCode(personId,{operationId,code})` → issue/expiry confirmation; `code:null` revokes the current lookup |
 | `POST /people/requests` | `requestFriend(personId,{operationId,code})` → private friend-request receipt addressed to the code owner |
 | `POST /people/:id/remove` | `removeFriend(personId,id,{operationId})` → symmetric removal and relationship-generation advance |
@@ -112,6 +113,16 @@ refuses without falsely accepting. A refused capacity action leaves the invitati
 After resolving capacity, the UI asks for a fresh explicit action; uncertain
 retries retain their original ID. Duplicate existing membership does not create a duplicate or change
 gameplay rights.
+
+The blocked-account name page resolves only IDs already in the authenticated
+person's blocked directory and checks the relationship plus both directories
+before returning each `{id,displayName}`. It remains usable after invitation
+archive, device reload or account recovery; unblocking does not restore a
+friendship. A page touches at most 99 storage records including authentication,
+independent of the account's 32 friends and up to 128 blocked IDs. `after` must
+name an entry still in this same blocked directory; an invalidated cursor asks
+the UI to refresh instead of looking up an arbitrary account. GET uses the
+existing expected-person and origin checks, and POST is refused.
 
 Inbox cards contain invitation ID/kind/state/times, an allowed other-person
 projection, and, for home invitations, its current name/cover and stable home
@@ -180,6 +191,10 @@ response/cancellation races, stale acceptance retries after leave/removal,
 rotation/blocking, recipient/CSRF/namespace isolation, corruption and guest play,
 injected-clock expiry/quota, 20-row pagination, archive and a full account home
 directory. Browser UI proof is not claimed by these API tests.
+The two blocked-name tests additionally cover archive/restart recovery, explicit
+unblock, a complete 32-name page and remaining page, a measured 99-record bound,
+and unauthenticated, wrong-person, cross-origin, malformed-query and wrong-method
+refusals. An unowned cursor touches no unrelated person's record.
 
 D3.2 automated evidence: the five `tests/account-presence.test.mjs` tests are in
 the unit lane. They prove independent online/location consent, membership and

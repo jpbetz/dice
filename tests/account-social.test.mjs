@@ -46,6 +46,41 @@ test('contact codes are distinct cryptographic sharing inputs and never recovery
   assert.throws(() => generateContactCode({}), /Secure key/);
 });
 
+test('blocked account names survive inbox archive and restart, with private GET and expected-person boundaries',async t=>{
+  const f=await fixture(t),a=await register(f.app,'Owner'),b=await register(f.app,'Blocked contact'),outsider=await register(f.app,'Unrelated');
+  const code=generateContactCode();await a.client.setContactCode(a.personId,{operationId:op(),code});
+  const request=await b.client.requestFriend(b.personId,{operationId:op(),code});await a.client.blockPerson(a.personId,b.personId,{operationId:op(),blocked:true});
+  assert.equal((await a.client.archiveInvitation(a.personId,request.invitation.id,{operationId:op()})).ok,true);
+  assert.deepEqual((await a.client.invitations(a.personId)).invitations,[]);
+  const before=await a.client.blockedPeople(a.personId);assert.deepEqual(before.blockedPeople,[{id:b.personId,displayName:'Blocked contact'}]);assert.equal(before.next,null);
+  assert.deepEqual((await b.client.blockedPeople(b.personId)).blockedPeople,[]);
+  assert.equal((await outsider.client.blockedPeople(a.personId)).code,'identity_changed');
+  const endpoint=f.app.origin+'/api/account/people/blocked';
+  assert.equal((await fetch(endpoint)).status,401);
+  assert.equal((await outsider.fetch(endpoint,{headers:{'X-Dice-Person':a.personId}})).status,409);
+  assert.equal((await a.fetch(endpoint,{headers:{Origin:'https://invalid.example','X-Dice-Person':a.personId}})).status,403);
+  assert.equal((await a.fetch(endpoint,{method:'POST',headers:{'X-Dice-Person':a.personId}})).status,405);
+  assert.equal((await(await a.fetch(endpoint+'?personId='+b.personId,{headers:{'X-Dice-Person':a.personId}})).json()).code,'invalid_social');
+  await f.app.stop();const app=await f.start(),clean=cookieClient(app.origin).client;await clean.recover(a.recoveryKey);
+  assert.deepEqual((await clean.blockedPeople(a.personId)).blockedPeople,before.blockedPeople);
+  assert.equal((await clean.blockPerson(a.personId,b.personId,{operationId:op(),blocked:false})).ok,true);assert.deepEqual((await clean.blockedPeople(a.personId)).blockedPeople,[]);assert.deepEqual((await clean.people(a.personId)).friends,[]);
+});
+
+test('blocked names page at 32 and verify their relationship within the 128-record transaction budget',async t=>{
+  const directory=await fs.mkdtemp(path.join(os.tmpdir(),'dice-blocked-page-')),store=await openFileStore({directory});let reads=0;
+  const measured={...store,transact:fn=>store.transact(async tx=>{const seen=new Set();const result=await fn({...tx,get:path=>{seen.add(path);return tx.get(path);}});reads=seen.size;return result;})};
+  const service=createAccountService({store:measured,homeBridge:{capture:()=>({ok:false}),validate:document=>({ok:true,document}),fresh:name=>({ok:true,document:{schema:1,settings:{tableName:name,venue:'table',felt:'baize'},setup:null}})}});
+  t.after(async()=>{await service.close();await fs.rm(directory,{recursive:true,force:true});});
+  const sign=displayName=>service.register({recoveryKey:recovery(),recoveryAcknowledged:true,displayName});
+  const a=await sign('Owner'),code=generateContactCode(),action=(who,kind,input={},id)=>service.social(who.sessionToken,who.csrfToken,who.person.id,kind,{input,id});
+  await action(a,'code',{operationId:op(),code});const blocked=[];
+  for(let n=0;n<33;n++){const b=await sign('Blocked '+n);blocked.push(b.person);const request=await action(b,'request',{operationId:op(),code});assert.equal(request.ok,true);
+    assert.equal((await action(a,'block',{operationId:op(),blocked:true},b.person.id)).ok,true);assert.equal((await action(a,'archive',{operationId:op()},request.invitation.id)).ok,true);}
+  const first=await action(a,'blocked-people');assert.equal(first.blockedPeople.length,32);assert.equal(first.next,blocked[31].id);assert.ok(reads>=96&&reads<=99,`full blocked page reads ${reads} records`);
+  const last=await action(a,'blocked-people',{after:first.next});assert.deepEqual(last.blockedPeople,[{id:blocked[32].id,displayName:'Blocked 32'}]);assert.equal(last.next,null);
+  const unknown='p_'+'x'.repeat(43);assert.equal((await action(a,'blocked-people',{after:unknown})).code,'invalid_social');assert.ok(reads<=3,'an unowned cursor never resolves an arbitrary account name');
+});
+
 test('an offline friend receives a named durable invitation after restart and accepts membership without joining', async t => {
   const f = await fixture(t), a = await register(f.app, 'Sam'), b = await register(f.app, 'Riley');
   assert.ok((await a.client.status()).capabilities.includes('people'));

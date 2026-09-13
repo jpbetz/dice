@@ -198,7 +198,7 @@ export function createAccountService({ store, now = Date.now, sessionMs = SESSIO
     },
     async social(token, csrf, expected, action, { id = null, input = {} } = {}) {
       if (!social) return outcome(503, 'social_unavailable', 'People service is unavailable. Your live table still works.');
-      const read = ['people', 'invitations'].includes(action);
+      const read = ['people', 'blocked-people', 'invitations'].includes(action);
       return store.transact(async tx => {
         const found = await authenticated(tx, token, csrf, now(), !read);
         if (!found.ok) return found;
