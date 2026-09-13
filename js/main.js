@@ -718,6 +718,7 @@ const LS_DICESET = 'dice.diceset.v1';    // "Just you" scope: dice-set identity 
 const LS_NAME = 'dice.name.v1';
 const LIBRARY_NAMESPACE_KEY='dice.library.namespace.v1';
 const LIBRARY_SHARING_OWNER='dice.library.sharing-owner.v1';
+const LIBRARY_IDENTITY_INTENT='dice.library.account-intent.v1';
 var libraryNamespace='guest',libraryApplying=false,librarySession,accountWorkspace,accountWorkspaceLoading;
 var libraryFavorites=null,libraryDefaultSet=null;
 var libraryMarkerAtBoot=(()=>{try{return localStorage.getItem(LIBRARY_NAMESPACE_KEY)||'guest';}catch{return 'guest';}})();
@@ -36195,9 +36196,10 @@ async function ensureAccountWorkspace(){
       const link=document.createElement('link');link.rel='stylesheet';link.href='css/accountui.css';link.onload=resolve;link.onerror=reject;document.head.append(link);
     })]);
     accountWorkspace=createAccountWorkspace({
-      capture:()=>captureLibraryStore(),apply:applyPrivateLibrary,
+      capture:()=>captureLibraryStore(),apply:applyPrivateLibrary,deviceNamespace:libraryMarkerAtBoot,initiallyBlocked:libraryPublicationBlocked,
       blockSharing:on=>{libraryPublicationBlocked=on;if(on)publishPools();},
-      clearSharing:async()=>{clearTimeout(poolsPublishTimer);poolsPublishTimer=null;if(!resetProfileSharing())return false;await publishPools();return true;},
+      clearSharing:async()=>{clearTimeout(poolsPublishTimer);poolsPublishTimer=null;if(!resetProfileSharing())return false;return net?await publishPools():true;},
+      identityIntent:()=>{try{localStorage.setItem(LIBRARY_IDENTITY_INTENT,crypto.randomUUID());}catch{/* HTTP requests still verify the fixed account */}},
       namespaceChanged:namespace=>{libraryNamespace=namespace;try{localStorage.setItem(LIBRARY_NAMESPACE_KEY,namespace);}catch{/* IDB remains the durable original */}},
       changed:info=>{
         librarySession=accountWorkspace?.session||librarySession;
@@ -36220,8 +36222,8 @@ const privateLibraryButton=document.createElement('button');privateLibraryButton
 privateLibraryButton.addEventListener('click',openAccountWorkspace);document.getElementById('pools-shared-note').before(privateLibraryButton);
 const accountMenuButton=document.createElement('button');accountMenuButton.type='button';accountMenuButton.id='idm-account';accountMenuButton.textContent='Account & private library';accountMenuButton.addEventListener('click',()=>{closeIdentityMenu();openAccountWorkspace();});document.getElementById('idm-library').after(accountMenuButton);
 window.addEventListener('storage',event=>{
-  if(event.key!==LIBRARY_NAMESPACE_KEY)return;
-  const next=event.newValue||'guest';if(next===libraryNamespace)return;
+  if(event.key!==LIBRARY_NAMESPACE_KEY&&event.key!==LIBRARY_IDENTITY_INTENT)return;
+  const next=event.newValue||'guest';if(event.key===LIBRARY_NAMESPACE_KEY&&next===libraryNamespace)return;
   libraryPublicationBlocked=true;publishPools();librarySession?.suspend();if(!librarySession)setPill('Account changed in another tab. Open Account & private library to review it.');
 });
 if(libraryMarkerAtBoot!=='guest')ensureAccountWorkspace();

@@ -7199,3 +7199,27 @@ assert an empty library and Numbers only. The repeatable visual probe is
 inspected. The composed phone workspace now shows this evidence at full width. The
 large push-turn card still overlaps dice; the result-layout slice must fix
 that remaining layout issue.
+
+
+## Optional recoverable identity and private library workspace (2026-09-13)
+
+The personal menu, People → You and saved-library status open one account
+workspace. Account creation/recovery keeps guest play available and leaves
+sync off until a library comparison is explicitly chosen. Comparison supports
+local/account/merge, retained tab alternatives and unequal-default dice choice;
+guest alternatives can be chosen without an account or sync. Downloads expose
+kept originals; eligible saved history requires explicit cleanup acknowledgment.
+
+The account namespace captures profiles, pool details, default dice and
+favorites through strict IDB transactions. Guest storage stays independent.
+Sharing consent and final live withdrawal must succeed before adoption; late
+edits abort a namespace or choice handoff and remain visible/exportable. Old
+comparison/history state is invalidated on transitions, including late replies.
+Offline reload offers the retained device copy with sync paused until refresh.
+
+Proof: full unit lane, focused app/account tests, workspace/personal-kit/sharing
+checks, and inspected desktop/390 × 844 screenshots from
+`tools/steps/account-ui-look.mjs`. Actual app tests use separate browser profiles,
+a real server restart, competing tabs, held HTTP saves and completed IDB
+transactions. [Protocol and evidence details](PRIVATE-LIBRARY-PROTOCOL.md#d13--actual-account-and-library-workspace).
+No deployment, physical-phone or cloud-persistence claim is made by this slice.

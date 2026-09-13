@@ -14,7 +14,7 @@ const read=namespace=>{const s=records.get(namespace);return s?{ok:true,state:co
 const cache={ok:true,read:async n=>{if(readHold&&n===readTarget)await readHold;return read(n);},seed:async(n,document)=>transition(n,{type:'seed',document}),edit:async(n,g,document)=>{
   events.push('edit-start:'+n);if(hold)await hold;
   const r=transition(n,{type:'edit',expectedWorkingGeneration:g,document});events.push('edit-end:'+n);return r;
-},export:async n=>({ok:true,data:copy(records.get(n))}),close(){}};
+},chooseGuest:async(g,localEntryId)=>transition('guest',{type:'choose-local',expectedGeneration:g,localEntryId}),export:async n=>({ok:true,data:copy(records.get(n))}),close(){}};
 let serverPerson=null;
 const accountFactory=({onIdentityChange})=>{
   const adopt=async next=>{const accepted=await onIdentityChange({personId:next,previousPersonId:serverPerson});if(accepted===false)return {ok:false,code:'identity_transition_refused'};serverPerson=next;return {ok:true,person:next?{id:next,displayName:'Private person'}:null};};
@@ -69,4 +69,16 @@ releaseRead();readHold=null;
 assert.equal((await raceRead).ok,false);await session.settled();
 assert.equal(session.info.namespace,person(1));assert.equal(mirror.profiles.profiles[0].name,'Edit during cache read');
 assert.ok((await session.exportOriginals()).data.entries.some(e=>e.document.profiles.profiles[0].name==='Edit during cache read'));
+await session.logout();
+await cache.edit('guest',session.info.workingGeneration,doc('Other guest tab'));
+mirror=doc('Kept guest tab');session.edit(mirror);await session.settled();
+const guestPreview=await session.preview(),guestAlternative=session.info.retainedId;
+assert.equal((await session.choose(guestPreview.state.generation,{localEntryId:guestAlternative})).ok,true);
+assert.equal(session.info.syncEnabled,false);assert.equal(session.info.namespace,'guest');
+assert.equal(mirror.profiles.profiles[0].name,'Kept guest tab');
+const keptGuest=(await session.exportOriginals()).data;
+assert.ok(keptGuest.entries.some(e=>e.document.profiles.profiles[0].name==='Other guest tab'));
+assert.ok(keptGuest.entries.some(e=>e.document.profiles.profiles[0].name==='Kept guest tab'));
+assert.equal(keptGuest.localConflictIds.length,0);
+assert.equal(transition(person(1),{type:'choose-local',expectedGeneration:read(person(1)).state.generation,localEntryId:read(person(1)).state.workingId}).code,'invalid_choice');
 console.log('library-session: durable handoff, refused sharing boundary, namespaces, and stale edits passed');

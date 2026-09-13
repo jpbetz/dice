@@ -442,11 +442,10 @@ one recovery response, queues another and then sign-out, and checks the
 actual resulting cookie identity as well as client state. These are protocol
 proofs, not screenshots of an account panel that does not yet exist.
 
-**D1.2 protocol is implemented**, with details and the remaining UI assignment
-in [PRIVATE-LIBRARY-PROTOCOL.md](PRIVATE-LIBRARY-PROTOCOL.md). The next UI slice
-is account recovery and explicit library reconciliation connected to the
-publication gate. Registration
-remains separate from library upload. Do not touch the main session's preview
+**D1.2 protocol and D1.3 app UI are implemented**, with the contract,
+namespace boundary and actual-app evidence in
+[PRIVATE-LIBRARY-PROTOCOL.md](PRIVATE-LIBRARY-PROTOCOL.md#d13--actual-account-and-library-workspace).
+Registration remains separate from explicit library reconciliation/upload. Do not touch the main session's preview
 port 8123. Use ephemeral ports and private temporary directories for every
 server proof.
 

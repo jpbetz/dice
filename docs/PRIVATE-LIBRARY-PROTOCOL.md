@@ -3,8 +3,9 @@
 # Private library protocol — D1.2
 
 2026-09-13. API, transactional browser cache and reconciliation controller are
-implemented and tested. This is the contract for the account/library UI slice;
-the app does not yet instantiate these modules or automatically sync anything.
+implemented and tested. The app now instantiates them through the optional
+account/library workspace described in the D1.3 record below. Uploads start
+only after an explicit comparison and choice.
 No cloud resources were provisioned and no deployment was performed.
 
 ## Private document and server actions
@@ -143,7 +144,57 @@ A held real HTTP save proves that an edit made while its acknowledgement is
 pending reaches the eventual server head without another edit, and background
 metadata does not manufacture a local edit conflict.
 
-Next is the visible account/recovery, comparison/conflict, saved-history cleanup
-and sync-status UI with desktop/phone screenshots, followed by durable homes.
-The present browser tests exercise the protocol on a minimal fixture page;
-they do not constitute completed app UI, real-device, or production-cloud proof.
+## D1.3 — actual account and library workspace
+
+The personal menu, People → You, and the status beside saved profiles open
+**You & private library**. Account registration/recovery is optional and keeps
+the table name, seat, draft and unfinished turn separate. Creating an account
+does not enable library sync. The recovery key is shown for the person's
+explicit copy/acknowledgment and removed from the form after use or close.
+
+`js/library-session.js` owns the active app mirror and its exact IDB working
+generation. Guest localStorage remains separate; account profiles, default
+dice and favorites are captured in their fixed person namespace. Startup
+with a previous account marker keeps sharing closed until identity settles.
+A transition first captures accepted edits and clears sharing consent, then
+waits for the final live publication withdrawal. Failed storage or a failed
+live withdrawal refuses adoption and blocks old sync. A lobby/solo workspace
+with no live connection has no live publication to withdraw.
+
+The transition ticket starts before any await. An edit during withdrawal,
+namespace reading or choice is retained in the previous namespace and aborts
+adoption. Immediately before the synchronous app mirror swap, the controller
+checks the ticket and current document again. Same-person refresh preserves
+a stale tab's actual document/generation instead of adopting the IDB winner.
+Cookie-changing intent suspends other same-origin tabs before the request;
+HTTP still verifies the fixed account on every private operation. A boundary
+epoch invalidates comparison/history UI, including late responses, and binds
+Apply and cleanup to the namespace being reviewed.
+
+Comparison shows device/account profiles, saved-roll names, default dice and
+favorites. A merge with unequal defaults requires a dice choice. Local tab
+alternatives can be selected explicitly. Guest alternatives use the separate
+`choose-local` transaction: it is guest-only, preserves all compared originals,
+checks the whole-state generation and never creates an upload or enables sync.
+History export and acknowledged cleanup use the server's `canArchive` list;
+head, conflict and reconciliation originals remain protected.
+
+An offline reload can explicitly open the last durable device copy with sync
+blocked until account refresh. Status distinguishes pending device writes,
+kept tab alternatives, refused device writes, offline retry and acknowledged
+private saves. Account service absence leaves guest rolls and downloads usable.
+
+`tests/account-ui.test.mjs` drives the actual app in independent Chrome profiles
+and shared-origin tabs. It covers real service restart/recovery, explicit merge
+and dice choice, offline edits/reload/retry, edits during a held HTTP save,
+sign-out and person switching, raw table privacy, stale tab choice, original
+export and protected acknowledged cleanup. Actual held publication and IDB
+handoffs prove late edits remain visible/exportable; a changed real cookie
+with refused withdrawal blocks adoption. A held old-account preview cannot
+repopulate its panel after another tab changes accounts. Guest-only conflict
+choice also survives reload without sync.
+
+`tools/steps/account-ui-look.mjs` captures populated desktop and 390 × 844
+phone recovery comparison/merge choice, plus account status and history.
+These are emulated Chrome device observations, not physical-device or
+production-cloud evidence. Durable homes and social UI are separate slices.

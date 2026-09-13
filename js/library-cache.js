@@ -120,6 +120,15 @@ export function transitionLibraryCache(raw, namespace, action, { id, at }) {
       if (!state.localConflictIds.includes(entryId)) state.localConflictIds.push(entryId);
       result = { ...stale(), retained: true, entryId };
     } else { state.workingId = entryId; state.workingGeneration++; }
+  } else if (action.type === 'choose-local') {
+    if (namespace !== 'guest' || state.syncEnabled) return refusal('invalid_choice', 'Review the account library before choosing it.');
+    if (action.expectedGeneration !== state.generation) return stale();
+    const chosen = entryById(state, action.localEntryId);
+    if (!chosen) return corrupt();
+    state.keptEntryIds = [...new Set([...state.keptEntryIds, state.workingId, chosen.id, ...state.localConflictIds])];
+    state.workingId = chosen.id;
+    state.workingGeneration++;
+    state.localConflictIds = [];
   } else if (action.type === 'preview') {
     const remote = action.result;
     if (!remote?.ok || remote.personId !== namespace || !revisionValid(remote.headRevision)
@@ -265,6 +274,7 @@ export async function openLibraryCache({ indexedDB = globalThis.indexedDB, dbNam
     edit: (namespace, expectedWorkingGeneration, document) => transact(namespace, { type: 'edit', expectedWorkingGeneration, document }),
     preview: (namespace, result) => transact(namespace, { type: 'preview', result }),
     choose: (namespace, expectedGeneration, options) => transact(namespace, { ...options, type: 'choose', expectedGeneration }),
+    chooseGuest: (expectedGeneration, localEntryId) => transact('guest', { type:'choose-local', expectedGeneration, localEntryId }),
     beginUpload: namespace => transact(namespace, { type: 'begin' }),
     acknowledge: (namespace, operationId, result) => transact(namespace, { type: 'acknowledge', operationId, result }),
     refuse: (namespace, operationId, result) => transact(namespace, { type: 'refuse', operationId, result }),
