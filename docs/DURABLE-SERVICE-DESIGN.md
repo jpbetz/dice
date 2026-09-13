@@ -3,7 +3,7 @@
 # Optional durable service
 
 **R1-D0/D1.1 · design decision, 2026-09-13 · adapters and optional recovery
-API implemented; account UI, library sync and home proofs pending.** Implements the account, library, home and social boundaries in
+API and private-library protocol implemented; account/sync UI and home proofs pending.** Implements the account, library, home and social boundaries in
 [People, personal dice, and persistent tables](PEOPLE-DICE-TABLES.md).
 This record enables local implementation; it does not claim a cloud service
 has been provisioned or a recovery prototype has passed.
@@ -44,7 +44,7 @@ path, not a file in the Cloud Run container. [Cloud Run runtime contract](https:
 
 Server modules belong in `service/`, outside the static allowlist. Browser
 transport belongs in `js/account.js`; pure library reconciliation and
-publication helpers belong in `js/library-sync.js`. Existing `js/net.js`
+reconciliation/cache helpers belong in `js/library-sync.js` and `js/library-cache.js`; publication consent remains separate in `js/profile-sharing.js`. Existing `js/net.js`
 continues to own live rolls, seats and room SSE.
 
 | Configuration | Meaning |
@@ -239,7 +239,7 @@ status are not a way to enumerate another person's account.
 | `POST /recover` | `{recoveryKey, revokeOtherSessions?:true}` → new cookie/person; explicit recovery-and-sign-out option remains usable at the 12-session cap; no implicit merge |
 | `POST /logout`; `POST /revoke-others` | Revoke current session; invalidate other session generations |
 | `POST /rotate-key` | Current/new recovery keys and acknowledgement; atomic replacement |
-| `GET /library` | `{headRevision, document, retainedVersions:[metadata]}` |
+| `GET /library` | `{personId, headRevision, document, versions:[metadata], historyBytes, archivedCount}` |
 | `POST /library` | `{baseRevision, operationId, document}` → acknowledged new revision or retained conflict ID + current head |
 | `GET /library/versions/:id` | Own immutable version for comparison/export |
 | `POST /library/reconcile` | `{baseRevision, sourceVersionIds, operationId, document}`; preserve sources, conditionally move head |
@@ -442,9 +442,10 @@ one recovery response, queues another and then sign-out, and checks the
 actual resulting cookie identity as well as client state. These are protocol
 proofs, not screenshots of an account panel that does not yet exist.
 
-**Next ready assignment: D1.2**, immutable library revision/conflict API,
-transactional browser working copies, explicit initial reconciliation and
-the account/recovery UI connected to the publication gate. Registration
+**D1.2 protocol is implemented**, with details and the remaining UI assignment
+in [PRIVATE-LIBRARY-PROTOCOL.md](PRIVATE-LIBRARY-PROTOCOL.md). The next UI slice
+is account recovery and explicit library reconciliation connected to the
+publication gate. Registration
 remains separate from library upload. Do not touch the main session's preview
 port 8123. Use ephemeral ports and private temporary directories for every
 server proof.

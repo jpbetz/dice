@@ -3,6 +3,7 @@
 import crypto from 'node:crypto';
 import { cutText } from '../js/notation.js';
 import { StoreError } from './store.js';
+import { readLibrary, prepareLibraryWrite, writeLibrary, archiveLibrary } from './library.js';
 
 export const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_SESSIONS = 12;
@@ -61,6 +62,8 @@ export function createAccountService({ store, now = Date.now, sessionMs = SESSIO
     csrfToken: session.record.csrfToken, expiresAt: session.record.expiresAt,
     // Route code consumes this field into Set-Cookie and never serializes it.
     sessionToken: session.token });
+  const expectedPerson = (found, expected) => found.person.id === expected ? null
+    : outcome(409, 'identity_changed', 'The signed-in person changed. Reopen the account before syncing.');
 
   return Object.freeze({
     async status() {
@@ -128,6 +131,29 @@ export function createAccountService({ store, now = Date.now, sessionMs = SESSIO
         if (!found.ok) return { ok: true, person: null };
         return { ok: true, person: projection(found.person), csrfToken: found.session.csrfToken,
           expiresAt: found.session.expiresAt };
+      });
+    },
+    async library(token, expected, versionId = null) {
+      return store.transact(async tx => {
+        const found = await authenticated(tx, token, null, now(), false);
+        if (!found.ok) return found;
+        return expectedPerson(found, expected) || readLibrary(tx, found.person, versionId);
+      });
+    },
+    async saveLibrary(token, csrf, expected, input, reconcile = false) {
+      const prepared = prepareLibraryWrite(input, reconcile, now());
+      if (!prepared.ok) return prepared;
+      return store.transact(async tx => {
+        const found = await authenticated(tx, token, csrf, now());
+        if (!found.ok) return found;
+        return expectedPerson(found, expected) || writeLibrary(tx, found.person, prepared);
+      });
+    },
+    async archiveLibrary(token, csrf, expected, input) {
+      return store.transact(async tx => {
+        const found = await authenticated(tx, token, csrf, now());
+        if (!found.ok) return found;
+        return expectedPerson(found, expected) || archiveLibrary(tx, found.person, input);
       });
     },
     async logout(token, csrf) {

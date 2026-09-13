@@ -59,17 +59,17 @@ export function createAccountClient({ fetch: fetcher = globalThis.fetch,
     csrfToken = result.csrfToken || null;
     return result;
   };
-  async function request(action, body, nonce = csrfToken) {
+  async function request(action, body, nonce = csrfToken, headers = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetcher(new URL(`/api/account/${action}`, origin), {
         method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin', cache: 'no-store',
-        headers: body === undefined ? {} : { 'Content-Type': 'application/json', 'X-Dice-Account': '1',
-          ...(nonce ? { 'X-Dice-CSRF': nonce } : {}) },
+        headers: { ...headers, ...(body === undefined ? {} : { 'Content-Type': 'application/json', 'X-Dice-Account': '1',
+          ...(nonce ? { 'X-Dice-CSRF': nonce } : {}) }) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: controller.signal,
       });
-      if (response.status === 404) return { ok: false, code: 'not_available', enabled: false };
+      if (response.status === 404 && !action.startsWith('library')) return { ok: false, code: 'not_available', enabled: false };
       const value = await response.json();
       if (!value || typeof value !== 'object') return unavailable();
       if (!response.ok) return { ...value, ok: false };
@@ -88,6 +88,17 @@ export function createAccountClient({ fetch: fetcher = globalThis.fetch,
         if (adopted.ok) latch(false);
         return adopted;
       }
+      return result;
+    });
+  };
+  const libraryRequest = (expectedPersonId, action, body) => {
+    const epoch = identityEpoch;
+    const changed = () => ({ ok: false, code: 'identity_changed', message: 'Reopen the account before syncing.' });
+    return serializeCookies(async () => {
+      if (epoch !== identityEpoch || !expectedPersonId || personId !== expectedPersonId || latched()) return changed();
+      const result = await request(action, body, csrfToken, { 'X-Dice-Person': expectedPersonId });
+      if (epoch !== identityEpoch || personId !== expectedPersonId
+          || (result.personId && result.personId !== expectedPersonId)) return changed();
       return result;
     });
   };
@@ -112,6 +123,11 @@ export function createAccountClient({ fetch: fetcher = globalThis.fetch,
     register: input => begin('register', input),
     recover: (recoveryKey, { revokeOtherSessions = false } = {}) =>
       begin('recover', { recoveryKey, ...(revokeOtherSessions ? { revokeOtherSessions: true } : {}) }),
+    library: (expectedPersonId, versionId = null) => libraryRequest(expectedPersonId,
+      versionId === null ? 'library' : `library/versions/${encodeURIComponent(versionId)}`),
+    saveLibrary: (expectedPersonId, input, { reconcile = false } = {}) =>
+      libraryRequest(expectedPersonId, reconcile ? 'library/reconcile' : 'library', input),
+    archiveLibrary: (expectedPersonId, input) => libraryRequest(expectedPersonId, 'library/archive', input),
     logout() {
       // Freeze the local namespace before awaiting a server that may be down.
       const epoch = ++identityEpoch;
