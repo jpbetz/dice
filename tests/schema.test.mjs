@@ -391,13 +391,14 @@ try {
 // roll whose reveal it carried becomes unrevealable by anybody, with nothing on
 // screen to say why). A runtime test cannot catch that: the purge only runs for
 // a browser below this epoch, and every test tab is stamped current on purpose.
-t('the purge spares the keys that have no shape to be stale about', () => {
+t('the purge preserves authority and saved work for its versioned readers', () => {
   const src = readFileSync(join(ROOT, 'js', 'main.js'), 'utf8');
   const m = /const PURGE_KEEPS = new Set\(\[([^\]]*)\]\)/.exec(src);
   assert.ok(m, 'main.js declares PURGE_KEEPS');
   const keeps = m[1].split(',').map((s) => s.trim()).filter(Boolean);
-  assert.deepEqual(keeps, ['LS_SCHEMA', 'LS_STABILITY', 'LS_WHO'],
-    'the keep list is exactly three, each with the pair of arguments its comment states');
+  assert.deepEqual(keeps, ['LS_SCHEMA', 'LS_STABILITY', 'LS_WHO', 'LS_PROFILES',
+    'LS_GROUPS', 'LS_GROUPS_MINE', 'LS_ROOMSETTINGS', 'LS_NAME', 'LS_DICESET'],
+    'R1 retains saved libraries and preferences instead of erasing them with stale UI state');
   // …and the one that costs a person their authority reads the SAME constant
   // net.js writes, so the purge and the minting cannot drift apart by a typo.
   assert.match(readFileSync(join(ROOT, 'js', 'net.js'), 'utf8'),

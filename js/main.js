@@ -9256,7 +9256,8 @@ function renderBreakdown(el, entry, hidden, key = false) {
   // named source. Only the unnamed fallback is conditional — that is the log's
   // own rule (`else if (entry.modifier)`), so a bare 0 never renders.
   const mods = modPartsOf(entry) || (entry.modifier ? [{ label: '', value: entry.modifier }] : []);
-  if (entry.parts.length <= 1 && !mods.length) return;
+  if (entry.parts.length <= 1 && !mods.length && !entry.push
+      && !entry.parts.some((p, i) => faceSymbolFor(entry, i, p) !== null)) return;
   // U17 step 3: this line ends in `= <sum>`, so it is arithmetic. It is
   // reachable under a per-die lens whenever outcomesFor returns null on a
   // VISIBLE roll — an all-child or all-discarded pool — which is the corner
@@ -9264,11 +9265,19 @@ function renderBreakdown(el, entry, hidden, key = false) {
   if (mods.length && !activeSystem().usesTotal) return;
 
   const partSpan = (p) => {
+    const i = entry.parts.indexOf(p);
     const s = document.createElement('span');
     let cls = p.counts && p.isMax ? 'crit-max' : p.counts && p.isMin ? 'crit-min' : '';
     if (!p.counts) cls += ' log-discarded';
-    s.className = cls.trim();
-    s.textContent = `${p.child ? '✴' : ''}${p.type} ${p.label}`;
+    s.className = `breakdown-die oc-die ${cls}`.trim();
+    if (faceScoresIn(entry, p)) s.classList.add('oc-scored');
+    const symbol = faceSymbolFor(entry, i, p);
+    if (symbol === null) s.textContent = `${p.child ? '✴' : ''}${p.type} ${p.label}`;
+    else {
+      s.append(`${p.type} `, faceSymbolSvg(symbol));
+      const said = document.createElement('span');
+      said.className = 'oc-sr'; said.textContent = symbol; s.append(said);
+    }
     return s;
   };
   // Source-grouped read (2b-⑤): 'WISDOM d8 7 + d8 2 · SWORDS d6 4' — each
@@ -14147,8 +14156,8 @@ window.__diceDebug = {
       state: payload ? payload.push || null : null,
       values: payload ? payload.values : null,
       line: el && !el.hidden ? el.textContent.replace(/\s+/g, ' ').trim() : null,
-      scoredChips: document.querySelectorAll('.oc-die.oc-scored').length,
-      totalChips: document.querySelectorAll('.oc-chip').length,
+      scoredChips: document.querySelectorAll('#result-meaning .oc-die.oc-scored, #result-breakdown .oc-die.oc-scored').length,
+      totalChips: document.querySelectorAll('#result-meaning .oc-chip, #result-breakdown .breakdown-die').length,
     };
   },
   // THE KEYBOARD CURSOR (MECHANICS M2c). Everything a scenario needs to prove

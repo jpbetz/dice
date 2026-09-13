@@ -778,6 +778,8 @@ export const scenarios = [
     // values, attribution, and interpretation (byte-equal log entries).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.waitFor(`window.__diceDebug.system === 'soul-deal'`);
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
       await a.roll('2d6+3[str] # Attack');
       await b.settle();
@@ -4921,6 +4923,7 @@ export const scenarios = [
     // (interpretation is a render-time lens).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setSystem('soul-deal')`); // this scenario proves the chosen per-die lens
       await a.roll('2d4');
       assert.equal(await a.eval(`getComputedStyle(document.getElementById('result-total')).display`),
         'none', 'no big total under a per-die system');
@@ -5048,6 +5051,7 @@ export const scenarios = [
     // interpretation.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setSystem('soul-deal')`); // this scenario proves the chosen per-die lens
       await a.roll('2d8[Wisdom]+1d4[Zeal]+1d6 # Hunt');
 
       // 2e: the breakdown line FOLDS under per-die \u2014 the outcome rows carry
@@ -5138,6 +5142,7 @@ export const scenarios = [
     // verdict ring folds under per-die.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setSystem('soul-deal')`); // this scenario proves the chosen per-die lens
       await a.roll('2d8[Wisdom]+1d10[Sword]+1d6[Peer Respect]');
 
       // the shared column: a sourced read turns the container to the grid
@@ -6343,8 +6348,9 @@ export const scenarios = [
     // Settings → Your data (the `portable` scenario covers that path).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.4', name: 'Alice' });
+      await a.dbg(`setGroups([{name:'Kept roll', notation:'1d6'}])`); // owned fixture; fresh visitors start empty
       const first = (await a.dbg('groups'))[0];
-      assert.ok(first && first.id, 'the rack seeded');
+      assert.ok(first && first.id, 'the owned roll exists');
 
       // A save writes storage — and nothing else. The key moved with PROFILES
       // §11: dice.groups.v1 is a fossil read once at boot, and the rack now
@@ -6425,6 +6431,7 @@ export const scenarios = [
     // draft shows the hint.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.eval(`document.querySelector('#quick-dice .dice-mode-link')?.click()`); // explicitly open the composer
       // origins share a profile across scenarios: seed the rack explicitly
       await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
       let ts = await a.dbg('trayState');
@@ -7094,6 +7101,9 @@ export const scenarios = [
     // lands a draft on a shelf via chips.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.waitFor(`window.__diceDebug.system === 'soul-deal'`);
+      await a.dbg(`profiles.reset('soul-deal')`); // a character sheet chosen by the player
       await a.dbg(`setGroups([{name: 'Claws', notation: '1d6', category: 'Attributes'},
         {name: 'Damage', notation: '3d4'},
         {name: 'Hunt', notation: '2d8[Wisdom]+1d4[Zeal] dc12'}])`);
@@ -7752,6 +7762,8 @@ export const scenarios = [
       await a.dbg(`setGroups([{name: 'Claws', notation: '1d20', category: 'Attributes'},
         {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
       await b.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}])`);
+      await a.dbg(`profiles.share(window.__diceDebug.profiles.active.id,true)`);
+      await b.dbg(`profiles.share(window.__diceDebug.profiles.active.id,true)`);
       // The predicate demands the FULL 3-pool rack: origins share a profile
       // across scenarios, and sheet-touch leaves a 1-pool Claws/Attributes
       // rack behind — Alice's join-time publish of THAT stale rack satisfied
@@ -8235,6 +8247,7 @@ export const scenarios = [
     // existing user's panel shows exactly what it showed yesterday).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.4', name: 'Sec' });
+      await a.eval(`document.querySelector('#quick-dice .dice-mode-link')?.click()`); // explicitly open the composer
       const stored = `JSON.parse(localStorage.getItem('dice.sections.v1') || 'null')`;
       try {
         // The second pool carries a modifier on purpose: 'Open in draft' —
@@ -8263,6 +8276,7 @@ export const scenarios = [
             await b.eval(`localStorage.setItem('dice.inputmode.v1', ${JSON.stringify(JSON.stringify(legacy))})`);
             await b.eval(`localStorage.removeItem('dice.sections.v1')`);
             await b.reload();
+            await b.eval(`document.querySelector('#quick-dice .dice-mode-link')?.click()`);
             assert.deepEqual((await b.dbg('sections')).shown, want,
               `a '${legacy}' user's panel is unchanged by the migration`);
             assert.equal(await b.eval(`localStorage.getItem('dice.inputmode.v1')`),
@@ -8399,6 +8413,7 @@ export const scenarios = [
     // did nothing. A hook-driven pin cannot see that.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.6', name: 'Rail' });
+      await a.eval(`document.querySelector('#quick-dice .dice-mode-link')?.click()`); // explicitly open the composer
       const SHEET = [{ name: 'Wisdom', notation: '2d8', category: 'attributes' },
         { name: 'Swordplay', notation: '1d10', category: 'skills' }];
       try {
@@ -8551,6 +8566,8 @@ export const scenarios = [
     // popover cannot express.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.15', name: 'Rim' });
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.waitFor(`window.__diceDebug.system === 'soul-deal'`);
       const word = `document.getElementById('tray-mods').textContent`;
       const tip = `document.getElementById('tray-mods').title`;
 
@@ -11727,8 +11744,10 @@ export const scenarios = [
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.2', name: 'Solo' });
 
-      // A fresh browser deals ONE profile and it is in hand: P1, and no prompt
-      // asked for it.
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.dbg(`profiles.reset('soul-deal')`); // explicit saved-kit fixture; first-play proves fresh defaults
+
+      // Begin with one saved profile in hand, then exercise lossless switches.
       const first = await a.dbg('profiles.active');
       assert.ok(first && first.name, 'a fresh browser holds a dealt profile');
       assert.equal(first.system, 'soul-deal', 'bound to the system it was dealt for');
@@ -11902,6 +11921,9 @@ export const scenarios = [
     async fn(ctx) {
       // Seed a library on this origin, then arrive anonymously so the modal opens.
       const seed = await ctx.newTable({ origin: '127.0.0.6', name: 'Setup' });
+      await seed.dbg(`setSystem('soul-deal')`);
+      await seed.waitFor(`window.__diceDebug.system === 'soul-deal'`);
+      await seed.dbg(`profiles.reset('soul-deal')`); // existing-library join fixture
       await seed.dbg(`profiles.create('Rogue')`);
       await seed.dbg(`setGroups([{name: 'Sneak', notation: '3d6'}])`);
       await seed.dbg(`profiles.deal('dnd')`);
@@ -11909,6 +11931,7 @@ export const scenarios = [
       assert.equal(seeded.length, 3, 'two soul-deal profiles and one D&D');
 
       const p = await ctx.newTable({ origin: '127.0.0.6', anon: true });
+      await p.waitFor(`window.__diceDebug.seatPicker.system === 'soul-deal'`, {desc:'pre-join table preview arrives'});
       const picker = await p.dbg('seatPicker');
       assert.equal(picker.open, true, 'the modal is up');
       assert.equal(picker.system, 'soul-deal', 'and it knows what the table reads by, pre-join');
@@ -24653,7 +24676,7 @@ export const scenarios = [
       await a.dbg('sim(240)');
 
       const read = await a.eval(`(() => {
-        const rows = [...document.querySelectorAll('.oc-chip .oc-die')];
+        const rows = [...document.querySelectorAll('#result-meaning .oc-chip .oc-die, #result-breakdown .breakdown-die')];
         return JSON.stringify(rows.map((r) => ({
           text: r.textContent.replace(/\\s+/g, ' ').trim(),
           svg: r.querySelectorAll('svg.chip-glyph').length,
@@ -24679,7 +24702,7 @@ export const scenarios = [
         { desc: 'the plain die settles', timeout: 30000 });
       await a.dbg('sim(240)');
       const plain = await a.eval(`(() => {
-        const r = document.querySelector('.oc-chip .oc-die');
+        const r = document.querySelector('#result-meaning .oc-chip .oc-die, #result-breakdown .breakdown-die') || document.getElementById('result-total');
         return JSON.stringify({ text: r.textContent.trim(), svg: r.querySelectorAll('svg').length });
       })()`).then(JSON.parse);
       assert.equal(plain.svg, 0, 'a standard d6 reads as a numeral');
@@ -24995,7 +25018,7 @@ export const scenarios = [
       // symbol rather than a numeral — the M3 machinery reading the PER-DIE
       // set, not the roll-level one.
       const chips = await a.eval(`(() => {
-        const rows = [...document.querySelectorAll('.oc-chip .oc-die')];
+        const rows = [...document.querySelectorAll('#result-meaning .oc-chip .oc-die, #result-breakdown .breakdown-die')];
         return JSON.stringify(rows.map((r) => r.querySelectorAll('svg.chip-glyph').length));
       })()`).then(JSON.parse);
       assert.equal(chips.length, 4, 'four dice are read out');

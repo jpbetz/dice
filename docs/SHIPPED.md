@@ -7038,3 +7038,19 @@ was recorded and C27 has now closed.
 - **C24 is not closed by this.** "Do not take another notch off the mat" still
   binds; `frame-residual.mjs --pile` re-asks its measurement of the presets
   that actually ship.
+
+## Numbers-only face evidence (2026-09-13)
+
+The fresh-visitor change exposed two previously hidden readout gaps: numeric
+breakdowns printed symbol face IDs and omitted push scoring marks. They now
+use each die's actual face symbol and the same declared scoring predicate as
+the per-die interpretation. A single symbol die retains its face evidence.
+The numeric total continues to follow the selected Numbers-only lens.
+
+The twelve previously failing composed scenarios now pass targeted checks
+(the character-sheet fixture explicitly chooses its profile). Old per-die and
+composer tests select the lens/workspace they exercise; fresh-visit tests still
+assert an empty library and Numbers only. The repeatable visual probe is
+`tools/steps/numbers-evidence-look.mjs`; desktop symbol/push captures were
+inspected. The resized old desktop rail still squeezes the phone view; its
+composed visual proof follows integration of the new phone workspace.
