@@ -63,5 +63,30 @@ isolation, stable solo restore, request failure/retry, and cancelling an actual
 in-flight model request. Static delivery verifies served bytes, embedded
 texture, real UV range, material count, normals and vertex colors.
 
-The combined four-player desktop/phone composition review is still pending.
-Navigation and Stone designs and the actual setup preview remain open.
+The combined four-player desktop and 390×844 phone captures were inspected
+with persistent result seats, full-width phone dice, and the bottom roll tray.
+The table has a distinct edge and landmarks, quiet grain below the dice, and
+all four latest reads remain together. This is the first complete model slice;
+Navigation, Stone, and grouped roll presentation remain open.
+
+## Appearance preview
+
+Table setup → Appearance displays the actual selected grounded-table GLB in
+a separate 3D viewport before Apply. Its loader is lazy and rendering is driven
+by changes and resize, with no animation loop. Closing the panel pauses it;
+selection never changes the live table or another viewer. Stable users can
+choose grounded table designs; fantasy designs remain experimental choices.
+Mat choices retain their actual texture swatch preview. Experimental fantasy
+venues retain a labelled selection rather than pretending to render their full
+scene. Tower selection is still a labelled choice, outside this preview slice.
+
+The 220-pixel preview deliberately expands the old 112-pixel sample inside the
+opened task workspace, following the owner's generous-workspace clarification.
+The settings content scrolls when needed; Apply and the return remain visible.
+Six targeted table/setup/channel tests pass, including actual preview render,
+no idle frames, other-viewer isolation and pause on close. Desktop and phone
+setup captures were inspected with the live dice preserved beside/behind it.
+
+Review captures: [desktop](redesign/2026-09-13-copper-desktop.png),
+[phone](redesign/2026-09-13-copper-phone.png),
+[phone setup](redesign/2026-09-13-table-preview-phone.png).

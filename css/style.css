@@ -3845,8 +3845,10 @@ body.seated #result-banner { left: calc(var(--table-left) + 24px); transform: no
 #table-people { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .table-person { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--hair); border-radius: 20px; padding: 5px 9px; font-size: 12px; }
 .table-person i { width: 7px; height: 7px; border-radius: 50%; }
-#table-preview { height: 112px; border-radius: 10px; border: 1px solid #ffffff20; margin-bottom: 20px; background-size: 192px; display: flex; align-items: flex-end; overflow: hidden; }
-#table-preview-label { padding: 9px 12px; background: #0009; color: #fff; width: 100%; font-size: 12px; }
+#table-preview { position:relative; height: 220px; border-radius: 10px; border: 1px solid #ffffff20; margin-bottom: 20px; background-size: 192px; display: flex; align-items: flex-end; overflow: hidden; }
+#table-preview-label { position:relative; padding: 9px 12px; background: #0009; color: #fff; width: 100%; font-size: 12px; }
+#table-preview-scene { position:absolute; inset:0 0 32px; background:#141110; }
+#table-preview-scene canvas { display:block; width:100%; height:100%; }
 #settings-panel #felt-swatches { max-height: none; overflow: visible; }
 #table-edit-footer { flex: none; border-top: 1px solid var(--hair); padding: 12px 22px 16px; }
 #table-edit-status { margin: 0 0 10px; font-size: 12px; color: #c4bdb1; }

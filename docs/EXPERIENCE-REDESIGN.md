@@ -35,7 +35,7 @@ for its content and keep the return to the same live table clear.
 | Priority | Investment | First useful release | What follows |
 | --- | --- | --- | --- |
 | **1 — implementation started** | **People, personal dice, and persistent tables.** Three clear destinations: Tables, My dice & rolls, People. Direct identity editing, a visual dice collection, visible table setup, familiar first rolls, and an optional recoverable identity. | Direct name editing, a usable dice gallery with favorites and practice, named table controls, and Quick dice with explicitly chosen starter kits. | Durable table homes, identity recovery, synchronized libraries, friends, presence, and an invitation inbox. |
-| **2 — next design track** | **The whole shared playing surface.** Compose recognizable tables and places for people; keep names and each player's latest visible result readable together. | One excellent multiplayer composition and a phone layout with a full-width table, bottom roll tray, and sheets for dice, people, and history. | Explore three complete designs: a worn tavern table with brass inlays, an illustrated navigation table, and a carved stone circle. Explore concurrent or grouped roll presentation. |
+| **2 — first composition implemented** | **The whole shared playing surface.** Compose recognizable tables and places for people; keep names and each player's latest visible result readable together. | One excellent multiplayer composition and a phone layout with a full-width table, bottom roll tray, and sheets for dice, people, and history. | Explore three complete designs: a worn tavern table with brass inlays, an illustrated navigation table, and a carved stone circle. Explore concurrent or grouped roll presentation. |
 | **3 — measured engineering track** | **Lightweight play.** Reduce delivery, simulation, and rendering costs while retaining character and readable dice. | Verify production compression and establish a reproducible baseline; implement missing compressed delivery and reduce dice-face material draws. | Load optional features on demand, move heavy simulation into a worker, stop unnecessary rendering at rest, and develop an attractive Battery saver presentation with an optional instant result. |
 
 These are investment priorities, not a waterfall. Item (1)'s mobile shell
@@ -59,6 +59,12 @@ the real solver off the main thread. Seated 40d20 input return falls from
 Turns, towers and reconstruction retain the shared inline bake. Physical
 devices, turn-event queue preservation, rendering startup, idle work and
 Battery saver remain open; no battery or faster-frame-rate claim is made.
+
+**R2 first composition, 2026-09-13:** [player results](PLAYER-RESULTS.md) now
+keep upright names, crests and the group’s latest visible reads together. The
+[table design slice](TABLE-COMPOSITIONS.md) adds Copper Lantern, a real setup
+preview and inspected four-player desktop/phone views. Navigation, Stone and
+grouped-roll presentation remain open.
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable

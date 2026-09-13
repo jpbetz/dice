@@ -15806,6 +15806,7 @@ window.__diceDebug = {
   setFelt(id) { return selectFelt(id); },
   // interpretation system (goal 6): active profile id + the picker's entry point
   get system() { return currentSystemId; },
+  get tablePreview() { return tablePreview?.state || null; },
   get tableDesign() { return tableDesign.state; },
   setSystem(id) { return selectSystem(id); },
   // mat-zoom (Joe 2026-08-04): the room-wide preset + world extents for the
@@ -29685,6 +29686,7 @@ function selectFelt(id) {
 // or another player's result until Apply; only edited keys ride the patch.
 // Hoisted for picker calls made during module evaluation.
 var tableEdit;
+var tablePreview, tablePreviewLoading, tablePreviewEpoch = 0;
 var settingsOpener;
 function tableSettingValue(key, fallback) { return tableEdit ? tableEdit.values[key] : fallback; }
 function tableSettingsSnapshot() {
@@ -29743,6 +29745,26 @@ function renderTablePeople() {
     list.append(item);
   }
 }
+async function syncTablePreview() {
+  const epoch = ++tablePreviewEpoch;
+  const design = tableEdit && TABLE_DESIGNS[tableEdit.values.venue];
+  const shown = design && settingsDest === 'staging' && !settingsModal.classList.contains('hidden');
+  if (!shown) { tablePreview?.pause(); return; }
+  try {
+    tablePreviewLoading ||= import('./tablepreview.js');
+    const {createTablePreview} = await tablePreviewLoading;
+    if (epoch !== tablePreviewEpoch) return;
+    tablePreview ||= createTablePreview(document.getElementById('table-preview-scene'), state => {
+      if (!tableEdit || tableEdit.values.venue !== state.wanted) return;
+      const label = document.getElementById('table-preview-label');
+      label.textContent = state.status === 'failed' ? 'Preview unavailable · the live table is unchanged'
+        : `${TABLE_DESIGNS[state.wanted]?.label || 'Table'} · ${state.status === 'loading' ? 'loading preview…' : 'appearance preview'}`;
+    });
+    tablePreview.show(design.id);
+  } catch {
+    if (epoch === tablePreviewEpoch) document.getElementById('table-preview-label').textContent = 'Preview unavailable · you can still choose this table';
+  }
+}
 function renderTableEdit() {
   if (!tableEdit) return;
   const e = tableEdit;
@@ -29751,10 +29773,12 @@ function renderTableEdit() {
   const sample = document.getElementById('table-preview');
   const swatch = [...document.querySelectorAll('#felt-swatches [data-felt]')].find(b => b.dataset.felt === e.values.felt);
   const fantasy = VENUES[e.values.venue]?.register === 'fantasy';
-  sample.style.backgroundImage = fantasy ? 'radial-gradient(ellipse at top, #47634e, #132524)' : swatch?.querySelector('.swatch-dot').style.backgroundImage || '';
-  document.getElementById('table-preview-label').textContent = fantasy
+  const design = TABLE_DESIGNS[e.values.venue];
+  sample.style.backgroundImage = design ? '' : fantasy ? 'radial-gradient(ellipse at top, #47634e, #132524)' : swatch?.querySelector('.swatch-dot').style.backgroundImage || '';
+  document.getElementById('table-preview-label').textContent = design ? `${design.label} · appearance preview` : fantasy
     ? `Venue selection · ${VENUES[e.values.venue].label}`
     : `Mat preview · ${FELT_THEMES[e.values.felt]?.name || e.values.felt}`;
+  syncTablePreview();
   document.getElementById('table-edit-apply').disabled = e.busy || !e.dirty.size;
   document.getElementById('table-edit-apply').textContent = e.busy ? 'Applying…' : IN_LOBBY ? 'Apply' : 'Apply to table';
   document.getElementById('table-edit-reset').disabled = e.busy || !e.dirty.size;
@@ -29882,6 +29906,7 @@ function showSettingsDest(dest) {
   // §7.23 fixed for the pools bar.
   const panel = document.getElementById('settings-scroll');
   if (panel) panel.scrollTop = 0;
+  syncTablePreview();
   return settingsDest;
 }
 
@@ -29959,6 +29984,7 @@ function openSettingsModal(at = 'table', anchor) {
   document.getElementById('portable-push').style.display = IN_LOBBY ? 'none' : '';
   syncSettingsUI();
   settingsModal.classList.remove('hidden');
+  syncTablePreview();
   renderTablePeople();
   syncSettingsModal();
   document.getElementById('settings-close').focus({preventScroll:true});
@@ -29968,6 +29994,7 @@ function closeSettingsModal() {
   const hadFocus = settingsModal.contains(document.activeElement);
   settingsModal.classList.add('hidden');
   tableEdit = null;
+  syncTablePreview();
   document.getElementById('table-open').setAttribute('aria-expanded','false');
   closeModal(settingsModal);
   document.getElementById('settings-note').textContent = '';

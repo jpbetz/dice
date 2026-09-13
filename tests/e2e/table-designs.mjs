@@ -11,10 +11,16 @@ export const tableDesignScenarios = [{
     await a.dbg('openSettings("staging")');
     await a.eval(`document.querySelector('[data-venue="copper"]').click()`);
     assert.equal(await a.dbg('venueInfo().id'),'table','a local candidate does not change the room');
-    assert.equal(await loaded(),false,'a text-only candidate has not loaded the live model');
+    await a.waitFor(`window.__diceDebug.tablePreview?.status==='ready'`);
+    assert.equal((await a.dbg('tableDesign')).visible,false,'the candidate model belongs only to the preview');
+    assert.equal((await b.dbg('tableDesign')).visible,false,'preview never changes another player’s surface');
+    const previewFrames=(await a.dbg('tablePreview')).frames;
+    await a.eval('new Promise(r=>setTimeout(r,150))');
+    assert.equal((await a.dbg('tablePreview')).frames,previewFrames,'an unchanged preview draws no idle frames');
     await a.eval(`document.getElementById('table-edit-apply').click()`);
     for(const t of [a,b]) await t.waitFor(`window.__diceDebug.tableDesign.status==='ready' && window.__diceDebug.tableDesign.activeId==='copper'`);
     await a.dbg('closeSettingsModal()');
+    assert.equal((await a.dbg('tablePreview')).visible,false,'the preview sleeps when setup closes');
     await a.roll('4d6'); await b.settle();
     assert.equal(await a.rollId(),await b.rollId(),'both players read the same roll on the new table');
     const c=await ctx.newTable({origin:'127.0.0.113',name:'Cora',query:'&stability=stable'});
