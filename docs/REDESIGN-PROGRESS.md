@@ -16,7 +16,7 @@ priority order. R1, R2 and R3 remain open until their composed proofs pass.
 | Gallery practice | Committed as `f67d1df`; local/shared isolation and lifecycle tests plus desktop/phone captures pass. Owner expanded gallery integrated as `8fe35cc`; `64035a4` keeps practice inside that preview on phones. Four gallery checks, the strengthened phone practice check, and desktop/phone/short-workspace captures pass. |
 | R1-C: Quick dice and explicit starter kits | Integrated `605b4f6` / `ab8e003` as `d6efcbb` / `5291b00`. Focused tests preserve empty/legacy libraries, occupied interpretation, drafts and unfinished private/shared/solo turns. Old tests explicitly select Soul Deal profiles/lenses and the composer; fresh-visit proofs retain the new empty/Numbers-only default. |
 | Explicit profile publication | Committed as `002b115`; focused raw-network proof and composed smoke pass; see PROFILE-SHARING.md. Connect the namespace-reset hook before account recovery can adopt a library. |
-| R1-D0: durable service | Local atomic store and Firestore REST adapter integrated as `046f9a7` / `0c121fa`; optional account API/client integrated as `a2037ee`. Adapter/account tests pass, including cookie races and restart recovery. Private immutable library revisions, transactional IndexedDB namespaces, explicit conflicts and cleanup integrated as `838f86a`. Real HTTP/browser/restart proofs pass. Agent now implements saved homes; UI agent implements account adoption and visible sync. No cloud storage is provisioned. |
+| R1-D0: durable service | Local atomic store and Firestore REST adapter integrated as `046f9a7` / `0c121fa`; optional account API/client integrated as `a2037ee`. Adapter/account tests pass, including cookie races and restart recovery. Private immutable library revisions, transactional IndexedDB namespaces, explicit conflicts and cleanup integrated as `838f86a`, cleanup protection follow-up `6ea70cf`. Saved-home protocol integrated as `e923893`; real restart/outage/corruption/concurrent-save proofs pass. UI agent completes account adoption and visible sync before home UI; service agent now implements contacts/invitations/presence. No cloud storage is provisioned. |
 | R3: compressed public text | Agent commit `8e44250` reviewed and integrated as `feb5f79`; combined suite passes. Production lacked compression; local six-file transfer shrinks approximately 72% with Brotli. |
 | R3: dice-face draw consolidation | Integrated as `354b965`: two real draws per compatible die, reviewed face sheets and exact geometry/film checks. Ordinary film worker integrated as `2490b07` / `fb47593`; complete event FIFO and worker rethrows as `f783874`. Full-film parity, input-return measurements, live clear/collect/reveal and next-film collider preservation pass. Fourteen combined turn/worker/result checks pass. Idle rendering is in progress. |
 | R1 destinations + R2 phone surface | Integrated as `55c42d7`: three destinations, content-sized desktop workspaces, full-width phone scene and bottom tray. Persistent result seats and reserved turn controls integrated as `955b2be`; composed desktop/phone/four-player/privacy/turn proofs pass. Copper Lantern, Navigation Table and Stone Circle plus actual appearance preview are integrated and visually inspected; Navigation/Stone are `0952007`. Both final recipes reproduce complete GLB bytes, and shared preview/application/restore, delivery and stable-channel checks pass. |
@@ -35,8 +35,14 @@ destinations and the initial phone layout are implemented. History protects
 100 unfinished turns beside 100 completed entries; capacity refuses without
 removing work, and batch DOM pruning is verified.
 
-R2 next: the grouped/concurrent roll experiment. Three complete compositions,
-actual setup preview and persistent result seats are implemented. R3 next:
+R2's compact arrival experiment is integrated as `7e80490`: active and waiting
+rollers are distinct, waiting players keep qualified previous results, and no
+queued face values or secret activity enter the read. Four combined burst,
+four-player, private-turn and FIFO checks pass; desktop/phone views are inspected.
+Three complete compositions, actual setup preview and persistent result seats
+are implemented. Simultaneous physical playback was not chosen for this slice;
+the compact experiment preserves the established films and collider ordering.
+R3 next:
 load remaining optional features on demand, reduce idle rendering, and implement
 Battery saver and optional instant results. Complete ordered turn events and
 worker parity for first/rethrows are implemented; towers and silent snapshot
@@ -77,8 +83,10 @@ preview. Worker mutation/reveal/parity checks pass together (5/5), as do
 workspace/result/privacy checks (5/5). The subsequent combined worker/turn/read
 suite passes 14/14. Both additional art directions have inspected desktop/phone
 views, reproducible bakes, three lifecycle scenarios, stable-channel check and
-60 static delivery assertions. New account UI, saved homes and grouped
-presentation are still active work.
+60 static delivery assertions. Saved-home integration passes 16 library/home
+checks, two real browser recovery/helper checks and seven combined table,
+result/privacy/burst/FIFO scenarios. Account/home UI and social features are
+still active work.
 
 The owner’s committed gallery is preserved. Main’s untracked initial service
 design draft remains untouched; the complete reviewed work is in the integration
