@@ -527,7 +527,7 @@ const SETTING_SPECS = {
   // purpose: it decides what a roll MEANS, and goal 8's one shared truth says
   // the table reads a result the same way for everyone.
   system: {
-    default: 'soul-deal',
+    default: 'none',
     validate: (v) => typeof v === 'string' && SYSTEMS.includes(v),
   },
   // The table's display name (the anatomy pass, Joe 2026-08-04: "does it

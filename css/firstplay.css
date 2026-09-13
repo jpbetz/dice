@@ -1,0 +1,22 @@
+/* Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 */
+#builder-panel.sec-off-dice #first-roll-context { display:none; }
+#quick-dice { margin-bottom: 8px; }
+.quick-rolls { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; }
+.quick-rolls .quick-roll { min-width:0; min-height:44px; padding:9px 3px; font:600 14px var(--font-ui); }
+.quick-rolls-compact { grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; padding:3px 6px; }
+.quick-rolls-compact .quick-roll { font-size:12px; }
+.dice-mode-link { display:block; margin:5px auto 10px; font-size:11px; padding:7px 3px; }
+#builder-panel.sec-off-dice :is(#quick-dice,#dice-mode-build), #quick-dice[hidden], #die-buttons[hidden], #dice-mode-build[hidden] { display:none; }
+#first-roll-context { margin:0 0 6px; font-size:11px; color:var(--muted); }
+#rail-dice .first-roll-context { margin:4px 6px 8px; font-size:10px; color:var(--muted); text-align:center; }
+#starter-kits { margin-top:12px; border-top:1px solid var(--hair); padding-top:12px; }
+#starter-kits > summary { cursor:pointer; color:var(--ivory); min-height:32px; }
+.starter-choices { display:flex; flex-wrap:wrap; gap:6px; margin:9px 0; }
+.starter-choices [aria-pressed="true"] { background:var(--ivory); color:#201c17; }
+.starter-preview h3 { margin:12px 0 6px; color:var(--ivory); font:20px Georgia,serif; }
+.starter-description,.starter-context,.starter-status { font-size:12px; line-height:1.5; color:var(--muted); }
+.starter-context { color:var(--ivory); }
+.starter-pools { list-style:none; margin:10px 0; padding:0; max-height:220px; overflow:auto; }
+.starter-pools li { display:flex; justify-content:space-between; gap:12px; padding:5px 1px; font-size:12px; border-bottom:1px solid var(--hair); }
+.starter-actions { display:flex; flex-wrap:wrap; gap:7px; }
+.starter-actions .btn { min-height:40px; }

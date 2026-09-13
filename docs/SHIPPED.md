@@ -8,6 +8,14 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## Familiar first rolls and explicit starter kits (2026-09-13)
+
+R1-C gives new rooms Numbers only, an empty personal library, and Quick dice
+inside the existing dice workspace. Starter kits preview before additive
+capture; existing libraries and unstamped legacy racks stay intact. See
+[FIRST-PLAY.md](FIRST-PLAY.md) for behavior, compatibility, validation, and
+the remaining four-player phone framing limitation.
+
 Ordering is by tier (matches GOALS.md's priority ladder: core mechanics →
 organization → secrecy → systems literacy → effects → customization).
 

@@ -54,7 +54,8 @@ import { PlacardRig } from './placard.js';
 import { previewOf, countingPmfs, sumForecast, sumAtLeast, sumBins, sumPeak,
   throwForecast, facesOf } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
-import { dealStartingRack, dealRack, dealName } from './seed.js';
+import { dealRack, dealName } from './seed.js';
+import { NEW_TABLE_SYSTEM, renderQuickRolls, createStarterKitChooser } from './firstplay.js';
 import { resolveChannel, PARAM as STABILITY_PARAM } from './stability.js';
 import { EPOCH as SCHEMA_EPOCH, STAMP as SCHEMA_STAMP, judgeStamp, convert as schemaConvert } from './schema.js';
 import { exportYaml, parsePortable, planImport, profileToImport, declareFelts } from './portable.js';
@@ -2265,7 +2266,7 @@ let feltRevision = 0;
 // applyRoomSettings below, because setSound()'s module-eval call chain
 // (syncSettingsUI → renderZoomPicker) reads roomSettings.zoom. Adding a new
 // key requires only adding it to defaults.
-let roomSettings = { felt: DEFAULT_FELT, system: DEFAULT_SYSTEM, tableName: '', zoom: DEFAULT_ZOOM,
+let roomSettings = { felt: DEFAULT_FELT, system: NEW_TABLE_SYSTEM, tableName: '', zoom: DEFAULT_ZOOM,
   tower: DEFAULT_TOWER, venue: 'table' };
 
 // COLLECTED IS A LIST, NOT A PLACE (C25, 2026-08-09).
@@ -8767,7 +8768,7 @@ let chipsOn = load(LS_CHIPS, false) === true;
 // currentSystemId is room state (settings.system), applied like felt.
 // ---------------------------------------------------------------------------
 
-let currentSystemId = DEFAULT_SYSTEM;
+let currentSystemId = NEW_TABLE_SYSTEM;
 
 // Is this entry's RESULT hidden from this client right now? True for a
 // redacted projection (the server withheld the values — held/whisper for a
@@ -19428,7 +19429,10 @@ const LS_SCHEMA = 'dice.schema.v1';
 // reveal it was carrying becomes unrevealable by anybody, with nothing on screen
 // to say why. Losing it costs a person their authority; keeping it costs
 // nothing, because it holds no data model to be stale about.
-const PURGE_KEEPS = new Set([LS_SCHEMA, LS_STABILITY, LS_WHO]);
+// R1-C supersedes the historical one-time library reset: saved personal
+// work reaches its versioned reader/migration even without the old UI stamp.
+const PURGE_KEEPS = new Set([LS_SCHEMA, LS_STABILITY, LS_WHO, LS_PROFILES,
+  LS_GROUPS, LS_GROUPS_MINE, LS_ROOMSETTINGS, LS_NAME, LS_DICESET]);
 function purgeStaleClientState() {
   try {
     const seen = Number(localStorage.getItem(LS_SCHEMA) || 0);
@@ -19452,6 +19456,16 @@ function purgeStaleClientState() {
   } catch { return 0; /* a browser that will not store has nothing stale to drop */ }
 }
 purgeStaleClientState();
+
+// Presence, not resemblance to an old generated rack, decides first visit.
+// Even unreadable or intentionally empty saved data belongs to its owner.
+const freshLibraryAtBoot = (() => {
+  try { return [LS_PROFILES, LS_GROUPS, LS_GROUPS_MINE, LS_ROOMSETTINGS]
+    .every(key => localStorage.getItem(key) === null); } catch { return true; }
+})();
+let diceWorkspaceMode = load('dice.workspace.v1', freshLibraryAtBoot ? 'quick' : 'build');
+if (!['quick','build'].includes(diceWorkspaceMode)) diceWorkspaceMode = 'quick';
+if (freshLibraryAtBoot) save('dice.workspace.v1', diceWorkspaceMode);
 
 function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
@@ -19606,6 +19620,32 @@ for (const type of DIE_TYPES) {
   });
   dieButtonsEl.appendChild(btn);
 }
+
+// R1-C: Quick dice occupies the existing dice workspace, beside the same
+// composer and modifiers. It does not create pools or replace a staged draft.
+function quickRoll(notation) {
+  const result = parseNotation(notation);
+  if (!result.ok) return;
+  requestRoll([...result.spec.dice], result.canonical, {notation, canonical:result.canonical});
+}
+function setDiceWorkspaceMode(mode) {
+  diceWorkspaceMode = mode;
+  save('dice.workspace.v1', mode);
+  renderDiceWorkspace(); renderRailColumn();
+}
+function renderDiceWorkspace() {
+  const quick = document.getElementById('quick-dice');
+  if (!quick) return;
+  const show = diceWorkspaceMode === 'quick';
+  quick.hidden = !show;
+  document.getElementById('die-buttons').hidden = show;
+  document.getElementById('dice-mode-build').hidden = show;
+  if (show) renderQuickRolls(quick, {roll:quickRoll, build:() => setDiceWorkspaceMode('build')});
+  const context = document.getElementById('first-roll-context');
+  context.textContent = SYSTEMS[currentSystemId]?.label || 'Numbers only';
+}
+document.getElementById('dice-mode-build').addEventListener('click', () => setDiceWorkspaceMode('quick'));
+setTimeout(renderDiceWorkspace, 0);
 
 // Canonical notation for a plain dice list — label fallbacks, pill titles,
 // offer details. One renderer everywhere so chips can't lie (UX §1.4).
@@ -20725,7 +20765,7 @@ if (!profilesOf(profileStore).length) {
   // configured, else the default. Guessing 'soul-deal' for a rack built at a
   // D&D table would strand it as a mismatch on its very first boot.
   const stored = load(LS_ROOMSETTINGS, null);
-  const bootSystem = knownSystem(stored && stored.system) || DEFAULT_SYSTEM;
+  const bootSystem = knownSystem(stored && stored.system) || (freshLibraryAtBoot ? NEW_TABLE_SYSTEM : DEFAULT_SYSTEM);
   let label = '';
   try { label = (localStorage.getItem(LS_NAME) || '').trim().replace(/#/g, ''); } catch { /* ignore */ }
   if (Array.isArray(legacyRack) && legacyRack.length) {
@@ -20742,22 +20782,11 @@ if (!profilesOf(profileStore).length) {
     // would migrate a second time if the library were ever cleared.
     try { localStorage.removeItem(LS_GROUPS_MINE); } catch { /* ignore */ }
   }
-  // The Soul Deal starting rack (Joe, 2026-08-01; DEALT since 2026-08-08): the
-  // nine attributes in their Physical/Mental/Social triads, six weapon skills
-  // and three motivations — a fresh seat can stage attribute+skill+motivation
-  // and roll ('1 2 3 Enter' territory). The dice are dealt at random inside
-  // each shelf's price (js/seed.js), so a fresh browser opens on a character
-  // rather than on eleven identical d6 pools; the ✎ editor is still the
-  // advancement path. Dealt ONCE, at the moment storage is empty — a reload
-  // never re-rolls a rack out from under its owner. It becomes profile #1
-  // with no prompt of any kind: the lobby asks nothing, and the first tap
-  // rolls (ROADMAP §3b L0).
+  // New visitors get an empty library to keep their own rolls in. Existing
+  // storage follows its migration and system; no generated rack is disposable.
   if (!profilesOf(profileStore).length) {
     addProfile(profileStore, {
-      name: label || dealName(bootSystem),
-      system: bootSystem,
-      pools: dealRack(bootSystem),
-      at: Date.now(),
+      name: label || 'My rolls', system: bootSystem, pools: [], at: Date.now(),
     });
   }
 }
@@ -20778,17 +20807,7 @@ function poolsOfProfile(profile) {
 }
 let groups = poolsOfProfile(activeProfile(profileStore));
 
-// Seed upgrade (2026-08-01): a rack that is EXACTLY the pre-Soul-Deal
-// starter set — Attack/Damage/Percentile, untouched, uncategorized — was
-// never the player's own work, so it swaps for the Soul Deal starting rack
-// instead of blocking it forever. One edit to any of the three and the rack is
-// theirs: no swap. (Runs after migrate so it sees the rack in canonical shape.)
-{
-  const oldSeed = [['Attack', '1d20'], ['Damage', '3d4'], ['Percentile', 'd100']];
-  const untouched = groups.length === 3 && groups.every((g, i) =>
-    g.name === oldSeed[i][0] && g.notation === oldSeed[i][1] && !g.category);
-  if (untouched) groups = dealStartingRack();
-}
+// Historical starter pools are kept exactly like any other saved rolls.
 
 // Publish the rack to the room whenever it changes (ROADMAP 2b): a
 // debounced display copy for the owner switcher — localStorage stays the
@@ -22871,6 +22890,16 @@ function renderRailDiceInner() {
   if (!el) return;
   el.textContent = '';
   if (!document.getElementById('left-panel').classList.contains('collapsed')) return;
+  if (diceWorkspaceMode === 'quick') {
+    const context = document.createElement('p'); context.className = 'first-roll-context';
+    context.textContent = systemLabel(tableSystem());
+    renderQuickRolls(el, {roll:quickRoll, compact:true, build:() => setDiceWorkspaceMode('build')});
+    el.prepend(context); updateRailRoll(); return;
+  }
+  const quickLink = document.createElement('button');
+  quickLink.type='button'; quickLink.className='btn ghost dice-mode-link'; quickLink.textContent='Quick dice';
+  quickLink.addEventListener('click',()=>setDiceWorkspaceMode('quick'));
+  el.append(quickLink);
   for (const type of RAIL_DIE_TYPES) {
     const n = railDice.filter((t) => t === type).length;
     const cell = document.createElement('div');
@@ -25944,6 +25973,8 @@ function setChips(on, persist = true) {
 // head's system word and the mismatch banner are repainted and the picker's
 // filter follows. The acknowledgement resets — this is a new question.
 function onTableSystemChanged() {
+  renderDiceWorkspace();
+  starterKitChooser?.update();
   mismatchKept = false;
   updateProfileBanner();
   updateOfferBanner(); // the system filter decides what is on offer
@@ -31847,18 +31878,16 @@ document.getElementById('profile-new').addEventListener('click', () => {
 document.getElementById('profile-newname').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); document.getElementById('profile-new').click(); }
 });
+// Random generation is a preview-and-add choice, never an implicit boot act.
+var starterKitChooser = createStarterKitChooser(document.getElementById('starter-kit-chooser'), {
+  tableLabel: () => systemLabel(tableSystem()),
+  add: candidate => makeProfile({name:uniqueName(profileStore,candidate.profileName),
+    system:candidate.id, pools:candidate.pools, activate:true}),
+});
 document.getElementById('profile-deal').addEventListener('click', () => {
-  // THE NAME BOX GOVERNS BOTH BUTTONS (C9). It sits in one row with `＋ New`
-  // and `⚄ Random`; `＋ New` read it and Random did not, so the realistic
-  // six-character path — Random gives you a PRICED rack, `＋ New` gives you
-  // an empty one — was Random, then rename, six times. The box is one input
-  // in one row: a control beside it that ignores it is a control that lies
-  // about what the row is for.
-  const input = document.getElementById('profile-newname');
-  const v = dealNewProfile(tableSystem(), input.value);
-  if (v.ok) input.value = '';
-  showProfileNote(v);
-  renderProfileLibrary();
+  const details=document.getElementById('starter-kits'); details.open=true;
+  details.querySelector('[data-kit]').focus({preventScroll:true});
+  details.scrollIntoView({block:'nearest'});
 });
 document.getElementById('profile-pick').addEventListener('click', openProfileMenu);
 document.getElementById('import-adopt-all').addEventListener('click', () => portableAdoptProfiles());
@@ -34471,6 +34500,7 @@ document.getElementById('idm-profile').addEventListener('click', () => {
 });
 document.getElementById('idm-dice').addEventListener('click', () => openDiceGallery(document.getElementById('my-dice')));
 document.getElementById('idm-rolls').addEventListener('click', () => { closeIdentityMenu(); returnToMyRolls(); });
+document.getElementById('idm-starter-kits').addEventListener('click', () => { openSettingsModal('stuff'); document.getElementById('starter-kits').open=true; });
 document.getElementById('idm-rename-row').addEventListener('submit', e => {
   e.preventDefault();
   const input = document.getElementById('idm-name-input');

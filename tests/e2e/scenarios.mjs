@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 
 import { personalKitScenarios } from './personal-kit.mjs';
 import { tableControlScenarios } from './table-controls.mjs';
+import { firstPlayScenarios } from './first-play.mjs';
 import { assert, Table, freePort, startServer } from './harness.mjs';
 import { probeCelticWeave } from './placard-knot-probe.mjs';
 
@@ -767,6 +768,7 @@ const picked = (a) => a.dbg('picked');
 export const scenarios = [
   ...personalKitScenarios,
   ...tableControlScenarios,
+  ...firstPlayScenarios,
   {
     name: 'shared-roll',
     tags: ['smoke', 'roll', 'cuj8'],
@@ -965,12 +967,8 @@ export const scenarios = [
   {
     name: 'schema-reset',
     tags: ['groups', 'cuj13'],
-    // A CLEAN BREAK, ONCE (Joe 2026-08-09: "I'm okay with a full reset on all
-    // user data… version forward and code the system to ditch this old broken
-    // data from clients"). The frozen-mtime bug meant a browser could be
-    // running a months-old main.js against a current index.html, so state on
-    // those clients was written by code nobody can reason about any more.
-    // Keeping it is not caution, it is carrying an unknown.
+    // R1-C keeps personal saved data for the versioned migration. The old
+    // UI/log reset may still retire stale presentation state once.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.12', name: 'Alice' });
       // Pre-fix state: dice.* keys with NO schema stamp, which is what every
@@ -982,10 +980,10 @@ export const scenarios = [
         localStorage.setItem('dice.panels.v1', '{"pools":false}');
         localStorage.setItem('keepme.other.app', 'not ours');
       })()`);
-      // At least the three seeded — the tab has its own dice.* keys too, and
+      // At least the two presentation keys — the tab has other dice.* keys, and
       // asserting an exact count would be asserting how much state a booted
       // tab happens to hold.
-      assert.ok(await a.dbg('purgeStale()') >= 3, 'the stale dice.* keys are dropped');
+      assert.ok(await a.dbg('purgeStale()') >= 2, 'stale presentation and log keys are dropped');
 
       const after = await a.eval(`JSON.stringify({
         schema: localStorage.getItem('dice.schema.v1'),
@@ -997,8 +995,8 @@ export const scenarios = [
       })`);
       const st = JSON.parse(after);
       assert.equal(st.schema, '2', 'the schema stamp is written');
-      assert.notEqual(st.stalePool, '{"v":1,"activeId":"old","profiles":[]}',
-        'pre-fix profile state is gone');
+      assert.equal(st.stalePool, '{"v":1,"activeId":"old","profiles":[]}',
+        'saved profiles reach their versioned migration instead of being erased');
       assert.equal(st.staleLog, null, 'and the stale log with it');
       // A RESET OF OUR DATA IS NOT A LICENCE TO CLEAR ANYONE ELSE'S. This
       // origin may be shared with another app.
@@ -17635,8 +17633,7 @@ export const scenarios = [
     },
   },
 
-  // =========================================================================
-  // PART A — THE COMPOSED JOURNEY WALKS (ROADMAP C1 + C3's open half)
+  // ==================================================================  // PART A — THE COMPOSED JOURNEY WALKS (ROADMAP C1 + C3's open half)
   //
   // Every journey in docs/CUJS.md already has PART-scenarios, and the tag half
   // shipped: 109 scenarios carry cuj1…cuj13. What was missing is the thing the
@@ -17661,8 +17658,7 @@ export const scenarios = [
   // `profile-dm-prepares`, `profile-file`); they are tagged `journey` where
   // they stand rather than duplicated here. CUJ5 has no code and no scenario,
   // and this file will not pretend otherwise — see CUJS.md gap B.
-  // =========================================================================
-  {
+  // ==================================================================  {
     name: 'journey-call-the-game',
     tags: ['journey', 'lobby', 'chrome', 'cuj2'],
     timeout: 150000,
@@ -18386,12 +18382,10 @@ export const scenarios = [
     },
   },
 
-  // =========================================================================
-  // PART B — the scenarios eight parallel build steps shipped hooks for and
+  // ==================================================================  // PART B — the scenarios eight parallel build steps shipped hooks for and
   // could not write, because this file has one owner. Grouped by the item that
   // owes them, in THE ORDER's order.
-  // =========================================================================
-
+  // ==================================================================
   // ---- C15 · restore: reading back the file this app writes (CUJ13) -------
   //
   // CUJ13's done-when is "a library can be written to a file they hold, and
@@ -23289,13 +23283,11 @@ export const scenarios = [
     },
   },
 
-  // ==========================================================================
-  // SUB-TABLES — CUJ5, "we need to split into two groups for a bit, then come
+  // ===================================================================  // SUB-TABLES — CUJ5, "we need to split into two groups for a bit, then come
   // back" (§3b L4, UX §7.46). The code shipped 2026-08-14 with hooks and a
   // 15-case server suite (tests/subtables.test.mjs) and no browser coverage at
   // all; these five are that coverage, and the first is the journey's GATE.
-  // ==========================================================================
-  {
+  // ===================================================================  {
     name: 'journey-split-the-party',
     tags: ['journey', 'subtables', 'cuj5'],
     timeout: 150000,
@@ -23744,11 +23736,9 @@ export const scenarios = [
     },
   },
 
-  // ==========================================================================
-  // THE U25 / U26 / U28b BATCH (UX §7.45) — the audit's own findings, each one
+  // ===================================================================  // THE U25 / U26 / U28b BATCH (UX §7.45) — the audit's own findings, each one
   // a surface that said the wrong thing rather than a surface that was missing.
-  // ==========================================================================
-  {
+  // ===================================================================  {
     name: 'log-row-says-each-pool-once',
     tags: ['log', 'meanings'],
     // THE LOG SAID EVERY POOL'S NAME TWICE (U26, audit F3). Two runs stood side

@@ -34,6 +34,7 @@ limitations under the License.
      cannot throw, and it never blocks the boot. -->
 <script src="js/report.js"></script>
 <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/firstplay.css">
 <script type="importmap">
 {
   "imports": {
@@ -292,7 +293,10 @@ limitations under the License.
         <button data-sec="pools" aria-pressed="true" title="Your saved pools come with you to every table">Your pools</button>
       </div>
 
+      <p id="first-roll-context"></p>
+      <div id="quick-dice" hidden></div>
       <div id="die-buttons"></div>
+      <button id="dice-mode-build" class="btn ghost dice-mode-link" type="button">Quick dice</button>
 
       <!-- Command box (UX §1.3): three-state validation, Enter rolls, ↑/↓ history -->
       <div id="cmd" class="cmd">
@@ -525,6 +529,7 @@ limitations under the License.
     </form>
     <button id="idm-dice" class="idm-item">My dice →<small id="idm-dice-current"></small></button>
     <button id="idm-rolls" class="idm-item">My saved rolls →</button>
+    <button id="idm-starter-kits" class="idm-item">Choose a starter kit…</button>
     <!-- The picker's second anchor (PROFILES §11.5 ②), and it is not
          redundancy: the first lives in #pools-head, inside a panel section
          §7.23 lets the player switch off, so on its own it is unreachable for
@@ -1297,9 +1302,10 @@ limitations under the License.
             <button id="profile-new" class="btn tiny"
                     title="A new, empty profile for this table’s system — build its pools with ✎">＋ New</button>
             <button id="profile-deal" class="btn tiny"
-                    title="Deal a whole profile at random for this table’s system">⚄ Random</button>
+                    title="Preview a starter kit before adding its rolls">Starter kits…</button>
           </div>
           <p id="profile-status" class="hint portable-status"></p>
+          <details id="starter-kits"><summary>Choose a starter kit</summary><div id="starter-kit-chooser"></div></details>
           <!-- THE BROADCAST, SAID OUT LOUD (U25, audit E4). publishPools sends
                your whole library — every profile's name, system and pools — to
                the room on every edit, and has since C17, because that is what
