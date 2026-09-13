@@ -18,7 +18,8 @@ have been inspected with four players on desktop and phone.
 
 ## Copper Lantern model brief
 
-- Playing radius: the existing 13.75 table units; a die radius is about 1.25.
+- Authored layout radius: 13.75 table units at medium; a die radius is about 1.25.
+  This is the intended circular area, not the inherited square collision shape.
 - Table radius: 15.4; top at zero, underside at −1.1. Decorative landmarks
   remain outside the playable circle and do not add physics bodies.
 - Model budget: 8,000 triangles, enforced against the exported mesh.
@@ -31,7 +32,8 @@ have been inspected with four players on desktop and phone.
 
 This sets aside the old venue guidance's back-corridor placement and
 tower-centred diorama: a circular multiplayer table is the main composition,
-and its decorative pieces sit outside the existing circular play boundary.
+and its decorative pieces sit outside the intended circular rolling area.
+The inherited physics boundary is square; the stress-roll gap below remains open.
 It preserves readable dice, shared authored values and interruptible play.
 The forge shape and normal checks are followed by an actual app-lighting
 look; a studio preview alone cannot establish tabletop contrast or framing.
@@ -131,3 +133,34 @@ setup captures were inspected with the live dice preserved beside/behind it.
 Review captures: [desktop](redesign/2026-09-13-copper-desktop.png),
 [phone](redesign/2026-09-13-copper-phone.png),
 [phone setup](redesign/2026-09-13-table-preview-phone.png).
+
+## Shared table size and the remaining collision gap
+
+The original models stayed at their authored medium size while the actual
+rolling area changed with zoom. A reproducible ordinary `4d20` throw (seed 4,
+wide) left two dice centres beyond Copper's wood: radii 16.052 and 15.750,
+against the original outer radius 15.4. All three cached models now scale with
+`TABLE_W / 27.5`, including shared changes and late loads. Their tops remain
+at the physics plane; the lowered visual floor follows the scaled underside.
+This changes scenery only, with no solver or collision-body change.
+
+Six targeted design/lifecycle/idle-load/zoom scenarios pass. A raycast against
+the actual GLB supports the cardinal rolling edges at every design and zoom;
+it does not infer support from a radius proxy. All nine ordinary seed-4 samples
+(three designs by three sizes) now have artwork beneath all four body centres.
+Complete film hashes for all 27 ordinary/stress samples match the nine matching
+samples from unchanged `e746966`. [Measurements](redesign/2026-09-13-table-size.json)
+include original films and actual support rays. The reproducible probe is
+`tools/steps/table-size-look.mjs`; four-player actual play uses the existing
+`table-composition-look.mjs`. [Wide phone](redesign/2026-09-13-sized-copper-phone.png)
+and [Navigation desktop](redesign/2026-09-13-sized-navigation-desktop.png) were
+inspected after the composed resize, alongside single-player close views.
+
+**Still open:** the inherited four infinite wall planes enclose a square,
+while the artwork is round. The `40d20` samples (seeds 90090 and 32676) still
+leave 3–7 body centres outside actual artwork, even with correct scale. A
+centre ray also does not prove the whole die footprint has support. This is
+an R2 collision/spawn follow-up; enlarging the board to hide square corners
+would erase the requested edge composition. The correction above is not a
+claim that every stress die is now physically supported. Emulated screenshots
+are not physical-device performance evidence.

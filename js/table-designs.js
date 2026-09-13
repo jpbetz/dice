@@ -15,15 +15,28 @@ export const TABLE_DESIGNS = Object.freeze({
     model:'models/tables/stone-circle-table.glb?v=d4dc9728fddc9d19'}),
 });
 
-export function createTableDesign({scene, floor, changed = () => {}}) {
+export function createTableDesign({scene, floor, width = 27.5, changed = () => {}}) {
   const cache = new Map();
+  let scale = width / 27.5;
   let epoch = 0, wanted = null, active = null, activeId = null, status = 'idle', error = null;
-  const notify = () => changed({wanted,status,error,activeId,visible:!!active,cached:cache.size});
+  const snapshot = () => ({wanted,status,error,activeId,visible:!!active,cached:cache.size,scale:active?.scale.x??null});
+  const notify = () => changed(snapshot());
   const originalY = floor.position.y;
   const remove = () => {
     if (active) scene.remove(active);
     active = null; activeId = null; floor.position.y = originalY;
   };
+  function sizeModel() {
+    if (!active) return;
+    active.scale.setScalar(scale);
+    floor.position.y = TABLE_DESIGNS[activeId].floorY * scale;
+  }
+  function resize(width) {
+    const next = width / 27.5;
+    if (!Number.isFinite(next) || next <= 0 || next === scale) return;
+    scale = next; sizeModel();
+    if (active) notify();
+  }
   async function select(id) {
     const token = ++epoch; wanted = id; error = null;
     if (!TABLE_DESIGNS[id]) { remove(); status='idle'; notify(); return true; }
@@ -47,12 +60,12 @@ export function createTableDesign({scene, floor, changed = () => {}}) {
       remove(); active = model; activeId = id; scene.add(active);
       // The authored top meets the existing y=0 physics plane. The old broad
       // cloth becomes the room floor below the solid table, not a second top.
-      floor.position.y=TABLE_DESIGNS[id].floorY; status='ready'; notify(); return true;
+      sizeModel(); status='ready'; notify(); return true;
     } catch {
       if (token !== epoch) return false;
       remove(); status='failed'; error='Table artwork could not load. The rolling surface is still available.';
       notify(); return false;
     }
   }
-  return {select, get state(){return {wanted,status,error,activeId,visible:!!active,cached:cache.size};}};
+  return {select, resize, get object(){return active;}, get state(){return snapshot();}};
 }

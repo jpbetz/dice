@@ -2,6 +2,36 @@
 import {assert} from './harness.mjs';
 
 export const tableDesignScenarios = [{
+  name:'table-design-size',tags:['table-designs','settings'],
+  async fn(ctx) {
+    const a=await ctx.newTable({origin:'127.0.0.116',name:'Alice'});
+    const b=await ctx.newTable({origin:'127.0.0.117',name:'Bob'});
+    for(const zoom of ['wide','close','medium']) {
+      await a.dbg(`setZoom('${zoom}')`);
+      for(const t of [a,b]) await t.waitFor(`window.__diceDebug.breathProbe().zoom==='${zoom}'`);
+      for(const id of ['copper','navigation','stone']) {
+        await a.dbg(`setVenue('${id}')`);
+        for(const t of [a,b]) {
+          await t.waitFor(`window.__diceDebug.tableDesign.activeId==='${id}'`);
+          const width=(await t.dbg('breathProbe()')).tableW;
+          const samples=await t.dbg(`tableDesignSurface([[0,${width*.48}],[${width*.48},0],[0,${-width*.48}],[${-width*.48},0]])`);
+          assert.equal(samples.length,4);
+          assert.ok(samples.every(p=>p.y!==null&&Math.abs(p.y)<.3),`${id}/${zoom}: actual artwork supports the rolling area's cardinal edges`);
+          assert.equal((await t.dbg('tableDesign')).scale,width/27.5,'cached model size follows the current shared rolling area');
+        }
+      }
+    }
+    await a.dbg("setZoom('wide')");await a.waitFor("window.__diceDebug.breathProbe().zoom==='wide'");
+    const late=await ctx.newTable({origin:'127.0.0.118',name:'Cora'});
+    await late.waitFor("window.__diceDebug.tableDesign.activeId==='stone'");
+    const width=(await late.dbg('breathProbe()')).tableW;
+    assert.equal((await late.dbg('tableDesign')).scale,width/27.5,'late model loads use the restored size');
+    await a.roll('4d20');for(const t of [b,late])await t.settle();
+    const values=await a.dbg('currentRoll.values');
+    for(const t of [b,late])assert.deepEqual(await t.dbg('currentRoll.values'),values);
+    assert.equal((await a.dbg('tableDesign')).cached,3,'resizing never fetches another model');
+  },
+},{
   name:'table-designs', tags:['table-designs','settings'],
   async fn(ctx) {
     const a=await ctx.newTable({origin:'127.0.0.111',name:'Alice',query:'&stability=stable'});

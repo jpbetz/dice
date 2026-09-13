@@ -3308,7 +3308,7 @@ const floor = new THREE.Mesh(
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
-const tableDesign = createTableDesign({scene, floor, changed: state => {
+const tableDesign = createTableDesign({scene, floor, width:TABLE_W, changed: state => {
   const note = document.getElementById('table-art-status');
   note.textContent = state.error || (state.status === 'loading' ? 'Loading table artwork… You can keep rolling.' : '');
   note.hidden = !note.textContent;
@@ -15990,6 +15990,16 @@ window.__diceDebug = {
   get system() { return currentSystemId; },
   get tablePreview() { return tablePreview?.state || null; },
   get tableDesign() { return tableDesign.state; },
+  tableDesignSurface(points) {
+    const model = tableDesign.object;
+    if (!model) return null;
+    model.updateWorldMatrix(true,true);
+    const ray = new THREE.Raycaster();
+    return points.map(([x,z]) => {
+      ray.set(new THREE.Vector3(x,100,z),new THREE.Vector3(0,-1,0));
+      return {x,z,y:ray.intersectObject(model,true)[0]?.point.y??null};
+    });
+  },
   setSystem(id) { return selectSystem(id); },
   // mat-zoom (Joe 2026-08-04): the room-wide preset + world extents for the
   // e2e assertion surface (never scrape the felt).
@@ -29219,6 +29229,7 @@ function applyZoom(level) {
   CAM_EYE = { full: [...p.eyeFull], mini: [...p.eyeMini] };
   updateShadowFrustum();
   currentZoom = level;
+  tableDesign.resize(TABLE_W);
   // Nothing on the felt survives a zoom but the live roll's dice, and those
   // are physics — the walls moved above and the bodies follow. Since C25 the
   // shelf has no slot pitch to re-derive and the felt no glow rings to
