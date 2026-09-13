@@ -710,6 +710,9 @@ const LS_CHIPS = 'dice.chips.v1';        // "Just you" scope: per-die value chip
 // js/portable.js's settings allowlist is exact and ambience is device-local
 // mood, not table state. A teammate must not inherit your room.
 const LS_AMBIENCE = 'dice.ambience.v1';  // "Just you" scope: room tone (default OFF)
+const LS_PRESENTATION = 'dice.presentation.v1'; // device-only; never in room or library data
+let presentationMode = load(LS_PRESENTATION, 'full') === 'battery' ? 'battery' : 'full';
+const batteryPresentation = () => presentationMode === 'battery';
 const LS_ROOMSETTINGS = 'dice.roomsettings.v1'; // solo-mode copy of the table settings
 const LS_DICESET = 'dice.diceset.v1';    // "Just you" scope: dice-set identity (Tier 6 §9)
 // Declared up here with the rest, not down beside initNet where it used to
@@ -7911,15 +7914,15 @@ function stepPlayback(dt, tempo = 1, curve = false, realtime = curve) {
       CLICKGATE.mode === 'film' ? s.time : undefined, s)) {
       roll.lastClickTime = s.time;
     }
-    if (fxSet && fxSet.particles && s.at) particleField.burst(fxSet.particles, s.at, s.strength);
+    if (!batteryPresentation() && fxSet && fxSet.particles && s.at) particleField.burst(fxSet.particles, s.at, s.strength);
     // Marks want floor contacts with real force, and only so many per
     // roll — the felt remembers the landing, not every tremble.
-    if (fxSet && fxSet.decal && s.at && s.at[1] < DECAL_MAX_CONTACT_Y
+    if (!batteryPresentation() && fxSet && fxSet.decal && s.at && s.at[1] < DECAL_MAX_CONTACT_Y
       && s.strength >= DECAL_MIN_STRENGTH && roll.decalsStamped < DECAL_CAP_PER_ROLL) {
       roll.decalsStamped += decalField.stamp(fxSet.decal, [s.at[0], DECAL_Y, s.at[2]], s.strength);
     }
     // Level 5: the pre-picked hardest RINGING landing pops ITS die's ring
-    if (sIdx === roll.ringIdx && fxSet && fxSet.post && fxSet.post.ring) {
+    if (!batteryPresentation() && sIdx === roll.ringIdx && fxSet && fxSet.post && fxSet.post.ring) {
       postStack.ring(s.at, camera, fxSet.post.ring);
     }
   }
@@ -11525,14 +11528,17 @@ function tick(dt, render = true, realtime = false) {
   // Themed-set clocks (Tier 6 §9): the Level 2 shader uniform and the
   // Level 3 particle field advance with the same dt discipline as
   // everything else (holdClock freezes both — deterministic screenshots).
-  SHADER_TIME.value += dt;
-  particleField.tick(dt, SHADER_TIME.value);
-  decalField.tick(dt);
-  dieLights.tick(dt, SHADER_TIME.value);
+  const battery = batteryPresentation();
+  if (!battery) {
+    SHADER_TIME.value += dt;
+    particleField.tick(dt, SHADER_TIME.value);
+    decalField.tick(dt);
+    dieLights.tick(dt, SHADER_TIME.value);
+  } else syncBatteryScene();
   stepPlayback(dt, realtime ? TEMPO.k : 1, realtime, realtime);
   placeWashSync(); // §7.63: the roller's arc follows the film's clock, AFTER the film stepped
   stepSinking(dt);   // per-roll Done departures (§7.5)
-  stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
+  if (!battery) stepResting(); // Slice 3: sub-mm cadence on settled-on-felt dice
   stepPickMarks();   // MECHANICS M1: the picked-die marker follows finalPos
   stepRevealing(dt); // reveal correction flips (goal 11)
   stepBreath(dt);    // the declare beat's room, easing closed and open
@@ -11557,9 +11563,11 @@ function tick(dt, render = true, realtime = false) {
   // SAME frame the roll ends rather than the next one.
   tryFlushRoomChanges();
   stepTowerLab(dt);  // tower lab (docs/TOWER.md) — inert unless towerCore(true)
-  stepTowerLantern(dt); // the ember breath — inert unless a glowing tower is up
-  stepMoodMotes(dt);    // dust in the lamplight — inert unless the mood is up
-  stepFaeConcept(dt);   // W0 concept lab — inert unless faeConcept() armed it
+  if (!battery) {
+    stepTowerLantern(dt); // the ember breath
+    stepMoodMotes(dt);    // dust in the lamplight
+    stepFaeConcept(dt);   // experimental living scenery
+  }
   stepAmbience();       // the room bed's crackle lookahead — inert unless the bed is up
   stepCamera(dt);    // eased reframing; only ever armed under a quiet picture
   stepCamPeek(dt);   // the hold-drag pivot's spring home
@@ -11582,8 +11590,8 @@ function tick(dt, render = true, realtime = false) {
     // running ring/shimmer, or the test force. (The S3 fix's shelf gate
     // retired with the felt shelf — C25: a collected roll's dice are off
     // the table, so every bloom-flagged die on it is by definition live.)
-    const need = postForced || postStack.busy() || particleField.count() > 0
-      || tableDice.some((d) => d.mesh.userData.bloom);
+    const need = !battery && (postForced || postStack.busy() || particleField.count() > 0
+      || tableDice.some((d) => d.mesh.userData.bloom));
     if (need) {
       postStack.setShimmer(collectShimmerSources(), camera);
       postStack.render(scene, camera, dt);
@@ -11661,6 +11669,49 @@ function animate(dt) {
   }
 }
 
+// Device-local presentation only: never write T, world bodies or room settings.
+// The fixed light pool keeps its shader layout; zero intensities remove its
+// animated contribution without recompiling every lit die mid-throw.
+function syncBatteryScene() {
+  particleField.points.visible = false;
+  if (decalField.mesh) decalField.mesh.visible = false;
+  if (MOOD.motes) MOOD.motes.points.visible = false;
+  if (TOWERLIGHT.rig?.ember) TOWERLIGHT.rig.ember.intensity = TOWERLIGHT.rig.emberBase;
+  for (const slot of dieLights.slots) slot.light.intensity = 0;
+  if (FAECONCEPT.rig) {
+    FAECONCEPT.rig.halos.visible = false;
+    FAECONCEPT.rig.life.group.visible = false;
+  }
+  for (const light of FAECONCEPT.lights) light.intensity = 0;
+}
+function setPresentation(mode, persist = true) {
+  presentationMode = mode === 'battery' ? 'battery' : 'full';
+  if (persist) save(LS_PRESENTATION, presentationMode);
+  if (batteryPresentation()) {
+    particleField.clear(); decalField.clear();
+    postStack.rings.length = 0; postStack.shimmer.length = 0;
+    syncBatteryScene();
+    // Remove only resting cosmetic offsets. Playback and reveal own all other
+    // transforms, including a kept die joining the next prepared film.
+    for (const d of tableDice) {
+      if (currentRoll && !currentRoll.done && d.rollId === currentRoll.rollId) continue;
+      if (revealing.some(r => r.die === d)) continue;
+      if (d.finalPos) d.mesh.position.copy(d.finalPos);
+      if (d.finalQuat) d.mesh.quaternion.copy(d.finalQuat);
+    }
+  } else {
+    particleField.points.visible = true;
+    if (decalField.mesh) decalField.mesh.visible = true;
+    if (MOOD.motes) MOOD.motes.points.visible = true;
+    if (FAECONCEPT.rig) {
+      FAECONCEPT.rig.halos.visible = true;
+      FAECONCEPT.rig.life.group.visible = true;
+    }
+  }
+  syncSettingsUI(); invalidateTable();
+  return presentationMode;
+}
+
 // Clock-driven visual work keeps frames; a quiet picture has no rAF loop.
 // An animated venue or material is still live scenery, not idle work.
 function tableAnimationActive() {
@@ -11668,9 +11719,10 @@ function tableAnimationActive() {
   if (currentRoll && !currentRoll.done && !currentRoll.baking) return true;
   if (sinking.length || revealing.length || camEase || CAMPEEK.yaw || CAMPEEK.pitch) return true;
   if (BREATH.state === 'enabled' && BREATH.t !== BREATH.target) return true;
+  if (TOWERLAB.on || (devPanel && devState.panel === 'open')) return true;
+  if (batteryPresentation()) return false;
   if (particleField.count() || decalField.count() || postStack.busy()) return true;
-  if (FAECONCEPT.on || MOOD.motes || TOWERLIGHT.rig?.ember || TOWERLAB.on) return true;
-  if (devPanel && devState.panel === 'open') return true;
+  if (FAECONCEPT.on || MOOD.motes || TOWERLIGHT.rig?.ember) return true;
   if (dieLights.slots.some(s => s.mesh && (s.dying || s.warm < 1
       || ['flicker','breathe','wave'].includes(s.recipe?.mode)))) return true;
   return tableDice.some(d => {
@@ -16148,6 +16200,8 @@ window.__diceDebug = {
   // ratio not clamped", and the clamp is a claim a test can hold (a headless
   // tab at dpr 1 reads 1; the ceiling is what matters, so assert `<= 2`).
   // Read it AFTER a settle — mid-playback frames legitimately draw more.
+  setPresentation(mode) { return setPresentation(mode); },
+  get presentation() { return {mode:presentationMode,shaderTime:SHADER_TIME.value,particles:particleField.count()}; },
   renderAudit() {
     const r = renderer.info.render;
     return {
@@ -17916,7 +17970,7 @@ window.__diceDebug = {
     const bloomDice = tableDice.filter((d) => d.mesh.userData.bloom).length;
     const bloomDiceLive = bloomDice; // since C25 every die on the table is live
     return {
-      active: postForced || postStack.busy() || particleField.count() > 0 || bloomDiceLive > 0,
+      active: !batteryPresentation() && (postForced || postStack.busy() || particleField.count() > 0 || bloomDiceLive > 0),
       forced: postForced,
       bloomDice,
       bloomDiceLive,
@@ -30072,6 +30126,10 @@ function syncSettingsUI() {
   document.getElementById('set-sound').setAttribute('aria-pressed', String(soundOn));
   document.getElementById('set-chips').setAttribute('aria-pressed', String(chipsOn));
   document.getElementById('set-ambience').setAttribute('aria-pressed', String(ambienceOn));
+  for (const el of document.querySelectorAll('[data-presentation]')) {
+    const selected = el.dataset.presentation === presentationMode;
+    el.setAttribute('aria-checked', String(selected)); el.tabIndex = selected ? 0 : -1;
+  }
   renderDiceSetPicker();
   renderSystemPicker();
   renderZoomPicker();
@@ -30092,7 +30150,7 @@ function openSettingsModal(at = 'table', anchor) {
   diceGallery?.close();
   closeIdentityMenu();
   showSettingsDest(at);
-  // Opening three device switches should not rebuild the whole library.
+  // Opening device preferences should not rebuild the whole library.
   libraryOpened = settingsDest === 'stuff';
   if (libraryOpened) {
     libraryQuery = ''; document.getElementById('library-search').value = '';
@@ -30197,6 +30255,10 @@ settingsModal.addEventListener('keydown', e => {
 });
 document.getElementById('set-chips').addEventListener('click', () => setChips(!chipsOn));
 document.getElementById('set-ambience').addEventListener('click', () => setAmbience(!ambienceOn));
+document.getElementById('presentation-picker').addEventListener('click', e => {
+  const choice = e.target.closest('[data-presentation]');
+  if (choice) setPresentation(choice.dataset.presentation);
+});
 
 // ---------------------------------------------------------------------------
 // Your data (Tier 4 §5): pools + just-you settings as portable YAML — one

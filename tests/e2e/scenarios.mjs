@@ -38,6 +38,7 @@ import { rollHistoryScenarios } from './roll-history.mjs';
 import { filmMutationScenarios } from "./film-mutations.mjs";
 import { filmTurnScenarios } from './film-turns.mjs';
 import { idleRenderScenarios } from './idle-render.mjs';
+import { presentationScenarios } from './presentation.mjs';
 import { filmWorkerScenarios } from "./film-worker.mjs";
 import { profileSharingScenarios } from './profile-sharing.mjs';
 import { libraryWorkspaceScenarios } from './library-workspace.mjs';
@@ -787,6 +788,7 @@ export const scenarios = [
   ...filmWorkerScenarios,
   ...filmTurnScenarios,
   ...idleRenderScenarios,
+  ...presentationScenarios,
   ...filmMutationScenarios,
   ...libraryWorkspaceScenarios,
   {

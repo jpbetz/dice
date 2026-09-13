@@ -172,6 +172,11 @@ export class ParticleField {
     return this.alive;
   }
 
+  clear() {
+    this.life.fill(0); this.alphaA.fill(0); this.alive = 0;
+    this.geometry.attributes.aAlpha.needsUpdate = true;
+  }
+
   tick(dt, t) {
     if (this.alive === 0) return;
     let alive = 0;

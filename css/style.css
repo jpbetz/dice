@@ -7026,3 +7026,5 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
   .library-browser:has(#starter-kits[open]) :is(.library-search-row, #profile-rows, #library-empty, #library-create) { display: none; }
   #starter-kits[open] { max-height: none; overflow: visible; }
 }
+/* Device presentation choices stay comfortably reachable on the phone sheet. */
+#presentation-picker button { min-height: 44px; }
