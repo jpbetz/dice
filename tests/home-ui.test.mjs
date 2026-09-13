@@ -8,6 +8,8 @@ import {Browser} from './e2e/cdp.mjs';
 import {Ctx,freePort,startServer} from './e2e/harness.mjs';
 const click=(a,id)=>a.eval(`document.getElementById(${JSON.stringify(id)}).click()`);
 const hs=a=>a.dbg('homes.state');
+// Kept draft data stays the same while its panel moves or becomes hidden.
+const draftOf=a=>a.eval(`(()=>{const {dice,sources,spent}=window.__diceDebug.trayState;return {dice,sources,spent,command:document.getElementById('cmd-input').value};})()`);
 const idle=a=>a.waitFor('!window.__diceDebug.homes.state?.loading&&!document.getElementById("homes-refresh")?.disabled');
 async function account(a,key){await a.dbg('privateLibrary.open()');await a.waitFor('document.getElementById("account-create")&&!document.getElementById("account-recover").disabled');
   if(key){await click(a,'account-recover');const node=await a.page.browser.send('Runtime.evaluate',{expression:'document.getElementById("account-key")'},a.page.sessionId);await a.page.browser.send('Runtime.callFunctionOn',{objectId:node.result.objectId,functionDeclaration:'function(value){this.value=value}',arguments:[{value:key}]},a.page.sessionId);await click(a,'account-submit');}
@@ -33,14 +35,14 @@ test('actual app saves a public home without library sync; explicit clean-browse
   await a.dbg("profiles.copyFrom({name:'Private wizard',system:'none',pools:[{name:'Private spell',notation:'3d6'}]},true)");
   await a.roll('3d6 t3 secret');const turn=await a.rollId();await a.dbg('pickToggle(0)');
   await a.eval("const input=document.getElementById('cmd-input');input.value='2d8+4 secret # Kept draft';input.dispatchEvent(new Event('input',{bubbles:true}))");await a.waitFor('window.__diceDebug.trayState.dice.length===2');
-  const draft=await a.dbg('trayState'),before=await a.dbg(`turnState(${JSON.stringify(turn)})`),pid=await a.playerId(),url=await a.eval('location.href');
+  const draft=await draftOf(a),before=await a.dbg(`turnState(${JSON.stringify(turn)})`),pid=await a.playerId(),url=await a.eval('location.href');
   await homes(a);await capture(a);const preview=(await hs(a)).preview.document;
   assert.deepEqual(Object.keys(preview).sort(),['schema','settings','setup']);assert.equal(JSON.stringify(preview).includes('Private spell'),false);assert.equal(preview.setup,null);
-  assert.equal((await a.dbg('privateLibrary.state')).syncEnabled,false);assert.deepEqual(await a.dbg('trayState'),draft);assert.deepEqual(await a.dbg(`turnState(${JSON.stringify(turn)})`),before);
+  assert.equal((await a.dbg('privateLibrary.state')).syncEnabled,false);assert.deepEqual(await draftOf(a),draft);assert.deepEqual(await a.dbg(`turnState(${JSON.stringify(turn)})`),before);
   await save(a);let state=await hs(a);assert.equal(state.cards.length,1);const home=state.cards[0];assert.equal(home.roomKey,ctx.room);
-  assert.equal(await a.playerId(),pid);assert.equal(await a.eval('location.href'),url);assert.deepEqual(await a.dbg('trayState'),draft);assert.deepEqual(await a.dbg(`turnState(${JSON.stringify(turn)})`),before);
+  assert.equal(await a.playerId(),pid);assert.equal(await a.eval('location.href'),url);assert.deepEqual(await draftOf(a),draft);assert.deepEqual(await a.dbg(`turnState(${JSON.stringify(turn)})`),before);
   await click(a,'home-detail-back');await click(a,'homes-new');await a.eval("document.getElementById('homes-new-name').value='The Navigation Club';document.getElementById('homes-new-form').requestSubmit()");await idle(a);await save(a);
-  assert.equal((await hs(a)).cards.length,2);assert.equal(await a.eval('location.href'),url,'new home creation does not join');assert.deepEqual(await a.dbg('trayState'),draft);
+  assert.equal((await hs(a)).cards.length,2);assert.equal(await a.eval('location.href'),url,'new home creation does not join');assert.deepEqual(await draftOf(a),draft);
   // A real former organizer cache would otherwise overwrite restored setup:null.
   await a.eval(`localStorage.setItem('dice.table.v1:'+${JSON.stringify(ctx.room)},JSON.stringify({rev:999,table:{tableName:'Obsolete organizer table',felt:'emerald'},profiles:[{name:'Old prepared rack',system:'none',pools:[{name:'Old roll',notation:'1d4'}]}]}))`);
   await a.close();await f.restart();
