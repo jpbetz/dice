@@ -64,7 +64,7 @@ export async function readLibrary(tx, person, versionId = null) {
   }
   const protectedIds = new Set([person.libraryHead, ...entries.flatMap(entry => entry.sourceVersionIds)]);
   const versions = entries.map(entry => ({ ...metadata(entry), bytes: entry.bytes,
-    canArchive: entry.kind === 'saved' && !protectedIds.has(entry.id) }));
+    canArchive: entry.kind === 'saved' && !entry.sourceVersionIds.length && !protectedIds.has(entry.id) }));
   const head = person.libraryHead === null ? null
     : checkVersion(await tx.get(pathFor(person.id, person.libraryHead)), person.libraryHead, person);
   return { ok: true, personId: person.id, headRevision: person.libraryHead,
@@ -149,7 +149,7 @@ export async function archiveLibrary(tx, person, input) {
   for (const id of input.versionIds) {
     if ((person.libraryArchiveIds || []).includes(id)) continue; // safe retry after a lost cleanup acknowledgement
     const entry = entries.find(item => item.id === id);
-    if (!entry || entry.kind !== 'saved' || protectedIds.has(id)) return outcome(409, 'version_protected',
+    if (!entry || entry.kind !== 'saved' || entry.sourceVersionIds.length || protectedIds.has(id)) return outcome(409, 'version_protected',
       'The current library, conflicts and reconciliation sources must be kept.');
     records.push(checkVersion(await tx.get(pathFor(person.id, id)), id, person));
   }

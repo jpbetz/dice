@@ -92,6 +92,8 @@ test('separate cookie clients racing one base retain both immutable versions and
   assert.deepEqual((await b.client.library(personId, merged.originalVersionId)).document, chosen.retainDocument);
   const refused = await a.client.archiveLibrary(personId, { versionIds: [listed.headRevision], discardAcknowledgedHistory: true });
   assert.equal(refused.code, 'version_protected');
+  assert.equal((await a.client.saveLibrary(personId, save(document('After reconciliation'), merged.revision))).ok, true);
+  assert.equal((await a.client.archiveLibrary(personId, { versionIds: [merged.revision], discardAcknowledgedHistory: true })).code, 'version_protected');
   // Another tab can change the browser's shared cookie while this tab's JS
   // namespace remains A. The server must refuse reads as well as writes.
   a.setCookie(stranger.cookie());
