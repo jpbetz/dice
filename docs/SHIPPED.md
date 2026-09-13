@@ -136,6 +136,51 @@ test now compares decoded bytes to decoded bytes because fetch automatically
 decompresses its response while preserving the encoded Content-Length.
 All servers used ephemeral ports. The owner’s live table was untouched.
 
+## Expanded dice workspace (2026-09-13)
+
+Joe clarified that the space budget applies to the root UI that stays on
+display; the task a player opens can occupy most or all of the screen. The
+dice collection now uses that space. Its compact launcher remains beside the
+personal name, while desktop browsing opens a centered workspace with the
+catalogue and preview side by side. Selecting a card keeps catalogue scroll
+and focus in place. Arrow keys compare adjacent sets; the grid has one Tab
+stop, so reaching the preview actions does not require tabbing through every
+set. Search matches names and collections, including `seaglass` for
+`Sea-glass`, and an empty search has a Show all dice action.
+
+On phones, the collection fills the viewport. Selecting a set opens its
+detail page; Back or Escape returns to the same catalogue position and card.
+Use stays outside the scrolling preview. Short screens put the image beside
+the name and description. The current set has a direct preview entry in the
+footer, alongside the return to saved rolls. Choosing remains explicit,
+favorites remain local, and browsing never authors a shared roll.
+
+The expanded view contains local focus on both desktop and phone; other
+players keep rolling and unfinished turns survive. Resize moves focus when
+the phone-only Back control disappears. This replaces the first gallery's
+510 px desktop drawer, stacked preview/catalogue and scroll-to-top selection.
+The change uses the existing lazy module, styles and baked portraits, adds
+no renderer, and adds no permanent table controls.
+
+At 1440 × 900, the opened workspace measures 1240 × 852 px, with a 525 × 306 px
+preview area. At 390 × 844, six complete cards fit the initial catalogue view.
+The root rail stays at 112 px on desktop and 111 px in the compact layout.
+Reproduce with `node tools/drive.mjs tools/steps/dice-workspace-look.mjs`.
+
+Visual proof: [desktop comparison](redesign/2026-09-13-dice-workspace-desktop.png),
+[phone catalogue](redesign/2026-09-13-dice-workspace-phone.png),
+[phone preview](redesign/2026-09-13-dice-workspace-phone-preview.png),
+and [short-screen preview](redesign/2026-09-13-dice-workspace-short-preview.png).
+Also inspected 1000 × 760 and 844 × 390 layouts. These are desktop Chromium
+captures with a GPU backend and touch emulation, not physical-device proof.
+
+The focused checks cover explicit selection, authored dice and late joiners,
+lazy loading, search recovery, keyboard comparison, catalogue return,
+focus/resize, incoming play and unfinished-turn preservation. Existing table
+controls, saved-roll overrides, stability offerings and venue/dice behavior
+also pass. `npm test` passes unit and fuzz checks and all 63 browser smoke
+scenarios. Practice throws and the broader destination shell remain open.
+
 ## Compact table controls and setup (2026-09-13)
 
 Integration review follow-up: the workspace's shortcut shield now runs the
