@@ -38,6 +38,7 @@ import { rollFlowScenarios } from './roll-flows.mjs';
 import { rollHistoryScenarios } from './roll-history.mjs';
 import { filmMutationScenarios } from "./film-mutations.mjs";
 import { filmSettingsScenarios } from './film-settings.mjs';
+import { filmUnavailableScenarios } from './film-unavailable.mjs';
 import { filmTowerSettingsScenarios } from './film-tower-settings.mjs';
 import { filmTurnScenarios } from './film-turns.mjs';
 import { idleRenderScenarios } from './idle-render.mjs';
@@ -804,6 +805,7 @@ export const scenarios = [
   ...filmMutationScenarios,
   ...filmSettingsScenarios,
   ...filmTowerSettingsScenarios,
+  ...filmUnavailableScenarios,
   ...libraryWorkspaceScenarios,
   {
     name: 'shared-roll',

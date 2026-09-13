@@ -1336,6 +1336,10 @@ function prunePicks() {
   if (PICK.focus && !tableDice.some((d) => pickKey(d) === PICK.focus)) PICK.focus = null;
   if (!PICK.ids.size) return;
   const live = new Set(tableDice.map(pickKey));
+  if(filmAvailability.tainted)for(const [id,roll] of liveTurns) {
+    const st=rollStates.get(id);
+    if(!st?.cleared&&!st?.collected)roll.dice.forEach((_,i)=>live.add(`${id}:${i}`));
+  }
   for (const k of PICK.ids) if (!live.has(k)) PICK.ids.delete(k);
 }
 
@@ -5590,6 +5594,86 @@ let currentRoll = null;    // active playback state (see playRoll)
 const rollQueue = [];
 let applyingQueuedEvent = false;
 let drainingRollQueue = false;
+// Missing physics is a viewer-local exception, never a different simulation.
+// After skipping any film, settled poses are unknown until a shared clear.
+const filmAvailability = {state:'ready', required:null, tainted:false};
+let towerWaitTimer = null;
+let towerWaitEvent = null;
+let filmAvailabilityPanel = null;
+function paintFilmAvailability() {
+  if (!filmAvailabilityPanel) {
+    const panel = document.createElement('aside');
+    panel.id = 'film-availability'; panel.hidden = true;
+    const status = document.createElement('p'); status.setAttribute('role','status');
+    const reload = document.createElement('button'); reload.type='button'; reload.textContent='Reload';
+    reload.onclick=()=>location.reload();
+    const clear = document.createElement('button'); clear.type='button'; clear.textContent='Clear table for everyone';
+    clear.onclick=()=>requestClear('table');
+    panel.append(status,reload,clear); document.getElementById('scene-container').append(panel);
+    filmAvailabilityPanel=panel;
+  }
+  const {state,required,tainted}=filmAvailability;
+  filmAvailabilityPanel.hidden=state==='ready';
+  filmAvailabilityPanel.firstChild.textContent=state==='waiting'
+    ? 'Loading tower. Rolls are waiting.'
+    : tainted ? '3D unavailable. Showing results. Clear the table to restore 3D once its tower is ready.'
+    : 'Tower could not load. Rolls will show results. Reload to retry, or choose another tower.';
+  filmAvailabilityPanel.children[1].hidden=state!=='results';
+  filmAvailabilityPanel.children[2].hidden=!tainted || !towerModelReady(required);
+  tableResults?.refresh();
+  invalidateTable();
+}
+function stopTowerWait() {
+  if(towerWaitTimer!==null)clearTimeout(towerWaitTimer);
+  towerWaitTimer=null; towerWaitEvent=null;
+}
+function towerBoundaryReady(event) {
+  if(towerModelReady(event.id)) return true;
+  const failed=towerGlbUrls(TOWERS[event.id]).some(url=>towerGlbStatus(url)==='error');
+  if(failed || event.expired || filmAvailability.tainted) {
+    filmAvailability.state='results'; filmAvailability.required=event.id;
+    paintFilmAvailability(); return true;
+  }
+  if(towerWaitEvent!==event) {
+    stopTowerWait(); towerWaitEvent=event;
+    filmAvailability.state='waiting'; filmAvailability.required=event.id;
+    paintFilmAvailability();
+    towerWaitTimer=setTimeout(()=>{
+      if(towerWaitEvent!==event)return;
+      event.expired=true; stopTowerWait(); drainRollQueue();
+    },TOWERGLB.holdMaxMs);
+  }
+  return false;
+}
+function applyTowerBoundary(event) {
+  stopTowerWait();
+  const ready=towerModelReady(event.id);
+  pendingTower=rollQueue.findLast(e=>e.kind==='tower')?.id || (ready?null:event.id);
+  filmAvailability.required=event.id;
+  if(ready) {
+    towerSocket(event.id);
+    if(!filmAvailability.tainted) filmAvailability.state='ready';
+  }
+  paintFilmAvailability();
+}
+function showUnavailableRoll(roll) {
+  if(!filmAvailability.tainted) {
+    // Remove obsolete physical poses, retaining logical turns and history.
+    finishSinkingNow();
+    for(const d of tableDice){world.removeBody(d.body);scene.remove(d.mesh);}
+    dieLights.releaseAll(); tableDice=[]; revealing=[];
+    chips.length=0; chipsLayer.replaceChildren();
+    reframeForFeltChange(); placeWashClear(); silenceRollingVoices();
+    dismissCeremonyUI();
+  }
+  filmAvailability.tainted=true; filmAvailability.state='results';
+  if(roll.rollId&&roll.throws)liveTurns.set(roll.rollId,roll);
+  currentRoll={...roll,diceTypes:[...roll.dice],dice:[],unavailable:true,
+    values:Array.isArray(roll.values)?roll.values:null,done:true,baking:false,
+    keyframes:[],sounds:[],rough:[],frames:0,duration:0,time:0,ceremony:null,pour:null};
+  showResults(currentRoll); paintFilmAvailability(); prunePicks();
+  if(!drainingRollQueue)drainRollQueue();
+}
 const queuedFilm = e => e.kind === 'roll' || e.kind === 'rethrow';
 const rollEventPending = id => (currentRoll?.rollId === id && !currentRoll.done)
   || rollQueue.some(e => e.roll.rollId === id);
@@ -5604,6 +5688,7 @@ function drainRollQueue() {
   try {
     while (rollQueue.length && (!currentRoll || currentRoll.done)) {
       if (['zoom', 'tower'].includes(rollQueue[0].kind) && revealing.length) break;
+      if (rollQueue[0].kind==='tower' && !towerBoundaryReady(rollQueue[0])) break;
       const e = rollQueue.shift();
       applyingQueuedEvent = true;
       try {
@@ -5611,9 +5696,7 @@ function drainRollQueue() {
           pendingZoom = rollQueue.findLast(e => e.kind === 'zoom')?.level || null;
           applyZoom(e.level);
         } else if (e.kind === 'tower') {
-          pendingTower = rollQueue.findLast(e => e.kind === 'tower')?.id || null;
-          if (towerModelReady(e.id)) towerSocket(e.id);
-          else pendingTower ||= e.id; // retain the existing unavailable-model wait
+          applyTowerBoundary(e);
         } else if (e.kind === 'roll') playRoll(e.roll, e.rethrow, e.options);
         else if (e.kind === 'rethrow') applyRethrow(e.data);
         else if (e.kind === 'banked') applyBanked(e.data);
@@ -6272,7 +6355,9 @@ function finishSinkingNow() {
 // leave it. Live collects and clears both animate.
 function removeRollDice(rollId, instant = false) {
   const going = tableDice.filter((d) => d.rollId === rollId);
-  if (!going.length) return false;
+  if (!going.length) {
+    liveTurns.delete(rollId); prunePicks(); return false;
+  }
   tableDice = tableDice.filter((d) => d.rollId !== rollId);
   prunePicks();           // MECHANICS M1: a pick cannot outlive its die
   liveTurns.delete(rollId); // MECHANICS M2: nor a turn outlive its dice
@@ -6976,6 +7061,10 @@ function turnDieCount(entry) {
 // The picked dice belonging to this roll, as die indices, sorted. M1's
 // selection is table-wide and permissive on purpose; the turn scopes it.
 function keptIndicesFor(rollId) {
+  if(filmAvailability.tainted) {
+    const roll=liveTurns.get(rollId);
+    return (roll?.dice||[]).flatMap((_,i)=>PICK.ids.has(`${rollId}:${i}`)?[i]:[]);
+  }
   return pickedDice()
     .filter((d) => d.rollId === rollId)
     .map((d) => d.dieIndex)
@@ -7118,7 +7207,7 @@ function flushPendingRollLog() {
 // it, and a row left on-felt would let the NEXT roll's arrival-collect shelve
 // a roll this sweep just took away. Online the server flags its own log the same
 // way, so both sides of a swept table agree with a fresh join.
-function clearTable() {
+function clearTable({shared = !netOnline} = {}) {
   invalidateTable();
   filmClient.cancel();
   flushPendingRollLog();
@@ -7139,8 +7228,17 @@ function clearTable() {
   silenceRollingVoices();
   roomDuck(false);
   ROLLING_OUT.length = 0;
+  stopTowerWait(); heldReplay.clear();
+  if(heldReplayTimer)clearTimeout(heldReplayTimer); heldReplayTimer=null;
+  idleReplay.clear(); stopIdleReplay(); clearDiePicks();
+  if(shared)filmAvailability.tainted=false;
+  // Re-establish the latest room configuration before the next SSE event.
+  tryFlushZoom();
+  const target=pendingTower || filmAvailability.required || currentTower;
+  if(pendingTower || filmAvailability.state!=='ready')queueTower(target);
   tableResults?.close();
   tableResults?.refresh();
+
 }
 
 // roll = {dice: [types], values: [...], seed, label, dc?, playerName?, color?}
@@ -7200,6 +7298,7 @@ function playRoll(roll, rethrow = null, options = {}) {
     queueRollEvent({ kind: 'roll', roll, rethrow, options });
     return;
   }
+  if(filmAvailability.state==='results') { showUnavailableRoll(roll); return; }
   // No whole-table overflow wipe here anymore (§7.7 retires it): auto-collect
   // keeps the felt to one roll and the shelf capped at five slots, so the
   // table population is bounded by the state machine, not by a reset.
@@ -8386,7 +8485,7 @@ function critWord(crit, entry) {
 // Build the display entry for a finished playback roll: per-die parts with
 // mechanics metadata, authoritative total, and reveal state.
 function entryFromRoll(roll) {
-  const types = roll.dice.map((d) => (d.type ? d.type : d)); // die objects or type strings
+  const types = (roll.unavailable ? roll.diceTypes : roll.dice).map((d) => (d.type ? d.type : d)); // die objects or type strings
   const hasValues = Array.isArray(roll.values);
   const perDie = Array.isArray(roll.perDie) && roll.perDie.length === types.length
     ? roll.perDie
@@ -9854,7 +9953,7 @@ let suppressRollFx = false;
 function showResults(roll) {
   const entry = entryFromRoll(roll);
   lastEntry = entry;
-  renderRollResults(entry, roll.dice, !suppressRollFx);
+  renderRollResults(entry, roll.dice, !suppressRollFx && !roll.unavailable);
   addLogEntry(entry);
 }
 
@@ -12590,14 +12689,7 @@ function towerModelEnsure(id) {
             + `${JSON.stringify(phys.portals)} — this file: ${JSON.stringify(entry.portals)}`);
         }
       } else {
-        // NEVER DEGRADE TO 'none'. pendingTower stays set, so a model that turns
-        // up on a later retry (or a later boot) still raises the tower — and
-        // until then this client keeps the table it has rather than silently
-        // becoming the one client in the room baking throws while everybody
-        // else bakes pours.
-        console.warn(`[tower] ${id}: its model did not load, so it will not be `
-          + `socketed. The table keeps '${currentTower}' and the pending change stays `
-          + `queued. Films on this client may diverge from other clients in this room.`);
+        console.warn(`[tower] ${id}: required model unavailable; authored results remain available without a substitute film.`);
       }
       invalidateTable();
       tryFlushRoomChanges();
@@ -12650,7 +12742,7 @@ function towerReplayBlocked() {
   // The one exception is the release itself (below): by then the waiting is
   // over by decision, and re-asking this question would stash the same roll
   // again and arm a second deadline, forever.
-  if (heldReplayReleasing) return false;
+  if (heldReplayReleasing || filmAvailability.state==='results') return false;
   return !!pendingTower && !towerModelReady(pendingTower);
 }
 
@@ -12670,6 +12762,10 @@ function towerReleaseHeldReplay() {
   // interior the rest of the room is baking against. Socketed ONCE, before
   // the whole burst: every held roll waited on the same model.
   tryFlushRoomChanges();
+  if(pendingTower&&!towerModelReady(pendingTower)) {
+    filmAvailability.state='results'; filmAvailability.required=pendingTower;
+    paintFilmAvailability();
+  }
   heldReplayReleasing = true;
   try {
     // In the order they were stashed, which is resyncTable's log order: each
@@ -15033,9 +15129,10 @@ window.__diceDebug = {
   // `held` is the oldest, `heldAll` every one in arrival order — the same
   // shape idleReplayInfo reports, because since v2 a snapshot can carry one
   // open roll per place and the hold has to carry all of them.
+  filmAvailability() { return {...filmAvailability,waiting:!!towerWaitTimer}; },
   towerHeldReplay() {
-    const held = [...heldReplay.keys()];
-    return { held: held.length ? held[0] : null, heldAll: held, armed: !!heldReplayTimer };
+    const held = [...heldReplay.keys(),...rollQueue.filter(e=>e.kind==='snapshot').map(e=>e.roll.rollId)];
+    return { held: held.length ? held[0] : null, heldAll: held, armed: !!heldReplayTimer || !!towerWaitTimer };
   },
   towerGhosts(on) {
     TOWERLAB.ghosts = on === undefined ? true : !!on;
@@ -25880,43 +25977,20 @@ function tryFlushZoom() {
 // The tower's half of the same rule (docs/TOWER.md: "Tower ON/OFF changes the
 // film and is a room setting with the queueZoom defer rule, never mid-roll").
 function queueTower(id) {
-  if (!TOWERS[id]) return;
-  pendingTower = id;
-  // The preload starts the moment the id is known, not when the boundary
-  // arrives: the wait for a roll to finish and the wait for a file to arrive
-  // should overlap, and for the common case (a change made at an idle table)
-  // the fetch IS the whole wait.
+  if(!TOWERS[id])return;
+  pendingTower=id;
   towerModelEnsure(id);
-  if (tableIsBusyForZoom()) {
-    // Like a size change, a tower belongs between its neighboring authored
-    // rolls, even when this viewer has not finished the earlier film.
-    const last = rollQueue.at(-1);
-    if (last?.kind === 'tower') last.id = id;
-    else queueRollEvent({kind:'tower',roll:{rollId:null},id});
-    if (id !== currentTower) showSettingsNote('the tower goes up after this roll');
-    invalidateTable();
-    return;
-  }
-  // TWO WAITS, TWO NOTES. "after this roll" and "when its model arrives" are
-  // different promises to the player, and a model-blocked change that borrowed
-  // the busy note would tell somebody at a perfectly idle table to finish a
-  // roll they are not making.
-  if (!towerModelReady(id)) {
-    if (id !== currentTower) showSettingsNote('the tower goes up when its model arrives');
-    return;
-  }
-  tryFlushTower();
+  const last=rollQueue.at(-1);
+  if(last?.kind==='tower') {
+    if(towerWaitEvent===last)stopTowerWait();
+    last.id=id; delete last.expired;
+  } else queueRollEvent({kind:'tower',roll:{rollId:null},id});
+  invalidateTable(); drainRollQueue();
 }
 
 function tryFlushTower() {
-  if (!pendingTower || tableIsBusyForZoom()) return;
-  // The model gate is in the FLUSH as well as the queue, because the flush has
-  // three other callers (the roll boundary, the zoom, the preload's own
-  // completion) and only one of them came through queueTower.
-  if (!towerModelReady(pendingTower)) return;
-  const id = pendingTower;
-  pendingTower = null;
-  towerSocket(id);
+  if(!pendingTower || tableIsBusyForZoom() || !towerModelReady(pendingTower))return;
+  applyTowerBoundary({id:pendingTower});
 }
 
 // A PLACE AT THE TABLE (docs/UX.md §7.63) — THE ROSTER MOVED, SO THE PLACARDS
@@ -34745,7 +34819,11 @@ function replaySettledRoll(r) {
   // and a playback runs ~4. Stash and re-attempt instead; the guards above run
   // again on the retry, so a roll that arrived by some other route in the
   // meantime is still dropped rather than doubled.
-  if (!applyingQueuedEvent && replayStageBusy()) { deferIdleReplay(r); return; }
+  if (!applyingQueuedEvent && replayStageBusy()) {
+    if(rollQueue.some(e=>e.kind==='tower'))queueRollEvent({kind:'snapshot',roll:r});
+    else deferIdleReplay(r);
+    return;
+  }
   // …and AFTER those, because a roll this client already holds must be dropped
   // rather than held: stashing one would arm a deadline whose only effect is to
   // run the same three guards again ten seconds later.
@@ -35092,7 +35170,7 @@ function handleNetEvent(type, data) {
       if (data.scope === 'mine' && Array.isArray(data.cleared)) {
         for (const rollId of data.cleared) applyClearRoll(rollId);
       } else {
-        clearTable();
+        clearTable({shared:true});
       }
       if (data.playerId && (!net || data.playerId !== net.playerId)) {
         const who = data.playerName || 'Someone';
@@ -36687,6 +36765,21 @@ function renderCompleteResult(read,controls,id) {
     const outcome=paragraph('','');
     if(!renderOutcomeRows(outcome,entry,true)) renderBreakdown(outcome,entry,false,true);
     paragraph('result-detail-context',resultState(entry));
+    if(filmAvailability.tainted && canThrowAgain(entry)) {
+      paragraph('result-detail-context','Select dice to keep.');
+      const picks=document.createElement('div'); picks.className='result-keep-dice';
+      entry.parts.forEach((part,i)=>{
+        const button=document.createElement('button');button.type='button';
+        button.dataset.keepIndex=String(i);
+        button.textContent=`${i+1}. ${part.type}: ${part.label}${part.counts?'':' (not counted)'}`;
+        button.setAttribute('aria-pressed',String(PICK.ids.has(`${id}:${i}`)));
+        button.onclick=()=>{
+          const key=`${id}:${i}`;if(PICK.ids.has(key))PICK.ids.delete(key);else PICK.ids.add(key);
+          refreshTurnVerb(); renderCompleteResult(read,controls,id);
+        };
+        picks.append(button);
+      });read.append(picks);
+    }
   }
   updateCardActions(controls,entry,{
     revealClass:'reveal-verb banner-btn',keepable:true,
@@ -36709,7 +36802,7 @@ tableResults=createPlayerResults({
     if(oldId&&resultBusy(oldId))return {id:oldId,label:'Your turn · complete result',state:'Rolling…',busy:true};
     const e=log.findLast(e=>isMine(e)&&!entryHidden(e)&&unfinished(e)&&!collected.has(e.rollId));
     if(!e||resultBusy(e.rollId))return null;
-    return {id:e.rollId,label:`Your turn · ${e.label} ↗`,state:e.push?resultState(e):`${keptIndicesFor(e.rollId).length} kept · ${e.throws.max-e.throws.used} throws left. Tap dice to keep.`,busy:false};
+    return {id:e.rollId,label:`Your turn · ${e.label} ↗`,state:e.push?resultState(e):`${keptIndicesFor(e.rollId).length} kept · ${e.throws.max-e.throws.used} throws left. ${filmAvailability.tainted?'Open result to keep dice.':'Tap dice to keep.'}`,busy:false};
   },
   paintTurn:(again,bank,id,busy)=>{
     if(busy){again.hidden=false;again.disabled=true;again.textContent='Rolling…';bank.hidden=true;return;}

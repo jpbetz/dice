@@ -78,3 +78,11 @@ body.has-table-result #result-banner { display:none; }
 #table-results[hidden], .result-seat-wrap[hidden], .result-seat[hidden], .result-seat-clear[hidden], .player-result-actions[hidden] { display:none; }
 
 .result-face.is-blank { border:1px solid #aa9874; border-radius:2px; }
+
+/* Required physics assets may fail independently for each viewer. */
+#film-availability { position:absolute; z-index:var(--z-panel,30); top:12px; left:12px; max-width:min(480px,calc(100% - 24px)); padding:12px; border:1px solid var(--border,#777); border-radius:8px; background:var(--panel,#202024); color:var(--text,#eee); }
+#film-availability[hidden] { display:none; }
+#film-availability p { margin:0 0 8px; }
+#film-availability button,.result-keep-dice button { min-height:44px; padding:8px 12px; margin:4px; }
+.result-keep-dice { display:flex; flex-wrap:wrap; }
+.result-keep-dice button[aria-pressed="true"] { outline:2px solid var(--accent,#e8bb77); }
