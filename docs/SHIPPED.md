@@ -13,6 +13,34 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Local gallery practice (2026-09-13)
+
+My dice now has **Practice throw** beside the explicit selection action.
+It lazily loads one isolated d20 physics/rendering viewport wearing the
+previewed set. Practice changes neither personal selection nor any shared
+roll, log, offer, or turn. Closing the collection or previewing another set
+releases its WebGL context; a settled or hidden practice viewport does not
+keep animating. Reduced motion renders the completed local practice without
+animated frames. Cached dice geometry/materials still belong to the table
+and are not disposed with the preview renderer.
+
+This extends R1-B2; it does not complete the destination or mobile redesign.
+The same close view follows every resting practice die irrespective of its
+value. Its bounds probe measures the mesh's projected vertices: projecting
+the corners of a rotated world bounding box falsely reported clipping in a
+frame where the actual die was fully visible. Open gallery suggestions also
+refresh when another participant changes the venue.
+
+Proof: `node tests/e2e/run.mjs --only personal-kit` exercises the shared-log
+boundary, uncommitted selection, idle rendering, close during asynchronous
+loading, context cleanup, phone resizing, and reduced motion. The new
+`dice-practice` check and existing desktop/phone personal-kit checks pass.
+Visuals: `node tools/drive.mjs tools/steps/dice-practice-look.mjs`, inspected
+at 1440 × 900 and 390 × 844 with four participants. The latter is desktop
+Chromium touch emulation, not a physical phone observation.
+[Desktop practice](redesign/2026-09-13-practice-desktop.png) and
+[phone practice](redesign/2026-09-13-practice-phone.png).
+
 ## Personal name and dice collection (2026-09-13)
 
 The first bounded implementation of the approved experience redesign makes

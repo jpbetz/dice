@@ -1,0 +1,54 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
+# Redesign execution record
+
+**2026-09-13:** the owner authorized autonomous work through the complete
+[plan of record](EXPERIENCE-REDESIGN.md), using agents, reviewing each result,
+and queueing the next ready task. This is an execution ledger, not a new
+priority order. R1, R2 and R3 remain open until their composed proofs pass.
+
+## Current work
+
+| Work | State and next action |
+| --- | --- |
+| Direct identity, gallery/favorites, personal selection | Initial slice committed as `b064b07`; preserve the subsequent owner correction asking for compact controls. |
+| Compact controls and transactional table setup | Existing work is advancing in the owner's main checkout. Review and integrate its commit; do not overwrite uncommitted work. Review found keyboard radio arrows, canonical Apply results and stale conflict flags needing proof. |
+| Gallery practice | Implemented in the integration worktree; local/shared isolation and lifecycle tests plus desktop/phone captures pass. Integration smoke remains to run with the other slices. |
+| R1-C: Quick dice and explicit starter kits | Agent implementing in `codex/r1-quick`; review empty-storage defaults, legacy-library retention, and joining a room with an existing interpretation. |
+| R1-D0: durable service | Design selects optional recovery keys, private local atomic store and a Firestore REST adapter; adapter implementation/proofs underway in `codex/durable-service`. No cloud storage is provisioned. |
+| R3: compressed public text | Agent commit `8e44250` reviewed; queue integration. Production lacked compression; local six-file transfer shrinks approximately 72% with Brotli. |
+| R3: dice-face draw consolidation | Agent investigating/implementing in `codex/r3-materials`; require measured draw savings and art/physics parity. |
+| R1 destinations + R2 phone surface | Next UI design/implementation after integrating the compact controls: one coherent workspace and full-width phone with bottom roll tray. |
+
+The root's integration checkout is `/tmp/dice-redesign-integration` on
+`codex/redesign-integration`. Agents use isolated worktrees so reviews and
+cherry-picks are explicit and another ongoing session's edits survive.
+
+## Remaining campaign work
+
+Finish R1-B3's recognizable names and real appearance preview; implement
+the destination shell and phone layout; deliver recovery APIs, explicit
+profile publication, safe library synchronization, saved homes, contacts,
+invitations, and permitted presence. Then exercise the full guest/recovered
+return loop after restart without a prior client repushing state.
+
+R2 owes one complete multiplayer composition, readable per-player latest
+results, subsequent table art directions, and a measured experiment for
+rolls arriving together. R3 owes responsive simulation, optional loading,
+idle work reduction, Battery saver, and optional instant results. Keep
+these on the queue rather than treating delivery compression as all of R3.
+
+Cloud provisioning, actual phone/midrange-device observations, user
+observation, and production deployment are not established by local tests.
+Prepare and verify their concrete artifacts before any final external
+approval step. Never treat a disabled optional service or fake-store test
+as completion of persistent table homes.
+
+## Validation baseline
+
+The initial main-checkout `npm test` run passed all unit/fuzz checks and
+59/62 smoke scenarios. Failures were the in-flight table-controls recents
+assertion, control-rail markup, and die-pick's ring at y=0.032 under a
+surface at y=1.8308. Those must be resolved or independently characterized
+before release; later edits may already address the first two. Use the
+harness's ephemeral ports. Port 8123 remains untouched.

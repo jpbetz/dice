@@ -25,11 +25,12 @@ export function createDiceGallery({ entries, current, choose, suggested, favorit
     </header>
     <div class="dg-scroll">
       <section class="dg-feature" aria-label="Preview dice">
-        <div class="dg-preview"><img alt="" width="560" height="280"><span class="dg-preview-fallback" hidden>Preview unavailable</span></div>
+        <div class="dg-preview"><img alt="" width="560" height="280"><span class="dg-preview-fallback" hidden>Preview unavailable</span><div class="dg-practice-view" hidden></div></div>
         <div class="dg-detail"><div><span class="dg-house"></span><h3 class="dg-name" tabindex="-1"></h3></div>
           <button class="dg-favorite" type="button" aria-label="Favorite this set" aria-pressed="false">☆</button></div>
         <p class="dg-description"></p>
-        <button class="dg-use" type="button">Use these dice</button>
+        <div class="dg-actions"><button class="dg-practice" type="button">Practice throw</button><button class="dg-use" type="button">Use these dice</button></div>
+        <p class="dg-practice-status" role="status" hidden></p>
         <p class="dg-status" role="status" aria-live="polite"></p>
       </section>
       <button class="dg-suggestion" type="button" hidden></button>
@@ -49,6 +50,14 @@ export function createDiceGallery({ entries, current, choose, suggested, favorit
   const stars = new Set(favorites());
   let catalogue = [];
   let cards = [];
+  let practice = null, practiceEpoch = 0;
+  function stopPractice() {
+    practiceEpoch++; practice?.dispose(); practice = null;
+    $('.dg-practice-view').hidden = true;
+    $('.dg-practice-status').hidden = true;
+    $('.dg-practice').disabled = false;
+    $('.dg-preview img').hidden = false;
+  }
   function refreshCatalogue() {
     catalogue = entries();
     const match = catalogue.find(e => e.id === suggested());
@@ -68,8 +77,10 @@ export function createDiceGallery({ entries, current, choose, suggested, favorit
     const entry = catalogue.find(e => e.id === selected) || catalogue[0];
     if (!entry) return;
     selected = entry.id;
+    if (practice?.state.set !== selected) stopPractice();
     $('.dg-preview-fallback').hidden = true;
     picture($('.dg-preview img'), entry.id);
+    if (practice) $('.dg-preview img').hidden = true;
     $('.dg-house').textContent = entry.house;
     $('.dg-name').textContent = entry.name;
     $('.dg-description').textContent = entry.description;
@@ -114,6 +125,7 @@ export function createDiceGallery({ entries, current, choose, suggested, favorit
   }
   function close() {
     if (root.hidden) return;
+    stopPractice();
     root.hidden = true;
     closed(root);
     if (returnTo?.isConnected && !returnTo.closest('[hidden], .hidden')) returnTo.focus({preventScroll:true});
@@ -126,6 +138,28 @@ export function createDiceGallery({ entries, current, choose, suggested, favorit
     grid();
   });
   $('.dg-use').addEventListener('click', () => { choose(selected); detail(); });
+  $('.dg-practice').addEventListener('click', async () => {
+    const epoch = ++practiceEpoch;
+    const selectedSet = selected;
+    $('.dg-practice').disabled = true;
+    const status = $('.dg-practice-status');
+    status.hidden = false; status.textContent = 'Opening practice…';
+    try {
+      const { createDicePractice } = await import('./dicepractice.js');
+      if (epoch !== practiceEpoch || root.hidden || selected !== selectedSet) return;
+      const host = $('.dg-practice-view');
+      host.hidden = false; $('.dg-preview img').hidden = true;
+      $('.dg-preview-fallback').hidden = true;
+      if (!practice) practice = createDicePractice(host, text => { status.textContent = text; });
+      practice.toss(selectedSet);
+      $('.dg-practice').disabled = false;
+    } catch {
+      if (epoch !== practiceEpoch) return;
+      stopPractice();
+      status.hidden = false;
+      status.textContent = 'Practice is unavailable here. You can still choose these dice.';
+    }
+  });
   $('.dg-suggestion').addEventListener('click', () => { selected = suggested(); detail(); $('.dg-scroll').scrollTop = 0; });
   root.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => {
     filter = button.dataset.filter;
@@ -151,6 +185,6 @@ export function createDiceGallery({ entries, current, choose, suggested, favorit
     close,
     update() { if (!root.hidden) { refreshCatalogue(); grid(); } },
     get isOpen() { return !root.hidden; },
-    get state() { return {open:!root.hidden, selected, current:current(), favorites:[...stars], filter}; },
+    get state() { return {open:!root.hidden, selected, current:current(), favorites:[...stars], filter, practice:practice?.state || null}; },
   };
 }

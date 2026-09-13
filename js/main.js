@@ -12071,7 +12071,7 @@ function stepFaeConcept(dt) {
 // its own queueTower deferral via the settings patch that carries it.
 function applyVenue(id) {
   const spec = VENUES[id] || VENUES.table;
-  if (spec.id === currentVenue) { updateVenueChrome(); return; }
+  if (spec.id === currentVenue) { updateVenueChrome(); diceGallery?.update(); return; }
   currentVenue = spec.id;
   if (spec.register === 'fantasy') faeConceptStart({ paletteId: spec.paletteId });
   else faeConceptStop();
@@ -12079,6 +12079,7 @@ function applyVenue(id) {
   // reskin (visual-only, shared portals) + the register's env policy.
   towerReskin();
   updateVenueChrome();
+  diceGallery?.update();
   // The venue stages the table's dice (W4): every prospective chip —
   // palette tiles, tray, pool strips — re-dresses to what a roll will
   // actually wear now, and back again when the room returns.

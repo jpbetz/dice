@@ -26,7 +26,13 @@ specific language governing permissions and limitations under the License.
 .dg-close:hover { background: #ffffff16; }
 .dg-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 26px 24px; scrollbar-color: #65625a transparent; }
 .dg-feature { padding-bottom: 18px; }
-.dg-preview { height: 205px; display: grid; place-items: center; margin: 2px -14px 0; background: radial-gradient(ellipse at 50% 68%, #cbb48220, transparent 65%); }
+.dg-preview { position: relative; height: 205px; display: grid; place-items: center; margin: 2px -14px 0; background: radial-gradient(ellipse at 50% 68%, #cbb48220, transparent 65%); }
+.dg-practice-view { position: absolute; inset: 0; }
+.dg-practice-view canvas { display: block; width: 100%; height: 100%; }
+.dg-actions { display: flex; gap: 8px; }
+.dg-actions .dg-use { flex: 1; width: auto; }
+.dg-practice { min-height: 44px; padding: 8px 12px; border-radius: 10px; border: 1px solid #c9b79070; background: transparent; color: #ead4ad; }
+.dg-practice-status { margin: 9px 0 0; font-size: 12px; color: #e3d0a9; }
 .dg-preview img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 15px 14px #0007); }
 .dg-preview-fallback { color: #c8c0b1; }
 .dg-detail { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
