@@ -1,6 +1,6 @@
 /* Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 */
 import {assert} from './harness.mjs';
-import {tapControl} from './roll-flows.mjs';
+import {click as tapControl} from '../fixtures/visible-input.mjs';
 
 // Profiles are private until a player checks their library sharing control.
 // Set up the library task, then exercise the real, hit-tested publication act.

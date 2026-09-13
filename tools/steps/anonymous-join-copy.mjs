@@ -1,6 +1,6 @@
 /* Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 */
 import assert from 'node:assert/strict';
-import {tapControl} from '../../tests/e2e/roll-flows.mjs';
+import {click as tapControl} from '../../tests/fixtures/visible-input.mjs';
 import {typeControl} from '../../tests/e2e/explicit-library-fixture.mjs';
 export default async function run(stage){
   const host=await stage.ctx.rawPlayer('Organizer');

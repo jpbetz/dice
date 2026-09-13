@@ -35,7 +35,8 @@ import { joinFirstPlayScenarios } from './join-first-play.mjs';
 import { firstPlayScenarios } from './first-play.mjs';
 import { workspaceScenarios } from './workspaces.mjs';
 import { playerResultScenarios } from './player-results.mjs';
-import { rollFlowScenarios, tapControl } from './roll-flows.mjs';
+import { rollFlowScenarios } from './roll-flows.mjs';
+import {click as tapControl} from '../fixtures/visible-input.mjs';
 import { shareProfiles, typeControl, pickOfferedProfile } from './explicit-library-fixture.mjs';
 import { rollHistoryScenarios } from './roll-history.mjs';
 import { filmMutationScenarios } from "./film-mutations.mjs";
@@ -6459,25 +6460,36 @@ export const scenarios = [
   {
     name: 'soul-seed',
     tags: ['groups', 'cuj6'],
-    // The pre-Soul-Deal starter trio (Attack/Damage/Percentile, untouched)
-    // upgrades to the Soul Deal rack on the next boot — it was never the
-    // player's own work. One edit and the rack is theirs: no swap.
-    //
-    // The rack is DEALT (js/seed.js, unit-tested in tests/seed.test.mjs), so
-    // what this proves in a real browser is the wiring, not the arithmetic:
-    // the deal reaches storage, survives migrateGroup, prices at 100/100/30
-    // through the app's OWN ledger, and — the one thing only a reload can
-    // show — does not re-roll itself out from under its owner on the way
-    // back in.
+    // Historical starter-shaped pools are kept data, including an untouched
+    // trio. Soul Deal is an explicit preview-and-add action; the exact chosen
+    // deal persists beside the original profile and keeps its priced shelves.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
+      const original = await a.eval('JSON.parse(localStorage.getItem("dice.profiles.v1"))');
+      const oldGroups = await a.dbg('groups');
       const b = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      assert.deepEqual(await b.dbg('groups'), oldGroups, 'even the untouched historical trio survives boot');
+      await b.dbg('openSettings("stuff")');
+      await tapControl(b, '#starter-kits > summary');
+      await tapControl(b, '[data-kit="soul-deal"]');
+      const preview = await b.eval(`[...document.querySelectorAll('.starter-pools li')].map(li => ({name:li.querySelector('span').textContent, notation:li.querySelector('code').textContent}))`);
+      assert.equal(preview.length, 18, 'the selected kit previews eighteen rolls');
+      assert.deepEqual(await b.eval('JSON.parse(localStorage.getItem("dice.profiles.v1"))'), original,
+        'preview does not modify the kept library');
+      await tapControl(b, '.starter-add');
+      await tapControl(b, '#settings-close');
       const gs = await b.dbg('groups');
-      assert.equal(gs.length, 18, `the old trio upgraded (got ${gs.length})`);
-      assert.equal(gs[0].name, 'Strength', 'attributes lead the rack');
+      assert.deepEqual(gs.map(({name,notation}) => ({name,notation})), preview,
+        'Add keeps exactly the rolls that were previewed');
+      assert.equal(gs[0].name, 'Strength', 'attributes lead the chosen rack');
       assert.equal(await b.eval(`document.querySelector('#groups-list .pool-sec-head').textContent`),
         'Attributes', 'the shelves are live');
+      assert.equal(await b.dbg('system'), 'none', 'adding a kit never changes the shared table interpretation');
+      const added = await b.eval('JSON.parse(localStorage.getItem("dice.profiles.v1"))');
+      assert.equal(added.profiles.length, original.profiles.length + 1, 'the kit is added beside kept profiles');
+      for (const profile of original.profiles) assert.deepEqual(added.profiles.find(p => p.id === profile.id), profile,
+        'the original library remains byte-for-byte intact');
       // Priced by the same rackDiceValue the ✎ ledger prints.
       const ledger = await b.dbg('rackDiceValue');
       assert.deepEqual(ledger.shelves, [
@@ -6490,6 +6502,9 @@ export const scenarios = [
       assert.ok(new Set(gs.map((g) => g.notation)).size > 3,
         `the dice vary across the rack (got ${JSON.stringify(gs.map((g) => g.notation))})`);
 
+      await b.dbg("setSystem('soul-deal')");
+      await b.waitFor('window.__diceDebug.system === "soul-deal"');
+
       // ONE deal per rack. A reload re-enters defaultGroups' neighbourhood
       // with storage already full, so the character has to come back byte
       // for byte — a re-roll here would silently rewrite a played sheet.
@@ -6499,8 +6514,9 @@ export const scenarios = [
 
       // a touched rack is the player's: rename one pool, reboot — no swap
       await b.dbg(`setGroups([{name: 'MyAttack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
+      const edited = await b.dbg('groups');
       const c2 = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
-      assert.equal((await c2.dbg('groups')).length, 3, 'an edited rack never swaps');
+      assert.deepEqual(await c2.dbg('groups'), edited, 'an edited rack survives exactly');
     },
   },
   {
@@ -6771,6 +6787,9 @@ export const scenarios = [
     // counts physical dice, so canonicalization cannot split the price.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg("setSystem('soul-deal')");
+      await a.waitFor('window.__diceDebug.system === "soul-deal"');
+      await a.dbg("profiles.reset('soul-deal')");
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
       await a.dbg(`setGroups([
         {name: 'Claws', notation: '1d6', category: 'Attributes'},
@@ -6837,6 +6856,8 @@ export const scenarios = [
       assert.equal(await a.eval(
         `document.querySelectorAll('.psh-fig, #pools-head .ph-fig').length`), 0,
         'figures are gone at Done — built only in manage mode');
+
+      await shareProfiles(a, [(await a.dbg('profiles.active')).id]);
 
       // a foreign rack never carries a figure (the ledger measures YOUR rack)
       await b.waitFor(`window.__diceDebug.netPlayers.some((p) =>
@@ -9755,6 +9776,11 @@ export const scenarios = [
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.dbg("profiles.reset('none')");
+      await b.dbg("profiles.reset('none')");
+      await a.dbg(`profiles.rename(${JSON.stringify((await a.dbg('profiles.active')).id)}, 'Appearance probes')`);
+      await a.dbg(`setGroups([{name:'OverrideProbe',notation:'1d6'},{name:'DefaultProbe',notation:'1d8'}])`);
+      await a.dbg('setPanelState({pools:true})');
       await a.eval(`window.__diceDebug.setDiceSet('std')`);
       await b.eval(`window.__diceDebug.setDiceSet('std')`);
       // click → wait like harness roll(): the click's server round-trip
@@ -9762,7 +9788,7 @@ export const scenarios = [
       // that read "got none" on the first run)
       const rollTheDraft = async () => {
         const before = await a.logCount();
-        await a.eval(`document.getElementById('tray-roll').click()`);
+        await tapControl(a, '#tray-roll');
         await a.waitFor(
           `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${before} && !window.__diceDebug.busy)`,
           { desc: 'draft roll completes' },
@@ -9800,7 +9826,7 @@ export const scenarios = [
 
       // stage the pool alone and roll: the roll wears the POOL's set on
       // every screen, while Alice herself still wears std
-      await a.eval(`document.querySelector('[data-group-id="${gid}"] .tile-stage').click()`);
+      await tapControl(a, `[data-group-id="${gid}"] .tile-stage`);
       const rid1 = await rollTheDraft();
       await b.waitFor(
         `(window.__diceDebug.sim(120), window.__diceDebug.tableDiceInfo().some((d) => d.rollId === ${JSON.stringify(rid1)}) && !window.__diceDebug.busy)`,
@@ -9812,6 +9838,8 @@ export const scenarios = [
           `${who}: the pool's roll wears the pool's set (got ${dice.map((d) => d.variant).join(',') || 'none'})`);
       }
 
+      await shareProfiles(a, [(await a.dbg('profiles.active')).id]);
+
       // the rack relay: B browses ALICE's rack and sees ALICE's world —
       // an explicit pool set wins, unmarked pools wear ALICE's default,
       // and EVERY strip is pinned so nothing can fall to the viewer's own
@@ -9820,7 +9848,9 @@ export const scenarios = [
         `document.querySelectorAll('#rail-roster .roster-name').length >= 1`,
         { desc: "B's rail shows Alice" },
       );
-      await b.eval(`[...document.querySelectorAll('#rail-roster .roster-name')].find((p) => p.textContent.includes('Alice')).click()`);
+      await b.waitFor('!document.getElementById("offer-banner").classList.contains("hidden")', {desc:'the explicitly shared profile is offered'});
+      await tapControl(b, '#offer-dismiss');
+      await tapControl(b, '#rail-roster .roster-name');
       await b.waitFor(
         `document.querySelectorAll('#groups-list .pool-tile.foreign img.die-art').length >= 1`,
         { desc: "Alice's rack renders" },
@@ -9853,13 +9883,11 @@ export const scenarios = [
 
       // staging SNAPSHOTS what the tile showed (Joe: a staged foreign pool
       // must not switch to the local default) — the resolved skin rides
-      await b.eval(`[...document.querySelectorAll('#groups-list .pool-tile.foreign')]
-        .find((t) => { const i = t.querySelector('img.die-art'); return i && i.dataset.artSet === 'stormcall.boltglass'; })
-        .querySelector('.tile-stage').click()`);
+      await tapControl(b, '#groups-list .pool-tile.foreign:has(img[data-art-set="stormcall.boltglass"]) .tile-stage');
       const borrowed = await b.dbg('draftSets');
       assert.ok(borrowed && borrowed.sets && borrowed.sets.includes('stormcall.boltglass'),
         `staging an unmarked foreign pool keeps the OWNER's default (got ${JSON.stringify(borrowed)})`);
-      await b.eval(`document.getElementById('clear-tray').click()`);
+      await tapControl(b, '#clear-tray');
 
       // back to std (the steps below expect Alice unthemed) — B follows too
       await a.eval(`window.__diceDebug.setDiceSet('std')`);
@@ -9870,17 +9898,15 @@ export const scenarios = [
       // the std flavor of the same rule: Alice-on-std stages as a 'std'
       // PIN, not as null-following-the-borrower — B wears anvil to prove it
       await b.eval(`window.__diceDebug.setDiceSet('emberforge.blackanvil')`);
-      await b.eval(`[...document.querySelectorAll('#groups-list .pool-tile.foreign')]
-        .find((t) => { const i = t.querySelector('img.die-art'); return i && i.dataset.artSet === 'std'; })
-        .querySelector('.tile-stage').click()`);
+      await tapControl(b, '#groups-list .pool-tile.foreign:has(img[data-art-set="std"]) .tile-stage');
       const borrowedStd = await b.dbg('draftSets');
       assert.ok(borrowedStd && borrowedStd.sets && borrowedStd.sets.includes('std')
         && !borrowedStd.sets.includes('emberforge.blackanvil'),
         `an std-world pool stages PINNED to std under the borrower's house set (got ${JSON.stringify(borrowedStd)})`);
-      await b.eval(`document.getElementById('clear-tray').click()`);
+      await tapControl(b, '#clear-tray');
       await b.eval(`window.__diceDebug.setDiceSet('std')`);
       // Pill-press-again to fall home (the You chip is retired with the switcher)
-      await b.eval(`[...document.querySelectorAll('#rail-roster .roster-name')].find((p) => p.textContent.includes('Alice')).click()`);
+      await tapControl(b, '#rail-roster .roster-name');
 
       // a MIXED draft: EACH die wears its own pool's set — pool B takes
       // seaglass on a d8, a loose palette d6 stays the roller's std, and
@@ -9888,10 +9914,11 @@ export const scenarios = [
       assert.ok(pools.length >= 2, 'the rack has a second pool to probe');
       const gid2 = pools[1].id;
       await a.eval(`window.__diceDebug.editPool(${JSON.stringify(gid2)}, { name: 'OverrideProbeB', notation: '1d8', category: '', set: 'tidewrack.seaglass' })`);
-      await a.eval(`document.getElementById('clear-tray').click()`);
-      await a.eval(`document.querySelector('[data-group-id="${gid}"] .tile-stage').click()`);
-      await a.eval(`document.querySelector('[data-group-id="${gid2}"] .tile-stage').click()`);
-      await a.eval(`document.querySelector('.die-btn img[data-art-type="d6"]').closest('button').click()`);
+      await tapControl(a, '#clear-tray');
+      await tapControl(a, `[data-group-id="${gid}"] .tile-stage`);
+      await tapControl(a, `[data-group-id="${gid2}"] .tile-stage`);
+      await tapControl(a, '#quick-dice .dice-mode-link');
+      await tapControl(a, '.die-btn:has(img[data-art-type="d6"])');
       const rid2 = await rollTheDraft();
       await b.waitFor(
         `(window.__diceDebug.sim(120), window.__diceDebug.tableDiceInfo().some((d) => d.rollId === ${JSON.stringify(rid2)}) && !window.__diceDebug.busy)`,
@@ -9907,8 +9934,8 @@ export const scenarios = [
       // 'std' PINS the classics even when the roller wears a house set
       await a.eval(`window.__diceDebug.setDiceSet('emberforge.blackanvil')`);
       await a.eval(`window.__diceDebug.editPool(${JSON.stringify(gid)}, { set: 'std' })`);
-      await a.eval(`document.getElementById('clear-tray').click()`);
-      await a.eval(`document.querySelector('[data-group-id="${gid}"] .tile-stage').click()`);
+      await tapControl(a, '#clear-tray');
+      await tapControl(a, `[data-group-id="${gid}"] .tile-stage`);
       const rid3 = await rollTheDraft();
       const pinned = await diceOf(a, rid3);
       assert.ok(pinned.length === 1 && pinned[0].variant === 'std',
@@ -9918,8 +9945,8 @@ export const scenarios = [
       const cleared = JSON.parse(await a.eval(
         `JSON.stringify(window.__diceDebug.editPool(${JSON.stringify(gid)}, { set: '' }))`));
       assert.equal(cleared.set, null, 'an empty patch clears the override');
-      await a.eval(`document.getElementById('clear-tray').click()`);
-      await a.eval(`document.querySelector('[data-group-id="${gid}"] .tile-stage').click()`);
+      await tapControl(a, '#clear-tray');
+      await tapControl(a, `[data-group-id="${gid}"] .tile-stage`);
       const rid4 = await rollTheDraft();
       const follows = await diceOf(a, rid4);
       assert.ok(follows.length === 1 && follows[0].variant === 'emberforge.blackanvil',
@@ -9927,14 +9954,14 @@ export const scenarios = [
 
       // Settings now links to the visual collection. Preview never applies.
       await a.dbg('openSettings("you")');
-      await a.eval(`document.getElementById('my-dice').click()`);
+      await tapControl(a, '#my-dice');
       await a.waitFor(`window.__diceDebug.diceGallery.open`);
       assert.equal((await a.dbg('diceGallery')).current, 'emberforge.blackanvil');
-      await a.eval(`document.querySelector('.dg-card[data-set="tidewrack.seaglass"]').click()`);
+      await tapControl(a, `.dg-card[data-set="tidewrack.seaglass"]`);
       assert.equal(await a.dbg('diceSet'), 'emberforge.blackanvil', 'preview leaves the default alone');
-      await a.eval(`document.querySelector('.dg-use').click()`);
+      await tapControl(a, `.dg-use`);
       assert.equal(await a.dbg('diceSet'), 'tidewrack.seaglass');
-      await a.eval(`document.querySelector('.dg-close').click()`);
+      await tapControl(a, `.dg-close`);
 
       // the popover identity strip drives the SAME control by pool id
       await a.eval(`window.__diceDebug.openPopoverFor(${JSON.stringify(gid)})`);
@@ -9944,8 +9971,8 @@ export const scenarios = [
       })())`));
       assert.ok(stripSel, 'the identity strip carries the set select');
       assert.equal(stripSel.value, null, 'a cleared pool shows the your-set default');
-      await a.eval(`document.querySelector('#pop-identity .set-select').click()`);
-      await a.eval(`document.querySelector('.set-menu [data-set="emberforge.blackanvil"]').click()`);
+      await tapControl(a, `#pop-identity .set-select`);
+      await tapControl(a, `.set-menu [data-set="emberforge.blackanvil"]`);
       const g2 = (await a.dbg('groups')).find((g) => g.id === gid);
       assert.equal(g2.set, 'emberforge.blackanvil', 'the strip picker commits through editPool');
       await a.eval(`window.__diceDebug.closePopover()`);
@@ -11389,10 +11416,14 @@ export const scenarios = [
     // profile, under a deduped name, with nothing of theirs written to.
     async fn(ctx) {
       const alice = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await alice.dbg("setSystem('soul-deal')");
+      await alice.waitFor('window.__diceDebug.system === "soul-deal"');
+      await alice.dbg("profiles.reset('soul-deal')");
       const bob = await ctx.newTable({ origin: '127.0.0.8', name: 'Bob' });
+      await bob.dbg("profiles.reset('none')");
       await alice.dbg(`profiles.rename('${(await alice.dbg('profiles.active')).id}', 'Nightblade')`);
       await alice.dbg(`setGroups([{name: 'Garrote', notation: '2d8', category: 'Skills'}])`);
-      await alice.dbg('publishPools()');
+      await shareProfiles(alice, [(await alice.dbg('profiles.active')).id]);
 
       // Bob sees the label, not just the owner.
       await bob.waitFor(
@@ -11404,9 +11435,10 @@ export const scenarios = [
 
       // And can copy it. Nothing of Bob's is touched.
       const mineBefore = await bob.dbg('profiles.active');
-      const got = await bob.dbg(`profiles.copyFrom({name: ${JSON.stringify(seen.profile)}, system: ${JSON.stringify(seen.system)}, pools: ${JSON.stringify(seen.pools)}})`);
-      assert.equal(got.ok, true, got.status);
-      assert.ok(got.status.includes('nothing of yours changed'), got.status);
+      await bob.dbg('openSettings("stuff")');
+      await tapControl(bob, '[data-library-page="shared"]');
+      await tapControl(bob, 'button[aria-label="Copy Nightblade to your library"]');
+      await tapControl(bob, '#settings-close');
       const list = await bob.dbg('profiles.list');
       assert.equal(list.length, 2, 'a second profile, not a merge');
       assert.equal(list.find((p) => p.name === 'Nightblade').pools, 1);
@@ -11438,7 +11470,9 @@ export const scenarios = [
     // powers every player has.
     async fn(ctx) {
       const dm = await ctx.newTable({ origin: '127.0.0.10', name: 'Walter' });
-      await dm.dbg('profiles.reset()');
+      await dm.dbg("setSystem('soul-deal')");
+      await dm.waitFor('window.__diceDebug.system === "soul-deal"');
+      await dm.dbg("profiles.reset('soul-deal')");
       // reset() deals a fresh profile and NAMES it — the dealt name, not the
       // player's — so the organizer's own seat is whatever was drawn.
       const dmOwn = (await dm.dbg('profiles.active')).name;
@@ -11452,9 +11486,11 @@ export const scenarios = [
 
       // Fill the box from the library, then offer it to the room.
       await dm.dbg('openSettings("stuff")');
-      await dm.eval(`document.getElementById('portable-open').click()`);
-      await dm.eval(`document.getElementById('portable-export').click()`);
-      const push = await dm.dbg('portable.pushToTable()');
+      await tapControl(dm, '#portable-open');
+      await tapControl(dm, '#portable-export');
+      await tapControl(dm, '#portable-push');
+      await dm.waitFor('document.getElementById("portable-push").textContent === "Sent!"');
+      const push = await dm.eval('({ok:!document.getElementById("portable-status").classList.contains("warn"),status:document.getElementById("portable-status").textContent})');
       assert.equal(push.ok, true, push.status);
       assert.ok(push.status.includes('4 seats'), `all four are offered (got ${push.status})`);
 
@@ -11471,14 +11507,13 @@ export const scenarios = [
       assert.equal(picker.preselect, 'Bo', '&as= pre-selects theirs, and nothing more');
       assert.equal(picker.chosen, null, 'nothing is taken for them');
 
-      await bo.dbg(`chooseSeat('Bo')`);
+      const kept = await bo.eval('JSON.parse(localStorage.getItem("dice.profiles.v1"))');
+      await pickOfferedProfile(bo, 'Bo');
+      assert.deepEqual(await bo.eval('JSON.parse(localStorage.getItem("dice.profiles.v1"))'), kept,
+        'selecting the prepared character does not write before Join');
+      await typeControl(bo, '#name-input', 'Bo');
+      await tapControl(bo, '#name-join');
       await bo.waitOnline();
-      await bo.waitFor(`window.__diceDebug.seatPicker.verdict.canApply === true`,
-        { desc: 'the seat previews' });
-      const v = await bo.dbg('seatPicker.verdict');
-      assert.ok(v.status.includes("adds 'Bo' to your profiles"),
-        `the preview says what will happen (got ${v.status})`);
-      await bo.dbg('applySeatImport()');
       await bo.waitFor(`(window.__diceDebug.profiles.active || {}).name === 'Bo'`,
         { desc: 'the seat becomes their profile' });
       assert.deepEqual((await bo.dbg('groups')).map((g) => g.notation), ['2d8'],
@@ -11494,7 +11529,7 @@ export const scenarios = [
       const stored = JSON.parse(await bo.eval(`localStorage.getItem('dice.profiles.v1')`));
       assert.equal(stored.profiles.find((x) => x.id === stored.activeId).name, 'Bo',
         'the store agrees with the screen about which profile is in hand');
-      assert.equal(stored.profiles.length, 2, "and their own dealt profile is still there beside it");
+      assert.equal(stored.profiles.length, 2, "and their own saved-roll workspace is still there beside it");
     },
   },
   {
@@ -12014,13 +12049,11 @@ export const scenarios = [
       };
 
       // ---- A SEAT THAT HAS PUBLISHED NOTHING ----
-      // A RawPlayer is the right fixture and a browser tab is the wrong one: a
-      // real tab re-shares its library on every hello, so publishing is not a
-      // user act and a browser can only be silent by accident.
+      // Occupancy alone is never a publication act.
       const bob = await ctx.rawPlayer('Bob');
       assert.ok(bob.playerId, 'Bob really is seated');
       const p0 = await peek();
-      assert.equal(p0.system, 'soul-deal', 'the peek answers about the room');
+      assert.equal(p0.system, 'none', 'the peek answers about the room');
       assert.equal(p0.seats, undefined,
         `and offers no seats at all — one occupant, nothing published (got ${JSON.stringify(p0)})`);
       assert.equal(JSON.stringify(p0).includes('Bob'), false, 'Bob is not in it');
@@ -12036,10 +12069,11 @@ export const scenarios = [
       await a.waitFor(`window.__diceDebug.players.length === 2`,
         { desc: 'two people are at this table' });
 
-      // Waited on the NAME, not on `seats.length === 1`: the tab publishes at
-      // hello, so a seat is already there under the dealt name and a length
-      // poll returns before the rename propagates. (It did, first run — the
-      // peek answered 'Alice Cooper' and the scenario read it as settled.)
+      const privatePeek = await peek();
+      assert.equal((privatePeek.seats || []).length, 0, 'a real browser keeps its library private by default');
+      assert.equal(JSON.stringify(privatePeek).includes('Alice Cooper'), false, 'the unpublished browser adds no public identity');
+      await shareProfiles(a, [mine.id]);
+
       const p1 = await peekUntil((p) => (p.seats || []).some((s) => s.name === 'Wren'),
         "the publishing player's renamed character reaches the door");
       assert.deepEqual(p1.seats.map((s) => s.name), ['Wren'],
@@ -23354,36 +23388,53 @@ export const scenarios = [
   {
     name: 'pools-broadcast-is-disclosed',
     tags: ['profiles', 'net'],
-    // THE SENDING HALF, DISCLOSED (U25). Sitting down at a table publishes your
-    // rack to everyone in it — that is what makes a teammate's pools copyable
-    // (§11 P10–P12) — and nothing on screen said so. It is one standing line,
-    // at a table only.
-    //
-    // WHAT THIS CATCHES: a note that stands SOLO would be a lie in the one place
-    // it cannot be true (there is no room to broadcast into), and a note whose
-    // count is hard-coded would say 'your 1 profile' to a player holding four.
-    // Both are asserted, and the count is CHANGED mid-scenario so a constant
-    // cannot pass.
+    // Sharing is explicit and counts selected profiles, not the whole local
+    // library. The status follows consent changes and states private lobby
+    // storage after leaving; it never claims automatic publication on Join.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.170', name: 'Alice' });
-      await a.dbg(`profiles.reset('soul-deal')`); // the library is per-ORIGIN: establish it
-      const one = await a.dbg('poolsSharedNote');
-      assert.ok(one, 'the disclosure stands at a table');
-      assert.match(one, /Everyone here can see and copy your character\b/,
-        `and counts what is actually being sent (got: ${JSON.stringify(one)})`);
-
-      await a.dbg(`profiles.create('Second', 'soul-deal')`);
-      const two = await a.dbg('poolsSharedNote');
-      assert.match(two, /can see and copy your 2 characters\b/,
-        `the count follows the library (got: ${JSON.stringify(two)})`);
-
-      // SOLO IT IS SILENT. 'Leave & switch seat' is the one scripted door to
-      // netOnline=false (draft-bench's note).
-      await a.eval(`document.getElementById('idm-leave').click()`);
-      await a.waitFor(`window.__diceDebug.net.online === false`, { desc: 'the seat drops' });
-      await a.dbg(`profiles.create('Third', 'soul-deal')`); // forces the re-render
-      assert.equal(await a.dbg('poolsSharedNote'), '',
-        'with no table there is nobody to disclose to, and the line goes');
+      await a.dbg("setSystem('soul-deal')");
+      await a.waitFor('window.__diceDebug.system === "soul-deal"');
+      const b = await ctx.newTable({origin:'127.0.0.175',name:'Bob'});
+      await b.dbg("profiles.reset('none')");
+      await a.dbg("profiles.reset('soul-deal')");
+      await a.dbg('publishPools()');
+      assert.match(await a.dbg('poolsSharedNote'), /^Your saved rolls are private\./,
+        'joining does not publish the library');
+      const first = (await a.dbg('profiles.active')).id;
+      await a.dbg("profiles.create('Second', 'soul-deal')");
+      const second = (await a.dbg('profiles.active')).id;
+      assert.equal(await b.eval('document.getElementById("offer-banner").classList.contains("hidden")'), true);
+      await shareProfiles(a, [first]);
+      await b.waitFor('!document.getElementById("offer-banner").classList.contains("hidden")',
+        {desc:'late explicit publication reaches the seated player without a roster change'});
+      assert.match(await a.dbg('poolsSharedNote'), /^1 profile is shared at this table/,
+        'one selected profile is disclosed while the other remains private');
+      await shareProfiles(a, [second]);
+      assert.match(await a.dbg('poolsSharedNote'), /^2 profiles are shared at this table/,
+        'the count changes with actual consent');
+      await a.dbg('openSettings("stuff")');
+      await tapControl(a, `.library-card[data-profile="${first}"]`);
+      await tapControl(a, `[data-share-profile="${first}"]`);
+      await a.dbg('publishPools()');
+      assert.deepEqual(await a.dbg('profiles.shared'), [second], 'unsharing removes only the selected consent');
+      assert.match(await a.dbg('poolsSharedNote'), /^1 profile is shared at this table/);
+      assert.match(await a.dbg('poolsSharedNote'), /Unsharing cannot remove copies they already kept\./,
+        'the status explains the actual limit of withdrawal');
+      await tapControl(a, `.library-card[data-profile="${second}"]`);
+      await tapControl(a, `[data-share-profile="${second}"]`);
+      await a.dbg('publishPools()');
+      await b.waitFor('document.getElementById("offer-banner").classList.contains("hidden")',
+        {desc:'withdrawing the final shared profile removes the offer immediately'});
+      await tapControl(a, '#settings-close');
+      await tapControl(a, '#identity-chip');
+      await tapControl(a, '#idm-lobby');
+      await a.waitFor('new URLSearchParams(location.search).has("lobby") && !!window.__diceDebug && window.__diceDebug.net.online === false',
+        {desc:'Leave table reaches the local lobby'});
+      await a.dbg('openSettings("stuff")');
+      await tapControl(a, `.library-card[data-profile="${second}"]`);
+      assert.match(await a.dbg('poolsSharedNote'), /^Your saved rolls are private\. At a shared table,/,
+        'the lobby describes local saved rolls rather than claiming a live broadcast');
     },
   },
   {
@@ -23502,6 +23553,7 @@ export const scenarios = [
         // scenario failed first: `.rp-dice` answered 'none' because nothing was
         // on screen at all.)
         await a.dbg(`setRailMode('dice')`);
+        await tapControl(a, '#rail-dice .dice-mode-link'); // Build dice, explicitly leaving Quick rolls.
         for (let i = 0; i < 10; i++) await a.dbg(`railTapDie('d6')`);
         assert.equal((await a.dbg('railDice')).total, 10, 'ten d6 staged');
         assert.deepEqual((await a.dbg('railMode')).shown, { pools: false, dice: true },

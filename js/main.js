@@ -35074,6 +35074,7 @@ function handleNetEvent(type, data) {
       // your own echo lands in `players` silently
       if (poolsOwner === data.playerId) renderGroups();
       renderTableProfiles(); // 'At this table' follows the room, live
+      updateOfferBanner(); // Explicit sharing and withdrawal change the offered profiles now.
       break;
     }
     case 'roll': // the only path that animates in online mode — ours included
@@ -36001,7 +36002,7 @@ function wirePoolsToShelves(pools) {
 // so netReady never resolves with the preview half-built.
 // EVERY CHARACTER THIS TABLE OFFERS (C17), from both sources: the profiles a
 // file PREPARED it with (roomSetup — survives everyone leaving) and the
-// libraries the players actually at it are holding (published automatically,
+// profiles the players at it explicitly shared (withdrawn when they unshare,
 // gone when they go). Setup wins a name collision: it was chosen deliberately
 // for this table, and a live library is whatever somebody is carrying.
 function tableOffers() {

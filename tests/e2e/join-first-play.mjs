@@ -1,6 +1,6 @@
 /* Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 */
 import {assert} from './harness.mjs';
-import {tapControl} from './roll-flows.mjs';
+import {click as tapControl} from '../fixtures/visible-input.mjs';
 import {typeControl} from './explicit-library-fixture.mjs';
 
 export const joinFirstPlayScenarios=[
