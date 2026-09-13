@@ -17633,7 +17633,8 @@ export const scenarios = [
     },
   },
 
-  // ==================================================================  // PART A — THE COMPOSED JOURNEY WALKS (ROADMAP C1 + C3's open half)
+  // =========================================================================
+  // PART A — THE COMPOSED JOURNEY WALKS (ROADMAP C1 + C3's open half)
   //
   // Every journey in docs/CUJS.md already has PART-scenarios, and the tag half
   // shipped: 109 scenarios carry cuj1…cuj13. What was missing is the thing the
@@ -17658,7 +17659,8 @@ export const scenarios = [
   // `profile-dm-prepares`, `profile-file`); they are tagged `journey` where
   // they stand rather than duplicated here. CUJ5 has no code and no scenario,
   // and this file will not pretend otherwise — see CUJS.md gap B.
-  // ==================================================================  {
+  // =========================================================================
+  {
     name: 'journey-call-the-game',
     tags: ['journey', 'lobby', 'chrome', 'cuj2'],
     timeout: 150000,
@@ -18382,10 +18384,12 @@ export const scenarios = [
     },
   },
 
-  // ==================================================================  // PART B — the scenarios eight parallel build steps shipped hooks for and
+  // =========================================================================
+  // PART B — the scenarios eight parallel build steps shipped hooks for and
   // could not write, because this file has one owner. Grouped by the item that
   // owes them, in THE ORDER's order.
-  // ==================================================================
+  // =========================================================================
+
   // ---- C15 · restore: reading back the file this app writes (CUJ13) -------
   //
   // CUJ13's done-when is "a library can be written to a file they hold, and
@@ -23283,11 +23287,13 @@ export const scenarios = [
     },
   },
 
-  // ===================================================================  // SUB-TABLES — CUJ5, "we need to split into two groups for a bit, then come
+  // ==========================================================================
+  // SUB-TABLES — CUJ5, "we need to split into two groups for a bit, then come
   // back" (§3b L4, UX §7.46). The code shipped 2026-08-14 with hooks and a
   // 15-case server suite (tests/subtables.test.mjs) and no browser coverage at
   // all; these five are that coverage, and the first is the journey's GATE.
-  // ===================================================================  {
+  // ==========================================================================
+  {
     name: 'journey-split-the-party',
     tags: ['journey', 'subtables', 'cuj5'],
     timeout: 150000,
@@ -23736,9 +23742,11 @@ export const scenarios = [
     },
   },
 
-  // ===================================================================  // THE U25 / U26 / U28b BATCH (UX §7.45) — the audit's own findings, each one
+  // ==========================================================================
+  // THE U25 / U26 / U28b BATCH (UX §7.45) — the audit's own findings, each one
   // a surface that said the wrong thing rather than a surface that was missing.
-  // ===================================================================  {
+  // ==========================================================================
+  {
     name: 'log-row-says-each-pool-once',
     tags: ['log', 'meanings'],
     // THE LOG SAID EVERY POOL'S NAME TWICE (U26, audit F3). Two runs stood side
