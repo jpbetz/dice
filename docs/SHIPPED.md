@@ -7098,5 +7098,6 @@ The twelve previously failing composed scenarios now pass targeted checks
 composer tests select the lens/workspace they exercise; fresh-visit tests still
 assert an empty library and Numbers only. The repeatable visual probe is
 `tools/steps/numbers-evidence-look.mjs`; desktop symbol/push captures were
-inspected. The resized old desktop rail still squeezes the phone view; its
-composed visual proof follows integration of the new phone workspace.
+inspected. The composed phone workspace now shows this evidence at full width. The
+large push-turn card still overlaps dice; the result-layout slice must fix
+that remaining layout issue.
