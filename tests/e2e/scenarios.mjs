@@ -12981,8 +12981,8 @@ export const scenarios = [
         'the room line becomes the privacy read');
       await a.eval(`document.getElementById('identity-chip').click()`); // close it again
 
-      // Settings: the room section, and its one intruder in Your data.
-      await a.dbg('openSettings()');
+      // Open the table task explicitly; the gear now opens Preferences.
+      await a.dbg('openSettings("table")');
       // The heading is RELABELLED, not hidden (UX §7.20, amended during the
       // build): hiding it left felt/system/zoom in a heading-less block that
       // reads as part of the section above — "Your data". What must never
@@ -12990,8 +12990,8 @@ export const scenarios = [
       const roomLabel = await a.eval(`document.getElementById('set-room-label').textContent`);
       assert.equal(roomLabel, 'This table',
         'the room heading stops claiming an audience it does not have');
-      assert.notEqual(await a.eval(shown('set-room-label')), 'none',
-        'but it still stands, or the controls below it read as "Your data"');
+      assert.notEqual(await a.eval(shown('settings-title')), 'none', 'the dedicated table task has a visible heading');
+      assert.equal(await a.eval(`document.getElementById('settings-scope').textContent`), 'Your solo table', 'the visible task heading names its actual scope');
       assert.equal(await a.eval(shown('set-table-name-row')), 'none', 'the Table name row is gone');
       assert.equal(await a.eval(shown('portable-push')), 'none', 'Apply to table is gone');
       assert.notEqual(await a.eval(shown('felt-swatches')), 'none', 'felt (yours) is still offered');
@@ -13247,8 +13247,8 @@ export const scenarios = [
       const search = await createTableFromLobby(a, 'The Tavern');
       const key = decodeURIComponent(search.replace('?room=', ''));
       assert.notEqual(key, 'The Tavern', 'the key is not the typed name');
-      assert.match(key, /^the-tavern-[a-z0-9]{16}$/,
-        `a readable slug + 16 random base36 chars — the random tail IS the door (got: ${key})`);
+      assert.match(key, /^g_[A-Za-z0-9_-]{43}$/,
+        `a server-reserved guest address with 256 random bits (got: ${key})`);
 
       // The typed name became the room's name — server-side truth, not just
       // this client's rendering (the peek is the unauthenticated read).
@@ -17734,8 +17734,8 @@ export const scenarios = [
       const search = await createTableFromLobby(dm, 'Thursday Game');
       const key = decodeURIComponent(search.replace('?room=', ''));
       assert.notEqual(key, 'Thursday Game', 'the key is not the typed name');
-      assert.match(key, /^thursday-game-[a-z0-9]{16}$/,
-        `unguessable: a slug plus 16 random chars, which IS the access control (got ${key})`);
+      assert.match(key, /^g_[A-Za-z0-9_-]{43}$/,
+        `a server-reserved guest address, separate from its name (got ${key})`);
       await dm.waitFor(`window.__diceDebug.settings.tableName === 'Thursday Game'`,
         { desc: 'the table wears the name he typed' });
 

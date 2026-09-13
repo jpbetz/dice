@@ -96,3 +96,16 @@
   #log-flyout { left:8px; bottom:calc(var(--phone-foot) + 8px); width:calc(100vw - 16px); max-height:calc(100dvh - var(--phone-head) - var(--phone-foot) - 16px); }
 }
 @keyframes phone-banner-in { from {opacity:0; transform:translateY(15px);} to {opacity:1; transform:none;} }
+
+/* A failed saved-home join remains an explicit retry state during local play. */
+#home-connection-notice[hidden] { display:none; }
+#home-connection-notice { padding:8px 0; border-top:1px solid var(--hair); }
+#home-connection-notice p { margin:0 0 6px; font-size:12px; }
+#home-connection-notice .btn { padding:5px 8px; font-size:11px; margin:2px; }
+@media(max-width:640px) {
+  body.home-unavailable { --phone-head:144px; }
+  #home-connection-notice { grid-column:1/-1; align-self:end; padding:4px 0; }
+  #home-connection-notice p { margin:0 0 3px; }
+  #home-connection-notice .btn { min-height:32px; }
+  body.home-unavailable #left-panel #status-pill { display:none; }
+}

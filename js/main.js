@@ -24,7 +24,7 @@ import { captureFilm, rngFromState, mergeFilmState, unpackFilm } from './film-wi
 import { FilmClient } from './film-client.js';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, bustDie, SHADER_TIME, FACE_SHAPES } from './dice.js';
 import { dieArtURL, bustArt } from './diceart.js';
-import { connect, forgetSeat, peekTable, prejoinSeat, LS_WHO } from './net.js';
+import { connect, createGuestTable, forgetSeat, peekTable, prejoinSeat, LS_WHO } from './net.js';
 import { recentTables, rememberTable, renameRecentTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
@@ -15878,7 +15878,7 @@ window.__diceDebug = {
   // rollId — this hook lets the scenario prove requestRoll fires with the
   // right entry AFTER many rebuilds (a stale closure was the pre-fix bug).
   get lastRequestedRoll() { return lastRequestedRoll ? { ...lastRequestedRoll } : null; },
-  get net() { return { online: netOnline, playerId: net ? net.playerId : null }; },
+  get net() { return { online: netOnline, playerId: net ? net.playerId : null, savedHome:!!net?.savedHome, unavailableHome:!!unavailableHomeInfo }; },
   get netReady() { return netReady; },
   // The last thing the server refused us ({path, status, code, message}) —
   // the same text the pill shows. Null until something is refused.
@@ -20047,6 +20047,7 @@ cmdHelpBtn.addEventListener('click', () => {
 // (further down) reads the roster. Assigned by initNet at the bottom.
 let net = null;         // live connection handle from net.connect (online only)
 let netOnline = false;
+var unavailableHomeInfo=null,homeRetrying=false;
 let players = [];
 let poolsOwner = null;  // a player id, or null = your own rack
 // The room's prepared table as this client knows it (§G4): {rev, table,
@@ -33138,7 +33139,7 @@ function adoptRoomSetup(setup) {
 // the debug hook can await the heal.
 let repushInFlight = false;
 function maybeRepushTable() {
-  if (!netOnline || !net || repushInFlight) return null;
+  if (!netOnline || !net || net.savedHome || repushInFlight) return null;
   const stored = storedTable();
   if (!stored) return null;
   const roomRev = roomSetup && Number.isInteger(roomSetup.rev) ? roomSetup.rev : 0;
@@ -33585,7 +33586,7 @@ const pendingSplitKey = (room) => `dice.subtable.v1:${room}`;
 // (goal 10), so the key is the door, and `?room=soulseal` would be a door
 // anyone can guess. A blank name is allowed — it makes an unnamed table,
 // exactly as one made by hand.
-function openTableMint(anchor, { verb, placeholder }, onCreate) {
+function openTableMint(anchor, { verb, placeholder, reserveGuest = false }, onCreate) {
   // Toggle, like the Tables pill: without this a second click on the anchor
   // (pointerdown-away deliberately exempts it) rebuilt the menu and threw away
   // a half-typed table name.
@@ -33605,9 +33606,14 @@ function openTableMint(anchor, { verb, placeholder }, onCreate) {
     row.appendChild(input);
     row.appendChild(go);
     el.appendChild(row);
-    const create = () => {
+    const error=document.createElement('p');error.className='hint';error.setAttribute('role','status');el.append(error);
+    const create = async () => {
+      if(go.disabled)return;
       const name = cutText(input.value.trim(), 28);
-      const key = mintRoomKey(name);
+      go.disabled=true;error.textContent='';
+      const result=reserveGuest?await createGuestTable(name):{ok:true,room:mintRoomKey(name)};
+      if(!result.ok){go.disabled=false;error.textContent=result.message||'The guest table could not be created. Try again.';return;}
+      const key=result.room;
       try { sessionStorage.setItem(pendingNameKey(key), name); } catch { /* a nameless table still works */ }
       closeRailMenu();
       onCreate(key, name);
@@ -33622,7 +33628,7 @@ function openTableMint(anchor, { verb, placeholder }, onCreate) {
 
 // "+ New table" — name it, land in it.
 function openNewTable(e) {
-  openTableMint(e.currentTarget, { verb: 'Create', placeholder: 'Table name…' },
+  openTableMint(e.currentTarget, { verb: 'Create', placeholder: 'Table name…', reserveGuest:true },
     (key) => gotoTable(key));
 }
 
@@ -34926,8 +34932,25 @@ function handleNetStatus(status) {
 // other transient table notice already lives.
 let lastRefusal = null;
 let refusalTimer = null;
+function showUnavailableHome(info){
+  unavailableHomeInfo=info||null;
+  document.body.classList.toggle('home-unavailable',!!info);
+  let box=document.getElementById('home-connection-notice');
+  if(!box){
+    box=document.createElement('section');box.id='home-connection-notice';box.setAttribute('role','status');
+    const text=document.createElement('p');text.textContent='Saved table unavailable. Your local dice still work.';
+    const retry=document.createElement('button');retry.id='home-connection-retry';retry.className='btn ghost';retry.textContent='Retry table';
+    retry.addEventListener('click',async()=>{if(homeRetrying)return;homeRetrying=true;retry.disabled=true;try{netReady=initNet();await netReady;}finally{homeRetrying=false;retry.disabled=false;}});
+    const fresh=document.createElement('button');fresh.id='home-connection-new';fresh.className='btn ghost';fresh.textContent='New guest table';fresh.addEventListener('click',openNewTable);
+    box.append(text,retry,fresh);document.getElementById('rail').append(box);
+  }
+  box.hidden=!info;
+  if(info){box.title=info.message||'';setPill(null);}
+  if(typeof refitView==='function')refitView();
+}
 function handleNetRefusal(info) {
   lastRefusal = info;
+  if(info.path==='/api/join'&&['home_not_found','home_closed','home_unavailable','homes_unavailable','account_unavailable'].includes(info.code)){clearTimeout(refusalTimer);showUnavailableHome(info);return;}
   clearTimeout(refusalTimer);
   setPill(info.message, 'refused');
   statusPill.title = info.message; // the pill clips; the tooltip does not
@@ -36024,6 +36047,7 @@ async function initNet() {
   let cameBackEmpty = false;
   if (conn.online) {
     net = conn;
+    showUnavailableHome(null);
     netOnline = true;
     players = conn.players || [];
     // The server sanitizes names ('#' stripped like control/bidi chars, then
@@ -36089,7 +36113,7 @@ async function initNet() {
     // unprepared room is deleted when its last player leaves) and it is not any
     // of the live-room cases. A pending name is different and always applies —
     // you typed it into "+ New table" seconds ago.
-    const freshRoom = !(conn.log && conn.log.length) && players.length <= 1 && !roomSetup;
+    const freshRoom = !conn.savedHome && !(conn.log && conn.log.length) && players.length <= 1 && !roomSetup;
     const remembered = freshRoom ? recentTables().find((t) => t.room === ROOM) : null;
     // …AND THIS IS WHERE A DEAD ROOM BECOMES KNOWABLE (UX §7.47). Read here
     // rather than re-derived below, because `wanted` is about to consume
@@ -36153,7 +36177,7 @@ async function initNet() {
     // action to point at, which is exactly when a readout is the right object.
     // Safe in the shared-transient channel too: with no server, no settings
     // event can fire and steal the slot.
-    setPill('solo', 'solo');
+    if(conn.unavailableHome)showUnavailableHome(conn.joinRefusal);else setPill('solo', 'solo');
     applyRoomSettings(ownSettingsForChannel(load(LS_ROOMSETTINGS, null))); // solo keeps its own felt
     renderPlayers(); // genuinely all three branches now — it early-returns here
   }
