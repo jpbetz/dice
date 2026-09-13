@@ -1,0 +1,204 @@
+[
+  {
+    "kind": "roll",
+    "first": {
+      "instant": {
+        "tower": "none",
+        "pending": null,
+        "queue": 0,
+        "throws": {
+          "max": 3,
+          "used": 1
+        },
+        "pour": false,
+        "rollId": "64d7c462-23b5-42da-9b00-6a0bed70202e",
+        "seed": 3926420498,
+        "values": [
+          9,
+          1,
+          8,
+          4
+        ],
+        "hash": "495bfdd02f32c8728adbfdfc8d0de08434710a643084c4997260dbfbce872ca9"
+      },
+      "normal": {
+        "tower": "none",
+        "pending": null,
+        "queue": 0,
+        "throws": {
+          "max": 3,
+          "used": 1
+        },
+        "pour": false,
+        "rollId": "64d7c462-23b5-42da-9b00-6a0bed70202e",
+        "seed": 3926420498,
+        "values": [
+          9,
+          1,
+          8,
+          4
+        ],
+        "hash": "495bfdd02f32c8728adbfdfc8d0de08434710a643084c4997260dbfbce872ca9"
+      }
+    },
+    "pending": {
+      "tower": "none",
+      "pending": "wickroot",
+      "queue": 1,
+      "throws": {
+        "max": 3,
+        "used": 1
+      },
+      "pour": false,
+      "rollId": "64d7c462-23b5-42da-9b00-6a0bed70202e",
+      "seed": 3926420498,
+      "values": [
+        9,
+        1,
+        8,
+        4
+      ],
+      "hash": "495bfdd02f32c8728adbfdfc8d0de08434710a643084c4997260dbfbce872ca9"
+    },
+    "instant": {
+      "tower": "wickroot",
+      "pending": null,
+      "queue": 0,
+      "throws": null,
+      "pour": true,
+      "rollId": "01043b75-6918-4858-8f9a-e56afc0ebb0d",
+      "seed": 1971878238,
+      "values": [
+        5,
+        10,
+        11,
+        9,
+        1,
+        3,
+        1,
+        15
+      ],
+      "hash": "0c940159d4c86cb6f4b81294c8e1fb050ed6f0cd62c21ad544055daa81f3ea0c"
+    },
+    "normal": {
+      "tower": "wickroot",
+      "pending": null,
+      "queue": 0,
+      "throws": null,
+      "pour": false,
+      "rollId": "01043b75-6918-4858-8f9a-e56afc0ebb0d",
+      "seed": 1971878238,
+      "values": [
+        5,
+        10,
+        11,
+        9,
+        1,
+        3,
+        1,
+        15
+      ],
+      "hash": "58b7cb472b733d1c935dfc19d676ca184ab1a954017e8c069a0c9fbb6eaa36bf"
+    }
+  },
+  {
+    "kind": "rethrow",
+    "first": {
+      "instant": {
+        "tower": "none",
+        "pending": null,
+        "queue": 0,
+        "throws": {
+          "max": 3,
+          "used": 1
+        },
+        "pour": false,
+        "rollId": "54d69c18-6563-4c7e-bdd2-a12433c29abc",
+        "seed": 1319954406,
+        "values": [
+          6,
+          17,
+          12,
+          16
+        ],
+        "hash": "af400f738218dc34b98fb864900b8cbe77d7b7697c1d49c3bc4172c64d0f95d8"
+      },
+      "normal": {
+        "tower": "none",
+        "pending": null,
+        "queue": 0,
+        "throws": {
+          "max": 3,
+          "used": 1
+        },
+        "pour": false,
+        "rollId": "54d69c18-6563-4c7e-bdd2-a12433c29abc",
+        "seed": 1319954406,
+        "values": [
+          6,
+          17,
+          12,
+          16
+        ],
+        "hash": "af400f738218dc34b98fb864900b8cbe77d7b7697c1d49c3bc4172c64d0f95d8"
+      }
+    },
+    "pending": {
+      "tower": "none",
+      "pending": "wickroot",
+      "queue": 1,
+      "throws": {
+        "max": 3,
+        "used": 1
+      },
+      "pour": false,
+      "rollId": "54d69c18-6563-4c7e-bdd2-a12433c29abc",
+      "seed": 1319954406,
+      "values": [
+        6,
+        17,
+        12,
+        16
+      ],
+      "hash": "af400f738218dc34b98fb864900b8cbe77d7b7697c1d49c3bc4172c64d0f95d8"
+    },
+    "instant": {
+      "tower": "wickroot",
+      "pending": null,
+      "queue": 0,
+      "throws": {
+        "max": 3,
+        "used": 2
+      },
+      "pour": false,
+      "rollId": "54d69c18-6563-4c7e-bdd2-a12433c29abc",
+      "seed": 1319954406,
+      "values": [
+        6,
+        15,
+        12,
+        4
+      ],
+      "hash": "3af0104d6373eb4f7b25ed46d7f134536e60b9f96a2ebdad27d618ad3a3346c6"
+    },
+    "normal": {
+      "tower": "wickroot",
+      "pending": null,
+      "queue": 0,
+      "throws": {
+        "max": 3,
+        "used": 2
+      },
+      "pour": false,
+      "rollId": "54d69c18-6563-4c7e-bdd2-a12433c29abc",
+      "seed": 1319954406,
+      "values": [
+        6,
+        15,
+        12,
+        4
+      ],
+      "hash": "3af0104d6373eb4f7b25ed46d7f134536e60b9f96a2ebdad27d618ad3a3346c6"
+    }
+  }
+]

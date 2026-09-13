@@ -5601,13 +5601,17 @@ function drainRollQueue() {
   drainingRollQueue = true;
   try {
     while (rollQueue.length && (!currentRoll || currentRoll.done)) {
-      if (rollQueue[0].kind === 'zoom' && revealing.length) break;
+      if (['zoom', 'tower'].includes(rollQueue[0].kind) && revealing.length) break;
       const e = rollQueue.shift();
       applyingQueuedEvent = true;
       try {
         if (e.kind === 'zoom') {
           pendingZoom = rollQueue.findLast(e => e.kind === 'zoom')?.level || null;
           applyZoom(e.level);
+        } else if (e.kind === 'tower') {
+          pendingTower = rollQueue.findLast(e => e.kind === 'tower')?.id || null;
+          if (towerModelReady(e.id)) towerSocket(e.id);
+          else pendingTower ||= e.id; // retain the existing unavailable-model wait
         } else if (e.kind === 'roll') playRoll(e.roll, e.rethrow, e.options);
         else if (e.kind === 'rethrow') applyRethrow(e.data);
         else if (e.kind === 'banked') applyBanked(e.data);
@@ -6907,7 +6911,7 @@ function applyRethrow(data) {
   if (!Array.isArray(data.thrown) || !data.thrown.length) return;
   if (!applyingQueuedEvent && (latestTurnPayload(payload.rollId)?.throws?.used || 0)
       >= (payload.throws?.used || 0)) return;
-  if (!applyingQueuedEvent && currentRoll && !currentRoll.done) {
+  if (!applyingQueuedEvent && ((currentRoll && !currentRoll.done) || rollQueue.length)) {
     queueRollEvent({ kind: 'rethrow', roll: payload, data });
     return;
   }
@@ -7088,7 +7092,7 @@ function flushPendingRollLog() {
     record(currentRoll);
   }
   for (const e of rollQueue.splice(0)) {
-    if (e.kind === 'zoom') continue; // pendingZoom retains the latest target for the cleared table
+    if (e.kind === 'zoom' || e.kind === 'tower') continue; // pending targets survive a whole-table clear
     if (queuedFilm(e) || e.kind === 'banked' || e.kind === 'snapshot') record(e.roll);
     else if (e.kind === 'reveal' && e.full) record({ ...e.full, revealed: true });
     else {
@@ -25853,7 +25857,13 @@ function queueTower(id) {
   // the fetch IS the whole wait.
   towerModelEnsure(id);
   if (tableIsBusyForZoom()) {
+    // Like a size change, a tower belongs between its neighboring authored
+    // rolls, even when this viewer has not finished the earlier film.
+    const last = rollQueue.at(-1);
+    if (last?.kind === 'tower') last.id = id;
+    else queueRollEvent({kind:'tower',roll:{rollId:null},id});
     if (id !== currentTower) showSettingsNote('the tower goes up after this roll');
+    invalidateTable();
     return;
   }
   // TWO WAITS, TWO NOTES. "after this roll" and "when its model arrives" are

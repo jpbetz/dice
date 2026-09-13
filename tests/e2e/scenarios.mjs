@@ -37,6 +37,7 @@ import { playerResultScenarios } from './player-results.mjs';
 import { rollHistoryScenarios } from './roll-history.mjs';
 import { filmMutationScenarios } from "./film-mutations.mjs";
 import { filmSettingsScenarios } from './film-settings.mjs';
+import { filmTowerSettingsScenarios } from './film-tower-settings.mjs';
 import { filmTurnScenarios } from './film-turns.mjs';
 import { idleRenderScenarios } from './idle-render.mjs';
 import { presentationScenarios } from './presentation.mjs';
@@ -798,6 +799,7 @@ export const scenarios = [
   ...optionalModelParserScenarios,
   ...filmMutationScenarios,
   ...filmSettingsScenarios,
+  ...filmTowerSettingsScenarios,
   ...libraryWorkspaceScenarios,
   {
     name: 'shared-roll',
