@@ -1,0 +1,1880 @@
+{
+  "copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "baseCommit": "4464dda",
+  "devicePixels": {
+    "phone": [
+      390,
+      844
+    ],
+    "desktop": [
+      1440,
+      900
+    ]
+  },
+  "deterministicCases": [
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "wide",
+      "notation": "4d20",
+      "seed": 4,
+      "frames": 84,
+      "entered": 4,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "5b115841fde2afd845c5c947aa5e0226abfacde1522d1d182d46dd4fcf2c0173",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "wide",
+      "notation": "40d20",
+      "seed": 90090,
+      "frames": 319,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "823d78484f98ed9eaf7fad801f52e8c1cc6934a673ba40da8e0db83510fbe1a1",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 6,
+        "maxExit": 289.59533519521096,
+        "finalClipped": 3,
+        "worstFinalClipPx": 226.33212615179593,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "wide",
+      "notation": "40d20",
+      "seed": 32676,
+      "frames": 193,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "98c153d4aa7a38078cc1bc244175604b9252d1be5f4e2e451b27dd1c416187a7",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 6,
+        "maxExit": 298.2404366519998,
+        "finalClipped": 3,
+        "worstFinalClipPx": 256.67749651843326,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "wide",
+      "notation": "40d4",
+      "seed": 90090,
+      "frames": 431,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "29943e0fc825a1e6d14603e6afac217d9bb3d3284fc93ee57fa8ac654de1167b",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "wide",
+      "notation": "40d4",
+      "seed": 32676,
+      "frames": 219,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "4a89647809e79c5de36ea0e1800c750b873003ba546d306bdeeccfd979cb9bb6",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "medium",
+      "notation": "4d20",
+      "seed": 4,
+      "frames": 88,
+      "entered": 4,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "f763027683328d3fcbd587a7d1198d38a6a567795cf54bd98a6d663dd6ab7ddb",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 90090,
+      "frames": 198,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "ee25214d378844afa0e35be9613c357de646bc8a61e1279094b8e9692cccba2a",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 10,
+        "maxExit": 292.749088144221,
+        "finalClipped": 5,
+        "worstFinalClipPx": 253.1808360129908,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 32676,
+      "frames": 273,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "1cf992c97ab586d9cce3bd5660e4de7fc7f32ed544dbcefd9016046fc5657288",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 12,
+        "maxExit": 268.44403099000533,
+        "finalClipped": 7,
+        "worstFinalClipPx": 199.46684984516733,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "medium",
+      "notation": "40d4",
+      "seed": 90090,
+      "frames": 540,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "dda3fcc639c58d180caabbb890ed4417fa1ccc6a994217ae92fe50439332fec2",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "medium",
+      "notation": "40d4",
+      "seed": 32676,
+      "frames": 236,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "cd352762dba95871de4c30878ffc23a2a8bdb6fcad6ceec71163077c5a13bfae",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "4d20",
+      "seed": 4,
+      "frames": 58,
+      "entered": 4,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "fddbd726449b2bfa8520969036cb3e9b0bba1dee3a3d7d548d0e3de1f504ca3b",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 90090,
+      "frames": 238,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "0ee1bf7abe6e24665723972a77af8279ee8f7f216aa1d8b765b99543e8651f44",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 11,
+        "maxExit": 263.82223742627366,
+        "finalClipped": 10,
+        "worstFinalClipPx": 256.47535270137985,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 32676,
+      "frames": 229,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "d261e1fb7ab99d3dca9bcd53f3665fbbf519cd1c620898f6828a403321dd8a6c",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 9,
+        "maxExit": 337.0788578114913,
+        "finalClipped": 7,
+        "worstFinalClipPx": 220.22802363940633,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 90090,
+      "frames": 538,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "092a0c02d76c0f38bf19437cc6c4743d78a30ef71a865b42249260880aa5145f",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 32676,
+      "frames": 126,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "b6bc068af25079ac80e3c7e616a0817a7a52e0f468193d55c03c46af754d8644",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "wide",
+      "notation": "4d20",
+      "seed": 4,
+      "frames": 84,
+      "entered": 4,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "5b115841fde2afd845c5c947aa5e0226abfacde1522d1d182d46dd4fcf2c0173",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "wide",
+      "notation": "40d20",
+      "seed": 90090,
+      "frames": 319,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "823d78484f98ed9eaf7fad801f52e8c1cc6934a673ba40da8e0db83510fbe1a1",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 2,
+        "maxExit": 44.464195864988724,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "wide",
+      "notation": "40d20",
+      "seed": 32676,
+      "frames": 193,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "98c153d4aa7a38078cc1bc244175604b9252d1be5f4e2e451b27dd1c416187a7",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 2,
+        "maxExit": 66.14785399057234,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "wide",
+      "notation": "40d4",
+      "seed": 90090,
+      "frames": 431,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "29943e0fc825a1e6d14603e6afac217d9bb3d3284fc93ee57fa8ac654de1167b",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "wide",
+      "notation": "40d4",
+      "seed": 32676,
+      "frames": 219,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "4a89647809e79c5de36ea0e1800c750b873003ba546d306bdeeccfd979cb9bb6",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "4d20",
+      "seed": 4,
+      "frames": 88,
+      "entered": 4,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "f763027683328d3fcbd587a7d1198d38a6a567795cf54bd98a6d663dd6ab7ddb",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 90090,
+      "frames": 198,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "ee25214d378844afa0e35be9613c357de646bc8a61e1279094b8e9692cccba2a",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 1,
+        "maxExit": 28.581138847242546,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 32676,
+      "frames": 273,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "1cf992c97ab586d9cce3bd5660e4de7fc7f32ed544dbcefd9016046fc5657288",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 1,
+        "maxExit": 17.254905303702486,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "40d4",
+      "seed": 90090,
+      "frames": 540,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "dda3fcc639c58d180caabbb890ed4417fa1ccc6a994217ae92fe50439332fec2",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "40d4",
+      "seed": 32676,
+      "frames": 236,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "cd352762dba95871de4c30878ffc23a2a8bdb6fcad6ceec71163077c5a13bfae",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "4d20",
+      "seed": 4,
+      "frames": 58,
+      "entered": 4,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "fddbd726449b2bfa8520969036cb3e9b0bba1dee3a3d7d548d0e3de1f504ca3b",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 90090,
+      "frames": 238,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "0ee1bf7abe6e24665723972a77af8279ee8f7f216aa1d8b765b99543e8651f44",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 32676,
+      "frames": 229,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "d261e1fb7ab99d3dca9bcd53f3665fbbf519cd1c620898f6828a403321dd8a6c",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 1,
+        "maxExit": 5.735075458441533,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 90090,
+      "frames": 538,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "092a0c02d76c0f38bf19437cc6c4743d78a30ef71a865b42249260880aa5145f",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 32676,
+      "frames": 126,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "b6bc068af25079ac80e3c7e616a0817a7a52e0f468193d55c03c46af754d8644",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "wide",
+      "notation": "4d20",
+      "seed": 4,
+      "frames": 84,
+      "entered": 4,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "5b115841fde2afd845c5c947aa5e0226abfacde1522d1d182d46dd4fcf2c0173",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 2,
+        "maxExit": 45.0229230377098,
+        "finalClipped": 2,
+        "worstFinalClipPx": 43.98674385222478,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "wide",
+      "notation": "40d20",
+      "seed": 90090,
+      "frames": 319,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "823d78484f98ed9eaf7fad801f52e8c1cc6934a673ba40da8e0db83510fbe1a1",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 6,
+        "maxExit": 52.576241240624995,
+        "finalClipped": 3,
+        "worstFinalClipPx": 33.188411627947744,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "wide",
+      "notation": "40d20",
+      "seed": 32676,
+      "frames": 193,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "98c153d4aa7a38078cc1bc244175604b9252d1be5f4e2e451b27dd1c416187a7",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 5,
+        "maxExit": 52.37061659320909,
+        "finalClipped": 2,
+        "worstFinalClipPx": 16.633277514234237,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "wide",
+      "notation": "40d4",
+      "seed": 90090,
+      "frames": 431,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "29943e0fc825a1e6d14603e6afac217d9bb3d3284fc93ee57fa8ac654de1167b",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "wide",
+      "notation": "40d4",
+      "seed": 32676,
+      "frames": 219,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "4a89647809e79c5de36ea0e1800c750b873003ba546d306bdeeccfd979cb9bb6",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "medium",
+      "notation": "4d20",
+      "seed": 4,
+      "frames": 88,
+      "entered": 4,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "f763027683328d3fcbd587a7d1198d38a6a567795cf54bd98a6d663dd6ab7ddb",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 2,
+        "maxExit": 47.85175179851876,
+        "finalClipped": 2,
+        "worstFinalClipPx": 41.746466870153654,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 90090,
+      "frames": 198,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "ee25214d378844afa0e35be9613c357de646bc8a61e1279094b8e9692cccba2a",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 9,
+        "maxExit": 64.75188827000841,
+        "finalClipped": 3,
+        "worstFinalClipPx": 50.620868965145974,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 32676,
+      "frames": 273,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "1cf992c97ab586d9cce3bd5660e4de7fc7f32ed544dbcefd9016046fc5657288",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 6,
+        "maxExit": 137.897288362423,
+        "finalClipped": 2,
+        "worstFinalClipPx": 53.1629958442021,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "medium",
+      "notation": "40d4",
+      "seed": 90090,
+      "frames": 540,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "dda3fcc639c58d180caabbb890ed4417fa1ccc6a994217ae92fe50439332fec2",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "medium",
+      "notation": "40d4",
+      "seed": 32676,
+      "frames": 236,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "cd352762dba95871de4c30878ffc23a2a8bdb6fcad6ceec71163077c5a13bfae",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "4d20",
+      "seed": 4,
+      "frames": 58,
+      "entered": 4,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "fddbd726449b2bfa8520969036cb3e9b0bba1dee3a3d7d548d0e3de1f504ca3b",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 2,
+        "maxExit": 66.09498342457937,
+        "finalClipped": 2,
+        "worstFinalClipPx": 54.74347373486785,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 90090,
+      "frames": 238,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "0ee1bf7abe6e24665723972a77af8279ee8f7f216aa1d8b765b99543e8651f44",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 9,
+        "maxExit": 70.64370366179139,
+        "finalClipped": 4,
+        "worstFinalClipPx": 56.163568026171106,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 32676,
+      "frames": 229,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "d261e1fb7ab99d3dca9bcd53f3665fbbf519cd1c620898f6828a403321dd8a6c",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 6,
+        "maxExit": 67.46068734607513,
+        "finalClipped": 4,
+        "worstFinalClipPx": 36.696926314949565,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 90090,
+      "frames": 538,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "092a0c02d76c0f38bf19437cc6c4743d78a30ef71a865b42249260880aa5145f",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 32676,
+      "frames": 126,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 316,
+        "top": 0,
+        "width": 1124,
+        "height": 900
+      },
+      "hash": "b6bc068af25079ac80e3c7e616a0817a7a52e0f468193d55c03c46af754d8644",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "wide",
+      "notation": "4d20",
+      "seed": 4,
+      "frames": 84,
+      "entered": 4,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "5b115841fde2afd845c5c947aa5e0226abfacde1522d1d182d46dd4fcf2c0173",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "wide",
+      "notation": "40d20",
+      "seed": 90090,
+      "frames": 319,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "823d78484f98ed9eaf7fad801f52e8c1cc6934a673ba40da8e0db83510fbe1a1",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "wide",
+      "notation": "40d20",
+      "seed": 32676,
+      "frames": 193,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "98c153d4aa7a38078cc1bc244175604b9252d1be5f4e2e451b27dd1c416187a7",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "wide",
+      "notation": "40d4",
+      "seed": 90090,
+      "frames": 431,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "29943e0fc825a1e6d14603e6afac217d9bb3d3284fc93ee57fa8ac654de1167b",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "wide",
+      "notation": "40d4",
+      "seed": 32676,
+      "frames": 219,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "4a89647809e79c5de36ea0e1800c750b873003ba546d306bdeeccfd979cb9bb6",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "4d20",
+      "seed": 4,
+      "frames": 88,
+      "entered": 4,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "f763027683328d3fcbd587a7d1198d38a6a567795cf54bd98a6d663dd6ab7ddb",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 90090,
+      "frames": 198,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "ee25214d378844afa0e35be9613c357de646bc8a61e1279094b8e9692cccba2a",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 32676,
+      "frames": 273,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "1cf992c97ab586d9cce3bd5660e4de7fc7f32ed544dbcefd9016046fc5657288",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "40d4",
+      "seed": 90090,
+      "frames": 540,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "dda3fcc639c58d180caabbb890ed4417fa1ccc6a994217ae92fe50439332fec2",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "40d4",
+      "seed": 32676,
+      "frames": 236,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "cd352762dba95871de4c30878ffc23a2a8bdb6fcad6ceec71163077c5a13bfae",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "4d20",
+      "seed": 4,
+      "frames": 58,
+      "entered": 4,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "fddbd726449b2bfa8520969036cb3e9b0bba1dee3a3d7d548d0e3de1f504ca3b",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 90090,
+      "frames": 238,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "0ee1bf7abe6e24665723972a77af8279ee8f7f216aa1d8b765b99543e8651f44",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 32676,
+      "frames": 229,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "d261e1fb7ab99d3dca9bcd53f3665fbbf519cd1c620898f6828a403321dd8a6c",
+      "finalClipped": 0,
+      "baseline": {
+        "reexit": 0,
+        "maxExit": 0,
+        "finalClipped": 0,
+        "worstFinalClipPx": 0,
+        "filmIdentical": true
+      }
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 90090,
+      "frames": 538,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "092a0c02d76c0f38bf19437cc6c4743d78a30ef71a865b42249260880aa5145f",
+      "finalClipped": 0,
+      "baseline": null
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 32676,
+      "frames": 126,
+      "entered": 40,
+      "reexit": 0,
+      "maxExit": 0,
+      "landedClip": 0,
+      "maxLanded": 0,
+      "view": {
+        "left": 0,
+        "top": 56,
+        "width": 390,
+        "height": 603
+      },
+      "hash": "b6bc068af25079ac80e3c7e616a0817a7a52e0f468193d55c03c46af754d8644",
+      "finalClipped": 0,
+      "baseline": null
+    }
+  ],
+  "motionSamples": [
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 32676,
+      "maxFrameRetreat": 1.188408039355476,
+      "maxFrameTravel": 4.747279850609187,
+      "maxRetreatFrame": 0
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 32676,
+      "maxFrameRetreat": 1.1790948830232455,
+      "maxFrameTravel": 4.295231358145917,
+      "maxRetreatFrame": 0
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 32676,
+      "maxFrameRetreat": 1.3027606228788786,
+      "maxFrameTravel": 8.814978042513772,
+      "maxRetreatFrame": 0
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 32676,
+      "maxFrameRetreat": 1.3308467594210098,
+      "maxFrameTravel": 6.992354225866992,
+      "maxRetreatFrame": 0
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 32676,
+      "maxFrameRetreat": 1.109305886867322,
+      "maxFrameTravel": 3.7689937596127723,
+      "maxRetreatFrame": 0
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 32676,
+      "maxFrameRetreat": 1.1154160664702244,
+      "maxFrameTravel": 3.920979316446338,
+      "maxRetreatFrame": 0
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 32676,
+      "maxFrameRetreat": 1.0061169503241805,
+      "maxFrameTravel": 1.188148580775991,
+      "maxRetreatFrame": 1
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 32676,
+      "maxFrameRetreat": 1.0001026197116878,
+      "maxFrameTravel": 3.1165119380486916,
+      "maxRetreatFrame": 4
+    }
+  ],
+  "pointerScreenshots": [
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "wide",
+      "notation": "4d20",
+      "seed": 2582800666
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "4d20",
+      "seed": 328632551
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "4d20",
+      "seed": 2751422025
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 303383060
+    },
+    {
+      "players": 1,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 4019972049
+    },
+    {
+      "players": 1,
+      "device": "desktop",
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 2763178446
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "4d20",
+      "seed": 2403720456
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 1714261418
+    },
+    {
+      "players": 4,
+      "device": "desktop",
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 2795938674
+    },
+    {
+      "players": 4,
+      "device": "phone",
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 2265775129
+    }
+  ],
+  "heldClockCpuSamples": {
+    "before": [
+      {
+        "trial": 0,
+        "notation": "4d20",
+        "seed": 4,
+        "frames": 105,
+        "ms": 3.399999976158142
+      },
+      {
+        "trial": 0,
+        "notation": "40d20",
+        "seed": 32676,
+        "frames": 276,
+        "ms": 9.5
+      },
+      {
+        "trial": 0,
+        "notation": "40d4",
+        "seed": 32676,
+        "frames": 173,
+        "ms": 5.699999928474426
+      },
+      {
+        "trial": 1,
+        "notation": "4d20",
+        "seed": 4,
+        "frames": 105,
+        "ms": 1
+      },
+      {
+        "trial": 1,
+        "notation": "40d20",
+        "seed": 32676,
+        "frames": 276,
+        "ms": 5
+      },
+      {
+        "trial": 1,
+        "notation": "40d4",
+        "seed": 32676,
+        "frames": 173,
+        "ms": 3.200000047683716
+      },
+      {
+        "trial": 2,
+        "notation": "4d20",
+        "seed": 4,
+        "frames": 105,
+        "ms": 0.7999999523162842
+      },
+      {
+        "trial": 2,
+        "notation": "40d20",
+        "seed": 32676,
+        "frames": 276,
+        "ms": 4.599999904632568
+      },
+      {
+        "trial": 2,
+        "notation": "40d4",
+        "seed": 32676,
+        "frames": 173,
+        "ms": 2.899999976158142
+      },
+      {
+        "trial": 3,
+        "notation": "4d20",
+        "seed": 4,
+        "frames": 105,
+        "ms": 1
+      },
+      {
+        "trial": 3,
+        "notation": "40d20",
+        "seed": 32676,
+        "frames": 276,
+        "ms": 4.899999976158142
+      },
+      {
+        "trial": 3,
+        "notation": "40d4",
+        "seed": 32676,
+        "frames": 173,
+        "ms": 3.200000047683716
+      }
+    ],
+    "after": [
+      {
+        "trial": 0,
+        "notation": "4d20",
+        "seed": 4,
+        "frames": 105,
+        "ms": 4.300000071525574
+      },
+      {
+        "trial": 0,
+        "notation": "40d20",
+        "seed": 32676,
+        "frames": 276,
+        "ms": 17
+      },
+      {
+        "trial": 0,
+        "notation": "40d4",
+        "seed": 32676,
+        "frames": 173,
+        "ms": 6.399999976158142
+      },
+      {
+        "trial": 1,
+        "notation": "4d20",
+        "seed": 4,
+        "frames": 105,
+        "ms": 1.5
+      },
+      {
+        "trial": 1,
+        "notation": "40d20",
+        "seed": 32676,
+        "frames": 276,
+        "ms": 10.199999928474426
+      },
+      {
+        "trial": 1,
+        "notation": "40d4",
+        "seed": 32676,
+        "frames": 173,
+        "ms": 4.800000071525574
+      },
+      {
+        "trial": 2,
+        "notation": "4d20",
+        "seed": 4,
+        "frames": 105,
+        "ms": 1.0999999046325684
+      },
+      {
+        "trial": 2,
+        "notation": "40d20",
+        "seed": 32676,
+        "frames": 276,
+        "ms": 14.599999904632568
+      },
+      {
+        "trial": 2,
+        "notation": "40d4",
+        "seed": 32676,
+        "frames": 173,
+        "ms": 9.100000023841858
+      },
+      {
+        "trial": 3,
+        "notation": "4d20",
+        "seed": 4,
+        "frames": 105,
+        "ms": 1.6999999284744263
+      },
+      {
+        "trial": 3,
+        "notation": "40d20",
+        "seed": 32676,
+        "frames": 276,
+        "ms": 6.700000047683716
+      },
+      {
+        "trial": 3,
+        "notation": "40d4",
+        "seed": 32676,
+        "frames": 173,
+        "ms": 4.300000071525574
+      }
+    ]
+  }
+}

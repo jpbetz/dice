@@ -1785,13 +1785,13 @@ let placardRebakeDone = 0;
 let simulatedPlaceView = null;
 const MAT_FOG_MARGIN = 1.5;   // units of clear air past the corner
 let matFogFloor = 0;
-function updateMatFogFloor() {
+function matFogFloorFrom(eye) {
   // Measured from the EYE THE FRAMING PARKED AT to the furthest mat corner.
   // Straight-line distance, while three.js fogs on view DEPTH (-mvPosition.z),
   // and that inequality is deliberate: depth is never more than distance, so
   // every die on the mat is inside this floor by construction rather than by a
   // number that happens to work at the zooms someone checked.
-  const [px, py, pz] = camFogEye || CAM_EYE.full;
+  const [px, py, pz] = eye;
   let far = 0;
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
@@ -1817,7 +1817,10 @@ function updateMatFogFloor() {
       far = Math.max(far, Math.hypot(a.x - px, py - a.y, a.z - pz));
     }
   }
-  matFogFloor = far + MAT_FOG_MARGIN;
+  return far + MAT_FOG_MARGIN;
+}
+function updateMatFogFloor() {
+  matFogFloor = matFogFloorFrom(camFogEye || CAM_EYE.full);
 }
 
 // RE-TAKE THE FLOOR AND, IF IT MOVED, THE FOG WITH IT — the one shape both
@@ -11768,6 +11771,7 @@ function tick(dt, render = true, realtime = false) {
   }
   stepAmbience();       // the room bed's crackle lookahead — inert unless the bed is up
   stepCamera(dt);    // eased reframing; only ever armed under a quiet picture
+  keepEnteredDiceInFrame();
   stepCamPeek(dt);   // the hold-drag pivot's spring home
   // The peek offset wraps everything that reads the camera from here to the
   // end of the frame — chips and cards track the pivoted view — and is
@@ -15791,6 +15795,7 @@ window.__diceDebug = {
     };
   },
   setHeroMargin(m) { HERO_MARGIN = m; applyCameraFraming(false); return HERO_MARGIN; },
+  cameraEntryInfo() { return {...cameraEntryStats}; },
   framingInfo() {
     const v = new THREE.Vector3();
     // The die span: one world unit at the mat's centre along the camera's
@@ -32152,22 +32157,32 @@ function fitCameraTo(pts, target = camTarget, from = 1, refundOnFail = false, ma
   }
 }
 
-// Every die on the felt, as an AABB grown by a die half-extent so a die sits
-// INSIDE the frame rather than tangent to it. Null when the felt is empty.
-function diceFramingPoints(margin = 1.0) {
+// A conservative volume for every visible die, including those from earlier
+// rolls. Geometry bounds are cached by Three.js; the fit visits eight corners
+// per die only when framing changes. The radius is rotation-independent, so
+// an authored face orientation cannot choose a different camera destination.
+function diceFramingPoints(margin = 0.1) {
   const live = tableDice.filter((d) => d.body && d.mesh && d.mesh.visible !== false);
   if (!live.length) return null;
-  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-  for (const d of live) {
-    x0 = Math.min(x0, d.body.position.x - margin); x1 = Math.max(x1, d.body.position.x + margin);
-    z0 = Math.min(z0, d.body.position.z - margin); z1 = Math.max(z1, d.body.position.z + margin);
-  }
   const pts = [];
-  for (const x of [x0, x1]) for (const z of [z0, z1]) {
-    pts.push({ p: new THREE.Vector3(x, 0, z), mx: 0.02, my: 0.02 });
+  for (const d of live) {
+    const geometry = d.mesh.geometry;
+    if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+    const bound = geometry.boundingSphere;
+    const radius = Math.max(margin, bound.radius + bound.center.length() + 0.1);
+    const at = d.body.position;
+    for (const x of [-radius, radius]) for (const y of [-radius, radius]) for (const z of [-radius, radius]) {
+      pts.push({ p: new THREE.Vector3(at.x + x, at.y + y, at.z + z), mx: 0.02, my: 0.02 });
+    }
   }
-  pts.centre = new THREE.Vector3((x0 + x1) / 2, 0, (z0 + z1) / 2);
+  pts.centre = framingCentre(pts);
   return pts;
+}
+
+function framingCentre(pts) {
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const {p} of pts) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z); }
+  return new THREE.Vector3((x0 + x1) / 2, 0, (z0 + z1) / 2);
 }
 
 // The die the roll came down to, and a box around it that always fits. This is
@@ -32395,16 +32410,28 @@ function framingFor(orbit) {
   // A phone's full-width table has a finite usable scene. The old placed-room
   // branch refunded failed mat fits to the close preset and then skipped all
   // fallback, putting every die off screen. Fit the whole occupied ring plus
-  // all dice inside the scene remaining after reserved controls. This inspects no
-  // faces,
-  // scoring, or a deciding die. The desktop ladder keeps its existing policy.
+  // all dice inside the scene remaining after reserved controls. This inspects
+  // no faces, scoring, or a deciding die. Placed desktop tables use the same
+  // volume floor below, with their existing smaller composition margins.
   if (window.innerWidth <= 640) {
     const pts = fp.map(q => ({...q, mx:0.08, my:0.08}));
     const dp = diceFramingPoints(1.25);
     if (dp) pts.push(...dp.map(q => ({...q, mx:0.08, my:0.08})));
-    const target = fp.centre || home;
+    const target = dp ? framingCentre(pts) : (fp.centre || home);
     fitCameraTo(pts, target, 1, false, 12);
     const pose = {pos:camera.position.clone(), tgt:target.clone(), mode:'phone-table', orbit,
+      on:framingScore().on, span:spanPxNow(), matFits:matOnScreen()};
+    camOrbit = prev;
+    return pose;
+  }
+  // Seats describe where people sit, not the furthest place a die can land.
+  // Keep their composition, with a full die-volume floor on desktop too.
+  if (placeRows().length > 0) {
+    const dp = diceFramingPoints();
+    const pts = dp ? [...fp, ...dp] : fp;
+    const target = dp ? framingCentre(pts) : (fp.centre || home);
+    fitCameraTo(pts, target, 1, false, 12);
+    const pose = {pos:camera.position.clone(), tgt:target.clone(), mode:'table', orbit,
       on:framingScore().on, span:spanPxNow(), matFits:matOnScreen()};
     camOrbit = prev;
     return pose;
@@ -32637,13 +32664,20 @@ function applyFramingPose(pose, animate) {
   // floor and skip the rebuild, leaving `no-die-sits-in-fog`'s
   // `fogNear >= matFogFloor - 1e-9` short by the difference. Skipping both, or
   // doing both, keeps the pair consistent by construction.
+  const destinationEye = pose.pos.toArray();
+  const currentEye = camera.position.toArray();
+  // An inward ease starts farther away than its destination. Keep both ends
+  // clear until the eye arrives; using only the destination fogged the dice
+  // while the camera returned from an outward safety correction.
+  const fogEye = animate && matFogFloorFrom(currentEye) > matFogFloorFrom(destinationEye)
+    ? currentEye : destinationEye;
   const eyeMoved = !camFogEye
-    || Math.hypot(camFogEye[0] - pose.pos.x, camFogEye[1] - pose.pos.y, camFogEye[2] - pose.pos.z) > 0.1;
+    || Math.hypot(...camFogEye.map((v,i)=>v-fogEye[i])) > 0.1;
   if (eyeMoved) {
     // A PLAIN TRIPLE, NOT A Vector3 — updateMatFogFloor destructures it beside
     // CAM_EYE.full, which is a triple, and the two have to be the same shape or
     // the boot path and the framed path read different things.
-    camFogEye = [pose.pos.x, pose.pos.y, pose.pos.z];
+    camFogEye = fogEye;
     fogFloorSync();
   }
   if (!animate || prefersReducedMotion()) {
@@ -32660,6 +32694,66 @@ function applyFramingPose(pose, animate) {
   };
 }
 
+// A die that has entered the picture must not leave it while the arrival
+// camera eases. This render-only guard can retreat the current eye, never pan
+// or turn it. It uses cached geometry bounds and two frames of position-only
+// lookahead; high spawn points are ignored until their centre enters the view.
+let cameraEntryRoll = null;
+let cameraEntered = new WeakSet();
+let cameraEntryStats = {corrections:0, maxStep:0, maxRatio:1, entered:0};
+const entryPoint = new THREE.Vector3();
+const entryBack = new THREE.Vector3();
+function keepEnteredDiceInFrame() {
+  if (!currentRoll || currentRoll.done || towerOn()) return;
+  if (cameraEntryRoll !== currentRoll) {
+    cameraEntryRoll = currentRoll; cameraEntered = new WeakSet();
+    cameraEntryStats = {corrections:0, maxStep:0, maxRatio:1, entered:0};
+  }
+  const px = camera.projectionMatrix.elements[0], py = camera.projectionMatrix.elements[5];
+  const mx = 1 - 16 / view.width, my = 1 - 16 / view.height;
+  let retreat = 0;
+  for (const die of tableDice) {
+    if (!die.mesh?.visible) continue;
+    const mesh = die.mesh;
+    if (!cameraEntered.has(mesh)) {
+      entryPoint.copy(mesh.position).project(camera);
+      if (Math.abs(entryPoint.x) > 1 || Math.abs(entryPoint.y) > 1 || Math.abs(entryPoint.z) > 1) continue;
+      cameraEntered.add(mesh); cameraEntryStats.entered++;
+    }
+    const geometry = mesh.geometry;
+    if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius + geometry.boundingSphere.center.length() + 0.1;
+    const positions = [mesh.position];
+    if (die.rollId === currentRoll.rollId) {
+      const frames = currentRoll.keyframes[die.dieIndex];
+      const next = frames?.[Math.min(frames.length - 1, Math.ceil(currentRoll.time * 60) + 2)];
+      if (next) positions.push(next.pos);
+    }
+    for (const at of positions) for (const x of [-radius,radius]) for (const y of [-radius,radius]) for (const z of [-radius,radius]) {
+      entryPoint.set(at.x+x,at.y+y,at.z+z).applyMatrix4(camera.matrixWorldInverse);
+      const depth = -entryPoint.z;
+      retreat = Math.max(retreat, Math.abs(entryPoint.x)*px/mx-depth, Math.abs(entryPoint.y)*py/my-depth, camera.near-depth);
+    }
+  }
+  if (retreat <= 0) return;
+  cameraEntryStats.maxRatio = Math.max(cameraEntryStats.maxRatio, 1 + retreat / camera.position.distanceTo(camTarget));
+  camera.getWorldDirection(entryBack).multiplyScalar(-retreat-0.01);
+  camera.position.add(entryBack); aimCamera(camTarget);
+  // The retreat itself may admit another die. Register it in this painted
+  // frame, before the next ease step can put its centre outside again.
+  for (const die of tableDice) {
+    if (!die.mesh?.visible || cameraEntered.has(die.mesh)) continue;
+    entryPoint.copy(die.mesh.position).project(camera);
+    if (Math.abs(entryPoint.x) <= 1 && Math.abs(entryPoint.y) <= 1 && Math.abs(entryPoint.z) <= 1) {
+      cameraEntered.add(die.mesh); cameraEntryStats.entered++;
+    }
+  }
+  cameraEntryStats.corrections++; cameraEntryStats.maxStep = Math.max(cameraEntryStats.maxStep, retreat);
+  // Fog must follow an outward correction in this same painted frame.
+  const eye = camera.position.toArray();
+  if (matFogFloorFrom(eye) > matFogFloor) { camFogEye = eye; fogFloorSync(); }
+}
+
 // Advance the ease. Driven from tick() by the same dt the physics uses, so a
 // scenario that freezes the clock freezes the camera with it.
 function stepCamera(dt) {
@@ -32669,7 +32763,10 @@ function stepCamera(dt) {
   camera.position.lerpVectors(camEase.fromPos, camEase.toPos, k);
   camTarget.lerpVectors(camEase.fromTgt, camEase.toTgt, k);
   aimCamera(camTarget);
-  if (camEase.t >= 1) camEase = null;
+  if (camEase.t >= 1) {
+    camEase = null;
+    camFogEye = camera.position.toArray(); fogFloorSync();
+  }
 }
 
 // Re-frame after the felt's contents change OUTSIDE a roll (a clear, a per-roll
@@ -36520,13 +36617,17 @@ window.__diceDebug.workspaces = {
 window.__diceDebug.phoneFrame = () => {
   const v = new THREE.Vector3();
   return { view:{...view}, busy:!!(currentRoll && !currentRoll.done), dice:tableDice.filter(d=>d.mesh?.visible).map(d => {
-    const bounds = {left:Infinity,top:Infinity,right:-Infinity,bottom:-Infinity};
+    const bounds = {left:Infinity,top:Infinity,right:-Infinity,bottom:-Infinity,nearDepth:Infinity,farDepth:-Infinity};
     d.mesh.updateWorldMatrix(true,true);
     d.mesh.traverse(m => {
       if (!m.isMesh || !m.visible) return;
       const p=m.geometry.getAttribute('position'); if (!p) return;
       for(let i=0;i<p.count;i++) {
-        v.fromBufferAttribute(p,i).applyMatrix4(m.matrixWorld).project(camera);
+        v.fromBufferAttribute(p,i).applyMatrix4(m.matrixWorld);
+        const inv=camera.matrixWorldInverse.elements;
+        const depth=-(inv[2]*v.x+inv[6]*v.y+inv[10]*v.z+inv[14]);
+        bounds.nearDepth=Math.min(bounds.nearDepth,depth);bounds.farDepth=Math.max(bounds.farDepth,depth);
+        v.project(camera);
         const x=view.left+(v.x+1)*view.width/2, y=view.top+(1-v.y)*view.height/2;
         bounds.left=Math.min(bounds.left,x); bounds.right=Math.max(bounds.right,x);
         bounds.top=Math.min(bounds.top,y); bounds.bottom=Math.max(bounds.bottom,y);
