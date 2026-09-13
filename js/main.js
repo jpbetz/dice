@@ -5597,6 +5597,7 @@ let drainingRollQueue = false;
 // Missing physics is a viewer-local exception, never a different simulation.
 // After skipping any film, settled poses are unknown until a shared clear.
 const filmAvailability = {state:'ready', required:null, tainted:false};
+const unavailableRolls = new Set();
 let towerWaitTimer = null;
 let towerWaitEvent = null;
 let filmAvailabilityPanel = null;
@@ -5605,9 +5606,9 @@ function paintFilmAvailability() {
     const panel = document.createElement('aside');
     panel.id = 'film-availability'; panel.hidden = true;
     const status = document.createElement('p'); status.setAttribute('role','status');
-    const reload = document.createElement('button'); reload.type='button'; reload.textContent='Reload';
+    const reload = document.createElement('button'); reload.type='button'; reload.className='btn'; reload.textContent='Reload';
     reload.onclick=()=>location.reload();
-    const clear = document.createElement('button'); clear.type='button'; clear.textContent='Clear table for everyone';
+    const clear = document.createElement('button'); clear.type='button'; clear.className='btn'; clear.textContent='Clear table for everyone';
     clear.onclick=()=>requestClear('table');
     panel.append(status,reload,clear); document.getElementById('scene-container').append(panel);
     filmAvailabilityPanel=panel;
@@ -5616,8 +5617,8 @@ function paintFilmAvailability() {
   filmAvailabilityPanel.hidden=state==='ready';
   filmAvailabilityPanel.firstChild.textContent=state==='waiting'
     ? 'Loading tower. Rolls are waiting.'
-    : tainted ? '3D unavailable. Showing results. Clear the table to restore 3D once its tower is ready.'
-    : 'Tower could not load. Rolls will show results. Reload to retry, or choose another tower.';
+    : tainted && towerModelReady(required) ? 'Showing results without 3D. Clear the table for everyone to restore 3D.'
+    : 'Tower unavailable. Showing results without 3D. Reload to retry, or choose another tower.';
   filmAvailabilityPanel.children[1].hidden=state!=='results';
   filmAvailabilityPanel.children[2].hidden=!tainted || !towerModelReady(required);
   tableResults?.refresh();
@@ -5629,7 +5630,9 @@ function stopTowerWait() {
 }
 function towerBoundaryReady(event) {
   if(towerModelReady(event.id)) return true;
-  const failed=towerGlbUrls(TOWERS[event.id]).some(url=>towerGlbStatus(url)==='error');
+  const row=TOWERS[event.id];
+  const failed=!row || towerPhys(row).portalMismatch?.length
+    || towerGlbUrls(row).some(url=>towerGlbStatus(url)==='error');
   if(failed || event.expired || filmAvailability.tainted) {
     filmAvailability.state='results'; filmAvailability.required=event.id;
     paintFilmAvailability(); return true;
@@ -5667,6 +5670,7 @@ function showUnavailableRoll(roll) {
     dismissCeremonyUI();
   }
   filmAvailability.tainted=true; filmAvailability.state='results';
+  if(roll.rollId)unavailableRolls.add(roll.rollId);
   if(roll.rollId&&roll.throws)liveTurns.set(roll.rollId,roll);
   currentRoll={...roll,diceTypes:[...roll.dice],dice:[],unavailable:true,
     values:Array.isArray(roll.values)?roll.values:null,done:true,baking:false,
@@ -6356,7 +6360,7 @@ function finishSinkingNow() {
 function removeRollDice(rollId, instant = false) {
   const going = tableDice.filter((d) => d.rollId === rollId);
   if (!going.length) {
-    liveTurns.delete(rollId); prunePicks(); return false;
+    liveTurns.delete(rollId); unavailableRolls.delete(rollId); prunePicks(); return false;
   }
   tableDice = tableDice.filter((d) => d.rollId !== rollId);
   prunePicks();           // MECHANICS M1: a pick cannot outlive its die
@@ -7228,8 +7232,7 @@ function clearTable({shared = !netOnline} = {}) {
   silenceRollingVoices();
   roomDuck(false);
   ROLLING_OUT.length = 0;
-  stopTowerWait(); heldReplay.clear();
-  if(heldReplayTimer)clearTimeout(heldReplayTimer); heldReplayTimer=null;
+  stopTowerWait(); unavailableRolls.clear();
   idleReplay.clear(); stopIdleReplay(); clearDiePicks();
   if(shared)filmAvailability.tainted=false;
   // Re-establish the latest room configuration before the next SSE event.
@@ -11167,23 +11170,6 @@ let pendingTower = null;           // a change waiting on the roll boundary
 let towerRig = null;               // {id, group, bodies, cm} while socketed
 const TOWER_WALL_AWAY = -1000;     // where the back wall plane parks, socketed
 
-// SETTLED ROLLS WAITING FOR A TOWER TO ARRIVE (see towerReleaseHeldReplay).
-// Declared beside pendingTower because it is the same fact seen from the other
-// side: pendingTower is a tower with no model yet, heldReplay holds the rolls that
-// must not be rebuilt until it has one.
-//
-// A MAP, IN ARRIVAL ORDER, SINCE v2 (UX §7.63) — and it was a scalar for one
-// day longer than its sibling. resyncTable replays one open roll PER PLACE
-// since the felt started holding them (server.js arrivalSweep), and the idle
-// stash below it (idleReplay) became a Map in the same commit; this one did
-// not, so a late joiner whose room had a GLB tower socketed and two chairs'
-// dice standing stashed both rolls into one slot, the second over the first,
-// and rebuilt only the last of them when the model landed — silently and for
-// good, with its own log saying both were open (goal 8). Found by the v2
-// verification's probe (three of three runs), 2026-09-01.
-const heldReplay = new Map();      // rollId -> the roll stashed by replaySettledRoll
-let heldReplayTimer = null;        // the holdMaxMs escape hatch
-
 // THE TOWER LANTERN (Joe, 2026-08-11: "could we improve the lighting?").
 // The scene's key light is tuned for dice on the felt and hits the tower
 // flat-on, which is what was leaving three towers' worth of baked normal
@@ -12617,7 +12603,7 @@ function towerPortalsMatch(a, b) {
 
 // Which urls already have a preload wired to them. Without it, a row asked to
 // ensure twice while its files are in flight stacks a second .then on the same
-// promise and releases the held replay twice.
+// promise and repeats its boundary wakeup.
 const towerGlbWired = new Set();
 
 // ---------------------------------------------------------------------------
@@ -12640,27 +12626,22 @@ const towerGlbWired = new Set();
 // towerPortalsOf's warning already describes. Two conditions, one meaning.
 function towerModelReady(id) {
   const row = TOWERS[id];
-  if (!row) return true;
+  if (!row) return false;
   const urls = towerGlbUrls(row);
   // EVERY variant, not the active one. See towerGlbUrls: the flip between two
   // palettes of one model happens inside a venue change and cannot be allowed
   // to land back in the not-ready state, so the row is ready when the whole
   // set is.
-  return !urls.length || (!!towerPhys(row).portals && urls.every((u) => towerGlbStatus(u) === 'ready'));
+  return !urls.length || (!!towerPhys(row).portals && !towerPhys(row).portalMismatch?.length
+    && urls.every((u) => towerGlbStatus(u) === 'ready'));
 }
 
 // Kick the preload for a row that needs one. Idempotent at every level:
 // towerGlbEnsure returns the same promise for a url already in flight, and a
 // row that already holds portals never asks again.
 //
-// The .then is where the model becomes PART OF THE ENGINE — the portals are
-// frozen onto the row, which is what makes towerPortalsOf return them and
-// towerVolumes derive a core from them — and then both waiting parties are
-// released: the queued socket (tryFlushRoomChanges) and the held replay. In
-// that order, and the order is the hello-ordering law: the tower goes up, THEN
-// the roll is rebuilt against it. Reverse them and a returning player rebuilds
-// the table's pour as a throw, against walls 4.5 units shallower than
-// everyone else's.
+// Validated portals become part of the engine before waking the ordered
+// tower boundary. Readiness never releases a roll against a retained core.
 function towerModelEnsure(id) {
   const row = TOWERS[id];
   if (!row) return;
@@ -12693,97 +12674,8 @@ function towerModelEnsure(id) {
       }
       invalidateTable();
       tryFlushRoomChanges();
-      // A LATE FELT BEATS A NEVER FELT: released on failure too, so a broken
-      // model costs the returning player a tower, not the roll on the table.
-      //
-      // BUT NOT UNTIL EVERY VARIANT HAS SETTLED, and this is the one place the
-      // two-variant row genuinely changed the shape of a promise rather than
-      // just its plumbing. The flush is safe to call per variant because it is
-      // gated on towerModelReady, which stays false until the LAST file lands.
-      // The RELEASE is not gated on anything — it is the give-up path — so
-      // firing it when the first of two files arrived let the replay out while
-      // the tower was still un-socketed, and the returning player's pour was
-      // rebuilt as a THROW against the shallow mat. That is precisely the
-      // hello-ordering law this hold exists to keep, broken by the hold's own
-      // release. Caught by tower-hollowbole-replay on the first run.
-      //
-      // 'ready' OR 'error' — a variant that failed terminally has settled too,
-      // or one bad file out of two would hold the roll until the deadline.
-      const settled = urls.every((u) => {
-        const s = towerGlbStatus(u);
-        return s === 'ready' || s === 'error';
-      });
-      if (settled) towerReleaseHeldReplay();
+
     });
-  }
-}
-
-// ---------------------------------------------------------------------------
-// THE HELD REPLAY — the hello-ordering law, made safe against a load.
-//
-// tower-roll pins this law and has since the socket shipped: on a reload,
-// hello.settings sockets the tower and THEN the newest on-felt roll is replayed
-// through playRoll. Get the order wrong and the returning player rebuilds the
-// table's pour as a THROW, against walls 4.5 units shallower than everyone
-// else's — a divergence they cannot see and cannot fix.
-//
-// That law was free while every tower was a synchronous function call: both
-// happen inside one hello handler, in source order, and nothing could get
-// between them. A model that arrives over the network breaks it not by
-// reordering anything but by making the first step UNFINISHED when the second
-// runs. So the second step waits — explicitly, with a deadline — instead of
-// racing and losing quietly.
-//
-// It is a hold, not a drop: the roll is kept and replayed, either when the
-// model lands or when the wait runs out. The only thing that can be lost is
-// the tower, and losing the tower is already the documented outcome of a model
-// that never arrives.
-function towerReplayBlocked() {
-  // The one exception is the release itself (below): by then the waiting is
-  // over by decision, and re-asking this question would stash the same roll
-  // again and arm a second deadline, forever.
-  if (heldReplayReleasing || filmAvailability.state==='results') return false;
-  return !!pendingTower && !towerModelReady(pendingTower);
-}
-
-let heldReplayReleasing = false;
-
-// Fired from all three ends of the wait: the preload succeeding, the preload
-// failing terminally, and the deadline. Idempotent — with nothing held it just
-// clears the timer.
-function towerReleaseHeldReplay() {
-  if (heldReplayTimer) { clearTimeout(heldReplayTimer); heldReplayTimer = null; }
-  if (!heldReplay.size) return;
-  const rolls = [...heldReplay.values()];
-  heldReplay.clear();
-  // THE ORDER IS THE LAW. Socket first — this is the same tryFlushRoomChanges
-  // the roll boundary calls, and by now the gate it was failing has usually
-  // opened — and only then rebuild the rolls, so playRoll bakes against the
-  // interior the rest of the room is baking against. Socketed ONCE, before
-  // the whole burst: every held roll waited on the same model.
-  tryFlushRoomChanges();
-  if(pendingTower&&!towerModelReady(pendingTower)) {
-    filmAvailability.state='results'; filmAvailability.required=pendingTower;
-    paintFilmAvailability();
-  }
-  heldReplayReleasing = true;
-  try {
-    // In the order they were stashed, which is resyncTable's log order: each
-    // replay fast-forwards synchronously to its last keyframe before the next
-    // begins, so a later pool bakes against the earlier pools' frozen dice —
-    // the same felt every client that watched them arrive is looking at.
-    for (const roll of rolls) {
-      // FRESHNESS, NOT JUST ARRIVAL — drainIdleReplay's own rule, for the same
-      // reason: the hold can last holdMaxMs, and the room may have collected
-      // or cleared this roll in the meantime (hello or 'roll-collected' has
-      // written it into the state row, which is the truth). Rebuilding it then
-      // would stand dice back up that everyone else has put away.
-      const st = roll.rollId ? rollStates.get(roll.rollId) : null;
-      if (st && (st.cleared || st.collected)) continue;
-      replaySettledRoll(roll);
-    }
-  } finally {
-    heldReplayReleasing = false;
   }
 }
 
@@ -15125,14 +15017,14 @@ window.__diceDebug = {
     if (typeof patch.holdMaxMs === 'number') TOWERGLB.holdMaxMs = patch.holdMaxMs;
     return { retryMs: [...TOWERGLB.retryMs], holdMaxMs: TOWERGLB.holdMaxMs };
   },
-  // Are settled rolls being held for a model? (See towerReleaseHeldReplay.)
+  // Snapshot events waiting at the ordered tower barrier.
   // `held` is the oldest, `heldAll` every one in arrival order — the same
   // shape idleReplayInfo reports, because since v2 a snapshot can carry one
   // open roll per place and the hold has to carry all of them.
   filmAvailability() { return {...filmAvailability,waiting:!!towerWaitTimer}; },
   towerHeldReplay() {
-    const held = [...heldReplay.keys(),...rollQueue.filter(e=>e.kind==='snapshot').map(e=>e.roll.rollId)];
-    return { held: held.length ? held[0] : null, heldAll: held, armed: !!heldReplayTimer || !!towerWaitTimer };
+    const held = rollQueue.filter(e=>e.kind==='snapshot').map(e=>e.roll.rollId);
+    return { held: held.length ? held[0] : null, heldAll: held, armed: !!towerWaitTimer };
   },
   towerGhosts(on) {
     TOWERLAB.ghosts = on === undefined ? true : !!on;
@@ -25977,7 +25869,7 @@ function tryFlushZoom() {
 // The tower's half of the same rule (docs/TOWER.md: "Tower ON/OFF changes the
 // film and is a room setting with the queueZoom defer rule, never mid-roll").
 function queueTower(id) {
-  if(!TOWERS[id])return;
+  if(typeof id!=='string'||!id)return;
   pendingTower=id;
   towerModelEnsure(id);
   const last=rollQueue.at(-1);
@@ -29533,28 +29425,14 @@ function applyRoomSettings(settings) {
     if (settings.zoom !== (pendingZoom || currentZoom)) queueZoom(settings.zoom);
     renderZoomPicker();
   }
-  // The tower (docs/TOWER.md), exactly the zoom shape: an unknown id is
-  // ignored rather than defaulted, so a client that has not shipped a model
-  // yet keeps the table it has instead of silently dropping to 'none' and
-  // baking a different film from everyone else.
-  if (typeof settings.tower === 'string' && TOWERS[settings.tower]) {
+  // An older client may not know the room's required core. It uses the
+  // same ordered results-only boundary as an asset failure, never a guess.
+  if (typeof settings.tower === 'string' && settings.tower) {
     roomSettings.tower = settings.tower;
     if (settings.tower !== (pendingTower || currentTower)) queueTower(settings.tower);
     renderTowerPicker();
-  } else if (typeof settings.tower === 'string') {
-    // KEEPING THE TABLE IS THE RIGHT CALL, AND IT IS NOT FREE. Ignoring the id
-    // means this client goes on baking against whatever tower it has while the
-    // rest of the room bakes against one it has never heard of — the pour is a
-    // pure function of the CORE and the seed, so the films genuinely diverge
-    // and the replay hashes with them. Silently was the wrong part: a player
-    // watching different dice from everyone else deserves a reason to exist in
-    // the console, and whoever ships the next model deserves to see the id
-    // that a stale build could not resolve.
-    console.warn(`[tower] unknown tower id '${settings.tower}' — this build cannot `
-      + `socket it, keeping '${currentTower}'. Films on this client may diverge `
-      + `from other clients in this room.`);
   }
-  // The venue (GOALS goals 13–15), the tower's unknown-id rule: a client
+  // The venue (GOALS goals 13–15) is visual: a client
   // that has not shipped a venue keeps the table it has. Applied AFTER the
   // tower so a fantasy patch ({venue, tower:'none'} — selectVenue sends
   // both) has already queued the tower down before the stage rises.
@@ -34748,7 +34626,7 @@ function rollToLogEntry(roll) {
 // flight, or queued) — closing the audit's empty-felt-on-reload gap without
 // disturbing a live table.
 // SETTLED ROLLS WAITING OUT A LIVE PLAYBACK (see replaySettledRoll's second
-// guard). Same doctrine as the tower's heldReplay above it — a hold, not a
+// guard). The tower's ordered barrier uses the event FIFO; this is a hold, not a
 // drop — for the other reason a replay cannot run at the instant it arrives.
 // A Map, in arrival order, since v2 (UX §7.63): a snapshot can carry one
 // open roll PER PLACE, and a single slot would have kept only the last of
@@ -34802,13 +34680,15 @@ function deferIdleReplay(r) {
 
 function replaySettledRoll(r) {
   if (!r || !r.rollId) return;
+  const state=rollStates.get(r.rollId);
+  if(state?.cleared||state?.collected)return;
   const known = applyingQueuedEvent ? liveTurns.get(r.rollId) : latestTurnPayload(r.rollId, true);
   const newerTurn = r.throws && known && r.throws.used > known.throws.used;
   if (newerTurn && !applyingQueuedEvent && replayStageBusy()) {
     queueRollEvent({ kind: 'snapshot', roll: r });
     return;
   }
-  if (!newerTurn && tableDice.some(d => d.rollId === r.rollId)) return;
+  if (!newerTurn && (unavailableRolls.has(r.rollId) || tableDice.some(d => d.rollId === r.rollId))) return;
   if (!applyingQueuedEvent && rollQueue.some(e => e.roll.rollId === r.rollId)) return;
   // A LIVE PLAYBACK OUTRANKS A REPLAY — BUT OUTRANKING IS NOT CANCELLING.
   // This used to `return`, and the roll was gone for good: hello is a one-shot
@@ -34822,22 +34702,6 @@ function replaySettledRoll(r) {
   if (!applyingQueuedEvent && replayStageBusy()) {
     if(rollQueue.some(e=>e.kind==='tower'))queueRollEvent({kind:'snapshot',roll:r});
     else deferIdleReplay(r);
-    return;
-  }
-  // …and AFTER those, because a roll this client already holds must be dropped
-  // rather than held: stashing one would arm a deadline whose only effect is to
-  // run the same three guards again ten seconds later.
-  //
-  // The tower this room asked for has a model that has not arrived. Hold the
-  // roll rather than rebuild it against the wrong interior (see
-  // towerReplayBlocked). Classic towers never reach this — towerModelReady is
-  // true by definition for a row with no glbUrl — so the reload-ordering
-  // assertions in tower-roll take exactly the path they always did.
-  if (towerReplayBlocked()) {
-    heldReplay.set(r.rollId, r);   // one per open roll — a resync carries several (§7.63 v2)
-    if (!heldReplayTimer) {
-      heldReplayTimer = setTimeout(towerReleaseHeldReplay, TOWERGLB.holdMaxMs);
-    }
     return;
   }
   // The server stores latest values and the original seed, not rethrow film
@@ -36747,6 +36611,7 @@ function resultSeatRows() {
 }
 var resultSeatVisible;
 function renderCompleteResult(read,controls,id) {
+  const focusIndex=read.contains(document.activeElement)?document.activeElement.dataset.keepIndex:undefined;
   const entry=log.find(e=>e.rollId===id); read.replaceChildren();
   if(!entry) {
     read.textContent=id?'This completed result is no longer in recent history.':'';
@@ -36765,17 +36630,17 @@ function renderCompleteResult(read,controls,id) {
     const outcome=paragraph('','');
     if(!renderOutcomeRows(outcome,entry,true)) renderBreakdown(outcome,entry,false,true);
     paragraph('result-detail-context',resultState(entry));
-    if(filmAvailability.tainted && canThrowAgain(entry)) {
+    if(filmAvailability.tainted && (canThrowAgain(entry)||canBankTurn(entry))) {
       paragraph('result-detail-context','Select dice to keep.');
       const picks=document.createElement('div'); picks.className='result-keep-dice';
       entry.parts.forEach((part,i)=>{
-        const button=document.createElement('button');button.type='button';
+        const button=document.createElement('button');button.type='button';button.className='btn ghost';
         button.dataset.keepIndex=String(i);
         button.textContent=`${i+1}. ${part.type}: ${part.label}${part.counts?'':' (not counted)'}`;
         button.setAttribute('aria-pressed',String(PICK.ids.has(`${id}:${i}`)));
         button.onclick=()=>{
           const key=`${id}:${i}`;if(PICK.ids.has(key))PICK.ids.delete(key);else PICK.ids.add(key);
-          refreshTurnVerb(); renderCompleteResult(read,controls,id);
+          refreshTurnVerb();
         };
         picks.append(button);
       });read.append(picks);
@@ -36788,6 +36653,7 @@ function renderCompleteResult(read,controls,id) {
   });
   const cue=controls._acts.strip.querySelector('.cue-word');
   if(cue.textContent!=='Reroll')cue.textContent='Reroll';
+  if(focusIndex!==undefined)read.querySelector(`[data-keep-index="${focusIndex}"]`)?.focus({preventScroll:true});
 }
 tableResults=createPlayerResults({
   rows:resultSeatRows, symbol:faceSymbolSvg,

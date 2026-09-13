@@ -1,0 +1,1086 @@
+[
+  {
+    "name": "desktop-lone",
+    "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "availability": {
+      "state": "results",
+      "required": "wickroot",
+      "tainted": true,
+      "waiting": false
+    },
+    "rollId": "c001d61f-4860-4f20-b9c9-2ea965c66ea0",
+    "seed": 2583757155,
+    "values": [
+      2,
+      4,
+      2,
+      4,
+      6,
+      2
+    ],
+    "film": null,
+    "bodyCount": 0,
+    "rows": [
+      {
+        "id": "265c7ffc-9e8f-4ebb-8789-0f9514983774",
+        "name": "Alice",
+        "color": "#e2574c",
+        "mine": true,
+        "rolling": false,
+        "queued": 0,
+        "queuePosition": 0,
+        "result": {
+          "id": "c001d61f-4860-4f20-b9c9-2ea965c66ea0",
+          "hidden": false,
+          "faces": [
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "4",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "4",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "6",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            }
+          ],
+          "headline": "20",
+          "worded": false,
+          "modifier": 0,
+          "state": "Throw 1 of 3 · turn open",
+          "spoken": "20 · d6 2, d6 4, d6 2, d6 4, d6 6, d6 2 · Throw 1 of 3 · turn open"
+        },
+        "openable": true,
+        "clearable": true
+      }
+    ],
+    "detail": null,
+    "viewport": {
+      "width": 1440,
+      "height": 900,
+      "scrollWidth": 1440
+    },
+    "panel": {
+      "x": 328,
+      "y": 114,
+      "width": 480,
+      "height": 124,
+      "top": 114,
+      "right": 808,
+      "bottom": 238,
+      "left": 328
+    },
+    "reader": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "buttons": [],
+    "render": {
+      "frame": 31,
+      "scheduled": {
+        "frames": 12,
+        "wakes": 23,
+        "pending": false,
+        "dirty": false,
+        "visible": true
+      },
+      "calls": 2,
+      "triangles": 4608,
+      "lines": 0,
+      "points": 1024,
+      "passes": 1,
+      "post": false,
+      "pixelRatio": 1,
+      "programs": 2,
+      "geometries": 2,
+      "textures": 4
+    }
+  },
+  {
+    "name": "desktop-keep",
+    "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "availability": {
+      "state": "results",
+      "required": "wickroot",
+      "tainted": true,
+      "waiting": false
+    },
+    "rollId": "c001d61f-4860-4f20-b9c9-2ea965c66ea0",
+    "seed": 2583757155,
+    "values": [
+      2,
+      4,
+      2,
+      4,
+      6,
+      2
+    ],
+    "film": null,
+    "bodyCount": 0,
+    "rows": [
+      {
+        "id": "265c7ffc-9e8f-4ebb-8789-0f9514983774",
+        "name": "Alice",
+        "color": "#e2574c",
+        "mine": true,
+        "rolling": false,
+        "queued": 0,
+        "queuePosition": 0,
+        "result": {
+          "id": "c001d61f-4860-4f20-b9c9-2ea965c66ea0",
+          "hidden": false,
+          "faces": [
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "4",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "4",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "6",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            }
+          ],
+          "headline": "20",
+          "worded": false,
+          "modifier": 0,
+          "state": "Throw 1 of 3 · turn open",
+          "spoken": "20 · d6 2, d6 4, d6 2, d6 4, d6 6, d6 2 · Throw 1 of 3 · turn open"
+        },
+        "openable": true,
+        "clearable": true
+      }
+    ],
+    "detail": "c001d61f-4860-4f20-b9c9-2ea965c66ea0",
+    "viewport": {
+      "width": 1440,
+      "height": 900,
+      "scrollWidth": 1440
+    },
+    "panel": {
+      "x": 328,
+      "y": 114,
+      "width": 480,
+      "height": 124,
+      "top": 114,
+      "right": 808,
+      "bottom": 238,
+      "left": 328
+    },
+    "reader": {
+      "x": 948,
+      "y": 12,
+      "width": 480,
+      "height": 876,
+      "top": 12,
+      "right": 1428,
+      "bottom": 888,
+      "left": 948
+    },
+    "buttons": [
+      {
+        "text": "1. d6: 2",
+        "pressed": "true",
+        "rect": {
+          "x": 969,
+          "y": 306.359375,
+          "width": 75.84375,
+          "height": 44,
+          "top": 306.359375,
+          "right": 1044.84375,
+          "bottom": 350.359375,
+          "left": 969
+        }
+      },
+      {
+        "text": "2. d6: 4",
+        "pressed": "false",
+        "rect": {
+          "x": 1052.84375,
+          "y": 306.359375,
+          "width": 75.84375,
+          "height": 44,
+          "top": 306.359375,
+          "right": 1128.6875,
+          "bottom": 350.359375,
+          "left": 1052.84375
+        }
+      },
+      {
+        "text": "3. d6: 2",
+        "pressed": "false",
+        "rect": {
+          "x": 1136.6875,
+          "y": 306.359375,
+          "width": 75.84375,
+          "height": 44,
+          "top": 306.359375,
+          "right": 1212.53125,
+          "bottom": 350.359375,
+          "left": 1136.6875
+        }
+      },
+      {
+        "text": "4. d6: 4",
+        "pressed": "false",
+        "rect": {
+          "x": 1220.53125,
+          "y": 306.359375,
+          "width": 75.84375,
+          "height": 44,
+          "top": 306.359375,
+          "right": 1296.375,
+          "bottom": 350.359375,
+          "left": 1220.53125
+        }
+      },
+      {
+        "text": "5. d6: 6",
+        "pressed": "false",
+        "rect": {
+          "x": 1304.375,
+          "y": 306.359375,
+          "width": 75.84375,
+          "height": 44,
+          "top": 306.359375,
+          "right": 1380.21875,
+          "bottom": 350.359375,
+          "left": 1304.375
+        }
+      },
+      {
+        "text": "6. d6: 2",
+        "pressed": "false",
+        "rect": {
+          "x": 969,
+          "y": 358.359375,
+          "width": 75.84375,
+          "height": 44,
+          "top": 358.359375,
+          "right": 1044.84375,
+          "bottom": 402.359375,
+          "left": 969
+        }
+      }
+    ],
+    "render": {
+      "frame": 34,
+      "scheduled": {
+        "frames": 15,
+        "wakes": 33,
+        "pending": false,
+        "dirty": false,
+        "visible": true
+      },
+      "calls": 2,
+      "triangles": 4608,
+      "lines": 0,
+      "points": 1024,
+      "passes": 1,
+      "post": false,
+      "pixelRatio": 1,
+      "programs": 4,
+      "geometries": 3,
+      "textures": 4
+    }
+  },
+  {
+    "name": "phone-lone",
+    "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "availability": {
+      "state": "results",
+      "required": "wickroot",
+      "tainted": true,
+      "waiting": false
+    },
+    "rollId": "c001d61f-4860-4f20-b9c9-2ea965c66ea0",
+    "seed": 2583757155,
+    "values": [
+      2,
+      4,
+      2,
+      4,
+      6,
+      2
+    ],
+    "film": null,
+    "bodyCount": 0,
+    "rows": [
+      {
+        "id": "265c7ffc-9e8f-4ebb-8789-0f9514983774",
+        "name": "Alice",
+        "color": "#e2574c",
+        "mine": true,
+        "rolling": false,
+        "queued": 0,
+        "queuePosition": 0,
+        "result": {
+          "id": "c001d61f-4860-4f20-b9c9-2ea965c66ea0",
+          "hidden": false,
+          "faces": [
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "4",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "4",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "6",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            }
+          ],
+          "headline": "20",
+          "worded": false,
+          "modifier": 0,
+          "state": "Throw 1 of 3 · turn open",
+          "spoken": "20 · d6 2, d6 4, d6 2, d6 4, d6 6, d6 2 · Throw 1 of 3 · turn open"
+        },
+        "openable": true,
+        "clearable": true
+      }
+    ],
+    "detail": null,
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390
+    },
+    "panel": {
+      "x": 12,
+      "y": 160,
+      "width": 366,
+      "height": 143,
+      "top": 160,
+      "right": 378,
+      "bottom": 303,
+      "left": 12
+    },
+    "reader": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "buttons": [],
+    "render": {
+      "frame": 36,
+      "scheduled": {
+        "frames": 17,
+        "wakes": 42,
+        "pending": false,
+        "dirty": false,
+        "visible": true
+      },
+      "calls": 2,
+      "triangles": 4608,
+      "lines": 0,
+      "points": 1024,
+      "passes": 1,
+      "post": false,
+      "pixelRatio": 1,
+      "programs": 4,
+      "geometries": 3,
+      "textures": 4
+    }
+  },
+  {
+    "name": "phone-keep",
+    "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "availability": {
+      "state": "results",
+      "required": "wickroot",
+      "tainted": true,
+      "waiting": false
+    },
+    "rollId": "c001d61f-4860-4f20-b9c9-2ea965c66ea0",
+    "seed": 2583757155,
+    "values": [
+      2,
+      4,
+      2,
+      4,
+      6,
+      2
+    ],
+    "film": null,
+    "bodyCount": 0,
+    "rows": [
+      {
+        "id": "265c7ffc-9e8f-4ebb-8789-0f9514983774",
+        "name": "Alice",
+        "color": "#e2574c",
+        "mine": true,
+        "rolling": false,
+        "queued": 0,
+        "queuePosition": 0,
+        "result": {
+          "id": "c001d61f-4860-4f20-b9c9-2ea965c66ea0",
+          "hidden": false,
+          "faces": [
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "4",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "4",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "6",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            }
+          ],
+          "headline": "20",
+          "worded": false,
+          "modifier": 0,
+          "state": "Throw 1 of 3 · turn open",
+          "spoken": "20 · d6 2, d6 4, d6 2, d6 4, d6 6, d6 2 · Throw 1 of 3 · turn open"
+        },
+        "openable": true,
+        "clearable": true
+      }
+    ],
+    "detail": "c001d61f-4860-4f20-b9c9-2ea965c66ea0",
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390
+    },
+    "panel": {
+      "x": 12,
+      "y": 160,
+      "width": 366,
+      "height": 143,
+      "top": 160,
+      "right": 378,
+      "bottom": 303,
+      "left": 12
+    },
+    "reader": {
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "top": 0,
+      "right": 390,
+      "bottom": 844,
+      "left": 0
+    },
+    "buttons": [
+      {
+        "text": "1. d6: 2",
+        "pressed": "true",
+        "rect": {
+          "x": 20,
+          "y": 293.359375,
+          "width": 75.84375,
+          "height": 44,
+          "top": 293.359375,
+          "right": 95.84375,
+          "bottom": 337.359375,
+          "left": 20
+        }
+      },
+      {
+        "text": "2. d6: 4",
+        "pressed": "false",
+        "rect": {
+          "x": 103.84375,
+          "y": 293.359375,
+          "width": 75.84375,
+          "height": 44,
+          "top": 293.359375,
+          "right": 179.6875,
+          "bottom": 337.359375,
+          "left": 103.84375
+        }
+      },
+      {
+        "text": "3. d6: 2",
+        "pressed": "true",
+        "rect": {
+          "x": 187.6875,
+          "y": 293.359375,
+          "width": 75.84375,
+          "height": 44,
+          "top": 293.359375,
+          "right": 263.53125,
+          "bottom": 337.359375,
+          "left": 187.6875
+        }
+      },
+      {
+        "text": "4. d6: 4",
+        "pressed": "false",
+        "rect": {
+          "x": 271.53125,
+          "y": 293.359375,
+          "width": 75.84375,
+          "height": 44,
+          "top": 293.359375,
+          "right": 347.375,
+          "bottom": 337.359375,
+          "left": 271.53125
+        }
+      },
+      {
+        "text": "5. d6: 6",
+        "pressed": "false",
+        "rect": {
+          "x": 20,
+          "y": 345.359375,
+          "width": 75.84375,
+          "height": 44,
+          "top": 345.359375,
+          "right": 95.84375,
+          "bottom": 389.359375,
+          "left": 20
+        }
+      },
+      {
+        "text": "6. d6: 2",
+        "pressed": "false",
+        "rect": {
+          "x": 103.84375,
+          "y": 345.359375,
+          "width": 75.84375,
+          "height": 44,
+          "top": 345.359375,
+          "right": 179.6875,
+          "bottom": 389.359375,
+          "left": 103.84375
+        }
+      }
+    ],
+    "render": {
+      "frame": 38,
+      "scheduled": {
+        "frames": 19,
+        "wakes": 51,
+        "pending": false,
+        "dirty": false,
+        "visible": true
+      },
+      "calls": 2,
+      "triangles": 4608,
+      "lines": 0,
+      "points": 1024,
+      "passes": 1,
+      "post": false,
+      "pixelRatio": 1,
+      "programs": 4,
+      "geometries": 3,
+      "textures": 4
+    }
+  },
+  {
+    "name": "phone-rethrow",
+    "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "availability": {
+      "state": "results",
+      "required": "wickroot",
+      "tainted": true,
+      "waiting": false
+    },
+    "rollId": "c001d61f-4860-4f20-b9c9-2ea965c66ea0",
+    "seed": 2583757155,
+    "values": [
+      2,
+      1,
+      2,
+      5,
+      6,
+      1
+    ],
+    "film": null,
+    "bodyCount": 0,
+    "rows": [
+      {
+        "id": "265c7ffc-9e8f-4ebb-8789-0f9514983774",
+        "name": "Alice",
+        "color": "#e2574c",
+        "mine": true,
+        "rolling": false,
+        "queued": 0,
+        "queuePosition": 0,
+        "result": {
+          "id": "c001d61f-4860-4f20-b9c9-2ea965c66ea0",
+          "hidden": false,
+          "faces": [
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "1",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "5",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "6",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "1",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            }
+          ],
+          "headline": "17",
+          "worded": false,
+          "modifier": 0,
+          "state": "Throw 2 of 3 · turn open",
+          "spoken": "17 · d6 2, d6 1, d6 2, d6 5, d6 6, d6 1 · Throw 2 of 3 · turn open"
+        },
+        "openable": true,
+        "clearable": true
+      }
+    ],
+    "detail": null,
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390
+    },
+    "panel": {
+      "x": 12,
+      "y": 160,
+      "width": 366,
+      "height": 143,
+      "top": 160,
+      "right": 378,
+      "bottom": 303,
+      "left": 12
+    },
+    "reader": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "buttons": [],
+    "render": {
+      "frame": 40,
+      "scheduled": {
+        "frames": 21,
+        "wakes": 59,
+        "pending": false,
+        "dirty": false,
+        "visible": true
+      },
+      "calls": 2,
+      "triangles": 4608,
+      "lines": 0,
+      "points": 1024,
+      "passes": 1,
+      "post": false,
+      "pixelRatio": 1,
+      "programs": 4,
+      "geometries": 3,
+      "textures": 4
+    }
+  },
+  {
+    "name": "phone-four",
+    "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "availability": {
+      "state": "results",
+      "required": "wickroot",
+      "tainted": true,
+      "waiting": false
+    },
+    "rollId": "c945c2fd-95a3-4150-b81d-52b11be5aa5e",
+    "seed": 1305097091,
+    "values": [
+      4,
+      1
+    ],
+    "film": null,
+    "bodyCount": 0,
+    "rows": [
+      {
+        "id": "265c7ffc-9e8f-4ebb-8789-0f9514983774",
+        "name": "Alice",
+        "color": "#e2574c",
+        "mine": true,
+        "rolling": false,
+        "queued": 0,
+        "queuePosition": 0,
+        "result": {
+          "id": "c001d61f-4860-4f20-b9c9-2ea965c66ea0",
+          "hidden": false,
+          "faces": [
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "1",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "5",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "6",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "1",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            }
+          ],
+          "headline": "17",
+          "worded": false,
+          "modifier": 0,
+          "state": "Throw 2 of 3 · turn open",
+          "spoken": "17 · d6 2, d6 1, d6 2, d6 5, d6 6, d6 1 · Throw 2 of 3 · turn open"
+        },
+        "openable": true,
+        "clearable": true
+      },
+      {
+        "id": "ad9b92b8-02d5-42ec-a77c-c180f289acfe",
+        "name": "Bram",
+        "color": "#e08a2e",
+        "mine": false,
+        "rolling": false,
+        "queued": 0,
+        "queuePosition": 0,
+        "result": {
+          "id": "12515021-43e3-40bb-a588-30724f9dd298",
+          "hidden": false,
+          "faces": [
+            {
+              "type": "d6",
+              "label": "5",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "3",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            }
+          ],
+          "headline": "8",
+          "worded": false,
+          "modifier": 0,
+          "state": "2d6",
+          "spoken": "8 · d6 5, d6 3 · 2d6"
+        },
+        "openable": true,
+        "clearable": false
+      },
+      {
+        "id": "ab404d91-c582-4115-81a5-8def9902493f",
+        "name": "Cora",
+        "color": "#d9c534",
+        "mine": false,
+        "rolling": false,
+        "queued": 0,
+        "queuePosition": 0,
+        "result": {
+          "id": "8adc7e1a-a6da-4408-a197-77c24127f567",
+          "hidden": false,
+          "faces": [
+            {
+              "type": "d6",
+              "label": "4",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "2",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            }
+          ],
+          "headline": "6",
+          "worded": false,
+          "modifier": 0,
+          "state": "2d6",
+          "spoken": "6 · d6 4, d6 2 · 2d6"
+        },
+        "openable": true,
+        "clearable": false
+      },
+      {
+        "id": "ebe61dde-ead3-4937-aa68-c195c76a1159",
+        "name": "Dev",
+        "color": "#5fbe55",
+        "mine": false,
+        "rolling": false,
+        "queued": 0,
+        "queuePosition": 0,
+        "result": {
+          "id": "c945c2fd-95a3-4150-b81d-52b11be5aa5e",
+          "hidden": false,
+          "faces": [
+            {
+              "type": "d6",
+              "label": "4",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            },
+            {
+              "type": "d6",
+              "label": "1",
+              "symbol": null,
+              "counts": true,
+              "scored": false
+            }
+          ],
+          "headline": "5",
+          "worded": false,
+          "modifier": 0,
+          "state": "2d6",
+          "spoken": "5 · d6 4, d6 1 · 2d6"
+        },
+        "openable": true,
+        "clearable": false
+      }
+    ],
+    "detail": null,
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390
+    },
+    "panel": {
+      "x": 12,
+      "y": 244,
+      "width": 366,
+      "height": 143,
+      "top": 244,
+      "right": 378,
+      "bottom": 387,
+      "left": 12
+    },
+    "reader": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "buttons": [],
+    "render": {
+      "frame": 43,
+      "scheduled": {
+        "frames": 24,
+        "wakes": 76,
+        "pending": false,
+        "dirty": false,
+        "visible": true
+      },
+      "calls": 3,
+      "triangles": 4624,
+      "lines": 0,
+      "points": 1024,
+      "passes": 1,
+      "post": false,
+      "pixelRatio": 1,
+      "programs": 5,
+      "geometries": 4,
+      "textures": 5
+    }
+  }
+]

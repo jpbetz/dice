@@ -67,3 +67,7 @@ collisions. The viewer therefore must not silently resume physical playback
 on asset arrival. Recovery requires a ready core plus a shared empty-table
 boundary, or a reload whose actual reconstruction succeeds. This is a new
 local film-state mode, not a timer that retries the old wrong-core bake.
+
+The follow-up [unavailable-physics implementation](2026-09-13-film-unavailable.md)
+replaces that retained-core fallback with an ordered wait and explicit authored
+results. The limitation above describes the warm-only checkpoint.
