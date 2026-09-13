@@ -37,6 +37,20 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Ordinary throw simulation worker — R3 third slice (2026-09-13)
+
+The actual physics bake for non-turn throws runs in a reusable module worker.
+Authoritative values and face correction stay on the main thread; both
+execution paths share the extracted solver. Cancellation terminates abandoned
+work, while FIFO, deferred reveals and skips keep their existing semantics.
+Turns, towers and reconstruction remain inline pending the next bounded slice.
+
+Twelve seated desktop/phone films match the pre-worker build exactly. Normal
+40d20 input handling falls from 263–292 ms to 4.8–5.8 ms on the verified GPU
+rig; the solver still takes roughly the same time off-thread. No warmed
+stress sample records a main task over 50 ms. Cold rendering still stalls.
+See [boundary, measurements and limitations](redesign/2026-09-13-film-worker.md).
+
 ## Explicit per-table profile sharing (2026-09-13)
 
 Saved profiles start private. **Share at this table** selects individual

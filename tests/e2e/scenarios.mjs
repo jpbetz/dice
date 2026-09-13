@@ -33,6 +33,7 @@ import { tableControlScenarios } from './table-controls.mjs';
 import { firstPlayScenarios } from './first-play.mjs';
 import { workspaceScenarios } from './workspaces.mjs';
 import { rollHistoryScenarios } from './roll-history.mjs';
+import { filmWorkerScenarios } from "./film-worker.mjs";
 import { profileSharingScenarios } from './profile-sharing.mjs';
 import { assert, Table, freePort, startServer } from './harness.mjs';
 import { probeCelticWeave } from './placard-knot-probe.mjs';
@@ -775,6 +776,7 @@ export const scenarios = [
   ...workspaceScenarios,
   ...rollHistoryScenarios,
   ...profileSharingScenarios,
+  ...filmWorkerScenarios,
   {
     name: 'shared-roll',
     tags: ['smoke', 'roll', 'cuj8'],
@@ -24800,6 +24802,10 @@ export const scenarios = [
       await clickDie(0);
       await a.dbg('sim(2)');
       await a.eval(`document.querySelector('.throw-again').click()`);
+      // The click starts a request; an idle table before its event arrives
+      // has not finished the throw. Observe the server-authored budget first.
+      await a.waitFor(`window.__diceDebug.turnState(${JSON.stringify(rid)})?.throws?.used === 3`,
+        { desc: 'the last throw event arrives' });
       await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
         { desc: 'the last throw plays out', timeout: 30000 });
       await a.dbg('sim(240)');
