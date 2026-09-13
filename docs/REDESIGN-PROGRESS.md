@@ -14,8 +14,8 @@ priority order. R1, R2 and R3 remain open until their composed proofs pass.
 | Identity, personal dice and first rolls | Direct name editing, full gallery/favorites/practice, focused libraries, explicit starter kits and Quick dice are implemented. Owner controls through `c90fd42` are composed, including compact phone saved rolls, direct result Clear and returning from accepted rolls. All 14 composed flow/workspace/gallery checks pass. |
 | Table setup and saved homes | Named setup with actual Preview/Apply, durable public capture, retained-version comparison and deliberate Join are implemented. Four final actual-app home cases and five account cases pass, including restart, independent recovery, busy account replacement and real device-write failure before HTTP. |
 | People | Recipient-bound contacts/invitations, blocked-name pagination and opt-in expiring presence APIs are integrated. The People workspace and its independent private action journal are integrated; all seven composed actual-app cases pass, including restart, account replacement, offline acceptance and real device-write failure. Acceptance must preserve the current table and turn; joining is a separate explicit action. |
-| Shared surface and phone | Three reproducibly baked tables, full-width phone tray, persistent visible results and compact queued arrivals are implemented. Model size follows the shared table. The round physical envelope and full support/golden proofs are integrated as `e67da2c`/`04aafbf`; all six composed geometry proofs pass, with cost and collision profiling retained. Actual inspection found desktop stress dice cropped by the viewport, queued as a separate camera fix. |
-| Shared film ordering | Ordinary rolls and kept-die rethrows use the worker with complete ordered events. `f4e20c0` orders size changes between films, including held reveals and clear. Warm tower changes now use the ordered FIFO (`cf0e48a`); six composed ordering/readiness cases pass. Required-model failure handling and an honest unavailable-asset escape remain active work. |
+| Shared surface and phone | Three reproducibly baked tables, full-width phone tray, persistent visible results and compact queued arrivals are implemented. Model size follows the shared table. The round physical envelope and full support/golden proofs are integrated as `e67da2c`/`04aafbf`; all six composed geometry proofs pass, with cost and collision profiling retained. The camera correction is integrated: 60 seeded painted-hull cases have no re-exits or settled crops, and all 36 baseline complete films agree. Long history reserves current results, with an inspected usable short-window layout. |
+| Shared film ordering | Ordinary rolls and kept-die rethrows use the worker with complete ordered events. `f4e20c0` orders size changes between films, including held reveals and clear. Warm tower changes now use the ordered FIFO (`cf0e48a`); six composed ordering/readiness cases pass. Required-model failure now offers explicit authored results without fabricated physics. The tainted physical world resumes only after the core is ready and a deliberate authoritative table clear; ordered warm/cold/reveal/keep checks pass. |
 | Lightweight play | Compressed delivery, face-material consolidation, idle sleep, Battery saver and independent Instant results are implemented. Optional scenery and the model parser now load on demand (`70d623b`, `530982b`); all eight composed loading/cancel/failure cases pass. Towers and silent reconstruction retain the inline solver. |
 | Operations and release | File/Firestore adapters, configuration preflight, safe maintenance pause and a concrete account operating plan are implemented. No cloud resources or production traffic changed. Complete composed release checks, then verify the external staging/restore/deployment work described in ACCOUNT-OPERATIONS.md. |
 
@@ -25,10 +25,12 @@ cherry-picks are explicit and another ongoing session's edits survive.
 
 ## Remaining campaign work
 
-Finish and review tower failure handling and the camera fit, then exercise the complete guest/recovered return loop on the composed
-app. Preserve unfinished and private turns through each visible action. The
+The tower failure and camera slices are reviewed and integrated. Finish the
+complete guest/recovered return loop on the composed app and current Help. Preserve unfinished and private turns through each visible action. The
 final full sweep must reconcile superseded fixtures with current behavior;
 a passing old geometry proxy is not a substitute for supported, visible dice.
+The three baseline legacy venue/material failures retain their gates and
+are characterized separately from redesign regressions.
 
 All three table compositions and the compact arrival experiment are implemented.
 Simultaneous physical playback was not selected: ordered films retain shared
@@ -192,3 +194,39 @@ profile publication, the former Soul Deal first run, or square/camera constants.
 Actual defects are fixed separately; assertions are retained where they still
 prove the approved behavior. A late accepted roll response can also close a new
 visit to the same editor; that reproduced defect is under correction.
+
+
+## Camera, current input and release reconciliation
+
+At `90100fd`, all thirteen composed camera/film/roll-flow/sharing scenarios
+pass. This includes the full actual pointer camera journey, complete worker
+and two-viewer film parity, and the late-response protection in reopened tasks.
+`7a2cd82` verifies the current upright roller cue and the explicitly enabled
+optional wash against prepared films; both cases pass. `d02b54a` converts all
+four saved-home app journeys to hit-tested pointer/keyboard input, preserving
+held HTTP/IDB and identity-change races. All four pass, with refreshed inspected
+phone/desktop captures. Earlier descriptions of those home tests as actual-app
+proofs did not imply that their old DOM-click helper tested reachability; this
+commit adds that missing input proof.
+
+`ceea875` retains measured before/after physics carriers without changing any
+solver, audio threshold or nudge budget. `8e9ac6a` replaces retired-banner and
+full-height-phone fixtures with current upright attribution, opposite-view
+complete-film/body parity, eight-player actual scrolling, and usable developer
+sheet input. The three composition cases pass. `d6f1529` fixes actual long-history
+occlusion and short-window usability; its new history and unchanged draft
+workbench checks pass 2/2. These are targeted results, not a final full sweep.
+
+The older frozen `4d9518c` preflight finished **299/346**. Its failures were
+triaged rather than used as a release verdict. Reproduced runtime defects now
+fixed include last-category Undo, late-created modal containment, delayed
+accepted-response dismissal, dev-clock idle wakeup, late shared-library offers,
+required-model failure, camera crops and long-history occlusion. Other updates
+make selected kits/publication explicit, wait for real prepared worker films,
+and measure current visible result controls instead of retired geometry.
+The old draft workbench failure does not reproduce on the newer owner controls.
+
+A fresh immutable checkout at `d6f1529` now runs unit, fuzz and the complete
+release script. Its result is pending. Optional legacy venue/material gates
+remain intact; paired before/redesign evidence is recorded in the relevant
+characterizations. Cloud traffic and the owner's live preview remain untouched.

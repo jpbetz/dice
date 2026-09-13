@@ -85,8 +85,25 @@ shows who is rolling, who is next, and waiting players' previously displayed
 results. It keeps sequential films and adds no scene-space cost; simultaneous
 physical playback is not implemented. Model size now follows shared zoom;
 a [round collision envelope](ROUND-TABLE-PHYSICS.md) is now integrated with full
-model-support proof and a retained cost record. Actual stress views also exposed a desktop camera crop;
-R2 stays open until the supported dice fit the visible playing surface.
+model-support proof and a retained cost record. The subsequent
+[camera correction](TABLE-CAMERA.md) keeps all entered dice visible and all
+settled painted bounds inside the scene, using geometry rather than outcomes.
+Sixty seeded visibility cases pass and all 36 baseline complete films agree.
+The inspected close stress view makes an early outward camera movement to keep
+that read; its motion and playback-CPU costs are recorded.
+[History now reserves the result region](redesign/2026-09-13-history-read/README.md),
+including a usable short-window history. Full composed release and physical
+device observations remain open.
+
+**R1 durable workflows, 2026-09-13:** optional accounts, explicit private-library
+comparison/sync, saved-home capture/retained-version management and People
+contacts/invitations/presence now have local durable implementations and
+actual-app proofs. Recovery after a real process restart is exercised in a
+clean browser. Invitation acceptance preserves the current seat and unfinished
+turn; joining the named home is a separate visible action. Contact/location
+sharing stays explicit and presence expires. These are local service and
+browser proofs; production enablement and human observation remain separate.
+The composed success walk and current Help are being completed.
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable

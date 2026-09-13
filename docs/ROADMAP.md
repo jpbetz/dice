@@ -190,9 +190,9 @@ below includes the subsequently composed work; the full release remains open. Th
 
 | Key | Current priority | Next deliverable | Status |
 | --- | --- | --- | --- |
-| **R1** | People, personal dice, and persistent tables | Finish People contacts/inbox/presence; then composed help and return-journey proof | Navigation, gallery/practice, focused library, Quick dice, explicit sharing and recoverable private library implemented; saved-home management and social/presence APIs tested; People UI still in progress |
-| **R2** | Redesign the complete shared playing surface | Correct the inherited square collision area for round tables; composed desktop/phone play and actual-device observation | Three baked table designs, live setup preview, persistent group results, full-width phone turns and compact queued-arrival presentation implemented |
-| **R3** | Make lightweight play a core feature | Finish remaining optional-module loading; then device measurements | Compressed delivery, face atlases, exact worker films, zero idle rendering, Battery saver and Instant results implemented; desktop measurements recorded |
+| **R1** | People, personal dice, and persistent tables | Complete the composed guest/recovered return walk and current Help; observe newcomers and physical devices | Navigation, gallery/practice, focused library, explicit kits/sharing, recoverable private library, durable saved-home management and People contacts/inbox/presence are implemented and tested through actual input |
+| **R2** | Redesign the complete shared playing surface | Finish composed release checks and actual-device observation | Three baked designs, live preview, upright group results, phone turns and queued arrivals implemented; round physical support and outcome-independent camera visibility proved; long history now leaves current results readable |
+| **R3** | Make lightweight play a core feature | Measure ordinary/stress use on physical devices and verify external delivery configuration | Compressed delivery, face atlases, ordered worker films, optional scenery/parser loading, zero idle rendering, Battery saver and Instant results implemented; required-model failure has an explicit authored-results fallback |
 
 This is not a waterfall: R2's phone structure informs R1-A, and bounded R3
 improvements can proceed while R1 develops. Correctness fixes remain
