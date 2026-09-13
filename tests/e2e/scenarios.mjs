@@ -34,7 +34,8 @@ import { tableControlScenarios } from './table-controls.mjs';
 import { firstPlayScenarios } from './first-play.mjs';
 import { workspaceScenarios } from './workspaces.mjs';
 import { playerResultScenarios } from './player-results.mjs';
-import { rollFlowScenarios } from './roll-flows.mjs';
+import { rollFlowScenarios, tapControl } from './roll-flows.mjs';
+import { shareProfiles, typeControl, pickOfferedProfile } from './explicit-library-fixture.mjs';
 import { rollHistoryScenarios } from './roll-history.mjs';
 import { filmMutationScenarios } from "./film-mutations.mjs";
 import { filmSettingsScenarios } from './film-settings.mjs';
@@ -3665,12 +3666,16 @@ export const scenarios = [
     // rather than only for the ones whose name happens to match.
     async fn(ctx) {
       const dm = await ctx.newTable({ origin: '127.0.0.10', name: 'Walter' });
-      await dm.dbg('profiles.reset()');
+      await dm.dbg("setSystem('soul-deal')");
+      await dm.waitFor("window.__diceDebug.system === 'soul-deal'");
+      await dm.dbg("profiles.reset('soul-deal')");
       for (const nm of ['Rill', 'Bo']) {
         await dm.dbg(`profiles.create(${JSON.stringify(nm)}, 'soul-deal')`);
         await dm.dbg(`setGroups([{name: 'Strength', notation: '2d8', category: 'Attributes'}])`);
       }
       await dm.settle();
+      const offeredIds=(await dm.dbg('profiles.list')).filter(p=>['Rill','Bo','Nessa'].includes(p.name)).map(p=>p.id);
+      await shareProfiles(dm,offeredIds);
 
       // A RETURNING player: a stored name, no `&as=`. They join straight
       // through — that part is deliberate and stays — and are told.
@@ -3683,15 +3688,13 @@ export const scenarios = [
       await back.waitFor(
         `!document.getElementById('offer-banner').classList.contains('hidden')`,
         { desc: 'the table says it is holding characters' });
-      // A COUNT, not a hard-coded one: Walter holds the profile reset() dealt
-      // him as well as the two he made, and all three are genuinely on offer.
-      // Asserting "2" would be asserting how many characters he happens to
-      // have rather than that the banner counts them.
+      // Only the two deliberately shared profiles are offered. Walter's
+      // additional local Soul Deal profile remains private.
       assert.match(await back.eval(`document.getElementById('offer-banner').textContent`),
-        /\d+ characters are on offer/, 'and how many');
+        /2 characters are on offer/, 'and how many');
 
       // "Not now" is remembered for THIS room, so it does not nag all evening.
-      await back.eval(`document.getElementById('offer-dismiss').click()`);
+      await tapControl(back,'#offer-dismiss');
       assert.equal(await back.eval(
         `document.getElementById('offer-banner').classList.contains('hidden')`), true,
       'and it takes an answer');
@@ -3725,11 +3728,15 @@ export const scenarios = [
     // selection now; the deal happens once, at Join.
     async fn(ctx) {
       const dm = await ctx.newTable({ origin: '127.0.0.10', name: 'Walter' });
-      await dm.dbg('profiles.reset()');
+      await dm.dbg("setSystem('soul-deal')");
+      await dm.waitFor("window.__diceDebug.system === 'soul-deal'");
+      await dm.dbg("profiles.reset('soul-deal')");
       const v = await dm.dbg(`profiles.create('Bo', 'soul-deal')`);
       assert.equal(v.ok, true, `Walter builds Bo (${v.status})`);
       await dm.dbg(`setGroups([{name: 'Bravery', notation: '1d20', category: 'Attributes'}])`);
       await dm.settle();
+      const offeredIds=(await dm.dbg('profiles.list')).filter(p=>['Rill','Bo','Nessa'].includes(p.name)).map(p=>p.id);
+      await shareProfiles(dm,offeredIds);
 
       const p = await ctx.newTable({ origin: 'localhost', anon: true });
       assert.equal(await p.eval(`document.querySelector('#name-panel h2').textContent`), 'Join table',
@@ -3747,9 +3754,7 @@ export const scenarios = [
       await p.waitFor(`[...document.querySelectorAll('#seat-mine-rows .seat-foreign')]
         .some((el) => el.textContent.includes('Bo'))`,
       { desc: "Walter's character reaches the door" });
-      // BY NAME: Walter holds his dealt profile as well as Bo, and both are
-      // offered — which is the feature. Reaching for "the first foreign row"
-      // would be asserting how many characters he happens to have.
+      // Bo is shared by name. Walter's other local profile stays private.
       const foreign = await p.eval(`(() => {
         const b = [...document.querySelectorAll('#seat-mine-rows .seat-foreign')]
           .find((el) => el.textContent.includes('Bo'));
@@ -3763,11 +3768,8 @@ export const scenarios = [
       // RANDOM IS PRE-SELECTED with nothing of your own, and MINTS NOTHING
       // until you join.
       const before = (await p.dbg('profiles.list')).length;
-      // A FIRST-TIMER HAS NO CHARACTERS, whatever the store says. Boot deals
-      // every browser one so CUJ1 has dice immediately, but that profile is
-      // scaffolding — unnamed by anyone, unseen by its owner — and showing it
-      // at a join door under "Yours" introduces a stranger by a random name
-      // and then defaults to them.
+      // A genuinely fresh guest starts with product-provided Quick dice,
+      // not a previously kept character under Yours.
       assert.equal(await p.eval(
         `[...document.querySelectorAll('#seat-mine-rows .seat-group')]`
         + `.some((h) => h.textContent === 'Yours')`), false,
@@ -3775,20 +3777,17 @@ export const scenarios = [
       assert.equal(await p.eval(
         `document.querySelector('#seat-mine-rows .seat-deal').classList.contains('preselected')`),
       true, 'Random is the pre-selection instead');
-      await p.eval(`document.querySelector('#seat-mine-rows .seat-deal').click()`);
+      await tapControl(p,'#seat-mine-rows .seat-deal');
       assert.equal((await p.dbg('profiles.list')).length, before,
         'selecting Random mints nothing — browsing is not committing');
 
       // Taking WALTER'S copies it, once, at the join.
-      const clickBo = `[...document.querySelectorAll('#seat-mine-rows .seat-foreign')]
-        .find((el) => el.textContent.includes('Bo')).click()`;
-      await p.eval(clickBo);
-      await p.eval(clickBo);
+      await pickOfferedProfile(p,'Bo');
+      await pickOfferedProfile(p,'Bo');
       assert.equal((await p.dbg('profiles.list')).length, before,
         'and browsing his does not either, however many times');
-      await p.eval(`(() => { const i = document.getElementById('name-input');
-        i.value = 'Alice'; i.dispatchEvent(new Event('input')); })()`);
-      await p.eval(`document.getElementById('name-join').click()`);
+      await typeControl(p,'#name-input','Alice');
+      await tapControl(p,'#name-join');
       await p.waitOnline();
       const held = await p.dbg('profiles.active');
       assert.equal(held.name, 'Bo', "the copy is in hand");
@@ -3806,19 +3805,14 @@ export const scenarios = [
   {
     name: 'library-is-the-seats',
     tags: ['profiles', 'prepared-seat', 'cuj6', 'cuj7'],
-    // C17 — THE ORGANIZER PUSHES NOTHING. Joe, 2026-08-09: "I was imagining a
-    // simpler approach where all profiles are available for use when joining
-    // a table." Before this, the only way a table offered characters was
-    // Settings → Your data → Export/import… → Fill with my data → Apply to
-    // table: five gestures behind a YAML textarea, for the headline act of
-    // the whole preparation journey.
-    //
-    // Now a player's library rides the publish their rack already rode, and
-    // the table offers what the people at it are holding. This asserts the
-    // ABSENCE of the push: the organizer never opens Settings.
+    // A library entry deliberately shared with this table is offered at the
+    // door without exporting YAML or pushing a prepared table. Unshared local
+    // profiles stay private; choosing one offered entry copies only that entry.
     async fn(ctx) {
       const dm = await ctx.newTable({ origin: '127.0.0.10', name: 'Walter' });
-      await dm.dbg('profiles.reset()');
+      await dm.dbg("setSystem('soul-deal')");
+      await dm.waitFor("window.__diceDebug.system === 'soul-deal'");
+      await dm.dbg("profiles.reset('soul-deal')");
       // Three characters, built the way C16 made possible — in the picker,
       // never in the modal.
       for (const [nm, pool] of [['Rill', '3d6'], ['Bo', '2d8'], ['Nessa', '1d20']]) {
@@ -3827,9 +3821,13 @@ export const scenarios = [
         await dm.dbg(`setGroups([{name: 'Strength', notation: '${pool}', category: 'Attributes'}])`);
       }
       await dm.settle();
+      const offeredIds=(await dm.dbg('profiles.list')).filter(p=>['Rill','Bo','Nessa'].includes(p.name)).map(p=>p.id);
+      await shareProfiles(dm,offeredIds);
       assert.equal(await dm.eval(
         `document.getElementById('settings-modal').classList.contains('hidden')`), true,
-      'and Settings was never opened — no Apply to table, no YAML pane');
+      'the library task closes after explicit sharing');
+      assert.equal(await dm.eval("document.getElementById('portable-zone').classList.contains('hidden')"),true,
+        'sharing does not require opening the table-file controls');
 
       // A player who has never been here opens the link and is offered them.
       // ESTABLISH: this asserts a copy lands under its own name, which an
@@ -3846,11 +3844,10 @@ export const scenarios = [
 
       // …and taking one WORKS — a seat the picker offers but the door cannot
       // open would be worse than no offer at all.
-      await p.dbg(`chooseSeat('Bo')`);
+      await pickOfferedProfile(p,'Bo');
+      await typeControl(p,'#name-input','Bo');
+      await tapControl(p,'#name-join');
       await p.waitOnline();
-      await p.waitFor(`window.__diceDebug.seatPicker.verdict.canApply === true`,
-        { desc: 'the preview resolves against a LIVE library, not just a pushed setup' });
-      assert.equal((await p.dbg('applySeatImport()')).ok, true, 'and applies');
       const held = await p.dbg('profiles.active');
       assert.equal(held.name, 'Bo', "the player is holding Bo");
       assert.equal(held.pools, 1, 'with the pools Walter built for it');
