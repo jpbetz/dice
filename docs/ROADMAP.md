@@ -185,14 +185,14 @@ implements direct name editing and visual dice selection. The
 [compact table-controls slice](SHIPPED.md#compact-table-controls-and-setup-2026-09-13)
 adds shared setup while reducing the permanent controls above Roll. The
 [expanded dice workspace](SHIPPED.md#expanded-dice-workspace-2026-09-13)
-now gives opened browsing and previews their own space. The full
-first release remains open. These keys preserve the existing roadmap's numbering.
+now gives opened browsing and previews their own space. The execution summary
+below includes the subsequently composed work; the full release remains open. These keys preserve the existing roadmap's numbering.
 
 | Key | Current priority | Next deliverable | Status |
 | --- | --- | --- | --- |
-| **R1** | People, personal dice, and persistent tables | R1-A: desktop/phone destination layouts and control relocation map; then the local identity/gallery/table/Quick dice release, followed by recoverable kits, homes, and invitations | **Personal kit, compact setup and [focused library](SHIPPED.md#focused-library-workspace-2026-09-13) shipped; broader R1 open** |
-| **R2** | Redesign the complete shared playing surface | One excellent four-player composition and full-width phone layout, coordinated with R1's bottom tray; expand to three art directions after the first works | Direction adopted |
-| **R3** | Make lightweight play a core feature | Reproducible ordinary/stress baseline, production compression check, then compressed delivery where needed and dice-face material consolidation | Direction adopted |
+| **R1** | People, personal dice, and persistent tables | Finish saved-home management and People contacts/inbox/presence; then composed help and return-journey proof | Navigation, gallery/practice, focused library, Quick dice, explicit sharing and recoverable private library implemented; durable home and social APIs tested; service UI still in progress |
+| **R2** | Redesign the complete shared playing surface | Composed desktop/phone play and actual-device observation | Three baked table designs, live setup preview, persistent group results, full-width phone turns and compact queued-arrival presentation implemented |
+| **R3** | Make lightweight play a core feature | Battery saver, optional instant results and remaining optional-module loading; then device measurements | Compressed delivery, dice-face atlases, exact first/rethrow worker films and zero idle rendering implemented and measured on the verified desktop GPU |
 
 This is not a waterfall: R2's phone structure informs R1-A, and bounded R3
 improvements can proceed while R1 develops. Correctness fixes remain

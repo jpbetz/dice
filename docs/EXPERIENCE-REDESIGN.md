@@ -35,7 +35,7 @@ for its content and keep the return to the same live table clear.
 | Priority | Investment | First useful release | What follows |
 | --- | --- | --- | --- |
 | **1 — implementation started** | **People, personal dice, and persistent tables.** Three clear destinations: Tables, My dice & rolls, People. Direct identity editing, a visual dice collection, visible table setup, familiar first rolls, and an optional recoverable identity. | Direct name editing, a usable dice gallery with favorites and practice, named table controls, and Quick dice with explicitly chosen starter kits. | Durable table homes, identity recovery, synchronized libraries, friends, presence, and an invitation inbox. |
-| **2 — first composition implemented** | **The whole shared playing surface.** Compose recognizable tables and places for people; keep names and each player's latest visible result readable together. | One excellent multiplayer composition and a phone layout with a full-width table, bottom roll tray, and sheets for dice, people, and history. | Explore three complete designs: a worn tavern table with brass inlays, an illustrated navigation table, and a carved stone circle. Explore concurrent or grouped roll presentation. |
+| **2 — three compositions implemented** | **The whole shared playing surface.** Compose recognizable tables and places for people; keep names and each player's latest visible result readable together. | One excellent multiplayer composition and a phone layout with a full-width table, bottom roll tray, and sheets for dice, people, and history. | Explore three complete designs: a worn tavern table with brass inlays, an illustrated navigation table, and a carved stone circle. Explore concurrent or grouped roll presentation. |
 | **3 — measured engineering track** | **Lightweight play.** Reduce delivery, simulation, and rendering costs while retaining character and readable dice. | Verify production compression and establish a reproducible baseline; implement missing compressed delivery and reduce dice-face material draws. | Load optional features on demand, move heavy simulation into a worker, stop unnecessary rendering at rest, and develop an attractive Battery saver presentation with an optional instant result. |
 
 These are investment priorities, not a waterfall. Item (1)'s mobile shell
@@ -60,8 +60,11 @@ The [turn-worker follow-up](redesign/2026-09-13-film-turns.md) now retains
 complete ordered turn/reveal/collection events and moves rethrows off-thread,
 with 24 complete first/rethrow films matching the pre-worker baseline. Towers
 and silent reconstruction retain the shared inline bake. Physical devices,
-rendering startup, idle work and Battery saver remain open; no battery or
-faster-frame-rate claim is made.
+rendering startup and Battery saver remain open. The [on-demand render
+loop](redesign/2026-09-13-idle-render.md) now draws zero settled frames for
+Table and all three baked designs on desktop/phone emulation (previously
+60 fps), with audio continuing independently and all 24 films unchanged.
+No physical-device battery or active-frame-rate claim is made.
 
 **R2 first composition, 2026-09-13:** [player results](PLAYER-RESULTS.md) now
 keep upright names, crests and the group’s latest visible reads together. The

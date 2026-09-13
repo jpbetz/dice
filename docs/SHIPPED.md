@@ -8,6 +8,33 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## 2026-09-13 — Optional recoverable private library
+
+The account task creates a client-generated recovery key, requires explicit
+retention, and offers recovery without automatically adopting or uploading a
+library. Initial local/remote/merge comparison preserves competing originals;
+subsequent opted-in edits sync with durable operation receipts. Offline retries,
+account changes, late edits and shared-cookie races keep namespace ownership
+and private table-publication boundaries explicit. Five actual-app tests cover
+two browsers, restart, late edits during publication and IndexedDB handoff,
+service absence and competing guest versions. See
+[the protocol](PRIVATE-LIBRARY-PROTOCOL.md) and
+[desktop comparison](redesign/2026-09-13-account-comparison-desktop.png).
+
+This is local implementation with durable file storage and a Firestore adapter,
+not a deployed account-service claim. Saved-home capture/cold restoration and
+recipient-bound social APIs are implemented and tested; their full Tables and
+People interfaces remain queued work in the roadmap.
+
+## 2026-09-13 — Draw only when the table changes
+
+Settled Table, Copper Lantern, Navigation and Stone scenes now issue zero
+renderer frames on both inspected layouts, down from 60 fps. Async models,
+rolls, worker replies, reveals and input wake the picture; visible animated
+materials remain live. Audio schedules independently at rest. All 24 original
+first/rethrow films match. Full units and 23 targeted cases pass for the slice.
+[Measurements, images and limits](redesign/2026-09-13-idle-render.md).
+
 ## 2026-09-13 — Three complete table designs and real setup preview
 
 The Copper Lantern is a forge-baked oak-and-brass shared table with a solid
