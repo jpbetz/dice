@@ -1353,6 +1353,13 @@ inertness and focus containment, with the close and Apply controls outside
 one content scroller. Changing viewport width updates modality. Closing
 returns focus to the opener and never tidies an ongoing turn.
 
+**Sizing guidance, clarified by Joe after this pass:** economize the root UI
+that stays on display. Opened tasks can occupy generous panels or full-screen
+and near-full-screen dialogs. The dimensions above describe this release;
+they do not cap future dice browsing, appearance editing, or library views.
+Assess persistent clutter and focused task usability separately, with a clear
+return to the same live table.
+
 The [shipped record](SHIPPED.md#compact-table-controls-and-setup-2026-09-13)
 has measurements, desktop/phone proof and scope limits. R1-A's wider
 navigation and R2's full-width phone scene are still open.
