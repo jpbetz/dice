@@ -1,0 +1,1706 @@
+[
+  {
+    "device": "desktop",
+    "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)",
+    "initial": {
+      "totals": {
+        "requests": 60,
+        "encoded": 1547562,
+        "decoded": 5142401,
+        "transfer": 1565562
+      },
+      "optional": [
+        {
+          "path": "/js/faelife.js",
+          "encoded": 10305,
+          "decoded": 25081,
+          "transfer": 10605,
+          "duration": 36.10000002384186
+        },
+        {
+          "path": "/js/fae-lab.js",
+          "encoded": 25687,
+          "decoded": 70574,
+          "transfer": 25987,
+          "duration": 36
+        }
+      ],
+      "modules": [
+        {
+          "path": "/js/report.js",
+          "encoded": 3313,
+          "decoded": 7422,
+          "transfer": 3613,
+          "duration": 6.200000047683716
+        },
+        {
+          "path": "/js/main.js",
+          "encoded": 623256,
+          "decoded": 1874773,
+          "transfer": 623556,
+          "duration": 10.600000023841858
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "encoded": 76922,
+          "decoded": 346256,
+          "transfer": 77222,
+          "duration": 13.100000023841858
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "encoded": 255043,
+          "decoded": 1272972,
+          "transfer": 255343,
+          "duration": 23.100000023841858
+        },
+        {
+          "path": "/js/film-bake.js",
+          "encoded": 15523,
+          "decoded": 40656,
+          "transfer": 15823,
+          "duration": 9.399999976158142
+        },
+        {
+          "path": "/js/film-client.js",
+          "encoded": 1310,
+          "decoded": 3440,
+          "transfer": 1610,
+          "duration": 9.600000023841858
+        },
+        {
+          "path": "/js/film-wire.js",
+          "encoded": 4646,
+          "decoded": 12753,
+          "transfer": 4946,
+          "duration": 9.700000047683716
+        },
+        {
+          "path": "/js/dice.js",
+          "encoded": 24145,
+          "decoded": 67984,
+          "transfer": 24445,
+          "duration": 13.299999952316284
+        },
+        {
+          "path": "/js/diceart.js",
+          "encoded": 3932,
+          "decoded": 8692,
+          "transfer": 4232,
+          "duration": 14
+        },
+        {
+          "path": "/js/net.js",
+          "encoded": 15274,
+          "decoded": 42497,
+          "transfer": 15574,
+          "duration": 15.899999976158142
+        },
+        {
+          "path": "/js/tables.js",
+          "encoded": 5400,
+          "decoded": 12062,
+          "transfer": 5700,
+          "duration": 16.700000047683716
+        },
+        {
+          "path": "/js/meanings.js",
+          "encoded": 13063,
+          "decoded": 34150,
+          "transfer": 13363,
+          "duration": 18
+        },
+        {
+          "path": "/js/rollspec.js",
+          "encoded": 8695,
+          "decoded": 22252,
+          "transfer": 8995,
+          "duration": 18.299999952316284
+        },
+        {
+          "path": "/js/places.js",
+          "encoded": 22870,
+          "decoded": 58875,
+          "transfer": 23170,
+          "duration": 20.200000047683716
+        },
+        {
+          "path": "/js/demo.js",
+          "encoded": 4587,
+          "decoded": 9945,
+          "transfer": 4887,
+          "duration": 20.5
+        },
+        {
+          "path": "/js/placard.js",
+          "encoded": 36034,
+          "decoded": 99748,
+          "transfer": 36334,
+          "duration": 23.5
+        },
+        {
+          "path": "/js/odds.js",
+          "encoded": 17331,
+          "decoded": 45932,
+          "transfer": 17631,
+          "duration": 23.199999928474426
+        },
+        {
+          "path": "/js/seed.js",
+          "encoded": 5961,
+          "decoded": 13564,
+          "transfer": 6261,
+          "duration": 23.899999976158142
+        },
+        {
+          "path": "/js/notation.js",
+          "encoded": 17222,
+          "decoded": 49080,
+          "transfer": 17522,
+          "duration": 23.600000023841858
+        },
+        {
+          "path": "/js/firstplay.js",
+          "encoded": 2068,
+          "decoded": 5273,
+          "transfer": 2368,
+          "duration": 25.899999976158142
+        },
+        {
+          "path": "/js/table-designs.js",
+          "encoded": 1328,
+          "decoded": 3077,
+          "transfer": 1628,
+          "duration": 25.899999976158142
+        },
+        {
+          "path": "/js/workspaces.js",
+          "encoded": 3697,
+          "decoded": 10761,
+          "transfer": 3997,
+          "duration": 25.899999976158142
+        },
+        {
+          "path": "/js/library-document.js",
+          "encoded": 2419,
+          "decoded": 6795,
+          "transfer": 2719,
+          "duration": 25.899999976158142
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "encoded": 584,
+          "decoded": 1211,
+          "transfer": 884,
+          "duration": 27.59999990463257
+        },
+        {
+          "path": "/js/playerresults.js",
+          "encoded": 3236,
+          "decoded": 8697,
+          "transfer": 3536,
+          "duration": 28.09999990463257
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "encoded": 695,
+          "decoded": 1283,
+          "transfer": 995,
+          "duration": 28.199999928474426
+        },
+        {
+          "path": "/js/stability.js",
+          "encoded": 3576,
+          "decoded": 8151,
+          "transfer": 3876,
+          "duration": 28.199999928474426
+        },
+        {
+          "path": "/js/schema.js",
+          "encoded": 4728,
+          "decoded": 10888,
+          "transfer": 5028,
+          "duration": 28.399999976158142
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "encoded": 1117,
+          "decoded": 2439,
+          "transfer": 1417,
+          "duration": 30.09999990463257
+        },
+        {
+          "path": "/js/portable.js",
+          "encoded": 14544,
+          "decoded": 40470,
+          "transfer": 14844,
+          "duration": 30.799999952316284
+        },
+        {
+          "path": "/js/profiles.js",
+          "encoded": 10493,
+          "decoded": 28332,
+          "transfer": 10793,
+          "duration": 30.899999976158142
+        },
+        {
+          "path": "/js/particles.js",
+          "encoded": 4717,
+          "decoded": 14318,
+          "transfer": 5017,
+          "duration": 31
+        },
+        {
+          "path": "/js/themes.js",
+          "encoded": 7801,
+          "decoded": 17363,
+          "transfer": 8101,
+          "duration": 31.40000009536743
+        },
+        {
+          "path": "/js/decals.js",
+          "encoded": 7646,
+          "decoded": 21108,
+          "transfer": 7946,
+          "duration": 33.300000071525574
+        },
+        {
+          "path": "/js/dielights.js",
+          "encoded": 2245,
+          "decoded": 4773,
+          "transfer": 2545,
+          "duration": 33.10000002384186
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "encoded": 684,
+          "decoded": 1396,
+          "transfer": 984,
+          "duration": 33.300000071525574
+        },
+        {
+          "path": "/js/towerids.js",
+          "encoded": 625,
+          "decoded": 625,
+          "transfer": 925,
+          "duration": 33.300000071525574
+        },
+        {
+          "path": "/js/post.js",
+          "encoded": 6683,
+          "decoded": 17377,
+          "transfer": 6983,
+          "duration": 33.300000071525574
+        },
+        {
+          "path": "/js/motes.js",
+          "encoded": 3130,
+          "decoded": 6716,
+          "transfer": 3430,
+          "duration": 35.60000002384186
+        },
+        {
+          "path": "/js/towerglb.js",
+          "encoded": 7535,
+          "decoded": 17418,
+          "transfer": 7835,
+          "duration": 35.700000047683716
+        },
+        {
+          "path": "/js/faelife.js",
+          "encoded": 10305,
+          "decoded": 25081,
+          "transfer": 10605,
+          "duration": 36.10000002384186
+        },
+        {
+          "path": "/js/fae-lab.js",
+          "encoded": 25687,
+          "decoded": 70574,
+          "transfer": 25987,
+          "duration": 36
+        },
+        {
+          "path": "/js/voices.js",
+          "encoded": 20876,
+          "decoded": 52340,
+          "transfer": 21176,
+          "duration": 37.700000047683716
+        },
+        {
+          "path": "/js/tunables.js",
+          "encoded": 13938,
+          "decoded": 41752,
+          "transfer": 14238,
+          "duration": 38.10000002384186
+        },
+        {
+          "path": "/js/tune.js",
+          "encoded": 45850,
+          "decoded": 129925,
+          "transfer": 46150,
+          "duration": 38.39999997615814
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "encoded": 5471,
+          "decoded": 16025,
+          "transfer": 5771,
+          "duration": 15.100000023841858
+        },
+        {
+          "path": "/js/placard-design.js",
+          "encoded": 1701,
+          "decoded": 3634,
+          "transfer": 2001,
+          "duration": 14.700000047683716
+        },
+        {
+          "path": "/vendor/GLTFLoader.js",
+          "encoded": 24361,
+          "decoded": 109259,
+          "transfer": 24661,
+          "duration": 3.200000047683716
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "encoded": 2405,
+          "decoded": 5825,
+          "transfer": 2705,
+          "duration": 1
+        },
+        {
+          "path": "/js/yaml.js",
+          "encoded": 9990,
+          "decoded": 30691,
+          "transfer": 10290,
+          "duration": 0.7999999523162842
+        },
+        {
+          "path": "/vendor/BufferGeometryUtils.js",
+          "encoded": 7390,
+          "decoded": 32292,
+          "transfer": 7690,
+          "duration": 1.0999999046325684
+        }
+      ],
+      "resources": [
+        {
+          "path": "/js/report.js",
+          "encoded": 3313,
+          "decoded": 7422,
+          "transfer": 3613,
+          "duration": 6.200000047683716
+        },
+        {
+          "path": "/css/workspaces.css",
+          "encoded": 2469,
+          "decoded": 9001,
+          "transfer": 2769,
+          "duration": 3
+        },
+        {
+          "path": "/css/firstplay.css",
+          "encoded": 745,
+          "decoded": 1865,
+          "transfer": 1045,
+          "duration": 2.8000000715255737
+        },
+        {
+          "path": "/css/style.css",
+          "encoded": 107062,
+          "decoded": 333481,
+          "transfer": 107362,
+          "duration": 5.600000023841858
+        },
+        {
+          "path": "/css/playerresults.css",
+          "encoded": 1911,
+          "decoded": 5809,
+          "transfer": 2211,
+          "duration": 4.600000023841858
+        },
+        {
+          "path": "/js/main.js",
+          "encoded": 623256,
+          "decoded": 1874773,
+          "transfer": 623556,
+          "duration": 10.600000023841858
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "encoded": 76922,
+          "decoded": 346256,
+          "transfer": 77222,
+          "duration": 13.100000023841858
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "encoded": 255043,
+          "decoded": 1272972,
+          "transfer": 255343,
+          "duration": 23.100000023841858
+        },
+        {
+          "path": "/js/film-bake.js",
+          "encoded": 15523,
+          "decoded": 40656,
+          "transfer": 15823,
+          "duration": 9.399999976158142
+        },
+        {
+          "path": "/js/film-client.js",
+          "encoded": 1310,
+          "decoded": 3440,
+          "transfer": 1610,
+          "duration": 9.600000023841858
+        },
+        {
+          "path": "/js/film-wire.js",
+          "encoded": 4646,
+          "decoded": 12753,
+          "transfer": 4946,
+          "duration": 9.700000047683716
+        },
+        {
+          "path": "/js/dice.js",
+          "encoded": 24145,
+          "decoded": 67984,
+          "transfer": 24445,
+          "duration": 13.299999952316284
+        },
+        {
+          "path": "/js/diceart.js",
+          "encoded": 3932,
+          "decoded": 8692,
+          "transfer": 4232,
+          "duration": 14
+        },
+        {
+          "path": "/js/net.js",
+          "encoded": 15274,
+          "decoded": 42497,
+          "transfer": 15574,
+          "duration": 15.899999976158142
+        },
+        {
+          "path": "/js/tables.js",
+          "encoded": 5400,
+          "decoded": 12062,
+          "transfer": 5700,
+          "duration": 16.700000047683716
+        },
+        {
+          "path": "/js/meanings.js",
+          "encoded": 13063,
+          "decoded": 34150,
+          "transfer": 13363,
+          "duration": 18
+        },
+        {
+          "path": "/js/rollspec.js",
+          "encoded": 8695,
+          "decoded": 22252,
+          "transfer": 8995,
+          "duration": 18.299999952316284
+        },
+        {
+          "path": "/js/places.js",
+          "encoded": 22870,
+          "decoded": 58875,
+          "transfer": 23170,
+          "duration": 20.200000047683716
+        },
+        {
+          "path": "/js/demo.js",
+          "encoded": 4587,
+          "decoded": 9945,
+          "transfer": 4887,
+          "duration": 20.5
+        },
+        {
+          "path": "/js/placard.js",
+          "encoded": 36034,
+          "decoded": 99748,
+          "transfer": 36334,
+          "duration": 23.5
+        },
+        {
+          "path": "/js/odds.js",
+          "encoded": 17331,
+          "decoded": 45932,
+          "transfer": 17631,
+          "duration": 23.199999928474426
+        },
+        {
+          "path": "/js/seed.js",
+          "encoded": 5961,
+          "decoded": 13564,
+          "transfer": 6261,
+          "duration": 23.899999976158142
+        },
+        {
+          "path": "/js/notation.js",
+          "encoded": 17222,
+          "decoded": 49080,
+          "transfer": 17522,
+          "duration": 23.600000023841858
+        },
+        {
+          "path": "/js/firstplay.js",
+          "encoded": 2068,
+          "decoded": 5273,
+          "transfer": 2368,
+          "duration": 25.899999976158142
+        },
+        {
+          "path": "/js/table-designs.js",
+          "encoded": 1328,
+          "decoded": 3077,
+          "transfer": 1628,
+          "duration": 25.899999976158142
+        },
+        {
+          "path": "/js/workspaces.js",
+          "encoded": 3697,
+          "decoded": 10761,
+          "transfer": 3997,
+          "duration": 25.899999976158142
+        },
+        {
+          "path": "/js/library-document.js",
+          "encoded": 2419,
+          "decoded": 6795,
+          "transfer": 2719,
+          "duration": 25.899999976158142
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "encoded": 584,
+          "decoded": 1211,
+          "transfer": 884,
+          "duration": 27.59999990463257
+        },
+        {
+          "path": "/js/playerresults.js",
+          "encoded": 3236,
+          "decoded": 8697,
+          "transfer": 3536,
+          "duration": 28.09999990463257
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "encoded": 695,
+          "decoded": 1283,
+          "transfer": 995,
+          "duration": 28.199999928474426
+        },
+        {
+          "path": "/js/stability.js",
+          "encoded": 3576,
+          "decoded": 8151,
+          "transfer": 3876,
+          "duration": 28.199999928474426
+        },
+        {
+          "path": "/js/schema.js",
+          "encoded": 4728,
+          "decoded": 10888,
+          "transfer": 5028,
+          "duration": 28.399999976158142
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "encoded": 1117,
+          "decoded": 2439,
+          "transfer": 1417,
+          "duration": 30.09999990463257
+        },
+        {
+          "path": "/js/portable.js",
+          "encoded": 14544,
+          "decoded": 40470,
+          "transfer": 14844,
+          "duration": 30.799999952316284
+        },
+        {
+          "path": "/js/profiles.js",
+          "encoded": 10493,
+          "decoded": 28332,
+          "transfer": 10793,
+          "duration": 30.899999976158142
+        },
+        {
+          "path": "/js/particles.js",
+          "encoded": 4717,
+          "decoded": 14318,
+          "transfer": 5017,
+          "duration": 31
+        },
+        {
+          "path": "/js/themes.js",
+          "encoded": 7801,
+          "decoded": 17363,
+          "transfer": 8101,
+          "duration": 31.40000009536743
+        },
+        {
+          "path": "/js/decals.js",
+          "encoded": 7646,
+          "decoded": 21108,
+          "transfer": 7946,
+          "duration": 33.300000071525574
+        },
+        {
+          "path": "/js/dielights.js",
+          "encoded": 2245,
+          "decoded": 4773,
+          "transfer": 2545,
+          "duration": 33.10000002384186
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "encoded": 684,
+          "decoded": 1396,
+          "transfer": 984,
+          "duration": 33.300000071525574
+        },
+        {
+          "path": "/js/towerids.js",
+          "encoded": 625,
+          "decoded": 625,
+          "transfer": 925,
+          "duration": 33.300000071525574
+        },
+        {
+          "path": "/js/post.js",
+          "encoded": 6683,
+          "decoded": 17377,
+          "transfer": 6983,
+          "duration": 33.300000071525574
+        },
+        {
+          "path": "/js/motes.js",
+          "encoded": 3130,
+          "decoded": 6716,
+          "transfer": 3430,
+          "duration": 35.60000002384186
+        },
+        {
+          "path": "/js/towerglb.js",
+          "encoded": 7535,
+          "decoded": 17418,
+          "transfer": 7835,
+          "duration": 35.700000047683716
+        },
+        {
+          "path": "/js/faelife.js",
+          "encoded": 10305,
+          "decoded": 25081,
+          "transfer": 10605,
+          "duration": 36.10000002384186
+        },
+        {
+          "path": "/js/fae-lab.js",
+          "encoded": 25687,
+          "decoded": 70574,
+          "transfer": 25987,
+          "duration": 36
+        },
+        {
+          "path": "/js/voices.js",
+          "encoded": 20876,
+          "decoded": 52340,
+          "transfer": 21176,
+          "duration": 37.700000047683716
+        },
+        {
+          "path": "/js/tunables.js",
+          "encoded": 13938,
+          "decoded": 41752,
+          "transfer": 14238,
+          "duration": 38.10000002384186
+        },
+        {
+          "path": "/js/tune.js",
+          "encoded": 45850,
+          "decoded": 129925,
+          "transfer": 46150,
+          "duration": 38.39999997615814
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "encoded": 5471,
+          "decoded": 16025,
+          "transfer": 5771,
+          "duration": 15.100000023841858
+        },
+        {
+          "path": "/js/placard-design.js",
+          "encoded": 1701,
+          "decoded": 3634,
+          "transfer": 2001,
+          "duration": 14.700000047683716
+        },
+        {
+          "path": "/vendor/GLTFLoader.js",
+          "encoded": 24361,
+          "decoded": 109259,
+          "transfer": 24661,
+          "duration": 3.200000047683716
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "encoded": 2405,
+          "decoded": 5825,
+          "transfer": 2705,
+          "duration": 1
+        },
+        {
+          "path": "/js/yaml.js",
+          "encoded": 9990,
+          "decoded": 30691,
+          "transfer": 10290,
+          "duration": 0.7999999523162842
+        },
+        {
+          "path": "/vendor/BufferGeometryUtils.js",
+          "encoded": 7390,
+          "decoded": 32292,
+          "transfer": 7690,
+          "duration": 1.0999999046325684
+        },
+        {
+          "path": "/api/table",
+          "encoded": 2,
+          "decoded": 2,
+          "transfer": 302,
+          "duration": 1.600000023841858
+        },
+        {
+          "path": "/models/mats/linen.png",
+          "encoded": 22974,
+          "decoded": 22974,
+          "transfer": 23274,
+          "duration": 2.100000023841858
+        },
+        {
+          "path": "/api/join",
+          "encoded": 325,
+          "decoded": 325,
+          "transfer": 625,
+          "duration": 1.2000000476837158
+        },
+        {
+          "path": "/api/pools",
+          "encoded": 11,
+          "decoded": 11,
+          "transfer": 311,
+          "duration": 0.7999999523162842
+        },
+        {
+          "path": "/api/pools",
+          "encoded": 11,
+          "decoded": 11,
+          "transfer": 311,
+          "duration": 0.7999999523162842
+        }
+      ]
+    },
+    "onUse": {
+      "readyMs": 1249.1000000238419,
+      "totals": {
+        "requests": 3,
+        "encoded": 580849,
+        "decoded": 580849,
+        "transfer": 581749
+      },
+      "optional": []
+    },
+    "allOptional": [
+      {
+        "path": "/js/faelife.js",
+        "encoded": 10305,
+        "decoded": 25081,
+        "transfer": 10605,
+        "duration": 36.10000002384186
+      },
+      {
+        "path": "/js/fae-lab.js",
+        "encoded": 25687,
+        "decoded": 70574,
+        "transfer": 25987,
+        "duration": 36
+      }
+    ],
+    "hash": "5a4c74a773053e33d473f6787a8510fdc6daf614cbe827cb7fe12b30ccd15695",
+    "moon": {
+      "flies": 260,
+      "wisps": 4,
+      "hue": {
+        "field": "#3fbfb4",
+        "wisp": "#5fdccb"
+      }
+    },
+    "fox": {
+      "flies": 260,
+      "wisps": 4,
+      "hue": {
+        "field": "#7dd8a8",
+        "wisp": "#b8f5d4"
+      }
+    }
+  },
+  {
+    "device": "phone",
+    "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)",
+    "initial": {
+      "totals": {
+        "requests": 60,
+        "encoded": 1547562,
+        "decoded": 5142401,
+        "transfer": 1565562
+      },
+      "optional": [
+        {
+          "path": "/js/fae-lab.js",
+          "encoded": 25687,
+          "decoded": 70574,
+          "transfer": 25987,
+          "duration": 25.899999976158142
+        },
+        {
+          "path": "/js/faelife.js",
+          "encoded": 10305,
+          "decoded": 25081,
+          "transfer": 10605,
+          "duration": 26.899999976158142
+        }
+      ],
+      "modules": [
+        {
+          "path": "/js/report.js",
+          "encoded": 3313,
+          "decoded": 7422,
+          "transfer": 3613,
+          "duration": 3.1999999284744263
+        },
+        {
+          "path": "/js/main.js",
+          "encoded": 623256,
+          "decoded": 1874773,
+          "transfer": 623556,
+          "duration": 8.700000047683716
+        },
+        {
+          "path": "/js/film-client.js",
+          "encoded": 1310,
+          "decoded": 3440,
+          "transfer": 1610,
+          "duration": 6.5
+        },
+        {
+          "path": "/js/film-wire.js",
+          "encoded": 4646,
+          "decoded": 12753,
+          "transfer": 4946,
+          "duration": 6.600000023841858
+        },
+        {
+          "path": "/js/film-bake.js",
+          "encoded": 15523,
+          "decoded": 40656,
+          "transfer": 15823,
+          "duration": 6.600000023841858
+        },
+        {
+          "path": "/js/diceart.js",
+          "encoded": 3932,
+          "decoded": 8692,
+          "transfer": 4232,
+          "duration": 9.299999952316284
+        },
+        {
+          "path": "/js/dice.js",
+          "encoded": 24145,
+          "decoded": 67984,
+          "transfer": 24445,
+          "duration": 9
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "encoded": 76922,
+          "decoded": 346256,
+          "transfer": 77222,
+          "duration": 9.100000023841858
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "encoded": 255043,
+          "decoded": 1272972,
+          "transfer": 255343,
+          "duration": 16.399999976158142
+        },
+        {
+          "path": "/js/net.js",
+          "encoded": 15274,
+          "decoded": 42497,
+          "transfer": 15574,
+          "duration": 10.100000023841858
+        },
+        {
+          "path": "/js/tables.js",
+          "encoded": 5400,
+          "decoded": 12062,
+          "transfer": 5700,
+          "duration": 11.199999928474426
+        },
+        {
+          "path": "/js/meanings.js",
+          "encoded": 13063,
+          "decoded": 34150,
+          "transfer": 13363,
+          "duration": 11.399999976158142
+        },
+        {
+          "path": "/js/rollspec.js",
+          "encoded": 8695,
+          "decoded": 22252,
+          "transfer": 8995,
+          "duration": 12.600000023841858
+        },
+        {
+          "path": "/js/places.js",
+          "encoded": 22870,
+          "decoded": 58875,
+          "transfer": 23170,
+          "duration": 13.399999976158142
+        },
+        {
+          "path": "/js/demo.js",
+          "encoded": 4587,
+          "decoded": 9945,
+          "transfer": 4887,
+          "duration": 13.299999952316284
+        },
+        {
+          "path": "/js/placard.js",
+          "encoded": 36034,
+          "decoded": 99748,
+          "transfer": 36334,
+          "duration": 13.699999928474426
+        },
+        {
+          "path": "/js/odds.js",
+          "encoded": 17331,
+          "decoded": 45932,
+          "transfer": 17631,
+          "duration": 15.5
+        },
+        {
+          "path": "/js/notation.js",
+          "encoded": 17222,
+          "decoded": 49080,
+          "transfer": 17522,
+          "duration": 16
+        },
+        {
+          "path": "/js/seed.js",
+          "encoded": 5961,
+          "decoded": 13564,
+          "transfer": 6261,
+          "duration": 15.5
+        },
+        {
+          "path": "/js/firstplay.js",
+          "encoded": 2068,
+          "decoded": 5273,
+          "transfer": 2368,
+          "duration": 16
+        },
+        {
+          "path": "/js/workspaces.js",
+          "encoded": 3697,
+          "decoded": 10761,
+          "transfer": 3997,
+          "duration": 18.100000023841858
+        },
+        {
+          "path": "/js/table-designs.js",
+          "encoded": 1328,
+          "decoded": 3077,
+          "transfer": 1628,
+          "duration": 18.200000047683716
+        },
+        {
+          "path": "/js/library-document.js",
+          "encoded": 2419,
+          "decoded": 6795,
+          "transfer": 2719,
+          "duration": 18.200000047683716
+        },
+        {
+          "path": "/js/playerresults.js",
+          "encoded": 3236,
+          "decoded": 8697,
+          "transfer": 3536,
+          "duration": 18.300000071525574
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "encoded": 584,
+          "decoded": 1211,
+          "transfer": 884,
+          "duration": 18.300000071525574
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "encoded": 695,
+          "decoded": 1283,
+          "transfer": 995,
+          "duration": 20.40000009536743
+        },
+        {
+          "path": "/js/stability.js",
+          "encoded": 3576,
+          "decoded": 8151,
+          "transfer": 3876,
+          "duration": 20.40000009536743
+        },
+        {
+          "path": "/js/schema.js",
+          "encoded": 4728,
+          "decoded": 10888,
+          "transfer": 5028,
+          "duration": 20.399999976158142
+        },
+        {
+          "path": "/js/portable.js",
+          "encoded": 14544,
+          "decoded": 40470,
+          "transfer": 14844,
+          "duration": 20.600000023841858
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "encoded": 1117,
+          "decoded": 2439,
+          "transfer": 1417,
+          "duration": 21.399999976158142
+        },
+        {
+          "path": "/js/profiles.js",
+          "encoded": 10493,
+          "decoded": 28332,
+          "transfer": 10793,
+          "duration": 21.600000023841858
+        },
+        {
+          "path": "/js/themes.js",
+          "encoded": 7801,
+          "decoded": 17363,
+          "transfer": 8101,
+          "duration": 22.299999952316284
+        },
+        {
+          "path": "/js/particles.js",
+          "encoded": 4717,
+          "decoded": 14318,
+          "transfer": 5017,
+          "duration": 22.700000047683716
+        },
+        {
+          "path": "/js/dielights.js",
+          "encoded": 2245,
+          "decoded": 4773,
+          "transfer": 2545,
+          "duration": 22.799999952316284
+        },
+        {
+          "path": "/js/decals.js",
+          "encoded": 7646,
+          "decoded": 21108,
+          "transfer": 7946,
+          "duration": 23.299999952316284
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "encoded": 684,
+          "decoded": 1396,
+          "transfer": 984,
+          "duration": 23.700000047683716
+        },
+        {
+          "path": "/js/post.js",
+          "encoded": 6683,
+          "decoded": 17377,
+          "transfer": 6983,
+          "duration": 23.799999952316284
+        },
+        {
+          "path": "/js/towerids.js",
+          "encoded": 625,
+          "decoded": 625,
+          "transfer": 925,
+          "duration": 25.100000023841858
+        },
+        {
+          "path": "/js/motes.js",
+          "encoded": 3130,
+          "decoded": 6716,
+          "transfer": 3430,
+          "duration": 25.200000047683716
+        },
+        {
+          "path": "/js/towerglb.js",
+          "encoded": 7535,
+          "decoded": 17418,
+          "transfer": 7835,
+          "duration": 25.299999952316284
+        },
+        {
+          "path": "/js/fae-lab.js",
+          "encoded": 25687,
+          "decoded": 70574,
+          "transfer": 25987,
+          "duration": 25.899999976158142
+        },
+        {
+          "path": "/js/faelife.js",
+          "encoded": 10305,
+          "decoded": 25081,
+          "transfer": 10605,
+          "duration": 26.899999976158142
+        },
+        {
+          "path": "/js/voices.js",
+          "encoded": 20876,
+          "decoded": 52340,
+          "transfer": 21176,
+          "duration": 27.899999976158142
+        },
+        {
+          "path": "/js/tunables.js",
+          "encoded": 13938,
+          "decoded": 41752,
+          "transfer": 14238,
+          "duration": 27.299999952316284
+        },
+        {
+          "path": "/js/tune.js",
+          "encoded": 45850,
+          "decoded": 129925,
+          "transfer": 46150,
+          "duration": 28.600000023841858
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "encoded": 5471,
+          "decoded": 16025,
+          "transfer": 5771,
+          "duration": 14.600000023841858
+        },
+        {
+          "path": "/js/placard-design.js",
+          "encoded": 1701,
+          "decoded": 3634,
+          "transfer": 2001,
+          "duration": 14.700000047683716
+        },
+        {
+          "path": "/vendor/GLTFLoader.js",
+          "encoded": 24361,
+          "decoded": 109259,
+          "transfer": 24661,
+          "duration": 4.300000071525574
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "encoded": 2405,
+          "decoded": 5825,
+          "transfer": 2705,
+          "duration": 2.399999976158142
+        },
+        {
+          "path": "/js/yaml.js",
+          "encoded": 9990,
+          "decoded": 30691,
+          "transfer": 10290,
+          "duration": 2.200000047683716
+        },
+        {
+          "path": "/vendor/BufferGeometryUtils.js",
+          "encoded": 7390,
+          "decoded": 32292,
+          "transfer": 7690,
+          "duration": 1.2000000476837158
+        }
+      ],
+      "resources": [
+        {
+          "path": "/js/report.js",
+          "encoded": 3313,
+          "decoded": 7422,
+          "transfer": 3613,
+          "duration": 3.1999999284744263
+        },
+        {
+          "path": "/css/firstplay.css",
+          "encoded": 745,
+          "decoded": 1865,
+          "transfer": 1045,
+          "duration": 2.9000000953674316
+        },
+        {
+          "path": "/css/workspaces.css",
+          "encoded": 2469,
+          "decoded": 9001,
+          "transfer": 2769,
+          "duration": 3.100000023841858
+        },
+        {
+          "path": "/css/playerresults.css",
+          "encoded": 1911,
+          "decoded": 5809,
+          "transfer": 2211,
+          "duration": 3.100000023841858
+        },
+        {
+          "path": "/css/style.css",
+          "encoded": 107062,
+          "decoded": 333481,
+          "transfer": 107362,
+          "duration": 4.5
+        },
+        {
+          "path": "/js/main.js",
+          "encoded": 623256,
+          "decoded": 1874773,
+          "transfer": 623556,
+          "duration": 8.700000047683716
+        },
+        {
+          "path": "/js/film-client.js",
+          "encoded": 1310,
+          "decoded": 3440,
+          "transfer": 1610,
+          "duration": 6.5
+        },
+        {
+          "path": "/js/film-wire.js",
+          "encoded": 4646,
+          "decoded": 12753,
+          "transfer": 4946,
+          "duration": 6.600000023841858
+        },
+        {
+          "path": "/js/film-bake.js",
+          "encoded": 15523,
+          "decoded": 40656,
+          "transfer": 15823,
+          "duration": 6.600000023841858
+        },
+        {
+          "path": "/js/diceart.js",
+          "encoded": 3932,
+          "decoded": 8692,
+          "transfer": 4232,
+          "duration": 9.299999952316284
+        },
+        {
+          "path": "/js/dice.js",
+          "encoded": 24145,
+          "decoded": 67984,
+          "transfer": 24445,
+          "duration": 9
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "encoded": 76922,
+          "decoded": 346256,
+          "transfer": 77222,
+          "duration": 9.100000023841858
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "encoded": 255043,
+          "decoded": 1272972,
+          "transfer": 255343,
+          "duration": 16.399999976158142
+        },
+        {
+          "path": "/js/net.js",
+          "encoded": 15274,
+          "decoded": 42497,
+          "transfer": 15574,
+          "duration": 10.100000023841858
+        },
+        {
+          "path": "/js/tables.js",
+          "encoded": 5400,
+          "decoded": 12062,
+          "transfer": 5700,
+          "duration": 11.199999928474426
+        },
+        {
+          "path": "/js/meanings.js",
+          "encoded": 13063,
+          "decoded": 34150,
+          "transfer": 13363,
+          "duration": 11.399999976158142
+        },
+        {
+          "path": "/js/rollspec.js",
+          "encoded": 8695,
+          "decoded": 22252,
+          "transfer": 8995,
+          "duration": 12.600000023841858
+        },
+        {
+          "path": "/js/places.js",
+          "encoded": 22870,
+          "decoded": 58875,
+          "transfer": 23170,
+          "duration": 13.399999976158142
+        },
+        {
+          "path": "/js/demo.js",
+          "encoded": 4587,
+          "decoded": 9945,
+          "transfer": 4887,
+          "duration": 13.299999952316284
+        },
+        {
+          "path": "/js/placard.js",
+          "encoded": 36034,
+          "decoded": 99748,
+          "transfer": 36334,
+          "duration": 13.699999928474426
+        },
+        {
+          "path": "/js/odds.js",
+          "encoded": 17331,
+          "decoded": 45932,
+          "transfer": 17631,
+          "duration": 15.5
+        },
+        {
+          "path": "/js/notation.js",
+          "encoded": 17222,
+          "decoded": 49080,
+          "transfer": 17522,
+          "duration": 16
+        },
+        {
+          "path": "/js/seed.js",
+          "encoded": 5961,
+          "decoded": 13564,
+          "transfer": 6261,
+          "duration": 15.5
+        },
+        {
+          "path": "/js/firstplay.js",
+          "encoded": 2068,
+          "decoded": 5273,
+          "transfer": 2368,
+          "duration": 16
+        },
+        {
+          "path": "/js/workspaces.js",
+          "encoded": 3697,
+          "decoded": 10761,
+          "transfer": 3997,
+          "duration": 18.100000023841858
+        },
+        {
+          "path": "/js/table-designs.js",
+          "encoded": 1328,
+          "decoded": 3077,
+          "transfer": 1628,
+          "duration": 18.200000047683716
+        },
+        {
+          "path": "/js/library-document.js",
+          "encoded": 2419,
+          "decoded": 6795,
+          "transfer": 2719,
+          "duration": 18.200000047683716
+        },
+        {
+          "path": "/js/playerresults.js",
+          "encoded": 3236,
+          "decoded": 8697,
+          "transfer": 3536,
+          "duration": 18.300000071525574
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "encoded": 584,
+          "decoded": 1211,
+          "transfer": 884,
+          "duration": 18.300000071525574
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "encoded": 695,
+          "decoded": 1283,
+          "transfer": 995,
+          "duration": 20.40000009536743
+        },
+        {
+          "path": "/js/stability.js",
+          "encoded": 3576,
+          "decoded": 8151,
+          "transfer": 3876,
+          "duration": 20.40000009536743
+        },
+        {
+          "path": "/js/schema.js",
+          "encoded": 4728,
+          "decoded": 10888,
+          "transfer": 5028,
+          "duration": 20.399999976158142
+        },
+        {
+          "path": "/js/portable.js",
+          "encoded": 14544,
+          "decoded": 40470,
+          "transfer": 14844,
+          "duration": 20.600000023841858
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "encoded": 1117,
+          "decoded": 2439,
+          "transfer": 1417,
+          "duration": 21.399999976158142
+        },
+        {
+          "path": "/js/profiles.js",
+          "encoded": 10493,
+          "decoded": 28332,
+          "transfer": 10793,
+          "duration": 21.600000023841858
+        },
+        {
+          "path": "/js/themes.js",
+          "encoded": 7801,
+          "decoded": 17363,
+          "transfer": 8101,
+          "duration": 22.299999952316284
+        },
+        {
+          "path": "/js/particles.js",
+          "encoded": 4717,
+          "decoded": 14318,
+          "transfer": 5017,
+          "duration": 22.700000047683716
+        },
+        {
+          "path": "/js/dielights.js",
+          "encoded": 2245,
+          "decoded": 4773,
+          "transfer": 2545,
+          "duration": 22.799999952316284
+        },
+        {
+          "path": "/js/decals.js",
+          "encoded": 7646,
+          "decoded": 21108,
+          "transfer": 7946,
+          "duration": 23.299999952316284
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "encoded": 684,
+          "decoded": 1396,
+          "transfer": 984,
+          "duration": 23.700000047683716
+        },
+        {
+          "path": "/js/post.js",
+          "encoded": 6683,
+          "decoded": 17377,
+          "transfer": 6983,
+          "duration": 23.799999952316284
+        },
+        {
+          "path": "/js/towerids.js",
+          "encoded": 625,
+          "decoded": 625,
+          "transfer": 925,
+          "duration": 25.100000023841858
+        },
+        {
+          "path": "/js/motes.js",
+          "encoded": 3130,
+          "decoded": 6716,
+          "transfer": 3430,
+          "duration": 25.200000047683716
+        },
+        {
+          "path": "/js/towerglb.js",
+          "encoded": 7535,
+          "decoded": 17418,
+          "transfer": 7835,
+          "duration": 25.299999952316284
+        },
+        {
+          "path": "/js/fae-lab.js",
+          "encoded": 25687,
+          "decoded": 70574,
+          "transfer": 25987,
+          "duration": 25.899999976158142
+        },
+        {
+          "path": "/js/faelife.js",
+          "encoded": 10305,
+          "decoded": 25081,
+          "transfer": 10605,
+          "duration": 26.899999976158142
+        },
+        {
+          "path": "/js/voices.js",
+          "encoded": 20876,
+          "decoded": 52340,
+          "transfer": 21176,
+          "duration": 27.899999976158142
+        },
+        {
+          "path": "/js/tunables.js",
+          "encoded": 13938,
+          "decoded": 41752,
+          "transfer": 14238,
+          "duration": 27.299999952316284
+        },
+        {
+          "path": "/js/tune.js",
+          "encoded": 45850,
+          "decoded": 129925,
+          "transfer": 46150,
+          "duration": 28.600000023841858
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "encoded": 5471,
+          "decoded": 16025,
+          "transfer": 5771,
+          "duration": 14.600000023841858
+        },
+        {
+          "path": "/js/placard-design.js",
+          "encoded": 1701,
+          "decoded": 3634,
+          "transfer": 2001,
+          "duration": 14.700000047683716
+        },
+        {
+          "path": "/vendor/GLTFLoader.js",
+          "encoded": 24361,
+          "decoded": 109259,
+          "transfer": 24661,
+          "duration": 4.300000071525574
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "encoded": 2405,
+          "decoded": 5825,
+          "transfer": 2705,
+          "duration": 2.399999976158142
+        },
+        {
+          "path": "/js/yaml.js",
+          "encoded": 9990,
+          "decoded": 30691,
+          "transfer": 10290,
+          "duration": 2.200000047683716
+        },
+        {
+          "path": "/vendor/BufferGeometryUtils.js",
+          "encoded": 7390,
+          "decoded": 32292,
+          "transfer": 7690,
+          "duration": 1.2000000476837158
+        },
+        {
+          "path": "/api/table",
+          "encoded": 2,
+          "decoded": 2,
+          "transfer": 302,
+          "duration": 1.399999976158142
+        },
+        {
+          "path": "/models/mats/linen.png",
+          "encoded": 22974,
+          "decoded": 22974,
+          "transfer": 23274,
+          "duration": 1.0999999046325684
+        },
+        {
+          "path": "/api/join",
+          "encoded": 325,
+          "decoded": 325,
+          "transfer": 625,
+          "duration": 1.5
+        },
+        {
+          "path": "/api/pools",
+          "encoded": 11,
+          "decoded": 11,
+          "transfer": 311,
+          "duration": 1
+        },
+        {
+          "path": "/api/pools",
+          "encoded": 11,
+          "decoded": 11,
+          "transfer": 311,
+          "duration": 1.100000023841858
+        }
+      ]
+    },
+    "onUse": {
+      "readyMs": 715.0999999046326,
+      "totals": {
+        "requests": 3,
+        "encoded": 580849,
+        "decoded": 580849,
+        "transfer": 581749
+      },
+      "optional": []
+    },
+    "allOptional": [
+      {
+        "path": "/js/fae-lab.js",
+        "encoded": 25687,
+        "decoded": 70574,
+        "transfer": 25987,
+        "duration": 25.899999976158142
+      },
+      {
+        "path": "/js/faelife.js",
+        "encoded": 10305,
+        "decoded": 25081,
+        "transfer": 10605,
+        "duration": 26.899999976158142
+      }
+    ],
+    "hash": "5a4c74a773053e33d473f6787a8510fdc6daf614cbe827cb7fe12b30ccd15695",
+    "moon": {
+      "flies": 260,
+      "wisps": 4,
+      "hue": {
+        "field": "#3fbfb4",
+        "wisp": "#5fdccb"
+      }
+    },
+    "fox": {
+      "flies": 260,
+      "wisps": 4,
+      "hue": {
+        "field": "#7dd8a8",
+        "wisp": "#b8f5d4"
+      }
+    }
+  }
+]

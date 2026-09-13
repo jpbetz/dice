@@ -87,8 +87,6 @@ import {
   TOWERGLB, towerGlbInit, towerGlbEnsure, towerGlbStatus, towerGlbAsset, towerGlbSkin,
 } from './towerglb.js';
 import { buildMotes, stepMotes, disposeMotes } from './motes.js';
-import { buildFaeConcept, brightenFog } from './fae-lab.js';
-import { stepLife, stepMootSession, disposeLife } from './faelife.js';
 // THE VOICE TABLES (js/voices.js, docs/AUDIO.md). They moved out of this file
 // on 2026-08-18, the day Joe first listened to all ten of them: six of his
 // eight complaints were about a measurable property, and nothing in a module
@@ -11180,6 +11178,7 @@ function venueDiceSet() {
 // argument made flesh) and restores every borrowed thing on the way out.
 const FAECONCEPT = {
   on: false, rig: null, t: 0, saved: null, held: null, lights: [], boosted: [],
+  status: 'idle', epoch: 0, palette: null,
   // THE LIVING LAYER's dials and its eased mood (W5, js/faelife.js).
   // `tune` is the slice `light.life` of the declaration — the live object
   // faelife.js reads, so lifeTune() and the panel move any dial without a
@@ -11224,8 +11223,44 @@ function faeFogFor(variant) {
   return FAEFOG.get(variant);
 }
 
+// Optional scenery follows the same cached-import pattern as the gallery.
+// Venue identity and tower colliders apply immediately; this promise owns only
+// the cosmetic stage. A stop/new palette invalidates every older continuation.
+let faeRuntime = null, faeLoading = null;
 function faeConceptStart(opts = {}) {
-  if (FAECONCEPT.rig) faeConceptStop();
+  faeConceptStop();
+  const epoch = FAECONCEPT.epoch, requested = { ...opts };
+  FAECONCEPT.status = 'loading';
+  FAECONCEPT.palette = requested.paletteId || 'moonrise';
+  updateVenueChrome();
+  const mount = () => {
+    if (epoch !== FAECONCEPT.epoch) return false;
+    faeConceptMount(requested);
+    FAECONCEPT.status = 'ready';
+    if (batteryPresentation()) syncBatteryScene();
+    updateVenueChrome();
+    invalidateTable();
+    return true;
+  };
+  const failed = () => {
+    if (epoch !== FAECONCEPT.epoch) return false;
+    FAECONCEPT.status = 'failed';
+    setPill('Scenery couldn’t load. Reload to retry.', 'error');
+    announce('Scenery couldn’t load. Reload to retry.');
+    updateVenueChrome();
+    invalidateTable();
+    return false;
+  };
+  if (faeRuntime) { try { return mount(); } catch { return failed(); } }
+  faeLoading ||= Promise.all([import('./fae-lab.js'), import('./faelife.js')])
+    .then(([stage, life]) => (faeRuntime = { ...stage, ...life }));
+  // A browser caches a failed module graph: a reload is the honest retry.
+  // Handle the rejection here so an unavailable optional asset never breaks
+  // the static solo table or rejects an SSE settings handler.
+  return faeLoading.then(mount).catch(failed);
+}
+
+function faeConceptMount(opts) {
   // THE CLOCK STARTS AT ZERO. Found while building W5 (2026-08-13): the
   // stage's `t` was never reset, so a venue toggled off and back on
   // resumed the air at whatever phase the last one left — two clients
@@ -11238,7 +11273,7 @@ function faeConceptStart(opts = {}) {
   // latch so entering the venue mid-session cannot fire the beat, and
   // neither can a late joiner's replay of somebody else's old roll.
   FAECONCEPT.seenEntry = (stagedVerdict && stagedVerdict.entry) || lastEntry;
-  const rig = buildFaeConcept({
+  const rig = faeRuntime.buildFaeConcept({
     ...opts,
     // The living layer is bounded by the TABLE's widest walls, not by a
     // number the venue keeps its own copy of (C25/C28: a constant sized
@@ -11285,6 +11320,9 @@ function faeConceptStart(opts = {}) {
 }
 
 function faeConceptStop() {
+  FAECONCEPT.epoch++;
+  FAECONCEPT.status = 'idle';
+  FAECONCEPT.palette = null;
   if (!FAECONCEPT.rig) return;
   for (const b of FAECONCEPT.boosted) b.m.emissiveIntensity = b.v;
   FAECONCEPT.boosted = [];
@@ -11292,7 +11330,7 @@ function faeConceptStop() {
   for (const l of FAECONCEPT.lights) scene.remove(l);
   FAECONCEPT.lights = [];
   scene.remove(FAECONCEPT.rig.group);
-  if (FAECONCEPT.rig.life) disposeLife(FAECONCEPT.rig.life);
+  if (FAECONCEPT.rig.life) faeRuntime.disposeLife(FAECONCEPT.rig.life);
   FAECONCEPT.rig = null;
   scene.background = FAECONCEPT.saved.bg;
   Object.assign(MOOD.tune, FAECONCEPT.saved.tune);
@@ -11372,7 +11410,7 @@ function stepFaeConcept(dt) {
 
   // THE LIVING LAYER (W5). Everything in it is f(t) except the eased
   // mood, so this whole call freezes under a held clock.
-  stepLife(rig.life, t, FAECONCEPT.mood);
+  faeRuntime.stepLife(rig.life, t, FAECONCEPT.mood);
   // THE MOOT IS IN SESSION WHEN THE WISPS ARE STANDING IN IT. Measured,
   // not scheduled: the nearest wisp's plan distance to the ring, eased so
   // the ring wakes and settles rather than switching. The faeries are the
@@ -11390,7 +11428,7 @@ function stepFaeConcept(dt) {
   const mt = FAECONCEPT.tune.moot;
   const visit = Math.max(0, Math.min(1, (mt.nearOut - near) / (mt.nearOut - mt.nearIn)));
   FAECONCEPT.mood.session = faeEase(FAECONCEPT.mood.session, visit, dt, 1.4);
-  FAECONCEPT.mootGain = stepMootSession(rig.moot, t, FAECONCEPT.mood, FAECONCEPT.tune.moot);
+  FAECONCEPT.mootGain = faeRuntime.stepMootSession(rig.moot, t, FAECONCEPT.mood, FAECONCEPT.tune.moot);
   // The dice light the fog (the venue's whole thesis): every settled die is
   // an emitter, plus the lead wisp; the moot's pools are already folded
   // into the sheets' base. A die whose SET declares a fog breath (the W4
@@ -11413,7 +11451,7 @@ function stepFaeConcept(dt) {
     gain: 0.7 * (0.35 + 0.65 * FAECONCEPT.mood.life),
     cr: 0.2, cg: 0.4, cb: 0.36,
   });
-  brightenFog(rig.sheets, em);
+  faeRuntime.brightenFog(rig.sheets, em);
   rig.halos.children.forEach((h, i) => {
     const d = settled[i];
     if (d) {
@@ -11515,10 +11553,12 @@ function updateVenueChrome() {
   // Explain the hidden staging controls. Beta offers them all, so needs no
   // absence note. Dice selection is personal on both channels.
   const modeled = !!TABLE_DESIGNS[venue.id];
-  const noted = modeled || (fantasy && !IS_BETA);
+  const sceneryNote = fantasy && FAECONCEPT.status === 'loading' ? 'Loading scenery…'
+    : fantasy && FAECONCEPT.status === 'failed' ? 'Scenery couldn’t load. Reload to retry.' : '';
+  const noted = modeled || (fantasy && !IS_BETA) || !!sceneryNote;
   const note = document.getElementById('venue-staged');
-  note.textContent = modeled ? `${venue.label} includes its own tabletop. Choose The Table to use a mat.`
-    : noted ? `${venue.label} stages this — felt and tower are its own.` : '';
+  note.textContent = sceneryNote || (modeled ? `${venue.label} includes its own tabletop. Choose The Table to use a mat.`
+    : noted ? `${venue.label} stages this — felt and tower are its own.` : '');
   note.classList.toggle('hidden', !noted);
 }
 
@@ -14230,10 +14270,12 @@ window.__diceDebug = {
   // THE FAE CONCEPT LAB (ROADMAP W0): faeConcept(true, {paletteId:
   // 'moonrise'|'foxfire'}) stages the Moonrise Glade sketch; false restores
   // the room exactly. Concept plates only — not the venue mechanism.
-  faeConcept(on, opts) {
+  async faeConcept(on, opts) {
     opts = opts || {};
-    if (on === undefined ? true : on) faeConceptStart(opts);
+    if (on === undefined ? true : on) await faeConceptStart(opts);
     else faeConceptStop();
+    updateVenueChrome();
+    invalidateTable();
     return { on: FAECONCEPT.on, palette: FAECONCEPT.rig ? Object.keys(FAECONCEPT.rig.pal).length && (opts.paletteId || 'moonrise') : null };
   },
   // The last socket change, step by step (see TOWER_SWAP): a tower→tower swap
@@ -16019,6 +16061,7 @@ window.__diceDebug = {
     return {
       id: currentVenue,
       register: spec.register,
+      scenery: { status: FAECONCEPT.status, palette: FAECONCEPT.palette, loaded: !!faeRuntime },
       staged: !!(FAECONCEPT.rig && FAECONCEPT.rig.group.parent),
       stageChildren: FAECONCEPT.rig ? FAECONCEPT.rig.group.children.length : 0,
       venueTower: spec.register === 'fantasy' ? venueTowerFor(currentVenue) : null,
