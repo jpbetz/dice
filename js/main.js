@@ -36863,7 +36863,7 @@ async function ensureAccountWorkspace(){
 async function openAccountWorkspace(){destinationShell.open('account');}
 const privateLibraryButton=document.createElement('button');privateLibraryButton.type='button';privateLibraryButton.className='btn ghost';privateLibraryButton.id='private-library-status';privateLibraryButton.textContent='Private library · account & sync';
 privateLibraryButton.addEventListener('click',openAccountWorkspace);document.getElementById('library-nav').after(privateLibraryButton);
-const accountMenuButton=document.createElement('button');accountMenuButton.type='button';accountMenuButton.id='idm-account';accountMenuButton.textContent='Account & private library';accountMenuButton.addEventListener('click',()=>{closeIdentityMenu();openAccountWorkspace();});document.getElementById('idm-library').after(accountMenuButton);
+const accountMenuButton=document.createElement('button');accountMenuButton.type='button';accountMenuButton.className='idm-item';accountMenuButton.id='idm-account';accountMenuButton.textContent='Account & private library';accountMenuButton.addEventListener('click',()=>{closeIdentityMenu();openAccountWorkspace();});document.getElementById('idm-library').after(accountMenuButton);
 window.addEventListener('storage',event=>{
   if(event.key!==LIBRARY_NAMESPACE_KEY&&event.key!==LIBRARY_IDENTITY_INTENT)return;
   const next=event.newValue||'guest';if(event.key===LIBRARY_NAMESPACE_KEY&&next===libraryNamespace)return;

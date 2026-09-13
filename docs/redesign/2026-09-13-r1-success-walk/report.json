@@ -1,0 +1,78 @@
+{
+  "license": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "base": "7a2cd82 + 75b0a10",
+  "environment": "Ephemeral local file store; normal SwiftShader browser harness; desktop 1440x900 and phone emulation 390x844",
+  "captureNote": "The initial walk captured setup while its optional preview was loading. 03-desktop-setup-ready and the identity editor images are separate visible-control captures. The retained walk now waits for preview readiness.",
+  "walk": {
+    "checkpoints": [
+      {
+        "name": "fresh guest renamed without reseating"
+      },
+      {
+        "name": "practice stays local and chosen dice become the future default"
+      },
+      {
+        "name": "useful roll saved and named table applied"
+      },
+      {
+        "name": "copied guest link joins the same named table with matching values",
+        "values": [
+          3,
+          2
+        ],
+        "total": 8,
+        "rollId": "a078321e-ca26-421e-943f-d47e3448f717"
+      },
+      {
+        "name": "returning Soul Deal guest joins and rolls with all kept profile content intact"
+      },
+      {
+        "name": "optional account keeps local library privately and explicitly saves public home"
+      },
+      {
+        "name": "all clients closed before real room process restart"
+      },
+      {
+        "name": "clean phone recovers the exact private kit and cold home without an old client repush"
+      },
+      {
+        "name": "People sends a home invitation while the fixture recipient has no open client"
+      },
+      {
+        "name": "Accept preserves the private turn and seat; separate Join reaches the same home"
+      },
+      {
+        "name": "recovered players and unchanged Soul Deal guest share matching results after return",
+        "values": [
+          2,
+          3
+        ],
+        "total": 8,
+        "guests": 1,
+        "recoveredAccounts": 2
+      }
+    ],
+    "screens": [
+      "01-desktop-practice",
+      "02-desktop-first-result",
+      "03-desktop-setup-preview",
+      "04-desktop-library-comparison",
+      "05-desktop-saved-home",
+      "06-phone-recovery-comparison",
+      "07-phone-recovered-home",
+      "08-phone-incoming-invitation",
+      "09-phone-accepted-still-at-own-turn",
+      "10-phone-return-with-guest-results"
+    ]
+  },
+  "validation": {
+    "command": "npm run test:r1",
+    "passed": 2,
+    "failed": 0,
+    "joinedWalkMs": 238948.337896,
+    "heldModuleBoundaryMs": 7978.043019,
+    "postRecoveryAllFilmDoublesEqual": true,
+    "librarySessionUnit": "passed",
+    "note": "Values and pictures above are from the first inspected successful walk; this final no-capture regression additionally checks every post-recovery film double and waits for confirmed account namespace adoption."
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "base": "7a2cd82 + 75b0a10",
+  "assertions": {
+    "realModuleHeld": true,
+    "guestRollAndCapture": true,
+    "privateDocumentExact": true,
+    "guestCaptureRetainedAsAlternative": true,
+    "guestCaptureExplicitlyRestored": true
+  }
+}

@@ -359,6 +359,8 @@ become a new route for unselected profiles or private account metadata.
 
 ## 10. Validation and the success walk
 
+**Scripted composed proof, 2026-09-13:** the [retained success walk](redesign/2026-09-13-r1-success-walk.md) connects visible guest play, private recovery, a cold saved home, and offline invitation acceptance with separate Join. It includes a returning Soul Deal guest. Actual player observation and physical-device validation remain outstanding.
+
 Use existing CUJ1 (instant roll), CUJ2/3 (invite/join), CUJ4 (leave/return),
 CUJ6/7 (profiles), CUJ8 (compose/read), CUJ9/11 (legibility/following), CUJ10
 (privacy), CUJ12 (table conventions), and CUJ13 (capture) as named in
