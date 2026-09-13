@@ -62,6 +62,7 @@ import { NEW_TABLE_SYSTEM, renderQuickRolls, createStarterKitChooser } from './f
 import { createWorkspaces } from './workspaces.js';
 import { TABLE_DESIGNS, createTableDesign } from './table-designs.js';
 import { libraryDocument } from './library-document.js';
+import { createFrameLoop } from './frame-loop.js';
 import { createPlayerResults } from './playerresults.js';
 import { HISTORY_CAP as LOG_HISTORY_CAP, TURN_CAP_MESSAGE, canStartTurn, trimRollHistory, unfinished } from './rollhistory.js';
 import { resolveChannel, PARAM as STABILITY_PARAM } from './stability.js';
@@ -766,6 +767,8 @@ if (!IN_LOBBY && !(new URLSearchParams(window.location.search).get('as') || '').
 // Renderer / scene
 // ---------------------------------------------------------------------------
 
+let frameLoop = null;
+function invalidateTable() { frameLoop?.invalidate(); }
 const container = document.getElementById('scene-container');
 // The felt is a LAYOUT REGION, not the viewport (2026-08-04: the side panel
 // is a real column beside it). `view` is the cached felt rect — every
@@ -2518,6 +2521,7 @@ function feltImage(path) {
 // below this one, and a ReferenceError inside an event listener is the silent
 // kind. The flag says what is true instead of relying on what is likely.
 function onFeltImage(path) {
+  invalidateTable();
   for (const row of Object.values(FELT_THEMES)) {
     if (row.cloth === 'image' && row.texture === path) feltTileCache.delete(feltTileKey(row));
   }
@@ -3376,6 +3380,7 @@ function recompositeFelt() {
 // Swap the felt + scene background live. Returns false for unknown ids — the
 // id can arrive off the wire or from localStorage, never trust it blindly.
 function applyFeltTheme(id) {
+  invalidateTable();
   const theme = FELT_THEMES[id];
   if (!theme) return false;
   currentFeltId = id;
@@ -4067,6 +4072,7 @@ function ensureAudio() {
   let ctx;
   try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
   AUDIO.ctx = audioCtx = ctx;
+  ctx.addEventListener('statechange',scheduleAmbience);
   // The buffer-allocation instrument (see AUDIO.buffersMade). Patched on OUR
   // context object only, never on the prototype, so nothing else on the page
   // is affected and there is exactly one of these per session.
@@ -4217,6 +4223,16 @@ function ensureShaft(spec) {
 // ---------------------------------------------------------------------------
 
 let bed = null;
+let ambienceTimer = null;
+function scheduleAmbience() {
+  if (ambienceTimer !== null) clearTimeout(ambienceTimer);
+  ambienceTimer = null;
+  if (!bed || document.hidden || AUDIO.ctx?.state !== 'running') return;
+  // The half-second audio horizon needs no GPU frame. A visible-only 200 ms
+  // wake preserves that lookahead even while the table picture is static.
+  stepAmbience();
+  ambienceTimer = setTimeout(() => { ambienceTimer = null; scheduleAmbience(); },200);
+}
 
 // ---------------------------------------------------------------------------
 // THE VENUE'S AUDIO PALETTE (ROADMAP W6; GOALS goals 13–15, docs/AUDIO.md §2.5)
@@ -4399,6 +4415,8 @@ function bedLfo(ctx, hz, depth, param) {
 // per-die; the bed is one object toggled rarely by hand, and `bedSources`
 // must read ZERO under mute for the switch to mean what it says.
 function bedDispose() {
+  if (ambienceTimer !== null) clearTimeout(ambienceTimer);
+  ambienceTimer = null;
   if (!bed) return;
   for (const n of bed.nodes) { try { n.stop(); } catch { /* already ended */ } }
   try { bed.mix.disconnect(); } catch { /* already gone */ }
@@ -4468,6 +4486,7 @@ function bedBuild() {
   };
   AUDIO.room = room;
   AUDIO.bedSources = bed.nodes.length;
+  scheduleAmbience();
   // Six seconds. A room does not switch on.
   mix.gain.setValueAtTime(0.0001, ctx.currentTime);
   mix.gain.exponentialRampToValueAtTime(1, ctx.currentTime + BED_FADE_S);
@@ -4595,9 +4614,8 @@ function bedSwell(ctx, at) {
   AUDIO.bedSwells++;
 }
 
-// Called from tick(). Lookahead scheduling off ctx.currentTime — not off dt,
-// and never off setInterval: a timer-driven bed stutters the moment the tab
-// throttles, and this one simply schedules further ahead.
+// Lookahead scheduling uses ctx.currentTime. Active frames and the separate
+// visible idle timer share these cursors, so either can fill the same horizon.
 function stepAmbience() {
   if (!bed || !AUDIO.ctx) return;
   // The venue's own voice, checked here rather than pushed from applyVenue —
@@ -4669,6 +4687,7 @@ let diceSet = (() => {
   return typeof v === 'string' && (v === 'std' || SETS[v]) ? v : 'std';
 })();
 function setDiceSet(id, persist = true) {
+  invalidateTable();
   diceSet = id === 'std' || SETS[id] ? id : 'std';
   if(!libraryApplying)libraryDefaultSet=diceSet;
   if (persist && libraryNamespace==='guest') save(LS_DICESET, diceSet);
@@ -6241,6 +6260,7 @@ function removeRollDice(rollId, instant = false) {
 // until its own playback settles (§7.5); the pending clear runs from the
 // completion paths (stepPlayback's showResults / ceremonyFinish).
 function applyClearRoll(rollId) {
+  invalidateTable();
   if (!rollId) return;
   if (!applyingQueuedEvent && rollEventPending(rollId)) {
     queueRollEvent({ kind: 'clear', roll: { rollId } });
@@ -6730,6 +6750,7 @@ document.addEventListener('pointerdown', (e) => {
 // exactly as clears defer — always-interruptible playback keeps the stage,
 // and the collect lands from the ordered event queue at completion.
 function applyRollCollected(rollId, seq, animate = true) {
+  invalidateTable();
   if (!rollId || !Number.isInteger(seq) || seq < 1) return;
   if (!applyingQueuedEvent && rollEventPending(rollId)) {
     queueRollEvent({ kind: 'collect', roll: { rollId }, seq, animate });
@@ -7041,6 +7062,7 @@ function flushPendingRollLog() {
 // a roll this sweep just took away. Online the server flags its own log the same
 // way, so both sides of a swept table agree with a fresh join.
 function clearTable() {
+  invalidateTable();
   filmClient.cancel();
   flushPendingRollLog();
   for (const st of rollStates.values()) st.cleared = true;
@@ -7086,6 +7108,7 @@ function clearTable() {
 // story, and it also keeps the pour machine (which assumes every die in the
 // cast is making the journey) out of a case it was never built for.
 function playRoll(roll, rethrow = null, options = {}) {
+  invalidateTable();
   const types = roll && Array.isArray(roll.dice) ? roll.dice : [];
   const values = roll && Array.isArray(roll.values) ? roll.values : null;
   if (!types.length) return;
@@ -7330,6 +7353,7 @@ function playRoll(roll, rethrow = null, options = {}) {
   finishBake(bakeFilm(bakeContext));
 
   function finishBake(film) {
+  invalidateTable();
   const { keyframes, sounds, roughTrack, simFrames, motionFrames, landings,
     lastLanding, nudges, pourFilm } = film;
 
@@ -9905,6 +9929,7 @@ function skipRevealFx() {
 // already applied changes nothing. `full` is the complete revealed entry —
 // absent when this client already holds the values (solo / legacy face-down).
 function applyReveal(rollId, full) {
+  invalidateTable();
   if (!rollId) return;
   // Keep the reveal BETWEEN the exact throws that surround it on the wire.
   if (!applyingQueuedEvent && rollEventPending(rollId)) {
@@ -10733,8 +10758,6 @@ document.addEventListener('keydown', (e) => {
 // ---------------------------------------------------------------------------
 // Animation loop
 // ---------------------------------------------------------------------------
-
-const clock = new THREE.Clock();
 
 // ---- Slice 3: REST CADENCE (Joe 2026-08-04) --------------------------------
 // Sub-mm continuous motion on SETTLED-on-felt dice — "sea-glass swells /
@@ -11615,13 +11638,11 @@ function updateCornerClear() {
 }
 
 // Tests only (__diceDebug.holdClock): freeze the rAF clock so the world moves
-// exactly as far as sim() says and no further. The delta is still consumed
-// every frame, so releasing the hold never dumps a saved-up dt into the sim.
+// exactly as far as sim() says and no further. Waking after a hold starts
+// with zero dt instead of accumulated wall time.
 let clockHeld = false;
 
-function animate() {
-  requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.1);
+function animate(dt) {
   tick(clockHeld ? 0 : dt, true, true);
   // DEVELOPER MODE'S PANEL REPAINTS FROM THE TREE once a frame while it is up
   // and unfolded (docs/DEVMODE.md §7 — "the panel holds no state"), so a
@@ -11639,7 +11660,40 @@ function animate() {
     devPanel.setFooter(devHud());
   }
 }
-animate();
+
+// Clock-driven visual work keeps frames; a quiet picture has no rAF loop.
+// An animated venue or material is still live scenery, not idle work.
+function tableAnimationActive() {
+  if (clockHeld) return false;
+  if (currentRoll && !currentRoll.done && !currentRoll.baking) return true;
+  if (sinking.length || revealing.length || camEase || CAMPEEK.yaw || CAMPEEK.pitch) return true;
+  if (BREATH.state === 'enabled' && BREATH.t !== BREATH.target) return true;
+  if (particleField.count() || decalField.count() || postStack.busy()) return true;
+  if (FAECONCEPT.on || MOOD.motes || TOWERLIGHT.rig?.ember || TOWERLAB.on) return true;
+  if (devPanel && devState.panel === 'open') return true;
+  if (dieLights.slots.some(s => s.mesh && (s.dying || s.warm < 1
+      || ['flicker','breathe','wave'].includes(s.recipe?.mode)))) return true;
+  return tableDice.some(d => {
+    if (!d.mesh.visible || d.shrouded) return false;
+    const set = SETS[d.variant];
+    return (d.rest && !d.rest.done && d.rest.kind !== 'still')
+      || set?.shader?.flow || set?.shader?.pulse || set?.post?.shimmer;
+  });
+}
+frameLoop = createFrameLoop({draw:animate,active:tableAnimationActive,
+  visible:()=>!document.hidden,request:requestAnimationFrame,cancel:cancelAnimationFrame});
+for (const event of ['pointerdown','pointermove','pointerup','pointercancel','keydown','keyup','click','input','change','focusin']) {
+  window.addEventListener(event,invalidateTable,{capture:true,passive:true});
+}
+window.addEventListener('wheel',invalidateTable,{capture:true,passive:true});
+renderer.domElement.addEventListener('webglcontextrestored',invalidateTable);
+// Texture/GLB loaders using Three's shared manager can complete after the
+// requesting event has gone idle. App-specific loaders also invalidate at
+// their actual scene mutation boundaries above.
+const priorLoad = THREE.DefaultLoadingManager.onLoad;
+THREE.DefaultLoadingManager.onLoad = (...args) => { priorLoad?.(...args); invalidateTable(); };
+tune.watch(invalidateTable);
+invalidateTable();
 
 // Browsers suspend rAF in hidden tabs, so 'roll' events received while hidden
 // pile up in rollQueue and would each replay at full length on refocus.
@@ -11659,6 +11713,8 @@ function fastForwardPlayback() {
 }
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) fastForwardPlayback();
+  frameLoop.visibilityChanged();
+  scheduleAmbience();
 });
 // A HIDDEN TAB HAS NO ROOM. Ramp the bed away and suspend the context — an
 // audio graph running behind a tab nobody is looking at is a battery bill —
@@ -12358,6 +12414,7 @@ function towerModelEnsure(id) {
           + `socketed. The table keeps '${currentTower}' and the pending change stays `
           + `queued. Films on this client may diverge from other clients in this room.`);
       }
+      invalidateTable();
       tryFlushRoomChanges();
       // A LATE FELT BEATS A NEVER FELT: released on failure too, so a broken
       // model costs the returning player a tower, not the roll on the table.
@@ -12885,6 +12942,7 @@ function towerReskin() {
     rig.group.add(towerCos(spec).skin(v));
     towerApplyEnvPolicy(rig.group);
     rig.skinUrl = want;
+    invalidateTable();
   });
 }
 
@@ -16093,7 +16151,7 @@ window.__diceDebug = {
   renderAudit() {
     const r = renderer.info.render;
     return {
-      calls: r.calls, triangles: Math.round(r.triangles), lines: r.lines, points: r.points,
+      frame: r.frame, scheduled: frameLoop?.state, calls: r.calls, triangles: Math.round(r.triangles), lines: r.lines, points: r.points,
       passes: renderPasses,
       post: renderPasses > 1,
       pixelRatio: renderer.getPixelRatio(),
@@ -18685,10 +18743,10 @@ window.__diceDebug = {
   // the same 1/60 s of REAL time animate() would deliver, so at k=2 the
   // playback drains in half as many calls. That difference is the tempo
   // theorem, and measuring it in frames beats timing a headless browser.
-  sim(frames, realtime = false) { for (let i = 0; i < frames; i++) tick(1 / 60, false, !!realtime); },
+  sim(frames, realtime = false) { for (let i = 0; i < frames; i++) tick(1 / 60, false, !!realtime); invalidateTable(); },
   // Freeze the rAF clock: with it held, only sim() advances playback, which is
   // how a scenario parks a tab mid-tumble (a reveal arriving THERE must defer).
-  holdClock(on) { clockHeld = !!on; return clockHeld; },
+  holdClock(on) { clockHeld = !!on; invalidateTable(); return clockHeld; },
   get clockHeld() { return clockHeld; },
   fastForward: fastForwardPlayback,
 };
@@ -18700,6 +18758,7 @@ window.__diceDebug = {
 // that hangs off the camera.
 const leftPanelEl = document.getElementById('left-panel');
 function refitView() {
+  invalidateTable();
   const pw = window.innerWidth <= 640 ? 0 : Math.round(leftPanelEl.getBoundingClientRect().width);
   document.documentElement.style.setProperty('--table-left', `${pw}px`);
   const r = container.getBoundingClientRect();
@@ -26028,6 +26087,7 @@ let devModule = null;
 // ZERO-arg hook on an ordinary tab, and this one changes the tab. A declared
 // parameter is what keeps it out of that sweep (`devClose` likewise).
 async function devOpen(_opts) {
+  invalidateTable();
   if (devProduction()) return null;
   if (devAbsent) return null;
   if (devOn()) return devInfoValue();
@@ -26142,6 +26202,7 @@ async function devOpen(_opts) {
   // it — so a tab that never pops one out pays a 250 ms timer and no
   // serialisation at all.
   devChannelOpen();
+  invalidateTable();
   return devInfoValue();
 }
 
@@ -26273,6 +26334,7 @@ async function devWriteSave(changes) {
 // has mounted (the module still in flight) the wish is recorded in the
 // state and devOpen applies it on arrival.
 function devFold(on) {
+  invalidateTable();
   if (!devOn()) return null;
   const want = on === undefined ? devState.panel === 'open' : !!on;
   if (devPanel) devPanel.fold(want);
@@ -26287,6 +26349,7 @@ function devFold(on) {
 // DEVMODE §12 (should Shut keep the values?) stands; until Joe answers it,
 // Fold is how values are kept.
 function devClose(_opts) {
+  invalidateTable();
   if (!devOn()) return null;
   tune.reset('all');
   // THE VENUE'S SNAPSHOT IS TAKEN THROUGH THE VIEW (found by the B2 review,
@@ -26711,6 +26774,7 @@ function devStandingVariants() {
 // version of that promise the app can actually keep: no frame renders between
 // the dispose and the swap, so no mesh is ever drawn holding a disposed build.
 function reskinStanding(variant) {
+  invalidateTable();
   if (typeof variant !== 'string' || variant === 'std' || variant === 'shroud') return 0;
   const skin = SETS[variant];
   if (!skin) return 0;
@@ -34549,6 +34613,7 @@ function resyncTable(snapshot) {
 }
 
 function handleNetEvent(type, data) {
+  invalidateTable();
   if (!data) return;
   switch (type) {
     case 'hello': // initial state + re-sync after a reconnect

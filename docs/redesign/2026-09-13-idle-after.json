@@ -1,0 +1,677 @@
+{
+  "label": "after",
+  "rows": [
+    {
+      "device": "desktop",
+      "name": "empty",
+      "elapsed": 1500.2000000476837,
+      "frames": 0,
+      "before": {
+        "frame": 23,
+        "scheduled": {
+          "frames": 4,
+          "wakes": 10,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 2,
+        "triangles": 4608,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 2,
+        "geometries": 2,
+        "textures": 4
+      },
+      "after": {
+        "frame": 23,
+        "scheduled": {
+          "frames": 4,
+          "wakes": 10,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 2,
+        "triangles": 4608,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 2,
+        "geometries": 2,
+        "textures": 4
+      },
+      "hidden": false,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    },
+    {
+      "device": "desktop",
+      "name": "settled",
+      "elapsed": 1500.2000000476837,
+      "frames": 0,
+      "before": {
+        "frame": 28,
+        "scheduled": {
+          "frames": 9,
+          "wakes": 16,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 18,
+        "triangles": 5856,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 5,
+        "geometries": 3,
+        "textures": 5
+      },
+      "after": {
+        "frame": 28,
+        "scheduled": {
+          "frames": 9,
+          "wakes": 16,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 18,
+        "triangles": 5856,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 5,
+        "geometries": 3,
+        "textures": 5
+      },
+      "hidden": false,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    },
+    {
+      "device": "desktop",
+      "name": "after-next-roll",
+      "elapsed": 1500.2000000476837,
+      "frames": 0,
+      "before": {
+        "frame": 36,
+        "scheduled": {
+          "frames": 17,
+          "wakes": 24,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 6,
+        "triangles": 5368,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 5,
+        "geometries": 4,
+        "textures": 6
+      },
+      "after": {
+        "frame": 36,
+        "scheduled": {
+          "frames": 17,
+          "wakes": 24,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 6,
+        "triangles": 5368,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 5,
+        "geometries": 4,
+        "textures": 6
+      },
+      "hidden": false,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    },
+    {
+      "device": "desktop",
+      "name": "copper",
+      "elapsed": 1500.2999999523163,
+      "frames": 0,
+      "before": {
+        "frame": 38,
+        "scheduled": {
+          "frames": 19,
+          "wakes": 28,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 11,
+        "triangles": 21340,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 7,
+        "textures": 7
+      },
+      "after": {
+        "frame": 38,
+        "scheduled": {
+          "frames": 19,
+          "wakes": 28,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 11,
+        "triangles": 21340,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 7,
+        "textures": 7
+      },
+      "hidden": false,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    },
+    {
+      "device": "desktop",
+      "name": "navigation",
+      "elapsed": 1500.1000000238419,
+      "frames": 0,
+      "before": {
+        "frame": 40,
+        "scheduled": {
+          "frames": 21,
+          "wakes": 32,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 12,
+        "triangles": 11888,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 10,
+        "textures": 8
+      },
+      "after": {
+        "frame": 40,
+        "scheduled": {
+          "frames": 21,
+          "wakes": 32,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 12,
+        "triangles": 11888,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 10,
+        "textures": 8
+      },
+      "hidden": false,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    },
+    {
+      "device": "desktop",
+      "name": "stone",
+      "elapsed": 1500.1000000238419,
+      "frames": 0,
+      "before": {
+        "frame": 42,
+        "scheduled": {
+          "frames": 23,
+          "wakes": 36,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 10,
+        "triangles": 16864,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "after": {
+        "frame": 42,
+        "scheduled": {
+          "frames": 23,
+          "wakes": 36,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 10,
+        "triangles": 16864,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "hidden": false,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    },
+    {
+      "device": "desktop",
+      "name": "hidden",
+      "elapsed": 1500.2000000476837,
+      "frames": 0,
+      "before": {
+        "frame": 42,
+        "scheduled": {
+          "frames": 23,
+          "wakes": 36,
+          "pending": false,
+          "dirty": false,
+          "visible": false
+        },
+        "calls": 10,
+        "triangles": 16864,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "after": {
+        "frame": 42,
+        "scheduled": {
+          "frames": 23,
+          "wakes": 36,
+          "pending": false,
+          "dirty": false,
+          "visible": false
+        },
+        "calls": 10,
+        "triangles": 16864,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "hidden": true,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    },
+    {
+      "device": "phone",
+      "name": "empty",
+      "elapsed": 1500.2000000476837,
+      "frames": 0,
+      "before": {
+        "frame": 94,
+        "scheduled": {
+          "frames": 75,
+          "wakes": 45,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 2,
+        "triangles": 4608,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "after": {
+        "frame": 94,
+        "scheduled": {
+          "frames": 75,
+          "wakes": 45,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 2,
+        "triangles": 4608,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "hidden": false,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    },
+    {
+      "device": "phone",
+      "name": "settled",
+      "elapsed": 1500.4000000953674,
+      "frames": 0,
+      "before": {
+        "frame": 102,
+        "scheduled": {
+          "frames": 83,
+          "wakes": 53,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 18,
+        "triangles": 5856,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "after": {
+        "frame": 102,
+        "scheduled": {
+          "frames": 83,
+          "wakes": 53,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 18,
+        "triangles": 5856,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "hidden": false,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    },
+    {
+      "device": "phone",
+      "name": "after-next-roll",
+      "elapsed": 1500.2000000476837,
+      "frames": 0,
+      "before": {
+        "frame": 110,
+        "scheduled": {
+          "frames": 91,
+          "wakes": 61,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 6,
+        "triangles": 5368,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "after": {
+        "frame": 110,
+        "scheduled": {
+          "frames": 91,
+          "wakes": 61,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 6,
+        "triangles": 5368,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "hidden": false,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    },
+    {
+      "device": "phone",
+      "name": "copper",
+      "elapsed": 1500.2000000476837,
+      "frames": 0,
+      "before": {
+        "frame": 111,
+        "scheduled": {
+          "frames": 92,
+          "wakes": 64,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 11,
+        "triangles": 21340,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "after": {
+        "frame": 111,
+        "scheduled": {
+          "frames": 92,
+          "wakes": 64,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 11,
+        "triangles": 21340,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "hidden": false,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    },
+    {
+      "device": "phone",
+      "name": "navigation",
+      "elapsed": 1500.1000000238419,
+      "frames": 0,
+      "before": {
+        "frame": 112,
+        "scheduled": {
+          "frames": 93,
+          "wakes": 67,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 12,
+        "triangles": 11888,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "after": {
+        "frame": 112,
+        "scheduled": {
+          "frames": 93,
+          "wakes": 67,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 12,
+        "triangles": 11888,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "hidden": false,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    },
+    {
+      "device": "phone",
+      "name": "stone",
+      "elapsed": 1500.5,
+      "frames": 0,
+      "before": {
+        "frame": 113,
+        "scheduled": {
+          "frames": 94,
+          "wakes": 70,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 10,
+        "triangles": 16864,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "after": {
+        "frame": 113,
+        "scheduled": {
+          "frames": 94,
+          "wakes": 70,
+          "pending": false,
+          "dirty": false,
+          "visible": true
+        },
+        "calls": 10,
+        "triangles": 16864,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "hidden": false,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    },
+    {
+      "device": "phone",
+      "name": "hidden",
+      "elapsed": 1501,
+      "frames": 0,
+      "before": {
+        "frame": 113,
+        "scheduled": {
+          "frames": 94,
+          "wakes": 70,
+          "pending": false,
+          "dirty": false,
+          "visible": false
+        },
+        "calls": 10,
+        "triangles": 16864,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "after": {
+        "frame": 113,
+        "scheduled": {
+          "frames": 94,
+          "wakes": 70,
+          "pending": false,
+          "dirty": false,
+          "visible": false
+        },
+        "calls": 10,
+        "triangles": 16864,
+        "lines": 0,
+        "points": 1024,
+        "passes": 1,
+        "post": false,
+        "pixelRatio": 1,
+        "programs": 7,
+        "geometries": 12,
+        "textures": 9
+      },
+      "hidden": true,
+      "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4090/PCIe/SSE2, OpenGL ES 3.2)"
+    }
+  ]
+}
