@@ -26033,7 +26033,7 @@ export const scenarios = [
         for (const name of ['vendor', 'models', 'index.html']) {
           symlinkSync(join(ROOT, name), join(dir, name));
         }
-        for (const tree of ['js', 'css']) {
+        for (const tree of ['js', 'css', 'service']) {
           mkdirSync(join(dir, tree));
           for (const entry of readdirSync(join(ROOT, tree))) {
             if (DROPPED.includes(`${tree}/${entry}`)) continue;
@@ -26252,7 +26252,7 @@ export const scenarios = [
       const original = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
       cpSync(join(ROOT, 'server.js'), join(dir, 'server.js'));
       writeFileSync(join(dir, 'dice.yaml'), original);
-      for (const name of ['js', 'css', 'vendor', 'models', 'index.html']) {
+      for (const name of ['js', 'css', 'vendor', 'models', 'service', 'index.html']) {
         symlinkSync(join(ROOT, name), join(dir, name));
       }
       const scratchYaml = () => readFileSync(join(dir, 'dice.yaml'), 'utf8');
@@ -26400,7 +26400,7 @@ export const scenarios = [
       const original = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
       cpSync(join(ROOT, 'server.js'), join(dir, 'server.js'));
       writeFileSync(join(dir, 'dice.yaml'), original);
-      for (const name of ['js', 'css', 'vendor', 'models', 'index.html']) {
+      for (const name of ['js', 'css', 'vendor', 'models', 'service', 'index.html']) {
         symlinkSync(join(ROOT, name), join(dir, name));
       }
       const port = await freePort();
@@ -27045,7 +27045,7 @@ export const scenarios = [
       const original = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
       cpSync(join(ROOT, 'server.js'), join(dir, 'server.js'));
       writeFileSync(join(dir, 'dice.yaml'), original);
-      for (const name of ['js', 'css', 'vendor', 'models', 'index.html']) {
+      for (const name of ['js', 'css', 'vendor', 'models', 'service', 'index.html']) {
         symlinkSync(join(ROOT, name), join(dir, name));
       }
       const port = await freePort();
@@ -28026,7 +28026,7 @@ export const scenarios = [
       const original = readFileSync(join(ROOT, 'dice.yaml'), 'utf8');
       cpSync(join(ROOT, 'server.js'), join(dir, 'server.js'));
       writeFileSync(join(dir, 'dice.yaml'), original);
-      for (const name of ['js', 'css', 'vendor', 'models', 'index.html']) {
+      for (const name of ['js', 'css', 'vendor', 'models', 'service', 'index.html']) {
         symlinkSync(join(ROOT, name), join(dir, name));
       }
       const port = await freePort();

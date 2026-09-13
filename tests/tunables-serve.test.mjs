@@ -81,6 +81,7 @@ function makeTree(yaml = FIXTURE) {
   const dir = mkdtempSync(join(SCRATCH_BASE, 'tunables-serve-'));
   cpSync(join(ROOT, 'server.js'), join(dir, 'server.js'));
   cpSync(join(ROOT, 'js'), join(dir, 'js'), { recursive: true });
+  cpSync(join(ROOT, 'service'), join(dir, 'service'), { recursive: true });
   if (yaml !== null) writeFileSync(join(dir, 'dice.yaml'), yaml);
   return dir;
 }

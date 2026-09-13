@@ -2,8 +2,8 @@
 
 # Optional durable service
 
-**R1-D0 · design decision, 2026-09-13 · adapter foundation implemented;
-end-to-end account recovery proofs pending.** Implements the account, library, home and social boundaries in
+**R1-D0/D1.1 · design decision, 2026-09-13 · adapters and optional recovery
+API implemented; account UI, library sync and home proofs pending.** Implements the account, library, home and social boundaries in
 [People, personal dice, and persistent tables](PEOPLE-DICE-TABLES.md).
 This record enables local implementation; it does not claim a cloud service
 has been provisioned or a recovery prototype has passed.
@@ -53,7 +53,8 @@ continues to own live rolls, seats and room SSE.
 | `DICE_ACCOUNT_DIR=/absolute/private/path` | Required for file mode; refuse checkout/static roots and symlinks into them |
 | `DICE_ACCOUNT_ORIGIN=https://…` | Exact accepted browser origin; HTTPS required except loopback development |
 | `DICE_FIRESTORE_PROJECT`, `DICE_FIRESTORE_DATABASE` | Required for Firestore; database defaults to `(default)` only when explicitly selecting Firestore |
-| `DICE_ACCOUNT_NAMESPACE` | Validated opaque deployment namespace, separate for tests/staging/production |
+| `DICE_ACCOUNT_NAMESPACE` | Validated opaque Firestore deployment namespace, separate for tests/staging/production |
+| `DICE_ACCOUNT_RECOVER_LOCK=1` | File mode only: explicitly recover a writer lock whose local process is demonstrably dead; ambiguous locks still refuse |
 | `DICE_GOOGLE_CLIENT_ID` | Future opt-in provider, absent in first release |
 
 Malformed enabled configuration fails account-service initialization with a
@@ -84,6 +85,9 @@ entering it; perform no network sends or UI effects inside it. Read all
 required records before queuing writes. Limit transaction retries and
 return a typed `busy`/`unavailable` error; never acknowledge an uncommitted
 write. Unknown schema versions refuse without rewriting data.
+Expected domain refusals are returned outcome objects; thrown exceptions
+crossing the adapter are storage errors with fixed, sanitized messages. Both
+adapters apply the same conservative 8 MiB transaction encoding budget.
 
 **File adapter:** serialize transactions through one process queue; load a
 versioned JSON snapshot at startup. Commit to a new same-directory file,
@@ -232,7 +236,7 @@ status are not a way to enumerate another person's account.
 | --- | --- |
 | `GET /status`; `GET /session` | Capabilities; current self projection and CSRF nonce, or anonymous |
 | `POST /register` | `{recoveryKey, displayName, recoveryAcknowledged:true}` → session cookie/person; no library uploaded yet |
-| `POST /recover` | `{recoveryKey}` → new cookie/person; no implicit merge |
+| `POST /recover` | `{recoveryKey, revokeOtherSessions?:true}` → new cookie/person; explicit recovery-and-sign-out option remains usable at the 12-session cap; no implicit merge |
 | `POST /logout`; `POST /revoke-others` | Revoke current session; invalidate other session generations |
 | `POST /rotate-key` | Current/new recovery keys and acknowledgement; atomic replacement |
 | `GET /library` | `{headRevision, document, retainedVersions:[metadata]}` |
@@ -419,11 +423,31 @@ after an unconfirmed write, and Firestore transaction/token/retry/deadline
 semantics against an injected protocol fixture. They do not prove live
 Google authentication, IAM or cloud durability.
 
-**Next ready assignment: D1.1**, recovery/domain API over these adapters,
-including sanitized server routing and independent cookie-jar recovery after
-restart. Keep registration separate from library upload. Do not touch the
-main session's UI files or preview port 8123. Use ephemeral ports and private
-temporary directories for every server proof.
+**D1.1 recovery foundation is implemented** in `service/account.js`,
+`service/account-http.js` and `js/account.js`, with a narrow optional route
+in `server.js`. The API is off by default. `tests/account-api.test.mjs`
+starts real isolated servers and proves independent cookie-jar recovery after
+restart, cookie attributes, origin/CSRF refusal, revocation/key rotation,
+expired/session-cap recovery, privacy and ordinary guest rolls during
+account-service failure. `tests/account-client.test.mjs` covers key handling,
+the namespace transition hook, offline sign-out and static hosting.
+
+The client awaits `onIdentityChange({previousPersonId, personId})`; a `false`
+result aborts namespace adoption. The app must use this hook to await any
+in-flight publication and successfully clear scoped profile sharing before
+adopting another person's library. Cookie-changing requests and session
+checks are serialized: a discarded response can still contain `Set-Cookie`,
+so an epoch check alone is insufficient. A real HTTP/cookie-jar test delays
+one recovery response, queues another and then sign-out, and checks the
+actual resulting cookie identity as well as client state. These are protocol
+proofs, not screenshots of an account panel that does not yet exist.
+
+**Next ready assignment: D1.2**, immutable library revision/conflict API,
+transactional browser working copies, explicit initial reconciliation and
+the account/recovery UI connected to the publication gate. Registration
+remains separate from library upload. Do not touch the main session's preview
+port 8123. Use ephemeral ports and private temporary directories for every
+server proof.
 
 After API proofs, inspect the named moments on desktop and 390 × 844 phone:
 save-key acknowledgement with the key hidden in captures, recovered-library

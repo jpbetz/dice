@@ -73,6 +73,7 @@ function makeTree(yaml = CHECKOUT_YAML) {
   trees.push(dir);
   cpSync(join(ROOT, 'server.js'), join(dir, 'server.js'));
   cpSync(join(ROOT, 'js'), join(dir, 'js'), { recursive: true });
+  cpSync(join(ROOT, 'service'), join(dir, 'service'), { recursive: true });
   writeFileSync(join(dir, 'dice.yaml'), yaml);
   return dir;
 }

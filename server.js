@@ -81,6 +81,11 @@ import { applyChanges } from './js/dice-apply-core.js';
 // same law would accept a room felt no client on earth could resolve. Node-pure
 // like the rest of the chain; dice-apply-core.js already pulls it in.
 import { ASSET_ID_RE } from './js/tune.js';
+import { createOptionalAccountApi } from './service/account-http.js';
+
+// Account durability is optional and isolated from the live room path. The
+// router catches its own errors before they can reach request diagnostics.
+const accountApi = createOptionalAccountApi();
 
 const PORT = Number(process.env.PORT) || 8123;
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -4807,6 +4812,7 @@ const server = http.createServer((req, res) => {
     if (route === '/health' && (req.method === 'GET' || req.method === 'HEAD')) {
       return handleHealth(req, res);
     }
+    if (route.startsWith('/api/account/')) return accountApi.handle(req, res, route);
     if (route === '/api/join' && req.method === 'POST') return handleJoin(req, res);
     if (route === '/api/events' && req.method === 'GET') return handleEvents(req, res, url);
     if (route === '/api/pong' && req.method === 'POST') return handlePong(req, res);
@@ -4890,7 +4896,10 @@ function shutdown(signal) {
       for (const res of player.clients) endStream(res);
     }
   }
-  server.close(() => process.exit(0));
+  server.close(async () => {
+    await accountApi.close().catch(() => {});
+    process.exit(0);
+  });
   setTimeout(() => process.exit(0), 1500).unref();
 }
 process.on('SIGINT', () => shutdown('SIGINT'));
