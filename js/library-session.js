@@ -195,8 +195,9 @@ export function createLibrarySession(actions,{cacheFactory=openLibraryCache,acco
     const key=`${namespace}:${boundaryEpoch}`;if(socialAccessMemo?.key===key)return socialAccessMemo;
     const owner=namespace,epoch=boundaryEpoch,active=()=>!blocked&&!transitioning&&namespace===owner&&boundaryEpoch===epoch;
     const scoped=method=>async(...args)=>{if(!active())return {ok:false,code:'identity_changed'};
-      const result=await account[method](owner,...args);return active()?result:{ok:false,code:'identity_changed'};};
-    const methods=['homes','people','setContactCode','requestFriend','removeFriend','blockPerson','invitations','inviteHome','respondInvitation','cancelInvitation','archiveInvitation','presence','homePresence','setPresence'];
+      const result=await account[method](owner,...args);if(active()&&['identity_changed','person_mismatch','login_required'].includes(result?.code))suspend();
+      return active()?result:{ok:false,code:'identity_changed'};};
+    const methods=['homes','people','blockedPeople','setContactCode','requestFriend','removeFriend','blockPerson','invitations','inviteHome','respondInvitation','cancelInvitation','archiveInvitation','presence','homePresence','setPresence'];
     socialAccessMemo=Object.freeze({key,personId:owner,epoch,person:{id:person.id,displayName:person.displayName},
       status:async()=>{if(!active())return {ok:false,code:'identity_changed'};const result=await account.status();return active()?result:{ok:false,code:'identity_changed'};},
       ...Object.fromEntries(methods.map(method=>[method,scoped(method)]))});return socialAccessMemo;
