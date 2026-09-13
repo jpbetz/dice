@@ -25,7 +25,7 @@ import { connect, forgetSeat, peekTable, prejoinSeat, LS_WHO } from './net.js';
 import { recentTables, rememberTable, renameRecentTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, composeThrow, validateMods, budgetOf, MAX_PHYSICAL_DICE,
-  scoringIndices, pushTally, faceScores, drawBag, MAX_PUSH_THROWS } from './rollspec.js';
+  scoringIndices, pushTally, faceScores, drawBag, MAX_PUSH_THROWS, turnIsOpen } from './rollspec.js';
 // A PLACE AT THE TABLE (UX §7.63): the ring's algebra lives in ONE shared
 // module — server.js stamps `roll.seat`/`roll.seats`/`roll.arc` out of it,
 // this file reads the stamp back (the rollspec.js precedent): seatToss for the
@@ -1193,11 +1193,6 @@ function refreshTurnVerb() {
 // that is the difference from canThrowAgain: whether a roll may be tidied away
 // is a fact about the roll, not about who is looking at it. A spectator's
 // client must not collect someone else's live turn either.
-function turnIsOpen(entry) {
-  if (!entry || !entry.rollId || !entry.throws) return false;
-  if (entry.push && (entry.push.busted || entry.push.banked)) return false;
-  return entry.throws.used < entry.throws.max;
-}
 
 // May this viewer bank? A push turn of theirs, still open, on the felt. Same
 // authority as throwing again, because it is the same decision seen from the
@@ -6805,6 +6800,9 @@ function soloAutoCollect(arriving = null) {
   const ids = [];
   const seen = new Set();
   const push = (id) => {
+    const entry = liveTurns.get(id) || log.find(r => r.rollId === id)
+      || (currentRoll?.rollId === id ? currentRoll : rollQueue.find(r => r.rollId === id));
+    if (turnIsOpen(entry)) return;
     if (id && !seen.has(id) && rollStates.has(id)) {
       seen.add(id);
       ids.push(id);

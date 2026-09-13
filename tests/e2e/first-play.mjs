@@ -54,6 +54,58 @@ export const firstPlayScenarios = [
     await a.reload();
     assert.deepEqual(await a.dbg('groups'),old,'historical starter-shaped data is never replaced');
   }},
+  {name:'quick-preserves-work',tags:['first-play','smoke','privacy','cuj9'],async fn(ctx) {
+    const a=await ctx.newTable({origin:'127.0.0.125',name:'Alice'});
+    const b=await ctx.newTable({origin:'127.0.0.126',name:'Bob'});
+    await a.roll('3d6 t3 secret');
+    const turn=await a.rollId();
+    await a.dbg('pickToggle(0)');
+    const picks=await a.dbg('picked.keys');
+    assert.ok(picks.length,'the unfinished turn has an actual kept choice');
+    const state=await a.dbg(`turnState(${JSON.stringify(turn)})`);
+    assert.equal(await b.logCount(),0,'the private turn stays absent for Bob');
+    await a.eval(`(()=>{const input=document.getElementById('cmd-input');input.value='2d8+4 w:Bob # Kept draft';input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    await a.waitFor(`window.__diceDebug.trayState.dice.length===2`);
+    const draft=await a.dbg('trayState');
+    await a.eval(`document.querySelector('#quick-dice [data-quick="1d6"]').click()`);
+    await b.waitFor(`document.getElementById('log-list').childElementCount===1`);
+    await a.settle(); await b.settle();
+    assert.deepEqual(await a.dbg('trayState'),draft,'a quick throw preserves the staged draft');
+    assert.equal(await a.eval(`document.getElementById('cmd-input').value`),'2d8+4 w:Bob # Kept draft','including its privacy and comment');
+    const after=await a.dbg(`turnState(${JSON.stringify(turn)})`);
+    assert.deepEqual(after.throws,state.throws,'the unfinished turn retains every remaining throw');
+    assert.deepEqual(after.values,state.values,'the private turn values are untouched');
+    assert.deepEqual(await a.dbg('picked.keys'),picks,'kept choices survive a separate quick throw');
+    assert.equal(await b.logCount(),1,'the only publication is the new Quick roll');
+    assert.equal(await b.eval('window.__diceDebug.currentRoll.dice.length'),1);
+    await a.dbg(`throwAgain(${JSON.stringify(turn)},[0])`);
+    await a.waitFor(`window.__diceDebug.turnState(${JSON.stringify(turn)}).throws.used===2`);
+    await a.settle();
+    assert.equal((await a.dbg(`turnState(${JSON.stringify(turn)})`)).values[0],state.values[0],'the old turn remains playable, keeping its chosen die');
+    assert.equal(await b.logCount(),1,'continuing the private turn still exposes nothing');
+    await a.roll('3d6 t3'); await b.settle();
+    const shared=await a.rollId(), sharedBefore=await a.dbg(`turnState(${JSON.stringify(shared)})`);
+    await a.eval(`document.querySelector('#quick-dice [data-quick="1d6"]').click()`);
+    await b.waitFor(`document.getElementById('log-list').childElementCount===3`);
+    await a.settle(); await b.settle();
+    assert.deepEqual((await a.dbg(`turnState(${JSON.stringify(shared)})`)).throws,sharedBefore.throws);
+    assert.deepEqual((await b.dbg(`turnState(${JSON.stringify(shared)})`)).throws,sharedBefore.throws,'other viewers keep the shared unfinished turn too');
+
+  }},
+  {name:'quick-preserves-solo-turn',tags:['first-play','cuj8'],async fn(ctx) {
+    const a=await ctx.newTable({origin:'127.0.0.127',name:'Alice'});
+    await a.page.browser.send('Network.enable',{},a.page.sessionId);
+    await a.page.browser.send('Network.setBlockedURLs',{urls:['*/api/*']},a.page.sessionId);
+    await a.page.navigate(a.url);
+    await a.waitFor(`window.__diceDebug && window.__diceDebug.netReady.then(r=>r && r.online===false)`,{desc:'static-host fallback is ready'});
+    assert.equal(await a.eval('window.__diceDebug.netReady.then(r=>r.online)'),false,'the static-host fallback is active');
+    await a.roll('3d6 t3');
+    const turn=await a.rollId(), before=await a.dbg(`turnState(${JSON.stringify(turn)})`);
+    await a.eval(`document.querySelector('#quick-dice [data-quick="1d6"]').click()`); await a.settle();
+    assert.deepEqual((await a.dbg(`turnState(${JSON.stringify(turn)})`)).throws,before.throws,'solo arrival leaves the unfinished turn standing');
+    await a.dbg(`throwAgain(${JSON.stringify(turn)},[0])`); await a.settle();
+    assert.equal((await a.dbg(`turnState(${JSON.stringify(turn)})`)).throws.used,2);
+  }},
   {name:'first-play-phone',tags:['first-play','touch','cuj1'],async fn(ctx) {
     const a=await ctx.newTable({origin:'127.0.0.124',name:'Alice'});
     await a.page.browser.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true},a.page.sessionId);

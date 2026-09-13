@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import assert from 'node:assert/strict';
-import { composeRoll, validateMods, countingBaseTypes, previewSpec, drawBag } from '../js/rollspec.js';
+import { composeRoll, validateMods, countingBaseTypes, previewSpec, drawBag, turnIsOpen } from '../js/rollspec.js';
 
 let n = 0;
 const t = (name, fn) => {
@@ -28,6 +28,14 @@ const t = (name, fn) => {
 // deterministic rng from a list
 const seq = (vals) => { let i = 0; return () => vals[i++ % vals.length]; };
 
+t('open turns stay out of automatic collection', () => {
+  const open = {rollId:'turn',throws:{used:1,max:3}};
+  assert.equal(turnIsOpen(open),true);
+  assert.equal(turnIsOpen({...open,throws:{used:3,max:3}}),false);
+  assert.equal(turnIsOpen({...open,push:{banked:true}}),false);
+  assert.equal(turnIsOpen({...open,push:{busted:true}}),false);
+  assert.equal(turnIsOpen({rollId:'plain'}),false);
+});
 t('plain roll', () => {
   const r = composeRoll(['d6', 'd6'], null, seq([0.5, 0.99]));
   assert.equal(r.total, 4 + 6);

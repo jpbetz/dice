@@ -44,6 +44,15 @@ export const EXPLODE_CHAIN_CAP = 3;
 // throws more, and an unbounded turn is a roll that never ends.
 export const MAX_THROWS = 5;
 
+// Automatic tidying must never take a procedure the player can still play.
+// Shared by server arrivals and the solo/client presentation paths.
+export function turnIsOpen(entry) {
+  if (!entry || !entry.rollId || !entry.throws) return false;
+  if (entry.push && (entry.push.busted || entry.push.banked)) return false;
+  return entry.throws.used < entry.throws.max;
+}
+
+
 // PUSH-YOUR-LUCK (MECHANICS M4, docs/MECHANICS.md). `mods.push` declares which
 // FACES score, and everything else about the mechanic follows from that one
 // fact plus the dice:

@@ -45,7 +45,7 @@ import { promisify } from 'node:util';
 import { brotliCompress, gzip, constants as zlibConstants } from 'node:zlib';
 
 import { composeRoll, composeThrow, validateMods, validateSpec, DIE_MAX,
-  scoringIndices, pushTally, drawBag, MAX_PUSH_THROWS } from './js/rollspec.js';
+  scoringIndices, pushTally, drawBag, MAX_PUSH_THROWS, turnIsOpen } from './js/rollspec.js';
 import { parseNotation } from './js/notation.js';
 // The dice catalogue. `SET_IDS` is EMPTY until `installCatalogue` fills it
 // from the declaration's `houses:` (phase D1) — js/themes.js holds the recipe
@@ -2466,14 +2466,17 @@ function collectEntries(room, entries) {
 // chair" exactly; a lingering flank-stamped roll is swept by whichever head
 // shares that side, which is the chair it was standing in front of anyway.
 function arrivalSweep(room, roll) {
+  // The chair rule applies to finished moments. A fresh roll cannot bank,
+  // collect, or discard a turn the player has not finished, even under a tower.
+  const finished = room.log.filter(r => !turnIsOpen(r));
   const towerUp = !!(room.settings.tower && room.settings.tower !== 'none');
-  if (!seatValid(roll.seat, roll.seats, roll.arc) || towerUp) return room.log;
+  if (!seatValid(roll.seat, roll.seats, roll.arc) || towerUp) return finished;
   // The felt holds one roll per CHAIR: a seated roller's arrival collects
   // their own prior rolls, any roll made from the chair they now hold (a
   // departed roller's dice do not outlive the chair), and any unstamped one —
   // and leaves the other chairs' rolls standing. `roll.place` is stamped for
   // this filter alone; the film never reads it.
-  return room.log.filter((r) => r.playerId === roll.playerId
+  return finished.filter((r) => r.playerId === roll.playerId
     || (Number.isInteger(roll.place) && r.place === roll.place)
     || !seatValid(r.seat, r.seats, r.arc || 0));
 }
