@@ -9,7 +9,7 @@ import {canonicalLibraryValue,validateLibraryDocument} from './library-document.
 export function createLibrarySession(actions,{cacheFactory=openLibraryCache,accountFactory=createAccountClient}={}) {
   let cache=null,sync=null,namespace='guest',viewGeneration=null,snapshot=null,person=null;
   let queue=Promise.resolve(),pending=0,error=null,ready=false,blocked=false,transitioning=false;
-  let retainedId=null,lastDocument=null,editFailure=false;
+  let retainedId=null,lastDocument=null,editFailure=false,transitionTicket=null;
   const emit=()=>actions.changed?.(info());
   const info=()=>({ready,namespace,person,pending,blocked,transitioning,error,retainedId,
     syncEnabled:!!snapshot?.state?.syncEnabled,state:snapshot?.state||null,
@@ -24,13 +24,14 @@ export function createLibrarySession(actions,{cacheFactory=openLibraryCache,acco
     if(cache)return cache;
     const opened=await cacheFactory();if(!opened.ok){error=opened;emit();return null;}cache=opened;return cache;
   }
-  function edit(document){
+  function edit(document,{capture=false}={}){
     const checked=validateLibraryDocument(document);
     if(!checked.ok){error=checked;editFailure=true;emit();return false;}
     // Keep a concrete exportable candidate even if the browser later refuses
     // its IDB transaction. No account candidate is written to guest keys.
     lastDocument=checked.document;
-    if(!ready||transitioning){error={ok:false,code:'workspace_opening',message:'The private workspace is opening. Your current changes remain on screen.'};editFailure=true;emit();return false;}
+    if(!ready){error={ok:false,code:'workspace_opening',message:'The private workspace is opening. Your current changes remain on screen.'};editFailure=true;emit();return false;}
+    if(transitionTicket&&!capture)transitionTicket.dirty=true;
     const target=namespace,copy=checked.document;
     pending++;emit();
     queue=queue.then(async()=>{
@@ -49,36 +50,61 @@ export function createLibrarySession(actions,{cacheFactory=openLibraryCache,acco
   async function capture(){
     if(!ready)return false;
     const doc=actions.capture();if(!doc?.ok){error=doc;editFailure=true;emit();return false;}
-    if(canonicalLibraryValue(doc.document)!==canonicalLibraryValue(lastDocument))edit(doc.document);
+    if(canonicalLibraryValue(doc.document)!==canonicalLibraryValue(lastDocument))edit(doc.document,{capture:true});
     return settled();
   }
-  async function boundary(){
-    if(!await capture())return false;
-    actions.blockSharing(true);
+  function startTransition(){
+    if(transitionTicket){transitionTicket.dirty=true;return null;}
+    transitionTicket={dirty:false};transitioning=true;actions.blockSharing(true);emit();return transitionTicket;
+  }
+  function refuseTransition(ticket,result){
+    if(transitionTicket===ticket)transitionTicket=null;
+    transitioning=false;blocked=true;sync?.close();sync=null;
+    error=result||{ok:false,code:'identity_transition_refused',message:'A new edit arrived while the library was changing. It is kept here. Review it before trying again.'};
+    emit();return false;
+  }
+  function transitionUnchanged(ticket){
+    const now=actions.capture();
+    if(!now?.ok){error=now;return false;}
+    if(canonicalLibraryValue(now.document)!==canonicalLibraryValue(lastDocument))edit(now.document);
+    return ticket===transitionTicket&&!ticket.dirty&&!editFailure;
+  }
+  async function stableTransition(ticket){
+    if(transitionUnchanged(ticket))return true;
+    await settled();return false;
+  }
+  async function boundary(ticket){
+    if(!await capture()||!await stableTransition(ticket))return false;
     const cleared=await actions.clearSharing();
-    if(cleared===false){error={ok:false,code:'sharing_boundary',message:'Sharing choices could not be cleared. Your current library is still open.'};emit();return false;}
-    return true;
+    if(cleared===false){error={ok:false,code:'sharing_boundary',message:'Sharing choices could not be cleared. Your current library is still open.'};return false;}
+    return stableTransition(ticket);
   }
   async function adoptIdentity({personId}) {
-    if(!await boundary())return false;
-    transitioning=true;emit();
-    const previous=sync;sync=null;previous?.close();
+    const ticket=startTransition();
+    if(!ticket)return refuseTransition(null);
+    if(!await boundary(ticket))return refuseTransition(ticket,error?.ok===false?error:null);
     const next=personId||'guest';
     let result=await cache.read(next);
+    if(!await stableTransition(ticket))return refuseTransition(ticket);
     if(result.code==='cache_missing')result=await cache.seed(next,lastDocument);
-    if(!result.ok){error=result;blocked=true;transitioning=false;emit();return false;}
-    // Seed never replaces a retained namespace. Apply only a verified local
-    // working document; remote adoption is the later explicit choose action.
-    if(await actions.apply(result.document,next)===false){error={ok:false,code:'adoption_refused',message:'The saved library could not be opened. Your previous library remains available for export.'};blocked=true;transitioning=false;emit();return false;}
-    namespace=next;blocked=false;transitioning=false;editFailure=false;
-    update(result,{adopt:true});
-    if(personId){const opened=createLibrarySync({account,cache,personId,onResult:result=>{if(namespace===personId&&sync===opened)receive(result);}});sync=opened;}
+    if(!await stableTransition(ticket))return refuseTransition(ticket);
+    if(!result.ok)return refuseTransition(ticket,result);
+    // apply is a synchronous mirror swap: all required persistence and checks
+    // finish first, with no await between swapping that mirror and its namespace.
+    if(!transitionUnchanged(ticket))return refuseTransition(ticket);
+    const sameNamespace=next===namespace;
+    if(!sameNamespace&&actions.apply(result.document,next)===false)return refuseTransition(ticket,{ok:false,code:'adoption_refused',message:'The saved library could not be opened. Your previous library remains available for export.'});
+    sync?.close();sync=null;namespace=next;blocked=false;transitioning=false;transitionTicket=null;editFailure=false;
+    update(result,{adopt:!sameNamespace});
+    if(personId){const opened=createLibrarySync({account,cache,personId,onResult:result=>{if(namespace===personId&&sync===opened)receive(result,personId,opened);}});sync=opened;}
     actions.namespaceChanged?.(next);actions.blockSharing(false);emit();return true;
   }
   const account=accountFactory({onIdentityChange:adoptIdentity});
-  async function receive(result){
-    if(result?.state)snapshot=result;
-    else if(cache){const current=await cache.read(namespace);if(current.ok)snapshot=current;}
+  async function receive(result,owner=namespace,opened=sync){
+    let current=result?.state?result:null;
+    if(!current&&cache)current=await cache.read(owner);
+    if(namespace!==owner||sync!==opened)return {ok:false,code:'identity_changed'};
+    if(current?.ok||current?.state)snapshot=current;
     if(!result?.ok){error=result;if(['identity_changed','person_mismatch','login_required'].includes(result?.code))suspend();}
     else error=null;
     emit();return result;
@@ -121,15 +147,18 @@ export function createLibrarySession(actions,{cacheFactory=openLibraryCache,acco
   }
   async function choose(generation,options){
     if(!sync||blocked)return {ok:false,code:'login_required'};
-    if(!await boundary())return error;
-    transitioning=true;emit();
-    const result=await sync.choose(generation,options);
+    const ticket=startTransition();
+    if(!ticket){refuseTransition(null);return error;}
+    if(!await boundary(ticket)){refuseTransition(ticket,error?.ok===false?error:null);return error;}
+    const opened=sync,result=await opened.choose(generation,options);
+    if(!await stableTransition(ticket)){refuseTransition(ticket);return error;}
     if(result.ok){
-      if(await actions.apply(result.document,namespace)===false){transitioning=false;blocked=true;return update({ok:false,code:'adoption_refused',message:'The chosen library is retained but could not be opened. Export it before retrying.'});}
+      if(!transitionUnchanged(ticket)){refuseTransition(ticket);return error;}
+      if(actions.apply(result.document,namespace)===false){refuseTransition(ticket,{ok:false,code:'adoption_refused',message:'The chosen library is retained but could not be opened. Export it before retrying.'});return error;}
       update(result,{adopt:true});
     }else update(result);
-    transitioning=false;actions.blockSharing(false);emit();
-    if(result.ok)sync.schedule();return result;
+    transitioning=false;transitionTicket=null;actions.blockSharing(false);emit();
+    if(result.ok)opened.schedule();return result;
   }
   async function flush(){
     if(!await settled())return error;
@@ -149,7 +178,7 @@ export function createLibrarySession(actions,{cacheFactory=openLibraryCache,acco
     exportOriginals:()=>cache?cache.export(namespace):Promise.resolve({ok:false,code:'cache_unavailable'}),
     version:id=>account.library(namespace,id),
     history:()=>account.library(namespace),
-    async archive(generation,ids){if(!sync||blocked)return {ok:false,code:'login_required'};const result=await sync.archive(generation,ids);return receive(result);},
+    async archive(generation,ids){if(!sync||blocked)return {ok:false,code:'login_required'};const owner=namespace,opened=sync,result=await opened.archive(generation,ids);return receive(result,owner,opened);},
     async reopen(){if(!await capture())return error;return identityAction(()=>account.session());},
     close(){sync?.close();cache?.close();},
   });
