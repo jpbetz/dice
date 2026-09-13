@@ -183,7 +183,9 @@ is [PEOPLE-DICE-TABLES.md](PEOPLE-DICE-TABLES.md). The
 [first personal-kit slice](SHIPPED.md#personal-name-and-dice-collection-2026-09-13)
 implements direct name editing and visual dice selection. The
 [compact table-controls slice](SHIPPED.md#compact-table-controls-and-setup-2026-09-13)
-adds shared setup while reducing the permanent controls above Roll. The full
+adds shared setup while reducing the permanent controls above Roll. The
+[expanded dice workspace](SHIPPED.md#expanded-dice-workspace-2026-09-13)
+now gives opened browsing and previews their own space. The full
 first release remains open. These keys preserve the existing roadmap's numbering.
 
 | Key | Current priority | Next deliverable | Status |

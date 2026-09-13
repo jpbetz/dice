@@ -82,9 +82,8 @@ export const personalKitScenarios = [
       assert.equal(await a.eval('document.activeElement.className'), 'dg-close', 'Tab wraps within the phone sheet');
       await a.page.browser.send('Emulation.setDeviceMetricsOverride',
         {width:1000,height:844,deviceScaleFactor:1,mobile:false},a.page.sessionId);
-      await a.waitFor(`!document.getElementById('left-panel').inert`);
-      assert.equal(await a.eval(`document.getElementById('dice-gallery').hasAttribute('aria-modal')`), false,
-        'expanding to a desktop drawer releases the table');
+      assert.equal(await a.eval(`document.getElementById('dice-gallery').getAttribute('aria-modal')`), 'true',
+        'the expanded workspace keeps local focus contained on desktop too');
       await a.page.browser.send('Emulation.setDeviceMetricsOverride',
         {width:390,height:844,deviceScaleFactor:1,mobile:true},a.page.sessionId);
       await a.waitFor(`document.getElementById('left-panel').inert`);
@@ -99,6 +98,77 @@ export const personalKitScenarios = [
       assert.ok(edit.input.top >= 0 && edit.save.bottom <= 440, 'name and Save remain usable with a shorter keyboard viewport');
       await a.eval(`document.getElementById('idm-name-input').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`);
       assert.equal(await a.eval(`document.getElementById('identity-menu').classList.contains('hidden')`), true);
+    },
+  },
+  {
+    name: 'dice-workspace', tags: ['smoke', 'personal-kit', 'dice-workspace'],
+    async fn(ctx) {
+      const a = await ctx.newTable({origin:'127.0.0.95',name:'Alice',query:'&stability=stable'});
+      const b = await ctx.newTable({origin:'127.0.0.96',name:'Bob'});
+      // Resizing is a foreground interaction. Chrome defers media-query
+      // change events in a background tab even while CSS reads the new size.
+      await a.page.browser.send('Page.bringToFront',{},a.page.sessionId);
+      const size = (width,height) => a.page.browser.send('Emulation.setDeviceMetricsOverride',
+        {width,height,deviceScaleFactor:1,mobile:width<761},a.page.sessionId);
+      const click = selector => a.eval(`document.querySelector(${JSON.stringify(selector)}).click()`);
+      const search = text => a.eval(`(() => {const input=document.getElementById('dg-search');input.value=${JSON.stringify(text)};input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+      await size(1440,900);
+      await a.roll('6d6 t3');
+      const rid = await a.rollId();
+      const turn = await a.dbg(`turnState(${JSON.stringify(rid)})`);
+      const layout = await a.eval(`document.getElementById('rail').getBoundingClientRect().toJSON()`);
+      await click('#my-dice'); await a.waitFor('window.__diceDebug.diceGallery.open');
+      const frame = await a.eval(`({root:document.getElementById('dice-gallery').getBoundingClientRect().toJSON(),list:document.querySelector('.dg-catalogue').getBoundingClientRect().toJSON(),preview:document.querySelector('.dg-feature').getBoundingClientRect().toJSON()})`);
+      assert.ok(frame.root.width>1100 && frame.list.right<=frame.preview.left,'focused browsing has a generous side-by-side workspace');
+      assert.equal(await a.eval(`document.getElementById('left-panel').inert`),true,'covered controls leave local focus order');
+      await a.eval(`(() => {const card=document.querySelector('[data-set="tidewrack.seaglass"]');card.scrollIntoView({block:'center'});card.focus({preventScroll:true})})()`);
+      const scroll = await a.eval(`document.querySelector('.dg-scroll').scrollTop`);
+      assert.ok(scroll>0,'the chosen set is down the catalogue');
+      await click('.dg-card[data-set="tidewrack.seaglass"]');
+      assert.equal(await a.eval(`document.querySelector('.dg-scroll').scrollTop`),scroll,'preview keeps the collection at the same place');
+      assert.equal(await a.eval(`document.activeElement.dataset.set`),'tidewrack.seaglass','desktop comparison keeps keyboard focus on the card');
+      await a.eval(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}))`);
+      assert.notEqual((await a.dbg('diceGallery')).selected,'tidewrack.seaglass','arrow keys compare neighboring sets');
+      assert.equal(await a.eval(`document.querySelectorAll('.dg-card[tabindex="0"]').length`),1,'Tab can leave the catalogue after one stop');
+      assert.notEqual(await a.dbg('diceSet'),'tidewrack.seaglass');
+      await search('seaglass tidewrack');
+      assert.equal(await a.eval(`document.querySelectorAll('.dg-card').length`),1,'search combines set name and collection');
+      await search('no-such-dice');
+      assert.equal(await a.eval(`document.querySelector('.dg-empty').hidden`),false);
+      await click('.dg-clear-filters');
+      assert.equal(await a.eval('document.activeElement.id'),'dg-search');
+      assert.ok(await a.eval(`document.querySelectorAll('.dg-card').length>10`),'empty search has a working recovery');
+      await b.roll('2d6'); await a.settle();
+      assert.equal(await a.rollId(),await b.rollId(),'other players keep rolling while the workspace is open');
+      const after = await a.dbg(`turnState(${JSON.stringify(rid)})`);
+      assert.deepEqual(after.throws,turn.throws,'browsing leaves the unfinished turn budget intact');
+      assert.deepEqual(after.values,turn.values);
+      await click('.dg-close');
+      assert.deepEqual(await a.eval(`document.getElementById('rail').getBoundingClientRect().toJSON()`),layout,'the expanded workspace adds no permanent header space');
+      assert.equal(await a.eval('document.activeElement.id'),'my-dice');
+      await size(390,844); await a.emulateCoarsePointer(true);
+      await click('#my-dice'); await a.waitFor('window.__diceDebug.diceGallery.open');
+      await a.eval(`(() => {const card=document.querySelector('.dg-card[data-set="tidewrack.seaglass"]');card.scrollIntoView({block:'center'});card.focus({preventScroll:true})})()`);
+      const phoneScroll = await a.eval(`document.querySelector('.dg-scroll').scrollTop`);
+      await click('.dg-card[data-set="tidewrack.seaglass"]');
+      assert.equal(await a.eval(`document.querySelector('.dg-catalogue').offsetParent`),null,'phone detail owns the workspace');
+      assert.equal(await a.eval(`document.activeElement.className`),'dg-back');
+      const apply = await a.eval(`document.querySelector('.dg-use').getBoundingClientRect().toJSON()`);
+      assert.ok(apply.top>0 && apply.bottom<844,'Use stays visible without scrolling past the preview');
+      await click('.dg-back');
+      assert.equal(await a.eval(`document.querySelector('.dg-scroll').scrollTop`),phoneScroll,'Back restores the exact catalogue position');
+      assert.equal(await a.eval(`document.activeElement.dataset.set`),'tidewrack.seaglass');
+      await size(390,440); await search('seaglass');
+      const keyboard = await a.eval(`({input:document.getElementById('dg-search').getBoundingClientRect().toJSON(),list:document.querySelector('.dg-scroll').getBoundingClientRect().toJSON(),width:document.body.scrollWidth})`);
+      assert.ok(keyboard.input.top>=0 && keyboard.list.height>=100 && keyboard.list.bottom<=440,'search and matches share the shorter keyboard viewport');
+      assert.equal(keyboard.width,390);
+      await click('.dg-card');
+      const shortPreview = await a.eval(`({name:document.querySelector('.dg-name').getBoundingClientRect().toJSON(),area:document.querySelector('.dg-feature-scroll').getBoundingClientRect().toJSON(),apply:document.querySelector('.dg-use').getBoundingClientRect().toJSON()})`);
+      assert.ok(shortPreview.name.top>=shortPreview.area.top && shortPreview.name.bottom<=shortPreview.area.bottom && shortPreview.apply.bottom<=440,'the short preview keeps the set name and Use in view');
+      await size(1000,844);
+      await a.waitFor(`document.activeElement.offsetParent !== null`,{desc:'resize moves focus off the hidden Back button'});
+      await click('.dg-close');
+      assert.equal(await a.eval(`document.getElementById('left-panel').inert`),false);
     },
   },
 ];

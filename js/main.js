@@ -30035,13 +30035,6 @@ async function openDiceGallery(anchor) {
         document.head.appendChild(link);
       });
       diceGalleryLoading = Promise.all([import('./dicegallery.js'), css]).then(([m]) => {
-        const phone = window.matchMedia('(max-width: 640px)');
-        const syncModal = root => {
-          const focused = root.contains(document.activeElement) ? document.activeElement : null;
-          if (phone.matches) openModal(root, {labelledBy:'dg-title'});
-          else closeModal(root);
-          focused?.focus({preventScroll:true});
-        };
         diceGallery = m.createDiceGallery({
           entries: galleryEntries, current: () => diceSet, choose: setDiceSet,
           suggested: () => venueDiceSet(),
@@ -30050,15 +30043,12 @@ async function openDiceGallery(anchor) {
           backToRolls: returnToMyRolls,
           opened: root => {
             document.getElementById('my-dice').setAttribute('aria-expanded', 'true');
-            syncModal(root);
+            openModal(root, {labelledBy:'dg-title'});
           },
           closed: root => {
             closeModal(root);
             document.getElementById('my-dice').setAttribute('aria-expanded', 'false');
           },
-        });
-        phone.addEventListener('change', () => {
-          if (diceGallery.isOpen) syncModal(document.getElementById('dice-gallery'));
         });
       }).catch(e => { diceGalleryLoading = null; throw e; });
     }
