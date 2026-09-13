@@ -1,0 +1,1291 @@
+{
+  "copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "node": "v24.14.1",
+  "source": "4d9518c",
+  "rows": [
+    {
+      "zoom": "wide",
+      "notation": "4d6",
+      "seed": 42,
+      "measures": [
+        {
+          "optimized": false,
+          "elapsed": 14.006358000000006,
+          "hash": "f92640ef00f1d1641805f5765597a04ba8ff12085cb2b38b2095c277672aad7c",
+          "steps": 88,
+          "pairs": 5382,
+          "rejected": 0,
+          "profile": {
+            "solve": 3.4656810000000036,
+            "makeContactConstraints": 0.6432969999999187,
+            "broadphase": 0.9318810000001037,
+            "integrate": 0.6547139999998848,
+            "narrowphase": 5.714768000000063
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 5264,
+              "ms": 2.042623999999975
+            },
+            "convexConvex": {
+              "calls": 100,
+              "ms": 1.3358690000001587
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 6.015761999999995,
+          "hash": "f92640ef00f1d1641805f5765597a04ba8ff12085cb2b38b2095c277672aad7c",
+          "steps": 88,
+          "pairs": 5382,
+          "rejected": 5049,
+          "profile": {
+            "solve": 1.9551469999999256,
+            "makeContactConstraints": 0.3657129999999995,
+            "broadphase": 1.041408999999959,
+            "integrate": 0.3944270000001211,
+            "narrowphase": 0.869616000000093
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 215,
+              "ms": 0.2294660000000306
+            },
+            "convexConvex": {
+              "calls": 100,
+              "ms": 0.4384389999999314
+            }
+          }
+        },
+        {
+          "optimized": false,
+          "elapsed": 6.550036000000006,
+          "hash": "f92640ef00f1d1641805f5765597a04ba8ff12085cb2b38b2095c277672aad7c",
+          "steps": 88,
+          "pairs": 5382,
+          "rejected": 0,
+          "profile": {
+            "solve": 1.4912490000000105,
+            "makeContactConstraints": 0.25372200000001044,
+            "broadphase": 0.4376259999998524,
+            "integrate": 0.07375200000015525,
+            "narrowphase": 3.187981999999977
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 5264,
+              "ms": 0.9462010000005137
+            },
+            "convexConvex": {
+              "calls": 100,
+              "ms": 0.3514469999998653
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 2.632097000000016,
+          "hash": "f92640ef00f1d1641805f5765597a04ba8ff12085cb2b38b2095c277672aad7c",
+          "steps": 88,
+          "pairs": 5382,
+          "rejected": 5049,
+          "profile": {
+            "solve": 0.7276269999999272,
+            "makeContactConstraints": 0.2312759999999514,
+            "broadphase": 0.3077179999998805,
+            "integrate": 0.06441000000003783,
+            "narrowphase": 0.4950259999999673
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 215,
+              "ms": 0.11072199999998134
+            },
+            "convexConvex": {
+              "calls": 100,
+              "ms": 0.23000700000008578
+            }
+          }
+        }
+      ]
+    },
+    {
+      "zoom": "wide",
+      "notation": "40d20",
+      "seed": 90090,
+      "measures": [
+        {
+          "optimized": false,
+          "elapsed": 472.70527500000003,
+          "hash": "902c96820bd4b673b923a33c773b62190ffa162c8e4cddb4123c0e9672c69d88",
+          "steps": 346,
+          "pairs": 130625,
+          "rejected": 0,
+          "profile": {
+            "solve": 20.92011199999996,
+            "makeContactConstraints": 2.9834300000003395,
+            "broadphase": 5.7379070000001775,
+            "integrate": 0.5485889999997937,
+            "narrowphase": 436.7329709999986
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 105532,
+              "ms": 14.698814000002812
+            },
+            "convexConvex": {
+              "calls": 7421,
+              "ms": 400.9938950000029
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 438.1468889999999,
+          "hash": "902c96820bd4b673b923a33c773b62190ffa162c8e4cddb4123c0e9672c69d88",
+          "steps": 346,
+          "pairs": 130625,
+          "rejected": 101247,
+          "profile": {
+            "solve": 18.19337399999904,
+            "makeContactConstraints": 2.171150999998872,
+            "broadphase": 6.420667999999978,
+            "integrate": 0.5599200000015117,
+            "narrowphase": 406.5125350000018
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 4285,
+              "ms": 1.9394409999989648
+            },
+            "convexConvex": {
+              "calls": 7421,
+              "ms": 401.584339
+            }
+          }
+        },
+        {
+          "optimized": false,
+          "elapsed": 464.41550099999995,
+          "hash": "902c96820bd4b673b923a33c773b62190ffa162c8e4cddb4123c0e9672c69d88",
+          "steps": 346,
+          "pairs": 130625,
+          "rejected": 0,
+          "profile": {
+            "solve": 18.69200399999977,
+            "makeContactConstraints": 2.1778740000020207,
+            "broadphase": 5.026115999999092,
+            "integrate": 0.5664829999998346,
+            "narrowphase": 434.00208300000213
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 105532,
+              "ms": 14.245798000024024
+            },
+            "convexConvex": {
+              "calls": 7421,
+              "ms": 398.67551000001913
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 432.4298590000001,
+          "hash": "902c96820bd4b673b923a33c773b62190ffa162c8e4cddb4123c0e9672c69d88",
+          "steps": 346,
+          "pairs": 130625,
+          "rejected": 101247,
+          "profile": {
+            "solve": 18.578392000002168,
+            "makeContactConstraints": 1.9654940000016268,
+            "broadphase": 6.959123000001455,
+            "integrate": 0.5250970000004145,
+            "narrowphase": 400.4993720000018
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 4285,
+              "ms": 1.6021230000085325
+            },
+            "convexConvex": {
+              "calls": 7421,
+              "ms": 396.16449400000556
+            }
+          }
+        }
+      ]
+    },
+    {
+      "zoom": "wide",
+      "notation": "40d20",
+      "seed": 32676,
+      "measures": [
+        {
+          "optimized": false,
+          "elapsed": 356.19675899999993,
+          "hash": "97d2a89f9eb0b8716ae6be28b4141036563ebbe1513c0e653fa0e2ee7b56dd14",
+          "steps": 220,
+          "pairs": 108069,
+          "rejected": 0,
+          "profile": {
+            "solve": 16.664023000003,
+            "makeContactConstraints": 1.8606960000008712,
+            "broadphase": 4.403350999998565,
+            "integrate": 0.3505960000011328,
+            "narrowphase": 329.52208400000063
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 87380,
+              "ms": 11.721885000041084
+            },
+            "convexConvex": {
+              "calls": 5026,
+              "ms": 300.74179400001617
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 325.8094530000003,
+          "hash": "97d2a89f9eb0b8716ae6be28b4141036563ebbe1513c0e653fa0e2ee7b56dd14",
+          "steps": 220,
+          "pairs": 108069,
+          "rejected": 83877,
+          "profile": {
+            "solve": 16.156669000001784,
+            "makeContactConstraints": 1.6278899999974783,
+            "broadphase": 4.901607999999669,
+            "integrate": 0.3508869999968738,
+            "narrowphase": 299.96872899999744
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 3503,
+              "ms": 1.4680920000114384
+            },
+            "convexConvex": {
+              "calls": 5026,
+              "ms": 296.54240800000116
+            }
+          }
+        },
+        {
+          "optimized": false,
+          "elapsed": 349.36956699999973,
+          "hash": "97d2a89f9eb0b8716ae6be28b4141036563ebbe1513c0e653fa0e2ee7b56dd14",
+          "steps": 220,
+          "pairs": 108069,
+          "rejected": 0,
+          "profile": {
+            "solve": 16.27162100000396,
+            "makeContactConstraints": 2.069092999998702,
+            "broadphase": 3.6998839999992015,
+            "integrate": 0.34622400000171183,
+            "narrowphase": 324.04683100000057
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 87380,
+              "ms": 11.676364999939778
+            },
+            "convexConvex": {
+              "calls": 5026,
+              "ms": 295.33514999998124
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 325.683082,
+          "hash": "97d2a89f9eb0b8716ae6be28b4141036563ebbe1513c0e653fa0e2ee7b56dd14",
+          "steps": 220,
+          "pairs": 108069,
+          "rejected": 83877,
+          "profile": {
+            "solve": 16.261027999999442,
+            "makeContactConstraints": 1.6206330000004527,
+            "broadphase": 4.8897560000009435,
+            "integrate": 0.3345169999970494,
+            "narrowphase": 299.75531999999885
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 3503,
+              "ms": 1.4615059999814548
+            },
+            "convexConvex": {
+              "calls": 5026,
+              "ms": 296.2904419999927
+            }
+          }
+        }
+      ]
+    },
+    {
+      "zoom": "wide",
+      "notation": "40d4",
+      "seed": 90090,
+      "measures": [
+        {
+          "optimized": false,
+          "elapsed": 158.59131700000034,
+          "hash": "ae277c5617a27f00326aecf6685e4d5673b2917a44f2464db9f77235af7a780e",
+          "steps": 540,
+          "pairs": 133535,
+          "rejected": 0,
+          "profile": {
+            "solve": 21.967331999995622,
+            "makeContactConstraints": 1.9179209999992963,
+            "broadphase": 4.6970230000010815,
+            "integrate": 0.595355000001291,
+            "narrowphase": 123.65999300000294
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 104065,
+              "ms": 8.203095000028043
+            },
+            "convexConvex": {
+              "calls": 17050,
+              "ms": 93.51226600000246
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 135.96417800000017,
+          "hash": "ae277c5617a27f00326aecf6685e4d5673b2917a44f2464db9f77235af7a780e",
+          "steps": 540,
+          "pairs": 133535,
+          "rejected": 99049,
+          "profile": {
+            "solve": 22.71801200000118,
+            "makeContactConstraints": 1.8583570000009786,
+            "broadphase": 6.199896000001445,
+            "integrate": 0.6122380000047087,
+            "narrowphase": 100.1921299999899
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 5016,
+              "ms": 1.4882490000177313
+            },
+            "convexConvex": {
+              "calls": 17050,
+              "ms": 93.9064789999884
+            }
+          }
+        },
+        {
+          "optimized": false,
+          "elapsed": 190.16775199999984,
+          "hash": "ae277c5617a27f00326aecf6685e4d5673b2917a44f2464db9f77235af7a780e",
+          "steps": 540,
+          "pairs": 133535,
+          "rejected": 0,
+          "profile": {
+            "solve": 29.183736999998928,
+            "makeContactConstraints": 2.3779600000034407,
+            "broadphase": 5.89871000000403,
+            "integrate": 0.8029460000016115,
+            "narrowphase": 146.0967219999984
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 104065,
+              "ms": 11.329377000009572
+            },
+            "convexConvex": {
+              "calls": 17050,
+              "ms": 105.29145000000881
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 134.73104899999998,
+          "hash": "ae277c5617a27f00326aecf6685e4d5673b2917a44f2464db9f77235af7a780e",
+          "steps": 540,
+          "pairs": 133535,
+          "rejected": 99049,
+          "profile": {
+            "solve": 22.625022000002446,
+            "makeContactConstraints": 1.869692999999188,
+            "broadphase": 6.2661219999986315,
+            "integrate": 0.628909999996722,
+            "narrowphase": 99.23387499999899
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 5016,
+              "ms": 1.4868479999990996
+            },
+            "convexConvex": {
+              "calls": 17050,
+              "ms": 92.9818479999858
+            }
+          }
+        }
+      ]
+    },
+    {
+      "zoom": "medium",
+      "notation": "4d6",
+      "seed": 42,
+      "measures": [
+        {
+          "optimized": false,
+          "elapsed": 3.3521449999998367,
+          "hash": "46f82b021c1b356bb41432b03dff1abbba692dc9e3a9e393216d13d02d640741",
+          "steps": 109,
+          "pairs": 5808,
+          "rejected": 0,
+          "profile": {
+            "solve": 0.7669050000022253,
+            "makeContactConstraints": 0.08571999999776381,
+            "broadphase": 0.228158999997504,
+            "integrate": 0.04000600000154009,
+            "narrowphase": 1.8664700000013
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 5693,
+              "ms": 0.6418690000014067
+            },
+            "convexConvex": {
+              "calls": 97,
+              "ms": 0.1626620000033654
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 1.894709000000148,
+          "hash": "46f82b021c1b356bb41432b03dff1abbba692dc9e3a9e393216d13d02d640741",
+          "steps": 109,
+          "pairs": 5808,
+          "rejected": 5454,
+          "profile": {
+            "solve": 0.7557259999962298,
+            "makeContactConstraints": 0.08111800000096991,
+            "broadphase": 0.322637999998733,
+            "integrate": 0.04017400000066118,
+            "narrowphase": 0.3539929999983542
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 239,
+              "ms": 0.11081499999454536
+            },
+            "convexConvex": {
+              "calls": 97,
+              "ms": 0.15158799999835537
+            }
+          }
+        },
+        {
+          "optimized": false,
+          "elapsed": 3.3174159999998665,
+          "hash": "46f82b021c1b356bb41432b03dff1abbba692dc9e3a9e393216d13d02d640741",
+          "steps": 109,
+          "pairs": 5808,
+          "rejected": 0,
+          "profile": {
+            "solve": 0.7706910000001699,
+            "makeContactConstraints": 0.08063899999888235,
+            "broadphase": 0.2255819999995765,
+            "integrate": 0.04098899999917194,
+            "narrowphase": 1.8361100000006445
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 5693,
+              "ms": 0.6325910000000476
+            },
+            "convexConvex": {
+              "calls": 97,
+              "ms": 0.1508849999991071
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 4.538839999999709,
+          "hash": "46f82b021c1b356bb41432b03dff1abbba692dc9e3a9e393216d13d02d640741",
+          "steps": 109,
+          "pairs": 5808,
+          "rejected": 5454,
+          "profile": {
+            "solve": 0.8149069999972198,
+            "makeContactConstraints": 0.09944400000222231,
+            "broadphase": 2.621658999999454,
+            "integrate": 0.050929999998515996,
+            "narrowphase": 0.4586409999983516
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 239,
+              "ms": 0.13187299999617608
+            },
+            "convexConvex": {
+              "calls": 97,
+              "ms": 0.21480699999938224
+            }
+          }
+        }
+      ]
+    },
+    {
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 90090,
+      "measures": [
+        {
+          "optimized": false,
+          "elapsed": 372.1626190000002,
+          "hash": "114c7efa128f68563e84a1ce17f9f5e07a2235318ab17451dc39b2c23da20a7c",
+          "steps": 225,
+          "pairs": 118256,
+          "rejected": 0,
+          "profile": {
+            "solve": 18.004096000005575,
+            "makeContactConstraints": 1.8615320000135398,
+            "broadphase": 4.190128000000641,
+            "integrate": 0.40381999999863183,
+            "narrowphase": 344.77526900000066
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 90018,
+              "ms": 13.428712999929303
+            },
+            "convexConvex": {
+              "calls": 5681,
+              "ms": 312.2584880000095
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 352.248294,
+          "hash": "114c7efa128f68563e84a1ce17f9f5e07a2235318ab17451dc39b2c23da20a7c",
+          "steps": 225,
+          "pairs": 118256,
+          "rejected": 86635,
+          "profile": {
+            "solve": 18.63130799999999,
+            "makeContactConstraints": 1.9079609999980676,
+            "broadphase": 5.7486199999957535,
+            "integrate": 0.41137099999286875,
+            "narrowphase": 322.7156330000007
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 3383,
+              "ms": 1.6721940000415998
+            },
+            "convexConvex": {
+              "calls": 5681,
+              "ms": 318.3436370000063
+            }
+          }
+        },
+        {
+          "optimized": false,
+          "elapsed": 360.8716549999999,
+          "hash": "114c7efa128f68563e84a1ce17f9f5e07a2235318ab17451dc39b2c23da20a7c",
+          "steps": 225,
+          "pairs": 118256,
+          "rejected": 0,
+          "profile": {
+            "solve": 16.824509999999464,
+            "makeContactConstraints": 1.651014000001851,
+            "broadphase": 3.9642219999977897,
+            "integrate": 0.34573200000340876,
+            "narrowphase": 335.63853100000415
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 90018,
+              "ms": 12.1425900001841
+            },
+            "convexConvex": {
+              "calls": 5681,
+              "ms": 305.93617000003087
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 345.94912399999976,
+          "hash": "114c7efa128f68563e84a1ce17f9f5e07a2235318ab17451dc39b2c23da20a7c",
+          "steps": 225,
+          "pairs": 118256,
+          "rejected": 86635,
+          "profile": {
+            "solve": 17.725422999998045,
+            "makeContactConstraints": 1.9161409999987882,
+            "broadphase": 5.461261999997987,
+            "integrate": 0.38319000000592496,
+            "narrowphase": 317.7107469999937
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 3383,
+              "ms": 1.4464240000143036
+            },
+            "convexConvex": {
+              "calls": 5681,
+              "ms": 313.81053299996165
+            }
+          }
+        }
+      ]
+    },
+    {
+      "zoom": "medium",
+      "notation": "40d20",
+      "seed": 32676,
+      "measures": [
+        {
+          "optimized": false,
+          "elapsed": 363.05210200000056,
+          "hash": "f044166c11796928ddbaac8880aef64f73e92fb949018b92545fd50e74ebc73c",
+          "steps": 300,
+          "pairs": 105096,
+          "rejected": 0,
+          "profile": {
+            "solve": 26.012680000004366,
+            "makeContactConstraints": 2.360784999998941,
+            "broadphase": 5.948731999995289,
+            "integrate": 0.768092000008437,
+            "narrowphase": 323.5123340000082
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 82127,
+              "ms": 17.570504000071196
+            },
+            "convexConvex": {
+              "calls": 3939,
+              "ms": 282.1759950000078
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 254.15004399999998,
+          "hash": "f044166c11796928ddbaac8880aef64f73e92fb949018b92545fd50e74ebc73c",
+          "steps": 300,
+          "pairs": 105096,
+          "rejected": 78460,
+          "profile": {
+            "solve": 16.954784000011387,
+            "makeContactConstraints": 1.6981250000008004,
+            "broadphase": 5.219576000002235,
+            "integrate": 0.3945029999986218,
+            "narrowphase": 227.19107900000563
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 3667,
+              "ms": 1.6492180000032022
+            },
+            "convexConvex": {
+              "calls": 3939,
+              "ms": 223.57493000000522
+            }
+          }
+        },
+        {
+          "optimized": false,
+          "elapsed": 283.0389239999995,
+          "hash": "f044166c11796928ddbaac8880aef64f73e92fb949018b92545fd50e74ebc73c",
+          "steps": 300,
+          "pairs": 105096,
+          "rejected": 0,
+          "profile": {
+            "solve": 18.460321999998996,
+            "makeContactConstraints": 1.7684289999961038,
+            "broadphase": 4.409537999993518,
+            "integrate": 0.5127660000052856,
+            "narrowphase": 254.85627199998999
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 82127,
+              "ms": 11.982684999937192
+            },
+            "convexConvex": {
+              "calls": 3939,
+              "ms": 226.08744999997452
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 248.46942799999943,
+          "hash": "f044166c11796928ddbaac8880aef64f73e92fb949018b92545fd50e74ebc73c",
+          "steps": 300,
+          "pairs": 105096,
+          "rejected": 78460,
+          "profile": {
+            "solve": 15.985739999994621,
+            "makeContactConstraints": 1.6409079999975802,
+            "broadphase": 5.255878999997549,
+            "integrate": 0.4053879999974015,
+            "narrowphase": 221.84210699998675
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 3667,
+              "ms": 1.6002089999883538
+            },
+            "convexConvex": {
+              "calls": 3939,
+              "ms": 218.27334600002905
+            }
+          }
+        }
+      ]
+    },
+    {
+      "zoom": "medium",
+      "notation": "40d4",
+      "seed": 90090,
+      "measures": [
+        {
+          "optimized": false,
+          "elapsed": 167.00003199999992,
+          "hash": "a2fe4a40a30c2e188325c80b0ff6c1dc9a68bc396536362c1f391c736f9b3c99",
+          "steps": 540,
+          "pairs": 143312,
+          "rejected": 0,
+          "profile": {
+            "solve": 21.71516099998189,
+            "makeContactConstraints": 1.89617800000633,
+            "broadphase": 5.351730000000316,
+            "integrate": 0.6195749999988038,
+            "narrowphase": 133.2202790000083
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 99447,
+              "ms": 7.9000559997930395
+            },
+            "convexConvex": {
+              "calls": 22302,
+              "ms": 103.12094399990019
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 145.0270499999997,
+          "hash": "a2fe4a40a30c2e188325c80b0ff6c1dc9a68bc396536362c1f391c736f9b3c99",
+          "steps": 540,
+          "pairs": 143312,
+          "rejected": 95065,
+          "profile": {
+            "solve": 22.088512999975137,
+            "makeContactConstraints": 1.8955379999961224,
+            "broadphase": 6.517394999998942,
+            "integrate": 0.6351609999956054,
+            "narrowphase": 109.96750199999497
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 4382,
+              "ms": 1.2958200000030047
+            },
+            "convexConvex": {
+              "calls": 22302,
+              "ms": 102.9090270000197
+            }
+          }
+        },
+        {
+          "optimized": false,
+          "elapsed": 165.69054400000005,
+          "hash": "a2fe4a40a30c2e188325c80b0ff6c1dc9a68bc396536362c1f391c736f9b3c99",
+          "steps": 540,
+          "pairs": 143312,
+          "rejected": 0,
+          "profile": {
+            "solve": 22.220625999987533,
+            "makeContactConstraints": 1.9087849999932587,
+            "broadphase": 4.87543399999322,
+            "integrate": 0.6380599999974947,
+            "narrowphase": 132.13675699999112
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 99447,
+              "ms": 7.753247999902669
+            },
+            "convexConvex": {
+              "calls": 22302,
+              "ms": 102.37686499983738
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 148.80493300000035,
+          "hash": "a2fe4a40a30c2e188325c80b0ff6c1dc9a68bc396536362c1f391c736f9b3c99",
+          "steps": 540,
+          "pairs": 143312,
+          "rejected": 95065,
+          "profile": {
+            "solve": 21.7127590000091,
+            "makeContactConstraints": 1.9427190000142218,
+            "broadphase": 6.519338999990396,
+            "integrate": 0.5845079999990048,
+            "narrowphase": 112.89494800001557
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 4382,
+              "ms": 1.2885890000234212
+            },
+            "convexConvex": {
+              "calls": 22302,
+              "ms": 105.94477899999947
+            }
+          }
+        }
+      ]
+    },
+    {
+      "zoom": "close",
+      "notation": "4d6",
+      "seed": 42,
+      "measures": [
+        {
+          "optimized": false,
+          "elapsed": 3.522769999999582,
+          "hash": "0e24e3f6b0e0503674b1ffa7edca5b92155b82069e1e7197d5e1d3caf59a449b",
+          "steps": 92,
+          "pairs": 5452,
+          "rejected": 0,
+          "profile": {
+            "solve": 0.9001479999978983,
+            "makeContactConstraints": 0.10399900000174966,
+            "broadphase": 0.26209400000243477,
+            "integrate": 0.041932000000997505,
+            "narrowphase": 1.877242000003207
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 5272,
+              "ms": 0.5912410000164527
+            },
+            "convexConvex": {
+              "calls": 151,
+              "ms": 0.2651990000031219
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 2.1621359999999186,
+          "hash": "0e24e3f6b0e0503674b1ffa7edca5b92155b82069e1e7197d5e1d3caf59a449b",
+          "steps": 92,
+          "pairs": 5452,
+          "rejected": 5054,
+          "profile": {
+            "solve": 0.9018369999985225,
+            "makeContactConstraints": 0.10088800000175979,
+            "broadphase": 0.3191560000013851,
+            "integrate": 0.03921999999693071,
+            "narrowphase": 0.48127000000295084
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 218,
+              "ms": 0.11946200000238605
+            },
+            "convexConvex": {
+              "calls": 151,
+              "ms": 0.2575040000001536
+            }
+          }
+        },
+        {
+          "optimized": false,
+          "elapsed": 3.510400999999547,
+          "hash": "0e24e3f6b0e0503674b1ffa7edca5b92155b82069e1e7197d5e1d3caf59a449b",
+          "steps": 92,
+          "pairs": 5452,
+          "rejected": 0,
+          "profile": {
+            "solve": 0.8975920000011683,
+            "makeContactConstraints": 0.0944279999976061,
+            "broadphase": 0.26802999999927124,
+            "integrate": 0.03851999999915279,
+            "narrowphase": 1.8872490000003381
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 5272,
+              "ms": 0.5967099999979837
+            },
+            "convexConvex": {
+              "calls": 151,
+              "ms": 0.26878199999555363
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 2.1758350000000064,
+          "hash": "0e24e3f6b0e0503674b1ffa7edca5b92155b82069e1e7197d5e1d3caf59a449b",
+          "steps": 92,
+          "pairs": 5452,
+          "rejected": 5054,
+          "profile": {
+            "solve": 0.8983919999955106,
+            "makeContactConstraints": 0.10106099999484286,
+            "broadphase": 0.31650099999842496,
+            "integrate": 0.03496699999868724,
+            "narrowphase": 0.47673800000302435
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 218,
+              "ms": 0.1157130000037796
+            },
+            "convexConvex": {
+              "calls": 151,
+              "ms": 0.260550000000876
+            }
+          }
+        }
+      ]
+    },
+    {
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 90090,
+      "measures": [
+        {
+          "optimized": false,
+          "elapsed": 465.1842459999998,
+          "hash": "ca9480a9830f39c1fdf1dae0437aeac8099a8ce6e454fd6a319a53d44c37ea49",
+          "steps": 265,
+          "pairs": 110639,
+          "rejected": 0,
+          "profile": {
+            "solve": 20.27602499999648,
+            "makeContactConstraints": 2.2851629999904617,
+            "broadphase": 4.435204000003978,
+            "integrate": 0.40967600000112725,
+            "narrowphase": 434.77034999999796
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 80522,
+              "ms": 10.839452000108395
+            },
+            "convexConvex": {
+              "calls": 6764,
+              "ms": 407.46440400004303
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 433.0145670000011,
+          "hash": "ca9480a9830f39c1fdf1dae0437aeac8099a8ce6e454fd6a319a53d44c37ea49",
+          "steps": 265,
+          "pairs": 110639,
+          "rejected": 77123,
+          "profile": {
+            "solve": 19.024579999994785,
+            "makeContactConstraints": 2.0616040000031717,
+            "broadphase": 5.117404000001443,
+            "integrate": 0.375873999997566,
+            "narrowphase": 403.329956999989
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 3399,
+              "ms": 1.3882290000146895
+            },
+            "convexConvex": {
+              "calls": 6764,
+              "ms": 399.4444870000043
+            }
+          }
+        },
+        {
+          "optimized": false,
+          "elapsed": 455.43836700000065,
+          "hash": "ca9480a9830f39c1fdf1dae0437aeac8099a8ce6e454fd6a319a53d44c37ea49",
+          "steps": 265,
+          "pairs": 110639,
+          "rejected": 0,
+          "profile": {
+            "solve": 18.37258399998791,
+            "makeContactConstraints": 2.6489069999843196,
+            "broadphase": 3.9496760000238282,
+            "integrate": 0.37565100000210805,
+            "narrowphase": 426.96206799999163
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 80522,
+              "ms": 10.82559100016988
+            },
+            "convexConvex": {
+              "calls": 6764,
+              "ms": 400.24076199991214
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 434.423440999999,
+          "hash": "ca9480a9830f39c1fdf1dae0437aeac8099a8ce6e454fd6a319a53d44c37ea49",
+          "steps": 265,
+          "pairs": 110639,
+          "rejected": 77123,
+          "profile": {
+            "solve": 19.25252999998338,
+            "makeContactConstraints": 1.967716000004657,
+            "broadphase": 5.099962000007508,
+            "integrate": 0.35793699999885575,
+            "narrowphase": 404.8171380000076
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 3399,
+              "ms": 1.4177570000101696
+            },
+            "convexConvex": {
+              "calls": 6764,
+              "ms": 401.0528059998942
+            }
+          }
+        }
+      ]
+    },
+    {
+      "zoom": "close",
+      "notation": "40d20",
+      "seed": 32676,
+      "measures": [
+        {
+          "optimized": false,
+          "elapsed": 538.1370630000001,
+          "hash": "5cc3549b3dcacacf7c998eb293d2cf070876deae7a64d64a195a621f7f02ff18",
+          "steps": 256,
+          "pairs": 129054,
+          "rejected": 0,
+          "profile": {
+            "solve": 21.14739599999848,
+            "makeContactConstraints": 2.2813029999997525,
+            "broadphase": 4.295940000003611,
+            "integrate": 0.40701999999873806,
+            "narrowphase": 506.8349159999889
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 94356,
+              "ms": 12.764755000391233
+            },
+            "convexConvex": {
+              "calls": 8305,
+              "ms": 475.2461250000033
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 523.715682,
+          "hash": "5cc3549b3dcacacf7c998eb293d2cf070876deae7a64d64a195a621f7f02ff18",
+          "steps": 256,
+          "pairs": 129054,
+          "rejected": 90382,
+          "profile": {
+            "solve": 22.097945000004984,
+            "makeContactConstraints": 3.0945429999992484,
+            "broadphase": 6.0296049999960815,
+            "integrate": 0.42656399999214045,
+            "narrowphase": 488.6543759999895
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 3974,
+              "ms": 1.750915999919016
+            },
+            "convexConvex": {
+              "calls": 8305,
+              "ms": 483.57143100002395
+            }
+          }
+        },
+        {
+          "optimized": false,
+          "elapsed": 538.5601179999994,
+          "hash": "5cc3549b3dcacacf7c998eb293d2cf070876deae7a64d64a195a621f7f02ff18",
+          "steps": 256,
+          "pairs": 129054,
+          "rejected": 0,
+          "profile": {
+            "solve": 21.19576600000073,
+            "makeContactConstraints": 2.2133969999922556,
+            "broadphase": 4.356574999990698,
+            "integrate": 0.38525800000934396,
+            "narrowphase": 507.51836499999445
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 94356,
+              "ms": 12.725015000078201
+            },
+            "convexConvex": {
+              "calls": 8305,
+              "ms": 475.8521670000664
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 543.654668000001,
+          "hash": "5cc3549b3dcacacf7c998eb293d2cf070876deae7a64d64a195a621f7f02ff18",
+          "steps": 256,
+          "pairs": 129054,
+          "rejected": 90382,
+          "profile": {
+            "solve": 23.47187600000325,
+            "makeContactConstraints": 2.810492000007798,
+            "broadphase": 6.309098999994603,
+            "integrate": 0.46660299999348354,
+            "narrowphase": 506.59062699998503
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 3974,
+              "ms": 1.7909039999740344
+            },
+            "convexConvex": {
+              "calls": 8305,
+              "ms": 501.12433199994484
+            }
+          }
+        }
+      ]
+    },
+    {
+      "zoom": "close",
+      "notation": "40d4",
+      "seed": 90090,
+      "measures": [
+        {
+          "optimized": false,
+          "elapsed": 178.89256699999896,
+          "hash": "b2afeeb7c3a4e7abf04956399acc8c320b0c134240457aac92866e885ee8785f",
+          "steps": 540,
+          "pairs": 161932,
+          "rejected": 0,
+          "profile": {
+            "solve": 26.220210999979827,
+            "makeContactConstraints": 2.246871999972427,
+            "broadphase": 5.110349000015049,
+            "integrate": 0.6162450000119861,
+            "narrowphase": 141.3285279999982
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 110308,
+              "ms": 8.538365999967937
+            },
+            "convexConvex": {
+              "calls": 19995,
+              "ms": 109.25846500002444
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 157.2332210000004,
+          "hash": "b2afeeb7c3a4e7abf04956399acc8c320b0c134240457aac92866e885ee8785f",
+          "steps": 540,
+          "pairs": 161932,
+          "rejected": 103121,
+          "profile": {
+            "solve": 26.201228999989326,
+            "makeContactConstraints": 2.288559999997233,
+            "broadphase": 7.251992999950744,
+            "integrate": 0.6232689999887953,
+            "narrowphase": 117.65320600000632
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 7187,
+              "ms": 1.5518969999848196
+            },
+            "convexConvex": {
+              "calls": 19995,
+              "ms": 110.23930099993049
+            }
+          }
+        },
+        {
+          "optimized": false,
+          "elapsed": 178.45831700000053,
+          "hash": "b2afeeb7c3a4e7abf04956399acc8c320b0c134240457aac92866e885ee8785f",
+          "steps": 540,
+          "pairs": 161932,
+          "rejected": 0,
+          "profile": {
+            "solve": 26.119814999980008,
+            "makeContactConstraints": 2.325541999982306,
+            "broadphase": 5.924587999963478,
+            "integrate": 0.611324000003151,
+            "narrowphase": 140.43220100000144
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 110308,
+              "ms": 8.524758999848927
+            },
+            "convexConvex": {
+              "calls": 19995,
+              "ms": 108.61340999992899
+            }
+          }
+        },
+        {
+          "optimized": true,
+          "elapsed": 154.5660029999999,
+          "hash": "b2afeeb7c3a4e7abf04956399acc8c320b0c134240457aac92866e885ee8785f",
+          "steps": 540,
+          "pairs": 161932,
+          "rejected": 103121,
+          "profile": {
+            "solve": 25.9030079999593,
+            "makeContactConstraints": 2.24642600001971,
+            "broadphase": 6.989682000019457,
+            "integrate": 0.6087049999932788,
+            "narrowphase": 115.7924419999963
+          },
+          "collision": {
+            "planeConvex": {
+              "calls": 7187,
+              "ms": 1.5013630000466947
+            },
+            "convexConvex": {
+              "calls": 19995,
+              "ms": 108.59217000010176
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
