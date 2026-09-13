@@ -39,6 +39,7 @@ export function createTablePreview(host, report) {
       if(design.state.wanted===id&&design.state.status==='ready') render();
       else if(design.state.wanted!==id||design.state.status!=='loading') design.select(id);
     },
+    capture(){render();return renderer.domElement.toDataURL('image/png');},
     pause() {visible=false;host.hidden=true;},
     get state(){return {...design.state,visible,frames};},
   };

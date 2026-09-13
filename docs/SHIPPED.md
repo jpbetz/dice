@@ -8,6 +8,19 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## 2026-09-13 — Saved table homes in Tables
+
+Optional accounts can now save the current public setup at its existing
+address, create named homes, and return through cover cards. Capture previews,
+retained conflict comparison and explicit reconciliation preserve ongoing live
+play. Failed saves keep an exact device retry and public export; account changes
+invalidate old views. Recovery and a deliberate Join restore an empty home
+after a real server restart, while returning members never reset occupied
+tables. An unavailable home keeps a persistent Retry / New guest table state.
+Actual app tests and inspected desktop/390 px captures are recorded in
+[SAVED-HOME-PROTOCOL.md](SAVED-HOME-PROTOCOL.md#tables-workspace-implementation--2026-09-13).
+Friends, invitations and presence remain separate work.
+
 ## 2026-09-13 — Help follows the new tasks and privacy choices
 
 Getting started now explains Quick dice, the three destinations, gallery

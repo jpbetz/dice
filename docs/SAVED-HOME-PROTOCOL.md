@@ -141,6 +141,48 @@ cookie jars against the real API.
 Both e2e lanes include `tests/account-homes-browser.test.mjs`, using real Chrome
 and real server processes to verify the network helper, cold-home refusal,
 old-host fallback, clean-browser account recovery and opening a saved home after
-restart. These are protocol pages, not evidence that the final Tables UI or
-phone layout has shipped. The UI slice still owes the named desktop/phone
-captures and composed end-to-end journeys.
+restart.
+
+## Tables workspace implementation — 2026-09-13
+
+Tables now separates saved home cards from browser recents. Manage opens a
+focused public-setup preview; **Join now** is the only saved-card navigation
+action. Saving the current table converts its existing address. Creating a new
+named home reserves its address without moving the player. Capture, save,
+reconciliation and acknowledged membership removal preserve the current seat,
+draft and unfinished turn. Reconciliation changes future saved setup only.
+The UI uses the authenticated account boundary without enabling private-library
+sync. Identity changes clear old cards, comparisons and retained-action rows;
+late responses cannot repopulate them.
+
+`home-session.js` fixes every action to a person and boundary epoch.
+`home-journal.js` keeps the exact operation and capture in IndexedDB before
+sending HTTP, with strict transaction completion and bounded failure. A failed
+or uncertain save retains its preview and exact retry across reload. Public
+exports omit the live-seat credential. The device journal caps each person at
+32 records / 16 MiB and never silently evicts originals. Acknowledged removal
+of confirmed device receipts leaves server homes and their versions intact.
+Only an explicit retained-version choice can reconcile a server conflict.
+
+Artwork covers are produced lazily from the existing table preview and cached
+by model version, with at most eight thumbnails and 1 MiB persisted. Listing
+cached homes needs no repeated model loading; generic surfaces keep a named
+color cover. Desktop management widens for comparison, and 390 px phone views
+use the existing full-screen task with a persistent return to play.
+
+`tests/home-ui.test.mjs` exercises the actual app in independent browsers:
+no-sync home creation, same-address conversion, real process restart and clean
+browser recovery, obsolete organizer suppression, occupied live-room return,
+private-pool exclusion, draft/secret-turn preservation, retained conflict and
+capture refusal, offline exact retry after reload, acknowledged cleanup/leave,
+real IndexedDB abort before HTTP, and a held former-account response after a
+second tab changes the actual cookie. `tests/home-connection-ui.test.mjs` proves
+local play under persistent home refusal and explicit guest creation during
+service outage, including a cancelled creation's delayed reply. The unit lane
+includes fixed-owner/view completion and exact-request tests.
+
+Inspected captures are reproducible with
+`node tools/drive.mjs tools/steps/homes-ui-look.mjs`: `tools/out/homes-capture-{desktop,phone}.png`
+and `homes-card-{desktop,phone}.png`. Capture shows two prepared profiles and
+three shared rolls; private libraries never enter the document. The composed
+release sweep remains a separate integration check.

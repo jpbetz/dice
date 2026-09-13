@@ -728,6 +728,7 @@ const LIBRARY_SHARING_OWNER='dice.library.sharing-owner.v1';
 const LIBRARY_IDENTITY_INTENT='dice.library.account-intent.v1';
 var libraryNamespace='guest',libraryApplying=false,librarySession,accountWorkspace,accountWorkspaceLoading;
 var libraryFavorites=null,libraryDefaultSet=null;
+var homesWorkspace=null,homesWorkspaceLoading=null;
 var libraryMarkerAtBoot=(()=>{try{return localStorage.getItem(LIBRARY_NAMESPACE_KEY)||'guest';}catch{return 'guest';}})();
 var libraryPublicationBlocked=libraryMarkerAtBoot!=='guest';
 
@@ -36356,6 +36357,8 @@ destinationShell = createWorkspaces({
   result: id => tableResults?.open(id),
   account: async slot => {const workspace=await ensureAccountWorkspace();workspace?.mount(slot);},
   accountClosed:()=>accountWorkspace?.close(),
+  homes:async slot=>{const workspace=await ensureHomesWorkspace();workspace?.mount(slot);},
+  homesClosed:()=>homesWorkspace?.close(),
 });
 window.__diceDebug.workspaces = {
   open: key => destinationShell.open(key), close: () => destinationShell.close(),
@@ -36544,6 +36547,7 @@ async function ensureAccountWorkspace(){
       namespaceChanged:namespace=>{libraryNamespace=namespace;try{localStorage.setItem(LIBRARY_NAMESPACE_KEY,namespace);}catch{/* IDB remains the durable original */}},
       changed:info=>{
         librarySession=accountWorkspace?.session||librarySession;
+        homesWorkspace?.identityChanged();
         if(info.namespace!=='guest')setStorageJammed(!!info.error&&!info.error.retained&&['cache_unavailable','cache_full','cache_corrupt','invalid_library'].includes(info.error.code));
         const button=document.getElementById('private-library-status');if(button)button.textContent=accountWorkspace?.statusText(info)||'Private library';
       },
@@ -36571,4 +36575,27 @@ if(libraryMarkerAtBoot!=='guest')ensureAccountWorkspace();
 window.__diceDebug.privateLibrary={open:openAccountWorkspace,ready:()=>ensureAccountWorkspace(),
   get state(){const s=librarySession?.info;return s?{ready:s.ready,namespace:s.namespace,person:s.person?{id:s.person.id}:null,pending:s.pending,blocked:s.blocked,error:s.error?.code||null,syncEnabled:s.syncEnabled,workingGeneration:s.workingGeneration}:null;},
   settled:()=>librarySession?.settled(),snapshot:()=>captureLibraryStore(),
+};
+
+
+async function ensureHomesWorkspace(){
+  if(homesWorkspace)return homesWorkspace;
+  if(homesWorkspaceLoading)return homesWorkspaceLoading;
+  homesWorkspaceLoading=(async()=>{
+    const account=await ensureAccountWorkspace();if(!account)return null;
+    const [{createHomesWorkspace}]=await Promise.all([import('./homesui.js'),new Promise((resolve,reject)=>{const css=document.createElement('link');css.rel='stylesheet';css.href='css/homesui.css';css.onload=resolve;css.onerror=reject;document.head.append(css);})]);
+    homesWorkspace=createHomesWorkspace({
+      access:()=>librarySession?.homeAccess(),
+      seat:()=>netOnline&&net&&!unavailableHomeInfo?{room:ROOM,playerId:net.playerId}:null,
+      account:openAccountWorkspace,join:room=>{if(room===ROOM&&!unavailableHomeInfo)destinationShell.close();else gotoTable(room);},
+      appearance:cover=>{const venue=cover?.venue||'table',felt=cover?.felt||DEFAULT_FELT;return {label:venue==='table'?(FELT_THEMES[felt]?.name||felt):(VENUES[venue]?.label||venue),color:FELT_THEMES[felt]?.feltBase||'#343330'};},
+      systemName:systemLabel,
+      download:(text,name)=>portableDownload(text,name,'application/json;charset=utf-8'),
+      layout:show=>{document.body.classList.toggle('home-managing',show&&destinationShell.current==='tables');refitView();},
+    });return homesWorkspace;
+  })().catch(()=>{homesWorkspaceLoading=null;setPill('Couldn’t open saved table homes. Your current table still works.');return null;});
+  return homesWorkspaceLoading;
+}
+window.__diceDebug.homes={open:()=>destinationShell.open('tables'),
+  get state(){const s=homesWorkspace?.info;return s?{owner:s.owner,cards:s.cards,selected:s.selected?.home||null,preview:s.preview?{kind:s.preview.kind,homeId:s.preview.homeId,document:s.preview.document}:null,error:s.error?.code||null,loading:s.loading,records:s.records.map(r=>({id:r.id,kind:r.kind,status:r.status,homeId:r.homeId}))}:null;},
 };

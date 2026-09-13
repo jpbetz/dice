@@ -32,6 +32,8 @@ export function createWorkspaces(actions) {
   head.append(back, title, tabs);
   const content = node('div', 'workspace-content'); root.append(head, content);
   const tables = node('section', 'workspace-section'); tables.id = 'workspace-tables';
+  const tableOverview=node('div'),tableRecents=node('div'),homeSlot=node('div');tableOverview.id='workspace-table-overview';tableRecents.id='workspace-table-recents';homeSlot.id='workspace-homes-slot';
+  tables.append(tableOverview,homeSlot,tableRecents);
   const people = node('section', 'workspace-section'); people.id = 'workspace-people';
   const dice = node('section', 'workspace-section'); dice.id = 'workspace-dice';
   const account=node('section','workspace-section');account.id='workspace-account';
@@ -85,20 +87,20 @@ export function createWorkspaces(actions) {
   function renderTables() {
     const s = actions.snapshot(), signature=JSON.stringify([s.table,s.recent]);
     if(signature===tablesSignature)return; tablesSignature=signature;
-    const focused=focusKey(tables); tables.replaceChildren();
+    const focused=focusKey(tables); tableOverview.replaceChildren();tableRecents.replaceChildren();
     const active = node('article', 'workspace-active');
     active.append(node('span', 'workspace-eyebrow', 'Your active table'), node('h3', '', s.table.name), node('p', 'hint', s.table.connection));
     const row = node('div', 'workspace-actions');
     row.append(keyed(button('Return to table', close),'return'), keyed(button('Table setup', e => actions.setup(e.currentTarget)),'setup'));
-    active.append(row); tables.append(active);
+    active.append(row); tableOverview.append(active);
     const h = node('div', 'workspace-list-head'); h.append(node('h3', '', 'Recent tables'), keyed(button('＋ New table', e => actions.create(e.currentTarget)),'create'));
-    tables.append(h);
+    tableRecents.append(h);
     const recent = s.recent.filter(t => t.room !== s.table.room);
-    if (!recent.length) tables.append(node('p', 'hint', 'Tables you visit in this browser will appear here.'));
+    if (!recent.length) tableRecents.append(node('p', 'hint', 'Tables you visit in this browser will appear here.'));
     for (const t of recent) {
       const row = node('div', 'workspace-row');
       row.append(node('span', 'workspace-row-name', t.name || t.room), keyed(button('Go to table', () => actions.go(t.room)),`go:${t.room}`), keyed(button('Forget', () => { actions.forget(t.room); renderTables(); }, 'btn ghost'),`forget:${t.room}`));
-      tables.append(row);
+      tableRecents.append(row);
     }
     restoreFocus(tables,focused);
   }
@@ -133,11 +135,12 @@ export function createWorkspaces(actions) {
       root.classList.remove('hidden'); actions.modalOpen(root);
     }
     if(current==='account'&&key!=='account')actions.accountClosed?.();
+    if(current==='tables'&&key!=='tables')actions.homesClosed?.();
     current = key; root.dataset.workspace = key; title.textContent = names[key];
     if (key === 'dice' && !browsing) actions.home();
     for (const [k, section] of Object.entries({ tables, dice, people, account })) section.hidden = k !== key;
     for (const b of [...nav.children, ...tabs.children]) b.setAttribute('aria-pressed', String(b.dataset.workspace === key));
-    if (key === 'tables') renderTables();
+    if (key === 'tables') {renderTables();actions.homes?.(homeSlot);}
     if (key === 'people') renderPeople();
     if(key==='account')actions.account(account);
     if (key === 'dice') diceView();
@@ -148,6 +151,7 @@ export function createWorkspaces(actions) {
     if (!current) return;
     actions.closeMenus();
     if(current==='account')actions.accountClosed?.();
+    if(current==='tables')actions.homesClosed?.();
     current = null; actions.modalClose(root); root.classList.add('hidden'); restore();
     document.body.classList.remove('workspace-open'); delete document.body.dataset.workspace; actions.layoutChanged();
     for (const b of [...nav.children, ...tabs.children]) b.setAttribute('aria-pressed', 'false');
