@@ -18078,9 +18078,10 @@ window.__diceDebug = {
   // array feeding sound, particles, decals and the shock ring (stepPlayback's
   // drain), so a starved recorder switches off the whole Level 3/4/5 layer
   // with no error and no failing test — which is exactly what shipped in v1.0.
-  // Read from currentRoll, never from a painted frame: these numbers are
-  // decided in the synchronous fast-forward, long before anything renders.
+  // Read the completed film, never a painted frame or the async worker's
+  // empty reservation. A completed zero-contact film remains observable.
   contactStats() {
+    if (currentRoll?.baking) return null;
     const s = currentRoll && currentRoll.sounds;
     if (!s) return null;
     return {

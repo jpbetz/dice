@@ -1233,21 +1233,23 @@ export const scenarios = [
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.settle();
 
-      // WAIT FOR THE ROLL, don't settle() for it. The fast-forward is
-      // synchronous inside playRoll, so the numbers are final the instant
-      // currentRoll exists — but clearTable() between throws NULLS currentRoll,
-      // so a settle() that returns before the next roll's SSE event lands reads
-      // null and the whole scenario collapses on a race rather than on the
-      // behaviour under test.
+      // Wait for the completed film, not the worker's empty reservation.
+      // contactStats is null while baking; a finished ZERO-contact film is
+      // still returned and must fail the unchanged contact bars below.
+      // settle() alone can return before the next SSE event has arrived.
       const stats = async (notation) => {
+        const completed = await a.dbg('filmWorker.completed');
         await a.dbg(`commandRoll(${JSON.stringify(notation)})`);
         await a.waitFor('!!window.__diceDebug.contactStats()',
-          { desc: `${notation}: the roll reached the client` });
+          { desc: `${notation}: the completed contact film reached the client` });
+        assert.equal(await a.dbg('filmWorker.baking'),false,'never sample the worker reservation');
+        assert.equal(await a.dbg('filmWorker.completed'),completed+1,'this throw completed its own film');
         const s = JSON.parse(await a.eval(
           'JSON.stringify(window.__diceDebug.contactStats())'));
         await a.dbg('sim(9000)');
         await a.dbg('clearTable()');
         await a.dbg('sim(400)');
+        assert.equal(await a.dbg('filmWorker.canceled'),0,'sampling never clears a pending film');
         return s;
       };
 

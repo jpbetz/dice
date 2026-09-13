@@ -5,6 +5,46 @@ const film = `(() => { const r=window.__diceDebug.currentRoll; return {
   lastLanding:r.lastLanding,nudges:r.nudges,simFrames:r.simFrames,frames:r.frames,
   values:r.values,final:r.dice.map(d=>({p:d.finalPos,q:d.finalQuat}))}; })()`;
 export const filmWorkerScenarios = [
+  {name:'film-worker-contact-readiness',tags:['film-worker','roll','fx'],async fn(ctx) {
+    const t=await ctx.newTable({origin:'localhost',name:'Contact reader'});
+    await t.dbg('holdClock(true)');await t.dbg('filmAudit(true)');
+    // Hold only delivery of a real module worker's completed result. This
+    // exposes the pending reservation deterministically without changing the
+    // input, solver, contact recorder or frame/audio thresholds.
+    await t.eval(`(() => {const Native=window.Worker;window.Worker=class {
+      constructor(...args){this.inner=new Native(...args);
+        this.inner.onmessage=e=>{window.__heldContactReply={data:e.data,deliver:()=>this.onmessage?.(e)};};
+        this.inner.onerror=e=>this.onerror?.(e);this.inner.onmessageerror=e=>this.onmessageerror?.(e);}
+      postMessage(...args){this.inner.postMessage(...args);}
+      terminate(){this.inner.terminate();}
+    };})()`);
+    await t.dbg("commandRoll('20d6')");
+    await t.waitFor('!!window.__heldContactReply');
+    const pending=await t.eval(`({baking:window.__diceDebug.filmWorker.baking,
+      stats:window.__diceDebug.contactStats(),reservedSounds:window.__diceDebug.currentRoll.sounds.length,
+      completed:window.__diceDebug.filmWorker.completed,canceled:window.__diceDebug.filmWorker.canceled})`);
+    assert.equal(pending.baking,true);assert.equal(pending.reservedSounds,0);
+    assert.equal(pending.completed,0);assert.equal(pending.canceled,0);
+    assert.equal(pending.stats,null,'pending is not a completed silent film');
+    await t.eval('window.__heldContactReply.deliver()');
+    await t.waitFor('!!window.__diceDebug.contactStats()');
+    const completed=await t.eval(`(async()=>{const d=window.__diceDebug,w=await import('/js/film-wire.js');
+      const reply=w.unpackFilm(window.__heldContactReply.data.result),inline=w.unpackFilm(w.bakeCaptured(d.filmInput));
+      return {stats:d.contactStats(),execution:d.filmWorker.last.execution,completed:d.filmWorker.completed,
+        sameReply:JSON.stringify(reply.sounds)===JSON.stringify(d.currentRoll.sounds),
+        sameInlineSounds:JSON.stringify(inline.sounds)===JSON.stringify(reply.sounds),
+        sameInlineFilm:JSON.stringify(inline.keyframes)===JSON.stringify(reply.keyframes)};})()`);
+    assert.equal(completed.execution,'worker');assert.equal(completed.completed,1);
+    assert.ok(completed.sameReply && completed.sameInlineSounds && completed.sameInlineFilm,'complete worker/inline film and contact bytes match');
+    assert.ok(completed.stats.total>0 && completed.stats.onFloor>0,'the same pending throw has real recorded landing contacts');
+    const empty=await t.eval(`(()=>{const d=window.__diceDebug,r=d.currentRoll,s=r.sounds;
+      try{r.sounds=[];return d.contactStats();}finally{r.sounds=s;}})()`);
+    assert.deepEqual(empty,{total:0,firstFrame:0,afterHalfSec:0,onFloor:0,lastTime:0},
+      'a complete starved recording is measurable, not hidden by a positive-contact readiness gate');
+    await t.dbg('sim(30)');
+    assert.deepEqual(t.page.consoleErrors,[]);
+    return {pending,completed,empty};
+  }},
   {name:'film-worker-parity',tags:['film-worker','perf','dice'],async fn(ctx) {
     const t=await ctx.newTable({origin:'localhost',name:'Worker'});
     await t.dbg('filmAudit(true)');
