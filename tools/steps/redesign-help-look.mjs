@@ -12,7 +12,8 @@ export default async function run(stage) {
     if(width<640){await click(a,'#phone-more');await click(a,'#phone-tool-help');}
     else await click(a,'#rail-help');
     await click(a,'#help-nav [data-topic="start"]');
-    assert.equal(await a.eval("document.getElementById('help-start').classList.contains('lit')"),true);
+    await a.waitFor("document.getElementById('help-start').classList.contains('lit')",
+      {desc:'Getting started is selected after the pointer action'});
     assert.ok(await a.eval("document.querySelector('#help-start h3').getBoundingClientRect().top>=document.getElementById('help-nav').getBoundingClientRect().bottom"),'sticky topic links leave the selected heading readable');
     const start=await a.eval('document.getElementById("help-start").textContent');
     for(const term of ['Friends','Invitations','Presence','Accept','Join now','More','Rolls'])assert.ok(start.includes(term),`Getting started names ${term}`);

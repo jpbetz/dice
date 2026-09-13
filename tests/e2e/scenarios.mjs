@@ -8189,8 +8189,13 @@ export const scenarios = [
     // and every root is asserted to CARRY TEXT before a single word is judged.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
-      // seed uncategorized pools: the plain-shelf name is what this reads
-      // (the DEFAULT rack is the categorized Soul Deal set now)
+      // This judges application chrome, not arbitrary saved profile titles.
+      // Earlier scenarios can retain a Numbers-only profile named 'Dice tray';
+      // use an explicit fixture name without changing real players' names.
+      assert.equal((await a.dbg("profiles.reset('none')")).ok, true);
+      const profile = await a.dbg('profiles.active');
+      assert.equal((await a.dbg(`profiles.rename(${JSON.stringify(profile.id)}, 'Alice rolls')`)).ok, true);
+      // Uncategorised fixture pools exercise the plain shelf's product label.
       await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}])`);
       assert.equal(await a.eval(`document.getElementById('head-compose')`), null,
         'the Pools title row is gone (2026-08-04: the column needs no name)');
