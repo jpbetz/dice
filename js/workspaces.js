@@ -63,6 +63,7 @@ export function createWorkspaces(actions) {
   const tableOverview=node('div'),tableRecents=node('div'),homeSlot=node('div');tableOverview.id='workspace-table-overview';tableRecents.id='workspace-table-recents';homeSlot.id='workspace-homes-slot';
   tables.append(tableOverview,homeSlot,tableRecents);
   const people = node('section', 'workspace-section'); people.id = 'workspace-people';
+  const peopleOverview=node('div'),peopleSlot=node('div');peopleOverview.id='workspace-people-current';peopleSlot.id='workspace-people-slot';people.append(peopleOverview,peopleSlot);
   const dice = node('section', 'workspace-section'); dice.id = 'workspace-dice';
   const account=node('section','workspace-section');account.id='workspace-account';
   const tools = node('div', 'workspace-tools');
@@ -153,11 +154,11 @@ export function createWorkspaces(actions) {
   function renderPeople() {
     const s = actions.snapshot(), signature=JSON.stringify([s.table,s.people]);
     if(signature===peopleSignature)return; peopleSignature=signature;
-    const focused=focusKey(people); people.replaceChildren();
+    const focused=focusKey(people); peopleOverview.replaceChildren();
     const h = node('div', 'workspace-list-head'); h.append(node('h3', '', `At ${s.table.name}`));
     if (s.table.invitable) h.append(keyed(button('Invite to table', e => actions.invite(e.currentTarget)),'invite'));
-    people.append(h);
-    people.append(keyed(button('You · account & private library',()=>open('account'),'btn ghost'),'account'));
+    peopleOverview.append(h);
+    peopleOverview.append(keyed(button('You · account & private library',()=>open('account'),'btn ghost'),'account'));
     for (const p of s.people) {
       const row = node('article', 'workspace-person'); row.dataset.player = p.id;
       const dot = node('span', 'workspace-person-dot'); dot.style.background = p.color || '#888';
@@ -168,9 +169,9 @@ export function createWorkspaces(actions) {
       const browse = button(p.mine ? 'My rolls' : 'Shared rolls', () => {
         if (actions.browse(p.mine ? null : p.id) !== false) { open('dice', null, true); diceView('rolls'); }
       }, 'btn ghost');
-      browse.disabled = p.blocked; keyed(browse,`browse:${p.id}`); row.append(browse); people.append(row);
+      browse.disabled = p.blocked; keyed(browse,`browse:${p.id}`); row.append(browse); peopleOverview.append(row);
     }
-    if (!s.people.length) people.append(node('p', 'hint', 'You’re playing solo. Start a table to invite people.'));
+    if (!s.people.length) peopleOverview.append(node('p', 'hint', 'You’re playing solo. Start a table to invite people.'));
     restoreFocus(people,focused);
   }
   function open(key, anchor, browsing = false) {
@@ -184,12 +185,13 @@ export function createWorkspaces(actions) {
     }
     if(current==='account'&&key!=='account')actions.accountClosed?.();
     if(current==='tables'&&key!=='tables')actions.homesClosed?.();
+    if(current==='people'&&key!=='people')actions.peopleClosed?.();
     current = key; root.dataset.workspace = key; title.textContent = names[key];
     if (key === 'dice' && !browsing) actions.home();
     for (const [k, section] of Object.entries({ tables, dice, people, account })) section.hidden = k !== key;
     for (const b of [...nav.children, ...tabs.children]) b.setAttribute('aria-pressed', String(b.dataset.workspace === key));
     if (key === 'tables') {renderTables();actions.homes?.(homeSlot);}
-    if (key === 'people') renderPeople();
+    if (key === 'people') {renderPeople();actions.people?.(peopleSlot);}
     if(key==='account')actions.account(account);
     if (key === 'dice') diceView();
     positionDiceControl();
@@ -202,6 +204,7 @@ export function createWorkspaces(actions) {
     actions.closeMenus();
     if(current==='account')actions.accountClosed?.();
     if(current==='tables')actions.homesClosed?.();
+    if(current==='people')actions.peopleClosed?.();
     current = null; actions.modalClose(root); root.classList.add('hidden'); restore();
     positionDiceControl();
     document.body.classList.remove('workspace-open'); delete document.body.dataset.workspace; actions.layoutChanged();

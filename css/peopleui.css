@@ -1,0 +1,24 @@
+/* Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 */
+.people-workspace { margin-top:22px; padding-top:18px; border-top:1px solid var(--hair); }
+.people-workspace [hidden] { display:none!important; }
+.social-actions { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+.social-actions .btn,.social-kept-row .btn { min-height:38px; padding:7px 10px; }
+.social-actions [aria-pressed=true] { border-color:#ceb369; background:#ceb36922; }
+.social-form,.social-card,.social-code { min-width:0; padding:14px; border:1px solid var(--hair); border-radius:10px; margin:12px 0; }
+.social-card h4,.social-form h4 { font-size:17px; margin:0 0 8px; }
+.social-card .hint { margin:6px 0; }
+.social-form label,.social-code label { display:grid; gap:8px; margin-bottom:10px; }
+.social-form textarea,.social-form select,.social-code textarea { width:100%; box-sizing:border-box; padding:9px; border:1px solid #ffffff38; border-radius:6px; color:var(--ink); background:#141719; font:inherit; }
+.social-code textarea,.social-form textarea { font:12px/1.5 ui-monospace,monospace; resize:none; overflow-wrap:anywhere; }
+.social-check { display:flex; align-items:flex-start; gap:8px; margin:12px 0; font-size:13px; }
+.social-blocked,.social-kept { padding:12px 0; margin-top:16px; border-top:1px solid var(--hair); }
+.social-blocked summary,.social-kept summary { cursor:pointer; padding:8px 0; }
+.social-home-cover { height:64px; display:grid; place-items:center; margin-bottom:12px; border-radius:7px; overflow:hidden; background:#121416; color:var(--muted); }
+.social-home-cover img { width:100%; height:100%; object-fit:contain; }
+.social-kept-row { display:flex; flex-wrap:wrap; gap:8px; padding:12px 0; border-bottom:1px solid var(--hair); }
+.social-kept-row>span,.social-abandon { flex:1 0 100%; font-size:13px; }
+@media(max-width:640px) { .social-actions .btn,.social-kept-row .btn { min-height:42px; } }
+
+.social-home-cover.has-image { height:145px; }
+.social-code summary { cursor:pointer; font-size:13px; }
+.social-code[open] summary { margin-bottom:12px; }

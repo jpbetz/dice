@@ -728,6 +728,7 @@ const LIBRARY_IDENTITY_INTENT='dice.library.account-intent.v1';
 var libraryNamespace='guest',libraryApplying=false,librarySession,accountWorkspace,accountWorkspaceLoading;
 var libraryFavorites=null,libraryDefaultSet=null;
 var homesWorkspace=null,homesWorkspaceLoading=null;
+var peopleWorkspace=null,peopleWorkspaceLoading=null;
 var libraryMarkerAtBoot=(()=>{try{return localStorage.getItem(LIBRARY_NAMESPACE_KEY)||'guest';}catch{return 'guest';}})();
 var libraryPublicationBlocked=libraryMarkerAtBoot!=='guest';
 
@@ -36549,6 +36550,8 @@ destinationShell = createWorkspaces({
   accountClosed:()=>accountWorkspace?.close(),
   homes:async slot=>{const workspace=await ensureHomesWorkspace();workspace?.mount(slot);},
   homesClosed:()=>homesWorkspace?.close(),
+  people:async slot=>{const workspace=await ensurePeopleWorkspace();if(destinationShell.current==='people')workspace?.mount(slot);},
+  peopleClosed:()=>peopleWorkspace?.close(),
 });
 window.__diceDebug.workspaces = {
   open: key => destinationShell.open(key), close: () => destinationShell.close(),
@@ -36749,6 +36752,7 @@ async function ensureAccountWorkspace(){
       changed:info=>{
         librarySession=accountWorkspace?.session||librarySession;
         homesWorkspace?.identityChanged();
+        peopleWorkspace?.identityChanged();
         if(info.namespace!=='guest')setStorageJammed(!!info.error&&!info.error.retained&&['cache_unavailable','cache_full','cache_corrupt','invalid_library'].includes(info.error.code));
         const button=document.getElementById('private-library-status');if(button)button.textContent=accountWorkspace?.statusText(info)||'Private library';
       },
@@ -36799,4 +36803,20 @@ async function ensureHomesWorkspace(){
 }
 window.__diceDebug.homes={open:()=>destinationShell.open('tables'),
   get state(){const s=homesWorkspace?.info;return s?{owner:s.owner,cards:s.cards,selected:s.selected?.home||null,preview:s.preview?{kind:s.preview.kind,homeId:s.preview.homeId,document:s.preview.document}:null,error:s.error?.code||null,loading:s.loading,records:s.records.map(r=>({id:r.id,kind:r.kind,status:r.status,homeId:r.homeId,volatile:!!r.volatile}))}:null;},
+};
+
+async function ensurePeopleWorkspace(){
+  if(peopleWorkspace)return peopleWorkspace;if(peopleWorkspaceLoading)return peopleWorkspaceLoading;
+  peopleWorkspaceLoading=(async()=>{
+    if(!await ensureAccountWorkspace())return null;
+    const [{createPeopleWorkspace}]=await Promise.all([import('./peopleui.js'),new Promise((resolve,reject)=>{const css=document.createElement('link');css.rel='stylesheet';css.href='css/peopleui.css';css.onload=resolve;css.onerror=reject;document.head.append(css);})]);
+    peopleWorkspace=createPeopleWorkspace({access:()=>librarySession?.socialAccess(),account:openAccountWorkspace,tables:()=>destinationShell.open('tables'),
+      seat:()=>netOnline&&net&&!unavailableHomeInfo?{room:ROOM,playerId:net.playerId}:null,
+      join:room=>{if(room===ROOM&&!unavailableHomeInfo)destinationShell.close();else gotoTable(room);},
+      download:(text,name)=>portableDownload(text,name,'application/json;charset=utf-8'),
+    });return peopleWorkspace;
+  })().catch(()=>{peopleWorkspaceLoading=null;setPill('Couldn’t open People.');return null;});return peopleWorkspaceLoading;
+}
+window.__diceDebug.people={open:()=>destinationShell.open('people'),refresh:()=>peopleWorkspace?.session.load(),readPresence:()=>peopleWorkspace?.session.readPresence(),
+  get state(){const s=peopleWorkspace?.info;return s?{owner:s.owner,friends:s.friends,blockedPeople:s.blockedPeople,homes:s.homes,incoming:s.incoming,outgoing:s.outgoing,fresh:s.fresh,loading:s.loading,available:s.available,paused:s.paused,error:s.error?.code||null,sharing:s.sharing,presence:s.presence,signals:s.signals,homeSignals:s.homeSignals,homePresence:s.homePresence,records:s.records.map(r=>({id:r.id,kind:r.request.kind,status:r.status,volatile:!!r.volatile}))}:null;},
 };
