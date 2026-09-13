@@ -4652,12 +4652,9 @@ function setDiceSet(id, persist = true) {
 }
 // What rides the wire: absent for standard (a plain roll's payload stays
 // byte-for-byte what it always was — the server's present-or-absent rule).
-// A fantasy venue's staged set OVERRIDES yours at this seam (W4): the
-// override is part of roll CREATION, so the record — and therefore every
-// client, replay and late joiner — carries the venue's dice.
+// R1: a venue suggests a matching set; the player chooses it explicitly.
+// The authored roll carries that choice to every viewer and replay.
 function wireSet() {
-  const v = venueDiceSet();
-  if (v) return v;
   return diceSet !== 'std' ? diceSet : undefined;
 }
 // The set a ROLL wears (§9 saved-pool override): an explicit opts.set wins —
@@ -4666,11 +4663,8 @@ function wireSet() {
 // Callers only pass opts.set when a pool rolls as itself (the rail quick
 // list; a staged draft rides per-die `sets` via draftDieSets instead);
 // rerolls, claims and plain notation stay on wireSet.
-// The venue outranks even a pool's pinned set (GOALS 13: the venue IS the
-// dice choice while it stands — a pool's identity resumes with the room).
+// Explicit saved-roll appearances take precedence over the personal default.
 function rollSetOf(opts) {
-  const v = venueDiceSet();
-  if (v) return v;
   const s = opts && opts.set;
   if (s === 'std') return undefined;
   if (typeof s === 'string' && SETS[s]) return s;
@@ -11771,13 +11765,8 @@ const VENUES = {
   // trunk): a venue-only model, chosen by choosing the venue. Guarded at
   // send time — until the model ships in TOWERS, the venue falls back to
   // 'none' rather than having the server reject the whole patch.
-  // `diceSet` on a fantasy venue is the set THE VENUE stages (W4 — the
-  // GOALS 13 punt delivered): while the venue is active every roll is
-  // MADE with this set at roll creation (venueDiceSet → wireSet/
-  // rollSetOf), so the roll RECORD carries it and replay, late joiners
-  // and every client agree for free. Dice already on the felt keep the
-  // skin they landed with — a roll is a record, same as a player
-  // changing their own set.
+  // `diceSet` offers a matching set in My dice. It is a suggestion only;
+  // choosing a venue never overwrites personal or saved-roll appearances.
   moonrise: {
     id: 'moonrise', label: 'Moonrise Glade', register: 'fantasy', paletteId: 'moonrise',
     tower: 'wickroot', diceSet: 'moonmoot.witchlight',
@@ -11799,11 +11788,8 @@ function venueTowerFor(id) {
 }
 let currentVenue = 'table';
 
-// The set the ACTIVE venue stages, or null when the table's own choice
-// rules (grounded room, or a fantasy venue whose set has not shipped).
-// Consulted at ROLL CREATION (wireSet/rollSetOf/draftDieSets) and by the
-// prospective-art surfaces — never at render of an existing roll, because
-// a roll is a record and keeps the skin it landed with.
+// The active venue's optional gallery suggestion. R1 keeps the player's
+// personal and saved-roll choices in control until they explicitly choose it.
 function venueDiceSet() {
   const spec = VENUES[currentVenue];
   return (spec && spec.register === 'fantasy' && spec.diceSet && SETS[spec.diceSet])
@@ -12120,18 +12106,18 @@ const BETA_ROWS = ['venue-row', 'venue-picker', 'tower-row', 'tower-picker'];
 // out of the glade short of the console, and read it as the beta being
 // revoked. On beta the pickers stay so towers and felts can be judged INSIDE
 // a venue, which is the loop the closed beta exists for; a choice the glade
-// is currently staging over (felt, dice art) simply shows its effect when
+// is currently staging over (felt) simply shows its effect when
 // the venue comes down.
 function panelRowShown(rowId) {
+  if (rowId === 'diceset-row' || rowId === 'diceset-picker') return true;
   if (!IS_BETA && BETA_ROWS.includes(rowId)) return false;
   if (IS_BETA) return true;
   const venue = VENUES[currentVenue] || VENUES.table;
   return venue.register !== 'fantasy';
 }
 
-// GOALS goal 13 made visible: while a fantasy venue is active, the felt,
-// tower and dice-set pickers leave the settings panel — the venue IS those
-// choices. Elements resolved by id per call (the renderFeltSwatches rule).
+// A fantasy venue owns its felt and tower; personal dice remain reachable.
+// Elements resolved by id per call (the renderFeltSwatches rule).
 function updateVenueChrome() {
   const venue = VENUES[currentVenue] || VENUES.table;
   const fantasy = venue.register === 'fantasy';
@@ -12143,27 +12129,12 @@ function updateVenueChrome() {
     const el = document.getElementById(rowId);
     if (el) el.style.display = panelRowShown(rowId) ? '' : 'none';
   }
-  // AND SAY WHAT TOOK THEM (UX §7.36). Until this pass three controls simply
-  // vanished when a fantasy venue went up — correct behaviour (goal 13: the
-  // venue IS those choices) delivered as an unexplained absence, which reads
-  // as a bug to anybody who does not already know the rule. Two lines because
-  // the controls now live in two destinations: felt and tower under Staging,
-  // dice set under You.
-  //
-  // PRODUCTION ONLY, both lines: the note explains an ABSENCE, and on beta
-  // nothing is absent (panelRowShown — beta is offered everything). On beta
-  // it would also be a line the panel cannot afford: Staging with every row
-  // AND a note is the §7.36 measurement's worst case, and the note is the
-  // part with no job.
+  // Explain the hidden staging controls. Beta offers them all, so needs no
+  // absence note. Dice selection is personal on both channels.
   const noted = fantasy && !IS_BETA;
-  const said = noted ? `${venue.label} stages this — felt, tower and dice are its own.` : '';
-  for (const id of ['venue-staged', 'venue-staged-you']) {
-    const el = document.getElementById(id);
-    if (!el) continue;
-    el.textContent = id === 'venue-staged-you' && noted
-      ? `${venue.label} chooses the dice too.` : said;
-    el.classList.toggle('hidden', !noted);
-  }
+  const note = document.getElementById('venue-staged');
+  note.textContent = noted ? `${venue.label} stages this — felt and tower are its own.` : '';
+  note.classList.toggle('hidden', !noted);
 }
 
 // How many `renderer.render()` calls the last rendered frame made: 1 through
@@ -17264,6 +17235,8 @@ window.__diceDebug = {
   // surface — never scrape the canvas).
   get diceSet() { return diceSet; },
   setDiceSet(id) { return setDiceSet(id); },
+  openDiceGallery(anchor) { return openDiceGallery(anchor); },
+  get diceGallery() { return diceGallery?.state || {open:false}; },
   get physics() { return { ...PHYS }; },
   setPhysics(p) { return setPhysics(p); },
   // The three settle knobs (C30c). THROW_TARGET and SLEEP are inert at their
@@ -19503,10 +19476,8 @@ let traySpent = false;
 // (source label, type) — one stage call shares one override, which makes
 // the pair a stable key. Returns null when no die carries an override.
 function draftDieSets(dice, sources) {
-  // A fantasy venue stages ONE set for every die (W4): suppress per-die
-  // overrides so the roll rides wireSet's venue answer uniformly — which
-  // is also what lets uniformRollRate apply the staged set's cadence.
-  if (venueDiceSet()) return null;
+  // R1: per-die overrides remain explicit even in a fantasy venue.
+
   if (!traySets.some(Boolean) || traySets.length !== tray.length) return null;
   const byKey = new Map();
   tray.forEach((t, i) => {
@@ -19569,9 +19540,8 @@ const offerDraftBtn = document.getElementById('offer-draft');
 // and the CSS ::before diamond keeps the tile legible — art never gates
 // function.
 function decorateDieBtn(btn, label, artType) {
-  // Prospective surfaces show what a roll WILL wear — in a fantasy venue
-  // that is the venue's staged set (W4), everywhere at once.
-  const url = dieArtURL(artType, venueDiceSet() || diceSet);
+  // Prospective surfaces show the player's default for new rolls.
+  const url = dieArtURL(artType, diceSet);
   if (url) {
     btn.classList.add('has-art');
     const img = document.createElement('img');
@@ -19594,10 +19564,9 @@ function refreshDieArt() {
   for (const img of document.querySelectorAll('img.die-art[data-art-type]')) {
     // data-art-set pins a chip to a POOL's own set (§9 override) — it
     // re-dresses only when its pool re-renders, never with your set.
-    // The venue outranks both (W4): while it stands, every prospective
-    // chip previews the dice the venue will actually deal.
+    // A venue suggestion never replaces either explicit appearance.
     const u = dieArtURL(img.dataset.artType,
-      venueDiceSet() || img.dataset.artSet || diceSet);
+      img.dataset.artSet || diceSet);
     if (u) img.src = u;
   }
 }
@@ -21334,7 +21303,7 @@ function buildDieStrip(types, cap, { grouped = false, set = null } = {}) {
     : types.map((t) => [t, 1]);
   const shown = units.slice(0, cap);
   for (const [type, n] of shown) {
-    const url = dieArtURL(type, venueDiceSet() || variant || diceSet);
+    const url = dieArtURL(type, variant || diceSet);
     if (url) {
       const img = document.createElement('img');
       img.className = 'die-art strip-die';
@@ -30031,25 +30000,89 @@ function buildSetSelect({ value = null, allowDefault = false, onPick, title }) {
   return btn;
 }
 
-// The settings row wears the SAME control. Value here is always concrete —
-// there is no default above your own set. The instance lives in the DOM,
-// not a module let: settings boot calls run at module scope ABOVE this
-// line (the renderFeltSwatches lazy-element lesson — module-eval ordering).
+// R1 personal kit: one visual collection, reachable without finding Settings.
+// The code and styles load on intent; the initial table loads no gallery art.
+// Hoisted because boot calls renderDiceSetPicker before this part of the module.
+var diceGallery;
+var diceGalleryLoading;
+function galleryEntries() {
+  return [{id: 'std', name: 'Standard', house: 'The originals',
+    description: 'A different color for every die. Familiar, easy to find.'},
+    ...Object.entries(SETS).filter(([id, r]) => id === diceSet || id === venueDiceSet()
+      || (!r.venueOnly && (IS_BETA || !r.beta) && devSetInFile(id)))
+      .map(([id,r]) => ({id, name:r.label, house:r.houseLabel, description:r.houseLine || 'Made for your next roll.'}))];
+}
+function returnToMyRolls() {
+  setPoolsOwner(null);
+  if (allPanelsCollapsed()) {
+    setRailMode('pools');
+  } else if (!sectionOn('pools')) {
+    setSection('pools', true);
+  }
+}
+async function openDiceGallery(anchor) {
+  const opener = anchor instanceof HTMLElement ? anchor : document.getElementById('my-dice');
+  try {
+    if (!diceGalleryLoading) {
+      const css = new Promise((resolve, reject) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet'; link.href = 'css/dicegallery.css';
+        link.onload = resolve;
+        link.onerror = () => { link.remove(); reject(new Error('gallery styles unavailable')); };
+        document.head.appendChild(link);
+      });
+      diceGalleryLoading = Promise.all([import('./dicegallery.js'), css]).then(([m]) => {
+        const phone = window.matchMedia('(max-width: 640px)');
+        const syncModal = root => {
+          const focused = root.contains(document.activeElement) ? document.activeElement : null;
+          if (phone.matches) openModal(root, {labelledBy:'dg-title'});
+          else closeModal(root);
+          focused?.focus({preventScroll:true});
+        };
+        diceGallery = m.createDiceGallery({
+          entries: galleryEntries, current: () => diceSet, choose: setDiceSet,
+          suggested: () => venueDiceSet(),
+          favorites: () => { const v = load('dice.favorites.v1', []); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; },
+          saveFavorites: ids => save('dice.favorites.v1', ids),
+          backToRolls: returnToMyRolls,
+          opened: root => {
+            document.getElementById('my-dice').setAttribute('aria-expanded', 'true');
+            syncModal(root);
+          },
+          closed: root => {
+            closeModal(root);
+            document.getElementById('my-dice').setAttribute('aria-expanded', 'false');
+          },
+        });
+        phone.addEventListener('change', () => {
+          if (diceGallery.isOpen) syncModal(document.getElementById('dice-gallery'));
+        });
+      }).catch(e => { diceGalleryLoading = null; throw e; });
+    }
+    opener.setAttribute('aria-busy', 'true');
+    await diceGalleryLoading;
+    closeSettingsModal(); closeIdentityMenu();
+    diceGallery.open(opener);
+  } catch {
+    setPill('Couldn’t open your dice. Try again.');
+  } finally {
+    opener.removeAttribute('aria-busy');
+  }
+}
 function renderDiceSetPicker() {
   const holder = document.getElementById('diceset-picker');
-  if (!holder) return;
-  let btn = holder.querySelector('.set-select');
-  if (!btn) {
-    btn = buildSetSelect({
-      value: diceSet,
-      allowDefault: false,
-      onPick: (v) => setDiceSet(v || 'std'),
-      title: IN_LOBBY ? 'Dice set — the dice you roll in' : 'Dice set — everyone sees your rolls in these dice',
-    });
-    holder.appendChild(btn);
+  const label = (setSwatchInfo(diceSet) || setSwatchInfo('std')).label;
+  document.getElementById('my-dice-current').textContent = label;
+  if (!holder.querySelector('button')) {
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'dice-gallery-link';
+    button.addEventListener('click', () => openDiceGallery(document.getElementById('my-dice')));
+    holder.append(button);
   }
-  btn.refreshSetSelect(diceSet);
+  holder.querySelector('button').textContent = `${label} · Browse my dice →`;
+  diceGallery?.update();
 }
+document.getElementById('my-dice').addEventListener('click', e => openDiceGallery(e.currentTarget));
 
 // Build the three system chips once, then only refresh the selected state.
 // Same lazy-element pattern as renderFeltSwatches (module-eval ordering).
@@ -30411,6 +30444,7 @@ function syncSettingsUI() {
 // together and the half with consequences for everyone. The other two are one
 // click away and named on the bar, which is the whole point of naming them.
 function openSettingsModal(at = 'table') {
+  diceGallery?.close();
   showSettingsDest(at);
   renderProfileLibrary(); // §11: the library and 'At this table', fresh per open
   // The table-name prefill lives HERE, not in syncSettingsUI: setSound()
@@ -33019,6 +33053,7 @@ document.addEventListener('keydown', (e) => {
     if (isHelpOpen()) closeHelpDialog(); // help rides above its opener
     else if (isKbdOpen()) closeKbd();
     else if (isPaletteOpen()) closePalette();
+    else if (diceGallery?.isOpen) diceGallery.close();
     else if (!settingsModal.classList.contains('hidden')) closeSettingsModal();
     else if (isSeatPickerOpen()) dismissSeatPicker(); // C12: the door was the one overlay with no way out
     else if (isIdentityMenuOpen()) closeIdentityMenu();
@@ -34181,18 +34216,9 @@ function updateIdentityChip() {
   // say the honest word instead, until you choose one.
   document.getElementById('identity-name').textContent = info.name
     || (IN_LOBBY || seatDeclined ? 'You' : '…');
-  // ONE grammar for whose-rack (Joe 2026-08-04): teammate consolidation
-  // grew the rail into a "whose pools" segmented control — pill click
-  // browses, press-again falls home. The identity chip joins that
-  // grammar: aria-pressed=true when you're at your own rack (the
-  // default), false while browsing a teammate. Exactly one chip in the
-  // rail is pressed at any time.
   const chip = document.getElementById('identity-chip');
-  const atHome = poolsOwner === null;
-  chip.setAttribute('aria-pressed', String(atHome));
-  chip.title = atHome
-    ? 'Your pools — right-click to change your name, switch tables or invite friends'
-    : 'Back to your pools — right-click for name, seat, invite';
+  chip.removeAttribute('aria-pressed');
+  chip.title = 'Edit your name and personal controls';
 }
 
 function isIdentityMenuOpen() { return !identityMenu.classList.contains('hidden'); }
@@ -34204,6 +34230,7 @@ function isIdentityMenuOpen() { return !identityMenu.classList.contains('hidden'
 const idmShow = (id, on) => { document.getElementById(id).style.display = on ? '' : 'none'; };
 
 function openIdentityMenu() {
+  diceGallery?.close();
   const info = identityInfo();
   document.getElementById('idm-who').textContent = info.name || 'You';
   // This line used to branch on `online`, which conflated two questions: a
@@ -34235,24 +34262,25 @@ function openIdentityMenu() {
   // that every capability belongs to everyone; it is not a licence to offer
   // one the table cannot have).
   idmShow('idm-split', !IN_LOBBY && info.online && !roomParent);
-  document.getElementById('idm-rename-row').classList.add('hidden');
+  document.getElementById('idm-name-input').value = info.name || '';
+  document.getElementById('idm-name-note').textContent = 'Your name at the table. Your character stays the same.';
   identityMenu.classList.remove('hidden');
+  identityMenu.setAttribute('role', 'dialog');
+  identityMenu.setAttribute('aria-label', 'Your name and personal controls');
+  document.getElementById('identity-chip').setAttribute('aria-expanded', 'true');
+  placeAnchored(identityMenu, document.getElementById('identity-chip'));
+  document.getElementById('idm-name-input').focus({preventScroll:true});
 }
 
 function closeIdentityMenu() {
+  const wasFocused = identityMenu.contains(document.activeElement);
   identityMenu.classList.add('hidden');
-  document.getElementById('idm-rename-row').classList.add('hidden');
+  document.getElementById('identity-chip').setAttribute('aria-expanded', 'false');
+  if (wasFocused) document.getElementById('identity-chip').focus({preventScroll:true});
 }
 
-// THE IDENTITY CHIP, gesture-split (Joe 2026-08-04): left-click IS the
-// "whose pools" toggle — falls home from a foreign rack, matching the
-// teammate pills' toggle grammar (one rail, one gesture, one gesture
-// grammar). Right-click / long-press opens the identity menu — the
-// same right-click-for-context pattern the pool tiles already speak.
-// Solo/at-home: left-click is a no-op (you're already home; the chip
-// is aria-pressed to say so); right-click is the way in to rename /
-// leave / invite. This deliberately supersedes the pre-2026-08-04
-// left-click-opens-menu wiring — recorded in UX.md §7.17.
+// R1: ordinary click, touch, and keyboard open your personal editor.
+// Right-click/long-press remain aliases, with release suppression intact.
 const identityLp = attachLongPress(
   document.getElementById('identity-chip'),
   () => { if (!isIdentityMenuOpen()) openIdentityMenu(); },
@@ -34264,8 +34292,8 @@ document.getElementById('identity-chip').addEventListener('click', () => {
   // Change name, Change seat and Leave table, so a touch-only player could
   // not rename, re-seat, or leave.
   if (identityLp.took()) return;
-  if (isIdentityMenuOpen()) closeIdentityMenu(); // menu is open (from right-click): let click-away close it
-  else setPoolsOwner(null); // fall home; no-op if already home
+  if (isIdentityMenuOpen()) closeIdentityMenu();
+  else openIdentityMenu();
 });
 // Right-click (mouse) → menu. preventDefault so the browser's context
 // menu never shows over the rail; the app's own menu is the answer.
@@ -34322,22 +34350,21 @@ document.getElementById('idm-profile').addEventListener('click', () => {
   // at the origin, which would park the menu in the corner.
   openRailMenu(document.getElementById('identity-chip'), buildProfileMenu);
 });
-document.getElementById('idm-rename').addEventListener('click', () => {
-  const row = document.getElementById('idm-rename-row');
+document.getElementById('idm-dice').addEventListener('click', () => openDiceGallery(document.getElementById('my-dice')));
+document.getElementById('idm-rolls').addEventListener('click', () => { closeIdentityMenu(); returnToMyRolls(); });
+document.getElementById('idm-rename-row').addEventListener('submit', e => {
+  e.preventDefault();
   const input = document.getElementById('idm-name-input');
-  row.classList.remove('hidden');
-  input.value = identityInfo().name || '';
-  input.focus();
-  input.select();
-});
-document.getElementById('idm-name-input').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    // a refused name ('#') keeps the input open to be fixed
-    if (applyRename(e.currentTarget.value)) closeIdentityMenu();
-  } else if (e.key === 'Escape') {
-    document.getElementById('idm-rename-row').classList.add('hidden');
+  if (applyRename(input.value)) closeIdentityMenu();
+  else {
+    document.getElementById('idm-name-note').textContent = input.value.trim()
+      ? 'Choose a name without #.' : 'Enter the name you want at the table.';
+    input.focus();
   }
+});
+identityMenu.addEventListener('keydown', e => {
   e.stopPropagation();
+  if (e.key === 'Escape') { e.preventDefault(); closeIdentityMenu(); }
 });
 
 // Leave & switch seat: net.disconnect drops the live stream, the stored

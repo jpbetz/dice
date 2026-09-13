@@ -1,0 +1,68 @@
+/*
+Copyright 2026 The Dice Table Authors
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+*/
+
+#dice-gallery {
+  position: fixed; z-index: var(--z-popover); inset: 16px 16px 16px auto;
+  width: min(510px, calc(100vw - 32px)); display: flex; flex-direction: column;
+  background: #1c2021; color: #f3eee4; border: 1px solid #51504a;
+  border-radius: 18px; box-shadow: 0 18px 70px #0009;
+  font: 14px/1.45 var(--font-ui); overflow: hidden;
+}
+#dice-gallery[hidden], #dice-gallery [hidden] { display: none; }
+#dice-gallery button { font: inherit; cursor: pointer; }
+#dice-gallery button:focus-visible { outline: 2px solid #f1cb78; outline-offset: 3px; }
+.dg-header { display: flex; justify-content: space-between; align-items: center; padding: 22px 26px 18px; border-bottom: 1px solid #ffffff12; }
+.dg-eyebrow { color: #beb6a7; font-size: 10px; letter-spacing: .17em; font-weight: 650; }
+#dice-gallery h2 { margin: 3px 0 0; font: 30px/1.15 Georgia, serif; color: #fff1d8; text-transform: none; letter-spacing: -.03em; }
+.dg-close { width: 40px; height: 40px; border-radius: 50%; background: #ffffff08; border: 1px solid #ffffff20; color: #ded9cf; }
+.dg-close:hover { background: #ffffff16; }
+.dg-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 26px 24px; scrollbar-color: #65625a transparent; }
+.dg-feature { padding-bottom: 18px; }
+.dg-preview { height: 205px; display: grid; place-items: center; margin: 2px -14px 0; background: radial-gradient(ellipse at 50% 68%, #cbb48220, transparent 65%); }
+.dg-preview img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 15px 14px #0007); }
+.dg-preview-fallback { color: #c8c0b1; }
+.dg-detail { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dg-house { color: #c9b790; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+#dice-gallery h3 { margin: 2px 0 0; font: 26px/1.2 Georgia, serif; color: #fff2da; }
+/* The preview heading receives reading focus; interactive controls keep rings. */
+#dice-gallery .dg-name:focus { outline: none; }
+.dg-favorite { flex: none; width: 44px; height: 44px; border: 1px solid #ffffff25; border-radius: 12px; color: #e4c281; background: #ffffff05; font-size: 24px !important; }
+.dg-favorite[aria-pressed="true"] { background: #d6b57420; border-color: #a88a50; }
+.dg-description { min-height: 20px; color: #c4bdb1; margin: 9px 0 17px; font-size: 13px; }
+.dg-use { width: 100%; min-height: 44px; border: 1px solid #f0cf8f; border-radius: 10px; background: #e6c07c; color: #241e16; font-weight: 700 !important; }
+.dg-use:hover:not(:disabled) { background: #f6d69b; }
+#dice-gallery .dg-use:disabled { cursor: default !important; color: #d8d2c7; border-color: #5d6059; background: #363d37; opacity: 1; filter: none; }
+.dg-status { color: #c0b9ac; font-size: 12px; line-height: 1.5; margin: 9px 0 0; min-height: 18px; }
+.dg-browse { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; border-top: 1px solid #ffffff18; }
+.dg-filters { display: flex; gap: 4px; }
+.dg-filters button { border: 0; border-radius: 8px; background: transparent; color: #bcb7ac; padding: 9px 13px; min-height: 40px; }
+.dg-filters button[aria-pressed="true"] { background: #ffffff10; color: #fff0d7; }
+.dg-count { color: #ada99f; font-size: 12px; }
+.dg-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.dg-card { min-width: 0; position: relative; padding: 8px 12px 12px; border: 1px solid #ffffff19; border-radius: 12px; background: linear-gradient(145deg,#303536,#262a2b); color: #f2eadb; text-align: left; }
+.dg-card:hover { border-color: #aca28b; background: #363b3b; }
+.dg-card[aria-pressed="true"] { border-color: #e9c680; box-shadow: inset 0 0 0 1px #e9c680; }
+.dg-card img { display: block; width: 100%; height: auto; aspect-ratio: 2; object-fit: contain; }
+.dg-card-name { display: block; font-size: 14px; font-weight: 600; }
+.dg-card-badge { display: block; min-height: 17px; margin-top: 3px; color: #dbbd85; font-size: 11px; }
+.dg-empty { color: #c6bfb2; padding: 12px; text-align: center; }
+.dg-suggestion { width: 100%; padding: 12px; margin: 0 0 10px; border: 1px solid #c9b79040; border-radius: 8px; background: #c9b7900d; color: #ead4ad; text-align: left; }
+.dg-footer { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 26px; border-top: 1px solid #ffffff16; background: #191d1e; }
+.dg-footer span { color: #aaa89e; font-size: 11px; }
+.dg-rolls { color: #ead4ad; background: none; border: 0; padding: 8px 0; min-height: 40px; white-space: nowrap; }
+@media (max-width: 640px) {
+  #dice-gallery { inset: auto 0 0; width: 100%; max-height: calc(100dvh - 24px); height: calc(100dvh - 24px); box-sizing: border-box; border-radius: 20px 20px 0 0; }
+  .dg-header { padding: 18px 20px 14px; }
+  .dg-scroll { padding: 0 20px 20px; }
+  .dg-preview { height: 165px; }
+  .dg-footer { padding: 10px 20px max(10px, env(safe-area-inset-bottom)); }
+  .dg-footer span { max-width: 110px; }
+}

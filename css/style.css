@@ -2899,21 +2899,23 @@ html, body {
   gap: 7px;
   max-width: 170px;
 }
-/* THE WHOSE-RACK STATE (Joe 2026-08-04): the identity chip joins the
-   rail's aria-pressed toggle grammar — pressed=true when you are at
-   your own rack (the default, and the .btn.ghost dress ALREADY reads
-   as pressed), pressed=false when you have navigated to a teammate.
-   Not-pressed just dims the chip a touch — it's still the corner
-   anchor and never moves, only its state signal changes. Left-click
-   toggles the state; right-click / long-press opens the menu. */
-#identity-chip[aria-pressed="false"] {
-  opacity: 0.68;
-  border-color: var(--hair);
+.identity-caret { color: #b9b3a7; font-size: 13px; margin-left: 2px; }
+#my-dice {
+  display: flex; flex: none; align-items: center; gap: 10px;
+  margin: 6px 14px 4px; padding: 9px 12px; min-height: 54px;
+  border: 1px solid #77706070; border-radius: 10px; background: #bda36d0d;
+  color: #f1e6ce; text-align: left; cursor: pointer; font: 600 13px/1.3 var(--font-ui);
 }
-#identity-chip[aria-pressed="false"]:hover {
-  opacity: 1;
-  border-color: rgba(255, 255, 255, 0.32);
-}
+#my-dice:hover { background: #bda36d20; border-color: #bba16b; }
+#my-dice:focus-visible { outline: 2px solid #e8c47e; outline-offset: 2px; }
+.my-dice-icon { font-size: 27px; color: #d7bf92; }
+.my-dice-label { flex: 1; min-width: 0; }
+#my-dice-current { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 400; color: #bfb6a6; margin-top: 2px; }
+.my-dice-arrow { color: #b8a583; }
+#left-panel.collapsed #my-dice { margin: 5px 6px 10px; padding: 8px 7px; gap: 6px; font-size: 12px; }
+#left-panel.collapsed .my-dice-icon { font-size: 19px; }
+#left-panel.collapsed .my-dice-arrow { display: none; }
+#left-panel.collapsed #my-dice-current { font-size: 10px; }
 .identity-dot {
   flex: none;
   width: 10px;
@@ -2932,7 +2934,11 @@ html, body {
   position: fixed;
   top: 12px;
   left: calc(var(--table-left) + 12px); /* drops beside the panel's toolbar */
-  width: 220px;
+  width: 288px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  box-sizing: border-box;
   padding: 8px;
   z-index: var(--z-popover); /* a small popover — same rung as ± */
 }
@@ -2982,6 +2988,13 @@ html, body {
 }
 .idm-rename { padding: 2px 10px 8px; }
 .idm-rename.hidden { display: none; }
+.idm-rename label { display: block; color: #eee0c6; font-size: 12px; margin: 9px 0 7px; }
+.idm-name-fields { display: flex; gap: 6px; }
+#idm-name-input { width: 100%; min-width: 0; font-size: 16px; padding: 10px 8px; }
+#idm-name-save { min-height: 42px; padding: 8px 13px; border: 1px solid #caae77; border-radius: 7px; background: #dec08a; color: #241e16; cursor: pointer; }
+#idm-name-note { font-size: 11px; line-height: 1.5; color: #b9ae99; margin: 8px 0; }
+#identity-menu .idm-item { min-height: 40px; }
+#diceset-picker .dice-gallery-link { min-height: 40px; padding: 8px 12px; border: 1px solid #9a865b; border-radius: 8px; background: #c1a67215; color: #ead6b1; cursor: pointer; }
 
 /* ---------- roll-log flyout (the rail's ≣ / key 'l') ---------- */
 /* The log is information, not workspace (P3): it drops from the rail like

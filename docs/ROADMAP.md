@@ -179,12 +179,14 @@ additional features. Joe approved all three priorities from the September
 experience audit and asked to start **planning (1)**. The full direction,
 evidence limits, and cross-track dependencies are in
 [EXPERIENCE-REDESIGN.md](EXPERIENCE-REDESIGN.md); the detailed first-item plan
-is [PEOPLE-DICE-TABLES.md](PEOPLE-DICE-TABLES.md). No redesign implementation
-has shipped yet. These keys preserve the existing roadmap's numbering.
+is [PEOPLE-DICE-TABLES.md](PEOPLE-DICE-TABLES.md). The
+[first personal-kit slice](SHIPPED.md#personal-name-and-dice-collection-2026-09-13)
+implements direct name editing and visual dice selection. The full first
+release remains open. These keys preserve the existing roadmap's numbering.
 
 | Key | Current priority | Next deliverable | Status |
 | --- | --- | --- | --- |
-| **R1** | People, personal dice, and persistent tables | R1-A: desktop/phone destination layouts and control relocation map; then the local identity/gallery/table/Quick dice release, followed by recoverable kits, homes, and invitations | **Planning started** |
+| **R1** | People, personal dice, and persistent tables | R1-A: desktop/phone destination layouts and control relocation map; then the local identity/gallery/table/Quick dice release, followed by recoverable kits, homes, and invitations | **First personal-kit slice shipped; broader R1 open** |
 | **R2** | Redesign the complete shared playing surface | One excellent four-player composition and full-width phone layout, coordinated with R1's bottom tray; expand to three art directions after the first works | Direction adopted |
 | **R3** | Make lightweight play a core feature | Reproducible ordinary/stress baseline, production compression check, then compressed delivery where needed and dice-face material consolidation | Direction adopted |
 

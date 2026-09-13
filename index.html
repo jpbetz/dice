@@ -92,9 +92,10 @@ limitations under the License.
          BELOW you instead of pushing you down (it led the rail before, which
          is exactly the drift this ordering exists to kill). -->
     <div id="rail">
-      <button id="identity-chip" class="btn ghost" title="You — right-click for name, seat, invite">
+      <button id="identity-chip" class="btn ghost" title="Your name and personal controls" aria-haspopup="dialog" aria-expanded="false">
         <span id="identity-dot" class="identity-dot"></span>
         <span id="identity-name" class="identity-name">…</span>
+        <span class="identity-caret" aria-hidden="true">⌄</span>
       </button>
       <div id="rail-roster"></div>
       <!-- Keep the table identity and connection state beside its roster. -->
@@ -109,6 +110,12 @@ limitations under the License.
            channel keeps its own rules; the announcement rides #sr-live. -->
       <span id="status-pill" class="hidden" role="status"></span>
     </div>
+
+    <button id="my-dice" type="button" aria-haspopup="dialog" aria-expanded="false">
+      <span class="my-dice-icon" aria-hidden="true">⚄</span>
+      <span class="my-dice-label">My dice<span id="my-dice-current">Standard</span></span>
+      <span class="my-dice-arrow" aria-hidden="true">→</span>
+    </button>
 
     <!-- THE COLLAPSED POOL RAIL (Joe 2026-08-07). At 56px a pool name had
          to be rotated on its side and a shelf title had nowhere to go, so
@@ -511,17 +518,21 @@ limitations under the License.
       <span id="idm-who" class="idm-name"></span>
       <span id="idm-room" class="idm-sub"></span>
     </div>
+    <form id="idm-rename-row" class="idm-rename">
+      <label id="idm-rename" for="idm-name-input">Your display name</label>
+      <div class="idm-name-fields"><input id="idm-name-input" class="tin" type="text" maxlength="24" autocomplete="nickname" required>
+        <button id="idm-name-save" type="submit">Save</button></div>
+      <p id="idm-name-note" role="status">Your name at the table. Your character stays the same.</p>
+    </form>
+    <button id="idm-dice" class="idm-item">My dice →</button>
+    <button id="idm-rolls" class="idm-item">My saved rolls →</button>
     <!-- The picker's second anchor (PROFILES §11.5 ②), and it is not
          redundancy: the first lives in #pools-head, inside a panel section
          §7.23 lets the player switch off, so on its own it is unreachable for
          anyone who collapsed Pools. This one is always here. Not table-scoped —
          your profiles are yours in the lobby too. -->
     <button id="idm-profile" class="idm-item" aria-haspopup="menu" aria-expanded="false"
-            title="The profile in your hands — tap to switch">Profile…</button>
-    <button id="idm-rename" class="idm-item">Change name…</button>
-    <div id="idm-rename-row" class="idm-rename hidden">
-      <input id="idm-name-input" class="tin" type="text" maxlength="24" autocomplete="off" placeholder="New name…">
-    </div>
+            title="The profile in your hands — tap to switch">Switch character…</button>
     <button id="idm-leave" class="idm-item" title="Drop this seat and sit down again at this same table">Change seat…</button>
     <button id="idm-lobby" class="idm-item" title="Leave this table and go back to the lobby — your name and pools come with you">Leave table</button>
     <!-- §3b L4 (CUJ5): the AUTHORING half of a split lives behind the chip
@@ -1293,10 +1304,9 @@ limitations under the License.
             </span>
             <button id="set-ambience" class="sw" aria-pressed="false" title="Room tone"></button>
           </div>
-          <!-- Dice set (Tier 6 §9): your identity on the felt. Rides every
-               roll you throw or claim; applies from the next roll. Hidden by
-               a fantasy venue like felt and tower — #venue-staged-you says
-               so, for the same reason its twin does. -->
+          <!-- R1 personal kit: Settings links to the same visual collection
+               as the visible My dice launcher. Venues suggest a set; the
+               player chooses it, and new rolls carry that choice. -->
           <div class="prow" id="diceset-row">
             <span class="grow">
               <span class="prow-label">Dice set</span>
@@ -1306,7 +1316,6 @@ limitations under the License.
             </span>
           </div>
           <div id="diceset-picker"></div>
-          <p id="venue-staged-you" class="hint venue-staged hidden"></p>
         </div>
       </section>
 

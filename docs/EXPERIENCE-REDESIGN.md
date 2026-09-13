@@ -4,8 +4,11 @@
 
 **Adopted 2026-09-12.** Joe approved the September experience audit's three
 priorities: “Great ideas. I'm all in.” His instruction is to record the plan
-and begin **planning item (1)**. This is the current investment order;
-implementation has not begun. The detailed design for (1) is in
+and begin **planning item (1)**. This is the current investment order.
+On 2026-09-13 he asked to focus on one area and start implementing: the
+[first personal-kit slice](SHIPPED.md#personal-name-and-dice-collection-2026-09-13)
+now delivers direct name editing and a visual dice collection. The larger
+release remains in progress; its detailed design is in
 [PEOPLE-DICE-TABLES.md](PEOPLE-DICE-TABLES.md).
 
 The product direction is approved. Release boundaries and technical choices
@@ -22,7 +25,7 @@ to find your dice, recognize your people, and return to your group's table.
 
 | Priority | Investment | First useful release | What follows |
 | --- | --- | --- | --- |
-| **1 — planning now** | **People, personal dice, and persistent tables.** Three clear destinations: Tables, My dice & rolls, People. Direct identity editing, a visual dice collection, visible table setup, familiar first rolls, and an optional recoverable identity. | Direct name editing, a usable dice gallery with favorites and practice, named table controls, and Quick dice with explicitly chosen starter kits. | Durable table homes, identity recovery, synchronized libraries, friends, presence, and an invitation inbox. |
+| **1 — implementation started** | **People, personal dice, and persistent tables.** Three clear destinations: Tables, My dice & rolls, People. Direct identity editing, a visual dice collection, visible table setup, familiar first rolls, and an optional recoverable identity. | Direct name editing, a usable dice gallery with favorites and practice, named table controls, and Quick dice with explicitly chosen starter kits. | Durable table homes, identity recovery, synchronized libraries, friends, presence, and an invitation inbox. |
 | **2 — next design track** | **The whole shared playing surface.** Compose recognizable tables and places for people; keep names and each player's latest visible result readable together. | One excellent multiplayer composition and a phone layout with a full-width table, bottom roll tray, and sheets for dice, people, and history. | Explore three complete designs: a worn tavern table with brass inlays, an illustrated navigation table, and a carved stone circle. Explore concurrent or grouped roll presentation. |
 | **3 — measured engineering track** | **Lightweight play.** Reduce delivery, simulation, and rendering costs while retaining character and readable dice. | Verify production compression and establish a reproducible baseline; implement missing compressed delivery and reduce dice-face material draws. | Load optional features on demand, move heavy simulation into a worker, stop unnecessary rendering at rest, and develop an attractive Battery saver presentation with an optional instant result. |
 

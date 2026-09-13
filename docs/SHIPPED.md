@@ -13,6 +13,65 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Personal name and dice collection (2026-09-13)
+
+The first bounded implementation of the approved experience redesign makes
+personal controls visible. An ordinary click, tap or keyboard activation on
+your name opens its editor with Save. **My dice** stays visible in both sidebar
+layouts, names the current set, and opens a visual collection with favorites,
+a larger preview, and an explicit **Use these dice** action. The personal menu
+and Settings reach that same collection; **Back to my rolls** returns to your
+own saved rolls in one action.
+
+The desktop drawer leaves the table available. The phone sheet contains focus
+and makes the covered background inert; resize and close release that state.
+Name changes preserve the seat and character library. Favorites and personal
+selection persist in the browser. Browsing does not change or broadcast a
+roll; new rolls carry the selected appearance to peers and late arrivals.
+Existing results retain their original art and saved-roll overrides still win.
+
+The collection dynamically imports `js/dicegallery.js` and its stylesheet.
+Its 24 offline 560 × 280 WebP portraits total 572,080 bytes on disk and use the
+actual app meshes/materials; the unopened collection requests none of them.
+The new gallery creates no scene geometry. This limits the cost of the new
+feature; it is not a claim that the existing rendering workload became faster.
+Regenerate portraits with `tools/steps/dice-gallery-bake.mjs` when dice art changes.
+
+Two prior design choices are deliberately superseded: §7.17's hidden
+secondary gesture for personal editing, and the venue's forced dice override.
+A venue now suggests a matching set in the gallery, requiring the same
+explicit Use action. These changes follow PEOPLE-DICE-TABLES §§2–3 and make
+personal choices discoverable and dependable.
+
+This is part of R1-B1/B2, not completion of R1: the full destination shell,
+practice throws, fuller saved-roll appearance controls, table setup, Quick
+dice, recovery and invitations remain open.
+
+Visual proof uses a four-person table at 1440 × 900, a 390 × 844 emulated touch
+viewport, and the name editor at 390 × 500. These are desktop Chromium
+screenshots, not a physical iPhone/Android keyboard test. Reproduce with
+`node tools/drive.mjs tools/steps/personal-kit-look.mjs`.
+
+Reviewed [desktop](redesign/2026-09-13-personal-kit-desktop.png),
+[phone collection](redesign/2026-09-13-personal-kit-phone.png), and
+[name editor in the shorter viewport](redesign/2026-09-13-personal-kit-name-phone.png).
+
+`npm test` passes: unit tests, notation fuzzing, and 61/61 browser smoke
+scenarios. Targeted browser proofs pass: `personal-kit`, `personal-kit-phone`,
+`panel-anatomy`, `pool-set-override`, `venue-dice`, and `dev-set-roundtrip`.
+They cover real shared rolls, late arrival, reload, independent preview/apply,
+saved-roll overrides inside a venue, venue suggestions, mobile focus/resize,
+and a removed developer set. The debug hook comparison adds only
+`openDiceGallery` and `diceGallery`, removing none.
+
+The broader settings sweep exposed two existing failures. `panel-anatomy`'s
+obsolete collapsed-table-label assertion was corrected to the already shipped
+visible table context and now passes. `venue-life` still reports 260 members
+pushed out of the felt versus its expected zero; the unchanged `e035c32`
+baseline reproduces the same failure. It is outside this personal-controls
+slice and remains unfixed. All checks used ephemeral ports; the owner's 8123
+table was untouched.
+
 ## The Foundry replaces the tower catalogue (2026-09-12)
 
 Joe asked for entirely new Blender towers, rejected reuse of the existing

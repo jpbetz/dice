@@ -28,6 +28,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { personalKitScenarios } from './personal-kit.mjs';
 import { assert, Table, freePort, startServer } from './harness.mjs';
 import { probeCelticWeave } from './placard-knot-probe.mjs';
 
@@ -763,6 +764,7 @@ const splitGhosts = async (t) => (await ghostLabels(t)).filter((l) => SPLIT_GHOS
 const picked = (a) => a.dbg('picked');
 
 export const scenarios = [
+  ...personalKitScenarios,
   {
     name: 'shared-roll',
     tags: ['smoke', 'roll', 'cuj8'],
@@ -5325,50 +5327,22 @@ export const scenarios = [
         'sticky', 'the head becomes sticky so mid-scroll ownership survives');
       assert.equal(await a.eval(`!!document.querySelector('.pools-owner-banner')`),
         false, 'the standalone banner is retired');
-      // ONE grammar for whose-rack (Joe 2026-08-04): the identity chip
-      // joins the rail's aria-pressed toggle grammar. Pressed=true at
-      // home, false while browsing a teammate — exactly one chip in the
-      // rail is pressed at any time.
-      assert.equal(await a.eval(
-        `document.getElementById('identity-chip').getAttribute('aria-pressed')`),
-        'false', 'the identity chip un-presses while you are browsing a teammate');
-      assert.equal(await a.eval(
-        `document.querySelector('#rail-roster .roster-name').getAttribute('aria-pressed')`),
-        'true', "and the teammate's pill is pressed instead");
-
-      // LEFT-CLICK on your identity chip falls home (Joe 2026-08-04:
-      // "switching back to yourself isn't possible by just clicking on
-      // your name. Maybe make that possible…"). No menu opens; the
-      // chip's own toggle grammar mirrors the teammate pill's.
+      // R1: identity edits you; browsing a teammate stays put until the
+      // explicit My saved rolls action returns to your own library.
       await a.eval(`document.getElementById('identity-chip').click()`);
-      await a.waitFor(
-        `!document.getElementById('pools-head').classList.contains('foreign')`,
-        { desc: 'left-click on identity chip falls home' },
-      );
-      assert.equal(await a.eval(
-        `getComputedStyle(document.getElementById('pools-head')).display`), 'none',
-        'and the ownership marker goes with the teammate — your own rack wears none');
-      assert.equal(await a.eval(
-        `document.getElementById('identity-menu').classList.contains('hidden')`), true,
-        'the identity menu does NOT open on left-click (moved to right-click)');
-      assert.equal(await a.eval(
-        `document.getElementById('identity-chip').getAttribute('aria-pressed')`),
-        'true', 'the identity chip is pressed again at home');
-
-      // RIGHT-CLICK on your identity chip opens the identity menu
-      // ("…make access to player details accessible via right click").
-      // Matches the right-click-for-popover pattern the pool tiles
-      // already speak (§7.9 the Sheet Pass: "right-click a tile for its
-      // ± popover"). Left-click while the menu is open closes it.
-      await a.eval(`document.getElementById('identity-chip')
-        .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`);
-      assert.equal(await a.eval(
-        `document.getElementById('identity-menu').classList.contains('hidden')`), false,
-        'right-click opens the identity menu');
+      assert.equal(await a.dbg('poolsOwner'), bobId, 'opening personal controls preserves the viewed rack');
+      assert.equal(await a.eval(`document.getElementById('identity-chip').getAttribute('aria-expanded')`), 'true');
+      assert.equal(await a.eval(`document.activeElement.id`), 'idm-name-input', 'normal click reaches name editing');
+      await a.eval(`document.getElementById('idm-rolls').click()`);
+      await a.waitFor(`!document.getElementById('pools-head').classList.contains('foreign')`,
+        {desc:'My saved rolls returns to your own rack'});
+      assert.equal(await a.dbg('poolsOwner'), null);
+      assert.equal(await a.eval(`document.getElementById('identity-menu').classList.contains('hidden')`), true);
+      await a.eval(`document.getElementById('identity-chip').dispatchEvent(new MouseEvent('contextmenu', { bubbles:true,cancelable:true }))`);
+      assert.equal(await a.eval(`document.getElementById('identity-menu').classList.contains('hidden')`), false,
+        'right-click remains a secondary alias');
       await a.eval(`document.getElementById('identity-chip').click()`);
-      assert.equal(await a.eval(
-        `document.getElementById('identity-menu').classList.contains('hidden')`), true,
-        'left-click while the menu is open closes it (via the chip handler)');
+      assert.equal(await a.eval(`document.getElementById('identity-menu').classList.contains('hidden')`), true);
 
       // and press-again on the teammate pill ALSO falls home — both
       // paths back must work; consistency-first, one gesture grammar.
@@ -5384,7 +5358,8 @@ export const scenarios = [
         { desc: 'the head returns home via the pill toggle' },
       );
 
-      // collapsed: both leave with the panel — the icon rail stays clean.
+      // The current table context stays visible in the compact rail; only
+      // the saved-roll workspace folds away (the September join redesign).
       // (try/finally: dice.panels.v1 persists per origin, and an aborted
       // collapse here would strand every later localhost scenario in a
       // zero-rect panel — the leak class this suite met once already.)
@@ -5392,7 +5367,7 @@ export const scenarios = [
         await a.dbg(`setPanelState({pools: false})`);
         assert.equal(await a.eval(
           `document.getElementById('table-name').offsetParent === null`),
-          true, 'the plate leaves the collapsed rail');
+          false, 'the table name stays visible in the collapsed rail');
         assert.equal(await a.eval(
           `document.getElementById('pools-head').offsetParent === null`),
           true, 'the head leaves with the panel');
@@ -8788,12 +8763,12 @@ export const scenarios = [
       'Change seat is withheld at a table too (Joe 2026-08-09)');
       await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
 
-      // (ii) A NORMAL TAP still falls home rather than opening the menu —
-      // the suppressor must not swallow the ordinary press.
+      // (ii) R1: a normal tap opens the editor too; the suppressor must not swallow it.
       await a.eval(`document.getElementById('identity-chip').click()`);
       assert.equal(await a.eval(
         `!document.getElementById('identity-menu').classList.contains('hidden')`),
-      false, 'a plain tap does not open the menu');
+      true, 'a plain tap opens the personal editor');
+      await a.eval(`document.getElementById('identity-chip').click()`);
 
       // (iii) THE COLLECTED ROLL'S ROW — its tweaked reroll was unreachable on
       // iOS. Roll, collect, then hold the row. (This was the shelf MARKER
@@ -10504,22 +10479,16 @@ export const scenarios = [
       assert.ok(follows.length === 1 && follows[0].variant === 'emberforge.blackanvil',
         `an override-free pool follows the roller's set (got ${follows.map((d) => d.variant).join(',')})`);
 
-      // the settings row wears the compact select; a pick commits and closes
-      await a.eval(`window.__diceDebug.openSettings("you")`);
-      await a.eval(`document.querySelector('#diceset-picker .set-select').click()`);
-      const menu = JSON.parse(await a.eval(`JSON.stringify((() => {
-        const m = document.querySelector('.set-menu');
-        if (!m) return null;
-        const sel = m.querySelector('[aria-selected="true"]');
-        return { rows: m.querySelectorAll('.set-swatch').length, selected: sel ? sel.dataset.set : null };
-      })())`));
-      assert.ok(menu && menu.rows >= 13, `the menu lists Standard + every house set (got ${menu && menu.rows})`);
-      assert.equal(menu.selected, 'emberforge.blackanvil', 'the current set is marked selected');
-      await a.eval(`document.querySelector('.set-menu [data-set="tidewrack.seaglass"]').click()`);
-      assert.equal(await a.dbg('diceSet'), 'tidewrack.seaglass', 'picking a row commits the set');
-      const menuGone = JSON.parse(await a.eval(`JSON.stringify(!document.querySelector('.set-menu'))`));
-      assert.equal(menuGone, true, 'the menu closes on pick');
-      await a.eval(`document.getElementById('settings-close').click()`);
+      // Settings now links to the visual collection. Preview never applies.
+      await a.dbg('openSettings("you")');
+      await a.eval(`document.querySelector('#diceset-picker button').click()`);
+      await a.waitFor(`window.__diceDebug.diceGallery.open`);
+      assert.equal((await a.dbg('diceGallery')).current, 'emberforge.blackanvil');
+      await a.eval(`document.querySelector('.dg-card[data-set="tidewrack.seaglass"]').click()`);
+      assert.equal(await a.dbg('diceSet'), 'emberforge.blackanvil', 'preview leaves the default alone');
+      await a.eval(`document.querySelector('.dg-use').click()`);
+      assert.equal(await a.dbg('diceSet'), 'tidewrack.seaglass');
+      await a.eval(`document.querySelector('.dg-close').click()`);
 
       // the popover identity strip drives the SAME control by pool id
       await a.eval(`window.__diceDebug.openPopoverFor(${JSON.stringify(gid)})`);
@@ -17799,31 +17768,17 @@ export const scenarios = [
   {
     name: 'venue-dice',
     tags: ['fx', 'settings'],
-    // THE VENUE STAGES THE DICE (ROADMAP W4 — the GOALS 13 punt
-    // delivered). Four claims: the staged set overrides the player's own
-    // AT ROLL CREATION, so the ROLL RECORD carries it and both tabs agree
-    // off the record, not off a render remap; the override releases with
-    // the venue (your own set resumes); the fae set is real in SETS but
-    // takes NO chip in the picker (venueOnly — a venue is chosen as one
-    // thing); and the venue reports what it stages so this scenario reads
-    // the contract, not a constant.
+    // R1: a venue suggests a matching set without overriding the player.
+    // The authored personal choice must reach both clients unchanged.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
 
-      // ---- the picker refuses to offer the fae set ------------------------
-      // (Registry + server presence are proven harder below: the roll's
-      // record carries the id end-to-end, which only a SET_IDS member can.)
-      await a.eval('window.__diceDebug.openSettings("you")');
-      await a.eval(`document.querySelector('#diceset-picker .set-select').click()`);
-      assert.equal(await a.eval(
-        `document.querySelectorAll('.set-menu [data-set^="moonmoot."]').length`), 0,
-        'no Moonmoot chip anywhere a player picks — the venue stages it');
-      assert.ok(await a.eval(
-        `document.querySelectorAll('.set-menu [data-set]').length`) > 3,
-        'while the menu itself is alive and full');
-      await a.eval(`document.activeElement && document.activeElement.blur(),
-        document.body.click()`);
+      await a.dbg('openDiceGallery(null)');
+      assert.equal(await a.eval(`!!document.querySelector('.dg-card[data-set="moonmoot.witchlight"]')`), false,
+        'venue-only dice are not advertised outside that venue');
+      assert.ok(await a.eval(`document.querySelectorAll('.dg-card').length`) > 3);
+      await a.eval(`document.querySelector('.dg-close').click()`);
 
       // ---- your own set, chosen honestly, before the venue ----------------
       await a.dbg(`setDiceSet('tidewrack.seaglass')`);
@@ -17834,28 +17789,51 @@ export const scenarios = [
       await a.dbg('clearTable()');
       await a.dbg('sim(400)');
 
-      // ---- the venue overrides at roll creation ---------------------------
+      // ---- the venue preserves your choice at roll creation ----------------
       await a.dbg(`setVenue('moonrise')`);
       await a.waitFor(`window.__diceDebug.venueInfo().staged`, { desc: 'the glade rises' });
       await b.waitFor(`window.__diceDebug.venueInfo().staged`, { desc: 'on both tabs' });
       assert.equal(await a.eval(`window.__diceDebug.venueInfo().venueDiceSet`),
-        'moonmoot.witchlight', 'the venue declares the set it stages');
+        'moonmoot.witchlight', 'the venue declares the set it suggests');
       await a.roll('3d6');
       await a.settle();
-      assert.equal(await a.eval('window.__diceDebug.currentRoll.set'), 'moonmoot.witchlight',
-        "the roll RECORD carries the venue's set — not Alice's seaglass");
+      assert.equal(await a.eval('window.__diceDebug.currentRoll.set'), 'tidewrack.seaglass',
+        'the roll record keeps Alice’s chosen dice in the venue');
       await b.waitFor(`window.__diceDebug.currentRoll
-        && window.__diceDebug.currentRoll.set === 'moonmoot.witchlight'`,
+        && window.__diceDebug.currentRoll.set === 'tidewrack.seaglass'`,
       { desc: "Bob's copy of the record agrees — the wire carried it" });
 
-      // ---- the override releases with the venue ---------------------------
+      // An explicitly dressed saved roll keeps its own dice in the venue.
+      const pool = (await a.dbg('groups'))[0];
+      await a.dbg(`editPool(${JSON.stringify(pool.id)}, {notation:'1d6',set:'emberforge.blackanvil'})`);
+      await a.eval(`document.getElementById('clear-tray').click()`);
+      const before = await a.logCount();
+      await a.eval(`document.querySelector('[data-group-id="${pool.id}"] .tile-stage').click(); document.getElementById('tray-roll').click()`);
+      await a.waitFor(`(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${before} && !window.__diceDebug.busy)`);
+      await b.settle();
+      assert.equal(await b.eval('window.__diceDebug.currentRoll.set'), 'emberforge.blackanvil',
+        'the venue preserves an explicit saved-roll appearance');
+      await a.settle();
+
+      // A matching suggestion is a preview until Alice explicitly uses it.
+      await a.dbg('openDiceGallery(null)');
+      assert.equal(await a.eval(`document.querySelector('.dg-suggestion').hidden`), false);
+      await a.eval(`document.querySelector('.dg-suggestion').click()`);
+      assert.equal(await a.dbg('diceSet'), 'tidewrack.seaglass');
+      await a.eval(`document.querySelector('.dg-use').click(); document.querySelector('.dg-close').click()`);
+      await a.roll('2d6'); await b.settle();
+      assert.equal(await b.eval('window.__diceDebug.currentRoll.set'), 'moonmoot.witchlight',
+        'the explicit matching choice reaches the other player');
+
+      // ---- the choice remains personal when the venue leaves --------------
       await a.settle();
       await a.dbg(`setVenue('table')`);
       await a.waitFor(`!window.__diceDebug.venueInfo().staged`, { desc: 'the room returns' });
       await a.roll('2d6');
       await a.settle();
-      assert.equal(await a.eval('window.__diceDebug.currentRoll.set'), 'tidewrack.seaglass',
-        'your own set resumes with the room — the venue never rewrote your identity');
+      assert.equal(await a.eval('window.__diceDebug.currentRoll.set'), 'moonmoot.witchlight',
+        'the chosen set remains yours after the venue leaves');
+      await a.dbg(`setDiceSet('std')`);
     },
   },
 
@@ -25882,24 +25860,12 @@ export const scenarios = [
       await prod.eval(`document.getElementById('toggle-settings').click()`);
       await prod.eval(`[...document.querySelectorAll('button,[role="tab"]')]
         .find((b) => b.textContent.trim() === 'You')?.click()`);
-      await prod.eval(`document.querySelector('#diceset-picker .set-select')?.click()`);
-      await prod.dbg('sim(10)');
-      const menu = await prod.eval(`JSON.stringify((() => {
-        const heads = [...document.querySelectorAll('.set-house-head')];
-        return {
-          symbols: heads.some((h) => h.textContent.trim() === 'Symbols'),
-          monster: document.body.innerText.includes('Monster'),
-          emptyHouses: heads.filter((h) => {
-            let n = h.nextElementSibling, rows = 0;
-            while (n && !n.classList.contains('set-house-head')) { rows++; n = n.nextElementSibling; }
-            return rows === 0;
-          }).map((h) => h.textContent.trim()),
-        };
-      })())`).then(JSON.parse);
-      assert.equal(menu.monster, false, 'production is not offered the Monster dice');
-      assert.equal(menu.symbols, true, 'but the Symbols house is still there for its other sets');
-      assert.deepEqual(menu.emptyHouses, [],
-        `no house heading is left standing over nothing (${JSON.stringify(menu.emptyHouses)})`);
+      await prod.dbg('openDiceGallery(null)');
+      assert.equal(await prod.eval(`!!document.querySelector('.dg-card[data-set="symbols.monster"]')`), false,
+        'production is not offered Monster dice');
+      assert.equal(await prod.eval(`!!document.querySelector('.dg-card[data-set="symbols.fate"]')`), true,
+        'the other Symbols sets remain available');
+      await prod.eval(`document.querySelector('.dg-close').click()`);
       await prod.eval(`document.getElementById('toggle-settings').click()`);
       assert.equal(await prod.eval(`[...document.querySelectorAll('.system-chip')]
         .some((c) => c.textContent.trim() === 'Monster dice')`), false,
@@ -27543,13 +27509,13 @@ export const scenarios = [
         // AND THE PLAYER'S OWN CHIP IS THE SAME DOOR, so it takes the same
         // clause: an unsaved row is not offered in the settings picker either,
         // beside the two rules already there about where a set may be PICKED.
-        await t.eval(`document.querySelector('#diceset-picker .set-select').click()`);
-        await t.waitFor(`!!document.querySelector('.set-menu')`, { desc: 'the settings picker opened' });
-        assert.equal(await t.eval(`!!document.querySelector('.set-menu .set-swatch[data-set="house.ivory-2"]')`), false,
+        await t.dbg('openDiceGallery(null)');
+        await t.waitFor(`window.__diceDebug.diceGallery.open`, { desc:'the collection opened' });
+        assert.equal(await t.eval(`!!document.querySelector('.dg-card[data-set="house.ivory-2"]')`), false,
           'a set only this session has takes no chip — picking it there would 400 exactly as Use at table would');
-        assert.equal(await t.eval(`!!document.querySelector('.set-menu .set-swatch[data-set="classics.ivory"]')`), true,
+        assert.equal(await t.eval(`!!document.querySelector('.dg-card[data-set="classics.ivory"]')`), true,
           '…while everything the file declares is offered as it always was');
-        await t.eval(`document.querySelector('.set-menu').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+        await t.eval(`document.querySelector('.dg-close').click()`);
         await t.dbg('sim(2)');
 
         // THE PROOF THAT THE GATE IS THE RIGHT ONE: the roll button still
@@ -27630,14 +27596,14 @@ export const scenarios = [
           'and it reads as SHIPPED — the file is the declaration, not a diff');
         // THE PICKER: a set the file declares takes a chip like any other,
         // under its house's header, with no panel anywhere.
-        await fresh.eval(`document.querySelector('#diceset-picker .set-select').click()`);
-        await fresh.waitFor(`!!document.querySelector('.set-menu .set-swatch[data-set="house.ivory-2"]')`,
+        await fresh.dbg('openDiceGallery(null)');
+        await fresh.waitFor(`!!document.querySelector('.dg-card[data-set="house.ivory-2"]')`,
           { desc: 'the settings picker offers it' });
-        assert.equal(await fresh.eval(`document.querySelector('.set-menu .set-swatch[data-set="house.ivory-2"] span:last-child').textContent`),
+        assert.equal(await fresh.eval(`document.querySelector('.dg-card[data-set="house.ivory-2"] .dg-card-name').textContent`),
           'Ivory (house)');
-        assert.equal(await fresh.eval(`[...document.querySelectorAll('.set-house-head')].some((h) => h.textContent === 'House')`),
+        assert.equal(await fresh.eval(`document.querySelector('.dg-card[data-set="house.ivory-2"]').getAttribute('aria-label').includes('House')`),
           true, 'under the house it was authored into');
-        await fresh.eval(`document.querySelector('.set-menu .set-swatch[data-set="house.ivory-2"]').click()`);
+        await fresh.eval(`document.querySelector('.dg-card[data-set="house.ivory-2"]').click(); document.querySelector('.dg-use').click()`);
         await fresh.waitFor(`window.__diceDebug.diceSet === 'house.ivory-2'`, { desc: 'picked from the ordinary chip' });
 
         // THE HALF THAT DECIDES WHETHER AN AUTHORED SET WORKS AT A TABLE: the

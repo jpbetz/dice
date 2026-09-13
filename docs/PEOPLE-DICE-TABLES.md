@@ -2,11 +2,19 @@
 
 # People, personal dice, and persistent tables
 
-**R1 · planning started 2026-09-12 · no application changes yet.** Detailed
-working design for item (1) of the approved
+**R1 · planning started 2026-09-12 · first personal-kit slice implemented
+2026-09-13.** Detailed working design for item (1) of the approved
 [experience redesign](EXPERIENCE-REDESIGN.md). Product direction is settled;
 the implementation slices and unresolved technical choices below are the
 initial design, to be developed against the actual screens and code.
+
+The [first shipped slice](SHIPPED.md#personal-name-and-dice-collection-2026-09-13)
+covers normal name editing, a visible My dice launcher, lazy static previews,
+favorites, explicit selection, and venue suggestions. It takes the bounded
+personal controls from R1-B1/B2 ahead of the full shell so the owner can use
+and assess them now. R1-B1/B2 remain incomplete: destination state, practice
+throws, and fuller saved-roll override editing still need work. R1-A's
+whole-app desktop/phone structure remains a planning deliverable.
 
 ## 1. The experience to build
 
