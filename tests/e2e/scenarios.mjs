@@ -32,6 +32,7 @@ import { personalKitScenarios } from './personal-kit.mjs';
 import { tableControlScenarios } from './table-controls.mjs';
 import { firstPlayScenarios } from './first-play.mjs';
 import { profileSharingScenarios } from './profile-sharing.mjs';
+import { workspaceScenarios } from './workspaces.mjs';
 import { assert, Table, freePort, startServer } from './harness.mjs';
 import { probeCelticWeave } from './placard-knot-probe.mjs';
 
@@ -771,6 +772,7 @@ export const scenarios = [
   ...tableControlScenarios,
   ...firstPlayScenarios,
   ...profileSharingScenarios,
+  ...workspaceScenarios,
   {
     name: 'shared-roll',
     tags: ['smoke', 'roll', 'cuj8'],

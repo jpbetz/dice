@@ -111,10 +111,10 @@ export const firstPlayScenarios = [
     await a.page.browser.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true},a.page.sessionId);
     await a.emulateCoarsePointer(true);
     await a.eval(`localStorage.removeItem('dice.panels.v1')`); await a.reload();
-    const controls=await a.eval(`[...document.querySelectorAll('#rail-dice [data-quick]')].map(b=>b.getBoundingClientRect().toJSON())`);
+    const controls=await a.eval(`[...document.querySelectorAll('#phone-quick-dice [data-quick]')].map(b=>b.getBoundingClientRect().toJSON())`);
     assert.equal(controls.length,8);
     assert.ok(controls.every(b=>b.left>=0 && b.right<=390 && b.bottom<=844 && b.height>=40),'all quick rolls fit the fresh phone');
-    await a.eval(`document.querySelector('#rail-dice [data-quick="1d20"]').click()`); await a.settle();
+    await a.eval(`document.querySelector('#phone-quick-dice [data-quick="1d20"]').click()`); await a.settle();
     assert.deepEqual(await a.dbg('groups'),[]);
   }},
 ];

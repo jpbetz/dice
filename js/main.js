@@ -56,6 +56,7 @@ import { previewOf, countingPmfs, sumForecast, sumAtLeast, sumBins, sumPeak,
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealRack, dealName } from './seed.js';
 import { NEW_TABLE_SYSTEM, renderQuickRolls, createStarterKitChooser } from './firstplay.js';
+import { createWorkspaces } from './workspaces.js';
 import { resolveChannel, PARAM as STABILITY_PARAM } from './stability.js';
 import { EPOCH as SCHEMA_EPOCH, STAMP as SCHEMA_STAMP, judgeStamp, convert as schemaConvert } from './schema.js';
 import { exportYaml, parsePortable, planImport, profileToImport, declareFelts } from './portable.js';
@@ -757,7 +758,7 @@ const container = document.getElementById('scene-container');
 // (further down, also the resize handler) owns refreshing it.
 const view = (() => {
   const r = container.getBoundingClientRect();
-  return { left: r.left, width: Math.max(1, r.width), height: Math.max(1, r.height) };
+  return { left: r.left, top: r.top, width: Math.max(1, r.width), height: Math.max(1, r.height) };
 })();
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -10636,7 +10637,7 @@ function positionChips() {
     v.y += 2.2;
     v.project(camera);
     el.style.left = `${view.left + (v.x * 0.5 + 0.5) * view.width}px`;
-    el.style.top = `${(-v.y * 0.5 + 0.5) * view.height}px`;
+    el.style.top = `${view.top + (-v.y * 0.5 + 0.5) * view.height}px`;
   }
 }
 
@@ -17388,7 +17389,7 @@ window.__diceDebug = {
     // rect. Measured wrong once: a 22 px overlap read as 293 px of clearance.
     const toPx = (p) => {
       v.set(p[0], p[1], p[2]).project(camera);
-      return { x: view.left + (v.x + 1) / 2 * view.width, y: (1 - v.y) / 2 * view.height, ndc: { x: v.x, y: v.y, z: v.z } };
+      return { x: view.left + (v.x + 1) / 2 * view.width, y: view.top + (1 - v.y) / 2 * view.height, ndc: { x: v.x, y: v.y, z: v.z } };
     };
     const faces = [];
     const ink = [];
@@ -17429,7 +17430,7 @@ window.__diceDebug = {
       ndc: { x0: nx0, x1: nx1, y0: ny0, y1: ny1 },
       px: {
         x0: view.left + (nx0 + 1) / 2 * view.width, x1: view.left + (nx1 + 1) / 2 * view.width,
-        y0: (1 - ny1) / 2 * view.height, y1: (1 - ny0) / 2 * view.height,
+        y0: view.top + (1 - ny1) / 2 * view.height, y1: view.top + (1 - ny0) / 2 * view.height,
       },
       // THE PRINTED BANDS THEMSELVES, one convex quad per tent panel (a tent
       // has two, and from the shipped eye you look down on both). Corners in
@@ -19197,7 +19198,7 @@ window.__diceDebug = {
     const v = new THREE.Vector3(x, y, z).project(camera);
     return {
       x: view.left + (v.x * 0.5 + 0.5) * view.width,
-      y: (-v.y * 0.5 + 0.5) * view.height,
+      y: view.top + (-v.y * 0.5 + 0.5) * view.height,
     };
   },
   // The cloth at world (x, z), as RGBA off the TILE.
@@ -19349,10 +19350,11 @@ window.__diceDebug = {
 // that hangs off the camera.
 const leftPanelEl = document.getElementById('left-panel');
 function refitView() {
-  const pw = Math.round(leftPanelEl.getBoundingClientRect().width);
+  const pw = window.innerWidth <= 640 ? 0 : Math.round(leftPanelEl.getBoundingClientRect().width);
   document.documentElement.style.setProperty('--table-left', `${pw}px`);
   const r = container.getBoundingClientRect();
   view.left = r.left;
+  view.top = r.top;
   view.width = Math.max(1, r.width);
   view.height = Math.max(1, r.height);
   camera.aspect = view.width / view.height;
@@ -30082,6 +30084,7 @@ function buildSetSelect({ value = null, allowDefault = false, onPick, title }) {
 // Hoisted because boot calls renderDiceSetPicker before this part of the module.
 var diceGallery;
 var diceGalleryLoading;
+var destinationShell;
 function galleryEntries() {
   return [{id: 'std', name: 'Standard', house: 'The originals',
     description: 'A different color for every die. Familiar, easy to find.'},
@@ -30617,6 +30620,7 @@ function syncSettingsUI() {
 // Programmatic callers retain their existing destination keys. The table
 // label opens setup; the gear opens Preferences; personal controls open the library.
 function openSettingsModal(at = 'table', anchor) {
+  destinationShell?.close();
   if (settingsModal.classList.contains('hidden')) {
     const from = anchor instanceof HTMLElement ? anchor : document.activeElement;
     settingsOpener = identityMenu.contains(from) ? document.getElementById('identity-chip') : from;
@@ -30674,7 +30678,7 @@ function closeSettingsModal() {
 document.getElementById('toggle-settings').addEventListener('click', e => openSettingsModal('you', e.currentTarget));
 document.getElementById('table-open').addEventListener('click', e => openSettingsModal('table', e.currentTarget));
 document.getElementById('idm-preferences').addEventListener('click', () => openSettingsModal('you'));
-document.getElementById('idm-library').addEventListener('click', () => openSettingsModal('stuff'));
+document.getElementById('idm-library').addEventListener('click', () => destinationShell ? destinationShell.library() : openSettingsModal('stuff'));
 document.getElementById('settings-close').addEventListener('click', closeSettingsModal);
 settingsModal.addEventListener('click', (e) => {
   if (e.target === settingsModal) closeSettingsModal(); // backdrop click
@@ -32303,7 +32307,7 @@ function presetRay(target) {
   return ray;
 }
 
-function fitCameraTo(pts, target = camTarget, from = 1, refundOnFail = false) {
+function fitCameraTo(pts, target = camTarget, from = 1, refundOnFail = false, maxScale = 3.671) {
   // THE RAY IS TAKEN IN THE VIEWER'S OWN FRAME — presetRay, the one expression.
   const ray = presetRay(target);
   const refund = () => {
@@ -32319,7 +32323,7 @@ function fitCameraTo(pts, target = camTarget, from = 1, refundOnFail = false) {
   for (let i = 0; ; i++) {
     const s = from + i * 0.03;
     // == the old `i < 90` when from is 1
-    if (s > 3.671) return refundOnFail ? refund() : false;
+    if (s > maxScale) return refundOnFail ? refund() : false;
     camera.position.copy(target).addScaledVector(ray, s);
     aimCamera(target);
     const fits = pts.every(({ p, mx, my }) => {
@@ -32581,6 +32585,22 @@ function framingFor(orbit) {
   // fail on big piles where the ceiling is a meaningful answer, and this file
   // has been bitten before by a rule that looked general and was not.
   const fp = framingPoints();
+  // A phone's full-width table has a finite usable scene. The old placed-room
+  // branch refunded failed mat fits to the close preset and then skipped all
+  // fallback, putting every die off screen. Fit the whole occupied ring plus
+  // all dice, with room for the result card. This does not inspect faces,
+  // scoring, or a deciding die. The desktop ladder keeps its existing policy.
+  if (window.innerWidth <= 640) {
+    const pts = fp.map(q => ({...q, mx:0.08, my:0.28}));
+    const dp = diceFramingPoints(1.25);
+    if (dp) pts.push(...dp.map(q => ({...q, mx:0.08, my:0.28})));
+    const target = fp.centre || home;
+    fitCameraTo(pts, target, 1, false, 12);
+    const pose = {pos:camera.position.clone(), tgt:target.clone(), mode:'phone-table', orbit,
+      on:framingScore().on, span:spanPxNow(), matFits:matOnScreen()};
+    camOrbit = prev;
+    return pose;
+  }
   const matOk = fitCameraTo(fp, fp.centre || home, 1, true);
   if (!matOk) fitCameraTo(matSquarePoints(), fp.centre || home, 1, true);
   // THE ROUND TABLE IS THE FRAME. When anyone holds a seat the picture is the
@@ -33255,6 +33275,7 @@ document.addEventListener('keydown', (e) => {
     else if (isPaletteOpen()) closePalette();
     else if (diceGallery?.isOpen) diceGallery.close();
     else if (!settingsModal.classList.contains('hidden')) closeSettingsModal();
+    else if (destinationShell?.current) destinationShell.close();
     else if (isSeatPickerOpen()) dismissSeatPicker(); // C12: the door was the one overlay with no way out
     else if (isIdentityMenuOpen()) closeIdentityMenu();
     else if (isOfferMenuOpen()) closeOfferMenu();
@@ -34553,8 +34574,8 @@ document.getElementById('idm-profile').addEventListener('click', () => {
   openRailMenu(document.getElementById('identity-chip'), buildProfileMenu);
 });
 document.getElementById('idm-dice').addEventListener('click', () => openDiceGallery(document.getElementById('my-dice')));
-document.getElementById('idm-rolls').addEventListener('click', () => { closeIdentityMenu(); returnToMyRolls(); });
-document.getElementById('idm-starter-kits').addEventListener('click', () => { openSettingsModal('stuff'); document.getElementById('starter-kits').open=true; });
+document.getElementById('idm-rolls').addEventListener('click', () => { closeIdentityMenu(); returnToMyRolls(); destinationShell?.open('dice'); });
+document.getElementById('idm-starter-kits').addEventListener('click', () => { destinationShell ? destinationShell.library() : openSettingsModal('stuff'); document.getElementById('starter-kits').open=true; });
 document.getElementById('idm-rename-row').addEventListener('submit', e => {
   e.preventDefault();
   const input = document.getElementById('idm-name-input');
@@ -36555,3 +36576,66 @@ netReady = initNet();
 
 // DEVELOPER MODE deals nothing at boot (docs/DEVMODE.md): the door is the
 // backtick key or `__diceDebug.devOpen()`, and the cast is dealt on demand.
+
+// Workspaces borrow existing editors without changing a room, seat, or draft.
+// Results are projected only from this viewer's settled, redacted history.
+destinationShell = createWorkspaces({
+  snapshot: () => ({
+    table: { room: ROOM, name: document.getElementById('table-name').textContent || 'Solo table',
+      connection: document.getElementById('table-connection').textContent, invitable: !!(netOnline && net && !IN_LOBBY) },
+    recent: recentTables(),
+    people: players.map(p => {
+      const e = log.findLast(e => e.playerId === p.id);
+      return { id:p.id, name:p.name, color:p.color, mine:p.id===net?.playerId, blocked:poolsEdit,
+        latest:e ? { id:e.rollId, text:entryHidden(e) ? heldWord(e)
+          : activeSystem().usesTotal ? String(e.total ?? '')
+          : (e.parts || []).filter(p => p.counts).map(p => p.label).join(' · ') } : null };
+    }),
+  }),
+  beforeOpen: () => { closeSettingsModal(); closeIdentityMenu(); diceGallery?.close(); closeRailMenu(); },
+  closeMenus: () => { closeRailMenu(); closeSetMenu(); },
+  modalOpen: el => {
+    if (window.innerWidth <= 640) openModal(el, {labelledBy:'workspace-title'});
+    else { closeModal(el); el.setAttribute('role','region'); }
+  }, modalClose: closeModal,
+  layoutChanged: refitView,
+  prepareLibrary: renderProfileLibrary,
+  home: () => { if (poolsOwner) setPoolsOwner(null); },
+  quickRoll,
+  gallery: openDiceGallery,
+  setup: anchor => openSettingsModal('table', anchor),
+  create: anchor => {
+    openNewTable({currentTarget:anchor});
+    // Keep the existing mint menu within the workspace's modal focus scope.
+    if (railMenuState) document.getElementById('workspace').append(railMenuState.el);
+  },
+  go: gotoTable,
+  forget: forgetTable,
+  invite: anchor => shareInvite(inviteUrl(), anchor, 'Invite to table'),
+  browse: id => { if (poolsEdit) return false; setPoolsOwner(id); },
+  result: openPeek,
+});
+window.__diceDebug.workspaces = {
+  open: key => destinationShell.open(key), close: () => destinationShell.close(),
+  get current() { return destinationShell.current; },
+};
+// Screenshot proof uses painted vertices, not world-space AABB corners (which
+// overstate a rotated die). It observes the live camera and every visible die.
+window.__diceDebug.phoneFrame = () => {
+  const v = new THREE.Vector3();
+  return { view:{...view}, busy:!!(currentRoll && !currentRoll.done), dice:tableDice.filter(d=>d.mesh?.visible).map(d => {
+    const bounds = {left:Infinity,top:Infinity,right:-Infinity,bottom:-Infinity};
+    d.mesh.updateWorldMatrix(true,true);
+    d.mesh.traverse(m => {
+      if (!m.isMesh || !m.visible) return;
+      const p=m.geometry.getAttribute('position'); if (!p) return;
+      for(let i=0;i<p.count;i++) {
+        v.fromBufferAttribute(p,i).applyMatrix4(m.matrixWorld).project(camera);
+        const x=view.left+(v.x+1)*view.width/2, y=view.top+(1-v.y)*view.height/2;
+        bounds.left=Math.min(bounds.left,x); bounds.right=Math.max(bounds.right,x);
+        bounds.top=Math.min(bounds.top,y); bounds.bottom=Math.max(bounds.bottom,y);
+      }
+    });
+    return {rollId:d.rollId,index:d.dieIndex,...bounds};
+  }) };
+};

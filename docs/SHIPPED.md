@@ -8,6 +8,15 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## 2026-09-13 — Three workspaces and a full-width phone table
+
+Tables / My dice & rolls / People now reuse the live workbench and library,
+with one-action return preserving seat, draft, and unfinished turns. People
+shows the live roster and latest visible results beside the desktop scene.
+Phones replace the side rail with a bottom roll tray and full-screen workspaces.
+The occupied-ring fit keeps all four players’ painted dice in frame during
+playback and after returning from a sheet. Scope and proof: [WORKSPACES.md](WORKSPACES.md).
+
 ## Familiar first rolls and explicit starter kits (2026-09-13)
 
 R1-C gives new rooms Numbers only, an empty personal library, and Quick dice
