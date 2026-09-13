@@ -229,10 +229,14 @@ The old draft workbench failure initially passed on a fresh single-profile
 library. The later full sweep exposed inherited multiple-profile state; the
 follow-up fixes its missing ownership-heading state and proves both layouts.
 
-A fresh immutable checkout at `d6f1529` now runs unit, fuzz and the complete
-release script. Its result is pending. Optional legacy venue/material gates
-remain intact; paired before/redesign evidence is recorded in the relevant
-characterizations. Cloud traffic and the owner's live preview remain untouched.
+The immutable `d6f1529` release preflight completed **355/366**, after its
+full unit/fuzz rerun and both leading protocol-browser suites passed. All eleven
+failures are classified in the [retained release
+record](redesign/2026-09-13-release/README.md): eight corrections and three
+unchanged legacy venue/material failures. Their gates remain intact.
+The final frozen candidate is `8a577e5`; unit/fuzz, the entire browser sweep and
+its normally skipped account/UI tail are now running with independent exit-code
+and signal recording. Cloud traffic and the owner's live preview remain untouched.
 
 
 ## Joined return and reviewed release corrections
@@ -268,3 +272,14 @@ local recovery drill passes seven checks and explicitly proves that restoring
 older data can revive later-revoked sessions and discard later blocks. Public
 restore therefore still needs a reviewed security-reconciliation procedure.
 No cloud resource, production traffic or live-preview process changed.
+
+
+## External observation handoff
+
+The [human and physical-device sheet](REDESIGN-VALIDATION-SHEET.md) supplies
+uncoached goals, exact existing script references, metric definitions and blank
+result fields for the remaining R1-F/R2/R3 observations. It is a runnable session
+plan, not completed evidence or a new performance threshold. A final read-only
+scope audit found no missing local R1-A–E feature; simultaneous physical films,
+automatic presentation selection and a legacy beta-scenery rebuild remain
+explicitly outside the current implementation scope.
