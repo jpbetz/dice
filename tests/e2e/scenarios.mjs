@@ -922,6 +922,9 @@ export const scenarios = [
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
 
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.waitFor(`window.__diceDebug.system==='soul-deal'`);
+
       // playRoll is the arrival path a networked roll already takes (the
       // server sends dice + values), so driving it with chosen values is the
       // real ceremony, not a rig — and the only way to ask about an outcome
@@ -1113,8 +1116,7 @@ export const scenarios = [
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.settle();
       const restHeights = async (notation) => {
-        await a.dbg(`commandRoll(${JSON.stringify(notation)})`);
-        await a.settle();
+        await a.roll(notation); // wait for this network arrival and its worker, not the prior idle table
         await a.dbg('sim(8000)');
         const r = await a.eval(`JSON.stringify((() => {
           const d = window.__diceDebug;

@@ -11,7 +11,16 @@ export const rollHistoryScenarios = [{name:'unfinished-turn-history',tags:['roll
   await a.dbg('pickToggle(0)'); const picked=await a.dbg('picked.keys'), before=await a.dbg(`turnState(${JSON.stringify(id)})`);
   const otherTurns=[];
   for(let i=0;i<2;i++) {await a.roll('1d6 t2'); otherTurns.push(await a.rollId());}
-  await a.eval(`(()=>{const d=window.__diceDebug;d.holdClock(true);for(let i=0;i<105;i++){d.commandRoll('1d6');d.sim(600);}})()`);
+  await a.eval(`(async()=>{const d=window.__diceDebug;d.holdClock(true);
+    for(let i=0;i<105;i++){
+      const previous=d.currentRoll?.rollId;d.commandRoll('1d6');
+      // Yield to the real worker and wait for this particular arrival. The
+      // completed-history count stops growing at capacity, so it is not a
+      // completion signal for these final rolls.
+      while(d.currentRoll?.rollId===previous||d.busy){d.sim(120);await new Promise(r=>setTimeout(r,0));}
+      d.sim(240);
+    }
+  })()`);
   assert.equal(await a.logCount(),103,'unfinished turns live outside the 100-entry history budget');
   assert.ok(await a.eval(`document.querySelector('[data-roll-id="${id}"]')!==null`),'the exact old history row survives pruning');
   assert.deepEqual(await a.dbg('picked.keys'),picked);
