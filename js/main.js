@@ -25656,7 +25656,7 @@ function addLogEntry(entry) {
     // An old unfinished turn may still be the last row. Remove the exact
     // discarded IDs, not the tail, or the DOM would lose protected work.
     const discardedIds = new Set(trimmed.dropped.map(e => e.rollId));
-    for (const row of logList.children) if (discardedIds.has(row.dataset.rollId)) row.remove();
+    for (const row of [...logList.children]) if (discardedIds.has(row.dataset.rollId)) row.remove();
   }
   // A filter is a claim about what this list is showing, so an arrival has to
   // be judged by it too — otherwise the one row that ignores the filter is the
