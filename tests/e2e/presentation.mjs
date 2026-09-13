@@ -1,5 +1,6 @@
 /* Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 */
 import {assert} from './harness.mjs';
+import {tapControl} from './roll-flows.mjs';
 // Personal settings outlive a scenario's room. Restore them even on failure
 // so unrelated Full-effects checks never inherit this test's Battery choice.
 const clean = fn => async ctx => {
@@ -8,6 +9,13 @@ const clean = fn => async ctx => {
  try { await fn(scope); }
  finally { for(const t of tables)await t.eval("window.__diceDebug.setInstantResults(false);window.__diceDebug.setPresentation('full')").catch(()=>{}); }
 };
+export async function choosePresentation(a,mode) {
+ await tapControl(a,'#toggle-settings');
+ await tapControl(a,`[data-presentation="${mode}"]`);
+ assert.equal(await a.dbg('presentation.mode'),mode);
+ assert.equal(await a.eval(`document.querySelector('[data-presentation="${mode}"]').getAttribute('aria-checked')`),'true');
+ await tapControl(a,'#settings-close');
+}
 const film=t=>t.eval(`(()=>{const r=window.__diceDebug.currentRoll;return {keyframes:r.keyframes,sounds:r.sounds,rough:r.rough,landings:r.landings,nudges:r.nudges,values:r.values,final:r.dice.map(d=>({p:d.finalPos,q:d.finalQuat}))};})()`);
 export const presentationScenarios=[
  {name:'battery-preference',tags:['presentation','settings'],fn:clean(async ctx=>{
@@ -53,15 +61,35 @@ export const presentationScenarios=[
  })},
  {name:'battery-ambient-wake',tags:['presentation','table-designs'],fn:clean(async ctx=>{
    const a=await ctx.newTable({origin:'localhost',name:'Alice'});
-   await a.dbg("setPresentation('battery')");await a.dbg("setVenue('moonrise')");
+   await choosePresentation(a,'battery');await a.dbg("setVenue('moonrise')");
    await a.waitFor("window.__diceDebug.venue==='moonrise'&&window.__diceDebug.venueInfo().staged");
    await a.waitFor('window.__diceDebug.pendingTower===null&&window.__diceDebug.towerModelStatus().ready',{desc:'venue model has finished loading'});
-   await a.waitFor('!window.__diceDebug.renderAudit().scheduled.pending');
-   const frame=await a.dbg('renderAudit().frame');await a.eval('new Promise(r=>setTimeout(r,500))');
-   assert.equal(await a.dbg('renderAudit().frame'),frame,'experimental scenery also stays still');
-   await a.dbg("setPresentation('full')");await a.eval('new Promise(r=>setTimeout(r,500))');
-   assert.ok(await a.dbg('renderAudit().frame')>frame+5,'restoring Full resumes the existing scenery');
-   await a.dbg("setPresentation('battery')");await a.dbg("setVenue('navigation')");
+   const snapshot=()=>a.eval(`(()=>{const d=window.__diceDebug,l=d.lifeInfo();return {frame:d.renderAudit().frame,scheduled:d.renderAudit().scheduled,t:l.t,sample:l.sample};})()`);
+   async function staysQuiet() {
+     await a.waitFor('!window.__diceDebug.renderAudit().scheduled.pending');
+     const before=await snapshot();await a.eval('new Promise(r=>setTimeout(r,500))');
+     const after=await snapshot();
+     assert.equal(after.frame,before.frame,'settled Battery issues zero rendered frames');
+     assert.equal(after.t,before.t);assert.deepEqual(after.sample,before.sample,'Battery leaves scenery positions still');
+   }
+   await staysQuiet();
+   await choosePresentation(a,'full');
+   const before=await snapshot();
+   assert.ok(before.sample.length>0,'the existing scenery has measured positions');
+   // This is a wake/completion proof, not an FPS budget. Cold software rendering
+   // supplied only 2 frames to the old 500 ms timer, then 29 across four such waits.
+   // Preserve actual frame progress, allow 5 s to complete it, and prove movement
+   // continues without another input, sim(), or explicit invalidation.
+   for(let pass=0,prior=before;pass<2;pass++) {
+     await a.waitFor(`window.__diceDebug.renderAudit().frame>${prior.frame}+5`,{desc:'Full resumes and continues rendering the existing scenery',timeout:5000});
+     const next=await snapshot();
+     assert.ok(next.t>prior.t,'the visible scenery clock advances');
+     assert.notDeepEqual(next.sample,prior.sample,'rendered scenery positions change');
+     assert.equal(next.scheduled.visible,true);assert.equal(next.scheduled.pending,true,'ambient rendering remains scheduled');
+     prior=next;
+   }
+   await choosePresentation(a,'battery');await staysQuiet();
+   await a.dbg("setVenue('navigation')");
    await a.waitFor("window.__diceDebug.tableDesign.activeId==='navigation'");
    await a.waitFor('!window.__diceDebug.renderAudit().scheduled.pending');assert.deepEqual(a.page.consoleErrors,[]);
  })},
