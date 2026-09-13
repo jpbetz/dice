@@ -43,7 +43,7 @@ test('strict JSON records and paths preserve values without hidden coercion', ()
   assert.deepEqual(copy, value);
   copy.nested.count = 7;
   assert.equal(value.nested.count, 3);
-  for (const key of ['../people/one', 'people', '/people/one', 'people/a/b', 'people/a?x=secret']) {
+  for (const key of ['../people/one', 'people', '/people/one', 'people/a/b', 'people/a?x=secret', 'people/__reserved__']) {
     assert.throws(() => validPath(key), hasCode('invalid'));
   }
   for (const invalid of [null, [], { x: undefined }, { x: NaN }, { x: new Date() }, { x: new Array(2) },
@@ -157,6 +157,7 @@ test('killing a process between temporary-file flush and rename cannot partially
   const recovery = child(dir, 'recover');
   assert.deepEqual(await recovery.message, { ok: true });
   assert.equal((await recovery.exit).code, 0);
+  assert.equal((await fs.readdir(dir)).some(name => /^pending-/.test(name)), false);
 });
 
 test('post-rename directory flush failure reports uncertainty and requires reopening', async t => {
@@ -202,6 +203,14 @@ test('bounds and private location checks fail before taking or replacing data', 
   const link = path.join(elsewhere, 'link');
   await fs.symlink(dir, link);
   await assert.rejects(openFileStore({ directory: link }), hasCode('invalid'));
+});
+
+test('local transaction byte budget matches the portable REST encoding budget', async t => {
+  const { store } = await opened(t);
+  await assert.rejects(store.transact(async tx => {
+    for (let i = 0; i < 20; i++) tx.put(`libraries/v${i}`, { data: 'x'.repeat(500000) });
+  }), hasCode('limit'));
+  assert.equal(await store.get('libraries/v0'), null);
 });
 
 test('close waits for accepted transactions and refuses new work', async t => {

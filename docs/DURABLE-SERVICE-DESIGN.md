@@ -2,8 +2,8 @@
 
 # Optional durable service
 
-**R1-D0 · design decision, 2026-09-13 · implementation and recovery proofs
-pending.** Implements the account, library, home and social boundaries in
+**R1-D0 · design decision, 2026-09-13 · adapter foundation implemented;
+end-to-end account recovery proofs pending.** Implements the account, library, home and social boundaries in
 [People, personal dice, and persistent tables](PEOPLE-DICE-TABLES.md).
 This record enables local implementation; it does not claim a cloud service
 has been provisioned or a recovery prototype has passed.
@@ -411,11 +411,19 @@ snapshots must never be served, uploaded with Cloud Build, or committed.
 | **E.1 — social return** | Contact tickets, friend/invite API, inbox and permitted presence UI | Offline friend receives invite after restart; accept/decline/cancel/expiry/retry/block/recipient isolation; accept never navigates; presence expires after abrupt tab close |
 | **D0.2 — production adapter enablement** | Provisioning runbook/config once independently authorized/available | Real staging IAM and cloud restart/restore checks; report separately from local completion |
 
-**Next concrete coding assignment:** D0.1 in an isolated worktree, beginning
-with the adapter contract, file transaction implementation and restart/crash
-test harness; then implement Firestore against an injected protocol fixture.
-Do not touch the main session's UI files or preview port 8123. Use ephemeral
-ports and private temporary directories for every server proof.
+**D0.1 adapter foundation is implemented** in `service/store.js`,
+`service/store-file.js` and `service/store-firestore.js`. The two
+`tests/account-store-*.test.mjs` suites run in `npm test`'s unit lane and
+prove local restart/crash behavior, whole-transaction replacement, uncertainty
+after an unconfirmed write, and Firestore transaction/token/retry/deadline
+semantics against an injected protocol fixture. They do not prove live
+Google authentication, IAM or cloud durability.
+
+**Next ready assignment: D1.1**, recovery/domain API over these adapters,
+including sanitized server routing and independent cookie-jar recovery after
+restart. Keep registration separate from library upload. Do not touch the
+main session's UI files or preview port 8123. Use ephemeral ports and private
+temporary directories for every server proof.
 
 After API proofs, inspect the named moments on desktop and 390 × 844 phone:
 save-key acknowledgement with the key hidden in captures, recovered-library

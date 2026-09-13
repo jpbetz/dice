@@ -77,7 +77,10 @@ function decodeSnapshot(bytes, maxBytes, maxRecords) {
       if (!value || !Number.isSafeInteger(value.version) || value.version < 1
           || value.version > snapshot.generation) throw new StoreError('corrupt');
       jsonCopy(value.value, { code: 'corrupt' });
-    } catch (error) { throw storageError(error, 'corrupt').code === 'limit' ? error : new StoreError('corrupt'); }
+    } catch (error) {
+      if (error instanceof StoreError && error.code === 'limit') throw error;
+      throw new StoreError('corrupt');
+    }
   }
   return snapshot;
 }
@@ -89,21 +92,24 @@ function decodeSnapshot(bytes, maxBytes, maxRecords) {
  */
 export async function openFileStore({ directory, forbiddenRoots = [CHECKOUT],
   maxBytes = 32 * 1024 * 1024, maxRecords = 10000,
-  recoverStaleLock = false, io = fs, cloudRun = Boolean(process.env.K_SERVICE) } = {}) {
-  if (cloudRun || typeof directory !== 'string' || !path.isAbsolute(directory)
+  recoverStaleLock = false, io = fs, cloudRun = false } = {}) {
+  if (cloudRun || process.env.K_SERVICE || typeof directory !== 'string' || !path.isAbsolute(directory)
       || !Number.isSafeInteger(maxBytes) || maxBytes < 128
       || !Number.isSafeInteger(maxRecords) || maxRecords < 1) throw new StoreError('invalid');
   let release;
   try {
     const resolved = path.resolve(directory);
-    for (const root of forbiddenRoots) {
+    if ([path.parse(resolved).root, os.tmpdir(), os.homedir()].includes(resolved)) throw new StoreError('invalid');
+    const protectedRoots = [...new Set([CHECKOUT, ...forbiddenRoots])];
+    for (const root of protectedRoots) {
       const realRoot = await io.realpath(root);
-      if (inside(resolved, path.resolve(root)) || inside(resolved, realRoot)) throw new StoreError('invalid');
+      if (inside(resolved, path.resolve(root)) || inside(resolved, realRoot)
+          || inside(realRoot, resolved)) throw new StoreError('invalid');
     }
     await io.mkdir(resolved, { recursive: true, mode: 0o700 });
     const real = await io.realpath(resolved);
     if (real !== resolved) throw new StoreError('invalid');
-    for (const root of forbiddenRoots) {
+    for (const root of protectedRoots) {
       if (inside(real, await io.realpath(root))) throw new StoreError('invalid');
     }
     await io.chmod(real, 0o700);
@@ -122,6 +128,13 @@ export async function openFileStore({ directory, forbiddenRoots = [CHECKOUT],
     let state = persisted
       ? decodeSnapshot(await io.readFile(filename, 'utf8'), maxBytes, maxRecords)
       : { schema: STORE_SCHEMA, generation: 0, records: {} };
+    // A killed writer can leave an uncommitted scratch image. Only the exact
+    // adapter-generated names are disposable, after lock and state validation.
+    for (const name of await io.readdir(real)) {
+      if (/^(pending|previous)-[0-9a-f]{24}\.json$/.test(name)) {
+        await io.unlink(path.join(real, name));
+      }
+    }
     let queue = Promise.resolve();
     let closing = false;
     let closeTask = null;
@@ -178,7 +191,7 @@ export async function openFileStore({ directory, forbiddenRoots = [CHECKOUT],
             persisted = true;
           } catch (error) {
             if (renamed) uncertain = true;
-            throw storageError(error, renamed ? 'uncertain' : 'unavailable');
+            throw renamed ? new StoreError('uncertain') : storageError(error);
           } finally {
             await io.unlink(temp).catch(() => {});
             await io.unlink(prior).catch(() => {});

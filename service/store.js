@@ -31,7 +31,7 @@ export function validPath(path) {
   if (typeof path !== 'string') throw new StoreError('invalid');
   const parts = path.split('/');
   if (parts.length < 2 || parts.length > 12 || parts.length % 2
-      || parts.some(part => !/^[A-Za-z0-9_-]{1,128}$/.test(part))) {
+      || parts.some(part => !/^[A-Za-z0-9_-]{1,128}$/.test(part) || /^__.*__$/.test(part))) {
     throw new StoreError('invalid');
   }
   return path;
@@ -46,6 +46,7 @@ export function jsonCopy(value, { record = true, code = 'invalid' } = {}) {
     if (!v || typeof v !== 'object' || seen.has(v)) throw new StoreError(code);
     if (!Array.isArray(v) && Object.getPrototypeOf(v) !== Object.prototype
         && Object.getPrototypeOf(v) !== null) throw new StoreError(code);
+    if (Object.getOwnPropertySymbols(v).length) throw new StoreError(code);
     if (Array.isArray(v) && Object.keys(v).length !== v.length) throw new StoreError(code);
     seen.add(v);
     for (const [key, child] of Object.entries(v)) {
@@ -68,13 +69,29 @@ export function jsonCopy(value, { record = true, code = 'invalid' } = {}) {
 export function transactionView(read, { maxRecords = MAX_TRANSACTION_RECORDS } = {}) {
   const reads = new Map();
   const writes = new Map();
+  const writeSizes = new Map();
   const touched = new Set();
+  let writeBytes = 8192; // transaction token and outer JSON envelope
   let active = true;
   const touch = path => {
     if (!active) throw new StoreError('closed');
     validPath(path);
     touched.add(path);
     if (touched.size > maxRecords) throw new StoreError('limit');
+  };
+  const write = (path, value) => {
+    touch(path);
+    const copy = value === null ? null : jsonCopy(value);
+    // Conservative Firestore REST encoding budget, shared by file mode:
+    // data is a JSON string in its document; reserve the bounded name/type
+    // envelope too. This keeps a locally accepted transaction portable.
+    const size = Buffer.byteLength(path) + 1024
+      + (copy === null ? 0 : Buffer.byteLength(JSON.stringify(JSON.stringify(copy))));
+    const total = writeBytes - (writeSizes.get(path) || 0) + size;
+    if (total > MAX_TRANSACTION_BYTES) throw new StoreError('limit');
+    writeBytes = total;
+    writeSizes.set(path, size);
+    writes.set(path, copy);
   };
   return {
     writes,
@@ -87,8 +104,8 @@ export function transactionView(read, { maxRecords = MAX_TRANSACTION_RECORDS } =
         const value = await reads.get(path);
         return value === null ? null : jsonCopy(value);
       },
-      put(path, value) { touch(path); writes.set(path, jsonCopy(value)); },
-      delete(path) { touch(path); writes.set(path, null); },
+      put(path, value) { if (value === null) throw new StoreError('invalid'); write(path, value); },
+      delete(path) { write(path, null); },
     }),
   };
 }
