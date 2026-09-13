@@ -45,6 +45,7 @@ import { optionalSceneryScenarios } from './optional-scenery.mjs';
 import { towerPendingCancelScenarios } from './tower-pending-cancel.mjs';
 import { optionalModelParserScenarios } from './optional-model-parser.mjs';
 import { filmWorkerScenarios } from "./film-worker.mjs";
+import { roundTableScenarios } from "./round-table.mjs";
 import { profileSharingScenarios } from './profile-sharing.mjs';
 import { libraryWorkspaceScenarios } from './library-workspace.mjs';
 import { assert, Table, freePort, startServer } from './harness.mjs';
@@ -791,6 +792,7 @@ export const scenarios = [
   ...rollHistoryScenarios,
   ...profileSharingScenarios,
   ...filmWorkerScenarios,
+  ...roundTableScenarios,
   ...filmTurnScenarios,
   ...idleRenderScenarios,
   ...presentationScenarios,
@@ -19644,94 +19646,9 @@ export const scenarios = [
       assert.equal((await a.entryState(held)).hidden, false, 'the reveal itself still landed');
     },
   },
-  {
-    name: 'spawn-inside-walls',
-    tags: ['roll', 'perf', 'cuj8'],
-    timeout: 300000,
-    // C28 ① — NO DIE IS BORN INSIDE A WALL, and the ROADMAP's own diagnosis of
-    // this was wrong in a way worth keeping in front of whoever reads the
-    // scenario. It checked the X axis, found the spread never went negative
-    // there, and concluded the bug did not exist. But `Math.min(TABLE_W - 4.4,
-    // …)` was applied to all FOUR throw sides, and two of them spread along Z,
-    // where the mat is 6.7 rather than 11. Measured over 144 paired throws: 16
-    // started a die through a wall plane, worst 0.29 units in — invisible in
-    // the film and a frame-zero contact storm in the recorder.
-    //
-    // So this scenario carries a NEGATIVE CONTROL, and it is not decoration:
-    // `clear` is a derived number, and a probe that always answers ≥ 0 —
-    // because the sign convention flipped, say, or because the line stopped
-    // being recorded at all — would pass this scenario forever while measuring
-    // nothing. `axis: 'width'` is the pre-2026-08-14 formula, still reachable
-    // through setSpawn precisely so the instrument can be shown to work.
-    //
-    // SINCE A PLACE AT THE TABLE (UX §7.63) A ROLLER'S THROWS COME IN OVER
-    // THEIR OWN EDGE. This probe used to lean on the seeded draw scattering a
-    // lone roller's throws over all four sides; a placed roller's no longer
-    // scatter (Ada, first in, is the front chair — side 0 every time), and
-    // the negative control measured 0 of 60 through a wall the day the stamp
-    // landed. So the sides are now chosen on purpose: Ada throws from the
-    // front, and Eluned — seated at the right HEAD by three raw players
-    // ahead of her — throws from side 3, one of the two sides that spread
-    // along Z, which is exactly where the bug lived.
-    async fn(ctx) {
-      const a = await ctx.newTable({ origin: '127.0.0.60', name: 'Ada' });
-      await a.waitFor('window.__diceDebug.places().mine === 0', { desc: 'Ada takes the front chair' });
-      for (const nm of ['Bram', 'Cass', 'Dev']) await ctx.rawPlayer(nm);      // stations 1-3
-      const eluned = await ctx.rawPlayer('Eluned');                           // station 4: the right head
-      await a.waitFor(`window.__diceDebug.places().stations.some((s) => s.name === 'Eluned' && s.station === 'right')`,
-        { desc: 'Eluned sits at the right head' });
-      // The tightest mat, which is where the room to spread is smallest.
-      await a.dbg(`setZoom('close')`);
-      await a.waitFor(`window.__diceDebug.zoom === 'close'`, { desc: 'the close mat' });
-
-      const sweep = async (seeds, playerId, who) => {
-        const out = [];
-        for (let i = 0; i < seeds; i++) {
-          const before = await a.logCount();
-          const r = await ctx.api('/api/roll', { playerId, notation: '3d20' });
-          assert.equal(r.status, 200, `${who}'s throw ${i}: ${JSON.stringify(r.data)}`);
-          await a.waitFor(`(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${before}`
-            + ' && !window.__diceDebug.busy)', { desc: `${who}'s throw ${i} lands`, timeout: 60000 });
-          const line = await a.dbg('spawnLine()');
-          assert.equal(line.length, 3, `every die of ${who}'s throw ${i} is on the line`);
-          out.push(...line);
-          await a.dbg('clearTable()');
-          await a.dbg('sim(240)');
-        }
-        return out;
-      };
-      const ada = await a.playerId();
-
-      // THE SHIPPED THROW. d20s, because a big die's hull is what eats the
-      // clearance, and the clamp works per die off that die's own hull. Six
-      // from the front, six from the head.
-      const shipped = [...await sweep(6, ada, 'Ada'), ...await sweep(6, eluned.playerId, 'Eluned')];
-      const worst = Math.min(...shipped.map((d) => d.clear));
-      assert.ok(shipped.length === 36, `36 dice measured (got ${shipped.length})`);
-      assert.ok(worst >= 0,
-        `no die is born inside a wall over 12 seeds (worst clearance ${worst}, `
-        + `offenders ${JSON.stringify(shipped.filter((d) => d.clear < 0))})`);
-      assert.ok(shipped.some((d) => d.side >= 2),
-        'and the sweep reached the sides that spread along Z (2/3, the heads), which is where the bug was');
-
-      // THE NEGATIVE CONTROL. The old formula, on the same mat, with the same
-      // dice, from the head: if this does not produce a die through a wall,
-      // the measurement above is not measuring anything.
-      await a.dbg(`setSpawn({axis: 'width'})`);
-      try {
-        const old = await sweep(20, eluned.playerId, 'Eluned');
-        assert.ok(old.every((d) => d.side === 3), 'every control throw came in over the right head');
-        const bad = old.filter((d) => d.clear < 0);
-        assert.ok(bad.length > 0,
-          `the pre-fix formula still puts dice through walls, so the probe works `
-          + `(0 of ${old.length} negative — if this is ever 0, the instrument is broken, `
-          + `not the fix vindicated)`);
-      } finally {
-        await a.dbg(`setSpawn({axis: 'clamp'})`);
-      }
-      assert.equal((await a.dbg('spawn')).axis, 'clamp', 'and the shipped throw is restored');
-    },
-  },
+  // spawn-inside-walls now lives in round-table.mjs. The former fixed-head
+  // station and rectangular axis:'width' control stopped describing the
+  // active geometry; the replacement measures actual active planes and hulls.
   {
     name: 'one-seed-one-film',
     tags: ['roll', 'perf', 'resync', 'cuj8'],
@@ -19981,11 +19898,12 @@ export const scenarios = [
     // budget slipped, a shared zero stopped being zero, or an expression
     // order got "cleaned up".
     async fn(ctx) {
-      // RE-RECORDED 2026-09-01 for the ROUND TABLE (js/main.js TABLE_SCALE 2.5):
-      // the walls and the seeded hurl's spawn line scale with TABLE_W, so the
-      // stampless film changed with the table, once, on purpose. The pin is
-      // the same pin: this build's stampless film, byte for byte, from now on.
-      const GOLDEN = "[{\"rollId\":\"seeded-2026-3-1\",\"i\":0,\"type\":\"d4\",\"shrouded\":false,\"pos\":[-1.92,0.383,-9.588],\"quat\":[-0.448,-0.753,-0.103,0.471]},{\"rollId\":\"seeded-2026-3-1\",\"i\":1,\"type\":\"d8\",\"shrouded\":false,\"pos\":[-2.381,0.598,-7.729],\"quat\":[0.88,-0.277,0.122,-0.367]},{\"rollId\":\"seeded-2026-3-1\",\"i\":2,\"type\":\"d12\",\"shrouded\":false,\"pos\":[1.341,0.873,-10.69],\"quat\":[-0.173,-0.096,-0.856,-0.477]},{\"rollId\":\"seeded-424242-7-0\",\"i\":0,\"type\":\"d6\",\"shrouded\":false,\"pos\":[-7.348,0.675,9.412],\"quat\":[0.588,0.588,0.392,0.392]},{\"rollId\":\"seeded-424242-7-0\",\"i\":1,\"type\":\"d6\",\"shrouded\":false,\"pos\":[-5.595,0.675,8.261],\"quat\":[0,0.733,0,-0.68]},{\"rollId\":\"seeded-424242-7-0\",\"i\":2,\"type\":\"d6\",\"shrouded\":false,\"pos\":[0.859,0.675,3.939],\"quat\":[0.413,0.574,0.574,-0.413]},{\"rollId\":\"seeded-424242-7-0\",\"i\":3,\"type\":\"d6\",\"shrouded\":false,\"pos\":[7.055,0.675,7.682],\"quat\":[-0.683,-0.184,0.184,-0.683]},{\"rollId\":\"seeded-424242-7-0\",\"i\":4,\"type\":\"d6\",\"shrouded\":false,\"pos\":[1.131,0.675,2.132],\"quat\":[0.009,0,1,0]},{\"rollId\":\"seeded-424242-7-0\",\"i\":5,\"type\":\"d6\",\"shrouded\":false,\"pos\":[2.466,0.672,6.197],\"quat\":[-0.422,0.422,-0.567,0.567]},{\"rollId\":\"seeded-424242-7-0\",\"i\":6,\"type\":\"d20\",\"shrouded\":false,\"pos\":[8.501,0.991,4.86],\"quat\":[-0.887,0.337,0.032,0.313]},{\"rollId\":\"seeded-64352-3-3\",\"i\":0,\"type\":\"d6\",\"shrouded\":false,\"pos\":[9.231,0.675,-3.283],\"quat\":[0,0.984,0,-0.177]},{\"rollId\":\"seeded-64352-3-3\",\"i\":1,\"type\":\"d6\",\"shrouded\":false,\"pos\":[11.086,0.675,0.798],\"quat\":[0.582,-0.402,0.402,0.582]},{\"rollId\":\"seeded-64352-3-3\",\"i\":2,\"type\":\"d6\",\"shrouded\":false,\"pos\":[5.744,0.671,-6.074],\"quat\":[0.706,-0.706,-0.035,0.035]},{\"rollId\":\"seeded-808-2-2\",\"i\":0,\"type\":\"d20\",\"shrouded\":false,\"pos\":[-7.353,0.988,-6.593],\"quat\":[-0.098,0.747,0.449,-0.48]},{\"rollId\":\"seeded-808-2-2\",\"i\":1,\"type\":\"d20\",\"shrouded\":false,\"pos\":[-7.645,0.993,0.983],\"quat\":[0.458,0.666,0.334,0.485]}]";
+      // RE-RECORDED 2026-09-13 for the physical ROUND TABLE: the fixed
+      // portalless enclosure and full-line hull clearance replace the square
+      // walls and per-axis clipping. These films deliberately change to keep
+      // dice on the actual round surface. The supplied values and both PRNG
+      // draw orders remain unchanged; round-table-spawn-budget proves them.
+      const GOLDEN = "[{\"rollId\":\"seeded-2026-3-1\",\"i\":0,\"type\":\"d4\",\"shrouded\":false,\"pos\":[-1.92,0.383,-9.588],\"quat\":[-0.448,-0.753,-0.103,0.471]},{\"rollId\":\"seeded-2026-3-1\",\"i\":1,\"type\":\"d8\",\"shrouded\":false,\"pos\":[-2.381,0.598,-7.729],\"quat\":[0.88,-0.277,0.122,-0.367]},{\"rollId\":\"seeded-2026-3-1\",\"i\":2,\"type\":\"d12\",\"shrouded\":false,\"pos\":[1.341,0.873,-10.69],\"quat\":[-0.173,-0.096,-0.856,-0.477]},{\"rollId\":\"seeded-424242-7-0\",\"i\":0,\"type\":\"d6\",\"shrouded\":false,\"pos\":[-3.135,0.675,10.125],\"quat\":[0.703,0.703,0.077,0.077]},{\"rollId\":\"seeded-424242-7-0\",\"i\":1,\"type\":\"d6\",\"shrouded\":false,\"pos\":[-4.077,0.675,4.748],\"quat\":[0,0.807,0,0.591]},{\"rollId\":\"seeded-424242-7-0\",\"i\":2,\"type\":\"d6\",\"shrouded\":false,\"pos\":[-3.725,0.675,8.161],\"quat\":[-0.493,0.507,0.507,0.493]},{\"rollId\":\"seeded-424242-7-0\",\"i\":3,\"type\":\"d6\",\"shrouded\":false,\"pos\":[6.964,0.675,5.507],\"quat\":[-0.42,-0.569,0.569,-0.42]},{\"rollId\":\"seeded-424242-7-0\",\"i\":4,\"type\":\"d6\",\"shrouded\":false,\"pos\":[-15.022,0.675,-5.849],\"quat\":[-0.918,0,0.396,0]},{\"rollId\":\"seeded-424242-7-0\",\"i\":5,\"type\":\"d6\",\"shrouded\":false,\"pos\":[0.601,0.675,8.463],\"quat\":[0.406,-0.406,-0.579,0.579]},{\"rollId\":\"seeded-424242-7-0\",\"i\":6,\"type\":\"d20\",\"shrouded\":false,\"pos\":[11.876,0.987,-10.832],\"quat\":[-0.32,0.42,0.828,-0.186]},{\"rollId\":\"seeded-64352-3-3\",\"i\":0,\"type\":\"d6\",\"shrouded\":false,\"pos\":[9.231,0.675,-3.283],\"quat\":[0,0.984,0,-0.177]},{\"rollId\":\"seeded-64352-3-3\",\"i\":1,\"type\":\"d6\",\"shrouded\":false,\"pos\":[11.086,0.675,0.798],\"quat\":[0.582,-0.402,0.402,0.582]},{\"rollId\":\"seeded-64352-3-3\",\"i\":2,\"type\":\"d6\",\"shrouded\":false,\"pos\":[5.744,0.671,-6.074],\"quat\":[0.706,-0.706,-0.035,0.035]},{\"rollId\":\"seeded-808-2-2\",\"i\":0,\"type\":\"d20\",\"shrouded\":false,\"pos\":[-6.775,0.993,-6.042],\"quat\":[-0.154,0.802,0.433,-0.382]},{\"rollId\":\"seeded-808-2-2\",\"i\":1,\"type\":\"d20\",\"shrouded\":false,\"pos\":[-7.607,0.992,0.984],\"quat\":[0.458,0.666,0.334,0.485]}]";
       const a = await ctx.newTable({ origin: 'localhost', name: 'Golden' });
       // PIN THE SET TO STD FIRST. `dice.diceset.v1` is per-origin and outlives
       // a scenario (the trap TESTING.md records), and the golden below was

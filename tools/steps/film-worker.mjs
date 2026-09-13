@@ -37,6 +37,7 @@ export default async function run(stage,args) {
             lastLanding:r.lastLanding,nudges:r.nudges,simFrames:r.simFrames,values:r.values,final:r.dice.map(d=>({p:d.finalPos,q:d.finalQuat}))};
           const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(payload))))).map(v=>v.toString(16).padStart(2,'0')).join('');
           return {returnMs,readyMs,feedbackMs,feedbackWhileBaking,tasks:tasks.filter(e=>e.at+e.duration>=started).map(e=>e.duration),ticks,
+            render:d.renderAudit?.()||null,inputBodies:d.filmInput?.world?.state?.bodies.length??null,
             worker:d.filmWorker?.last||null,inputBytes:d.filmInput?new TextEncoder().encode(JSON.stringify(d.filmInput)).byteLength:null,poseBytes:r.dice.length*r.frames*7*8,hash,frames:r.frames,backend:ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'unknown'};})()`);
         await t.settle();const framing=await t.dbg('framingInfo()');
         const row={device,width,height,cpu,notation,seed,...result,framing};rows.push(row);
