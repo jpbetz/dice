@@ -1,14 +1,19 @@
 /* Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 */
 import {assert} from './harness.mjs';
 import {assertResultLayout} from './player-results.mjs';
+import {click as visibleClick} from '../fixtures/visible-input.mjs';
 
 // DOM click() bypasses occlusion and inert. These flows must use a pointer
 // on the painted control, then prove the actual destination is visible.
 export async function tapControl(a,selector) {
-  await a.eval(`document.querySelector(${JSON.stringify(selector)})?.scrollIntoView({block:'nearest'})`);
+  // Background tabs can suspend rAF even when timer throttling is disabled.
+  // Foreground before waiting for the control's animation and paint to settle.
+  await a.page.browser.send('Page.bringToFront',{},a.page.sessionId);
+  await a.eval(`document.querySelector(${JSON.stringify(selector)})?.scrollIntoView({block:'nearest',behavior:'instant'})`);
   await a.eval('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
-  const point=await a.waitFor(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e||e.disabled)return false;const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;return r.width&&r.height&&e.contains(document.elementFromPoint(x,y))?{x,y}:false;})()`,{desc:`visible, reachable ${selector}`,timeout:3000});
-  for(const type of ['mousePressed','mouseReleased'])await a.page.browser.send('Input.dispatchMouseEvent',{type,...point,button:'left',clickCount:1},a.page.sessionId);
+  await a.waitFor(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e||e.disabled||e.closest('[inert]'))return false;const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;return r.width&&r.height&&e.contains(document.elementFromPoint(x,y));})()`,{desc:`visible, reachable ${selector}`,timeout:3000});
+  // The canonical helper rechecks eligibility and hit testing at dispatch time.
+  await visibleClick(a,selector);
 }
 export async function rollViewVisible(a) {
   await a.waitFor(`(()=>{const s=document.getElementById('scene-container'),r=s.getBoundingClientRect();return !s.inert&&s.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));})()`,{desc:'the rolling surface is visible and interactive'});
@@ -30,6 +35,40 @@ async function tapRoll(a,selector) {
   await a.dbg('sim(12)');await rollViewVisible(a);await a.settle();await rollViewVisible(a);
 }
 export const rollFlowScenarios=[
+  {name:'roll-flow-return-to-background-draft',tags:['roll-flows','workspaces','multiplayer'],async fn(ctx){
+    const a=await ctx.newTable({origin:'127.0.0.155',name:'Alice'});await phone(a);
+    await a.dbg('setGroups([])');
+    await tapControl(a,'#phone-build-roll');
+    await tapControl(a,'#die-buttons .die-btn:nth-child(2)');
+    const seat=await a.playerId(),draft=await a.dbg('trayState.dice');
+    const b=await ctx.newTable({origin:'127.0.0.156',name:'Bob'});await phone(b);
+    await b.dbg('setGroups([])');
+    await tapRoll(b,'#phone-quick-dice [data-quick="2d6"]');
+    const bobsRoll=await b.rollId();
+    await a.waitFor(`window.__diceDebug.currentRoll?.rollId===${JSON.stringify(bobsRoll)}`);
+    await a.settle();
+    assert.equal(await a.eval('document.visibilityState'),'hidden','Bob’s real controls leave Alice in a background tab');
+    assert.equal(await a.dbg('workspaces.current'),'dice','Bob’s roll keeps Alice’s draft open');
+    assert.deepEqual(await a.dbg('trayState.dice'),draft);
+    // Bound the click itself: the former pre-foreground rAF never completed.
+    let timeout;
+    try {
+      await Promise.race([
+        tapControl(a,'#tray-roll'),
+        new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error('returning to Alice’s visible Roll control timed out')),5000);}),
+      ]);
+    } finally { clearTimeout(timeout); }
+    await a.waitFor(`window.__diceDebug.currentRoll?.rollId!==${JSON.stringify(bobsRoll)}`);
+    await a.settle();await rollViewVisible(a);
+    const roll=await a.rollId();
+    await b.waitFor(`window.__diceDebug.currentRoll?.rollId===${JSON.stringify(roll)}`);await b.settle();
+    const alice=await a.entryState(roll),bob=await b.entryState(roll);
+    assert.deepEqual(alice.values,bob.values,'Bob receives Alice’s actual staged roll');
+    assert.equal(alice.values.length,draft.length);
+    assert.equal(await a.playerId(),seat);
+    assert.equal(await a.eval('document.visibilityState'),'visible');
+    assert.deepEqual(a.page.errors,[]);assert.deepEqual(b.page.errors,[]);
+  }},
   {name:'roll-flow-delayed-response-keeps-reopened-task',tags:['roll-flows','workspaces'],async fn(ctx){
     const a=await ctx.newTable({origin:'127.0.0.154',name:'Alice'});await phone(a);
     async function hold(path){
