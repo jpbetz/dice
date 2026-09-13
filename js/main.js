@@ -30354,7 +30354,22 @@ function closeSettingsModal() {
   closeModal(settingsModal);
   document.getElementById('settings-note').textContent = '';
   closeSetMenu(); // the dice-set menu must not outlive its anchor
-  if (hadFocus && settingsOpener?.isConnected) settingsOpener.focus({preventScroll:true});
+  if (hadFocus) {
+    // The original entry may disappear across the phone breakpoint, or live
+    // in the workspace that closed when this task opened. Return to a usable
+    // entry for the same task rather than leaving focus in the hidden dialog.
+    const fallbacks = settingsDest === 'you' ? ['#phone-more', '#toggle-settings']
+      : settingsDest === 'stuff' ? ['#workspace-nav [data-workspace="dice"]', '#identity-chip']
+      : ['#table-open'];
+    const candidates = [settingsOpener, ...fallbacks.map(selector => document.querySelector(selector))];
+    const target = candidates.find(el => {
+      if (!el?.isConnected || el.disabled || el.closest('[inert]')) return false;
+      if (el.tabIndex < 0 && !el.hasAttribute('tabindex') && !el.isContentEditable) return false;
+      const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
+      return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.visibility !== 'collapse';
+    });
+    target?.focus({preventScroll:true});
+  }
 }
 
 document.getElementById('toggle-settings').addEventListener('click', e => openSettingsModal('you', e.currentTarget));

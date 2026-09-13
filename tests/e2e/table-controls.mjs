@@ -9,6 +9,8 @@ CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 */
 import {assert} from './harness.mjs';
+import {tapControl} from './roll-flows.mjs';
+import {type as typeControl, key} from '../fixtures/visible-input.mjs';
 
 const inputName = (tab, name) => tab.eval(`(() => {
   const input=document.getElementById('set-table-name'); input.value=${JSON.stringify(name)};
@@ -93,32 +95,43 @@ export const tableControlScenarios = [
         {width,height,deviceScaleFactor:1,mobile},a.page.sessionId);
       await size(390,844); await a.emulateCoarsePointer(true);
       await a.eval(`localStorage.removeItem('dice.panels.v1')`); await a.reload();
-      const layout=await a.eval(`({dice:document.getElementById('my-dice').getBoundingClientRect().toJSON(),name:document.getElementById('identity-chip').getBoundingClientRect().toJSON(),roll:document.getElementById('rail-roll-wrap').getBoundingClientRect().toJSON(),width:document.body.scrollWidth})`);
-      assert.ok(layout.dice.height>=34 && layout.dice.top>layout.name.bottom,'dice selection belongs to the phone roll controls');
-      assert.equal(await a.eval(`document.getElementById('my-dice').closest('#phone-roll-tray')?.id`),'phone-roll-tray');
-      assert.ok(layout.roll.top<=125,'management controls do not reclaim the space above Roll');
+      const layout=await a.eval(`({dice:document.getElementById('my-dice').getBoundingClientRect().toJSON(),nav:document.getElementById('workspace-nav').getBoundingClientRect().toJSON(),scene:document.getElementById('scene-container').getBoundingClientRect().toJSON(),width:document.body.scrollWidth})`);
+      assert.equal(layout.dice.height,0,'phone dice-set selection stays in the expanded roll controls');
+      assert.equal(layout.scene.left,0);assert.equal(layout.scene.width,390);
+      assert.equal(layout.nav.height,52,'one navigation row leaves the playing surface full width');
       assert.equal(layout.width,390);
-      await click(a,'#table-open');
+      await tapControl(a,'#workspace-nav [data-workspace="dice"]');
+      assert.equal(await a.dbg('workspaces.current'),'dice');
+      const dice=await a.eval(`document.getElementById('my-dice').getBoundingClientRect().toJSON()`);
+      assert.ok(dice.height>=34&&dice.top>=0&&dice.bottom<=844,'Dice is visible beside the expanded roll controls');
+      assert.equal(await a.eval(`document.getElementById('my-dice').closest('#draft-actions')?.id`),'draft-actions');
+      await tapControl(a,'#my-dice');await a.waitFor('window.__diceDebug.diceGallery.open');
+      await tapControl(a,'.dg-close');
+      assert.equal(await a.eval('document.activeElement.id'),'my-dice');
+      await tapControl(a,'#workspace-back');
+      await tapControl(a,'#table-open');
       assert.equal(await a.eval(`document.getElementById('left-panel').inert`),true);
-      await a.eval(`document.getElementById('snav-table').focus();document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}))`);
+      await tapControl(a,'#snav-table');await key(a,'ArrowRight','ArrowRight',39);
       assert.equal(await a.eval('document.activeElement.id'),'snav-staging','keyboard arrows reach Appearance inside the sheet');
       assert.equal(await a.dbg('settingsDest()'),'staging');
-      await a.eval(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true,cancelable:true}))`);
+      await key(a,'ArrowLeft','ArrowLeft',37);
       const zoom = await a.dbg('settings.zoom');
-      await a.eval(`document.querySelector('#zoom-picker [aria-checked="true"]').focus();document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}))`);
+      await tapControl(a,'#zoom-picker [aria-checked="true"]');await key(a,'ArrowRight','ArrowRight',39);
       assert.notEqual((await a.dbg('tableEdit')).values.zoom,zoom,'arrows change the tentative rolling-area selection');
       assert.equal(await a.dbg('settings.zoom'),zoom,'keyboard selection still waits for Apply');
-      await a.eval(`document.getElementById('table-edit-apply').focus();document.getElementById('table-edit-apply').dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}))`);
+      // Follow actual keyboard focus to the final action, without applying it.
+      for(let i=0;i<30&&await a.eval('document.activeElement.id')!=='table-edit-apply';i++)await key(a,'Tab','Tab',9);
+      assert.equal(await a.eval('document.activeElement.id'),'table-edit-apply');
+      await key(a,'Tab','Tab',9);
       assert.equal(await a.eval('document.activeElement.id'),'settings-close');
       await size(390,440);
-      await a.eval(`document.getElementById('set-table-name').focus()`);
-      await inputName(a,'Not applied');
+      await typeControl(a,'#set-table-name','Not applied');
       const bounds=await a.eval(`({input:document.getElementById('set-table-name').getBoundingClientRect().toJSON(),apply:document.getElementById('table-edit-apply').getBoundingClientRect().toJSON()})`);
       assert.ok(bounds.input.top>=0 && bounds.apply.bottom<=440,'name and Apply fit a shorter keyboard viewport');
-      await a.eval(`document.getElementById('set-table-name').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`);
+      await key(a,'Escape','Escape',27);
       assert.equal(await a.eval('document.activeElement.id'),'table-open');
       assert.notEqual(await a.dbg('settings.tableName'),'Not applied');
-      await size(390,844); await click(a,'#toggle-settings');
+      await size(390,844);await tapControl(a,'#phone-more');await tapControl(a,'#phone-tool-preferences');
       const pref=await a.eval(`document.getElementById('settings-panel').getBoundingClientRect().toJSON()`);
       assert.ok(pref.top>=0 && pref.bottom<=844,'device preferences fit the phone viewport');
       assert.ok(await a.eval(`document.getElementById('presentation-picker').getBoundingClientRect().top>=0 && document.getElementById('set-ambience').getBoundingClientRect().bottom<=844`),'presentation and sound choices remain visible together');
@@ -126,8 +139,26 @@ export const tableControlScenarios = [
       await size(1000,844,false);
       await a.waitFor(`!document.getElementById('left-panel').inert`);
       assert.equal(await a.eval('document.activeElement.id'),'settings-close');
-      await click(a,'#settings-close');
-      assert.equal(await a.eval('document.activeElement.id'),'toggle-settings');
+      await tapControl(a,'#settings-close');
+      assert.equal(await a.eval('document.activeElement.id'),'toggle-settings','closing after a desktop resize returns to the visible Preferences entry');
+      await tapControl(a,'#toggle-settings');await size(390,844);
+      await a.waitFor(`document.getElementById('left-panel').inert`);
+      await tapControl(a,'#settings-close');
+      assert.equal(await a.eval('document.activeElement.id'),'phone-more','the reverse breakpoint uses the visible More entry');
+      // A borrowed task entry is hidden when its workspace closes. Its return
+      // destination must be usable on both layouts without reopening a task.
+      for(const width of [390,1000]) {
+        await size(width,844,width===390);
+        await tapControl(a,'#workspace-nav [data-workspace="dice"]');
+        await tapControl(a,'#workspace .workspace-tools button:nth-child(2)');
+        assert.equal(await a.dbg('settingsDest()'),'stuff');
+        await tapControl(a,'#settings-close');
+        assert.equal(await a.eval(`document.activeElement.matches('#workspace-nav [data-workspace="dice"]')`),true,'library returns to the visible Rolls entry');
+        await tapControl(a,'#workspace-nav [data-workspace="tables"]');
+        await tapControl(a,'#workspace-table-overview [data-focus-key="setup"]');
+        await tapControl(a,'#settings-close');
+        assert.equal(await a.eval('document.activeElement.id'),'table-open','setup returns to the visible table label');
+      }
     },
   },
   {
