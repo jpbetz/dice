@@ -1,0 +1,30 @@
+/* Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 */
+body[data-workspace="account"] { --workspace-width:min(760px,calc(100vw - 32px)); }
+.account-content { color:var(--ivory); font-size:14px; line-height:1.5; }
+.account-content h4 { font:20px var(--font-display); margin:0 0 12px; }
+.account-identity { margin:20px 0 8px; }
+.account-status { padding:9px 12px; background:#262822; border:1px solid #72704c; border-radius:7px; }
+.account-notice { color:#d4c49f; min-height:1.5em; }
+.account-actions { display:flex; flex-wrap:wrap; gap:8px; margin:18px 0; }
+.account-content .btn { min-height:42px; padding:8px 12px; font-size:12px; white-space:normal; }
+.account-form { max-width:560px; padding:18px; margin:20px 0; border:1px solid var(--hair); border-radius:10px; background:#202225; }
+.account-form label:not(.account-check),.account-comparison>label { display:block; margin:12px 0; }
+.account-content input:not([type="checkbox"]):not([type="radio"]),.account-content textarea,.account-content select { display:block; width:100%; padding:10px; margin-top:7px; background:#151719; color:var(--ivory); border:1px solid #646566; border-radius:5px; font:14px var(--font-ui); }
+.account-content textarea { resize:vertical; overflow-wrap:anywhere; font-family:monospace; }
+.account-check { display:flex; align-items:flex-start; gap:9px; padding:8px 0; }
+.account-check input { flex:none; margin-top:4px; accent-color:var(--gold); }
+.account-columns { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:18px 0; }
+.account-version { padding:18px; border:1px solid var(--hair); border-radius:9px; background:#222527; min-width:0; overflow-wrap:anywhere; }
+.account-version ul { padding-left:18px; }.account-version li { margin:8px 0; }.account-version li p { margin:4px 0; }
+.account-comparison,.account-history { border-top:1px solid var(--hair); padding-top:20px; margin-top:20px; }
+.account-choices { border:0; padding:0; }.account-choices legend { font-weight:600; }
+.account-history-row { display:flex; justify-content:space-between; gap:10px; align-items:center; border-bottom:1px solid var(--hair); padding:8px 0; }
+.account-content [hidden] { display:none!important; }
+#private-library-status { margin:10px 0; font-size:12px; text-align:left; }
+#idm-account { display:block; width:100%; border:0; background:transparent; color:inherit; text-align:left; padding:8px 12px; }
+@media(max-width:640px) {
+  body[data-workspace="account"] { --workspace-width:100%; }
+  .account-columns { grid-template-columns:1fr; }
+  .account-version,.account-form { padding:14px; }
+  .account-content .btn { min-height:44px; }
+}

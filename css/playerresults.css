@@ -34,7 +34,7 @@ body.has-table-result #result-banner { display:none; }
 .player-result-actions .banner-foot { display:flex; flex-wrap:wrap; gap:7px; }
 .player-result-actions .pool-roll { min-height:44px; }
 @media(min-width:641px) {
-  body.workspace-open:not([data-workspace="dice"]) { --table-results-right:calc(var(--workspace-width) + 24px); }
+  body.workspace-open:not([data-workspace="dice"]):not([data-workspace="account"]) { --table-results-right:calc(var(--workspace-width) + 24px); }
 }
 @media(max-width:640px) {
   #table-results { top:var(--phone-head); grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; padding:7px 8px; max-height:186px; }

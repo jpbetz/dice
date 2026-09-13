@@ -267,6 +267,7 @@ export function createDiceGallery({ entries, current, choose, suggested, favorit
   });
   return {
     open(anchor) {
+      stars.clear();for(const id of favorites())stars.add(id);
       returnTo = anchor || document.activeElement;
       refreshCatalogue();
       selected = current();

@@ -40,8 +40,8 @@
 #workspace .pp-row { flex-wrap:wrap; }
 .phone-roll-tray { display:none; }
 @media(min-width:641px) {
-  body.workspace-open:not([data-workspace="dice"]) #scene-container { right:calc(var(--workspace-width) + 24px); }
-  body.workspace-open:not([data-workspace="dice"]) #result-banner { max-width:calc(100vw - var(--table-left) - var(--workspace-width) - 60px); min-width:0; }
+  body.workspace-open:not([data-workspace="dice"]):not([data-workspace="account"]) #scene-container { right:calc(var(--workspace-width) + 24px); }
+  body.workspace-open:not([data-workspace="dice"]):not([data-workspace="account"]) #result-banner { max-width:calc(100vw - var(--table-left) - var(--workspace-width) - 60px); min-width:0; }
   #workspace[data-workspace="dice"] { width:min(760px,calc(100vw - 32px)); }
   body.workspace-open #left-panel { width:184px; }
   body.workspace-open #left-panel #personal-controls { max-width:100%; }

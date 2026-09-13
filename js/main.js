@@ -61,6 +61,7 @@ import { dealRack, dealName } from './seed.js';
 import { NEW_TABLE_SYSTEM, renderQuickRolls, createStarterKitChooser } from './firstplay.js';
 import { createWorkspaces } from './workspaces.js';
 import { TABLE_DESIGNS, createTableDesign } from './table-designs.js';
+import { libraryDocument } from './library-document.js';
 import { createPlayerResults } from './playerresults.js';
 import { HISTORY_CAP as LOG_HISTORY_CAP, TURN_CAP_MESSAGE, canStartTurn, trimRollHistory, unfinished } from './rollhistory.js';
 import { resolveChannel, PARAM as STABILITY_PARAM } from './stability.js';
@@ -715,6 +716,13 @@ const LS_DICESET = 'dice.diceset.v1';    // "Just you" scope: dice-set identity 
 // that runs during the rack's module-eval block — a const down at the net
 // section is in TDZ there, which kills the whole module.
 const LS_NAME = 'dice.name.v1';
+const LIBRARY_NAMESPACE_KEY='dice.library.namespace.v1';
+const LIBRARY_SHARING_OWNER='dice.library.sharing-owner.v1';
+var libraryNamespace='guest',libraryApplying=false,librarySession,accountWorkspace,accountWorkspaceLoading;
+var libraryFavorites=null,libraryDefaultSet=null;
+var libraryMarkerAtBoot=(()=>{try{return localStorage.getItem(LIBRARY_NAMESPACE_KEY)||'guest';}catch{return 'guest';}})();
+var libraryPublicationBlocked=libraryMarkerAtBoot!=='guest';
+
 
 // THE DOOR KNOCK (docs/IDENTITY.md §8, UX §7.57) — the first line of this boot
 // that touches the network, and deliberately the FIRST thing after the name key
@@ -4661,7 +4669,9 @@ let diceSet = (() => {
 })();
 function setDiceSet(id, persist = true) {
   diceSet = id === 'std' || SETS[id] ? id : 'std';
-  if (persist) save(LS_DICESET, diceSet);
+  if(!libraryApplying)libraryDefaultSet=diceSet;
+  if (persist && libraryNamespace==='guest') save(LS_DICESET, diceSet);
+  if(persist&&!libraryApplying)capturePrivateLibraryEdit();
   renderDiceSetPicker();
   refreshDieArt(); // palette + strips wear the new set immediately
   schedulePublishPools(); // teammates' view of your rack wears your default (§9)
@@ -20156,7 +20166,9 @@ if (!profilesOf(profileStore).length) {
 // so the wrapper had no caller left. The dealt rack itself — and U24's
 // digit map that reads it — are untouched.
 function poolsOfProfile(profile) {
-  return ((profile && profile.pools) || []).map(migrateGroup).filter(Boolean);
+  // Modern stored records are already captured intentionally. Keep unknown
+  // dice IDs and unavailable notation intact for export and future readers.
+  return ((profile && profile.pools) || []).map((p,i)=>typeof p.notation==='string'?{...p}:migrateGroup(p,i)).filter(Boolean);
 }
 let groups = poolsOfProfile(activeProfile(profileStore));
 
@@ -20277,6 +20289,7 @@ function bootLossSummary() {
 // old library whole, in memory and on disk, with nothing half-moved between.
 let forceStorageFail = false; // test hook only — see __diceDebug.jamStorage
 function saveProfileStore(store = profileStore) {
+  if(libraryApplying)return true;
   // C22's refusal, enforced. A store this build could not read is a store this
   // build must not WRITE — every path here would replace it with a truncated
   // copy of itself. Returning false routes through the same standing 'Not
@@ -20285,7 +20298,9 @@ function saveProfileStore(store = profileStore) {
   if (storeRefusal) return false;
   try {
     if (forceStorageFail) throw new Error('storage jammed (test)');
+    if(libraryNamespace!=='guest')return capturePrivateLibraryEdit(store);
     localStorage.setItem(LS_PROFILES, JSON.stringify(store));
+    capturePrivateLibraryEdit(store);
     // The moment the boot notice stops being true. It says "nothing has been
     // overwritten", and this is the write that overwrites — so the notice comes
     // down HERE rather than lingering as a claim about a key that no longer
@@ -21031,7 +21046,11 @@ var profileShareFlight = null;
 var profileShareVersion = 0;
 var profileShareFailed = false;
 var profileShareStorageFailed = false;
-function currentSharedIds() { return IN_LOBBY ? [] : sharedIds(load(SHARING_KEY,null),ROOM); }
+function currentSharedIds() {
+  if(IN_LOBBY||libraryPublicationBlocked)return [];
+  let owner='guest';try{owner=localStorage.getItem(LIBRARY_SHARING_OWNER)||'guest';}catch{return [];}
+  return owner===libraryNamespace?sharedIds(load(SHARING_KEY,null),ROOM):[];
+}
 function persistSharing(next) {
   try {
     const text = JSON.stringify(next);
@@ -21042,7 +21061,8 @@ function persistSharing(next) {
   } catch { profileShareStorageFailed = true; return false; }
 }
 function setProfileShared(id, enabled) {
-  if (IN_LOBBY || !findProfile(profileStore,id)) return false;
+  if (IN_LOBBY || libraryPublicationBlocked || !findProfile(profileStore,id)) return false;
+  try{localStorage.setItem(LIBRARY_SHARING_OWNER,libraryNamespace);if(localStorage.getItem(LIBRARY_SHARING_OWNER)!==libraryNamespace)return false;}catch{return false;}
   if (!persistSharing(chooseSharedProfile(load(SHARING_KEY,null),ROOM,id,enabled))) {
     renderProfileLibrary(); return false;
   }
@@ -29461,8 +29481,8 @@ async function openDiceGallery(anchor) {
         diceGallery = m.createDiceGallery({
           entries: galleryEntries, current: () => diceSet, choose: setDiceSet,
           suggested: () => venueDiceSet(),
-          favorites: () => { const v = load('dice.favorites.v1', []); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; },
-          saveFavorites: ids => save('dice.favorites.v1', ids),
+          favorites: currentLibraryFavorites,
+          saveFavorites: ids => {libraryFavorites=[...ids];if(libraryNamespace==='guest')save('dice.favorites.v1',ids);capturePrivateLibraryEdit();},
           backToRolls: returnToMyRolls,
           opened: root => {
             document.getElementById('my-dice').setAttribute('aria-expanded', 'true');
@@ -35992,6 +36012,8 @@ destinationShell = createWorkspaces({
   invite: anchor => shareInvite(inviteUrl(), anchor, 'Invite to table'),
   browse: id => { if (poolsEdit) return false; setPoolsOwner(id); },
   result: id => tableResults?.open(id),
+  account: async slot => {const workspace=await ensureAccountWorkspace();workspace?.mount(slot);},
+  accountClosed:()=>accountWorkspace?.close(),
 });
 window.__diceDebug.workspaces = {
   open: key => destinationShell.open(key), close: () => destinationShell.close(),
@@ -36128,3 +36150,82 @@ tableResults=createPlayerResults({
   bank:id=>{if(!resultBusy(id))requestBankTurn(id);},
 });
 window.__diceDebug.tableResults={get rows(){return tableResults.rows;},open:id=>tableResults.open(id),close:()=>tableResults.close(),get detailId(){return tableResults.detailId;}};
+
+
+function currentLibraryFavorites(){
+  const value=libraryFavorites||load('dice.favorites.v1',[]);
+  return Array.isArray(value)?value.filter(id=>typeof id==='string'):[];
+}
+function captureLibraryStore(store=profileStore){
+  return libraryDocument(store,{defaultSet:libraryDefaultSet||diceSet,favorites:currentLibraryFavorites()});
+}
+function capturePrivateLibraryEdit(store=profileStore){
+  if(libraryApplying||!librarySession?.info.ready)return libraryNamespace==='guest';
+  const captured=captureLibraryStore(store);
+  return captured.ok&&librarySession.edit(captured.document);
+}
+function applyPrivateLibrary(document,namespace){
+  const checked=libraryDocument(document.profiles,document.dice);if(!checked.ok)return false;
+  // The cache owns the verified original. Guest localStorage remains an
+  // independent familiar export/reload path; accounts never write those keys.
+  if(namespace==='guest'){
+    try{localStorage.setItem(LS_PROFILES,JSON.stringify(checked.document.profiles));
+      localStorage.setItem(LS_DICESET,JSON.stringify(checked.document.dice.defaultSet));
+      localStorage.setItem('dice.favorites.v1',JSON.stringify(checked.document.dice.favorites));
+    }catch{return false;}
+  }
+  libraryApplying=true;
+  try{
+    libraryNamespace=namespace;profileStore=checked.document.profiles;
+    groups=poolsOfProfile(activeProfile(profileStore));
+    libraryFavorites=[...checked.document.dice.favorites];
+    libraryDefaultSet=checked.document.dice.defaultSet;
+    setDiceSet(libraryDefaultSet,false);
+    editingGroupId=null;creatingShelf=null;poolsOwner=null;mismatchKept=false;
+    diceGallery?.close();closePopover();
+    renderGroups();renderPlayers();renderProfileLibrary();updateProfileBanner();
+    return true;
+  }finally{libraryApplying=false;}
+}
+async function ensureAccountWorkspace(){
+  if(accountWorkspace)return accountWorkspace;
+  if(accountWorkspaceLoading)return accountWorkspaceLoading;
+  accountWorkspaceLoading=(async()=>{
+    const [{createAccountWorkspace}]=await Promise.all([import('./accountui.js'),new Promise((resolve,reject)=>{
+      const link=document.createElement('link');link.rel='stylesheet';link.href='css/accountui.css';link.onload=resolve;link.onerror=reject;document.head.append(link);
+    })]);
+    accountWorkspace=createAccountWorkspace({
+      capture:()=>captureLibraryStore(),apply:applyPrivateLibrary,
+      blockSharing:on=>{libraryPublicationBlocked=on;if(on)publishPools();},
+      clearSharing:async()=>{clearTimeout(poolsPublishTimer);poolsPublishTimer=null;if(!resetProfileSharing())return false;await publishPools();return true;},
+      namespaceChanged:namespace=>{libraryNamespace=namespace;try{localStorage.setItem(LIBRARY_NAMESPACE_KEY,namespace);}catch{/* IDB remains the durable original */}},
+      changed:info=>{
+        librarySession=accountWorkspace?.session||librarySession;
+        if(info.namespace!=='guest')setStorageJammed(!!info.error&&!info.error.retained&&['cache_unavailable','cache_full','cache_corrupt','invalid_library'].includes(info.error.code));
+        const button=document.getElementById('private-library-status');if(button)button.textContent=accountWorkspace?.statusText(info)||'Private library';
+      },
+      download:(text,name)=>portableDownload(text,name,'application/json;charset=utf-8'),
+      portable:()=>portableDownload(),
+      openLibrary:()=>destinationShell.library(),
+      diceName:id=>id==='std'?'Standard':SETS[id]?.label||id,
+    });
+    librarySession=accountWorkspace.session;
+    await accountWorkspace.initialize();
+    return accountWorkspace;
+  })().catch(()=>{accountWorkspaceLoading=null;setPill('Couldn’t open the private library. Your table still works.');return null;});
+  return accountWorkspaceLoading;
+}
+async function openAccountWorkspace(){destinationShell.open('account');}
+const privateLibraryButton=document.createElement('button');privateLibraryButton.type='button';privateLibraryButton.className='btn ghost';privateLibraryButton.id='private-library-status';privateLibraryButton.textContent='Private library · account & sync';
+privateLibraryButton.addEventListener('click',openAccountWorkspace);document.getElementById('pools-shared-note').before(privateLibraryButton);
+const accountMenuButton=document.createElement('button');accountMenuButton.type='button';accountMenuButton.id='idm-account';accountMenuButton.textContent='Account & private library';accountMenuButton.addEventListener('click',()=>{closeIdentityMenu();openAccountWorkspace();});document.getElementById('idm-library').after(accountMenuButton);
+window.addEventListener('storage',event=>{
+  if(event.key!==LIBRARY_NAMESPACE_KEY)return;
+  const next=event.newValue||'guest';if(next===libraryNamespace)return;
+  libraryPublicationBlocked=true;publishPools();librarySession?.suspend();if(!librarySession)setPill('Account changed in another tab. Open Account & private library to review it.');
+});
+if(libraryMarkerAtBoot!=='guest')ensureAccountWorkspace();
+window.__diceDebug.privateLibrary={open:openAccountWorkspace,ready:()=>ensureAccountWorkspace(),
+  get state(){const s=librarySession?.info;return s?{ready:s.ready,namespace:s.namespace,person:s.person?{id:s.person.id}:null,pending:s.pending,blocked:s.blocked,error:s.error?.code||null,syncEnabled:s.syncEnabled,workingGeneration:s.workingGeneration}:null;},
+  settled:()=>librarySession?.settled(),snapshot:()=>captureLibraryStore(),
+};
