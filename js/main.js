@@ -22136,7 +22136,12 @@ function renderGroups() {
     renderForeignPools(poolsOwnerPlayer());
     return;
   }
-  for (const sec of buildSections(groups, { ensureTrio: poolsEdit })) {
+  // Keep an emptied custom category while its last deletion can be undone.
+  // The deleted row contributes only its category here, never a live pool,
+  // digit shortcut or saved value. Leaving edit mode still clears the undo.
+  const sectionPools = poolsEdit && deletedPool ? [...groups, deletedPool.group] : groups;
+  for (const sec of buildSections(sectionPools, { ensureTrio: poolsEdit })) {
+    if (sectionPools !== groups) sec.pools = sec.pools.filter(g => g !== deletedPool.group);
     const head = document.createElement('div');
     head.className = 'plabel pool-sec-head';
     const word = document.createElement('span');
