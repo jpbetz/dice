@@ -34,6 +34,7 @@ import { tableControlScenarios } from './table-controls.mjs';
 import { firstPlayScenarios } from './first-play.mjs';
 import { workspaceScenarios } from './workspaces.mjs';
 import { playerResultScenarios } from './player-results.mjs';
+import { rollFlowScenarios } from './roll-flows.mjs';
 import { rollHistoryScenarios } from './roll-history.mjs';
 import { filmMutationScenarios } from "./film-mutations.mjs";
 import { filmSettingsScenarios } from './film-settings.mjs';
@@ -789,6 +790,7 @@ export const scenarios = [
   ...firstPlayScenarios,
   ...workspaceScenarios,
   ...playerResultScenarios,
+  ...rollFlowScenarios,
   ...rollHistoryScenarios,
   ...profileSharingScenarios,
   ...filmWorkerScenarios,
@@ -25419,6 +25421,7 @@ export const scenarios = [
       // outlives its turn is a number about dice nobody is holding.
       await a.dbg('pickToggle(0)');
       for (let t = 0; t < 2; t++) {
+        await a.dbg(`tableResults.open(${JSON.stringify(rid)})`);
         await a.eval(`document.querySelector('#player-result-actions .throw-again').click()`);
         await a.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy && window.__diceDebug.turnState(${JSON.stringify(rid)}).throws.used === ${t+2})`,
           { desc: `throw ${t + 2} plays out`, timeout: 30000 });

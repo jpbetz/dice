@@ -1138,107 +1138,34 @@ html, body {
   border-color: rgba(212, 175, 55, 0.55);
   box-shadow: var(--pocket), 0 0 0 1px rgba(212, 175, 55, 0.22), 0 0 16px rgba(255, 215, 102, 0.1);
 }
-/* THE RIM (P6: management STANDS — supersedes the 2026-08-01 ghost-text
-   demotion; §7.14). ONE row of tools under the well (Joe 2026-08-04: the
-   ± as a full-width bronze bar read as a second, weaker roll button
-   directly under the real one). Every tool here acts on the well's
-   contents and every one of them arms on the same condition, so they are
-   one group: ± shapes the draft, Save · Offer · ✕ Clear dispose of it.
-   Standing furniture is untouched — the rim never leaves, its tools gray
-   on an empty well, and the geometry never moves. Inset 7px = well
-   border 1 + well padding 6: the rim's outer edges sit exactly on the
-   well's interior grid. Fixed min-height: the save morph swaps in
-   without a jump. */
-.draft-actions {
-  margin-top: 0;
-  padding: 0 7px 10px;
-  gap: 4px;
-  justify-content: flex-start;
-  align-items: stretch;
-  min-height: 36px;
+/* One quiet toolbar beneath Roll: consistent targets, no mixed plate styles. */
+#draft-actions {
+  display:flex; flex-wrap:nowrap; align-items:center; gap:2px;
+  margin:8px 7px 10px; padding:3px; min-height:40px;
+  border:1px solid rgba(255,255,255,.09); border-radius:10px;
+  background:rgba(255,255,255,.025);
 }
-.draft-actions.hidden { display: none; }
-/* Tool plates — machined steel: a bevel hairline along the top edge, a
-   seated shadow beneath. The metal vocabulary the panel already speaks
-   (Joe: 'the metal (bronze, steel) theme is really great… lean into all
-   that'), at the quiet end of it. */
-.draft-actions .btn,
-#tray-mods {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11.5px;
-  padding: 5px 8px;
-  border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
-  /* the full machined recipe (2i-D): bevel AND seat shadow */
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.35);
-  color: var(--muted);
-  cursor: pointer;
-  transition: color 0.12s, border-color 0.12s, background 0.15s, box-shadow 0.15s;
+#draft-actions.hidden { display:none; }
+#builder-panel #draft-actions > button {
+  flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+  min-width:36px; min-height:36px; padding:0 8px;
+  border:0; border-radius:6px; box-shadow:none; background:transparent;
+  color:#bfc3c8; font:500 12px/1.2 var(--font-ui); letter-spacing:0;
+  cursor:pointer; transition:color .12s,background .12s;
 }
-.draft-actions .btn:hover:not(:disabled),
-.draft-actions .btn:focus-visible {
-  color: var(--ivory);
-  border-color: rgba(243, 234, 215, 0.38);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 1px 2px rgba(0, 0, 0, 0.35);
+#builder-panel #draft-actions > button:hover:not(:disabled),
+#builder-panel #draft-actions > button:focus-visible {
+  color:var(--ivory); background:rgba(255,255,255,.08); box-shadow:none;
 }
-/* unlit, not absent: an empty well's tools recede but hold their place —
-   and wear the disabled CODE (grayscale) so recede never reads as the
-   reveal tier's resting dim (2i-C, three states three codes).
-   NAMED EXCEPTION, and only for the seat (audit C4): the drain itself now
-   comes from THE DISABLED RECIPE — this block used to carry its own
-   0.42 + grayscale(0.7), which is the pair C2 measured at 2.36:1 against
-   live 2.24:1 cells. What is genuinely local is the SHADOW: a plate that
-   is not powered is not a raised object either, so it sheds the machined
-   bevel-and-seat while the lit tools keep it. */
-.draft-actions .btn:disabled,
-#tray-mods:disabled {
-  box-shadow: none;
-}
-/* '± Modify' leads the rim (Joe 2026-08-04: the rim's Save retired, the
-   freed room lets the modifier tool wear its word) — the one tool that
-   SHAPES rather than disposes, so it wears the warm metal instead of the
-   cold (gold stays reserved for the roll act itself). Gold-bright while
-   its popover is open: the field being edited and the tool editing it
-   light together. */
-#tray-mods {
-  padding: 5px 9px;
-  border-color: rgba(212, 175, 55, 0.28);
-  background: linear-gradient(180deg, rgba(212, 175, 55, 0.11), rgba(212, 175, 55, 0.035));
-  box-shadow: inset 0 1px 0 rgba(255, 215, 102, 0.08);
-  color: rgba(255, 215, 102, 0.7);
-  font-weight: 600;
-  letter-spacing: 0.03em;
-}
-#tray-mods:hover:not(:disabled) {
-  color: var(--gold-bright);
-  border-color: rgba(212, 175, 55, 0.5);
-  background: linear-gradient(180deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.07));
-  box-shadow: inset 0 1px 0 rgba(255, 215, 102, 0.14);
-}
-#tray-actions.open ~ .draft-actions #tray-mods {
-  color: var(--gold-bright);
-  border-color: rgba(212, 175, 55, 0.55);
-  background: linear-gradient(180deg, rgba(212, 175, 55, 0.22), rgba(212, 175, 55, 0.08));
-}
-/* D2 FIX — no bare `.hidden` rule exists in this codebase, so the solo
-   'Offer to table' had been a live-looking dead verb (updateTrayButtons's
-   toggle had no visual effect while offerDraft() dead-ends offline). */
-.draft-actions .btn.hidden { display: none; }
-#clear-tray { margin-left: auto; }         /* the right rail, under ± */
-/* The split verb reads as ONE verb with a chooser. */
-#offer-draft { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-#offer-pick  { margin-left: -5px; padding: 4px 6px;
-               border-top-left-radius: 0; border-bottom-left-radius: 0; }
-/* Touch targets share one row: Modify, Dice, Offer and its audience picker,
-   then Clear. Compact padding keeps all five buttons inside a 252px rim. */
-@media (pointer: coarse) {
-  .draft-actions .btn, #tray-mods { padding: 10px 7px; min-width: 34px; }
-  #offer-pick { padding: 10px 9px; }
+#builder-panel #draft-actions > button:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
+#builder-panel #tray-actions.open ~ #draft-actions #tray-mods { color:var(--ivory); background:rgba(255,255,255,.1); }
+#builder-panel #draft-actions #clear-tray { margin-left:auto; color:#b4a5a2; }
+#builder-panel #draft-actions #clear-tray:hover:not(:disabled) { color:#ffd3cd; background:rgba(226,73,59,.14); }
+#builder-panel #draft-actions #offer-pick { margin-left:-3px; padding:0 4px; }
+#builder-panel #draft-actions > button.hidden { display:none; }
+@media(pointer:coarse) {
+  #draft-actions { gap:0; }
+  #builder-panel #draft-actions > button { min-width:44px; min-height:44px; padding:0 6px; }
 }
 /* (the tray save morph's rules retired 2026-08-04 with the rim's Save) */
 
@@ -6772,20 +6699,6 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
    itself never breaks mid-phrase. */
 .log-head .log-group { min-width: 0; }
 .log-rerolled { white-space: nowrap; }
-
-/* ---- the rim wraps before it overflows (U28b) ----
-   `.draft-actions` is a no-wrap flex row and on a coarse pointer its four
-   tools come to ~240px of the expanded panel's 260 — comfortable on a tablet,
-   overflowing below a ~320px viewport, where the last tool leaves the panel
-   with nothing saying it did. Wrapping is the failure direction this file
-   picks everywhere else (#rail wraps, the roster wraps): a second 36px row is
-   a visible, complete answer, and `min-height` on the container already
-   guarantees the first row's height either way. Coarse-only — on a fine
-   pointer the row has never overflowed and a stray wrap there would move
-   standing furniture for nothing. */
-@media (pointer: coarse) {
-  .draft-actions { flex-wrap: wrap; }
-}
 
 /* ---- a counted dice row spends its art on its remover (U28b) ----
    THE MEASUREMENT, which is why this is markup and not more cascade: the row

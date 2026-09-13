@@ -20,7 +20,8 @@ export function createWorkspaces(actions) {
   const root = node('section', 'hidden'); root.id = 'workspace';
   root.setAttribute('aria-labelledby', 'workspace-title');
   const head = node('header', 'workspace-head');
-  const back = button('← Back to table', () => close(), 'btn ghost'); back.id = 'workspace-back';
+  const back = button('×', () => close(), 'btn ghost'); back.id = 'workspace-back';
+  back.setAttribute('aria-label','Close workspace'); back.title='Close';
   const title = node('h2', '', ''); title.id = 'workspace-title';
   const tabs = node('nav', 'workspace-tabs'); tabs.setAttribute('aria-label', 'Workspaces');
   for (const [key, name] of Object.entries(names).filter(([key])=>key!=='account')) {
@@ -29,7 +30,34 @@ export function createWorkspaces(actions) {
       b.dataset.workspace = key; host.append(b);
     }
   }
-  head.append(back, title, tabs);
+  const moreButton=button('More',()=>openMore(),'btn ghost'); moreButton.id='phone-more';
+  moreButton.setAttribute('aria-haspopup','dialog'); moreButton.setAttribute('aria-expanded','false'); nav.append(moreButton);
+  const more=node('section','phone-more-panel hidden'); more.id='phone-more-panel';
+  const moreHead=node('header','phone-more-head');
+  const moreTitle=node('h2','','Table tools'); moreTitle.id='phone-more-title';
+  const moreClose=button('×',()=>closeMore(),'btn ghost'); moreClose.id='phone-more-close'; moreClose.setAttribute('aria-label','Close table tools');
+  moreHead.append(moreTitle,moreClose);
+  const moreTools=node('div','phone-more-tools');
+  for(const [key,label] of [['preferences','Preferences'],['history','Roll history'],['notation','Roll notation'],['help','Help']]){
+    const b=button(label,()=>{closeMore();actions.tool(key,moreButton);}); b.id=`phone-tool-${key}`;moreTools.append(b);
+  }
+  more.append(moreHead,moreTools);document.body.append(more);
+  const clearHome=document.createComment('table clear return point'); $('corner-controls').before(clearHome);
+  function positionPhoneTools(){
+    nav.querySelector('[data-workspace="dice"]').textContent=window.innerWidth<=640?'Rolls':names.dice;
+    if(window.innerWidth<=640) moreTools.append($('corner-controls'));
+    else { closeMore();clearHome.after($('corner-controls')); }
+  }
+  function openMore(){
+    close();actions.beforeOpen();more.classList.remove('hidden');moreButton.setAttribute('aria-expanded','true');actions.modalOpen(more);moreClose.focus({preventScroll:true});
+  }
+  function closeMore(){
+    if(more.classList.contains('hidden'))return;
+    actions.modalClose(more);more.classList.add('hidden');moreButton.setAttribute('aria-expanded','false');moreButton.focus({preventScroll:true});
+  }
+  more.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeMore();}if(e.key!=='Tab')e.stopPropagation();});
+  const status=node('p','workspace-status');status.hidden=true;status.setAttribute('role','status');
+  head.append(title, back, tabs, status);
   const content = node('div', 'workspace-content'); root.append(head, content);
   const tables = node('section', 'workspace-section'); tables.id = 'workspace-tables';
   const tableOverview=node('div'),tableRecents=node('div'),homeSlot=node('div');tableOverview.id='workspace-table-overview';tableRecents.id='workspace-table-recents';homeSlot.id='workspace-homes-slot';
@@ -51,12 +79,19 @@ export function createWorkspaces(actions) {
   // forwards to the original button, including all privacy/offer validation.
   const tray = node('section', 'phone-roll-tray'); tray.id = 'phone-roll-tray'; tray.setAttribute('aria-label', 'Roll tray');
   const trayHead = node('div', 'phone-tray-head');
-  trayHead.append(button('Build a roll', e => open('dice', e.currentTarget), 'btn ghost'));
+  const trayTitle=node('span','phone-tray-title','Quick dice');trayHead.append(trayTitle);
+  const build = button('Build a roll', e => { open('dice', e.currentTarget); actions.build(); }, 'btn ghost');
+  build.id = 'phone-build-roll'; trayHead.append(build);
   const draftRoll = button('Roll draft', () => { if (!$('tray-roll').disabled) $('tray-roll').click(); });
-  draftRoll.id = 'phone-draft-roll'; trayHead.append(draftRoll);
+  draftRoll.id = 'phone-draft-roll';
+  const saved=node('div','phone-saved-rolls');saved.id='phone-saved-rolls';
+  const savedList=node('div','phone-pool-list');saved.append(savedList,draftRoll);
   const quick = node('div', ''); quick.id = 'phone-quick-dice';
-  renderQuickRolls(quick, { roll: actions.quickRoll, build: e => open('dice', e.currentTarget) }); tray.append(trayHead, quick);
+  renderQuickRolls(quick, { roll: actions.quickRoll, build: e => open('dice', e.currentTarget) }); tray.append(trayHead, saved, quick);
   document.body.append(tray);
+  // The saved list and empty-draft states change the usable table height
+  // without a window resize. Keep the renderer fitted to that real rectangle.
+  new ResizeObserver(()=>actions.layoutChanged()).observe(tray);
 
   let current = null, opener = null, borrowed = [];
   // One launcher follows the visible roll controls, including the borrowed
@@ -64,8 +99,7 @@ export function createWorkspaces(actions) {
   function positionDiceControl() {
     const launcher = $('my-dice');
     const atBuilder = current === 'dice';
-    const host = !atBuilder && window.innerWidth <= 640 ? trayHead
-      : !atBuilder && $('left-panel').classList.contains('collapsed') ? $('rail-roll-wrap') : $('draft-actions');
+    const host = window.innerWidth > 640 && !atBuilder && $('left-panel').classList.contains('collapsed') ? $('rail-roll-wrap') : $('draft-actions');
     if (launcher.parentElement === host) return;
     const focused = launcher === document.activeElement;
     host.insertBefore(launcher, host === $('draft-actions') ? $('offer-draft') : null);
@@ -141,6 +175,8 @@ export function createWorkspaces(actions) {
   }
   function open(key, anchor, browsing = false) {
     if (!names[key]) return;
+    closeMore();
+    status.hidden=true;status.textContent='';
     if (!current) {
       actions.beforeOpen(); opener = anchor || document.activeElement;
       borrow($('builder-panel'), slot);
@@ -161,6 +197,7 @@ export function createWorkspaces(actions) {
     back.focus({preventScroll:true});
   }
   function close() {
+    closeMore();
     if (!current) return;
     actions.closeMenus();
     if(current==='account')actions.accountClosed?.();
@@ -177,21 +214,42 @@ export function createWorkspaces(actions) {
     // Tab available to the app's shared modal trap, and input-local keys local.
     if (e.key !== 'Tab') e.stopPropagation();
   });
+  let poolSignature='';
   const update = () => {
     const source = $('tray-roll'); draftRoll.disabled = source.disabled;
-    draftRoll.textContent = source.disabled ? 'Roll draft' : 'Roll staged dice';
+    draftRoll.hidden = source.classList.contains('hidden');
+    draftRoll.textContent = source.disabled ? 'Roll draft' : `Roll staged dice · ${actions.draft()}`;
+    if(window.innerWidth<=640){
+      const pools=actions.pools(), signature=JSON.stringify(pools);
+      if(signature!==poolSignature){
+        poolSignature=signature;savedList.replaceChildren();
+        for(const p of pools){
+          const b=button('',()=>actions.rollPool(p.id),'phone-pool');b.dataset.pool=p.id;
+          b.setAttribute('aria-label',`Roll ${p.name||p.notation} · ${p.notation}`);
+          const name=node('span','phone-pool-name',p.name||p.notation),notation=node('span','phone-pool-notation',p.name?p.notation:'');
+          const cue=node('span','phone-pool-cue','Roll');cue.setAttribute('aria-hidden','true');b.append(name,notation,cue);savedList.append(b);
+        }
+      }
+      const hasSaved=pools.length>0||!draftRoll.hidden;
+      saved.hidden=!hasSaved;quick.hidden=hasSaved;
+      trayTitle.textContent=pools.length?'Saved rolls':hasSaved?'Staged roll':'Quick dice';
+    }
     if (current === 'people') renderPeople();
     if (current === 'tables') renderTables();
   };
   const observer = new MutationObserver(update);
-  for (const el of [$('rail-roster'), $('table-name'), $('log-list')]) observer.observe(el, {childList:true, subtree:true, characterData:true});
-  observer.observe($('tray-roll'), {attributes:true, attributeFilter:['disabled']});
+  for (const el of [$('rail-roster'), $('table-name'), $('log-list'),$('groups-list')]) observer.observe(el, {childList:true, subtree:true, characterData:true});
+  observer.observe($('tray-roll'), {attributes:true, attributeFilter:['disabled','class']});
   update();
   positionDiceControl();
+  positionPhoneTools();
   window.matchMedia('(max-width:640px)').addEventListener('change', () => {
     positionDiceControl();
+    positionPhoneTools();
+    update();
     if (current) actions.modalOpen(root);
     actions.layoutChanged();
   });
-  return { open, close, get current() { return current; }, library, positionDiceControl };
+  return { open, close, get current() { return current; }, library, positionDiceControl,
+    notice(message){if(current){status.textContent=message||'';status.hidden=!message;}} };
 }

@@ -4,6 +4,7 @@
 // The adapter supplies only locally revealed/redacted display data. No roll
 // payload, random seed, or future value is read by this presentation module.
 export function createPlayerResults(actions) {
+  const focusTableControl=()=>document.getElementById(window.innerWidth<=640?'phone-build-roll':'rail-log')?.focus({preventScroll:true});
   const el = (tag, cls, text) => {
     const node=document.createElement(tag); if(cls) node.className=cls;
     if(text!==undefined) node.textContent=text; return node;
@@ -24,11 +25,13 @@ export function createPlayerResults(actions) {
   turn.append(turnRead,turnState,again,bank); document.body.append(turn);
   const detail=el('section','player-result-detail hidden'); detail.id='player-result-detail';
   detail.setAttribute('aria-labelledby','player-result-title');
-  const back=el('button','btn ghost','← Back to table'); back.type='button'; back.id='player-result-close';
+  const back=el('button','btn ghost','×'); back.type='button'; back.id='player-result-close';
+  back.setAttribute('aria-label','Close result'); back.title='Close';
   const title=el('h2','',''); title.id='player-result-title';
+  const head=el('header','player-result-head'); head.append(title,back);
   const read=el('div','player-result-read'); read.id='player-result-read';
   const controls=el('div','player-result-actions'); controls.id='player-result-actions';
-  detail.append(back,title,read,controls); document.body.append(detail);
+  detail.append(head,read,controls); document.body.append(detail);
   back.addEventListener('click',close);
   detail.addEventListener('keydown',event=>{
     if(event.key==='Escape'&&!event.defaultPrevented){event.preventDefault();close();}
@@ -36,21 +39,31 @@ export function createPlayerResults(actions) {
   });
 
   function createSeat(row) {
+    const wrap=el('div','result-seat-wrap');
     const button=el('button','result-seat'); button.type='button'; button.dataset.player=row.id;
+    const clear=el('button','result-seat-clear','×'); clear.type='button'; clear.hidden=true;
     const crest=el('span','result-seat-crest'); crest.setAttribute('aria-hidden','true');
     const name=el('span','result-seat-name');
     const value=el('span','result-seat-value');
     const faces=el('span','result-seat-faces');
     const state=el('span','result-seat-state');
     button.append(crest,name,value,faces,state);
-    const seat={button,crest,name,value,faces,state,row:null,signature:null};
+    wrap.append(button,clear);
+    const seat={wrap,button,clear,crest,name,value,faces,state,row:null,signature:null};
     button.addEventListener('click',()=>{if(seat.row?.result?.id&&seat.row.openable) open(seat.row.result.id,button);});
+    clear.addEventListener('click',()=>{if(seat.row?.clearable) actions.clear(seat.row.result.id,clear);});
     return seat;
   }
   function paint(seat,row) {
     const signature=JSON.stringify(row); seat.row=row;
     if(signature===seat.signature) return;
     seat.signature=signature;
+    seat.button.hidden=!row.result&&!row.rolling&&!row.queued;
+    seat.wrap.hidden=seat.button.hidden;
+    seat.wrap.classList.toggle('has-clear',row.clearable);
+    seat.clear.hidden=!row.clearable;
+    seat.clear.title=`Clear ${row.name}’s roll`;
+    seat.clear.setAttribute('aria-label',`Clear ${row.name}’s roll from the table`);
     seat.button.style.setProperty('--seat-color',row.color||'#9c8f77');
     seat.crest.textContent=row.name.trim().split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase();
     seat.name.textContent=row.name; seat.name.title=row.name;
@@ -86,15 +99,17 @@ export function createPlayerResults(actions) {
     const live=new Set(rows.map(r=>r.id));
     for(const [id,seat] of seats) if(!live.has(id)) {
       if(document.activeElement===seat.button) document.getElementById('workspace-nav')?.querySelector('[data-workspace="people"]')?.focus();
-      seat.button.remove(); seats.delete(id);
+      seat.wrap.remove(); seats.delete(id);
     }
     rows.forEach((row,index)=>{
       let seat=seats.get(row.id);
       if(!seat){seat=createSeat(row);seats.set(row.id,seat);}
-      if(root.children[index]!==seat.button) root.insertBefore(seat.button,root.children[index]||null);
+      if(root.children[index]!==seat.wrap) root.insertBefore(seat.wrap,root.children[index]||null);
+      const focused=seat.wrap.contains(document.activeElement);
       paint(seat,row);
+      if(seat.button.hidden&&focused) focusTableControl();
     });
-    root.hidden=!rows.length;
+    root.hidden=!rows.some(row=>row.result||row.rolling||row.queued);
     // The detailed reader stays pinned to its chosen roll while fresh results
     // arrive elsewhere. Shared renderers update revealed values and turn acts.
     if(detailId) actions.renderDetail(read,controls,detailId);
@@ -120,7 +135,9 @@ export function createPlayerResults(actions) {
   function close() {
     if(!detailId) return;
     detailId=null; detail.classList.add('hidden'); actions.closeDetail(detail);
-    detailOpener?.focus({preventScroll:true});
+    actions.renderDetail(read,controls,null);
+    if(detailOpener?.getClientRects().length) detailOpener.focus({preventScroll:true});
+    else focusTableControl();
   }
   const resize=new ResizeObserver(()=>{
     document.documentElement.style.setProperty('--table-results-height',`${Math.ceil(root.getBoundingClientRect().height)}px`);
