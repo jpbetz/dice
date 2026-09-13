@@ -32777,7 +32777,11 @@ function openHelpDialog(topic) {
   const sec = topic ? document.getElementById(`help-${topic}`) : null;
   if (sec) {
     sec.classList.add('lit');
-    sec.scrollIntoView({ block: 'start' });
+    const body = document.getElementById('help-body');
+    const nav = document.getElementById('help-nav');
+    // Wrapped sticky topic links must not cover the selected heading.
+    body.scrollTop += sec.getBoundingClientRect().top - body.getBoundingClientRect().top
+      - nav.getBoundingClientRect().height - 12;
   } else {
     document.getElementById('help-body').scrollTop = 0;
   }

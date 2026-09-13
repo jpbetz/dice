@@ -1,3 +1,5 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # CUJS.md — the critical user journeys
 
 > **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
@@ -12,9 +14,30 @@
 is assigned.** Everything else — ROADMAP, PROFILES, UX, UX-AUDIT, SHIPPED,
 commit messages, e2e comments — cites numbers from here and never mints one.*
 
-Read [GOALS.md](GOALS.md) first: it says what the product is and what may
-never be traded away. This file says **what people actually come here to
+Read [GOALPOST.md](GOALPOST.md) first for the binding product promises;
+[GOALS.md](GOALS.md) records their fuller history. This file says **what people actually come here to
 do**, in their own words, and holds each journey to an end-to-end proof.
+
+---
+
+## September redesign: current surfaces and proof
+
+2026-09-13. The historical narratives below retain their journey numbers.
+These updates map the implemented redesign to those same journeys; they do
+not declare actual-player or physical-phone observation complete.
+
+| Journey | Current experience and added evidence |
+| --- | --- |
+| CUJ1 | Familiar Quick dice and Numbers only for a new table; starter kits preview before additive capture. `first-play`, `first-play-phone`, `quick-preserves-work`, `quick-preserves-solo-turn`. |
+| CUJ2–4 | Named setup with Preview/Apply; three destinations preserve the seat; explicit New table reserves a guest address. `table-controls`, `workspaces-keep-table`, `home-connection-ui.test.mjs`. Durable home management/social return are in progress. |
+| CUJ6–7 | Focused searchable library with preview-before-use, named management actions and explicit per-table sharing. `library-workspace`, `profile-sharing`; existing prepared-seat/copy proofs remain. |
+| CUJ8–9 | The full-width phone tray and persistent result seats retain dice visibility and unfinished turns. `workspaces-phone-four`, `player-results-privacy-turn`, `roll-history`; [results and turn proof](PLAYER-RESULTS.md). |
+| CUJ10–11 | Each participant has an upright latest visible result. Waiting rolls retain qualified previous results; held/secret data stays redacted. `player-results`, `roll-arrivals`, and the raw-stream privacy scenarios. |
+| CUJ12 | Table interpretation stays shared, personal dice remain personal. Actual artwork previews before Apply. `table-controls`, `table-designs`, `personal-kit`; a kit never changes the occupied table’s procedure. |
+| CUJ13 | Optional recoverable private library adds explicit initial comparison and preserved competing/offline versions. `account-ui.test.mjs` proves actual-browser recovery/restart, session changes and late-edit boundaries; portable backup remains available without the service. |
+
+The [execution ledger](REDESIGN-PROGRESS.md) records composed validation and
+remaining work. Physical-device and newcomer observations still need evidence.
 
 ---
 

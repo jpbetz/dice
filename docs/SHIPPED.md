@@ -8,6 +8,19 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## 2026-09-13 — Help follows the new tasks and privacy choices
+
+Getting started now explains Quick dice, the three destinations, gallery
+practice, starter-kit preview and Table setup. Your data describes private
+profiles, explicit sharing, optional recovery/sync and portable backups;
+it no longer claims that accounts do not exist or that all profiles are
+broadcast. Selecting a Help topic reserves space for the wrapped sticky links
+so its heading remains readable on phones. The existing pool-stats help
+scenario passes; desktop and phone views were inspected with
+`tools/steps/redesign-help-look.mjs`. [Phone start](redesign/2026-09-13-help-phone-start.png)
+and [data help](redesign/2026-09-13-help-desktop-data.png).
+The CUJ document maps these implemented surfaces to its existing numbers.
+
 ## 2026-09-13 — Optional recoverable private library
 
 The account task creates a client-generated recovery key, requires explicit

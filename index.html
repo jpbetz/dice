@@ -682,6 +682,7 @@ limitations under the License.
       </div>
       <div id="help-body">
         <nav id="help-nav" aria-label="Help sections">
+          <button data-topic="start">Getting started</button>
           <button data-topic="rolls">Rolls</button>
           <button data-topic="systems">Systems</button>
           <button data-topic="notation">Notation</button>
@@ -690,6 +691,25 @@ limitations under the License.
           <button data-topic="pools">Your pools</button>
           <button data-topic="data">Your data</button>
         </nav>
+        <section id="help-start">
+          <h3>Your first roll</h3>
+          <p>Tap a Quick dice button to roll immediately, or choose
+            <b>Build dice…</b> to compose a roll such as <code>2d6+3</code>.
+            New tables start with <b>Numbers only</b>. A game’s starter kit is
+            your choice: preview its saved rolls before adding it to your library.</p>
+          <p>Your name opens its editor. <b>My Dice</b>, beside your name,
+            opens the visual collection: browse, favorite, try a private practice
+            throw, then choose <b>Use these dice</b>. Practice leaves the shared
+            table and your chosen dice unchanged.</p>
+          <p><b>Tables</b> shows this table and recent visits. <b>My dice &amp;
+            rolls</b> brings together the builder, collection and saved-roll
+            library. <b>People</b> shows who is here and their latest visible
+            results. Returning to the table keeps your draft and unfinished turn.</p>
+          <p>The table name opens <b>Table setup</b>. Preview its name, artwork
+            and interpretation, then Apply your changes. The gear opens personal
+            <b>Preferences</b>. Invite a guest with the table’s link; they can
+            play without creating an account.</p>
+        </section>
         <section id="help-rolls">
           <h3>Fair rolls, one table</h3>
           <p>Online, the server does the rolling. Values come from
@@ -791,22 +811,28 @@ limitations under the License.
         </section>
         <section id="help-data">
           <h3>Your data</h3>
-          <p>Your pools live in your browser, per site — there are no
-            accounts. A room lives in server memory while the table stands
-            and evaporates afterwards; its log is the room's record for as
-            long as it lasts. Links carry a room name and nothing else about
-            you.</p>
-          <!-- U25: this paragraph used to say pools travel by file and stop
-               there, which was not true of a table. Both halves now stand. -->
-          <p>At a table, everyone can see your profiles and the pools in
-            them, and can copy them — that is how a prepared table hands you
-            your character, and how you browse a teammate's pools. It is a
-            copy the room holds while it lasts, never a copy of your browser:
-            nothing you keep is stored on the server, and nothing anyone
-            copies changes yours.</p>
-          <p>To move pools <em>off</em> a table — to another browser, or to
-            keep them — use export and import: a small portable text file you
-            hand around yourself.</p>
+          <p>Your saved-roll library stays in this browser by default.
+            <b>Saved rolls &amp; starter kits</b> opens a searchable library;
+            choosing a character previews it, and <b>Use these rolls</b>
+            switches without losing the character you were using.</p>
+          <p>Your profiles are private until you select <b>Share at this
+            table</b> for each character you want others to see and copy.
+            Later edits follow that choice. Unsharing stops publication;
+            it cannot remove copies another player already kept. Shared
+            profiles are separate from each roll’s visibility choice.</p>
+          <p>Where the account service is available, <b>Account &amp; private
+            library</b> offers optional recovery and synchronization. Keep your
+            recovery key somewhere you can retrieve it on another device.
+            Review local and saved versions before turning sync on. Subsequent
+            edits can sync automatically; competing or offline versions stay
+            available for review and export. Check the sync status and retry
+            when a save needs attention.</p>
+          <p><b>Import / export</b> previews incoming data before you apply it.
+            <b>Download backup</b> keeps a portable copy of your library.
+            A table link addresses the room; it is not a library backup.
+            The live room and its roll history are temporary, even when the
+            group keeps a saved table home. Account-service failure does not
+            prevent local dice rolls or export.</p>
         </section>
       </div>
     </div>
