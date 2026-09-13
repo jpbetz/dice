@@ -170,6 +170,9 @@ Cookie-changing intent suspends other same-origin tabs before the request;
 HTTP still verifies the fixed account on every private operation. A boundary
 epoch invalidates comparison/history UI, including late responses, and binds
 Apply and cleanup to the namespace being reviewed.
+Profile-sharing checkboxes reflect this same boundary: they are cleared and
+disabled while review is blocked, with a visible paused status. A refused
+checkbox change cannot leave a checked control claiming successful sharing.
 
 Comparison shows device/account profiles, saved-roll names, default dice and
 favorites. A merge with unequal defaults requires a dice choice. Local tab
@@ -198,3 +201,7 @@ choice also survives reload without sync.
 phone recovery comparison/merge choice, plus account status and history.
 These are emulated Chrome device observations, not physical-device or
 production-cloud evidence. Durable homes and social UI are separate slices.
+
+Reviewed captures: [populated desktop comparison](redesign/2026-09-13-account-comparison-desktop.png),
+[phone comparison](redesign/2026-09-13-account-comparison-phone.png),
+[phone merge choice](redesign/2026-09-13-account-merge-phone.png).

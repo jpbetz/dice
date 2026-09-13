@@ -21052,6 +21052,14 @@ function currentSharedIds() {
   let owner='guest';try{owner=localStorage.getItem(LIBRARY_SHARING_OWNER)||'guest';}catch{return [];}
   return owner===libraryNamespace?sharedIds(load(SHARING_KEY,null),ROOM):[];
 }
+function syncProfileSharingChoices() {
+  const ids=currentSharedIds();
+  for(const input of document.querySelectorAll('input[data-share-profile]')) {
+    input.checked=ids.includes(input.dataset.shareProfile);
+    input.disabled=libraryPublicationBlocked;
+  }
+  renderProfileSharingStatus();
+}
 function persistSharing(next) {
   try {
     const text = JSON.stringify(next);
@@ -21108,6 +21116,7 @@ function renderProfileSharingStatus(pending = !!profileShareFlight) {
     : IN_LOBBY ? 'Your saved rolls are private. At a shared table, choose which profiles others can see and copy.'
     : pending ? 'Updating the profiles shared at this table…'
     : profileShareFailed ? 'Couldn’t update sharing at the table. Its previous shared copy may still be visible.'
+    : libraryPublicationBlocked ? 'Sharing is paused while the account library is being reviewed.'
     : !netOnline ? 'Sharing will update when you connect. A previous shared copy may still be visible at the table.'
     : n ? `${n} ${n === 1 ? 'profile is' : 'profiles are'} shared at this table, including later edits. Others can copy those rolls. Unsharing cannot remove copies they already kept.`
     : 'Your saved rolls are private. Choose Share at this table beside each profile you want others to see and copy.';
@@ -31186,9 +31195,10 @@ function renderProfileLibrary() {
       label.className = 'profile-share-choice';
       const input = document.createElement('input');
       input.type = 'checkbox'; input.checked = currentSharedIds().includes(p.id);
+      input.disabled = libraryPublicationBlocked;
       input.dataset.shareProfile = p.id;
       input.setAttribute('aria-label', `Share ${p.name} at this table`);
-      input.addEventListener('change', () => setProfileShared(p.id,input.checked));
+      input.addEventListener('change', () => {if(!setProfileShared(p.id,input.checked))syncProfileSharingChoices();});
       label.append(input, document.createTextNode('Share at this table'));
       row.append(label);
     }
@@ -36197,7 +36207,7 @@ async function ensureAccountWorkspace(){
     })]);
     accountWorkspace=createAccountWorkspace({
       capture:()=>captureLibraryStore(),apply:applyPrivateLibrary,deviceNamespace:libraryMarkerAtBoot,initiallyBlocked:libraryPublicationBlocked,
-      blockSharing:on=>{libraryPublicationBlocked=on;if(on)publishPools();},
+      blockSharing:on=>{libraryPublicationBlocked=on;if(on)publishPools();syncProfileSharingChoices();},
       clearSharing:async()=>{clearTimeout(poolsPublishTimer);poolsPublishTimer=null;if(!resetProfileSharing())return false;return net?await publishPools():true;},
       identityIntent:()=>{try{localStorage.setItem(LIBRARY_IDENTITY_INTENT,crypto.randomUUID());}catch{/* HTTP requests still verify the fixed account */}},
       namespaceChanged:namespace=>{libraryNamespace=namespace;try{localStorage.setItem(LIBRARY_NAMESPACE_KEY,namespace);}catch{/* IDB remains the durable original */}},
@@ -36224,7 +36234,7 @@ const accountMenuButton=document.createElement('button');accountMenuButton.type=
 window.addEventListener('storage',event=>{
   if(event.key!==LIBRARY_NAMESPACE_KEY&&event.key!==LIBRARY_IDENTITY_INTENT)return;
   const next=event.newValue||'guest';if(event.key===LIBRARY_NAMESPACE_KEY&&next===libraryNamespace)return;
-  libraryPublicationBlocked=true;publishPools();librarySession?.suspend();if(!librarySession)setPill('Account changed in another tab. Open Account & private library to review it.');
+  libraryPublicationBlocked=true;publishPools();syncProfileSharingChoices();librarySession?.suspend();if(!librarySession)setPill('Account changed in another tab. Open Account & private library to review it.');
 });
 if(libraryMarkerAtBoot!=='guest')ensureAccountWorkspace();
 window.__diceDebug.privateLibrary={open:openAccountWorkspace,ready:()=>ensureAccountWorkspace(),

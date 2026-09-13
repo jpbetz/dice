@@ -99,6 +99,7 @@ test('actual app: namespace switch, table publication, shared-cookie refusal and
   await compare(a);await click(a,'account-history');await idle(a);
   await a.page.browser.send('Network.enable',{},a.page.sessionId);await a.page.browser.send('Network.setBlockedURLs',{urls:['*/api/pools']},a.page.sessionId);
   await recover(a,two.key);assert.equal((await state(a)).namespace,one.id);assert.equal((await state(a)).blocked,true,'failed live withdrawal refuses identity adoption');
+  assert.ok(await a.eval(`(()=>{const inputs=[...document.querySelectorAll('input[data-share-profile]')];return inputs.length>0&&inputs.every(input=>input.disabled&&!input.checked)})()`),'blocked account review cannot visually claim profile sharing');
   assert.equal(await a.eval('document.getElementById("account-comparison").hidden && document.getElementById("account-history-panel").hidden'),true);
   assert.equal(await a.eval('document.getElementById("account-local-preview").textContent.length + document.getElementById("account-history-list").textContent.length'),0);
   await a.page.browser.send('Network.setBlockedURLs',{urls:[]},a.page.sessionId);await recover(a,one.key);
