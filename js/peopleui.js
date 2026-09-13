@@ -482,7 +482,7 @@ export function createPeopleWorkspace(actions){
     homeSelect.disabled=busy;
     requestCode.disabled=busy;
     const pending=info.incoming.filter(i=>i.state==='pending'&&i.expiresAt>Date.now()).length;
-    tabs.invitations.textContent='Invitations'+(pending?' · '+pending:'');
+    tabs.invitations.textContent='Invitations'+(pending?' · '+pending+(info.next.incoming?'+':''):'');
     codePanel.hidden=!info.contactCode?.enabled&&!info.ownCode;
     codeLabel.hidden=!info.ownCode;
     copyCode.hidden=!info.ownCode;
