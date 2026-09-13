@@ -271,7 +271,7 @@ t('planImport: a set change alone is an update; the same set is unchanged', () =
 
 // ---- §G2: the prepared table — table: + players: ---------------------------
 
-t('the today-format file still parses, and still exports byte-identically', () => {
+t('a legacy pools-only file still parses and exports with the current header', () => {
   // the literal bytes a pre-G2 browser wrote — the regression guard for
   // "both new sections are present-or-absent"
   const text = [
@@ -302,12 +302,11 @@ t('the today-format file still parses, and still exports byte-identically', () =
     ],
     settings: parsed.settings,
   });
-  // The emitter STAMPS now (C22 build order 4) — that is the one difference,
-  // and it is two lines in a place an older reader skips. Everything else is
-  // byte-for-byte what it was, which is what this test is really guarding.
+  // The emitter now stamps the version and points to the current import UI.
+  // Keep the historical input unchanged; its user data still round-trips.
   const stamped = text.replace(
     "# paste back via Settings → Your data (import previews; Apply is explicit)\n",
-    `# paste back via Settings → Your data (import previews; Apply is explicit)\nversion:\n  schema: '${SCHEMA_STAMP}'\n`,
+    `# paste back via Saved rolls → Import / export (import previews; Apply is explicit)\nversion:\n  schema: '${SCHEMA_STAMP}'\n`,
   );
   assert.equal(again, stamped);
 });

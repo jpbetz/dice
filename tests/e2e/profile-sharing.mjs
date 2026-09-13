@@ -15,8 +15,11 @@ export const profileSharingScenarios = [
     assert.ok(!raw.raw.includes('Unshared archive') && !raw.raw.includes('Never publish'));
     assert.ok(!raw.raw.includes('Public hero'),'even an inactive local profile starts private');
     await a.dbg('openSettings("stuff")');
+    await a.eval(`document.querySelector('.library-card[data-profile="${id}"]').click()`);
     await a.eval(`document.querySelector('[data-share-profile="${id}"]').click()`);
     await raw.waitForEvent('pools-changed',d=>d.library?.some(p=>p.name==='Public hero'));
+    await b.dbg('openSettings("stuff")');
+    await b.eval(`document.querySelector('[data-library-page="shared"]').click()`);
     await b.waitFor(`document.getElementById('table-profile-rows').textContent.includes('Public hero')`);
     const alice=await a.playerId();
     const shared=raw.events().filter(e=>e.type==='pools-changed'&&e.data.playerId===alice).at(-1).data;

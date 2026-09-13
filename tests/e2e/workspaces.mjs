@@ -47,8 +47,8 @@ export const workspaceScenarios = [
     await a.dbg('workspaces.open("dice")');
     assert.ok(await a.eval(`document.querySelector('#workspace #builder-panel')===window.keptBuilder`),'the actual draft editor is reused');
     await a.eval(`[...document.querySelectorAll('.workspace-tools button')].find(b=>b.textContent==='Saved rolls & starter kits').click()`);
-    assert.ok(await a.eval(`document.querySelector('#workspace #dest-stuff')===window.keptLibrary`),'the actual library is reused');
-    await a.eval(`document.getElementById('workspace-back').click()`);
+    assert.ok(await a.eval(`document.querySelector('#settings-modal:not(.hidden) #dest-stuff')===window.keptLibrary`),'the same library opens as its full browsing task');
+    await a.eval(`document.getElementById('settings-close').click()`);
     assert.equal(await a.dbg('workspaces.current'),null);
     assert.equal(await a.playerId(),pid,'workspace visits keep the seat');
     assert.deepEqual(await a.dbg('trayState'),draft,'workspace visits keep the draft');

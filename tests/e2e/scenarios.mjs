@@ -39,6 +39,7 @@ import { filmMutationScenarios } from "./film-mutations.mjs";
 import { filmTurnScenarios } from './film-turns.mjs';
 import { filmWorkerScenarios } from "./film-worker.mjs";
 import { profileSharingScenarios } from './profile-sharing.mjs';
+import { libraryWorkspaceScenarios } from './library-workspace.mjs';
 import { assert, Table, freePort, startServer } from './harness.mjs';
 import { probeCelticWeave } from './placard-knot-probe.mjs';
 
@@ -785,6 +786,7 @@ export const scenarios = [
   ...filmWorkerScenarios,
   ...filmTurnScenarios,
   ...filmMutationScenarios,
+  ...libraryWorkspaceScenarios,
   {
     name: 'shared-roll',
     tags: ['smoke', 'roll', 'cuj8'],
@@ -24166,14 +24168,12 @@ export const scenarios = [
       await a.dbg(`profiles.reset('soul-deal')`); // the library is per-ORIGIN: establish it
       const one = await a.dbg('poolsSharedNote');
       assert.ok(one, 'the disclosure stands at a table');
-      assert.match(one, /Everyone at this table can see your profile\b/,
+      assert.match(one, /Everyone here can see and copy your character\b/,
         `and counts what is actually being sent (got: ${JSON.stringify(one)})`);
-      assert.match(one, /Nothing of yours is stored on the server/,
-        'it also says what is NOT happening, which is the other half of the truth');
 
       await a.dbg(`profiles.create('Second', 'soul-deal')`);
       const two = await a.dbg('poolsSharedNote');
-      assert.match(two, /can see your 2 profiles\b/,
+      assert.match(two, /can see and copy your 2 characters\b/,
         `the count follows the library (got: ${JSON.stringify(two)})`);
 
       // SOLO IT IS SILENT. 'Leave & switch seat' is the one scripted door to

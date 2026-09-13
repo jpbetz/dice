@@ -190,7 +190,7 @@ first release remains open. These keys preserve the existing roadmap's numbering
 
 | Key | Current priority | Next deliverable | Status |
 | --- | --- | --- | --- |
-| **R1** | People, personal dice, and persistent tables | R1-A: desktop/phone destination layouts and control relocation map; then the local identity/gallery/table/Quick dice release, followed by recoverable kits, homes, and invitations | **Personal kit and compact table setup shipped; broader R1 open** |
+| **R1** | People, personal dice, and persistent tables | R1-A: desktop/phone destination layouts and control relocation map; then the local identity/gallery/table/Quick dice release, followed by recoverable kits, homes, and invitations | **Personal kit, compact setup and [focused library](SHIPPED.md#focused-library-workspace-2026-09-13) shipped; broader R1 open** |
 | **R2** | Redesign the complete shared playing surface | One excellent four-player composition and full-width phone layout, coordinated with R1's bottom tray; expand to three art directions after the first works | Direction adopted |
 | **R3** | Make lightweight play a core feature | Reproducible ordinary/stress baseline, production compression check, then compressed delivery where needed and dice-face material consolidation | Direction adopted |
 

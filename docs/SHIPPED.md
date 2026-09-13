@@ -20,8 +20,8 @@ records the bake, delivery and lifecycle proofs. Navigation adds an illustrated
 chart in a supported shipwright frame; Stone adds twelve radial slabs, cut
 marks and unequal cairns. Both have original packed illustrations, reproducible
 GLBs and inspected four-player desktop/phone compositions. All three share
-local candidate preview and live/late-viewer application. Grouped rolls remain
-an open presentation experiment.
+local candidate preview and live/late-viewer application. The compact grouped-arrival presentation is
+recorded with shared results below.
 
 ## 2026-09-13 — Shared results and playable phone turns
 
@@ -188,6 +188,72 @@ binary delivery and immediately readable SSE. The existing stale-validator
 test now compares decoded bytes to decoded bytes because fetch automatically
 decompresses its response while preserving the encoded Content-Length.
 All servers used ephemeral ports. The owner’s live table was untouched.
+## Focused library workspace (2026-09-13)
+
+The personal menu's **Manage saved rolls** now opens a focused workspace:
+a searchable character list beside its saved-roll preview on desktop, and
+full-screen list/detail views on phones. **Your library**, **From this table**
+and **Import / export** separate personal organization, shared characters
+and file tools. Search includes names of saved rolls. Selection previews;
+Use changes the active character and returns to play. The outgoing character
+keeps every saved roll, and a different procedure is explained before switching.
+
+Rename, Duplicate and Delete are named actions. Rename has Save/Cancel;
+deletion names the character and roll count, with an explicit Keep/Delete
+confirmation that stays until answered. Duplicate selects a separate copy
+without activating it. A local-storage failure in rename/delete now rolls
+back the in-memory mutation and leaves the pending form available for retry;
+the old verbs changed memory before discovering that persistence failed.
+New character expands to **Create & use** or **Starter kits…**, whose preview
+adds only on an explicit choice. On short screens,
+that task gets the browsing area so its actions cannot overlap the footer.
+
+Shared characters identify their source and copy into the player's library.
+An active character published in both the live rack and the full library is
+listed once. File tools retain preview, merge, per-character adoption, and
+the separately confirmed restore/backup path. The exported file now points
+back to the current import destination. A standing disclosure names current
+sharing, while the header states that this library is saved on this device.
+
+Phone Back/Escape restores the list's position and card; desktop arrows
+browse with one Tab stop for the list. Use and backup remain outside the
+content scrollers. Rename/Save work at 390 × 440, and rotation to 844 × 390
+retains edit focus and reveals the complete form. The expanded view contains
+local focus on either device; shared rolls and unfinished turns continue.
+Close returns to the invoking personal control.
+
+The inherited 440 px library drawer and tiny inline controls are superseded
+because focused work warrants space, following Joe's root-versus-focus
+clarification. The root rail remains **112 px** on desktop and **111 px** in
+the compact layout with four participants. At 1440 × 900 the workspace is
+1120 × 820, with a 760 px detail pane. The composed 390 × 844 phone fits four complete
+character cards alongside the explicit starter-kit and account entries. Closed libraries skip character/detail/shared-row rendering;
+this adds no renderer, dependency or permanent root control.
+
+Reproduce with `node tools/drive.mjs tools/steps/library-workspace-look.mjs`.
+Visual proof: [desktop](redesign/2026-09-13-library-desktop.png),
+[phone list](redesign/2026-09-13-library-phone-list.png),
+[phone detail](redesign/2026-09-13-library-phone-detail.png),
+[short-screen creation](redesign/2026-09-13-library-phone-create.png),
+[short-screen rename](redesign/2026-09-13-library-phone-rename.png), and
+[shared characters](redesign/2026-09-13-library-shared.png).
+These are Chromium GPU captures and viewport/touch emulation, not physical
+phone/keyboard proof. File and landscape views were also inspected.
+
+The original owner-library branch passed its 64 smoke scenarios and 14
+focused checks. After composition with the destination shell, private sharing,
+starter kits and account synchronization, the seven library/first-play/task
+preservation scenarios and five actual-account scenarios pass. Explicit
+profile-sharing and both other workspace layouts pass too. The focused library
+is the same task from the personal menu or My dice & rolls; its selected
+character has an explicit sharing choice. Account review disables that choice
+without claiming publication. Full composed-suite validation is recorded with
+subsequent integration work, not inferred from the earlier branch.
+
+The captures above now show the composed library. Short-screen starter-kit
+preview was also inspected. Wider destination navigation, quick dice, practice
+and the recoverable private library are implemented; saved-home management and
+People's durable social interface remain in progress.
 
 ## Expanded dice workspace (2026-09-13)
 

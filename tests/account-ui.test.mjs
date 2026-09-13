@@ -90,6 +90,7 @@ test('actual app: namespace switch, table publication, shared-cookie refusal and
   const fixture=await setup(t),ctx=await fixture.context('account-app-boundary'),a=await ctx.newTable({origin:'127.0.0.1',name:'Alice'});
   const observer=await ctx.rawPlayer('Observer');
   await a.dbg("profiles.create('Guest original')");await open(a);const guest=await snapshot(a),one=await register(a,'One');await compare(a);await choose(a);await flush(a);await rename(a,'One private');await flush(a);
+  await a.dbg('openSettings("stuff")');await open(a); // Materialize the actual selected profile sharing control before account review.
   const oneProfile=(await a.dbg('profiles.active')).id;assert.equal(await a.dbg(`profiles.share(${JSON.stringify(oneProfile)},true)`),true);
   const b=await ctx.newTable({origin:'127.0.0.1',name:'Alice'});await open(b);await b.waitFor(`window.__diceDebug.privateLibrary.state?.namespace===${JSON.stringify(one.id)}`);assert.ok((await names(b)).includes('One private'));
   await rename(a,'First tab wins');await rename(b,'Second tab kept');assert.equal((await state(b)).error,'local_conflict');assert.ok((await names(b)).includes('Second tab kept'));

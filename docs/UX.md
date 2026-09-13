@@ -1324,10 +1324,52 @@ a stale row is worse than no table.
 | Personal dice collection | **[Expanded dice workspace](#expanded-dice-workspace-2026-09-13)** for side-by-side browsing/preview, search, keyboard comparison, full-screen phone detail and catalogue return. **[Compact table controls](#compact-table-controls-2026-09-13)** places My Dice beside the personal name. | The first gallery's narrow desktop drawer and scroll-to-top selection; the standalone launcher card and duplicate Preferences link; §7.36's venue-controlled personal dice |
 | Shared table artwork and setup preview | **[Table compositions](TABLE-COMPOSITIONS.md)** — Copper Lantern, Navigation Table and Stone Circle; stable grounded choices, actual GLB preview before Apply, lazy load/fallback/Retry and unchanged live dice. | Flat color-only preview for modelled tables; blanket beta gating of all table designs |
 | Group results and arriving rolls | **[Shared result seats](PLAYER-RESULTS.md)** — upright names, latest redacted results, reserved phone turn controls and complete-result drawer. Queued players retain a qualified previous result with queue position; only the active film says Rolling. | One floating latest-result card for the group; treating every queued player as already rolling |
-| Settings | **[Compact table controls](#compact-table-controls-2026-09-13)** — Table setup from the table label; compact device Preferences from the gear; Saved rolls from the personal menu. Preview then Apply for shared choices; scope, conflict and retry states stay visible. | §7.37's four peer destinations, immediate setting/blur commits, and nested mat scroller |
+| Settings and saved rolls | **[Focused library](#focused-library-workspace-2026-09-13)** for character browsing, preview, named management actions and separate shared/file views. **[Compact table controls](#compact-table-controls-2026-09-13)** — Table setup from the table label; compact device Preferences from the gear; Saved rolls from the personal menu. Preview then Apply for shared choices; scope, conflict and retry states stay visible. | §7.37's four peer destinations, immediate setting/blur commits, and nested mat scroller |
 | Tower catalogue and fae venue tower | **§7.31, amended 2026-09-12** — None, Wickroot, Cairnwatch and Cinderbell; both fae venues use Wickroot · §7.38 retains the settings channel rule | §7.31's archived classic catalogue and dressing; TOWER.md's old STATUS blocks and Hollow Bole palette variants |
 | **Any control's ON / OFF / UNAVAILABLE dress** (not a surface — the rule that governs all of them) | **§7.41** — the token layer. THE KIND OF CHOICE PICKS THE DRESS: switch / pick / dial, three degrees of not-active, and the override rule that makes a disagreement one greppable line. The values of record are the `:root` block in `css/style.css` | Copying the nearest neighbour's numbers, which is what produced nine `[aria-pressed="true"]` dresses across four hue families (audit C3) · any reading in which `#left-panel` scoping is what makes a dress right — 2i-C and U6 both had to un-scope a law twice for the same reason |
 | Camera / framing | **§7.62** — the roll frames itself BEFORE it moves, so the flight frame and the settled frame are one; an unsatisfiable mat fit is refunded and the mat is fitted cropped square instead; the fog floor rides the camera's pose · §7.55 for the dice-first rung and its two gate conditions · §5.4a for the fog invariant, as amended there | §7.55's "where the eye ends up once the dice have STOPPED" — the reframe moved to frame zero on 2026-08-31, and a settle-time reframe is now a no-op · §5.4a's floor measured from the zoom's preset eye · any reading in which `mat-overflow` is a frame somebody chose (it was the fit scan's give-up position) |
+
+### Focused library workspace (2026-09-13)
+
+The personal menu's **Manage saved rolls** opens a centered desktop workspace
+or a full-screen phone view. **Your library**, **From this table** and
+**Import / export** separate personal organization, shared characters and
+file tools. Your library pairs a searchable character list with a preview of
+the selected character's saved rolls, grouped by category. Search matches
+character names, procedures and saved-roll names. Browsing never changes the
+active rack; **Use these rolls** does, and **Back to my rolls** returns to the
+active character. A procedure mismatch is explained beside the disabled Use.
+
+Rename, Duplicate and Delete are named actions. Rename uses an explicit
+form; deletion names the character and roll count, with Keep and Delete
+choices that do not expire. A failed local write retains the library and the
+pending action. Duplicate selects the new copy without switching. New
+character expands an inline creator with separate **Create & use** and
+**Starter kits…** actions. A starter kit previews its exact rolls before an
+explicit additive choice; selecting a kit never changes the table procedure.
+
+Desktop keyboard arrows browse the list through one Tab stop. Phone detail
+has Back/Escape to the same list position and card, with Use outside the
+scroller. Rename/Save remain reachable in a keyboard-height viewport and
+rotation preserves edit focus. Both desktop and phone contain local focus;
+other players keep rolling. Close returns to the invoking personal control.
+The root table gets no new controls or height.
+
+Shared characters identify their source and offer **Copy to library**. The
+active character appears once when also present in its owner's published
+library. The existing import preview/merge and separately confirmed restore
+remain in the file view. Download backup is available throughout the workspace;
+local storage and current table sharing are stated visibly. The selected
+character has an explicit **Share at this table** checkbox; account review
+pauses and disables publication. The account/sync entry opens the recoverable
+private library task. Closed libraries
+skip list/detail/shared-row rendering. My dice & rolls opens this same focused
+task after restoring the live draft; it does not borrow the library into a
+narrower workspace.
+
+The [shipped record](SHIPPED.md#focused-library-workspace-2026-09-13) contains
+measurements and screenshots. This supersedes the library's former 440 px
+drawer and icon-sized inline management rows.
 
 ### Expanded dice workspace (2026-09-13)
 
@@ -1368,10 +1410,11 @@ and recents while retaining the table address and existing recovery behavior.
 The gear opens compact **Preferences** for three device controls. The personal
 menu opens **Saved rolls** for library/file management. These share one frame
 with setup but have no table tabs or Apply footer. Personal dice remain at the
-name entry. Desktop workspaces leave the table interactive; phone sheets use
+name entry. Desktop setup and Preferences leave the table interactive; phone sheets use
 inertness and focus containment, with the close and Apply controls outside
 one content scroller. Changing viewport width updates modality. Closing
-returns focus to the opener and never tidies an ongoing turn.
+returns focus to the opener and never tidies an ongoing turn. The library now
+uses the expanded, locally modal workspace described above.
 
 **Sizing guidance, clarified by Joe after this pass:** economize the root UI
 that stays on display. Opened tasks can occupy generous panels or full-screen

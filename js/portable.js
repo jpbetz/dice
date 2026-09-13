@@ -320,7 +320,7 @@ export function exportYaml({ groups = [], settings = {}, table = null, profiles 
 
   const lines = [
     prepared ? '# Dice Table — the prepared table' : '# Dice Table — pools & just-you settings',
-    '# paste back via Settings → Your data (import previews; Apply is explicit)',
+    '# paste back via Saved rolls → Import / export (import previews; Apply is explicit)',
   ];
   // FIRST, so a human opening the file in a text editor sees what wrote it
   // before they see anything they might be tempted to hand-edit.

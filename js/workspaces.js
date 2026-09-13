@@ -37,12 +37,11 @@ export function createWorkspaces(actions) {
   const account=node('section','workspace-section');account.id='workspace-account';
   const tools = node('div', 'workspace-tools');
   const rollTab = button('Roll dice', () => diceView('rolls'));
-  const libraryTab = button('Saved rolls & starter kits', () => diceView('library'));
+  const libraryTab = button('Saved rolls & starter kits', e => library(e.currentTarget));
   const gallery = button('Explore my dice', e => actions.gallery(e.currentTarget)); gallery.id = 'workspace-gallery';
   tools.append(rollTab, libraryTab, gallery);
   const slot = node('div', 'workspace-dice-slot'); slot.id = 'workspace-dice-slot';
-  const librarySlot = node('div', 'workspace-library-slot'); librarySlot.id = 'workspace-library-slot';
-  dice.append(tools, slot, librarySlot); content.append(tables, dice, people, account);
+  dice.append(tools, slot); content.append(tables, dice, people, account);
   $('left-panel').insertBefore(nav, $('rail-foot'));
   document.body.append(root);
 
@@ -57,7 +56,7 @@ export function createWorkspaces(actions) {
   renderQuickRolls(quick, { roll: actions.quickRoll, build: e => open('dice', e.currentTarget) }); tray.append(trayHead, quick);
   document.body.append(tray);
 
-  let current = null, opener = null, borrowed = [], subview = 'rolls';
+  let current = null, opener = null, borrowed = [];
   const borrow = (el, host) => {
     const place = document.createComment('workspace return point'); el.before(place);
     borrowed.push({el, place, hidden: el.classList.contains('hidden')}); host.append(el); el.classList.remove('hidden');
@@ -66,12 +65,15 @@ export function createWorkspaces(actions) {
     for (const {el, place, hidden} of borrowed) { place.replaceWith(el); el.classList.toggle('hidden', hidden); }
     borrowed = [];
   };
-  function diceView(view) {
-    subview = view;
-    slot.hidden = view !== 'rolls'; librarySlot.hidden = view !== 'library';
-    rollTab.setAttribute('aria-pressed', String(view === 'rolls'));
-    libraryTab.setAttribute('aria-pressed', String(view === 'library'));
-    if (view === 'library') actions.prepareLibrary();
+  function diceView() {
+    slot.hidden = false;
+    rollTab.setAttribute('aria-pressed', 'true');
+  }
+  function library(anchor) {
+    // Saved rolls has its own generous browsing task. Restore the live draft
+    // before entering it, and keep the task's existing focus/escape behavior.
+    const returnTo = anchor || (current ? opener : document.activeElement);
+    close(); actions.openLibrary(returnTo);
   }
   // Arrival repaints keep the control the keyboard user is operating. Stable
   // action/player keys survive a new result or roster update; draft controls
@@ -127,7 +129,7 @@ export function createWorkspaces(actions) {
     if (!names[key]) return;
     if (!current) {
       actions.beforeOpen(); opener = anchor || document.activeElement;
-      borrow($('builder-panel'), slot); borrow($('dest-stuff'), librarySlot);
+      borrow($('builder-panel'), slot);
       root.classList.remove('hidden'); actions.modalOpen(root);
     }
     if(current==='account'&&key!=='account')actions.accountClosed?.();
@@ -138,7 +140,7 @@ export function createWorkspaces(actions) {
     if (key === 'tables') renderTables();
     if (key === 'people') renderPeople();
     if(key==='account')actions.account(account);
-    if (key === 'dice') diceView(subview);
+    if (key === 'dice') diceView();
     document.body.classList.add('workspace-open'); document.body.dataset.workspace = key; actions.layoutChanged();
     back.focus({preventScroll:true});
   }
@@ -171,5 +173,5 @@ export function createWorkspaces(actions) {
     if (current) actions.modalOpen(root);
     actions.layoutChanged();
   });
-  return { open, close, get current() { return current; }, library() { open('dice'); diceView('library'); } };
+  return { open, close, get current() { return current; }, library };
 }

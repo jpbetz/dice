@@ -1282,56 +1282,78 @@ limitations under the License.
         </div>
       </section>
 
-      <!-- ③ YOUR STUFF — the workspace. Manage-frequency work, and the reason
-           the panel needed destinations at all: a 32-row library and a
-           seven-button text tool are not rows in a preferences list. -->
-      <section class="settings-dest hidden" id="dest-stuff">
-        <!-- THE LIBRARY (PROFILES §11.5 ③). Manage-frequency work lives here
-             rather than in the picker menu over the rack, for two reasons found
-             by building the alternative: a menu that closes on focus-out is the
-             wrong container for a rename field, and a 32-row list with a scroller
-             is a panel wearing a menu's clothes. The picker switches; this
-             creates, renames, deletes, duplicates and copies.
-
-             'At this table' below it is the prepared seats plus the teammates'
-             published racks — each one Copy away from being yours. Absent when
-             there is nothing at the table, because a heading over no rows is the
-             prose "empty renders nothing" exists to refuse. -->
-        <div class="settings-sec">
-          <span class="plabel">Your profiles <span id="profile-count" class="pp-count"></span></span>
-          <div id="profile-rows"></div>
-          <div class="pp-new">
-            <input id="profile-newname" type="text" maxlength="24"
-                   placeholder="new profile name…" spellcheck="false">
-            <button id="profile-new" class="btn tiny"
-                    title="A new, empty profile for this table’s system — build its pools with ✎">＋ New</button>
-            <button id="profile-deal" class="btn tiny"
-                    title="Preview a starter kit before adding its rolls">Starter kits…</button>
+      <!-- A focused library: browsing never switches the active character. -->
+      <section class="settings-dest hidden" id="dest-stuff" data-profile-view="list">
+        <nav id="library-nav" aria-label="Saved rolls views">
+          <button type="button" data-library-page="mine" aria-pressed="true">Your library</button>
+          <button type="button" data-library-page="shared" aria-pressed="false">From this table</button>
+          <button type="button" id="portable-open" data-library-page="files" aria-pressed="false">Import / export</button>
+        </nav>
+        <div id="library-mine" class="library-page">
+          <div class="library-browser">
+            <div class="library-search-row"><label for="library-search">Find a character or saved roll</label>
+              <input id="library-search" type="search" autocomplete="off" placeholder="Search your library…">
+              <span id="profile-count" class="pp-count"></span></div>
+            <div id="profile-rows" role="group" aria-label="Your characters"></div>
+            <p id="library-empty" class="hint" hidden>No matching characters or saved rolls.</p>
+            <details id="library-create"><summary>＋ New character</summary>
+              <label for="profile-newname">Character name</label>
+              <input id="profile-newname" type="text" maxlength="24" placeholder="e.g. Nessa" spellcheck="false" autocomplete="off">
+              <p class="hint">Create an empty character, or preview a game’s starter kit before adding its rolls.</p>
+              <div class="btn-row"><button id="profile-new" class="btn" type="button">Create &amp; use</button>
+                <button id="profile-deal" class="btn" type="button">Starter kits…</button></div>
+            </details>
+            <details id="starter-kits"><summary>Choose a starter kit</summary><div id="starter-kit-chooser"></div></details>
           </div>
-          <p id="profile-status" class="hint portable-status"></p>
-          <details id="starter-kits"><summary>Choose a starter kit</summary><div id="starter-kit-chooser"></div></details>
-          <p id="pools-shared-note" class="hint" role="status"></p>
-          <button id="profile-share-retry" class="btn tiny" type="button" hidden>Retry sharing update</button>
+          <section id="library-detail" aria-label="Character and saved rolls">
+            <div class="library-detail-scroll">
+              <button id="library-back" type="button">← Your library</button>
+              <p id="library-system" class="library-eyebrow"></p>
+              <h3 id="library-name" tabindex="-1"></h3>
+              <p id="library-meta" class="hint"></p>
+              <div class="library-actions">
+                <button id="library-rename-open" type="button">Rename</button>
+                <button id="library-duplicate" type="button">Duplicate</button>
+                <button id="library-delete-open" type="button">Delete…</button>
+              </div>
+              <div id="library-share-choice"></div>
+              <p id="pools-shared-note" class="hint" role="status"></p>
+              <button id="profile-share-retry" class="btn tiny" type="button" hidden>Retry sharing update</button>
+              <form id="library-rename" hidden>
+                <label for="library-rename-input">Character name</label>
+                <input id="library-rename-input" type="text" maxlength="24" autocomplete="off">
+                <div class="btn-row"><button type="submit" class="btn">Save name</button>
+                  <button id="library-rename-cancel" type="button" class="btn ghost">Cancel</button></div>
+              </form>
+              <div id="library-delete" hidden role="group" aria-label="Confirm character deletion">
+                <p id="library-delete-question"></p><p id="library-delete-impact" class="hint"></p>
+                <div class="btn-row"><button id="library-delete-cancel" type="button" class="btn ghost">Keep character</button>
+                  <button id="library-delete-confirm" type="button" class="btn">Delete character</button></div>
+              </div>
+              <div id="library-rolls"></div>
+            </div>
+            <div class="library-use-row"><p id="library-use-note" class="hint"></p>
+              <button id="library-use" type="button" class="btn">Use these rolls</button></div>
+          </section>
+        </div>
+        <div id="library-shared" class="library-page hidden">
+          <h3>From this table</h3><p class="hint">Copy a character into your library to make it your own.</p>
           <div id="table-profiles" class="portable-profiles hidden">
-            <span class="pp-head">At this table</span>
+            <span class="pp-head">Shared characters</span>
             <div id="table-profile-rows"></div>
           </div>
+          <p id="library-shared-empty" class="hint">No shared characters here yet.</p>
         </div>
         <!-- Your data (Tier 4 §5): pools + just-you settings as portable YAML.
              ONE textarea, two directions — Export fills it (copy it anywhere);
              pasting/editing re-parses live and the status line previews what
              Apply would do. Apply is explicit, merges by name, deletes
              nothing. Strict subset parser (js/portable.js), fail-closed. -->
-        <div class="settings-sec">
-          <span class="plabel">In and out</span>
-          <div class="prow">
-            <span class="grow">
-              <span class="prow-label">Pools &amp; settings as text</span>
-              <span class="prow-sub">copy it out, keep it anywhere, paste one back</span>
-            </span>
-            <button id="portable-open" class="btn tiny">Export / import…</button>
-          </div>
+        <div id="library-files" class="library-page hidden">
+          <h3>Import &amp; export</h3>
+          <p class="hint">Keep a backup or bring in saved rolls. Imports preview their changes before you apply them.</p>
           <div id="portable-zone" class="portable-zone hidden">
+            <label for="portable-text">Portable library file</label>
             <textarea id="portable-text" class="portable-text" rows="9" spellcheck="false"
               placeholder="paste an export here to import…"></textarea>
             <div class="btn-row portable-row">
@@ -1362,7 +1384,7 @@ limitations under the License.
                  replace — names dedupe and nothing of the player's is touched.
                  Absent when the box carries no players:. -->
             <div id="import-profiles" class="portable-profiles hidden">
-              <span class="pp-head">Profiles in this file
+              <span class="pp-head">Characters in this file
                 <button id="import-adopt-all" class="btn tiny"
                         title="Add every profile in this file to your library">Add all</button></span>
               <div id="import-profile-rows"></div>
@@ -1385,6 +1407,11 @@ limitations under the License.
             </div>
           </div>
         </div>
+        <footer id="library-footer">
+          <div><p id="profile-status" role="status" class="hint portable-status"></p>
+          </div>
+          <button id="library-backup" class="btn ghost" type="button">Download backup</button>
+        </footer>
       </section>
 
       </div>

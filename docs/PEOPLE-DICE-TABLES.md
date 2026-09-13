@@ -2,33 +2,31 @@
 
 # People, personal dice, and persistent tables
 
-**R1 · planning started 2026-09-12 · first personal-kit slice implemented
-2026-09-13.** Detailed working design for item (1) of the approved
-[experience redesign](EXPERIENCE-REDESIGN.md). Product direction is settled;
-the implementation slices and unresolved technical choices below are the
-initial design, to be developed against the actual screens and code.
+**R1 · implementation in progress, 2026-09-13.** This is the detailed design
+for item (1) of the approved [experience redesign](EXPERIENCE-REDESIGN.md).
+The owner authorized autonomous execution of all three priorities with agents.
+The sections below retain the original design and slice identifiers; this
+status is the current execution summary.
 
-The [first shipped slice](SHIPPED.md#personal-name-and-dice-collection-2026-09-13)
-covers normal name editing, a visible My dice launcher, lazy static previews,
-favorites, explicit selection, and venue suggestions. It takes the bounded
-personal controls from R1-B1/B2 ahead of the full shell so the owner can use
-and assess them now. R1-B1/B2 remain incomplete: destination state, practice
-throws, and fuller saved-roll override editing still need work. R1-A's
-whole-app desktop/phone structure remains a planning deliverable.
+Implemented: normal name editing; the three destination shell and full-width
+phone table; the visual gallery with favorites, practice and explicit selection;
+named setup with actual artwork preview and Apply; familiar Quick dice and
+explicit starter kits; the [focused saved-roll library](SHIPPED.md#focused-library-workspace-2026-09-13)
+with search, preview-before-use and named management actions. Saved profiles
+stay private until individually shared at a table.
 
-The [compact table-controls slice](SHIPPED.md#compact-table-controls-and-setup-2026-09-13)
-now fits My Dice into the personal row, turns the existing table label into
-setup, and separates compact Preferences from library management. Shared
-choices preview before Apply, with conflict/reset/retry handling; names also
-update browser titles and recents. This implements the local setup portion
-of R1-B3. The wider destination shell, prepared-material organization, Quick
-dice, practice, persistent homes and in-app invitations remain open.
+Optional recoverable identity and the private library now have durable service
+and actual-app workflows: explicit first comparison, offline retry, preserved
+competing versions, account/session boundaries and recovery on another device.
+See [service design](DURABLE-SERVICE-DESIGN.md) and
+[library protocol](PRIVATE-LIBRARY-PROTOCOL.md). The saved-home backend supports
+safe capture and cold restoration after restart; its Tables management UI is
+in progress. [Saved-home contract](SAVED-HOME-PROTOCOL.md).
 
-The [expanded dice workspace](SHIPPED.md#expanded-dice-workspace-2026-09-13)
-implements the owner's distinction between economical persistent controls
-and generous focused views: a searchable catalogue beside a desktop preview,
-and full-screen phone browsing/detail with a return to the same list position.
-This advances the gallery part of R1-B2; practice and the broader shell remain.
+Next: finish saved-home management, durable contacts/invitations and permitted
+presence; inspect the full guest/returning-player journey and update help.
+Physical-phone and actual newcomer observations remain outstanding. No
+production durability or deployment is claimed from the local fixture proofs.
 
 ## 1. The experience to build
 
@@ -394,14 +392,13 @@ roll; do not infer discoverability from click count or scripted completion.
 
 ## 11. What is still a design task
 
-**Next:** produce R1-A's layouts, validate §2's control relocation map,
-and settle panel/sheet dimensions and the practice surface against the
-named moments. This is design work still to do, not an approval prerequisite
-for the plan of record or a reason to start the account backend first.
-
-Before R1-D implementation, settle the recovery method/provider, durable
-store/deployment, resource schemas and retention/deletion behavior, and
-account-to-seat authority. Make those choices against a concrete prototype.
+**Next:** finish the saved-home and social interfaces against the implemented
+service boundaries, then run the composed success walk. The destination,
+practice and setup layouts are implemented and inspected in desktop/phone
+emulation; the remaining observation is on actual devices and with players.
+The recovery/store decisions and conflict-preservation policy are in the
+service/protocol documents linked above. Production provisioning and deployment
+remain separate from local implementation and its restart proofs.
 The initial design intentionally keeps roll history ephemeral and has no
 friends directory search, chat, game rules, campaign state, uploaded cover
 art, payments, cross-process live rooms, or ongoing-turn recovery. Additional
