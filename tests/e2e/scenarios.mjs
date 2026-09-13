@@ -51,7 +51,7 @@ import { optionalSceneryScenarios } from './optional-scenery.mjs';
 import { towerPendingCancelScenarios } from './tower-pending-cancel.mjs';
 import { optionalModelParserScenarios } from './optional-model-parser.mjs';
 import { filmWorkerScenarios } from "./film-worker.mjs";
-import { roundTableScenarios } from "./round-table.mjs";
+import { roundTableScenarios, roundFilmHash } from "./round-table.mjs";
 import { tableCameraScenarios } from "./table-camera.mjs";
 import { compositionScenarios } from "./composition.mjs";
 import { profileSharingScenarios } from './profile-sharing.mjs';
@@ -19206,6 +19206,15 @@ export const scenarios = [
       await desk.page.browser.send('Emulation.setDeviceMetricsOverride',
         { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false }, desk.page.sessionId);
       try {
+        // Acknowledged CDP metrics do not mean a background page has resized
+        // its scene yet. Use the same actual-layout handshake as the adjacent
+        // one-seed-one-film proof, before judging two different viewports.
+        for (const [tab, width] of [[phone, 390], [desk, 1600]]) {
+          await tab.page.browser.send('Page.bringToFront', {}, tab.page.sessionId);
+          await tab.waitFor(`(() => { const v = window.__diceDebug.phoneFrame().view;
+            return window.innerWidth === ${width} && Math.abs(v.left + v.width - ${width}) < 1; })()`,
+            { desc: `${width}px viewer has applied its actual scene layout` });
+        }
         await desk.waitFor('window.__diceDebug.places().stations.length === 2', { desc: 'both seated' });
         assert.equal(await phone.dbg('places().mine'), 0, 'the phone sits at the front');
         assert.equal(await desk.dbg('places().mine'), 1, 'the desktop sits opposite');
@@ -19220,6 +19229,8 @@ export const scenarios = [
         await phone.settle();
         await desk.settle();
 
+        assert.equal(await phone.eval(roundFilmHash), await desk.eval(roundFilmHash),
+          'the whole film, contact events and authored values agree across the different viewports and chairs');
         const od = await desk.dbg('throwOrigin()');
         const op = await phone.dbg('throwOrigin()');
         assert.equal(od.from, 'place', 'the roller\'s own tab took the stamp');
