@@ -11,15 +11,13 @@ priority order. R1, R2 and R3 remain open until their composed proofs pass.
 
 | Work | State and next action |
 | --- | --- |
-| Direct identity, gallery/favorites, personal selection | Initial slice committed as `b064b07`; preserve the subsequent owner correction asking for compact controls. |
-| Compact controls and transactional table setup | Integrated owner-session commit `85da885`. Follow-up fixes restore keyboard radio arrows inside the sheet and clear conflicts when a peer restores the base; targeted desktop/phone proofs pass. Actual grounded-table 3D preview is now integrated as `00557f3`; six setup/design/channel tests and desktop/phone views pass. |
-| Gallery practice | Committed as `f67d1df`; local/shared isolation and lifecycle tests plus desktop/phone captures pass. Owner expanded gallery integrated as `8fe35cc`; `64035a4` keeps practice inside that preview on phones. Four gallery checks, the strengthened phone practice check, and desktop/phone/short-workspace captures pass. |
-| R1-C: Quick dice and explicit starter kits | Integrated `605b4f6` / `ab8e003` as `d6efcbb` / `5291b00`. Focused tests preserve empty/legacy libraries, occupied interpretation, drafts and unfinished private/shared/solo turns. Old tests explicitly select Soul Deal profiles/lenses and the composer; fresh-visit proofs retain the new empty/Numbers-only default. |
-| Explicit profile publication | Committed as `002b115`; focused raw-network proof and composed smoke pass; see PROFILE-SHARING.md. Account adoption now withdraws publication before switching; blocked or uncertain transitions disable the visible sharing choice. |
-| R1-D0: durable service | Local atomic store and Firestore REST adapter integrated as `046f9a7` / `0c121fa`; optional account API/client integrated as `a2037ee`. Adapter/account tests pass, including cookie races and restart recovery. Private immutable library revisions, transactional IndexedDB namespaces, explicit conflicts and cleanup integrated as `838f86a`, cleanup protection follow-up `6ea70cf`. Saved-home protocol integrated as `e923893`; real restart/outage/corruption/concurrent-save proofs pass. Account adoption and visible sync are integrated (`c12fdd5` plus `93fdd13`); five actual-app cases pass. Home UI is in progress. Recipient-bound contacts/inbox API is integrated as `eeb9d13`; presence and composed browser handoff are next. No cloud storage is provisioned. |
-| R3: compressed public text | Agent commit `8e44250` reviewed and integrated as `feb5f79`; combined suite passes. Production lacked compression; local six-file transfer shrinks approximately 72% with Brotli. |
-| R3: dice-face draw consolidation | Integrated as `354b965`: two real draws per compatible die, reviewed face sheets and exact geometry/film checks. Ordinary film worker integrated as `2490b07` / `fb47593`; complete event FIFO and worker rethrows as `f783874`. Full-film parity, input-return measurements, live clear/collect/reveal and next-film collider preservation pass. Fourteen combined turn/worker/result checks pass. Idle rendering is integrated as `df3f970`: zero settled renderer frames, with 24 matching original films. Four actual idle/wakeup/effect cases also pass after composition. Battery saver/instant are in progress. |
-| R1 destinations + R2 phone surface | Integrated as `55c42d7`: three destinations, content-sized desktop workspaces, full-width phone scene and bottom tray. Persistent result seats and reserved turn controls integrated as `955b2be`; composed desktop/phone/four-player/privacy/turn proofs pass. Copper Lantern, Navigation Table and Stone Circle plus actual appearance preview are integrated and visually inspected; Navigation/Stone are `0952007`. Both final recipes reproduce complete GLB bytes, and shared preview/application/restore, delivery and stable-channel checks pass. |
+| Identity, personal dice and first rolls | Direct name editing, full gallery/favorites/practice, focused libraries, explicit starter kits and Quick dice are implemented. Owner controls through `cd69c20` are composed; subsequent owner roll-flow edits remain in main until committed and reviewed. |
+| Table setup and saved homes | Named setup with actual Preview/Apply, durable public capture, retained-version comparison and deliberate Join are implemented. Four final actual-app home cases and five account cases pass, including restart, independent recovery, busy account replacement and real device-write failure before HTTP. |
+| People | Recipient-bound contacts/invitations, blocked-name pagination and opt-in expiring presence APIs are integrated. The People workspace and its independent private action journal are under implementation/review. Acceptance must preserve the current table and turn; joining is a separate explicit action. |
+| Shared surface and phone | Three reproducibly baked tables, full-width phone tray, persistent visible results and compact queued arrivals are implemented. Model size follows the shared table. A round physical envelope is integrated as `e67da2c`; support/cost/golden evidence is being completed. Actual inspection found desktop stress dice cropped by the viewport, queued as a separate camera fix. |
+| Shared film ordering | Ordinary rolls and kept-die rethrows use the worker with complete ordered events. `f4e20c0` orders size changes between films, including held reveals and clear. Tower changes have a reproduced different-speed-viewer divergence; ordered readiness and an honest unavailable-asset escape are active work. |
+| Lightweight play | Compressed delivery, face-material consolidation, idle sleep, Battery saver and independent Instant results are implemented. Optional scenery and the model parser now load on demand (`70d623b`, `530982b`); all eight composed loading/cancel/failure cases pass. Towers and silent reconstruction retain the inline solver. |
+| Operations and release | File/Firestore adapters, configuration preflight, safe maintenance pause and a concrete account operating plan are implemented. No cloud resources or production traffic changed. Complete composed release checks, then verify the external staging/restore/deployment work described in ACCOUNT-OPERATIONS.md. |
 
 The root's integration checkout is `/tmp/dice-redesign-integration` on
 `codex/redesign-integration`. Agents use isolated worktrees so reviews and
@@ -27,30 +25,21 @@ cherry-picks are explicit and another ongoing session's edits survive.
 
 ## Remaining campaign work
 
-Complete saved-home management and the contacts, invitations and permitted
-presence interfaces. Optional account/recovery and visible library sync are
-implemented and verified in the actual app. Then exercise the complete
-guest/recovered return loop after restart without a previous client repushing
-setup. Profile publication, named-table controls, familiar first rolls,
-destinations and the initial phone layout are implemented. History protects
-100 unfinished turns beside 100 completed entries; capacity refuses without
-removing work, and batch DOM pruning is verified.
+Finish and review People, tower event ordering/failure handling and the camera
+fit, then exercise the complete guest/recovered return loop on the composed
+app. Preserve unfinished and private turns through each visible action. The
+final full sweep must reconcile superseded fixtures with current behavior;
+a passing old geometry proxy is not a substitute for supported, visible dice.
 
-R2's compact arrival experiment is integrated as `7e80490`: active and waiting
-rollers are distinct, waiting players keep qualified previous results, and no
-queued face values or secret activity enter the read. Four combined burst,
-four-player, private-turn and FIFO checks pass; desktop/phone views are inspected.
-Three complete compositions, actual setup preview and persistent result seats
-are implemented. Simultaneous physical playback was not chosen for this slice;
-the compact experiment preserves the established films and collider ordering.
-R3 next:
-load remaining optional features on demand and implement
-Battery saver and optional instant results. Complete ordered turn events and
-worker parity for first/rethrows are implemented; towers and silent snapshot
-reconstruction still use the inline solver.
+All three table compositions and the compact arrival experiment are implemented.
+Simultaneous physical playback was not selected: ordered films retain shared
+collider history while each player’s last visible result remains available.
+Full is the presentation default. Automatic device selection is deferred until
+a measured criterion can support it. Remaining main-module extraction requires
+an actual unused feature boundary; further file splitting alone saves no bytes.
 
-Cloud provisioning, actual phone/midrange-device observations, user
-observation, and production deployment are not established by local tests.
+Cloud provisioning, physical phone/midrange-device observations, newcomer
+observation and production deployment are not established by local tests.
 Prepare and verify their concrete artifacts before any final external
 approval step. Never treat a disabled optional service or fake-store test
 as completion of persistent table homes.
@@ -162,3 +151,22 @@ modules, saving about 36 KB encoded startup bodies in the local capture;
 GLTF parser loading is the next bounded slice. Your main checkout has new
 uncommitted owner-session work, so this checkpoint stays in integration until
 that work is committed and reviewed.
+
+## Ordered settings and model-parser checkpoint
+
+`f4e20c0` fixes the reproduced size-change race between Instant and normal
+viewers. New full-film and held-reveal/clear checks pass beside existing
+ceremony, reveal and size checks (7/7). The initial pre-round worker/turn/Instant
+regression run passes 21/21. The separate tower-order reproduction remains open.
+
+`530982b` defers GLTF parsing within the existing model readiness/retry boundary.
+Eight composed scenery/parser/cancel/failure cases pass, and the actual phone
+first-use capture was inspected. Together the two optional module graphs save
+67,256 encoded and 234,894 decoded startup bytes in the recorded local capture.
+These figures describe delivery, not battery use or faster scene construction.
+
+The round mechanism's pure helper checks 782,784 spawn/hull/jitter clearances.
+Nine composed size/design/readiness/order cases pass. Actual Copper stress
+inspection confirms phone support and exposes the desktop viewport crop; the
+round proof and camera fix remain separate work. No final full sweep or cloud
+enablement is claimed by this checkpoint.

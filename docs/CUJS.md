@@ -29,7 +29,7 @@ not declare actual-player or physical-phone observation complete.
 | Journey | Current experience and added evidence |
 | --- | --- |
 | CUJ1 | Familiar Quick dice and Numbers only for a new table; starter kits preview before additive capture. `first-play`, `first-play-phone`, `quick-preserves-work`, `quick-preserves-solo-turn`. |
-| CUJ2–4 | Named setup with Preview/Apply; three destinations preserve the seat; explicit New table reserves a guest address. `table-controls`, `workspaces-keep-table`, `home-connection-ui.test.mjs`. Durable home management/social return are in progress. |
+| CUJ2–4 | Named setup with Preview/Apply; three destinations preserve the seat; explicit New table reserves a guest address. `table-controls`, `workspaces-keep-table`, `home-connection-ui.test.mjs`. Durable home capture, retained comparison and explicit return are proved by `home-ui.test.mjs`, including clean recovery after restart. The People workspace remains in progress. |
 | CUJ6–7 | Focused searchable library with preview-before-use, named management actions and explicit per-table sharing. `library-workspace`, `profile-sharing`; existing prepared-seat/copy proofs remain. |
 | CUJ8–9 | The full-width phone tray and persistent result seats retain dice visibility and unfinished turns. `workspaces-phone-four`, `player-results-privacy-turn`, `roll-history`; [results and turn proof](PLAYER-RESULTS.md). |
 | CUJ10–11 | Each participant has an upright latest visible result. Waiting rolls retain qualified previous results; held/secret data stays redacted. `player-results`, `roll-arrivals`, and the raw-stream privacy scenarios. |

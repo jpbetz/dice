@@ -61,8 +61,9 @@ the real solver off the main thread. Seated 40d20 input return falls from
 The [turn-worker follow-up](redesign/2026-09-13-film-turns.md) now retains
 complete ordered turn/reveal/collection events and moves rethrows off-thread,
 with 24 complete first/rethrow films matching the pre-worker baseline. Towers
-and silent reconstruction retain the shared inline bake. Physical devices,
-rendering startup and remaining optional loading remain open. The [on-demand render
+and silent reconstruction retain the shared inline bake. Physical devices and rendering startup remain open. The optional scenery and
+[model-parser graphs](redesign/2026-09-13-optional-model-parser.md) now load on
+first use, saving 67,256 encoded startup bytes in the recorded local comparison. The [on-demand render
 loop](redesign/2026-09-13-idle-render.md) now draws zero settled frames for
 Table and all three baked designs on desktop/phone emulation (previously
 60 fps), with audio continuing independently and all 24 films unchanged.
@@ -83,8 +84,9 @@ desktop/phone views. The [compact arrival experiment](PLAYER-RESULTS.md#rolls-ar
 shows who is rolling, who is next, and waiting players' previously displayed
 results. It keeps sequential films and adds no scene-space cost; simultaneous
 physical playback is not implemented. Model size now follows shared zoom;
-the inherited square collision envelope still needs a round-table correction
-for stress throws. The actual GLB support probe records that open gap.
+a round collision envelope is now integrated, with its full support and cost
+record in progress. Actual stress views also exposed a desktop camera crop;
+R2 stays open until the supported dice fit the visible playing surface.
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable
