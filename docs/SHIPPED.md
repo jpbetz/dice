@@ -7527,3 +7527,22 @@ its rendered controls. Its two-person regression returns from Bob's roll to
 Alice's still-open draft through actual pointer input and compares the shared
 values. This prevents a background browser's suspended animation frames from
 being mistaken for an unreachable application control.
+
+
+## Library ownership headings follow kept profiles (2026-09-13)
+
+Duplicating a character without activating it now updates the active rack's
+ownership heading immediately; deleting the inactive copy updates it again.
+The active character and all its pools stay unchanged. With several profiles,
+the ownership heading pins below the roll well while category headings scroll
+past it. With one profile, the category heading pins there instead.
+
+The full sweep exposed an inherited-library assumption in `draft-bench`, then
+the explicit multiple-profile proof exposed a missing CSS state on the list.
+The scenario now establishes one profile, uses visible Duplicate/Delete
+controls, and proves both sticky-heading roles. Three focused library/draft
+cases pass. The real wheel driver
+`tools/steps/draft-bench-heads-look.mjs` checks all three states; the
+[multiple-profile](redesign/2026-09-13-task-focus/rack-multiple.png) and
+[restored single-profile](redesign/2026-09-13-task-focus/rack-restored.png)
+captures were inspected.
