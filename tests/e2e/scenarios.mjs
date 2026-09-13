@@ -9584,6 +9584,10 @@ export const scenarios = [
       await a.dbg(`profiles.rename(${JSON.stringify((await a.dbg('profiles.active')).id)}, 'Appearance probes')`);
       await a.dbg(`setGroups([{name:'OverrideProbe',notation:'1d6'},{name:'DefaultProbe',notation:'1d8'}])`);
       await a.dbg('setPanelState({pools:true})');
+      // The saved workspace preference is independent of the library. Choose
+      // Quick explicitly so the later Build action exists after either boot.
+      if(await a.eval("document.getElementById('quick-dice').hidden"))await tapControl(a,'#dice-mode-build');
+      assert.equal(await a.eval("document.getElementById('quick-dice').hidden"),false);
       await a.eval(`window.__diceDebug.setDiceSet('std')`);
       await b.eval(`window.__diceDebug.setDiceSet('std')`);
       // click → wait like harness roll(): the click's server round-trip
@@ -9755,8 +9759,7 @@ export const scenarios = [
       assert.ok(follows.length === 1 && follows[0].variant === 'emberforge.blackanvil',
         `an override-free pool follows the roller's set (got ${follows.map((d) => d.variant).join(',')})`);
 
-      // Settings now links to the visual collection. Preview never applies.
-      await a.dbg('openSettings("you")');
+      // Dice beside the roll controls opens the collection. Preview never applies.
       await tapControl(a, '#my-dice');
       await a.waitFor(`window.__diceDebug.diceGallery.open`);
       assert.equal((await a.dbg('diceGallery')).current, 'emberforge.blackanvil');
