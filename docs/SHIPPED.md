@@ -31,6 +31,12 @@ controls reserve scene space; the phone push card no longer conceals dice.
 Complete results remain one action away, and People retains keyboard focus
 through arrivals. Scope and inspected proof: [PLAYER-RESULTS.md](PLAYER-RESULTS.md).
 
+The compact burst-arrival follow-up distinguishes active and queued rollers,
+retains waiting players' previously displayed reads, and shows queue positions
+and additional-throw counts. It consumes the same result-seat area. Real shared
+burst/held/secret tests and desktop/phone views were inspected; the physics FIFO
+and films are unchanged. Details: [Rolls arriving together](PLAYER-RESULTS.md#rolls-arriving-together).
+
 ## 2026-09-13 — Unfinished work survives history eviction
 
 History trims completed entries while keeping unfinished turns playable.

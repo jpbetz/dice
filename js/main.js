@@ -35968,7 +35968,7 @@ destinationShell = createWorkspaces({
       connection: document.getElementById('table-connection').textContent, invitable: !!(netOnline && net && !IN_LOBBY) },
     recent: recentTables(),
     people: resultSeatRows().map(p => ({...p,blocked:poolsEdit,
-      latest:p.rolling ? {id:null,text:'Rolling…'} : p.result ? {id:p.result.id,text:p.result.headline} : null})),
+      latest:p.rolling ? {id:null,text:'Rolling…'} : p.queued ? {id:p.openable?p.result?.id:null,text:`${p.queuePosition===1?'Next':`Queue ${p.queuePosition}`}${p.result?` · previous: ${p.result.headline}`:''}`} : p.result ? {id:p.result.id,text:p.result.headline} : null})),
   }),
   beforeOpen: () => { tableResults?.close(); closeSettingsModal(); closeIdentityMenu(); diceGallery?.close(); closeRailMenu(); },
   closeMenus: () => { closeRailMenu(); closeSetMenu(); },
@@ -36059,16 +36059,32 @@ function resultDisplay(entry) {
 }
 function resultSeatRows() {
   if(IN_LOBBY) return [];
+  // Keep only an already displayed, redacted read while its next throw waits.
+  // Never derive the previous read from a payload whose rethrow may be newer.
+  resultSeatVisible ||= new Map();
   const identity=identityInfo();
   const roster=players.length?players:[{id:net?.playerId||'solo',name:identity.name||'You',color:identity.color}];
+  const live=new Set(roster.map(p=>p.id));
+  for(const id of resultSeatVisible.keys())if(!live.has(id))resultSeatVisible.delete(id);
+  const films=rollQueue.filter(queuedFilm);
   return roster.map(p=>{
     const mine=!netOnline||p.id===net?.playerId;
     const e=log.findLast(e=>netOnline?e.playerId===p.id:!e.playerId||e.playerId===p.id);
+    const waiting=films.filter(event=>netOnline?event.roll.playerId===p.id:mine);
+    const queuePosition=waiting.length?films.indexOf(waiting[0])+1:0;
     const rolling=(currentRoll&&!currentRoll.done&&(netOnline?currentRoll.playerId===p.id:mine))
-      ||rollQueue.some(e=>queuedFilm(e)&&(netOnline?e.roll.playerId===p.id:mine))||resultBusy(e?.rollId);
-    return {id:p.id,name:p.name,color:p.color,mine,rolling:!!rolling,result:rolling?null:resultDisplay(e)};
+      ||resultPreparing.has(e?.rollId)||revealing.some(r=>r.rollId===e?.rollId);
+    const busy=rolling||resultBusy(e?.rollId);
+    if(!busy&&!waiting.length){
+      const read=resultDisplay(e);
+      if(read)resultSeatVisible.set(p.id,read);else resultSeatVisible.delete(p.id);
+    }
+    const result=rolling?null:waiting.length?resultSeatVisible.get(p.id)||null:busy?null:resultDisplay(e);
+    return {id:p.id,name:p.name,color:p.color,mine,rolling:!!rolling,
+      queued:waiting.length,queuePosition,result,openable:!!result&&!resultBusy(result.id)};
   });
 }
+var resultSeatVisible;
 function renderCompleteResult(read,controls,id) {
   const entry=log.find(e=>e.rollId===id); read.replaceChildren();
   if(!entry) {read.textContent='This completed result is no longer in recent history.';controls.hidden=true;return;}

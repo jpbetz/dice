@@ -67,7 +67,10 @@ faster-frame-rate claim is made.
 keep upright names, crests and the group’s latest visible reads together. The
 [table design slice](TABLE-COMPOSITIONS.md) adds Copper Lantern, Navigation
 Table and Stone Circle, a real setup preview and inspected four-player
-desktop/phone views. Grouped-roll presentation remains open.
+desktop/phone views. The [compact arrival experiment](PLAYER-RESULTS.md#rolls-arriving-together)
+shows who is rolling, who is next, and waiting players' previously displayed
+results. It keeps sequential films and adds no scene-space cost; simultaneous
+physical playback is not implemented.
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable

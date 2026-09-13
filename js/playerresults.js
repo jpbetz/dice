@@ -44,7 +44,7 @@ export function createPlayerResults(actions) {
     const state=el('span','result-seat-state');
     button.append(crest,name,value,faces,state);
     const seat={button,crest,name,value,faces,state,row:null,signature:null};
-    button.addEventListener('click',()=>{if(seat.row?.result?.id&&!seat.row.rolling) open(seat.row.result.id,button);});
+    button.addEventListener('click',()=>{if(seat.row?.result?.id&&seat.row.openable) open(seat.row.result.id,button);});
     return seat;
   }
   function paint(seat,row) {
@@ -56,10 +56,11 @@ export function createPlayerResults(actions) {
     seat.name.textContent=row.name; seat.name.title=row.name;
     seat.button.classList.toggle('is-mine',row.mine);
     seat.button.classList.toggle('is-rolling',row.rolling);
+    seat.button.classList.toggle('is-waiting',!row.rolling&&row.queued>0);
     seat.button.dataset.rollId=row.result?.id||'';
     const result=row.rolling ? null : row.result;
-    seat.value.textContent=row.rolling?'Rolling…':result?.headline||'—';
-    seat.value.classList.toggle('is-word',row.rolling||!!result?.worded);
+    seat.value.textContent=row.rolling?'Rolling…':result?.headline||(row.queued?'Waiting':'—');
+    seat.value.classList.toggle('is-word',row.rolling||!!result?.worded||(!result&&row.queued>0));
     seat.faces.replaceChildren();
     if(result&&!result.hidden) {
       for(const face of result.faces.slice(0,6)) {
@@ -73,9 +74,12 @@ export function createPlayerResults(actions) {
       if(result.faces.length>6) seat.faces.append(el('span','result-face-more',`+${result.faces.length-6}`));
       if(result.modifier) seat.faces.append(el('span','result-modifier',`${result.modifier>0?'+':''}${result.modifier}`));
     }
-    seat.state.textContent=row.rolling?'':result?.state||'Ready to roll';
-    seat.button.setAttribute('aria-label',`${row.name}${row.mine?', you':''}: ${row.rolling?'Rolling':result?.spoken||'Ready to roll'}${result&&!row.rolling?'. Open complete result':''}`);
-    seat.button.setAttribute('aria-disabled',String(!result));
+    const next=row.queuePosition===1?'Next':`Queue ${row.queuePosition}`;
+    const activity=row.queued?(row.rolling?`${row.queued} more queued`:`${result?'Previous · ':''}${result?next.toLowerCase():next}${row.queued>1?` · +${row.queued-1}`:''}`):'';
+    seat.state.textContent=activity||(row.rolling?'':result?.state||'Ready to roll');
+    const spokenActivity=row.queued?`${row.queued} ${row.queued===1?'roll':'rolls'} queued${!row.rolling?`, first at position ${row.queuePosition}${result?'. Showing previous result':''}`:''}`:'';
+    seat.button.setAttribute('aria-label',`${row.name}${row.mine?', you':''}: ${row.rolling?'Rolling':result?.spoken||'Ready to roll'}${spokenActivity?'. '+spokenActivity:''}${row.openable?'. Open complete result':''}`);
+    seat.button.setAttribute('aria-disabled',String(!row.openable));
   }
   function refresh() {
     const rows=actions.rows(); lastRows=rows;
@@ -107,7 +111,7 @@ export function createPlayerResults(actions) {
     document.body.classList.toggle('has-table-result',represented&&!latest.ceremony);
   }
   function open(id,anchor) {
-    const row=lastRows.find(r=>r.result?.id===id&&!r.rolling) || actions.owner(id); if(!row) return false;
+    const row=lastRows.find(r=>r.result?.id===id&&r.openable) || actions.owner(id); if(!row) return false;
     actions.beforeDetail(); detailId=id; detailOpener=anchor||seats.get(row.id)?.button;
     title.textContent=`${row.name}’s roll`;
     actions.renderDetail(read,controls,id); detail.classList.remove('hidden');

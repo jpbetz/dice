@@ -14,6 +14,41 @@ export async function assertResultLayout(a,phone=false) {
   return frame;
 }
 export const playerResultScenarios=[
+  {name:'player-results-arrivals',tags:['player-results','roll-arrivals','visibility'],async fn(ctx){
+    const a=await ctx.newTable({origin:'127.0.0.145',name:'Alice'});
+    const others=[];for(const name of ['Bram','Cora','Dev'])others.push(await ctx.rawPlayer(name));
+    for(const p of others){await ctx.api('/api/roll',{playerId:p.playerId,notation:'2d6'});await a.waitFor(`window.__diceDebug.currentRoll?.playerName===${JSON.stringify(p.name)}`);await a.settle();}
+    await a.roll('2d6');const before=await a.dbg('tableResults.rows');
+    await a.dbg('holdClock(true)');await a.dbg("commandRoll('3d6')");
+    await a.waitFor('window.__diceDebug.currentRoll&&!window.__diceDebug.currentRoll.done');
+    const upcoming=[];
+    for(const [i,p] of others.entries())upcoming.push((await ctx.api('/api/roll',{playerId:p.playerId,notation:i===1?'3d6 held':'3d6'})).data.roll);
+    await ctx.api('/api/roll',{playerId:others[0].playerId,notation:'1d20'});
+    await a.waitFor('window.__diceDebug.tableResults.rows.reduce((n,r)=>n+r.queued,0)===4');
+    const queued=await a.dbg('tableResults.rows');
+    assert.ok(queued.find(r=>r.mine).rolling&&!queued.find(r=>r.mine).result);
+    for(const [i,p] of others.entries()){
+      const row=queued.find(r=>r.id===p.playerId);
+      assert.equal(row.rolling,false,'a waiting roller is not portrayed as already tumbling');
+      assert.equal(row.queuePosition,i+1);assert.equal(row.queued,i===0?2:1);
+      assert.deepEqual(row.result,before.find(r=>r.id===p.playerId).result,'only the previously displayed read remains while waiting');
+      assert.notEqual(row.result.id,upcoming[i].rollId,'no upcoming result enters the display projection');
+    }
+    assert.match(await a.eval(`document.querySelector('#table-results [data-player="${others[0].playerId}"] .result-seat-state').textContent`),/Previous · next · \+1/);
+    await a.page.browser.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true},a.page.sessionId);await a.emulateCoarsePointer(true);
+    assert.ok(await a.eval(`[...document.querySelectorAll('#table-results .result-seat-state')].every(e=>e.scrollWidth<=e.clientWidth)`),'the previous-result qualification remains fully visible on a phone');
+    const publicState=JSON.stringify(queued);
+    await ctx.api('/api/roll',{playerId:others[2].playerId,notation:'6d6 secret'});
+    await a.eval('new Promise(r=>setTimeout(r,100))');
+    assert.equal(JSON.stringify(await a.dbg('tableResults.rows')),publicState,'secret arrivals reveal neither queue activity nor values');
+    await a.waitFor('!window.__diceDebug.filmWorker.baking');await a.dbg('skipPlain()');
+    await a.waitFor(`window.__diceDebug.currentRoll?.playerId===${JSON.stringify(others[0].playerId)}`);
+    assert.equal((await a.dbg('tableResults.rows')).find(r=>r.id===others[0].playerId).result,null,'a starting film hides its upcoming faces');
+    await a.settle();
+    const done=await a.dbg('tableResults.rows');assert.ok(done.every(r=>!r.rolling&&!r.queued));
+    const held=done.find(r=>r.id===others[1].playerId).result;assert.equal(held.hidden,true);assert.deepEqual(held.faces,[]);
+    assert.equal(await a.dbg('queueLength'),0);assert.deepEqual(a.page.consoleErrors,[]);
+  }},
   {name:'player-results-four',tags:['smoke','player-results','cuj2'],async fn(ctx){
     const a=await ctx.newTable({origin:'127.0.0.145',name:'Alice'});
     await a.page.browser.send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false},a.page.sessionId);

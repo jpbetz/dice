@@ -54,7 +54,43 @@ that scene, with the push controls below it. These measurements are of mesh
 vertices, not world AABB corners. The optional detail capture shows full odds
 and keep/bank/clear actions and a single return control.
 
-This completes the persistent result/active-turn layout slice, not all R2.
-Table artwork, richer on-surface props, simultaneous roll presentation, and
-further 3D phone die enlargement are separate work. The existing table art and
-physics placements are unchanged by this slice.
+## Rolls arriving together
+
+The first grouped-presentation experiment retains sequential films and makes
+the group visible through the standing seats. An active roller reads
+“Rolling”; waiting players retain their last displayed read with an explicit
+“Previous · next” or queue position. Additional throws show a short `+1` count.
+When a waiting film starts, its seat hides the prior face read until the new
+film settles. The complete result stays accessible while it is still safe to
+open. People uses the same waiting/read projection.
+
+This replaces the inherited presentation that called every queued player
+“Rolling” and removed everyone's comparison values during a burst. Only an
+already displayed redacted projection is retained, bounded by the live roster.
+No queued payload supplies faces; held films stay held, and a secret arrival
+causes no observer activity or queue indicator. The event FIFO, bake order,
+collision bodies, seeds, cameras and playback speed do not change.
+
+Simultaneous physical playback was not selected for this increment. Later
+films include earlier settled dice as colliders; overlapping independently
+baked time ranges would require new ownership and visual-contact behavior.
+The compact queue read addresses the observed group-comparison problem while
+preserving each viewer's established film. It adds no always-visible strip or
+new frame loop. This is a reviewed compact presentation experiment, not a
+claim that simultaneous animation has been implemented.
+
+The burst scenario sends four actual shared throws behind a held playback,
+including two from one player and a held roll, then a secret arrival. It checks
+queue order/count, exact equality with previously displayed reads, absence of
+incoming outcomes, hidden-result completion, and full draining. Existing
+four-player, privacy/turn and worker FIFO checks pass alongside it. The phone
+qualification is measured for actual text overflow. The first capture exposed
+truncation, so “Previous” now leads the short line.
+
+`node tools/drive.mjs tools/steps/roll-arrivals-look.mjs` reproduces the inspected
+[desktop burst](redesign/2026-09-13-arrivals-desktop.png),
+[390×844 phone burst](redesign/2026-09-13-arrivals-phone.png), and
+[completed group](redesign/2026-09-13-arrivals-phone-complete.png).
+All three [complete table designs](TABLE-COMPOSITIONS.md) are now implemented;
+physical phone observations and user validation of this presentation remain
+outside these emulated layout checks.
