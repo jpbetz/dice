@@ -32953,6 +32953,22 @@ document.getElementById('rail-palette').addEventListener('click', () => {
 // ---------------------------------------------------------------------------
 const modalStack = [];
 
+function containModalBackground() {
+  const modal = modalStack.at(-1);
+  if (!modal) return;
+  // A nested dialog may itself have been muted by the older one. New body
+  // children also arrive after a boot-time name prompt (workspaces, results,
+  // previews); they must join the same containment until this dialog closes.
+  modal.el.inert = false;
+  for (const child of document.body.children) {
+    if (child !== modal.el && !child.inert) {
+      child.inert = true;
+      modal.muted.push(child);
+    }
+  }
+}
+new MutationObserver(containModalBackground).observe(document.body, { childList: true });
+
 function focusablesIn(root) {
   return [...root.querySelectorAll(
     'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]),'
@@ -32971,6 +32987,7 @@ function openModal(el, { label = null, labelledBy = null, focus = null } = {}) {
   const muted = [...document.body.children].filter((c) => c !== el && !c.inert);
   muted.forEach((c) => { c.inert = true; });
   modalStack.push({ el, muted, returnTo: document.activeElement });
+  containModalBackground();
   const first = focus || focusablesIn(el)[0] || el;
   if (first === el && !el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
   try { first.focus({ preventScroll: true }); } catch { /* not focusable */ }
@@ -32982,6 +32999,7 @@ function closeModal(el) {
   const [m] = modalStack.splice(i, 1);
   m.muted.forEach((c) => { c.inert = false; });
   el.removeAttribute('aria-modal');
+  containModalBackground();
   // FOCUS GOES BACK TO WHAT OPENED IT. Without this it falls to <body> and
   // the next Tab restarts at the top of the document — the same defect the
   // rail's re-render has, and the reason a keyboard player pays a full

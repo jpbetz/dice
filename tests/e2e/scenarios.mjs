@@ -3142,6 +3142,20 @@ export const scenarios = [
         assert.equal(await anyInert(a), false, `${id} releases the page when it closes`);
       }
 
+      // Help above the notation sheet temporarily owns focus; roots created
+      // meanwhile stay contained when returning, then release on final close.
+      await a.dbg('toggleKbd()');
+      await a.dbg('openHelpDialog(null)');
+      assert.equal((await state(a,'help-overlay')).inertBg,true);
+      assert.equal((await state(a,'help-overlay')).focusInside,true);
+      await a.eval(`(()=>{const b=document.createElement('button');b.id='modal-late-background';b.textContent='Late background';document.body.append(b);})()`);
+      assert.equal(await a.eval(`document.getElementById('modal-late-background').inert`),true);
+      await a.dbg('closeHelpDialog()');
+      assert.equal((await state(a,'kbd-overlay')).inertBg,true);
+      await a.dbg('closeKbd()');
+      assert.equal(await anyInert(a),false);
+      await a.eval(`document.getElementById('modal-late-background').remove()`);
+
       await a.dbg('openSettingsModal()');
       assert.equal((await state(a,'settings-modal')).modal,null,'desktop setup keeps the table available');
       assert.equal((await state(a,'settings-modal')).focusInside,true);

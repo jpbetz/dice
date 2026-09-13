@@ -36,6 +36,23 @@ in [SOCIAL-SERVICE-PROTOCOL.md](SOCIAL-SERVICE-PROTOCOL.md). All invitations and
 accounts used in development are isolated fixtures; production deployment is
 separate.
 
+## Startup dialog focus containment — 2026-09-13
+
+The first name prompt opens before the workspaces and result controls are
+created. Those later body roots previously remained reachable behind a dialog
+that claimed to contain focus. New roots now join the active dialog's inert
+background, and nested dialogs release/restore their actual focus boundary.
+The final close releases the page, including controls created while it was open.
+
+The original `a11y-modals` case failed on the startup prompt. All eight composed
+modal/workspace/roll-flow cases now pass; the expanded nested-dialog case passes
+separately. `tools/steps/modal-lifecycle-look.mjs` uses actual 390 × 844 keyboard
+and pointer input: sixteen Tab presses stay in the name prompt, Enter joins,
+and Help opens and returns on Escape without leaving inert roots. The
+[seat prompt](redesign/2026-09-13-modal-phone-seat.png) and
+[Help](redesign/2026-09-13-modal-phone-help.png) were opened and inspected.
+The prompt's old pool-sharing subtitle is a separate copy correction.
+
 ## 2026-09-13 — Mobile roll flows and direct result clearing
 
 Reproduced Joe's failures in Chrome at the iPhone 12 Pro viewport (390 × 844):
