@@ -29365,4 +29365,71 @@ export const scenarios = [
       assert.deepEqual(t.page.consoleErrors, []);
     },
   },
+  {
+    name: 'dice-face-atlas',
+    tags: ['dice', 'themes', 'perf'],
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Atlas' });
+      const proof = await a.eval(`(async () => {
+        const THREE = await import('three');
+        const D = await import('/js/dice.js');
+        const T = await import('/js/themes.js');
+        const custom = structuredClone(T.SETS['emberforge.blackanvil']);
+        delete custom.shader;
+        T.registerSet('test.atlas', custom);
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false });
+        renderer.setSize(128,128);renderer.setClearColor(0x000000,0);
+        const scene = new THREE.Scene(); scene.add(new THREE.HemisphereLight(0xffffff,0x444444,3));
+        const light = new THREE.DirectionalLight(0xffffff,2);light.position.set(2,3,5);scene.add(light);
+        const camera = new THREE.PerspectiveCamera(35,1,.1,30);camera.position.z=5;
+        const rows = [];
+        for (const variant of ['std','shroud','tidewrack.seaglass','rimehold.deepglacier',
+          'symbols.monster','symbols.fate','test.atlas','emberforge.blackanvil','stormcall.boltglass']) {
+          for (const type of D.DIE_TYPES) {
+            const die=D.getDie(type,variant), mesh=D.createDieMesh(type,variant);
+            const own=die.geometry.userData.faceAtlas;
+            mesh.quaternion.setFromUnitVectors(D.faceNormalForValue(type,D.valueRange(type)[1]).normalize(),new THREE.Vector3(0,0,1));
+            scene.add(mesh);renderer.render(scene,camera);
+            const gl=renderer.getContext(), pixels=new Uint8Array(11*11*4);
+            gl.readPixels(59,59,11,11,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+            const covered=Array.from({length:121},(_,i)=>pixels[i*4+3]).filter(v=>v>250).length;
+            let allFaces=0;
+            for (const face of die.faces) {
+              mesh.quaternion.setFromUnitVectors(face.normal.clone().normalize(),new THREE.Vector3(0,0,1));
+              renderer.render(scene,camera);gl.readPixels(59,59,11,11,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+              if (Array.from({length:121},(_,i)=>pixels[i*4+3]).filter(v=>v>250).length>100) allFaces++;
+            }
+            rows.push({variant,type,atlas:!!own,groups:die.geometry.groups.length,
+              calls:renderer.info.render.calls,covered,allFaces,faces:die.faces.length,channels:['map','emissiveMap','normalMap','roughnessMap']
+                .filter(k=>die.materials[0][k]).map(k=>[k,die.materials[0][k].channel])});
+            scene.remove(mesh);
+          }
+        }
+        const die=D.getDie('d6','test.atlas'), other=D.createDieMesh('d6','test.atlas');
+        const shared=other.geometry===die.geometry && other.material===die.materials;
+        const resources=[die.geometry,...die.materials,...new Set(die.materials.flatMap(m=>
+          [m.map,m.emissiveMap,m.normalMap,m.roughnessMap]).filter(Boolean))];
+        const disposed=resources.map(()=>0);resources.forEach((r,i)=>r.addEventListener('dispose',()=>disposed[i]++));
+        D.bustDie('test.atlas');
+        const rebuilt=D.getDie('d6','test.atlas');
+        const fresh=rebuilt.geometry!==die.geometry && rebuilt.materials[0].map!==die.materials[0].map;
+        D.bustDie('test.atlas');delete T.SETS['test.atlas'];
+        renderer.dispose();renderer.forceContextLoss();
+        return {rows,shared,disposed,fresh};
+      })()`);
+      assert.equal(proof.rows.length, 63, 'every die type, all channel/finish cases, and procedural fallback ran');
+      for (const row of proof.rows) {
+        const fallback = ['emberforge.blackanvil','stormcall.boltglass'].includes(row.variant);
+        assert.equal(row.atlas, !fallback, `${row.variant}/${row.type}: intended material path`);
+        assert.equal(row.groups, fallback ? Number(row.type.replace('d','').replace('x','')) + 1 : 2);
+        assert.equal(row.calls, row.groups, 'measured renderer calls agree with actual groups');
+        assert.ok(row.covered > 100, `${row.variant}/${row.type}: the face exists in its FIRST render (${row.covered}/121 pixels)`);
+        assert.equal(row.allFaces,row.faces, `${row.variant}/${row.type}: every face renders toward the camera`);
+        for (const [,channel] of row.channels) assert.equal(channel, fallback ? 0 : 1);
+      }
+      assert.ok(proof.shared && proof.fresh, 'cache shares builds, then rebuilds fresh resources after bust');
+      assert.ok(proof.disposed.every(n=>n===1), 'each shared material, texture and geometry is disposed once');
+      assert.deepEqual(a.page.consoleErrors, []);
+    },
+  },
 ];

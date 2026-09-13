@@ -50,7 +50,11 @@ and caches compressed public text responses. The same six local assets fall
 from 3.93 MB to 1.10 MB with Brotli; this is an encoded-byte comparison, not
 a page-load or battery claim. The reproducible probe and operational details
 are in [DEPLOY → Static delivery](DEPLOY.md#static-delivery-2026-09-13).
-Dice-face draws and physical-device baselines remain the next measured work.
+The [dice-face atlas slice](redesign/2026-09-13-dice-materials.md) now reduces
+standard d20s from 21 actual draw groups to two, preserving face art and
+physics. Procedural flow/dissolve keeps its established rendering path.
+Physical-device baselines, simulation stalls, idle work and Battery saver
+remain open; no battery or faster-frame-rate claim has been established.
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable

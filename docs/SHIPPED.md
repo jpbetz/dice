@@ -72,6 +72,36 @@ Chromium touch emulation, not a physical phone observation.
 [Desktop practice](redesign/2026-09-13-practice-desktop.png) and
 [phone practice](redesign/2026-09-13-practice-phone.png).
 
+## Dice-face atlases — R3 second slice (2026-09-13)
+
+Compatible dice now use one face atlas/material and one bevel material, with
+two actual draw groups. A standard d6 drops from seven draws to two; d20
+drops from 21 to two. Color, normal, emissive and roughness channels retain
+their original face pixels. Render positions/normals, original UVs, canonical
+hulls/values and seeded films compare exactly with the baseline.
+
+The factory keeps the same cached API and safe disposal behavior. Standard,
+shroud, glass/fresnel, symbols and compatible custom maps use the atlas;
+UV-dependent flow/dissolve and incompatible materials retain the prior path.
+The latter preserves first-render correctness after a Black Anvil experiment
+showed that matching channel hashes alone did not prove visible faces.
+
+Texture objects across seven standard types fall from 70 to seven. Filtering
+gutters add 3.15% base texture pixels and the atlas UVs add 40,320 geometry
+bytes. Visible desktop 40d20 samples fall from 1,682 to 160 calls/frame;
+their different server seeds/culling make those samples illustrative, while
+the per-die counts are exact. Frame rate stays refresh-limited on the test
+RTX 4090 and roughly 200 ms stress setup stalls remain. Physical-device and
+battery measurements, and the existing phone clipping, remain open.
+
+The [measurement and visual record](redesign/2026-09-13-dice-materials.md)
+contains reproduction commands, device/backend limits and inspected images.
+Full unit tests and ten targeted browser scenarios pass, including a new
+63-case real-renderer proof of every type, face coverage, draw calls, shared
+caches and disposal, plus authored-value/privacy and live set-edit checks.
+All tests used ephemeral ports. No vendor files, physics rules, navigation,
+live preview process or deployment changed.
+
 ## Compressed public delivery — R3 first slice (2026-09-13)
 
 The production origin was measured to send six entry assets without

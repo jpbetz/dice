@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Dice factory: builds three.js meshes, per-face number textures, and
+// Dice factory: builds three.js meshes, packed face textures, and
 // cannon-es convex hulls for each die type. All dice share cached
 // geometry/materials/shapes per (type, variant).
 //
@@ -725,8 +725,9 @@ const BEVEL = 0.055; // inset share of each corner's distance to its face centro
 // mesh comes out BIT-IDENTICAL to that bench row, which is the check.
 //
 // It costs 3.4× the render vertices of the cut it replaces (1476 → 5040 over
-// the seven types) and ZERO draw calls — a die is one mesh in `faces+1`
-// material groups either way, so the frame's shipped budget (`scene-draw-budget`
+// the seven types) and ZERO additional draw calls. The original layout used
+// `faces+1` material groups either way; the R3 atlas now reduces standard dice
+// to two groups. The frame's shipped budget (`scene-draw-budget`
 // asserts calls ≤ 220) does not move. Priced at the pool cap with
 // `node tools/drive.mjs tools/steps/edge-price.mjs 40 d20`. If a field report
 // ever names the cost, `segments: 2` is the lever: 3480 verts, ~69%, measured.
@@ -1230,11 +1231,93 @@ function buildDie(type, variant = 'std') {
     envMapIntensity: skin.house ? ((skin.spec && skin.spec.envMapIntensity) ?? 1) : 0.35,
   }));
 
+  // UV-driven flow/dissolve retains per-face sampling. A first-frame atlas
+  // experiment blanked Black Anvil's d6 in one-shot portraits; preserve that
+  // established path until its shader/renderer interaction has a separate fix.
+  if (!skin.shader?.flow && !skin.shader?.dissolve) materials = atlasFaceMaterials(geometry, materials, faces.length);
   const shape = buildShape(faces);
   // `geo` is the RESOLVED recipe (standard edge folded in), so a probe can
   // assert what this die actually wears instead of re-deriving it from a
   // vertex count — see __diceDebug.dieGeoStats.
   return { type, def, geo: skin.geo, geometry, materials, shape, faces, vertexValues };
+}
+
+// Faces are already contiguous before the bevel, after every geometry
+// character pass. Pack the existing painted pixels without changing them,
+// remap only texture coordinates, then collapse the actual draw groups.
+// All faces come from one skin recipe, so their scalar material settings
+// match. Keep the existing path for transparent/transmissive faces (which
+// need independent sorting) or channels that cannot share this canvas atlas.
+function atlasFaceMaterials(geometry, materials, count) {
+  const faces = materials.slice(0, count);
+  const channels = ['map', 'emissiveMap', 'normalMap', 'roughnessMap'];
+  const first = faces[0];
+  if (faces.some((m) => m.transparent || m.opacity !== 1 || m.transmission > 0
+    || m.alphaTest > 0 || m.blending !== THREE.NormalBlending)) return materials;
+  if (channels.some((key) => faces.some((m) => {
+    const t = m[key], reference = first[key];
+    return !!t !== !!reference || (t && (!t.isCanvasTexture
+      || t.image.width !== TEX_SIZE || t.image.height !== TEX_SIZE
+      || t.wrapS !== THREE.ClampToEdgeWrapping || t.wrapT !== THREE.ClampToEdgeWrapping));
+  }))) return materials;
+
+  // All shipped face counts factor into a grid no wider than five cells.
+  // Factor rather than round up: d10 is 5×2, avoiding two unused d10 cells.
+  let rows = Math.floor(Math.sqrt(count));
+  while (count % rows) rows--;
+  const columns = count / rows, padding = 2, cellSize = TEX_SIZE + padding * 2;
+  const width = columns * cellSize, height = rows * cellSize;
+  const oldTextures = new Set(faces.flatMap((m) => channels.map((k) => m[k])).filter(Boolean));
+  const atlases = {};
+  for (const key of channels) {
+    const reference = first[key];
+    if (!reference) continue;
+    const canvas = document.createElement('canvas');
+    canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    faces.forEach((m, index) => {
+      const source = m[key].image;
+      const x = index % columns * cellSize + padding;
+      const y = Math.floor(index / columns) * cellSize + padding;
+      ctx.drawImage(source, x, y);
+      // Replicate the border into a gutter for filtering. The painted face
+      // already has a wide unused margin; no neighbor's digit reaches it.
+      ctx.drawImage(source, 0, 0, TEX_SIZE, 1, x, y-padding, TEX_SIZE, padding);
+      ctx.drawImage(source, 0, TEX_SIZE-1, TEX_SIZE, 1, x, y+TEX_SIZE, TEX_SIZE, padding);
+      ctx.drawImage(canvas, x, y-padding, 1, cellSize, x-padding, y-padding, padding, cellSize);
+      ctx.drawImage(canvas, x+TEX_SIZE-1, y-padding, 1, cellSize, x+TEX_SIZE, y-padding, padding, cellSize);
+    });
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.channel = 1;
+    for (const property of ['colorSpace', 'anisotropy', 'magFilter', 'minFilter',
+      'generateMipmaps', 'flipY', 'premultiplyAlpha', 'unpackAlignment']) texture[property] = reference[property];
+    atlases[key] = texture;
+  }
+  // Three's second UV channel handles every atlas map. Keep the original
+  // UV attribute intact for procedural effects and existing geometry readers.
+  const uv = geometry.attributes.uv.clone();
+  geometry.setAttribute('uv1', uv);
+  let faceVertices = 0;
+  for (const group of geometry.groups) {
+    if (group.materialIndex >= count) continue;
+    const col = group.materialIndex % columns, row = Math.floor(group.materialIndex / columns);
+    for (let i = group.start; i < group.start + group.count; i++) {
+      uv.setXY(i, (col * cellSize + padding + uv.getX(i) * TEX_SIZE) / width,
+        1 - (row * cellSize + padding + (1 - uv.getY(i)) * TEX_SIZE) / height);
+    }
+    faceVertices += group.count;
+  }
+  uv.needsUpdate = true;
+  geometry.clearGroups();
+  geometry.addGroup(0, faceVertices, 0);
+  geometry.addGroup(faceVertices, geometry.attributes.position.count - faceVertices, 1);
+  geometry.userData.faceAtlas = { columns, rows, padding, cellSize, count };
+  for (const texture of oldTextures) texture.dispose();
+  for (const m of faces.slice(1)) m.dispose();
+  Object.assign(first, atlases);
+  first.userData.faceAtlas = true;
+  first.needsUpdate = true;
+  return [first, materials[count]];
 }
 
 function materialFor(def, face, spec, shroud = false, seed = 1) {
