@@ -8,6 +8,15 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## History keeps the current results readable — 2026-09-13
+
+A long history covered every sampled pixel of the current phone result. Its
+height now reserves the visible result rows and unfinished-turn controls.
+Short windows use one horizontally scrollable result row so history retains
+space for its entries. The actual pointer/resize/wheel proof and inspected
+phone, landscape and desktop captures are in the
+[history read record](redesign/2026-09-13-history-read/README.md).
+
 ## Undo after deleting the last roll in a custom category — 2026-09-13
 
 Deleting a category's final roll used to remove its section along with Undo.

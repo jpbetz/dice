@@ -49,10 +49,17 @@ body.has-table-result #result-banner { display:none; }
 .player-result-actions .pk-strip .cue-word { font:inherit; text-transform:capitalize; }
 .player-result-actions .pk-strip .roll-cue i { display:none; }
 .player-result-actions [hidden] { display:none; }
+/* History shares the remaining scene with dice; it must not cover the standing
+   current results or unfinished-turn controls when its list becomes long. */
+#log-flyout {
+  bottom:calc(12px + max(var(--banner-lift,0px),var(--table-turn-height)));
+  max-height:min(60vh,calc(100dvh - var(--table-results-height) - max(var(--banner-lift,0px),var(--table-turn-height)) - 24px));
+}
 @media(min-width:641px) {
   body.workspace-open:not([data-workspace="dice"]):not([data-workspace="account"]) { --table-results-right:calc(var(--workspace-width) + 24px); }
 }
 @media(max-width:640px) {
+  #log-flyout { bottom:calc(var(--phone-foot) + 8px); max-height:calc(100dvh - var(--phone-head) - var(--table-results-height) - var(--phone-foot) - 16px); }
   #table-results { top:var(--phone-head); grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; padding:7px 8px; max-height:186px; }
   #scene-container { top:calc(var(--phone-head) + var(--table-results-height)); bottom:var(--phone-foot); }
   #pick-hint { display:none; }
@@ -86,3 +93,12 @@ body.has-table-result #result-banner { display:none; }
 #film-availability button,.result-keep-dice button { min-height:44px; padding:8px 12px; margin:4px; }
 .result-keep-dice { display:flex; flex-wrap:wrap; }
 .result-keep-dice button[aria-pressed="true"] { outline:2px solid var(--accent,#e8bb77); }
+/* A short window needs room to read history as well as the current rolls.
+   Keep the same readable cards in one horizontally scrollable row. */
+@media(max-height:480px) {
+  #table-results { display:flex; }
+  .result-seat-wrap { flex:0 0 220px; }
+}
+@media(max-height:480px) and (max-width:640px) {
+  .result-seat-wrap { flex-basis:calc((100vw - 22px)/2); }
+}
