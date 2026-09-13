@@ -83,6 +83,14 @@ guest addresses need the saved-home guard even while storage is unavailable.
 The local file adapter is for private restart proofs and refuses Cloud Run;
 production requires the Firestore REST adapter and reviewed external setup.
 
+The concrete remaining operator decisions and candidate commands are in
+[ACCOUNT-ENABLEMENT-CHECKLIST.md](ACCOUNT-ENABLEMENT-CHECKLIST.md). A safe local
+backup/restore and maintenance rehearsal is `node tools/account-local-drill.mjs`.
+`make deploy` preserves account environment but only sets the commit stamp;
+it does not create the database, attach the dedicated runtime identity or run
+account preflight. The account-enabled candidate uses an explicit `--no-traffic`
+command before the separately reviewed traffic switch.
+
 ## Why Cloud Run
 
 The guest runtime is serverless-friendly: `server.js` reads `$PORT`, and its

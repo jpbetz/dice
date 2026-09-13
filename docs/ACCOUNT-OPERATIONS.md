@@ -16,11 +16,12 @@ Read-only Cloud Run/API checks on 2026-09-13 found:
 | --- | --- |
 | Public origin | `https://dice-5wi5rwk2oa-uc.a.run.app` |
 | Ready revision / public health SHA | `dice-00059-r9r` / `407ad4b4c4c9` |
-| Runtime | Node `24.19.0`; revision maximum 1, timeout 3600 s, concurrency 80 |
+| Runtime | Node `24.19.0`; revision maximum 1, **service maximum 20**, timeout 3600 s, concurrency 80 |
 | Account environment keys | None; account mode defaults to off |
 | Public `/api/account/status` | 404: this deployed code predates the optional API |
 | Firestore API | Not enabled in the active deployment project |
 | Developer write switch | Disabled |
+| Local operator configuration | Project, billing account, region and service are set; custom domain is unset; no durable configuration is supplied by the Makefile template |
 
 Project IDs, runtime account addresses, tokens and full service configuration
 were not printed or saved. The read-only local source-upload manifest includes
@@ -28,13 +29,19 @@ all `service/` modules and browser transports, and excludes operator config and
 `tools/`. Local unit/real-process/Chrome proofs cover recovery, version conflicts,
 same-address home restoration, recipient isolation, invitation acceptance during
 an open turn, and permitted presence. They do not prove deployed IAM, cloud
-writes, backup recovery, production cookies, or final People/Tables UI.
+writes, cloud backup recovery or production cookies. Final Account/Tables/People
+UI flows are now implemented and have local browser proofs; the composed release
+sweep remains a separate gate. The observations above were refreshed read-only
+against the completed runtime review on 2026-09-13.
 
 The external work is: reviewed database/location and cost choice; Firestore API
 enablement; distinct staging/production storage; a dedicated runtime identity;
 database-scoped IAM; restrictive client access; backup/PITR setup and a restore
 drill; staging recovery; and a reviewed deployment/rollback pair. Existing guest
 play can ship with the optional API disabled before those steps.
+
+[ACCOUNT-ENABLEMENT-CHECKLIST.md](ACCOUNT-ENABLEMENT-CHECKLIST.md) is the concise
+operator handoff: exact remaining external choices, commands and required proof.
 
 ## Configuration preflight
 
@@ -78,6 +85,13 @@ Use one canonical browser origin. A custom domain and a `run.app` host are
 different cookie/origin boundaries; the second is not an interchangeable sign-in
 URL. Staging gets its own origin and its own data. Do not weaken the Origin/CSRF
 checks to make a revision tag act like the production browser origin.
+
+`make deploy` currently sets only `GIT_SHA` with `--update-env-vars`. It preserves
+existing account settings, but does **not** create them, attach the proposed
+runtime identity or run account preflight. Use the explicit first-enablement
+commands in the checklist. A green `make status` describes guest hosting only.
+Do not run `make init`/`make setup` on this already configured project as an
+account-enablement step.
 
 ## Storage and provisioning proposal
 
@@ -185,8 +199,9 @@ Cloud Run creates immutable revisions for code/config changes. Traffic updates
 are not instant, and existing requests can continue on their previous revision.
 Splitting traffic would split this app's in-memory live rooms, even though
 Firestore transactions remain correct. Use the existing one-instance live-room
-discipline and consider a service-level maximum of one alongside the revision
-maximum; it still does not turn rolling updates into an atomic room migration.
+discipline and explicitly set the service-level maximum to one alongside the
+revision maximum (the current service-level value is 20). This still does not
+turn rolling updates into an atomic room migration.
 [Revision traffic/rollback](https://cloud.google.com/run/docs/rollouts-rollbacks-traffic-migration),
 [maximum-instance semantics](https://docs.cloud.google.com/run/docs/configuring/max-instances).
 
@@ -237,6 +252,18 @@ Rollback choices:
   validate it, review the acknowledged writes it lacks, and reconcile before
   selecting it. Database restoration is not a normal code rollback.
 
+An older snapshot also restores older **security decisions**: session/key
+revocations, friend blocks/removals, invitation cancellations and membership
+changes. The local drill below proves that a session revoked after the backup
+becomes valid in the restored copy, and that a later block disappears. Validate
+the copy on an isolated origin; do not put it behind the production cookie
+origin until these later acknowledged decisions have been reconciled. The
+current runtime has no global restore-time session invalidation or automatic
+security reconciliation tool. Account recovery can revoke that account's other
+sessions, but it is not a service-wide restore procedure. If affected security
+decisions cannot be reconstructed, public resume remains blocked on a reviewed
+recovery procedure; switching the database alone is not sufficient.
+
 Resume by selecting `firestore` with the same reviewed original configuration
 and known-compatible code. After recovery, verify both a converted address and a
 reserved `h_…` address, not just a newly created home. Local
@@ -246,8 +273,30 @@ turn/rethrow and restores original data after resuming the same store.
 
 ## Local file recovery and operating limits
 
+Run the documented disposable rehearsal from the checkout:
+
+```sh
+node tools/account-preflight.mjs
+node tests/account-config.test.mjs
+node tools/account-local-drill.mjs
+```
+
+The first command intentionally exits 2 in the default `off` environment.
+The other two commands must exit 0. They use ephemeral loopback ports and
+private temporary file stores, never port 8123 or the cloud. The drill validates
+preflight without creating a store, cleanly stops before backing up, restores
+into a separate directory, recovers with clean cookie jars, and verifies kept
+library data, membership, a pending invitation, converted/reserved addresses,
+pause/new-guest play and the security rollback condition above. It prints only
+aggregate checks and removes its fixture state; it accepts no operator path or
+live-backup argument. This does not certify HTTPS cookies, IAM or Firestore
+backup correctness.
+
 Stop the owned file-mode process cleanly before copying `state.json` and
-`previous.json` together into a private backup. `previous.json` is a previous
+`previous.json` (if present) together into a private backup. Restore only into
+a new private directory, preserving modes 0700 for directories and 0600 for
+snapshots; never copy an old `writer.lock` into the restored copy.
+`previous.json` is a previous
 transaction image, not a separately replicated backup. Keep originals when a
 snapshot is malformed or a commit acknowledgement is uncertain. After a crash,
 `DICE_ACCOUNT_RECOVER_LOCK=1` only recovers a provably dead same-host writer;
