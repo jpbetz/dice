@@ -189,7 +189,19 @@ export function createLibrarySession(actions,{cacheFactory=openLibraryCache,acco
       captureHome:scoped('captureHome'),createHome:scoped('createHome'),saveHome:scoped('saveHome'),leaveHome:scoped('leaveHome')});
     return homeAccessMemo;
   }
-  return Object.freeze({initialize,edit,settled,capture,preview,choose,flush,suspend,homeAccess,get info(){return info();},
+  let socialAccessMemo=null;
+  function socialAccess(){
+    if(blocked||transitioning||!person||namespace!==person.id)return null;
+    const key=`${namespace}:${boundaryEpoch}`;if(socialAccessMemo?.key===key)return socialAccessMemo;
+    const owner=namespace,epoch=boundaryEpoch,active=()=>!blocked&&!transitioning&&namespace===owner&&boundaryEpoch===epoch;
+    const scoped=method=>async(...args)=>{if(!active())return {ok:false,code:'identity_changed'};
+      const result=await account[method](owner,...args);return active()?result:{ok:false,code:'identity_changed'};};
+    const methods=['homes','people','setContactCode','requestFriend','removeFriend','blockPerson','invitations','inviteHome','respondInvitation','cancelInvitation','archiveInvitation','presence','homePresence','setPresence'];
+    socialAccessMemo=Object.freeze({key,personId:owner,epoch,person:{id:person.id,displayName:person.displayName},
+      status:async()=>{if(!active())return {ok:false,code:'identity_changed'};const result=await account.status();return active()?result:{ok:false,code:'identity_changed'};},
+      ...Object.fromEntries(methods.map(method=>[method,scoped(method)]))});return socialAccessMemo;
+  }
+  return Object.freeze({initialize,edit,settled,capture,preview,choose,flush,suspend,homeAccess,socialAccess,get info(){return info();},
     status:()=>account.status(),
     refreshAccount:()=>identityAction(()=>account.session()),
     async openDeviceCopy(personId){

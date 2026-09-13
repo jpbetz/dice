@@ -1,0 +1,22 @@
+/* Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 */
+import assert from 'node:assert/strict';
+import {transitionSocialJournal as step,validSocialRequest} from '../js/social-journal.js';
+const person='p_'+'p'.repeat(43),other='p_'+'o'.repeat(43),code='dc1_'+'c'.repeat(43);
+const request=(n=0)=>({kind:'friend-request',input:{operationId:'operation_'+n,code}});
+assert.equal(validSocialRequest(request()),true);assert.equal(validSocialRequest({...request(),input:{operationId:'operation_1',code:'dt1_'+'c'.repeat(43)}}),false,'recovery credentials never enter a People request');
+assert.equal(validSocialRequest({...request(),input:{...request().input,privatePools:[]}}),false);
+let result=step(undefined,person,{kind:'begin',request:request(),at:1}),state=result.state;assert.equal(result.record.attempt,1);
+assert.equal(step(state,person,{kind:'begin',request:{...request(),input:{...request().input,code:'dc1_'+'z'.repeat(43)}},at:2}).code,'operation_changed');
+state=step(state,person,{kind:'complete',id:request().input.operationId,attempt:1,result:{ok:false,code:'account_unavailable'}}).state;
+assert.equal(state.records[0].status,'pending');assert.equal(step(state,person,{kind:'forget',generation:state.generation,ids:[state.records[0].id],acknowledged:true,downloaded:true}).code,'social_action_protected');
+const before=state;state=step(state,person,{kind:'begin',request:request(),at:3}).state;assert.equal(state.records[0].attempt,2);assert.deepEqual(state.records[0].request,before.records[0].request);
+assert.equal(step(state,person,{kind:'complete',id:request().input.operationId,attempt:1,result:{ok:true,personId:person}}).code,'social_attempt_changed');
+assert.equal(step(state,person,{kind:'complete',id:request().input.operationId,attempt:2,result:{ok:true,personId:other}}).code,'identity_changed');
+state=step(state,person,{kind:'complete',id:request().input.operationId,attempt:2,result:{ok:false,code:'contact_unavailable'}}).state;
+assert.equal(state.records[0].status,'refused');assert.equal(step(state,person,{kind:'forget',generation:state.generation,ids:[state.records[0].id],acknowledged:true}).code,'social_action_protected');
+assert.equal(step(state,person,{kind:'forget',generation:state.generation,ids:[state.records[0].id],acknowledged:true,downloaded:true}).state.records.length,0);
+for(let n=1;n<32;n++)state=step(state,person,{kind:'begin',request:request(n),at:n}).state;
+assert.equal(state.records.length,32);assert.equal(step(state,person,{kind:'begin',request:request(32),at:33}).code,'social_journal_full');
+assert.equal(step(state,other).code,'social_journal_corrupt');assert.equal(step({...state,records:[null]},person).code,'social_journal_corrupt');
+const original=JSON.stringify(state);const stale=step(state,person,{kind:'forget',generation:1,ids:[state.records[0].id],acknowledged:true,downloaded:true});assert.equal(stale.code,'social_attempt_changed');assert.equal(JSON.stringify(state),original);
+console.log('social-journal: exact intents, protected uncertain writes, attempt/owner boundaries, explicit cleanup and capacity passed');
