@@ -26,6 +26,12 @@ dice mechanics and artwork, but ordinary tasks are hard to discover and the
 shared surface delivers less visual interest than its controls. Make it easy
 to find your dice, recognize your people, and return to your group's table.
 
+**Space and focus, clarified by Joe 2026-09-13:** keep the root interface that
+stays on display economical. Once the player opens a task, give it the space
+it needs, including expanded panels or full-screen and near-full-screen
+dialogs. Compact entry points can lead to generous workspaces. Size each view
+for its content and keep the return to the same live table clear.
+
 | Priority | Investment | First useful release | What follows |
 | --- | --- | --- | --- |
 | **1 — implementation started** | **People, personal dice, and persistent tables.** Three clear destinations: Tables, My dice & rolls, People. Direct identity editing, a visual dice collection, visible table setup, familiar first rolls, and an optional recoverable identity. | Direct name editing, a usable dice gallery with favorites and practice, named table controls, and Quick dice with explicitly chosen starter kits. | Durable table homes, identity recovery, synchronized libraries, friends, presence, and an invitation inbox. |

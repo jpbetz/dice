@@ -63,14 +63,15 @@ the table's name, interpretation, appearance, and prepared material.
 choices. Help and roll history remain directly reachable during play.
 “Table / Staging / You / Your stuff” cease to be the organizing scheme.
 
-On desktop, use a persistent table header and an expandable workspace/panel.
-On a phone, use the full-width scene, a bottom roll tray, and sheets. Share
-these nouns and navigation state with R2; do not create a second mobile
-information architecture. A sheet can cover the local scene for editing,
-but collapse returns to the same live roll and the server never pauses.
-Keyboard focus returns to the invoking control; selection, focus, and
-connection state are conveyed by text as well as color. Dialogs are reserved
-for decisions such as conflicting saved versions or destructive actions.
+On desktop, use a compact persistent table header and workspaces sized for
+the task the player opens. Expanded panels and full-screen or near-full-screen
+dialogs are valid choices for focused browsing, editing, and organization.
+On a phone, use the full-width scene, a bottom roll tray, and sheets or full
+views. Share these nouns and navigation state with R2; do not create a second
+mobile information architecture. An opened workspace can cover the local
+scene; returning to play restores the same live roll and the server never
+pauses. Keyboard focus returns to the invoking control; selection, focus,
+and connection state are conveyed by text as well as color.
 
 **Owner correction, 2026-09-13:** organize the whole interface rather than
 giving each new feature a prominent block. The first My dice card consumed
@@ -82,6 +83,16 @@ management. On desktop, setup leaves the scene interactive; on a phone it is
 a sheet. New controls must earn their space against the rolling workflow.
 Measure the start of the composer before and after, with four players and a
 compact phone sidebar; discoverability alone does not justify permanent bulk.
+
+**Owner clarification, same day:** the space concern applies to the root UI
+that is always, or almost always, visible. A player's chosen focus can expand
+and take up space. Size opened views for the work: generous dice comparisons,
+appearance previews, and library organization may warrant most or all of the
+screen; a few preference switches can stay compact. The current drawer width
+and shared frame are implementation choices, not ceilings for future views.
+Review the resting table for permanent clutter and the opened task for
+readability, useful preview size, and ease of completion. Return to play stays
+clear and preserves the player's place.
 
 Initial relocation map, read from `index.html` and the handlers at the
 baseline revision. These move existing capabilities; they do not require
