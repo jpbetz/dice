@@ -78,6 +78,54 @@ export function applyWorldState(w, state) {
   w.collisionMatrixPrevious.matrix = state.previousCollision.slice();
 }
 
+// Only the worker's cast is owned by this reply. Other dice can be cleared,
+// collected or revealed while it runs; developer tools can move/add colliders
+// or retune the live world. Those later edits must survive the old film.
+export function mergeFilmState(w, state, input) {
+  const owned = new Set(input.dice.map((d) => d.bodyId));
+  const before = new Map(input.world.state.bodies.map((b) => [b.id, b]));
+  for (const s of state.bodies) {
+    const body = w.getBodyById(s.id);
+    if (body && owned.has(s.id)) restoreBody(body, s);
+  }
+  // Configuration is live. Only the completed simulation's clock advances.
+  for (const key of ['time', 'stepnumber', 'dt']) w[key] = state[key];
+  for (const body of w.bodies) {
+    if (owned.has(body.id)) continue;
+    const old = before.get(body.id);
+    if (!old || vec(body.position).some((v, i) => v !== old.vectors.position[i])
+        || quat(body.quaternion).some((v, i) => v !== old.quaternions.quaternion[i])) {
+      body.aabbNeedsUpdate = true;
+    }
+  }
+  // Removal renumbers Body.index. Matrix slots must follow surviving IDs,
+  // not their stale snapshot indices; new bodies have no previous contact.
+  const oldIndices = new Map(state.bodies.map((b, index) => [b.id, { index }]));
+  const remap = (matrix) => {
+    const source = new CANNON.ArrayCollisionMatrix(); source.matrix = matrix;
+    const result = new CANNON.ArrayCollisionMatrix(); result.setNumObjects(w.bodies.length);
+    for (let i = 1; i < w.bodies.length; i++) {
+      const a = oldIndices.get(w.bodies[i].id); if (!a) continue;
+      for (let j = 0; j < i; j++) {
+        const b = oldIndices.get(w.bodies[j].id);
+        if (b && source.get(a, b)) result.set(w.bodies[i], w.bodies[j], true);
+      }
+    }
+    return result.matrix;
+  };
+  w.collisionMatrix.matrix = remap(state.collision);
+  w.collisionMatrixPrevious.matrix = remap(state.previousCollision);
+  const order = [], seen = new Set();
+  for (const id of [...state.axis, ...w.broadphase.axisList.map((b) => b.id), ...w.bodies.map((b) => b.id)]) {
+    const body = w.getBodyById(id);
+    if (body && !seen.has(id)) { seen.add(id); order.push(body); }
+  }
+  // Keep SAP's listener-owned array, and force bounds/order to be checked
+  // again. A later reveal or developer wall move can invalidate either.
+  w.broadphase.axisList.splice(0, w.broadphase.axisList.length, ...order);
+  w.broadphase.dirty = true;
+}
+
 export function captureFilm(ctx, getDie) {
   const { world: w } = ctx;
   if (ctx.pouring || w.constraints.length || !(w.broadphase instanceof CANNON.SAPBroadphase)) return null;

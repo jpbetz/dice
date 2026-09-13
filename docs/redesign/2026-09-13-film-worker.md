@@ -22,6 +22,26 @@ this DTO. Results transfer Float64 poses and Uint8 rough tracks, plus sound,
 landing and solver-state records. Restoring the original SAP array **in
 place** matters: Cannon's add/remove listeners retain that array's identity.
 
+Replies merge **only their own cast** into the live world. Another player's
+old dice can leave or reveal during the bake. Those bodies are never restored
+from the snapshot: surviving poses and newer configuration stay live, removed
+bodies stay absent, and newly added colliders remain. Contact matrices are
+remapped by surviving body IDs because removal renumbers Cannon's indices;
+SAP retains its array, filters removed IDs, includes new bodies and rechecks
+its bounds/order. Only the completed solver clock advances. The film still
+uses the immutable pre-event snapshot, as when a synchronous bake completed
+before the same event was processed.
+
+This is proved with Alice's shared 40d20 while Bob clears, collects or reveals
+an older settled roll. The clear case hung on the initial implementation;
+all three now complete without losing the later mutation. A separate unit
+proof compares the entire next film to the original live-world inline bake
+followed by the same remove/move/add/tuning event, including contact matrices.
+Venue changes are visual; their tower changes and normal zoom changes already
+defer through the busy predicate. The developer tower lab can move the main
+world's back wall immediately, which is why the merge also preserves moved
+and newly added colliders, rather than special-casing old-roll removals.
+
 One `currentRoll.baking` reservation keeps existing FIFO, busy checks and
 pending reveal/collect/clear behavior. A whole-table clear terminates the
 worker and retires the reservation; old replies and old worker errors cannot

@@ -20,7 +20,7 @@ limitations under the License.
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { bakeFilm } from './film-bake.js';
-import { captureFilm, rngFromState, applyWorldState, unpackFilm } from './film-wire.js';
+import { captureFilm, rngFromState, mergeFilmState, unpackFilm } from './film-wire.js';
 import { FilmClient } from './film-client.js';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, bustDie, SHADER_TIME, FACE_SHAPES } from './dice.js';
 import { dieArtURL, bustArt } from './diceart.js';
@@ -7235,7 +7235,7 @@ function playRoll(roll, rethrow = null, options = {}) {
       // A clear ends both the real work and its right to alter the table.
       if (!reply || currentRoll !== reservation) return;
       const film = reply.error ? bakeFilm(bakeContext) : unpackFilm(reply.result);
-      if (!reply.error) applyWorldState(world, reply.result.world);
+      if (!reply.error) mergeFilmState(world, reply.result.world, input);
       for (const d of dice) d.mesh.visible = true;
       finishBake(film);
       if (reservation.skipPlayback === 'one') {
@@ -7383,8 +7383,8 @@ function playRoll(roll, rethrow = null, options = {}) {
     // Which terminator baked this roll, recorded ON the roll rather than read
     // live: a tool that flips the mode between the bake and the read would
     // otherwise judge one throw by the other gate's epsilon.
-    settleMode: SETTLEGATE.mode,
-    settleEps: SETTLEGATE.eps,
+    settleMode: (input?.config.SETTLEGATE || SETTLEGATE).mode,
+    settleEps: (input?.config.SETTLEGATE || SETTLEGATE).eps,
     time: 0,
     // Where the tumble ends, off the baked film — see TEMPO. Computed here so
     // it is decided once, from bytes every client agrees on, rather than

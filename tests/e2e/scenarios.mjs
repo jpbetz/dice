@@ -33,6 +33,7 @@ import { tableControlScenarios } from './table-controls.mjs';
 import { firstPlayScenarios } from './first-play.mjs';
 import { workspaceScenarios } from './workspaces.mjs';
 import { rollHistoryScenarios } from './roll-history.mjs';
+import { filmMutationScenarios } from "./film-mutations.mjs";
 import { filmWorkerScenarios } from "./film-worker.mjs";
 import { profileSharingScenarios } from './profile-sharing.mjs';
 import { assert, Table, freePort, startServer } from './harness.mjs';
@@ -777,6 +778,7 @@ export const scenarios = [
   ...rollHistoryScenarios,
   ...profileSharingScenarios,
   ...filmWorkerScenarios,
+  ...filmMutationScenarios,
   {
     name: 'shared-roll',
     tags: ['smoke', 'roll', 'cuj8'],
