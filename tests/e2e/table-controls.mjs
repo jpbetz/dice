@@ -119,7 +119,8 @@ export const tableControlScenarios = [
       assert.notEqual(await a.dbg('settings.tableName'),'Not applied');
       await size(390,844); await click(a,'#toggle-settings');
       const pref=await a.eval(`document.getElementById('settings-panel').getBoundingClientRect().toJSON()`);
-      assert.ok(pref.height<400 && pref.bottom<=844,'three device preferences use a compact sheet');
+      assert.ok(pref.top>=0 && pref.bottom<=844,'device preferences fit the phone viewport');
+      assert.ok(await a.eval(`document.getElementById('presentation-picker').getBoundingClientRect().top>=0 && document.getElementById('set-ambience').getBoundingClientRect().bottom<=844`),'presentation and sound choices remain visible together');
       assert.equal(await a.eval(`document.getElementById('settings-title').textContent`),'Preferences');
       await size(1000,844,false);
       await a.waitFor(`!document.getElementById('left-panel').inert`);
