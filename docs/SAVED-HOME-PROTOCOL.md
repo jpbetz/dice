@@ -192,14 +192,21 @@ capture refusal, offline exact retry after reload, acknowledged cleanup/leave,
 real IndexedDB abort before HTTP, a held former-account response after a
 second tab changes the actual cookie, close during a held save, new-account
 mount during a held durable acknowledgement, and real IDB capacity/attempt
-protection. `tests/home-connection-ui.test.mjs` proves
+protection. Home navigation, capture/save, recovery, native version selection,
+Join, retry, download, acknowledgements and Leave use hit-tested pointer and
+keyboard input via `tests/fixtures/visible-input.mjs`. Test setup and injected
+storage/network failures stay direct. The IDB-failure case holds its actual
+failure callback until the visible Close action finishes, preserving the race
+that a synchronous DOM click previously exercised.
+`tests/home-connection-ui.test.mjs` proves
 local play under persistent home refusal and explicit guest creation during
 service outage, including a cancelled creation's delayed reply. The unit lane
 includes fixed-owner/view completion and exact-request tests.
 
 Inspected captures are reproducible with
 `node tools/drive.mjs tools/steps/homes-ui-look.mjs`: `tools/out/homes-capture-{desktop,phone}.png`
-and `homes-card-{desktop,phone}.png`. Capture shows two prepared profiles and
+and `homes-card-{desktop,phone}.png`. The look script also uses hit-tested
+account, capture, phone Save and Back actions. Capture shows two prepared profiles and
 three shared rolls; private libraries never enter the document. The composed
 release sweep remains a separate integration check.
 
