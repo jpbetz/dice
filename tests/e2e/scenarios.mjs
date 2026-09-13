@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { personalKitScenarios } from './personal-kit.mjs';
 import { tableControlScenarios } from './table-controls.mjs';
 import { firstPlayScenarios } from './first-play.mjs';
+import { profileSharingScenarios } from './profile-sharing.mjs';
 import { assert, Table, freePort, startServer } from './harness.mjs';
 import { probeCelticWeave } from './placard-knot-probe.mjs';
 
@@ -769,6 +770,7 @@ export const scenarios = [
   ...personalKitScenarios,
   ...tableControlScenarios,
   ...firstPlayScenarios,
+  ...profileSharingScenarios,
   {
     name: 'shared-roll',
     tags: ['smoke', 'roll', 'cuj8'],

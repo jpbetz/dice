@@ -66,6 +66,7 @@ import {
   setActiveSystem, setProfileSet, migrateLegacy, rebuildStore, toWire, fromWire,
   readStore,
 } from './profiles.js';
+import { SHARING_KEY, sharingChoices, sharedIds, chooseSharedProfile, profilePublication } from './profile-sharing.js';
 import { THEMES, SETS, installCatalogue } from './themes.js';
 import { ParticleField } from './particles.js';
 import { DecalField } from './decals.js';
@@ -17001,6 +17002,9 @@ window.__diceDebug = {
       const p = activeProfile(profileStore);
       return p ? { id: p.id, name: p.name, system: p.system, pools: groups.length, ...(p.set ? { set: p.set } : {}) } : null;
     },
+    share(id,on) { return setProfileShared(id,!!on); },
+    get shared() { return currentSharedIds(); },
+    clearSharing() { return resetProfileSharing(); },
     get tableSystem() { return tableSystem(); },
     // R6's answer, per system — what each table would hand you on arrival.
     get lastUsed() {
@@ -17034,6 +17038,7 @@ window.__diceDebug = {
     // reason at the rack's grain; this is it at the library's.
     reset(system) {
       const sys = knownSystem(system) || tableSystem();
+      if (!resetProfileSharing()) return {ok:false,status:'Couldn’t clear sharing choices'};
       profileStore = emptyStore();
       const added = addProfile(profileStore, {
         name: dealName(sys), system: sys, pools: dealRack(sys), at: Date.now(),
@@ -19023,7 +19028,7 @@ window.__diceDebug = {
       system: p.system || null,
       set: p.set || null }));
   },
-  publishPools() { publishPools(); return true; },
+  publishPools() { return publishPools(); },
   // the Pools tab flyout (the WHOLE panel body — draft + list — on hover
   // of the collapsed tab), driven directly where headless tests can't hover.
   setPanelState(patch) {
@@ -21670,50 +21675,79 @@ function setPoolsOwner(id) {
   renderPlayers(); // rail pills reflect the pressed state (teammate consolidation 2026-08-04)
 }
 
-// Share the rack with the room: name + notation + category, capped like the
-// server caps it. Fire-and-forget — everyone (us included) hears the
-// 'pools-changed' echo, and a solo table simply has no one to tell.
-// Tier G's publish gate is GONE, and its deletion is a design consequence
-// rather than a tidy-up: it existed because `Edit ⟨name⟩` put somebody else's
-// pools in the one rack, so a publish mid-swap would have claimed Alice's rack
-// under your own name and corrupted the owner switcher. The rack is now always
-// the profile in your own hands, so a publish is always honest and there is
-// nothing left to gate (PROFILES §11.8).
-function publishPools() {
-  if (!net) return;
-  const mine = activeProfile(profileStore);
-  net.setPools(groups.slice(0, MAX_POOLS).map((g) => {
-    const rec = { name: g.name || '', notation: g.notation };
-    if (g.category) rec.category = g.category;
-    if (g.set) rec.set = g.set; // §9: pool identity rides the rack broadcast
-    return rec;
-  }),
-  wireSet(), // §9: your default set rides too — foreign racks show YOUR world
-  // §11: and WHICH profile this is, plus the system it was built for. The
-  // owner switcher has browsed teammates' racks since ROADMAP 2b; until now
-  // it could only say whose. A rack a teammate can name is one they can copy.
-  mine ? mine.name : null,
-  mine ? mine.system : null,
-  // C17: THE WHOLE LIBRARY RIDES ALONG. An organizer builds six characters
-  // and sits down; the table offers six, with no push and no YAML pane. The
-  // ACTIVE profile's pools come from `groups` (the live rack) rather than
-  // from its stored copy, because an edit in progress has not been written
-  // back yet and a seat offering yesterday's version of the character you
-  // are visibly editing is worse than none.
-  profilesOf(profileStore).map((p) => ({
-    name: p.name,
-    system: p.system,
-    ...(p.set ? { set: p.set } : {}),
-    pools: (p.id === profileStore.activeId ? groups : (p.pools || []))
-      .slice(0, MAX_POOLS)
-      .map((g) => {
-        const rec = { name: g.name || '', notation: g.notation };
-        if (g.category) rec.category = g.category;
-        if (g.set) rec.set = g.set;
-        return rec;
-      }),
-  })));
+// Only explicitly selected profiles enter the live room. Queue writes so a
+// slow earlier publication cannot land after a later withdrawal in this tab.
+var profileShareFlight = null;
+var profileShareVersion = 0;
+var profileShareFailed = false;
+var profileShareStorageFailed = false;
+function currentSharedIds() { return IN_LOBBY ? [] : sharedIds(load(SHARING_KEY,null),ROOM); }
+function persistSharing(next) {
+  try {
+    const text = JSON.stringify(next);
+    localStorage.setItem(SHARING_KEY,text);
+    if (localStorage.getItem(SHARING_KEY) !== text) throw new Error('not saved');
+    profileShareStorageFailed = false;
+    return true;
+  } catch { profileShareStorageFailed = true; return false; }
 }
+function setProfileShared(id, enabled) {
+  if (IN_LOBBY || !findProfile(profileStore,id)) return false;
+  if (!persistSharing(chooseSharedProfile(load(SHARING_KEY,null),ROOM,id,enabled))) {
+    renderProfileLibrary(); return false;
+  }
+  publishPools(); renderProfileLibrary(); return true;
+}
+// Invoke before adopting a replacement or another account's namespace. IDs
+// such as p1 may be reused, but permission for an old profile is not inherited.
+function resetProfileSharing() {
+  if (!persistSharing(sharingChoices(null))) return false;
+  publishPools(); renderProfileLibrary(); return true;
+}
+function publishPools() {
+  if (!net) return Promise.resolve(false);
+  profileShareVersion++;
+  if (profileShareFlight) return profileShareFlight;
+  profileShareFlight = (async () => {
+    let ok = false;
+    do {
+      const version = profileShareVersion;
+      const data = profilePublication(profileStore,groups,currentSharedIds(),wireSet());
+      const consent = JSON.stringify(currentSharedIds());
+      renderProfileSharingStatus(true);
+      try { ok = await net.setPools(data.pools,data.set,data.profile,data.system,data.library); }
+      catch { ok = false; }
+      profileShareFailed = !ok;
+      // Another same-origin tab may have changed consent while this request
+      // was in flight. Converge on that current choice, never replay a copy.
+      if (JSON.stringify(currentSharedIds()) !== consent) profileShareVersion++;
+      if (version === profileShareVersion) break;
+    } while (true);
+    return ok;
+  })().finally(() => { profileShareFlight = null; renderProfileSharingStatus(); });
+  return profileShareFlight;
+}
+function renderProfileSharingStatus(pending = !!profileShareFlight) {
+  const el = document.getElementById('pools-shared-note');
+  if (!el) return;
+  el.classList.remove('hidden');
+  const selected = new Set(currentSharedIds());
+  const n = profilesOf(profileStore).filter(p => selected.has(p.id)).length;
+  el.textContent = profileShareStorageFailed ? 'Couldn’t save your sharing choice. Try again.'
+    : IN_LOBBY ? 'Your saved rolls are private. At a shared table, choose which profiles others can see and copy.'
+    : pending ? 'Updating the profiles shared at this table…'
+    : profileShareFailed ? 'Couldn’t update sharing at the table. Its previous shared copy may still be visible.'
+    : !netOnline ? 'Sharing will update when you connect. A previous shared copy may still be visible at the table.'
+    : n ? `${n} ${n === 1 ? 'profile is' : 'profiles are'} shared at this table, including later edits. Others can copy those rolls. Unsharing cannot remove copies they already kept.`
+    : 'Your saved rolls are private. Choose Share at this table beside each profile you want others to see and copy.';
+  const retry = document.getElementById('profile-share-retry');
+  if (retry) retry.hidden = !profileShareFailed || pending;
+}
+window.addEventListener('storage', e => {
+  if (e.key !== SHARING_KEY && e.key !== null) return;
+  publishPools(); renderProfileLibrary();
+});
+document.getElementById('profile-share-retry').addEventListener('click', () => publishPools());
 
 // Category shelves (the Rack): fixed trio order — Attributes, Skills,
 // Motivations — then other categories alphabetically, uncategorized last
@@ -31259,6 +31293,7 @@ function portableReplaceLibrary() {
   // the store to write, so the replacement library is on disk before anything
   // in this tab points at it — a browser that refuses the write leaves the old
   // library whole in memory AND on disk, with no half-moved state to repair.
+  if (!resetProfileSharing()) return portableRefuse('✗ couldn’t clear previous sharing choices — nothing was replaced');
   if (!saveProfileStore(built.store)) {
     return portableRefuse('✗ couldn’t save the restored library (storage unavailable?) — nothing was replaced');
   }
@@ -31697,6 +31732,8 @@ let profileRenaming = null;
 function renderProfileLibrary() {
   const rows = document.getElementById('profile-rows');
   if (!rows) return;
+  const focusedShare = rows.contains(document.activeElement)
+    ? document.activeElement.dataset.shareProfile : null;
   rows.textContent = '';
   const sys = tableSystem();
   for (const p of profilesOf(profileStore)) {
@@ -31748,6 +31785,17 @@ function renderProfileLibrary() {
     countEl.className = 'pp-count';
     countEl.textContent = `${n} pool${n === 1 ? '' : 's'}`;
     row.append(nameEl, sysEl, countEl);
+    if (!IN_LOBBY) {
+      const label = document.createElement('label');
+      label.className = 'profile-share-choice';
+      const input = document.createElement('input');
+      input.type = 'checkbox'; input.checked = currentSharedIds().includes(p.id);
+      input.dataset.shareProfile = p.id;
+      input.setAttribute('aria-label', `Share ${p.name} at this table`);
+      input.addEventListener('change', () => setProfileShared(p.id,input.checked));
+      label.append(input, document.createTextNode('Share at this table'));
+      row.append(label);
+    }
 
     if (active) {
       const tag = document.createElement('span');
@@ -31793,12 +31841,20 @@ function renderProfileLibrary() {
       renderProfileLibrary();
     });
     row.append(del);
+    row.classList.add('pp-library-row');
+    const info = document.createElement('div'); info.className = 'pp-library-info';
+    info.append(nameEl,sysEl,countEl);
+    const actions = document.createElement('div'); actions.className = 'pp-library-actions';
+    actions.append(...row.children);
+    row.append(info,actions);
     rows.appendChild(row);
   }
 
   const count = document.getElementById('profile-count');
   if (count) count.textContent = `${profilesOf(profileStore).length} of ${MAX_PROFILES}`;
   renderTableProfiles();
+  if (focusedShare) [...rows.querySelectorAll('[data-share-profile]')]
+    .find(input => input.dataset.shareProfile === focusedShare)?.focus({preventScroll:true});
 }
 
 // 'At this table' — the prepared seats and the teammates' published racks, each
@@ -31821,16 +31877,7 @@ function renderTableProfiles() {
       rec: { name: pl.profile || pl.name, system: pl.system || null, set: pl.set || null, pools: pl.pools },
     });
   }
-  // …and the SENDING half, disclosed (U25). One line, standing, at a table
-  // only — see the markup comment for why it lives here and not in a tooltip.
-  const shared = document.getElementById('pools-shared-note');
-  if (shared) {
-    const n = profilesOf(profileStore).length;
-    shared.textContent = `Everyone at this table can see your ${n === 1 ? 'profile' : `${n} profiles`}`
-      + ' and copy the pools in them. Nothing of yours is stored on the server —'
-      + ' the room forgets it when the table ends.';
-    shared.classList.toggle('hidden', !netOnline);
-  }
+  renderProfileSharingStatus();
   zone.classList.toggle('hidden', !offers.length);
   if (!offers.length) return;
   for (const o of offers) {
@@ -35036,6 +35083,7 @@ function handleNetEvent(type, data) {
       // loss that made foreign racks wear the viewer's skin.
       if (p) {
         p.pools = data.pools || [];
+        p.library = Array.isArray(data.library) ? data.library : [];
         p.set = typeof data.set === 'string' ? data.set : null;
         // §11: which of THEIR profiles this rack is, and what it was built for
         // — the owner switcher could only ever say whose until now, and a rack

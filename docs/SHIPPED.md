@@ -21,6 +21,20 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Explicit per-table profile sharing (2026-09-13)
+
+Saved profiles start private. **Share at this table** selects individual
+profiles, including whether the active rack is published; later edits follow
+that choice. New and imported profiles do not inherit consent. Failed
+withdrawals retain an honest retry state, and late joins receive only the
+currently selected material. Existing viewers now refresh alternate profiles
+on each publication event. This supersedes C17's automatic library broadcast
+and prepares R1's optional synchronization boundary.
+
+Four unit cases and a raw-stream/late-join browser scenario pass. Desktop and
+phone library captures were inspected. [Design and proof details](PROFILE-SHARING.md).
+Account recovery, sync and the destination/mobile layout remain in progress.
+
 ## Local gallery practice (2026-09-13)
 
 My dice now has **Practice throw** beside the explicit selection action.

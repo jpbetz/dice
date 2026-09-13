@@ -1306,18 +1306,8 @@ limitations under the License.
           </div>
           <p id="profile-status" class="hint portable-status"></p>
           <details id="starter-kits"><summary>Choose a starter kit</summary><div id="starter-kit-chooser"></div></details>
-          <!-- THE BROADCAST, SAID OUT LOUD (U25, audit E4). publishPools sends
-               your whole library — every profile's name, system and pools — to
-               the room on every edit, and has since C17, because that is what
-               makes "At this table" below it work in both directions and what
-               CUJ6/CUJ7 stand on. Nothing said so, and the app's two sentences
-               about pool sharing said the opposite ("Pools travel via Settings
-               → Your data → Export"). Both are now true and this is the
-               disclosure: it stands where the receiving half already stands, so
-               the symmetry is legible in one glance. At a table only —
-               announcing a broadcast to a solo player is a lie in the other
-               direction. -->
-          <p id="pools-shared-note" class="hint hidden"></p>
+          <p id="pools-shared-note" class="hint" role="status"></p>
+          <button id="profile-share-retry" class="btn tiny" type="button" hidden>Retry sharing update</button>
           <div id="table-profiles" class="portable-profiles hidden">
             <span class="pp-head">At this table</span>
             <div id="table-profile-rows"></div>

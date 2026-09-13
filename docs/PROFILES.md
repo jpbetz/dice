@@ -34,6 +34,11 @@ sign-in is historical; the capture, preview/merge, and guest-play promises
 remain. This records a new direction, not a claim that remote saving exists
 in the current app.
 
+**Publication changed 2026-09-13:** [explicit profile sharing](PROFILE-SHARING.md)
+supersedes C17's automatic whole-library broadcast. Each browser/table now
+publishes only profiles deliberately selected there, including the active
+rack. Creating, importing or recovering a profile grants no sharing consent.
+
 ## 1. The two jobs
 
 > **RENUMBERED 2026-08-08.** These two were written before

@@ -6905,3 +6905,13 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
 .fc-seg.fc-w-energy { background: rgba(255, 212, 121, 0.62); }
 .fc-seg.fc-w-claw   { background: rgba(196, 143, 166, 0.62); }
 .fc-seg.fc-w-heart  { background: rgba(143, 196, 160, 0.62); }
+
+/* A profile's sharing choice belongs beside that profile, never in a toast. */
+.profile-share-choice { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); cursor: pointer; }
+.profile-share-choice input { accent-color: var(--gold); width: 16px; height: 16px; }
+.pp-row.pp-library-row { display: block; padding: 10px 0; border-bottom: 1px solid var(--hair); }
+.pp-library-info, .pp-library-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.pp-library-info .pp-name { flex: 1 1 140px; }
+.pp-library-actions { margin-top: 5px; }
+.pp-library-actions .profile-share-choice { flex: 1 1 auto; }
+@media (pointer: coarse) { .profile-share-choice { min-height: 44px; } }
