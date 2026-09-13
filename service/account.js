@@ -5,6 +5,7 @@ import { cutText } from '../js/notation.js';
 import { StoreError } from './store.js';
 import { readLibrary, prepareLibraryWrite, writeLibrary, archiveLibrary } from './library.js';
 import { createHomeDomain } from './homes.js';
+import { createSocialDomain } from './social.js';
 
 export const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_SESSIONS = 12;
@@ -66,12 +67,13 @@ export function createAccountService({ store, now = Date.now, sessionMs = SESSIO
   const expectedPerson = (found, expected) => found.person.id === expected ? null
     : outcome(409, 'identity_changed', 'The signed-in person changed. Reopen the account before syncing.');
   const homes = createHomeDomain({ bridge: homeBridge, now });
+  const social = homes ? createSocialDomain({ now }) : null;
 
   return Object.freeze({
     async status() {
       await store.get('meta/accounts');
       return { enabled: true, available: true, recoveryMethods: ['key'], schema: 1,
-        capabilities: ['library', ...(homes ? ['homes'] : [])] };
+        capabilities: ['library', ...(homes ? ['homes', 'people'] : [])] };
     },
     async register(input) {
       if (!input || !validRecoveryKey(input.recoveryKey) || input.recoveryAcknowledged !== true
@@ -180,6 +182,17 @@ export function createAccountService({ store, now = Date.now, sessionMs = SESSIO
     async resolveHomeRoom(roomKey) {
       if (!homes) return outcome(503, 'homes_unavailable', 'Saved tables are unavailable. Try this address again later.');
       return store.transact(tx => homes.resolve(tx, roomKey));
+    },
+    async social(token, csrf, expected, action, { id = null, input = {} } = {}) {
+      if (!social) return outcome(503, 'social_unavailable', 'People service is unavailable. Your live table still works.');
+      const read = ['people', 'invitations'].includes(action);
+      return store.transact(async tx => {
+        const found = await authenticated(tx, token, csrf, now(), !read);
+        if (!found.ok) return found;
+        return expectedPerson(found, expected) || (read
+          ? social.read(tx, found.person, action, input)
+          : social.mutate(tx, found.person, action, id, input));
+      });
     },
     async logout(token, csrf) {
       return store.transact(async tx => {

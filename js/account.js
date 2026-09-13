@@ -15,6 +15,12 @@ export function generateRecoveryKey(webCrypto = globalThis.crypto) {
   return 'dt1_' + btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 }
 
+export function generateContactCode(webCrypto = globalThis.crypto) {
+  // Deliberately separate names and prefixes: a contact code may be shared;
+  // a recovery key must never be offered in an invitation flow.
+  return 'dc1_' + generateRecoveryKey(webCrypto).slice(4);
+}
+
 export function createAccountClient({ fetch: fetcher = globalThis.fetch,
   origin = globalThis.location?.origin, onIdentityChange = async () => {},
   storage, timeoutMs = 6000 } = {}) {
@@ -69,7 +75,7 @@ export function createAccountClient({ fetch: fetcher = globalThis.fetch,
           ...(nonce ? { 'X-Dice-CSRF': nonce } : {}) }) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: controller.signal,
       });
-      if (response.status === 404 && !action.startsWith('library') && !action.startsWith('homes')) return { ok: false, code: 'not_available', enabled: false };
+      if (response.status === 404 && !['library', 'homes', 'people', 'invitations', 'presence'].some(prefix => action.startsWith(prefix))) return { ok: false, code: 'not_available', enabled: false };
       const value = await response.json();
       if (!value || typeof value !== 'object') return unavailable();
       if (!response.ok) return { ...value, ok: false };
@@ -136,6 +142,17 @@ export function createAccountClient({ fetch: fetcher = globalThis.fetch,
     saveHome: (expectedPersonId, id, input, { reconcile = false } = {}) => libraryRequest(expectedPersonId,
       `homes/${encodeURIComponent(id)}${reconcile ? '/reconcile' : ''}`, input),
     leaveHome: (expectedPersonId, id, input) => libraryRequest(expectedPersonId, `homes/${encodeURIComponent(id)}/leave`, input),
+    people: expectedPersonId => libraryRequest(expectedPersonId, 'people'),
+    setContactCode: (expectedPersonId, input) => libraryRequest(expectedPersonId, 'people/contact-code', input),
+    requestFriend: (expectedPersonId, input) => libraryRequest(expectedPersonId, 'people/requests', input),
+    removeFriend: (expectedPersonId, id, input) => libraryRequest(expectedPersonId, `people/${encodeURIComponent(id)}/remove`, input),
+    blockPerson: (expectedPersonId, id, input) => libraryRequest(expectedPersonId, `people/${encodeURIComponent(id)}/block`, input),
+    invitations: (expectedPersonId, { direction = 'incoming', after } = {}) => libraryRequest(expectedPersonId,
+      `invitations?direction=${encodeURIComponent(direction)}${after ? `&after=${encodeURIComponent(after)}` : ''}`),
+    inviteHome: (expectedPersonId, input) => libraryRequest(expectedPersonId, 'invitations', input),
+    respondInvitation: (expectedPersonId, id, input) => libraryRequest(expectedPersonId, `invitations/${encodeURIComponent(id)}/respond`, input),
+    cancelInvitation: (expectedPersonId, id, input) => libraryRequest(expectedPersonId, `invitations/${encodeURIComponent(id)}/cancel`, input),
+    archiveInvitation: (expectedPersonId, id, input) => libraryRequest(expectedPersonId, `invitations/${encodeURIComponent(id)}/archive`, input),
     logout() {
       // Freeze the local namespace before awaiting a server that may be down.
       const epoch = ++identityEpoch;

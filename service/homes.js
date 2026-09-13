@@ -59,6 +59,9 @@ function checkHome(home, id) {
   return home;
 }
 
+// Shared only with the private social service's membership transaction.
+export { checkHome as checkHomeRecord, summary as homeCard };
+
 function document(raw, bridge) {
   const copy = jsonCopy(raw);
   if (bytes(copy) > MAX_DOCUMENT_BYTES) return refusal(413, 'home_limit', 'This prepared table is too large to save. Keep its export.');
