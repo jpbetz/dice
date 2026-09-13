@@ -49,7 +49,7 @@ continues to own live rolls, seats and room SSE.
 
 | Configuration | Meaning |
 | --- | --- |
-| `DICE_ACCOUNT_STORE=off\|file\|firestore` | Explicit mode; default `off` |
+| `DICE_ACCOUNT_STORE=off\|paused\|file\|firestore` | Explicit mode; default `off` |
 | `DICE_ACCOUNT_DIR=/absolute/private/path` | Required for file mode; refuse checkout/static roots and symlinks into them |
 | `DICE_ACCOUNT_ORIGIN=https://…` | Exact accepted browser origin; HTTPS required except loopback development |
 | `DICE_FIRESTORE_PROJECT`, `DICE_FIRESTORE_DATABASE` | Required for Firestore; database defaults to `(default)` only when explicitly selecting Firestore |
@@ -361,16 +361,18 @@ it cannot revoke a room address already learned. **Join now** is a separate
 user action. Initial inbox transport is bounded polling while People is
 visible or on focus, with backoff, not a second always-open stream.
 
-Presence is ephemeral in the live service, outside the durable snapshot:
-authenticated client pulses every 25 seconds while participating, expires
-after 75 seconds and is immediately cleared on successful sign-out. Test
-with injected clock/short intervals. Require explicit presence sharing,
-check current relationship/membership before projection, and aggregate
-multiple devices by person. A service restart shows **Unknown** until new
-pulses, not a historical online count. Room occupancy comes from the current
-room's liveness-checked players, with no roll information. Never infer
-presence from an open proxy socket; the existing production incident and
-`/api/pong` mechanism are recorded in [deployment guidance](DEPLOY.md).
+The implemented presence contract supersedes the initial in-memory pulse
+sketch: markers live in the optional store, expire after 90 seconds and renew
+at most every 30 seconds while a tab is visible. Current session hashes and
+generation, relationships, membership and explicit per-device choices govern
+every projection. A process restart can retain an unexpired marker; it is not
+historical occupancy and expires without another pulse. Current saved-home
+location requires a separate choice and live-seat check; no arbitrary guest
+location or roll information is included. See the implemented
+[social/presence protocol](SOCIAL-SERVICE-PROTOCOL.md), including atomic marker
+withdrawal on account switches. Never infer presence from an open proxy socket;
+the existing production incident and `/api/pong` mechanism are recorded in
+[deployment guidance](DEPLOY.md).
 
 ## 7. Deployment, operating cost and external work
 
@@ -463,3 +465,12 @@ precise cold-address outage boundary in
 capture, immutable competing revisions, new guest creation independent of home
 storage, and restart hydration. The main UI seams listed there remain for the
 Tables/account integration slice; no production deployment is implied.
+
+**Production enablement and safe maintenance** are specified in
+[ACCOUNT-OPERATIONS.md](ACCOUNT-OPERATIONS.md). The configuration-only preflight
+uses the runtime schema and makes no provider or filesystem changes. After
+homes exist, `paused` is the safe unavailable mode; `off` and pre-D2 rollback
+can bypass the mapping for a converted guest address. Pause requires no storage
+credentials, refuses cold addresses, preserves data, and leaves live rooms and
+explicit new guest creation usable. No cloud service has been enabled by these
+local changes.

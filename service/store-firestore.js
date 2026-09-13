@@ -2,8 +2,8 @@
 
 import { STORE_SCHEMA, MAX_RECORD_BYTES, MAX_TRANSACTION_BYTES, StoreError, storageError,
   validPath, jsonCopy, transactionView } from './store.js';
+import { firestoreAddress } from './account-config.js';
 
-const SEGMENT = /^[A-Za-z0-9_-]{1,128}$/;
 const abortError = () => new StoreError('timeout');
 
 // Include token acquisition and reading the response body in the deadline.
@@ -38,8 +38,8 @@ export function openFirestoreStore({ project, database = '(default)', namespace,
   tokenSupplier, fetch: fetcher = globalThis.fetch, timeoutMs = 5000,
   maxAttempts = 3, retryDelay = attempt => new Promise(resolve =>
     setTimeout(resolve, Math.min(250, 20 * 2 ** attempt) * (0.5 + Math.random()))) } = {}) {
-  if (!SEGMENT.test(project || '') || !(database === '(default)' || SEGMENT.test(database || ''))
-      || !SEGMENT.test(namespace || '') || typeof tokenSupplier !== 'function'
+  firestoreAddress({ project, database, namespace });
+  if (typeof tokenSupplier !== 'function'
       || typeof fetcher !== 'function' || !Number.isFinite(timeoutMs) || timeoutMs < 1
       || timeoutMs > 60000 || !Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 5
       || typeof retryDelay !== 'function') throw new StoreError('invalid');

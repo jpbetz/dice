@@ -5,22 +5,13 @@ import { openFirestoreStore, metadataTokenSupplier } from './store-firestore.js'
 import { createAccountService, SESSION_MS } from './account.js';
 import { StoreError } from './store.js';
 import { MAX_LIBRARY_BYTES } from '../js/library-document.js';
+import { readAccountConfiguration } from './account-config.js';
 
 const ROOT = '/api/account';
 const MAX_BODY = 8192;
 const unavailable = { ok: false, code: 'account_unavailable', message: 'Account service is unavailable. Your table still works.' };
 const disabled = { enabled: false, available: false, recoveryMethods: [], schema: 1 };
 const known = new Set(['/status', '/session', '/register', '/recover', '/logout', '/revoke-others', '/rotate-key', '/library', '/library/reconcile', '/library/archive']);
-
-function originConfig(raw) {
-  let parsed;
-  try { parsed = new URL(raw); } catch { throw new StoreError('invalid'); }
-  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(parsed.hostname);
-  if ((parsed.protocol !== 'https:' && !(local && parsed.protocol === 'http:'))
-      || parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash
-      || parsed.origin !== raw) throw new StoreError('invalid');
-  return { origin: parsed.origin, secure: parsed.protocol === 'https:' };
-}
 
 function cookieToken(req, name) {
   const matches = String(req.headers.cookie || '').split(';').map(part => part.trim())
@@ -112,14 +103,16 @@ export function createOptionalAccountApi({ env = process.env, service = null,
   let ready;
   if (enabled) {
     ready = (async () => {
-      settings = originConfig(env.DICE_ACCOUNT_ORIGIN);
+      const config = readAccountConfiguration(env, { injectedService: !!service });
+      if (config.mode === 'paused') return null;
+      settings = { origin: config.origin, secure: config.secure };
       if (service) return service;
       let store;
-      if (mode === 'file') store = await openFileStore({ directory: env.DICE_ACCOUNT_DIR,
-        recoverStaleLock: env.DICE_ACCOUNT_RECOVER_LOCK === '1', ...storeOptions });
+      if (mode === 'file') store = await openFileStore({ directory: config.directory,
+        recoverStaleLock: config.recoverStaleLock, ...storeOptions });
       else if (mode === 'firestore') store = openFirestoreStore({
-        project: env.DICE_FIRESTORE_PROJECT, database: env.DICE_FIRESTORE_DATABASE || '(default)',
-        namespace: env.DICE_ACCOUNT_NAMESPACE, tokenSupplier: metadataTokenSupplier(), ...storeOptions,
+        project: config.project, database: config.database,
+        namespace: config.namespace, tokenSupplier: metadataTokenSupplier(), ...storeOptions,
       });
       else throw new StoreError('invalid');
       return createAccountService({ store, now, homeBridge });
@@ -163,7 +156,7 @@ export function createOptionalAccountApi({ env = process.env, service = null,
         }
         const account = await ready;
         if (!account) { send(res, suffix === '/status' ? 200 : 503,
-          suffix === '/status' ? { enabled: true, available: false, recoveryMethods: ['key'], schema: 1 } : unavailable); return true; }
+          suffix === '/status' ? { enabled: true, available: false, ...(mode === 'paused' ? { paused: true } : {}), recoveryMethods: ['key'], schema: 1 } : unavailable); return true; }
         if (suffix === '/status') { send(res, 200, await account.status()); return true; }
         const cookieName = settings.secure ? '__Host-dice-account' : 'dice-account-local';
         const token = cookieToken(req, cookieName);

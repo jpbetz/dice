@@ -14,7 +14,7 @@
 
 # What NOT to upload to Cloud Build when deploying from source.
 # The app that ships is: server.js, package.json, index.html,
-# js/, css/, vendor/, models/, LICENSE — minus developer mode's four files,
+# js/, css/, vendor/, models/, service/, LICENSE — minus developer mode's four files,
 # named at the bottom of this file.
 #
 # `lab.html` left that list on 2026-09-03: the dice lab retired with js/lab.js

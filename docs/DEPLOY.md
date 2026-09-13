@@ -68,11 +68,25 @@ response and 0.51 ms for the cached response. Server CPU speed and network
 conditions affect timings; byte counts are the delivery proof. Physical
 phone, page-load, idle-rendering and battery measurements remain R3 work.
 
+## Optional recoverable accounts (2026-09-13)
+
+The account service is locally implemented and remains absent from the current
+public revision. [ACCOUNT-OPERATIONS.md](ACCOUNT-OPERATIONS.md) records read-only
+cloud evidence, exact configuration preflight, external Firestore/IAM/backup
+work, staging proofs and safe pause/rollback. It is the operating contract for
+recoverable identity, synchronized libraries, saved homes and social data. The
+old guest-only cost estimates below do not include these new operations.
+
+Once a deployment offers saved homes, use `DICE_ACCOUNT_STORE=paused` for
+maintenance; do not switch it to `off` or an older pre-home revision. Converted
+guest addresses need the saved-home guard even while storage is unavailable.
+The local file adapter is for private restart proofs and refuses Cloud Run;
+production requires the Firestore REST adapter and reviewed external setup.
+
 ## Why Cloud Run
 
-The app is unusually serverless-friendly: `server.js` reads `$PORT`, writes
-nothing to disk, and all state is in-memory rooms that are *designed* to be
-disposable (a room dies when the last player leaves; `js/net.js` silently
+The guest runtime is serverless-friendly: `server.js` reads `$PORT`, and its
+live state is in-memory rooms that are *designed* to be disposable (a room dies when the last player leaves; `js/net.js` silently
 re-joins after a server restart). The only hard constraints are:
 
 1. **One instance.** Rooms live in one process's memory, so every player must
