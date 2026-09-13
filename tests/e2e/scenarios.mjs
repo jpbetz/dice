@@ -3922,7 +3922,9 @@ export const scenarios = [
     // no budget still prints a bare total, which is what this asserts second.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
-      await a.dbg('profiles.reset()');
+      await a.dbg("setSystem('soul-deal')");
+      await a.waitFor('window.__diceDebug.system === "soul-deal"');
+      await a.dbg("profiles.reset('soul-deal')");
       await a.dbg('setPanelState({pools: true})');
       const fig = (label) => a.eval(`(() => {
         const head = [...document.querySelectorAll('.pool-sec-head')]
@@ -11914,6 +11916,9 @@ export const scenarios = [
     // — so nothing is ever swapped and nothing ever breaks.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.5', name: 'Solo' });
+      await a.dbg("setSystem('soul-deal')");
+      await a.waitFor('window.__diceDebug.system === "soul-deal"');
+      await a.dbg("profiles.reset('soul-deal')");
       const soul = await a.dbg('profiles.active');
       assert.equal(soul.system, 'soul-deal');
 
@@ -18431,6 +18436,8 @@ export const scenarios = [
     // exist. That is what is asserted here, on the second player's tab.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.34', name: 'Ada' });
+      await a.dbg("setSystem('soul-deal')");
+      await a.waitFor('window.__diceDebug.system === "soul-deal"');
       const b = await ctx.newTable({ origin: '127.0.0.35', name: 'Bram' });
       await b.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
 
@@ -18966,7 +18973,7 @@ export const scenarios = [
       await ctx.api('/api/table', {
         playerId: organizer.playerId,
         rev: 1,
-        table: { tableName: 'Session 3' },
+        table: { tableName: 'Session 3', system: 'soul-deal' },
         profiles: [{ name: 'Rill', pools: [{ name: 'Agility', notation: '2d8' }] }],
       });
 
@@ -19217,6 +19224,8 @@ export const scenarios = [
     // surface exists to undo.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.47', name: 'Ada' });
+      await a.dbg("setSystem('soul-deal')");
+      await a.waitFor('window.__diceDebug.system === "soul-deal"');
       assert.equal((await a.dbg('logFlyout')).open, false,
         'the flyout starts CLOSED — that is the state with the defect in it');
 
@@ -22916,7 +22925,9 @@ export const scenarios = [
     // assertion cannot see (§7.21's lesson).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.75', name: 'Ada' });
-      assert.equal(await a.dbg('system'), 'soul-deal', 'the per-die lens is the default');
+      await a.dbg("setSystem('soul-deal')");
+      await a.waitFor('window.__diceDebug.system === "soul-deal"');
+      assert.equal(await a.dbg('system'), 'soul-deal', 'the selected lens reads each die');
 
       // ---- one row per die the player THREW --------------------------------
       await a.roll('4d6dl1 # Ability');
@@ -23017,6 +23028,9 @@ export const scenarios = [
     async fn(ctx) {
       const a = await tableTab(ctx, { origin: '127.0.0.76', seed: { 'dice.name.v1': 'Ada' } });
       await a.waitOnline();
+      await a.dbg("setSystem('soul-deal')");
+      await a.waitFor('window.__diceDebug.system === "soul-deal"');
+      await a.dbg("profiles.reset('soul-deal')");
       await a.dbg(`setGroups([
         {name: 'Claws', notation: '1d6', category: 'Attributes'},
         {name: 'Fangs', notation: '2d8', category: 'Attributes'},
@@ -23787,7 +23801,9 @@ export const scenarios = [
     // at the end of the line would fail.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: '127.0.0.160', name: 'Alice' });
-      assert.equal(await a.dbg('system'), 'soul-deal', 'the per-die lens is the default');
+      await a.dbg("setSystem('soul-deal')");
+      await a.waitFor('window.__diceDebug.system === "soul-deal"');
+      assert.equal(await a.dbg('system'), 'soul-deal', 'the selected lens reads each die');
       await a.roll('2d8[Wisdom]+1d6[Zeal]');
       const rid = await a.rollId();
       const row = await a.dbg(`logRow(${JSON.stringify(rid)})`);
