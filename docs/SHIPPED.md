@@ -8,6 +8,34 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## 2026-09-13 — People, received invitations and explicit presence
+
+The optional People task now offers contact-code friend requests, named saved
+home invitations, Accept/Decline/Cancel/Archive, acknowledged removal/blocking,
+a paged list of blocked account names, and separate online/home-location
+sharing. Guests retain the live roster and room-link invitation. Accept refreshes
+membership while preserving the current seat and unfinished turn; Join is a
+separate action. Recovering an account does not enable library sync or presence.
+
+A strict per-account IndexedDB journal keeps exact operations before sending.
+Uncertain replies survive reload and account changes. Failed device writes send
+no request; explicit exports and acknowledged cleanup preserve kept originals.
+Identity and relationship epochs prevent late responses restoring prior names or
+signals. Both invitation actions and presence markers expire on screen, and
+failed home-presence reads say Unknown.
+
+The actual-app suite uses hit-tested pointer/keyboard input, independent Chrome
+contexts, a service restart, real IDB failures and held HTTP responses. Desktop
+and 390 × 844 phone captures include a named invitation, a lone result, four
+players and one-action return with every painted die inside the scene. Reproduce
+with `node tools/drive.mjs tools/steps/people-ui-look.mjs`. Captures:
+[desktop invitation](redesign/2026-09-13-people-invitation-desktop.png),
+[phone invitation](redesign/2026-09-13-people-invitation-phone.png), and
+[phone return](redesign/2026-09-13-people-return-phone-four.png). Contract and limits are
+in [SOCIAL-SERVICE-PROTOCOL.md](SOCIAL-SERVICE-PROTOCOL.md). All invitations and
+accounts used in development are isolated fixtures; production deployment is
+separate.
+
 ## 2026-09-13 — Mobile roll flows and direct result clearing
 
 Reproduced Joe's failures in Chrome at the iPhone 12 Pro viewport (390 × 844):

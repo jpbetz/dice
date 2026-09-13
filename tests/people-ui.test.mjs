@@ -16,10 +16,14 @@ test('actual controls deliver an offline invitation across restart; acceptance p
   await people(a);await click(a,'#people-tab-friends');const friend=(await state(a)).friends[0];await click(a,`[data-social-focus="invite:${friend.id}"]`);await click(a,'#people-invite-send');await idle(a);
   assert.deepEqual(a.page.errors,[]);await one.closeAll();await f.restart();
   const returned=await f.context('people-ui-returned');b=await returned.newTable({origin:'127.0.0.1',name:'Bob'});
+  await b.page.browser.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true},b.page.sessionId);
+  await b.emulateCoarsePointer(true);await b.reload();
   await b.roll('3d6 t3 secret');const turn=await b.rollId();await account(b,{recoveryKey});await people(b);await click(b,'#people-tab-invitations');invitation=(await state(b)).incoming.find(i=>i.kind==='home');assert.equal(invitation.home.name,'The Copper Lantern');
   const seat=await b.playerId(),url=await b.eval('location.href'),before=await b.dbg(`turnState(${JSON.stringify(turn)})`);
   await click(b,`[data-invitation-id="${invitation.id}"] [data-social-focus="respond-invitation:${invitation.id}:accept"]`);await idle(b);
   assert.equal(await b.playerId(),seat);assert.equal(await b.eval('location.href'),url);assert.deepEqual(await b.dbg(`turnState(${JSON.stringify(turn)})`),before);assert.equal((await state(b)).homes[0].name,'The Copper Lantern');
+  assert.equal((await b.dbg('privateLibrary.state')).syncEnabled,false);
+  assert.deepEqual(await b.dbg('profiles.shared'),[],'acceptance does not publish private profiles');
   await click(b,`[data-social-focus="join:${invitation.id}"]`);await b.waitFor('window.__diceDebug?.net?.savedHome&&window.__diceDebug.settings.tableName==="The Copper Lantern"');
   assert.notEqual(await b.eval('location.href'),url);assert.deepEqual(a.page.errors,[]);assert.deepEqual(b.page.errors,[]);
 });
@@ -149,7 +153,12 @@ test('real IDB keeps uncertain exact actions across reload and refuses HTTP befo
   await a.eval('IDBObjectStore.prototype.put=window.__socialPut');
   await click(a,`[data-operation="${unkept.id}"] button:nth-of-type(2)`);await idle(a);
   assert.equal(posts,1);assert.equal((await state(a)).records.find(r=>r.id===unkept.id).status,'saved');
-  await click(a,'#people-add');await type(a,'#people-contact-code','dc1_'+'X'.repeat(43));await click(a,'#people-request-send');await idle(a);
+  await click(a,'#people-add');await type(a,'#people-contact-code','dc1_'+'X'.repeat(43));
+  await one.rawPlayer('Observer');
+  await a.waitFor('document.querySelectorAll("#workspace-people-current .workspace-person").length===2');
+  assert.equal(await a.eval('document.activeElement.id'),'people-contact-code','roster updates preserve the typed contact field and its focus');
+  assert.equal(await a.eval('document.getElementById("people-contact-code").value.length'),47);
+  await click(a,'#people-request-send');await idle(a);
   const refused=(await state(a)).records.find(r=>r.status==='refused');assert.ok(refused);
   await click(a,`[data-operation="${refused.id}"] button:first-of-type`);
   await click(a,`[data-operation="${refused.id}"] .social-abandon input`);
@@ -185,4 +194,40 @@ test('a held inbox response cannot expose previous-account names after a real sa
   await a.waitFor('!window.__diceDebug.privateLibrary.state.person&&!document.getElementById("account-refresh").disabled');await people(a);
   assert.equal((await state(a)).owner,null);assert.deepEqual((await state(a)).friends,[]);assert.deepEqual((await state(a)).records,[]);
   assert.deepEqual(a.page.errors,[]);assert.deepEqual(b.page.errors,[]);assert.deepEqual(c.page.errors,[]);
+});
+
+test('Decline, Cancel and Archive use the visible invitation controls and retain the other inbox copy',async t=>{
+  const f=await fixture(t),one=await f.context('g_people_decline'),two=await f.context('people-decline-b');
+  const a=await one.newTable({origin:'127.0.0.1',name:'Alice'}),b=await two.newTable({origin:'127.0.0.1',name:'Bob'});
+  await account(a,{name:'Sam'});await account(b,{name:'Riley'});const {second}=await seedFriendship(a,b);
+  await one.api('/api/settings',{playerId:await a.playerId(),settings:{tableName:'The Copper Lantern'}});
+  const {home,invitation}=await seedHome(a,{toPersonId:second});
+  await people(b);await click(b,'#people-tab-invitations');
+  await click(b,`[data-social-focus="respond-invitation:${invitation.id}:decline"]`);await idle(b);
+  assert.equal((await state(b)).incoming.find(i=>i.id===invitation.id).state,'declined');assert.deepEqual((await state(b)).homes,[]);
+  await click(b,`[data-social-focus="archive-invitation:${invitation.id}"]`);await idle(b);
+  assert.equal((await state(b)).incoming.some(i=>i.id===invitation.id),false);
+  await people(a);await click(a,'#people-tab-invitations');await click(a,'#people-outgoing');
+  assert.equal((await state(a)).outgoing.find(i=>i.id===invitation.id).state,'declined','archiving own inbox does not remove the sender copy');
+  await click(a,'#people-tab-friends');await click(a,`[data-social-focus="invite:${second}"]`);await click(a,'#people-invite-send');await idle(a);
+  const pending=(await state(a)).outgoing.find(i=>i.home?.id===home.id&&i.state==='pending');assert.ok(pending);
+  await click(a,'#people-tab-invitations');await click(a,`[data-social-focus="cancel-invitation:${pending.id}"]`);await idle(a);
+  assert.equal((await state(a)).outgoing.find(i=>i.id===pending.id).state,'cancelled');
+  await click(b,'#people-refresh');await idle(b);assert.equal((await state(b)).incoming.find(i=>i.id===pending.id).state,'cancelled');
+  assert.deepEqual(a.page.errors,[]);assert.deepEqual(b.page.errors,[]);
+});
+
+test('service-absent guest People remains an optional task beside a working phone table',async t=>{
+  const f=await fixture(t,{mode:'off'}),ctx=await f.context('people-static'),a=await ctx.newTable({origin:'127.0.0.1',name:'Alice'});
+  await a.page.browser.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true},a.page.sessionId);
+  await a.emulateCoarsePointer(true);await a.reload();
+  const before=await a.playerId();await people(a);
+  assert.equal((await state(a)).owner,null);assert.equal(await a.eval('document.getElementById("people-account").hidden'),false);
+  await click(a,'#people-account');await a.waitFor('document.getElementById("account-create")?.disabled');
+  assert.equal(await a.playerId(),before);
+  await click(a,'#workspace-back');
+  const previous=await a.rollId();await click(a,'#phone-quick-dice [data-quick="2d6"]');
+  await a.waitFor(`window.__diceDebug.currentRoll&&window.__diceDebug.currentRoll.rollId!==${JSON.stringify(previous)}`);await a.settle();
+  assert.equal(await a.dbg('workspaces.current'),null);assert.equal(await a.diceCount(),2);
+  assert.deepEqual(a.page.errors,[]);
 });

@@ -313,7 +313,9 @@ export function createPeopleWorkspace(actions){
   function renderInbox(info,enabled){
     incomingTab.setAttribute('aria-pressed',String(direction==='incoming'));
     outgoingTab.setAttribute('aria-pressed',String(direction==='outgoing'));
-    const invitations=info[direction];
+    const pending=item=>item.state==='pending'&&item.expiresAt>Date.now();
+    const invitations=[...info[direction]].sort((a,b)=>Number(pending(b))-Number(pending(a))
+      ||(b.createdAt||0)-(a.createdAt||0));
     const is=JSON.stringify([direction,invitations.map(item=>({...item,state:item.state==='pending'&&item.expiresAt<=Date.now()?'expired':item.state})),info.homes]);
     if(is!==inboxSignature){
       inboxSignature=is;
@@ -476,7 +478,11 @@ export function createPeopleWorkspace(actions){
     }
     refresh.disabled=busy;
     download.disabled=busy;
-    for(const b of [add,codeNew,revokeCode,requestSubmit,inviteSubmit,homeSelect,requestCode])b.disabled=!enabled;
+    for(const b of [add,codeNew,revokeCode,requestSubmit,inviteSubmit])b.disabled=!enabled;
+    homeSelect.disabled=busy;
+    requestCode.disabled=busy;
+    const pending=info.incoming.filter(i=>i.state==='pending'&&i.expiresAt>Date.now()).length;
+    tabs.invitations.textContent='Invitations'+(pending?' · '+pending:'');
     codePanel.hidden=!info.contactCode?.enabled&&!info.ownCode;
     codeLabel.hidden=!info.ownCode;
     copyCode.hidden=!info.ownCode;

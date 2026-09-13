@@ -3,7 +3,9 @@
 # Relationships, invitations and permitted presence — D3 design
 
 2026-09-13. Relationships/inbox, permitted presence and their client transport
-are implemented (D3.1–D3.3). Social UI and deployment are later work. Implementation and tests use newly created fixture accounts only.
+are implemented (D3.1–D3.3), together with the People workspace described below.
+Deployment remains separate. Implementation and tests use newly created
+fixture accounts only.
 
 ## Decisions
 
@@ -223,3 +225,47 @@ These protocol pages do not claim that final People/phone UI is shipped.
 
 Display names are authenticated account-provided labels, not independently
 verified real identities. UI copy must not describe them as “verified people.”
+
+
+## People workspace and device boundary
+
+`js/social-session.js` uses `librarySession.socialAccess()` for a fixed person
+and identity epoch. Recovering an account does not enable library sync or
+presence. The live roster and guest-link invitation remain available without an
+account; People adds Friends, Invitations and Presence tasks for a recovered
+person. Pending received invitations appear first and label the Invitations tab.
+Accept refreshes authoritative friendship/home membership before any Join
+control appears. Only the separate Join action navigates.
+
+Every social write first commits its exact operation ID and payload to the
+strict IndexedDB journal in `js/social-journal.js`. The per-person limit is
+32 records / 256 KiB. Uncertain replies remain exact retries across reload;
+failed device commits send no HTTP and keep one explicit in-memory export per
+person until that page closes. Switching accounts hides previous names, codes,
+comparisons and journals without removing those originals. Confirmed device
+receipts require acknowledged cleanup. Definitive refusals additionally require
+Download before explicit abandonment; uncertain writes cannot be abandoned by
+this path. Device downloads disclose that kept requests can contain contact
+codes. Recovery keys never enter this journal or export.
+
+Online and current-home location use independent opt-ins. A relationship change
+invalidates pending presence reads and clears displayed markers immediately.
+Expired signals repaint to Unknown without a successful refresh. Failed or stale
+home projections say Unknown, not an empty membership assertion. Invitation
+expiry likewise removes Accept without needing another read. Account changes
+synchronously stop the old heartbeat without enqueueing an identity-hook request.
+
+`tests/people-ui.test.mjs` drives hit-tested pointer/text input through account,
+friend, invitation, presence, retry and cleanup controls. The scenarios cover an
+offline recipient, actual service restart, clean-browser account recovery,
+acceptance while retaining a secret unfinished turn, explicit Join, response
+expiry, held pre-block presence, independent location choice, failed home reads,
+real IDB failure/reload/retry, same-origin cookie replacement, sign-out,
+Decline/Cancel/Archive, and service-absent phone play. Debug hooks and scoped API
+calls arrange data or held background reads; user actions use visible controls.
+`tools/steps/people-ui-look.mjs` reproduces populated desktop and 390 × 844 phone
+views, plus return to the four-player table with actual mesh bounds measured.
+
+These are local service/UI proofs. No production resources or real-person
+invitations were created. There is no email delivery, global name search, push
+notification service or claim of independently verified account names.

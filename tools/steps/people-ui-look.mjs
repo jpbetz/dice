@@ -31,6 +31,7 @@ export default async function run(stage){
     console.log(await stage.shot(a,'people-desktop-four.png'));
     await click(a,'#people-tab-invitations');
     await a.waitFor('document.querySelector("#people-inbox .social-home-cover img")');
+    await a.eval('document.getElementById("people-inbox").scrollIntoView({block:"start",behavior:"instant"})');
     console.log(await stage.shot(a,'people-invitation-desktop.png'));
     await size(390,844,true);await a.emulateCoarsePointer(true);await a.reload();
     await people(a);await click(a,'#people-tab-invitations');
