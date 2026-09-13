@@ -60,6 +60,16 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Complete turn FIFO and worker rethrows (2026-09-13)
+
+Rethrows now use the same worker boundary as first throws. Complete ordered
+roll, rethrow, reveal, bank, collect and clear events survive a delayed viewer;
+newer snapshots reconstruct missing turns silently and stale ones cannot
+downgrade them. Kept dice remain visible during worker preparation. Twenty-four
+complete first/rethrow films match the pre-worker build. The integrated worker,
+turn and result-reader checks pass 14/14. [Measured proof and remaining snapshot
+limitations](redesign/2026-09-13-film-turns.md).
+
 ## Ordinary throw simulation worker — R3 third slice (2026-09-13)
 
 The actual physics bake for non-turn throws runs in a reusable module worker.

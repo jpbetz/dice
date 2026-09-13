@@ -56,9 +56,12 @@ physics. Procedural flow/dissolve keeps its established rendering path.
 The [ordinary-throw worker slice](redesign/2026-09-13-film-worker.md) now moves
 the real solver off the main thread. Seated 40d20 input return falls from
 263–292 ms to 4.8–5.8 ms in desktop/phone emulation, with identical films.
-Turns, towers and reconstruction retain the shared inline bake. Physical
-devices, turn-event queue preservation, rendering startup, idle work and
-Battery saver remain open; no battery or faster-frame-rate claim is made.
+The [turn-worker follow-up](redesign/2026-09-13-film-turns.md) now retains
+complete ordered turn/reveal/collection events and moves rethrows off-thread,
+with 24 complete first/rethrow films matching the pre-worker baseline. Towers
+and silent reconstruction retain the shared inline bake. Physical devices,
+rendering startup, idle work and Battery saver remain open; no battery or
+faster-frame-rate claim is made.
 
 **R2 first composition, 2026-09-13:** [player results](PLAYER-RESULTS.md) now
 keep upright names, crests and the group’s latest visible reads together. The
