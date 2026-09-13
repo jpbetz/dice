@@ -40,6 +40,7 @@ import { filmTurnScenarios } from './film-turns.mjs';
 import { idleRenderScenarios } from './idle-render.mjs';
 import { presentationScenarios } from './presentation.mjs';
 import { optionalSceneryScenarios } from './optional-scenery.mjs';
+import { towerPendingCancelScenarios } from './tower-pending-cancel.mjs';
 import { filmWorkerScenarios } from "./film-worker.mjs";
 import { profileSharingScenarios } from './profile-sharing.mjs';
 import { libraryWorkspaceScenarios } from './library-workspace.mjs';
@@ -791,6 +792,7 @@ export const scenarios = [
   ...idleRenderScenarios,
   ...presentationScenarios,
   ...optionalSceneryScenarios,
+  ...towerPendingCancelScenarios,
   ...filmMutationScenarios,
   ...libraryWorkspaceScenarios,
   {

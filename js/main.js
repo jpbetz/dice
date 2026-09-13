@@ -29354,7 +29354,7 @@ function applyRoomSettings(settings) {
   // baking a different film from everyone else.
   if (typeof settings.tower === 'string' && TOWERS[settings.tower]) {
     roomSettings.tower = settings.tower;
-    if (settings.tower !== currentTower) queueTower(settings.tower);
+    if (settings.tower !== (pendingTower || currentTower)) queueTower(settings.tower);
     renderTowerPicker();
   } else if (typeof settings.tower === 'string') {
     // KEEPING THE TABLE IS THE RIGHT CALL, AND IT IS NOT FREE. Ignoring the id
