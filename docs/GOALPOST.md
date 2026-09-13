@@ -1,3 +1,5 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # The goal post
 
 *The eight things this project actually cares about. Everything else in
@@ -10,6 +12,15 @@ reduce it down to 5–10 items we actually care about"), after an inventory of
 487 stated rules across the docs and an adversarial pass over the candidates.
 Where this file and any other document disagree, this file wins, and the
 other document is wrong or stale.*
+
+*Owner-approved amendment, 2026-09-12: Joe adopted the
+[experience redesign](EXPERIENCE-REDESIGN.md), including persistent table
+homes, optional recoverable identity, friends/invitations, and synchronized
+libraries. Items 3–4 below now permit the account-data permissions and
+durable storage those features require. This revises the former “no access
+control, ever” and “server holds no durable state” mechanisms explicitly;
+equal participation in live play, private rolls, and safe capture remain
+promises. The direction is approved; the service is not yet implemented.*
 
 ## What this is
 
@@ -33,16 +44,26 @@ dice they could read, results they could trust.
    one film" and a keyframe-hash check — a technique, replaceable by any
    other that keeps the promise.*
 
-3. **Privacy is a per-roll choice, and it fails closed.** No roles and no
-   access control, ever — the room key is the only gate. A hidden value
-   leaves the server through exactly one redaction path; a value hidden only
-   by CSS is not hidden; no log line, health surface or crash report carries
-   a key, a name or a value.
+3. **Privacy is a per-roll choice, and it fails closed.** No privileged
+   gameplay roles: account or saved-home membership grants no extra power
+   over another player's dice or reveals. Room links retain guest access;
+   authentication and permissions protect private accounts, libraries,
+   relationships, invitations, and saved-home data. A hidden value leaves
+   the server through exactly one redaction path; a value hidden only by CSS
+   is not hidden. New social and storage surfaces may not bypass that path;
+   no diagnostic log line, health surface or crash report carries a key,
+   a name or a value.
 
 4. **Nothing takes what you keep.** Saved pools and profiles are captured on
    purpose and restored the same way; an import previews and merges, never
-   replaces; nothing durable rides the URL. The server holds no durable
-   state, and every room lives in one process.
+   replaces. Recoverable identity, library synchronization, and saved table
+   homes are optional, explicit choices backed by durable storage. Once
+   opted in, sync may save subsequent edits automatically, but concurrent
+   or offline changes never silently discard a kept version. URLs address
+   tables or redeem invitations; they never carry a saved library or act as
+   its save file. A live roll session stays in one process; a saved table
+   home survives it. Guest and static solo play remain usable without the
+   identity/storage service.
 
 5. **No toil, and the table never stops.** The system picks up, sums,
    attributes and tidies finished rolls — never a turn still in progress.

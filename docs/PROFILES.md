@@ -1,3 +1,5 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # The Prepared Table — profiles, the table file, and the shared link
 
 > **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
@@ -23,6 +25,14 @@ Referenced from [POOL-ANALYSIS.md](POOL-ANALYSIS.md) §9 and §11 (which
 named CUJ1 before this document existed).
 
 ---
+
+**Direction amended 2026-09-12:** the owner approved optional recoverable
+identity, synchronized libraries, and persistent table homes in
+[the experience redesign](EXPERIENCE-REDESIGN.md). [R1](PEOPLE-DICE-TABLES.md)
+now owns that design. Sections 5–6's advice to defer server persistence and
+sign-in is historical; the capture, preview/merge, and guest-play promises
+remain. This records a new direction, not a claim that remote saving exists
+in the current app.
 
 ## 1. The two jobs
 

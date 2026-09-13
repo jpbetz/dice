@@ -14,8 +14,11 @@ Open work only, priority-sorted. Shipped work, killed designs and verified
 patterns live in [SHIPPED.md](SHIPPED.md); section numbers are preserved
 there so cross-references still resolve.
 
-Sequenced against [GOALS.md](GOALS.md) (the authority). [UX.md](UX.md) holds
-component specs; [TESTING.md](TESTING.md) governs how each step is checked.
+The current investment order is the September
+[experience redesign](EXPERIENCE-REDESIGN.md), at the top of THE ORDER below.
+[GOALPOST.md](GOALPOST.md) holds the product promises; [GOALS.md](GOALS.md)
+records their fuller history. [UX.md](UX.md) holds component specs;
+[TESTING.md](TESTING.md) guides how each step is checked.
 **What people come here to DO is [CUJS.md](CUJS.md)** — thirteen numbered
 journeys, and the only place a CUJ number is assigned. Items below cite them;
 none of them mints one.
@@ -88,6 +91,12 @@ report above came from one sentence about a phone, and it cost three defects.
 ---
 
 ## How this file is sequenced — read this before THE ORDER
+
+**Sequencing amendment, 2026-09-12:** R1–R3 in THE ORDER now lead. The
+older track descriptions and numbered rows below retain their historical
+identifiers and open details; they do not outrank the approved redesign.
+In particular, browser-only identity and the deferral of persistent tables
+are superseded by R1, not unresolved requests for permission.
 
 **Two tracks run in parallel.** Track A is the debt — correctness, capture,
 organization, ops — sequenced by GOALS' ladder. Track B is the owner's track —
@@ -164,6 +173,26 @@ ordering means; their key is an identifier, not a rank.
 ---
 
 ## THE ORDER
+
+**Plan of record, approved 2026-09-12:** structural redesign comes before
+additional features. Joe approved all three priorities from the September
+experience audit and asked to start **planning (1)**. The full direction,
+evidence limits, and cross-track dependencies are in
+[EXPERIENCE-REDESIGN.md](EXPERIENCE-REDESIGN.md); the detailed first-item plan
+is [PEOPLE-DICE-TABLES.md](PEOPLE-DICE-TABLES.md). No redesign implementation
+has shipped yet. These keys preserve the existing roadmap's numbering.
+
+| Key | Current priority | Next deliverable | Status |
+| --- | --- | --- | --- |
+| **R1** | People, personal dice, and persistent tables | R1-A: desktop/phone destination layouts and control relocation map; then the local identity/gallery/table/Quick dice release, followed by recoverable kits, homes, and invitations | **Planning started** |
+| **R2** | Redesign the complete shared playing surface | One excellent four-player composition and full-width phone layout, coordinated with R1's bottom tray; expand to three art directions after the first works | Direction adopted |
+| **R3** | Make lightweight play a core feature | Reproducible ordinary/stress baseline, production compression check, then compressed delivery where needed and dice-face material consolidation | Direction adopted |
+
+This is not a waterfall: R2's phone structure informs R1-A, and bounded R3
+improvements can proceed while R1 develops. Correctness fixes remain
+immediate. Additional mechanics, mats, towers, and ceremony are backlog
+unless needed by these releases or explicitly reordered. The older entries
+below supply context and unresolved details, not a second plan of record.
 
 **Tower catalogue replacement, 2026-09-12:** Joe approved the three Foundry
 models in place of every old tower. This work is recorded in

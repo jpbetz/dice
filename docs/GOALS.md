@@ -1,3 +1,5 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # Design Goals
 
 > **Superseded as the authority, 2026-09-02.** The eight things this project
@@ -12,6 +14,17 @@
 The fuller statement of what this system is and how design decisions were
 made through 2026-09-01. [ROADMAP.md](ROADMAP.md) sequences work; [UX.md](UX.md)
 specifies components. Where documents disagree, GOALPOST.md wins.
+
+**2026-09-12 direction change:** the approved
+[experience redesign](EXPERIENCE-REDESIGN.md) replaces goal 7's refusal of
+durable server state, goal 9's “server adds sharing, nothing else,” and
+goal 10's blanket refusal of account/data permissions. GOALPOST 3–4 carry
+the explicit amendment. Optional recoverable identity and saved table homes
+are planned, with equal live-table participation and working guest/static
+solo play preserved. Goal 13's venue-forced dice appearance is also
+superseded in the [R1 working design](PEOPLE-DICE-TABLES.md#4-personal-dice-that-visibly-take-effect)
+by explicit personal selection. These are planned changes, not claims about
+the current implementation; the older rationale below remains history.
 
 **The word is "pool."** The dice you assemble to roll are a *pool*; the named
 preset you keep is a *saved pool*. "Tray" and "group" are gone from every

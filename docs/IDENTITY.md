@@ -1,4 +1,14 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # IDENTITY.md — what a "who" is at this table (2026-08-17, §8 added 2026-08-18, decision 7 added 2026-08-31)
+
+**Direction amended 2026-09-12:** [R1](PEOPLE-DICE-TABLES.md) plans optional
+recoverable identity, personal library sync, persistent homes, and social
+invitations. The browser-profile-only ceiling below is historical, under
+the owner's approved redesign and GOALPOST 3–4 amendment. Existing guest
+seat continuity still describes shipped behavior; account-to-seat authority
+must be designed explicitly before changing it. The rejection of beta
+capability enforcement is not reopened by adding accounts.
 
 > **Guidance, not law (2026-09-02).** Every rule, law, ruling, invariant, gate
 > and budget in this file is a dated lesson somebody paid for, with its reason

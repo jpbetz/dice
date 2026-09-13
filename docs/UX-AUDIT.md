@@ -1,3 +1,5 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 <!-- Generated 2026-08-08 by a multi-agent audit; every claim was verified
      against source or a captured frame before it was written down. Findings
      are referenced by their letter-number ids (A1, C3, …) from ROADMAP.md's
@@ -6,6 +8,12 @@
 # The converged UX — an audit
 
 *2026-08-08, as of commit `1b7a8f2`.*
+
+**Current planning entry point, 2026-09-12:** the owner-approved
+[experience redesign](EXPERIENCE-REDESIGN.md) incorporates the newer
+September audit and now sets the investment order. This August audit
+remains historical evidence; its “what not to change” findings are context,
+not a veto on that redesign.
 
 *Method: six surfaces mapped as built (workbench · rack · launcher · roll
 lifecycle · keyboard/focus/touch/size · the shared table), then **five audit
