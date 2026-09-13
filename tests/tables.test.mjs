@@ -55,7 +55,7 @@ const KEY = 'dice.tables.v1';
 const rooms = (list) => list.map((e) => e.room);
 
 setLS(undefined); // start from "no storage at all"
-const { recentTables, rememberTable, forgetTable, mintRoomKey } =
+const { recentTables, rememberTable, renameRecentTable, forgetTable, mintRoomKey } =
   await import('../js/tables.js');
 
 // ---- never throws, fails closed ---------------------------------------------
@@ -143,6 +143,20 @@ t("upsert moves to front, refreshes at, and '' never clobbers a real name", () =
   list = recentTables();
   assert.equal(list[0].name, 'Alpha Prime');
   assert.equal(list.length, 2, 'upsert, not a duplicate');
+});
+
+t('live renames include clearing a name, retain recency, and never create a visit', () => {
+  setLS(memLS());
+  rememberTable('alpha', 'Alpha'); rememberTable('beta', 'Beta');
+  const before = recentTables();
+  renameRecentTable('alpha', 'Copper Lantern');
+  let after = recentTables();
+  assert.deepEqual(after.map(e => [e.room,e.at]), before.map(e => [e.room,e.at]));
+  assert.equal(after[1].name, 'Copper Lantern');
+  renameRecentTable('alpha', '');
+  assert.equal(recentTables()[1].name, '');
+  renameRecentTable('unvisited', 'Somewhere');
+  assert.equal(recentTables().length, 2);
 });
 
 t('remember cleans its arguments (caps, controls, non-strings)', () => {

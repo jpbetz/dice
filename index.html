@@ -92,15 +92,20 @@ limitations under the License.
          BELOW you instead of pushing you down (it led the rail before, which
          is exactly the drift this ordering exists to kill). -->
     <div id="rail">
-      <button id="identity-chip" class="btn ghost" title="Your name and personal controls" aria-haspopup="dialog" aria-expanded="false">
-        <span id="identity-dot" class="identity-dot"></span>
-        <span id="identity-name" class="identity-name">…</span>
-        <span class="identity-caret" aria-hidden="true">⌄</span>
-      </button>
+      <div id="personal-controls" role="group" aria-label="Your name and dice">
+        <button id="identity-chip" class="btn ghost" title="Your name and personal controls" aria-haspopup="dialog" aria-expanded="false">
+          <span id="identity-dot" class="identity-dot"></span>
+          <span id="identity-name" class="identity-name">…</span>
+          <span class="identity-caret" aria-hidden="true">⌄</span>
+        </button>
+        <button id="my-dice" type="button" aria-label="My dice" title="My dice" aria-haspopup="dialog" aria-expanded="false"><span class="my-dice-prefix">My </span>Dice<span id="my-dice-current" class="sr-only">Standard</span></button>
+      </div>
       <div id="rail-roster"></div>
       <!-- Keep the table identity and connection state beside its roster. -->
       <div id="table-context">
-        <span id="table-name" class="table-name hidden"></span>
+        <button id="table-open" type="button" title="Table setup and invitations" aria-haspopup="dialog" aria-expanded="false">
+          <span id="table-name" class="table-name hidden"></span><span id="table-solo-label" hidden>Solo table</span><span aria-hidden="true">⌄</span>
+        </button>
         <span id="table-connection" role="status"></span>
         <button id="table-retry" class="btn tiny ghost" hidden>Retry</button>
       </div>
@@ -110,12 +115,6 @@ limitations under the License.
            channel keeps its own rules; the announcement rides #sr-live. -->
       <span id="status-pill" class="hidden" role="status"></span>
     </div>
-
-    <button id="my-dice" type="button" aria-haspopup="dialog" aria-expanded="false">
-      <span class="my-dice-icon" aria-hidden="true">⚄</span>
-      <span class="my-dice-label">My dice<span id="my-dice-current">Standard</span></span>
-      <span class="my-dice-arrow" aria-hidden="true">→</span>
-    </button>
 
     <!-- THE COLLAPSED POOL RAIL (Joe 2026-08-07). At 56px a pool name had
          to be rotated on its side and a shelf title had nowhere to go, so
@@ -462,7 +461,7 @@ limitations under the License.
          the thing the ✕ pushed around.) ? Help sits with ≣ in the consult
          pair (Joe 2026-08-06). -->
     <div id="rail-foot">
-      <button id="toggle-settings" class="btn ghost" title="Settings" aria-label="Settings">⚙</button>
+      <button id="toggle-settings" class="btn ghost" title="Preferences" aria-label="Preferences">⚙</button>
       <!-- No notification COUNT BUBBLE on the log (user call, 2026-07):
            history is reference material, not an inbox, and a number that
            exists to be zeroed nags like one. That ruling stands and there is
@@ -524,7 +523,7 @@ limitations under the License.
         <button id="idm-name-save" type="submit">Save</button></div>
       <p id="idm-name-note" role="status">Your name at the table. Your character stays the same.</p>
     </form>
-    <button id="idm-dice" class="idm-item">My dice →</button>
+    <button id="idm-dice" class="idm-item">My dice →<small id="idm-dice-current"></small></button>
     <button id="idm-rolls" class="idm-item">My saved rolls →</button>
     <!-- The picker's second anchor (PROFILES §11.5 ②), and it is not
          redundancy: the first lives in #pools-head, inside a panel section
@@ -533,6 +532,8 @@ limitations under the License.
          your profiles are yours in the lobby too. -->
     <button id="idm-profile" class="idm-item" aria-haspopup="menu" aria-expanded="false"
             title="The profile in your hands — tap to switch">Switch character…</button>
+    <button id="idm-library" class="idm-item">Manage saved rolls…</button>
+    <button id="idm-preferences" class="idm-item">Preferences…</button>
     <button id="idm-leave" class="idm-item" title="Drop this seat and sit down again at this same table">Change seat…</button>
     <button id="idm-lobby" class="idm-item" title="Leave this table and go back to the lobby — your name and pools come with you">Leave table</button>
     <!-- §3b L4 (CUJ5): the AUTHORING half of a split lives behind the chip
@@ -728,7 +729,7 @@ limitations under the License.
             <b>Throw N again</b> for the rest. That is the roll-and-lock
             mechanic — Yahtzee, and the monster-brawl dice game with the
             energy, claw and heart faces. For those faces, pick the
-            <b>Monster</b> dice set under <b>Settings → You → Dice set</b>.</p>
+            <b>Monster</b> set in <b>My Dice</b>, beside your name.</p>
           <p><code>6d6 push&gt;=5</code> — <b>push-your-luck</b>: you say which
             faces score, keep the ones you like, and throw the rest. A throw
             with nothing scoring in it <b>busts</b> and the turn ends with
@@ -1114,62 +1115,41 @@ limitations under the License.
     <div id="crit-text"></div>
   </div>
 
-  <!-- Settings modal (roadmap §2): "Just you" locals + room-wide table settings -->
-  <!-- THE SETTINGS PANEL — everything that is not a roll.
-       Reorganised 2026-08-14 (UX §7.36) after it grew to 45 controls in a
-       320px column that scrolled 1004px inside a 647px window. The trouble was
-       never the number of controls; it was that THREE KINDS OF WORK shared one
-       scroll — flipping a switch (seconds), staging the table (a decision
-       everyone here sees), and managing belongings (a 32-row library and a
-       text tool with seven buttons). The most common job, flipping a switch,
-       required scrolling past a YAML workspace.
-       So the panel has THREE DESTINATIONS, cut first by BLAST RADIUS — because
-       "does this change the game for everyone?" is the question that must
-       never be ambiguous — and then by kind of work:
-         TABLE       room-wide, broadcast, socially significant
-         YOU         this device (plus the one setting with an audience)
-         YOUR STUFF  the workspace: profiles, export, import, files
-       THE RULE for anything new: it goes where its blast radius says, and if
-       it needs more than a row it goes in Your stuff. -->
+  <!-- One workspace frame, opened from the control's context: table label
+       for shared setup, gear for device preferences, personal menu for the
+       library. Only table setup has tabs and an explicit Apply footer. -->
   <div id="settings-modal" class="hidden">
     <div class="panel" id="settings-panel">
       <div class="settings-head">
-        <h2 id="settings-title">Settings</h2>
-        <button id="settings-close" class="pop-close" title="Close">✕</button>
+        <div><h2 id="settings-title">Table</h2><p id="settings-scope">Shared with everyone here</p></div>
+        <button id="settings-close" class="pop-close" title="Close" aria-label="Close panel">✕</button>
       </div>
       <!-- The destination bar. RADIO semantics, not the pools bar's checkbox
            multi-toggle (§7.23): these are exclusive, and aria-checked is the
            spelling U22 settled for exclusive chips. It sits above what it
            reveals so the bar and the stack read in the same order. -->
-      <div id="settings-nav" class="seg" role="radiogroup" aria-label="Settings sections">
+      <div id="settings-nav" class="seg" role="radiogroup" aria-label="Table setup sections">
         <button id="snav-table" data-dest="table" role="radio" aria-checked="true"
-                title="What everyone at this table sees">Table</button>
+                title="Name, people, and how results are read">Table</button>
         <button id="snav-staging" data-dest="staging" role="radio" aria-checked="false"
-                title="How the table looks — venue, felt, tower">Staging</button>
-        <button id="snav-you" data-dest="you" role="radio" aria-checked="false"
-                title="Your own settings, on this device">You</button>
-        <button id="snav-stuff" data-dest="stuff" role="radio" aria-checked="false"
-                title="Your profiles, and getting them in and out">Your stuff</button>
+                title="How the table looks — venue, mat, tower">Appearance</button>
       </div>
 
+      <div id="settings-scroll">
       <!-- ① TABLE — room-wide. §3b/L0: this section's heading is a CLAIM and
            in the lobby it is a false one, so openSettingsModal relabels it.
            Every control here has a working local branch, which is exactly why
            the label has to be honest: with no table they silently become
            personal. Table name has no roomless meaning at all and is hidden. -->
       <section class="settings-dest" id="dest-table">
-        <div class="settings-sec">
+        <fieldset class="settings-sec settings-fields">
           <span class="plabel" id="set-room-label">Everyone at the table</span>
-          <!-- Table name (anatomy pass): the rail nameplate's rename path —
-               management stands behind the settings gate (P6), room-wide
-               like felt/system. Empty = unnamed (no plate). -->
           <div class="prow" id="set-table-name-row">
-            <span class="grow">
-              <span class="prow-label">Table name</span>
-              <span class="prow-sub">shows at the top of everyone’s panel</span>
-            </span>
-            <input id="set-table-name" class="tin" maxlength="28" placeholder="unnamed">
+            <label class="prow-label" for="set-table-name">Table name</label>
+            <input id="set-table-name" class="tin" maxlength="28" placeholder="e.g. Thursday at the Lantern" autocomplete="off">
+            <span class="prow-sub">The name everyone sees, including in the browser tab.</span>
           </div>
+          <div id="table-people-row"><span class="prow-label">People here</span><div id="table-people" role="list"></div></div>
           <!-- THE INVITE LINK GETS A PRIMARY GESTURE (U25, audit E4). Its only
                pointer door was right-click / long-press on the identity chip —
                invisible, and the chip's LEFT-click is a visible no-op when you
@@ -1186,13 +1166,13 @@ limitations under the License.
           <div class="prow" id="set-invite-row">
             <span class="grow">
               <span class="prow-label">Invite link</span>
-              <span class="prow-sub">anyone holding it can join this table — press <code>i</code> anywhere</span>
+              <span class="prow-sub">Send this link to someone you want at the table.</span>
             </span>
             <button id="set-invite" class="btn tiny">Copy invite link</button>
           </div>
           <div class="prow">
             <span class="grow">
-              <span class="prow-label">Rolling system</span>
+              <span class="prow-label">How results are read</span>
               <span class="prow-sub">how the table reads a result</span>
             </span>
           </div>
@@ -1203,32 +1183,18 @@ limitations under the License.
                change defers to the next roll boundary (queueZoom). -->
           <div class="prow">
             <span class="grow">
-              <span class="prow-label">Mat zoom</span>
-              <span class="prow-sub">smaller mat, larger dice — better on small screens</span>
+              <span class="prow-label">Rolling area</span>
+              <span class="prow-sub">Same size for everyone; smaller keeps dice closer.</span>
             </span>
           </div>
           <div id="zoom-picker" role="radiogroup" aria-label="Mat zoom"></div>
-        </div>
+        </fieldset>
       </section>
 
-      <!-- ② STAGING — also room-wide, and its own destination for a measured
-           reason: with staging inside Table that destination stood 710px tall
-           and overflowed a 459px window by 251px, which is the defect this
-           whole pass exists to remove, surviving one level down. Split, the
-           worst destination is ~425px and nothing scrolls. The two room-wide
-           cells sit FIRST and together on the bar, so the blast-radius reading
-           survives the split: the left pair changes the game for everyone, the
-           right pair is yours.
-           STAGING — one concern, and a HIERARCHY rather than three peers.
-             GOALS goal 13: a fantasy venue IS the felt and the tower, so it
-             leads and they are its detail; while one is active
-             updateVenueChrome hides them and #venue-staged says what took
-             them, because a control that vanishes with no explanation is its
-             own defect (they used to just disappear). Felt was a `plabel`
-             SECTION heading until this pass — a heading pretending to be a
-             peer of "Just you" while being one control inside staging. -->
+      <!-- Appearance is part of table setup. The one content scroller holds
+           growing catalogues; the Apply footer and close control stay put. -->
       <section class="settings-dest hidden" id="dest-staging">
-        <div class="settings-sec">
+        <fieldset class="settings-sec settings-fields">
           <!-- THE CHANNEL SAYS SO OUT LOUD (js/stability.js), and says it
                INSIDE the heading rather than under it. Without a mark, "why
                can I see this and my player can't" is a support conversation
@@ -1237,12 +1203,13 @@ limitations under the License.
                this destination 21px over a 459px panel — the exact overflow
                §7.36 exists to have removed. A tag on a line that was already
                there costs nothing. -->
-          <span class="plabel">Staging<span id="staging-beta" class="beta-tag"
+          <div id="table-preview"><span id="table-preview-label"></span></div>
+          <span class="plabel">Appearance<span id="staging-beta" class="beta-tag"
                 title="Venue and tower are unfinished, and liable to change under you.">closed beta</span></span>
           <div class="prow" id="venue-row">
             <span class="grow">
               <span class="prow-label">Venue</span>
-              <span class="prow-sub">where the table stands — a fantasy venue stages everything at once</span>
+              <span class="prow-sub">The surroundings, lighting, and atmosphere.</span>
             </span>
           </div>
           <div id="venue-picker" role="radiogroup" aria-label="Venue"></div>
@@ -1272,11 +1239,10 @@ limitations under the License.
             </span>
           </div>
           <div id="tower-picker" role="radiogroup" aria-label="Tower"></div>
-        </div>
+        </fieldset>
       </section>
 
-      <!-- ② YOU — this device. Dice set is the one exception and it says so
-           in its own sub-line: it is chosen by you and seen by everyone. -->
+      <!-- Device preferences. Personal dice are beside the name and in its menu. -->
       <section class="settings-dest hidden" id="dest-you">
         <div class="settings-sec">
           <span class="plabel">Just you</span>
@@ -1304,18 +1270,6 @@ limitations under the License.
             </span>
             <button id="set-ambience" class="sw" aria-pressed="false" title="Room tone"></button>
           </div>
-          <!-- R1 personal kit: Settings links to the same visual collection
-               as the visible My dice launcher. Venues suggest a set; the
-               player chooses it, and new rolls carry that choice. -->
-          <div class="prow" id="diceset-row">
-            <span class="grow">
-              <span class="prow-label">Dice set</span>
-              <!-- §3b/L0: the audience half of this line is a claim, and in the
-                   lobby it is false; syncSettingsUI rewrites it there. -->
-              <span class="prow-sub" id="set-diceset-sub">the dice everyone sees you roll — from your next roll</span>
-            </span>
-          </div>
-          <div id="diceset-picker"></div>
         </div>
       </section>
 
@@ -1433,12 +1387,19 @@ limitations under the License.
         </div>
       </section>
 
+      </div>
       <!-- THE NOTE IS PANEL-LEVEL, not per-destination, and that is
            load-bearing: showSettingsNote is the refusal channel for zoom,
            tower, system, venue and felt, and a refusal that lands on a
            destination you are not looking at is UX-AUDIT D2 again — a notice
            channel silent by construction. -->
-      <div id="settings-note"></div>
+      <div id="settings-note" role="status"></div>
+      <footer id="table-edit-footer">
+        <p id="table-edit-status" role="status">Changes stay here until you apply them.</p>
+        <div><button id="table-edit-reset" class="btn ghost" type="button">Reset</button>
+          <button id="table-edit-cancel" class="btn ghost" type="button">Cancel</button>
+          <button id="table-edit-apply" class="btn" type="button" disabled>Apply to table</button></div>
+      </footer>
     </div>
   </div>
 

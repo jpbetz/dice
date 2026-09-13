@@ -1320,12 +1320,42 @@ a stale row is worse than no table.
 | Roll log | **§7.45** — the row's ONE labelled group per pool (label, evidence, answer — §7.12's fix, finally applied here) and the `rerolled` chip that names the rerollER when attribution flipped · **§7.42** — the record: the ≣'s spine, the flyout's rank panels and their anchor, `Find a roll…`, the scroll on `#log-list`, and what `Clear history` actually reaches · §7.27 for the row-as-door · §7.9 for the rail-foot flyout and key `l` · §7.12 for the compact grouped line (the per-die ROWS belong to the other three surfaces) · §7.15's "The log says so" for `reroll` / `rerolled` · **§7.24** — `vs 15` with no `✓`/`✗` where nothing sums, and no dangling `+5` feeding an empty total column | §2.5 (retired) · §7.9's "the count rides only the hover title (still the accessible name)" — the parenthesis was false and is why the count reached nobody (§7.42) · any reading in which `Clear history` is local-only |
 | Shelf | **RETIRED as a place.** §7.27 — a put-away roll lives in the log and its ROW is the door · **§7.42** — what it looks like at rest, open and closed · §7.7 for the collect/clear state machine, which is wire and survives verbatim | §7.7's slots, geometry and marker read · §7.7.1's compaction · ROADMAP U20/C13's "decide how much read the shelf owes" — answered by §7.42 |
 | ± popover | **§7.43** — the visibility sub-lines, and the whisper rung's amended words (§3.2's old quotation is struck there) · §7.10 — a pure editor, and where an edit lands by source · §7.14.2 — Done, click-away, the ring · §7.9's SHEET PASS identity strip · **§7.24** — only **Modifier** folds under a per-die lens; Target, d20 pairing, keep/drop and reroll/exploding are authorable under every system, and the rim reads `± Modify` in both | §7.10's "reroll and explode stay… behind the sysnote's *Show anyway*" — superseded 2026-08-06, no note and no disclosure; the accurate record is the comment over the popover's sections in `index.html` · any account of the fold in which Target or keep/drop hides under a per-die system: that was `usesMods`, deleted 2026-08-08 · ROADMAP U11's `± Moment` — its rule survived, its word did not (§7.24) |
-| Identity chip · roster · nameplate | **[R1 personal kit](#r1-personal-kit-2026-09-13)** — normal click/tap/keyboard opens the name editor; explicit My saved rolls returns to your rack. **§7.20a, amended 2026-09-11** — guest host, table label, persistent connection state and retry. §7.43 for table naming and roster folds; §7.17 for teammate browsing; §7.22 for compact layout | §7.17's own-name click-to-rack and secondary-gesture-only personal menu |
-| Personal dice collection | **[R1 personal kit](#r1-personal-kit-2026-09-13)** — visible My dice, lazy portrait gallery, browser-local favorites, preview then Use these dice; venues suggest a set without overriding the player | §7.9's Settings-only set dropdown and §7.36's venue-controlled personal dice |
-| Settings | No single section. **§7.43** for the Table destination's `Copy invite link` row and the pool-broadcast disclosure over *At this table* · §7.9 for the *Just you* scope (chips off by default); [R1 personal kit](#r1-personal-kit-2026-09-13) replaces the personal set dropdown with a link to My dice · §7.13 for *Your data* · §7.17 for the table name; the room-wide keys are `SETTING_SPECS` in `server.js` | §2.1 / §2.3's experience record and its editor — never built, and `/api/table` refuses the key |
+| Identity chip · roster · nameplate | **[Compact table controls](#compact-table-controls-2026-09-13)** for header layout and the table setup entry. **[R1 personal kit](#r1-personal-kit-2026-09-13)** — normal click/tap/keyboard opens the name editor; explicit My saved rolls returns to your rack. **§7.20a, amended 2026-09-11** — guest host, table label, persistent connection state and retry. §7.43 for table naming and roster folds; §7.17 for teammate browsing; §7.22 for compact layout | §7.17's own-name click-to-rack and secondary-gesture-only personal menu |
+| Personal dice collection | **[Compact table controls](#compact-table-controls-2026-09-13)** places My Dice beside the personal name. [R1 personal kit](#r1-personal-kit-2026-09-13) for gallery previews, favorites, explicit selection and venue suggestions | The first personal-kit release's standalone launcher card and duplicate Preferences link; §7.36's venue-controlled personal dice |
+| Settings | **[Compact table controls](#compact-table-controls-2026-09-13)** — Table setup from the table label; compact device Preferences from the gear; Saved rolls from the personal menu. Preview then Apply for shared choices; scope, conflict and retry states stay visible. | §7.37's four peer destinations, immediate setting/blur commits, and nested mat scroller |
 | Tower catalogue and fae venue tower | **§7.31, amended 2026-09-12** — None, Wickroot, Cairnwatch and Cinderbell; both fae venues use Wickroot · §7.38 retains the settings channel rule | §7.31's archived classic catalogue and dressing; TOWER.md's old STATUS blocks and Hollow Bole palette variants |
 | **Any control's ON / OFF / UNAVAILABLE dress** (not a surface — the rule that governs all of them) | **§7.41** — the token layer. THE KIND OF CHOICE PICKS THE DRESS: switch / pick / dial, three degrees of not-active, and the override rule that makes a disagreement one greppable line. The values of record are the `:root` block in `css/style.css` | Copying the nearest neighbour's numbers, which is what produced nine `[aria-pressed="true"]` dresses across four hue families (audit C3) · any reading in which `#left-panel` scoping is what makes a dress right — 2i-C and U6 both had to un-scope a law twice for the same reason |
 | Camera / framing | **§7.62** — the roll frames itself BEFORE it moves, so the flight frame and the settled frame are one; an unsatisfiable mat fit is refunded and the mat is fitted cropped square instead; the fog floor rides the camera's pose · §7.55 for the dice-first rung and its two gate conditions · §5.4a for the fog invariant, as amended there | §7.55's "where the eye ends up once the dice have STOPPED" — the reframe moved to frame zero on 2026-08-31, and a settle-time reframe is now a no-op · §5.4a's floor measured from the zoom's preset eye · any reading in which `mat-overflow` is a frame somebody chose (it was the fit scan's give-up position) |
+
+### Compact table controls (2026-09-13)
+
+Management shares the existing context header. My Dice sits beside your name,
+with the current set in its accessible label and personal menu. The existing
+table name is a button for Table setup and invitations; it truncates within a
+fixed row, never growing into a featured card. Connection state remains
+visible. This replaces the first personal-kit release's large launcher.
+
+The table label opens **Table setup**, with Table / Appearance tabs. Shared
+name, interpretation, rolling area and appearance changes remain tentative
+until **Apply to table**. The mat preview uses its material tile without
+repainting the live scene. A venue is identified by name rather than rendered
+in a second scene. Apply submits edited keys only, including a venue's tower.
+Unedited fields track other players' changes; edited conflicts are called out.
+Reset takes the live state; Cancel or Escape discards the unsubmitted edit.
+A failed request retains it for retry. Renames reach the header, browser title,
+and recents while retaining the table address and existing recovery behavior.
+
+The gear opens compact **Preferences** for three device controls. The personal
+menu opens **Saved rolls** for library/file management. These share one frame
+with setup but have no table tabs or Apply footer. Personal dice remain at the
+name entry. Desktop workspaces leave the table interactive; phone sheets use
+inertness and focus containment, with the close and Apply controls outside
+one content scroller. Changing viewport width updates modality. Closing
+returns focus to the opener and never tidies an ongoing turn.
+
+The [shipped record](SHIPPED.md#compact-table-controls-and-setup-2026-09-13)
+has measurements, desktop/phone proof and scope limits. R1-A's wider
+navigation and R2's full-width phone scene are still open.
 
 ### R1 personal kit (2026-09-13)
 
@@ -1334,8 +1364,9 @@ Save. Enter saves; Escape or clicking outside closes. Renaming preserves the
 seat and character library. Right-click/long-press remain aliases. **My saved
 rolls** explicitly returns to your own rack; teammate pills still browse theirs.
 
-**My dice** is visible in both sidebar layouts and names your current set.
-The personal menu and Settings reach the same collection. It opens as a
+**My dice** remains visible in both sidebar layouts. Its placement and the
+Preferences shortcut are superseded by the compact table-controls pass above;
+the personal menu reaches the same collection. It opens as a
 nonmodal desktop drawer or a phone sheet with background inertness, Tab
 containment and focus restoration; changing viewport width updates that scope.
 The footer closes the gallery and returns to your rolls in one action.

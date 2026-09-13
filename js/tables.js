@@ -153,6 +153,17 @@ export function rememberTable(room, name) {
   writeList([entry, ...list.filter((e) => e.room !== key)].slice(0, MAX_TABLES));
 }
 
+// A live table rename is authoritative, including an explicitly cleared name.
+// Update only an already visited table and retain its recency/order.
+export function renameRecentTable(room, name) {
+  const key = cleanRoom(room), next = cleanName(name);
+  const list = recentTables();
+  const entry = list.find(e => e.room === key);
+  if (!entry || entry.name === next) return;
+  entry.name = next;
+  writeList(list);
+}
+
 // Remove one table from the recents (the lobby row's "forget"). Never
 // throws; forgetting a room that is not there changes nothing.
 export function forgetTable(room) {

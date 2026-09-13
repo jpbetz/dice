@@ -7,7 +7,10 @@ priorities: “Great ideas. I'm all in.” His instruction is to record the plan
 and begin **planning item (1)**. This is the current investment order.
 On 2026-09-13 he asked to focus on one area and start implementing: the
 [first personal-kit slice](SHIPPED.md#personal-name-and-dice-collection-2026-09-13)
-now delivers direct name editing and a visual dice collection. The larger
+now delivers direct name editing and a visual dice collection. The
+[compact table-controls follow-up](SHIPPED.md#compact-table-controls-and-setup-2026-09-13)
+fits that entry into the name row and reuses the table label for shared setup,
+following his instruction to conserve the rolling area's space. The larger
 release remains in progress; its detailed design is in
 [PEOPLE-DICE-TABLES.md](PEOPLE-DICE-TABLES.md).
 
