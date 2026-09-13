@@ -25370,10 +25370,12 @@ export const scenarios = [
       for (const c of quiet.cards) {
         assert.equal(c.head + c.main + c.note, '', 'and nothing stale is left in it');
       }
+      await a.dbg('tableResults.close()');
       await a.dbg('clearTable()');
       await a.dbg('sim(60)');
 
-      // ② A TURN OPENS AND THE NUMBERS ARRIVE.
+      // ② A TURN OPENS. Its compact standing control opens the complete odds
+      // drawer, keeping the dice exposed until this detail is requested.
       // THE SYSTEM IS SET, and it is not incidental: the readout forecasts in
       // the shape the table READS, so the higher/same/lower line exists only
       // where a total is a fact of play. `none` is the plainest such system;
@@ -25381,6 +25383,8 @@ export const scenarios = [
       await a.dbg("setSystem('none')");
       await a.roll('6d6 t3');
       const rid = await a.rollId();
+      await a.eval(`document.getElementById('table-turn-read').click()`);
+      assert.equal(await a.dbg('tableResults.detailId'),rid,'the standing turn control opens its complete decision read');
       const one = await state(rid);
       const o1 = await odds(rid);
       assert.equal(o1.forecast.kind, 'total', 'six ordinary d6 have a total worth forecasting');
@@ -25450,8 +25454,8 @@ export const scenarios = [
       // outlives its turn is a number about dice nobody is holding.
       await a.dbg('pickToggle(0)');
       for (let t = 0; t < 2; t++) {
-        await a.eval(`document.querySelector('.throw-again').click()`);
-        await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        await a.eval(`document.querySelector('#player-result-actions .throw-again').click()`);
+        await a.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy && window.__diceDebug.turnState(${JSON.stringify(rid)}).throws.used === ${t+2})`,
           { desc: `throw ${t + 2} plays out`, timeout: 30000 });
         await a.dbg('sim(240)');
       }
@@ -25468,11 +25472,13 @@ export const scenarios = [
       // 1..6 on the wire (M3) so a total is computable and meaningless — a claw
       // is not greater than a bolt — so the numeric line is refused IN WRITING
       // and replaced by a question that needs no ordering.
+      await a.dbg('tableResults.close()');
       await a.dbg('clearTable()');
       await a.dbg('sim(60)');
       await a.dbg("setDiceSet('symbols.monster')");
       await a.roll('4d6 t2');
       const srid = await a.rollId();
+      await a.eval(`document.getElementById('table-turn-read').click()`);
       const o4 = await odds(srid);
       assert.equal(o4.forecast.kind, 'faces', 'no total read on symbol dice');
       assert.equal(o4.forecast.now, null, 'and no total leaks out beside the refusal');
@@ -25502,11 +25508,13 @@ export const scenarios = [
       // the rest of the app. The words the system reads take the total's place.
       // (Found by looking at a frame: "55% higher" sat directly under a row of
       // Success / Partial Success / Fail chips.)
+      await a.dbg('tableResults.close()');
       await a.dbg('clearTable()');
       await a.dbg('sim(60)');
       await a.dbg("setSystem('soul-deal')");
       await a.roll('6d6 t3');
       const prid = await a.rollId();
+      await a.eval(`document.getElementById('table-turn-read').click()`);
       const o5 = await odds(prid);
       assert.equal(o5.forecast.kind, 'faces', 'no total read where a total is not the read');
       assert.equal(o5.forecast.noTotal.code, 'no-sum');
@@ -25549,6 +25557,7 @@ export const scenarios = [
       // self-cleaned while the button beside it went stale would be worse. So
       // the claim is not "no stale holder exists": it is that exactly ONE
       // readout is on screen and it is the one about the open turn.
+      await a.dbg('tableResults.close()');
       await a.dbg('clearTable()');
       await a.dbg('sim(60)');
       await a.dbg("setSystem('none')");

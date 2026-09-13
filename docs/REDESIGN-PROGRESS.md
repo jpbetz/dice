@@ -12,14 +12,14 @@ priority order. R1, R2 and R3 remain open until their composed proofs pass.
 | Work | State and next action |
 | --- | --- |
 | Direct identity, gallery/favorites, personal selection | Initial slice committed as `b064b07`; preserve the subsequent owner correction asking for compact controls. |
-| Compact controls and transactional table setup | Integrated owner-session commit `85da885`. Follow-up fixes restore keyboard radio arrows inside the sheet and clear conflicts when a peer restores the base; targeted desktop/phone proofs pass. True 3D appearance preview remains open. |
-| Gallery practice | Committed as `f67d1df`; local/shared isolation and lifecycle tests plus desktop/phone captures pass. First combined unit/fuzz/smoke run passed (61/61 smoke). |
+| Compact controls and transactional table setup | Integrated owner-session commit `85da885`. Follow-up fixes restore keyboard radio arrows inside the sheet and clear conflicts when a peer restores the base; targeted desktop/phone proofs pass. Actual grounded-table 3D preview is now integrated as `00557f3`; six setup/design/channel tests and desktop/phone views pass. |
+| Gallery practice | Committed as `f67d1df`; local/shared isolation and lifecycle tests plus desktop/phone captures pass. Owner expanded gallery integrated as `8fe35cc`; `64035a4` keeps practice inside that preview on phones. Four gallery checks, the strengthened phone practice check, and desktop/phone/short-workspace captures pass. |
 | R1-C: Quick dice and explicit starter kits | Integrated `605b4f6` / `ab8e003` as `d6efcbb` / `5291b00`. Focused tests preserve empty/legacy libraries, occupied interpretation, drafts and unfinished private/shared/solo turns. Old tests explicitly select Soul Deal profiles/lenses and the composer; fresh-visit proofs retain the new empty/Numbers-only default. |
 | Explicit profile publication | Committed as `002b115`; focused raw-network proof and composed smoke pass; see PROFILE-SHARING.md. Connect the namespace-reset hook before account recovery can adopt a library. |
-| R1-D0: durable service | Local atomic store and Firestore REST adapter integrated as `046f9a7` / `0c121fa`; optional account API/client integrated as `a2037ee`. Adapter/account tests pass, including cookie races and restart recovery. Agent now implementing immutable private library revisions, IndexedDB namespaces and explicit conflicts. No cloud storage is provisioned. |
+| R1-D0: durable service | Local atomic store and Firestore REST adapter integrated as `046f9a7` / `0c121fa`; optional account API/client integrated as `a2037ee`. Adapter/account tests pass, including cookie races and restart recovery. Private immutable library revisions, transactional IndexedDB namespaces, explicit conflicts and cleanup integrated as `838f86a`. Real HTTP/browser/restart proofs pass. Agent now implements saved homes; UI agent implements account adoption and visible sync. No cloud storage is provisioned. |
 | R3: compressed public text | Agent commit `8e44250` reviewed and integrated as `feb5f79`; combined suite passes. Production lacked compression; local six-file transfer shrinks approximately 72% with Brotli. |
-| R3: dice-face draw consolidation | Integrated as `354b965`: two real draws per compatible die, reviewed face sheets and exact geometry/film checks. Worker branch now proves original film parity; main-thread responsiveness measurements and lifecycle review underway. |
-| R1 destinations + R2 phone surface | Integrated as `55c42d7`: three destinations, content-sized desktop workspaces, full-width phone scene and bottom tray. Agent now implementing persistent result seats and fixing open-turn card overlap on phone. |
+| R3: dice-face draw consolidation | Integrated as `354b965`: two real draws per compatible die, reviewed face sheets and exact geometry/film checks. Ordinary film worker integrated as `2490b07` / `fb47593`. Full-film parity, input-return measurements, live clear/collect/reveal and next-film collider preservation pass. Turn FIFO and worker turns are in progress. |
+| R1 destinations + R2 phone surface | Integrated as `55c42d7`: three destinations, content-sized desktop workspaces, full-width phone scene and bottom tray. Persistent result seats and reserved turn controls integrated as `955b2be`; composed desktop/phone/four-player/privacy/turn proofs pass. Copper Lantern and real appearance preview are integrated and visually inspected. |
 
 The root's integration checkout is `/tmp/dice-redesign-integration` on
 `codex/redesign-integration`. Agents use isolated worktrees so reviews and
@@ -27,17 +27,19 @@ cherry-picks are explicit and another ongoing session's edits survive.
 
 ## Remaining campaign work
 
-Finish R1-B3's recognizable names and real appearance preview; implement
-the destination shell and phone layout; deliver recovery APIs, explicit
-profile publication, safe library synchronization, saved homes, contacts,
-invitations, and permitted presence. History-cap eviction is fixed as `c775622` / `98f72e4`: 100 unfinished turns are protected beside 100 completed entries, new-turn capacity refuses without deleting work, and batch DOM pruning is verified. Then exercise the full guest/recovered
-return loop after restart without a prior client repushing state.
+Complete optional account/recovery and visible library synchronization, saved
+homes, contacts, invitations and permitted presence. Then exercise the complete
+guest/recovered return loop after restart without a previous client repushing
+setup. Profile publication, named-table controls, familiar first rolls,
+destinations and the initial phone layout are implemented. History protects
+100 unfinished turns beside 100 completed entries; capacity refuses without
+removing work, and batch DOM pruning is verified.
 
-R2 owes one complete multiplayer composition, readable per-player latest
-results, subsequent table art directions, and a measured experiment for
-rolls arriving together. R3 owes responsive simulation, optional loading,
-idle work reduction, Battery saver, and optional instant results. Keep
-these on the queue rather than treating delivery compression as all of R3.
+R2 next: Navigation and Stone compositions, followed by the grouped/concurrent
+roll experiment. Copper Lantern, actual setup preview and persistent result
+seats are implemented. R3 next: preserve complete ordered turn events, extend
+worker parity to turns, load remaining optional features on demand, reduce idle
+rendering, and implement Battery saver and optional instant results.
 
 Cloud provisioning, actual phone/midrange-device observations, user
 observation, and production deployment are not established by local tests.
@@ -59,19 +61,21 @@ ephemeral ports. Port 8123 remains untouched.
 
 ## Composed checkpoint — 2026-09-13
 
-At `354b965`, all unit/fuzz checks and **67/67 browser smoke scenarios pass**.
-The numeric default exposed real symbol-face and push-scoring omissions;
-`d39651c` fixes the actual breakdown and tests both old chosen lenses and the
-new default. Desktop/phone numeric captures were inspected after the shell
-merge. A large open push-turn card still overlaps the phone dice and its
-keyboard hint crosses the header; this is assigned to the result-layout slice.
+At `db13791`, all unit/fuzz checks and the real library browser suite pass;
+69/70 smoke scenarios pass in the full run. The remaining odds test expected
+the replaced floating card. It now opens the actual standing turn control's
+complete-result drawer, verifies visible odds and selection updates, and waits
+for the authored throw budget before continuing; its targeted rerun passes.
+The feature's read is available in the deliberately requested detail surface.
+The six subsequent grounded-table/preview/setup/channel checks pass at `00557f3`.
 
-The history fix adds passing shared/private/solo long-session proofs (three
-browser scenarios plus server capacity/retention/claim retry). The root has
-started the first forge-baked Copper Lantern table in `codex/r2-art`; its
-7,996-triangle model passes manifold/color/bounds gates, but app composition
-and material review are still underway. No artwork completion is claimed.
+Reviewed composed views include the owner’s full gallery and practice on phone,
+short-height gallery detail, four-player desktop and phone results, push turns
+with exposed dice and bottom actions, and Copper Lantern with an actual setup
+preview. Worker mutation/reveal/parity checks pass together (5/5), as do
+workspace/result/privacy checks (5/5). New account UI, saved homes, grouped
+presentation and the remaining two art directions are still active work.
 
-The owner's main checkout has newer uncommitted gallery workspace edits.
-They are left intact; integrate their committed result and retain the local
-practice throw when reconciling the gallery. The live preview is untouched.
+The owner’s committed gallery is preserved. Main’s untracked initial service
+design draft remains untouched; the complete reviewed work is in the integration
+checkout. Port 8123 and the owner’s browser have not been used for validation.
