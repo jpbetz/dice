@@ -26,3 +26,31 @@ context=access(person(1),2);await session.load();assert.equal(session.info.recor
 // A late accepted response may acknowledge only its original durable journal.
 sendGate=new Promise(r=>{release=r;});const late=session.retry(session.info.records[0].id);while(sent.length===before)await new Promise(r=>setTimeout(r,0));context=access(person(2),2);session.identity();release();sendGate=null;assert.equal((await late).code,'identity_changed');assert.deepEqual(session.info.records,[]);assert.equal(states.get(person(1)).records[0].status,'saved');
 console.log('social-session: durable exact requests, authoritative membership, opt-in/offline opt-out and fixed-owner completions passed');
+
+// A response authorized before a relationship action may not restore its
+// former signal, even when the browser still has the same account cookie.
+{
+  const friend = {id:person(3),displayName:'Riley'};
+  let releasePresence, presenceGate = null, currentFriends = [friend];
+  const fixed = access(person(4));
+  fixed.people = async () => ({ok:true,friends:currentFriends,contactCode:{enabled:false}});
+  fixed.presence = async () => {
+    const result = {ok:true,signals:currentFriends.map(person => ({person,state:'online',expiresAt:Date.now()+90000}))};
+    if (presenceGate) await presenceGate;
+    return result;
+  };
+  fixed.homePresence = async () => ({ok:false,code:'account_unavailable'});
+  fixed.blockPerson = async () => { currentFriends=[]; return {ok:true,personId:fixed.personId}; };
+  const controlled = createSocialSession({access:()=>fixed,seat:()=>({room:home.roomKey})},{journalFactory:async()=>journal});
+  await controlled.load(); await controlled.readPresence();
+  assert.equal(controlled.info.signals[0].state,'online');
+  assert.equal(controlled.info.homePresence.state,'unknown','a failed home projection is not a known empty home');
+  presenceGate = new Promise(resolve => {releasePresence=resolve;});
+  const held = controlled.readPresence();
+  await controlled.act('block-person',{blocked:true},friend.id);
+  assert.ok(controlled.info.signals.every(signal=>signal.state!=='online'),'mutation immediately clears displayed markers');
+  releasePresence();
+  assert.equal((await held).code,'request_superseded');
+  assert.deepEqual(controlled.info.friends,[]);
+  assert.ok(controlled.info.signals.every(signal=>signal.state!=='online'),'late pre-block projection cannot restore online state');
+}
