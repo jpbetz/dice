@@ -30,6 +30,14 @@ and generous focused views: a searchable catalogue beside a desktop preview,
 and full-screen phone browsing/detail with a return to the same list position.
 This advances the gallery part of R1-B2; practice and the broader shell remain.
 
+The [focused library workspace](SHIPPED.md#focused-library-workspace-2026-09-13)
+now separates your characters, shared characters and file tools. A searchable
+list previews saved rolls before an explicit switch, with named Rename,
+Duplicate and Delete actions. Phones use list/detail views with preserved
+return position; desktop uses both panes. This advances the local saved-roll
+organization in R1-B1 without adding permanent controls. The wider navigation,
+Quick dice, practice, saved-roll dice editing, sync and invitations remain open.
+
 ## 1. The experience to build
 
 A new visitor rolls immediately with familiar dice. They can see where to

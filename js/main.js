@@ -21093,9 +21093,13 @@ function copyProfileIn(rec, { activate = false, from = null } = {}) {
 }
 
 function renameProfileTo(id, name) {
+  const before = structuredClone(profileStore);
   const got = renameProfile(profileStore, id, name);
   if (!got.ok) return pv(false, `✗ ${got.error}`);
-  if (!saveProfileStore()) return pv(false, '✗ couldn’t save the new name (storage unavailable?)');
+  if (!saveProfileStore()) {
+    profileStore = before;
+    return pv(false, '✗ couldn’t save the new name (storage unavailable?)');
+  }
   if (id === profileStore.activeId) { schedulePublishPools(); renderGroups(); }
   renderProfileLibrary();
   return pv(true, `✓ renamed to '${got.name}'`);
@@ -21106,9 +21110,13 @@ function removeProfileById(id) {
   if (!rec) return pv(false, '✗ that profile is gone already');
   const wasActive = id === profileStore.activeId;
   if (!wasActive) writeActivePools(profileStore, groups); // don't lose edits to the one in hand
+  const before = structuredClone(profileStore);
   const got = deleteProfile(profileStore, id);
   if (!got.ok) return pv(false, `✗ ${got.error}`);
-  if (!saveProfileStore()) return pv(false, '✗ couldn’t save the deletion (storage unavailable?) — nothing was removed');
+  if (!saveProfileStore()) {
+    profileStore = before;
+    return pv(false, '✗ couldn’t save the deletion (storage unavailable?) — nothing was removed');
+  }
   if (wasActive) adoptRack(activeProfile(profileStore));
   else renderProfileLibrary();
   const left = profilesOf(profileStore).length;
@@ -30475,7 +30483,7 @@ function showSettingsDest(dest) {
   document.getElementById('settings-title').textContent = shared ? 'Table setup' : dest === 'you' ? 'Preferences' : 'Saved rolls';
   document.getElementById('settings-scope').textContent = shared
     ? (IN_LOBBY ? 'Your solo table' : 'Shared with everyone here')
-    : dest === 'you' ? 'For this device' : 'Your characters, rolls, and files';
+    : dest === 'you' ? 'For this device' : 'Your characters and rolls · Saved on this device';
   document.getElementById('settings-nav').hidden = !shared;
   document.getElementById('table-edit-footer').hidden = !shared;
   document.getElementById('table-open').setAttribute('aria-expanded', String(shared));
@@ -30494,6 +30502,7 @@ function showSettingsDest(dest) {
   // §7.23 fixed for the pools bar.
   const panel = document.getElementById('settings-scroll');
   if (panel) panel.scrollTop = 0;
+  if (!settingsModal.classList.contains('hidden')) syncSettingsModal();
   return settingsDest;
 }
 
@@ -30540,7 +30549,15 @@ function openSettingsModal(at = 'table', anchor) {
   closeIdentityMenu();
   showSettingsDest(at);
   // Opening three device switches should not rebuild the whole library.
-  if (settingsDest === 'stuff') renderProfileLibrary();
+  libraryOpened = settingsDest === 'stuff';
+  if (libraryOpened) {
+    libraryQuery = ''; document.getElementById('library-search').value = '';
+    document.getElementById('profile-status').textContent = '';
+    libraryFocus = null;
+    librarySelectedId = profileStore.activeId;
+    showLibraryPage('mine');
+    renderProfileLibrary();
+  }
   // The table-name prefill lives HERE, not in syncSettingsUI: setSound()
   // calls syncSettingsUI during module evaluation, before roomSettings'
   // let initializes — the exact eval-order trap the felt-swatch comment
@@ -30579,6 +30596,8 @@ function closeSettingsModal() {
   const hadFocus = settingsModal.contains(document.activeElement);
   settingsModal.classList.add('hidden');
   tableEdit = null;
+  libraryOpened = false;
+  dismissLibraryForms();
   document.getElementById('table-open').setAttribute('aria-expanded','false');
   closeModal(settingsModal);
   document.getElementById('settings-note').textContent = '';
@@ -30608,7 +30627,7 @@ document.getElementById('table-edit-cancel').addEventListener('click', closeSett
 const settingsPhone = window.matchMedia('(max-width: 640px)');
 function syncSettingsModal() {
   const focused = settingsModal.contains(document.activeElement) ? document.activeElement : null;
-  if (settingsPhone.matches) openModal(settingsModal, {labelledBy:'settings-title'});
+  if (settingsPhone.matches || settingsDest === 'stuff') openModal(settingsModal, {labelledBy:'settings-title'});
   else {
     closeModal(settingsModal);
     settingsModal.setAttribute('role','dialog');
@@ -30621,7 +30640,11 @@ settingsPhone.addEventListener('change', () => {
 });
 settingsModal.addEventListener('keydown', e => {
   e.stopPropagation();
-  if (e.key === 'Escape') { e.preventDefault(); closeSettingsModal(); }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    if (settingsDest === 'stuff' && libraryEscape()) return;
+    closeSettingsModal();
+  }
 });
 document.getElementById('set-chips').addEventListener('click', () => setChips(!chipsOn));
 document.getElementById('set-ambience').addEventListener('click', () => setAmbience(!ambienceOn));
@@ -31610,7 +31633,7 @@ function openProfileMenu(e) {
 }
 
 // A profile verb's receipt, said where it can be seen. The library list's own
-// status line when the settings modal is open; the transient status pill
+// status line when the library workspace is open; the transient status pill
 // otherwise — the picker works with the modal closed, which is the whole point
 // of it being a menu over the rack.
 function showProfileNote(v) {
@@ -31619,7 +31642,7 @@ function showProfileNote(v) {
     line.textContent = v.status;
     line.classList.toggle('warn', !v.ok);
   }
-  if (!document.getElementById('settings-modal').classList.contains('hidden')) return v;
+  if (libraryOpened) return v;
   showSettingsNote(v.status);
   return v;
 }
@@ -31633,136 +31656,246 @@ function showProfileNote(v) {
 // `openSettings('stuff')` IS the deep link.)
 
 // ---------------------------------------------------------------------------
-// The library list (§11.5 ③) — Settings → Your data
-// ---------------------------------------------------------------------------
-//
-// Manage-frequency work lives here rather than in the picker, for two reasons
-// found by building the alternative: a menu that closes on focus-out is the
-// wrong container for a rename field, and a 32-row list with a scroller is a
-// panel wearing a menu's clothes.
-//
-// Delete is two-step IN PLACE — the label becomes 'Delete ⟨name⟩?' for three
-// seconds and the second click commits. That is Copy's own morph grammar
-// (js:portable-copy) used as a confirm, and it keeps the promise that nothing
-// modal locks the table (goal: the table is never blocked).
-let profileArmedDelete = null;
-let profileDeleteTimer = null;
-let profileRenaming = null;
-
-function renderProfileLibrary() {
-  const rows = document.getElementById('profile-rows');
-  if (!rows) return;
-  rows.textContent = '';
-  const sys = tableSystem();
-  for (const p of profilesOf(profileStore)) {
-    const active = p.id === profileStore.activeId;
-    const n = active ? groups.length : (p.pools || []).length;
-    const row = document.createElement('div');
-    row.className = 'pp-row';
-    if (active) row.classList.add('editing');
-
-    if (profileRenaming === p.id) {
-      const input = document.createElement('input');
-      input.className = 'tin';
-      input.type = 'text';
-      input.maxLength = 24;
-      input.value = p.name;
-      input.autocomplete = 'off';
-      const commit = () => {
-        const v = renameProfileTo(p.id, input.value);
-        profileRenaming = null;
-        showProfileNote(v);
-        renderProfileLibrary();
-      };
-      input.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
-        if (ev.key === 'Escape') { ev.preventDefault(); profileRenaming = null; renderProfileLibrary(); }
-      });
-      const ok = document.createElement('button');
-      ok.className = 'btn tiny confirm';
-      ok.textContent = 'Rename';
-      ok.addEventListener('click', commit);
-      row.append(input, ok);
-      rows.appendChild(row);
-      setTimeout(() => input.focus(), 0);
-      continue;
-    }
-
-    const nameEl = document.createElement('button');
-    nameEl.className = 'pp-name pp-rename';
-    nameEl.textContent = p.name;
-    nameEl.title = 'Rename';
-    nameEl.addEventListener('click', () => { profileRenaming = p.id; renderProfileLibrary(); });
-
-    const sysEl = document.createElement('span');
-    sysEl.className = 'pp-tag pp-sys';
-    sysEl.textContent = systemLabel(p.system);
-    if (p.system !== sys) sysEl.classList.add('off');
-
-    const countEl = document.createElement('span');
-    countEl.className = 'pp-count';
-    countEl.textContent = `${n} pool${n === 1 ? '' : 's'}`;
-    row.append(nameEl, sysEl, countEl);
-
-    if (active) {
-      const tag = document.createElement('span');
-      tag.className = 'pp-tag';
-      tag.textContent = 'in hand';
-      row.append(tag);
-    } else {
-      const use = document.createElement('button');
-      use.className = 'btn tiny';
-      use.textContent = 'Use';
-      use.disabled = p.system !== sys;
-      use.title = p.system === sys
-        ? `Take '${p.name}' in hand — the pools you have now stay with '${activeProfileName()}'`
-        : `'${p.name}' was built for ${systemLabel(p.system)} — this table reads ${systemLabel(sys)}`;
-      use.addEventListener('click', () => showProfileNote(switchToProfile(p.id)));
-      row.append(use);
-    }
-
-    const copy = document.createElement('button');
-    copy.className = 'btn tiny';
-    copy.textContent = 'Copy';
-    copy.title = `Add a second copy of '${p.name}' — a variant to edit without touching this one`;
-    copy.addEventListener('click', () => showProfileNote(copyProfileIn(toWire(
-      p.id === profileStore.activeId ? { ...p, pools: groups } : p,
-    ))));
-    row.append(copy);
-
-    const del = document.createElement('button');
-    del.className = 'btn tiny pp-del';
-    const armed = profileArmedDelete === p.id;
-    del.textContent = armed ? `Delete ${p.name}?` : '✕';
-    del.title = `Delete '${p.name}'`;
-    del.addEventListener('click', () => {
-      clearTimeout(profileDeleteTimer);
-      if (!armed) {
-        profileArmedDelete = p.id;
-        renderProfileLibrary();
-        profileDeleteTimer = setTimeout(() => { profileArmedDelete = null; renderProfileLibrary(); }, 3000);
-        return;
-      }
-      profileArmedDelete = null;
-      showProfileNote(removeProfileById(p.id));
-      renderProfileLibrary();
-    });
-    row.append(del);
-    rows.appendChild(row);
-  }
-
-  const count = document.getElementById('profile-count');
-  if (count) count.textContent = `${profilesOf(profileStore).length} of ${MAX_PROFILES}`;
-  renderTableProfiles();
+// The focused library. Selection is a preview; Use alone changes the rack.
+// State is hoisted because library verbs can run during initial restoration.
+var libraryOpened = false;
+var librarySelectedId = null;
+var libraryQuery = '';
+var libraryPage = 'mine';
+var libraryFocus = null;
+var libraryEditingId = null;
+var libraryDeletingId = null;
+const libraryNarrow = window.matchMedia('(max-width: 760px)');
+const libEl = id => document.getElementById(id);
+function libraryRecord() {
+  return findProfile(profileStore, librarySelectedId) || activeProfile(profileStore);
 }
+function dismissLibraryForms() {
+  libraryEditingId = null;
+  libraryDeletingId = null;
+  libEl('library-rename').hidden = true;
+  libEl('library-delete').hidden = true;
+}
+function showLibraryPage(page) {
+  if (!['mine','shared','files'].includes(page)) return;
+  libraryPage = page;
+  for (const id of ['mine','shared','files']) libEl(`library-${id}`).classList.toggle('hidden', id !== page);
+  document.querySelectorAll('[data-library-page]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.libraryPage === page)));
+  libEl('dest-stuff').dataset.profileView = 'list';
+  dismissLibraryForms();
+  if (page === 'shared') renderTableProfiles();
+}
+function browseLibrary() {
+  libEl('dest-stuff').dataset.profileView = 'list';
+  dismissLibraryForms();
+  const card = [...libEl('profile-rows').querySelectorAll('button')].find(b => b.dataset.profile === librarySelectedId);
+  (card || libEl('library-search')).focus({preventScroll:true});
+}
+function selectLibraryProfile(id) {
+  librarySelectedId = id;
+  dismissLibraryForms(); renderProfileLibrary();
+  libEl('dest-stuff').dataset.profileView = 'detail';
+  libEl('library-detail').querySelector('.library-detail-scroll').scrollTop = 0;
+  if (libraryNarrow.matches) libEl('library-back').focus({preventScroll:true});
+}
+function libraryEscape() {
+  if (!libEl('library-rename').hidden) { dismissLibraryForms(); libEl('library-rename-open').focus(); return true; }
+  if (!libEl('library-delete').hidden) { dismissLibraryForms(); libEl('library-delete-open').focus(); return true; }
+  if (libraryPage === 'mine' && libEl('library-create').open) {
+    libEl('library-create').open = false; libEl('library-create').querySelector('summary').focus(); return true;
+  }
+  if (libraryPage === 'mine' && libraryNarrow.matches && libEl('dest-stuff').dataset.profileView === 'detail') {
+    browseLibrary(); return true;
+  }
+  return false;
+}
+function renderLibrarySharing() {
+  const shared = document.getElementById('pools-shared-note');
+  if (!shared) return;
+  const n = profilesOf(profileStore).length;
+  shared.textContent = `Everyone here can see and copy your ${n === 1 ? 'character' : `${n} characters`}.`;
+  shared.classList.toggle('hidden', !netOnline);
+}
+function renderProfileLibrary() {
+  renderLibrarySharing();
+  // Most callers are live-table updates. A closed library owes no DOM work.
+  if (!libraryOpened) return;
+  const profiles = profilesOf(profileStore);
+  if (!findProfile(profileStore, librarySelectedId)) {
+    librarySelectedId = profileStore.activeId;
+    dismissLibraryForms();
+  }
+  const p = libraryRecord();
+  const rows = libEl('profile-rows');
+  const focusId = rows.contains(document.activeElement) ? document.activeElement.dataset.profile : null;
+  const scroll = rows.scrollTop;
+  const search = text => String(text).normalize('NFKD').toLocaleLowerCase().replace(/\p{M}/gu, '');
+  const words = search(libraryQuery).trim().split(/\s+/).filter(Boolean);
+  const poolsFor = rec => rec.id === profileStore.activeId ? groups : poolsOfProfile(rec);
+  const matches = profiles.filter(rec => words.every(w => search([rec.name,systemLabel(rec.system),...poolsFor(rec).map(g => g.name)].join(' ')).includes(w)));
+  rows.replaceChildren();
+  for (const rec of matches) {
+    const card = document.createElement('button');
+    card.type = 'button'; card.className = 'library-card'; card.dataset.profile = rec.id;
+    card.tabIndex = rec.id === (matches.find(p => p.id === librarySelectedId) || matches[0]).id ? 0 : -1;
+    card.setAttribute('aria-pressed', String(rec.id === librarySelectedId));
+    card.setAttribute('aria-controls', 'library-detail');
+    const monogram = document.createElement('span'); monogram.className = 'library-monogram';
+    monogram.textContent = Array.from(rec.name)[0] || '•'; monogram.setAttribute('aria-hidden','true');
+    const text = document.createElement('span'); text.className = 'library-card-text';
+    const name = document.createElement('strong'); name.textContent = rec.name;
+    const info = document.createElement('span');
+    const count = poolsFor(rec).length;
+    info.textContent = `${systemLabel(rec.system)} · ${count} saved ${count === 1 ? 'roll' : 'rolls'}`;
+    text.append(name,info);
+    if (rec.id === profileStore.activeId) {
+      const tag = document.createElement('small'); tag.textContent = 'In use'; text.append(tag);
+    }
+    card.append(monogram,text);
+    card.addEventListener('click', () => selectLibraryProfile(rec.id));
+    rows.append(card);
+  }
+  rows.scrollTop = scroll;
+  if (focusId) {
+    const card = [...rows.children].find(b => b.dataset.profile === focusId);
+    (card || libEl('library-search')).focus({preventScroll:true});
+  }
+  libEl('profile-count').textContent = `${matches.length} of ${profiles.length} characters · ${MAX_PROFILES} maximum`;
+  libEl('library-empty').hidden = matches.length > 0;
+  renderTableProfiles();
+  if (!p) return;
+  const active = p.id === profileStore.activeId;
+  const pools = poolsFor(p);
+  libEl('library-name').textContent = p.name;
+  libEl('library-system').textContent = systemLabel(p.system);
+  libEl('library-meta').textContent = `${pools.length} saved ${pools.length === 1 ? 'roll' : 'rolls'}${active ? ' · In use at this table' : ' · Previewing your library'}`;
+  libEl('library-use').textContent = active ? 'Back to my rolls' : 'Use these rolls';
+  libEl('library-use').disabled = !active && p.system !== tableSystem();
+  libEl('library-use-note').textContent = p.system !== tableSystem()
+    ? `Built for ${systemLabel(p.system)}. This table uses ${systemLabel(tableSystem())}.`
+    : active ? 'Your active character. Add and edit its rolls at the table.' : `Switch to ${p.name}. Your current character keeps all its saved rolls.`;
+  const list = libEl('library-rolls'); list.replaceChildren();
+  const sections = new Map();
+  for (const pool of pools) {
+    const label = pool.category || 'Saved rolls';
+    if (!sections.has(label)) sections.set(label, []);
+    sections.get(label).push(pool);
+  }
+  if (!pools.length) {
+    const empty = document.createElement('p'); empty.className = 'library-no-rolls';
+    empty.textContent = 'No saved rolls yet. Use this character, then add rolls at the table.';
+    list.append(empty);
+  }
+  for (const [label, contents] of sections) {
+    const section = document.createElement('section');
+    const heading = document.createElement('h4'); heading.textContent = label; section.append(heading);
+    for (const pool of contents) {
+      const row = document.createElement('div'); row.className = 'library-roll';
+      const name = document.createElement('strong'); name.textContent = pool.name;
+      const notation = document.createElement('code'); notation.textContent = pool.notation || '';
+      row.append(name,notation);
+      if (pool.set) {
+        const set = document.createElement('small'); set.textContent = `Dice: ${setSwatchInfo(pool.set)?.label || pool.set}`; row.append(set);
+      }
+      section.append(row);
+    }
+    list.append(section);
+  }
+}
+libEl('library-nav').addEventListener('click', e => {
+  const b = e.target.closest('[data-library-page]');
+  if (b && b.id !== 'portable-open') showLibraryPage(b.dataset.libraryPage);
+});
+libEl('library-search').addEventListener('input', e => {
+  libraryQuery = e.target.value; renderProfileLibrary(); libEl('profile-rows').scrollTop = 0;
+});
+libEl('profile-rows').addEventListener('keydown', e => {
+  if (!['ArrowUp','ArrowDown','Home','End'].includes(e.key)) return;
+  const cards = [...libEl('profile-rows').children];
+  const at = cards.indexOf(e.target); if (at < 0) return;
+  e.preventDefault();
+  const next = e.key === 'Home' ? 0 : e.key === 'End' ? cards.length - 1
+    : Math.max(0,Math.min(cards.length - 1,at + (e.key === 'ArrowDown' ? 1 : -1)));
+  if (libraryNarrow.matches) {
+    cards.forEach((b,i) => { b.tabIndex = i === next ? 0 : -1; });
+    cards[next].focus();
+  } else {
+    selectLibraryProfile(cards[next].dataset.profile);
+    libEl('profile-rows').children[next].focus();
+  }
+});
+libEl('library-back').addEventListener('click', browseLibrary);
+libEl('library-use').addEventListener('click', () => {
+  const p = libraryRecord(); if (!p) return;
+  const v = p.id === profileStore.activeId ? pv(true,'') : switchToProfile(p.id);
+  if (!v.ok) { showProfileNote(v); return; }
+  closeSettingsModal(); returnToMyRolls();
+});
+libEl('library-rename-open').addEventListener('click', () => {
+  const p = libraryRecord(); if (!p) return;
+  dismissLibraryForms(); libEl('library-rename').hidden = false;
+  libraryEditingId = p.id;
+  libEl('library-rename-input').value = p.name;
+  libEl('library-rename-input').focus(); libEl('library-rename-input').select();
+});
+libEl('library-rename').addEventListener('submit', e => {
+  e.preventDefault();
+  const p = findProfile(profileStore, libraryEditingId); if (!p) return;
+  const v = renameProfileTo(p.id,libEl('library-rename-input').value);
+  showProfileNote(v);
+  if (v.ok) { dismissLibraryForms(); libEl('library-rename-open').focus(); }
+});
+libEl('library-rename-cancel').addEventListener('click', () => { dismissLibraryForms(); libEl('library-rename-open').focus(); });
+libEl('library-duplicate').addEventListener('click', () => {
+  const p = libraryRecord(); if (!p) return;
+  const before = new Set(profilesOf(profileStore).map(p => p.id));
+  const v = copyProfileIn(toWire(p.id === profileStore.activeId ? {...p,pools:groups} : p));
+  showProfileNote(v);
+  if (v.ok) {
+    librarySelectedId = profilesOf(profileStore).find(p => !before.has(p.id))?.id || p.id;
+    dismissLibraryForms(); renderProfileLibrary();
+  }
+});
+libEl('library-delete-open').addEventListener('click', () => {
+  const p = libraryRecord(); if (!p) return;
+  dismissLibraryForms(); libEl('library-delete').hidden = false;
+  libraryDeletingId = p.id;
+  libEl('library-delete-question').textContent = `Delete “${p.name}”?`;
+  const n = p.id === profileStore.activeId ? groups.length : poolsOfProfile(p).length;
+  libEl('library-delete-impact').textContent = `${n} saved ${n === 1 ? 'roll' : 'rolls'} in this character will be removed. Other characters keep their rolls.`;
+  libEl('library-delete-cancel').focus();
+});
+libEl('library-delete-cancel').addEventListener('click', () => { dismissLibraryForms(); libEl('library-delete-open').focus(); });
+libEl('library-delete-confirm').addEventListener('click', () => {
+  const p = findProfile(profileStore, libraryDeletingId); if (!p) return;
+  const v = removeProfileById(p.id); showProfileNote(v);
+  if (v.ok) { dismissLibraryForms(); renderProfileLibrary(); libEl('library-name').focus({preventScroll:true}); }
+});
+libEl('library-backup').addEventListener('click', () => portableDownload());
+libEl('dest-stuff').addEventListener('focusin', e => { libraryFocus = e.target; });
+libraryNarrow.addEventListener('change', () => {
+  if (!libraryOpened || libraryPage !== 'mine') return;
+  const focus = libEl('dest-stuff').contains(document.activeElement) ? document.activeElement : libraryFocus;
+  if (libraryNarrow.matches) {
+    if (focus) libEl('dest-stuff').dataset.profileView = libEl('library-detail').contains(focus) ? 'detail' : 'list';
+    if (focus?.offsetParent !== null) focus?.focus({preventScroll:true});
+  } else if (focus === libEl('library-back')) {
+    (libEl('profile-rows').querySelector('[aria-pressed="true"]') || libEl('library-search')).focus({preventScroll:true});
+  } else if (focus?.isConnected && focus.offsetParent !== null) {
+    focus.focus({preventScroll:true});
+  }
+  if (!libEl('library-rename').hidden) libEl('library-rename').scrollIntoView({block:'nearest'});
+});
 
-// 'At this table' — the prepared seats and the teammates' published racks, each
-// one Copy away from being mine (§11 P10/P11/P12). ABSENT when there is nothing
-// at the table: empty renders nothing, and a heading over no rows is prose.
+// Prepared characters and teammates' published racks remain explicit copies.
+// Incoming presence updates retain the Copy control's focus by source.
 function renderTableProfiles() {
   const zone = document.getElementById('table-profiles');
   const rows = document.getElementById('table-profile-rows');
   if (!zone || !rows) return;
+  renderLibrarySharing();
+  if (!libraryOpened) return;
+  const focusSource = rows.contains(document.activeElement) ? document.activeElement.closest('.pp-row')?.dataset.source : null;
   rows.textContent = '';
   const offers = [];
   for (const o of tableOffers()) {
@@ -31770,45 +31903,45 @@ function renderTableProfiles() {
   }
   for (const pl of players) {
     if (!pl || pl.id === (net && net.playerId) || !Array.isArray(pl.pools) || !pl.pools.length) continue;
+    // Current clients publish the active character in the library as well as
+    // the live rack. Show it once; a legacy rack still has its own copy door.
+    if (offers.some(o => o.label === (pl.profile || pl.name) && o.sub === pl.name)) continue;
     offers.push({
       label: pl.profile || pl.name,
-      sub: pl.profile ? pl.name : 'their rack',
+      sub: pl.name || 'a player',
       rec: { name: pl.profile || pl.name, system: pl.system || null, set: pl.set || null, pools: pl.pools },
     });
   }
-  // …and the SENDING half, disclosed (U25). One line, standing, at a table
-  // only — see the markup comment for why it lives here and not in a tooltip.
-  const shared = document.getElementById('pools-shared-note');
-  if (shared) {
-    const n = profilesOf(profileStore).length;
-    shared.textContent = `Everyone at this table can see your ${n === 1 ? 'profile' : `${n} profiles`}`
-      + ' and copy the pools in them. Nothing of yours is stored on the server —'
-      + ' the room forgets it when the table ends.';
-    shared.classList.toggle('hidden', !netOnline);
-  }
   zone.classList.toggle('hidden', !offers.length);
+  libEl('library-shared-empty').hidden = !!offers.length;
   if (!offers.length) return;
   for (const o of offers) {
     const row = document.createElement('div');
     row.className = 'pp-row';
+    row.dataset.source = JSON.stringify([o.label,o.sub]);
     const nameEl = document.createElement('span');
     nameEl.className = 'pp-name';
     nameEl.textContent = o.label;
+    const source = document.createElement('small');
+    source.textContent = o.sub === 'prepared' ? 'Prepared for this table' : `From ${o.sub}`;
+    nameEl.append(source);
     const sysEl = document.createElement('span');
     sysEl.className = 'pp-tag pp-sys';
     sysEl.textContent = o.rec.system ? systemLabel(o.rec.system) : o.sub;
     const n = (o.rec.pools || []).length;
     const countEl = document.createElement('span');
     countEl.className = 'pp-count';
-    countEl.textContent = `${n} pool${n === 1 ? '' : 's'}`;
+    countEl.textContent = `${n} saved ${n === 1 ? 'roll' : 'rolls'}`;
     const copy = document.createElement('button');
     copy.className = 'btn tiny';
-    copy.textContent = 'Copy';
+    copy.textContent = 'Copy to library';
+    copy.setAttribute('aria-label', `Copy ${o.label} to your library`);
     copy.title = `Add '${o.label}' to your library — nothing of yours is touched`;
-    copy.addEventListener('click', () => showProfileNote(copyProfileIn(o.rec)));
+    copy.addEventListener('click', () => showProfileNote(copyProfileIn(o.rec, {from:o.sub === 'prepared' ? 'this table' : o.sub})));
     row.append(nameEl, sysEl, countEl, copy);
     rows.appendChild(row);
   }
+  if (focusSource) [...rows.children].find(row => row.dataset.source === focusSource)?.querySelector('button').focus({preventScroll:true});
 }
 
 // The banner's three exits.
@@ -31824,9 +31957,14 @@ document.getElementById('profile-keep').addEventListener('click', () => {
 document.getElementById('profile-new').addEventListener('click', () => {
   const input = document.getElementById('profile-newname');
   const v = makeProfile({ name: input.value, system: tableSystem(), pools: [] });
-  if (v.ok) input.value = '';
+  if (v.ok) {
+    input.value = ''; librarySelectedId = profileStore.activeId;
+    libEl('library-create').open = false;
+    libEl('dest-stuff').dataset.profileView = 'detail';
+  }
   showProfileNote(v);
   renderProfileLibrary();
+  if (v.ok && libraryOpened) libEl('library-name').focus({preventScroll:true});
 });
 document.getElementById('profile-newname').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); document.getElementById('profile-new').click(); }
@@ -31840,9 +31978,14 @@ document.getElementById('profile-deal').addEventListener('click', () => {
   // about what the row is for.
   const input = document.getElementById('profile-newname');
   const v = dealNewProfile(tableSystem(), input.value);
-  if (v.ok) input.value = '';
+  if (v.ok) {
+    input.value = ''; librarySelectedId = profileStore.activeId;
+    libEl('library-create').open = false;
+    libEl('dest-stuff').dataset.profileView = 'detail';
+  }
   showProfileNote(v);
   renderProfileLibrary();
+  if (v.ok && libraryOpened) libEl('library-name').focus({preventScroll:true});
 });
 document.getElementById('profile-pick').addEventListener('click', openProfileMenu);
 document.getElementById('import-adopt-all').addEventListener('click', () => portableAdoptProfiles());
@@ -31897,8 +32040,9 @@ function fillPortableBox() {
 }
 
 document.getElementById('portable-open').addEventListener('click', () => {
-  const opening = portableZone.classList.toggle('hidden') === false;
-  if (opening && !portableText.value) fillPortableBox();
+  showLibraryPage('files');
+  portableZone.classList.remove('hidden');
+  if (!portableText.value) fillPortableBox();
 });
 document.getElementById('portable-export').addEventListener('click', fillPortableBox);
 document.getElementById('portable-copy').addEventListener('click', async (e) => {
