@@ -713,6 +713,9 @@ const LS_AMBIENCE = 'dice.ambience.v1';  // "Just you" scope: room tone (default
 const LS_PRESENTATION = 'dice.presentation.v1'; // device-only; never in room or library data
 let presentationMode = load(LS_PRESENTATION, 'full') === 'battery' ? 'battery' : 'full';
 const batteryPresentation = () => presentationMode === 'battery';
+const LS_INSTANT_RESULTS = 'dice.instant-results.v1';
+let instantResults = load(LS_INSTANT_RESULTS, false) === true;
+let instantCompletionQueued = false;
 const LS_ROOMSETTINGS = 'dice.roomsettings.v1'; // solo-mode copy of the table settings
 const LS_DICESET = 'dice.diceset.v1';    // "Just you" scope: dice-set identity (Tier 6 §9)
 // Declared up here with the rest, not down beside initNet where it used to
@@ -7584,6 +7587,7 @@ function playRoll(roll, rethrow = null, options = {}) {
   // the whole roll to Plain.
   if (currentRoll.exp) beginCeremony(currentRoll);
   tableResults?.refresh();
+  requestInstantCompletion();
   }
 }
 
@@ -9933,6 +9937,7 @@ function skipRevealFx() {
 // absent when this client already holds the values (solo / legacy face-down).
 function applyReveal(rollId, full) {
   invalidateTable();
+  requestInstantCompletion();
   if (!rollId) return;
   // Keep the reveal BETWEEN the exact throws that surround it on the wire.
   if (!applyingQueuedEvent && rollEventPending(rollId)) {
@@ -11752,16 +11757,36 @@ invalidateTable();
 // Instead, the moment the tab becomes visible again, finish the in-flight
 // roll and drain the whole queue instantly (results, chips, and log entries
 // all land via the normal stepPlayback -> showResults path).
-function fastForwardPlayback() {
+function fastForwardPlayback(reserveBaking = true) {
   let guard = 0;
   while (currentRoll && !currentRoll.done && guard++ < 500) {
-    if (currentRoll.baking) { currentRoll.skipPlayback = true; break; }
+    if (currentRoll.baking) { if (reserveBaking) currentRoll.skipPlayback = true; break; }
     // A ceremony roll jumps straight to its completed verdict (also covers
     // post-settle staging, where duration - time would be ≤ 0).
     if (currentRoll.ceremony) skipCeremony();
     else stepPlayback(currentRoll.duration - currentRoll.time + FIXED_DT);
   }
   skipRevealFx(); // a reveal beat queued behind the playback lands too
+}
+// Let the entire authored event finish setting up its film/ceremony/reveal
+// before completing it. A queued worker stays pending, and finishing its film
+// requests this again. Turning the preference off during a bake therefore
+// leaves no stale skip flag; explicit Skip/refocus retain their own behavior.
+function requestInstantCompletion() {
+  if (!instantResults || instantCompletionQueued) return;
+  instantCompletionQueued = true;
+  queueMicrotask(() => {
+    instantCompletionQueued = false;
+    if (!instantResults) return;
+    fastForwardPlayback(false);
+    invalidateTable();
+  });
+}
+function setInstantResults(on, persist = true) {
+  instantResults = !!on;
+  if (persist) save(LS_INSTANT_RESULTS, instantResults);
+  syncSettingsUI(); requestInstantCompletion(); invalidateTable();
+  return instantResults;
 }
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) fastForwardPlayback();
@@ -16201,7 +16226,8 @@ window.__diceDebug = {
   // tab at dpr 1 reads 1; the ceiling is what matters, so assert `<= 2`).
   // Read it AFTER a settle — mid-playback frames legitimately draw more.
   setPresentation(mode) { return setPresentation(mode); },
-  get presentation() { return {mode:presentationMode,shaderTime:SHADER_TIME.value,particles:particleField.count()}; },
+  setInstantResults(on) { return setInstantResults(on); },
+  get presentation() { return {mode:presentationMode,instantResults,shaderTime:SHADER_TIME.value,particles:particleField.count()}; },
   renderAudit() {
     const r = renderer.info.render;
     return {
@@ -30126,6 +30152,7 @@ function syncSettingsUI() {
   document.getElementById('set-sound').setAttribute('aria-pressed', String(soundOn));
   document.getElementById('set-chips').setAttribute('aria-pressed', String(chipsOn));
   document.getElementById('set-ambience').setAttribute('aria-pressed', String(ambienceOn));
+  document.getElementById('set-instant-results').setAttribute('aria-pressed', String(instantResults));
   for (const el of document.querySelectorAll('[data-presentation]')) {
     const selected = el.dataset.presentation === presentationMode;
     el.setAttribute('aria-checked', String(selected)); el.tabIndex = selected ? 0 : -1;
@@ -30255,6 +30282,7 @@ settingsModal.addEventListener('keydown', e => {
 });
 document.getElementById('set-chips').addEventListener('click', () => setChips(!chipsOn));
 document.getElementById('set-ambience').addEventListener('click', () => setAmbience(!ambienceOn));
+document.getElementById('set-instant-results').addEventListener('click', () => setInstantResults(!instantResults));
 document.getElementById('presentation-picker').addEventListener('click', e => {
   const choice = e.target.closest('[data-presentation]');
   if (choice) setPresentation(choice.dataset.presentation);

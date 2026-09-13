@@ -79,5 +79,5 @@ node tools/drive.mjs tools/steps/battery-presentation.mjs
 node tests/e2e/run.mjs --only presentation,idle-render,film-turns,dice-practice,table-designs,rest-cadence
 ```
 
-Use the same verified GPU backend for comparison. Instant result presentation
-is the next independent preference; this commit leaves playback timing intact.
+Use the same verified GPU backend for comparison. [Instant results](2026-09-13-instant-results.md)
+is an independent preference; Battery alone leaves playback timing intact.
