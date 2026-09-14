@@ -1,0 +1,79 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "artifactNote": "Preparation snapshot and separately recorded anonymous refusal checks, before any public activation. Exact private mappings and provider responses remain in operator records. Preparing a revision does not send it traffic.",
+  "preparedAt": "2026-09-14T01:46:53.922136+00:00",
+  "sourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+  "service": "dice",
+  "database": "dice-accounts",
+  "namespace": "production-v1",
+  "region": "us-central1",
+  "runtimeAccountName": "dice-accounts-runtime",
+  "databaseReadback": {
+    "type": "FIRESTORE_NATIVE",
+    "databaseEdition": "STANDARD",
+    "pointInTimeRecoveryEnablement": "POINT_IN_TIME_RECOVERY_ENABLED",
+    "deleteProtectionState": "DELETE_PROTECTION_ENABLED"
+  },
+  "dailyBackupReadback": {
+    "scheduleCount": 1,
+    "dailyRecurrence": true,
+    "retention": "604800s"
+  },
+  "runtimeIamReadback": {
+    "soleProjectBinding": true,
+    "role": "roles/datastore.user",
+    "condition": "Exact equality to the production database resource name",
+    "broaderInheritedPrincipalGrantFound": false
+  },
+  "directClientRules": {
+    "reviewedDenyAllSourceReadBack": true,
+    "namedDatabaseReleaseReadBack": true,
+    "anonymousRequests": {
+      "get": {
+        "status": 403,
+        "errorStatus": "PERMISSION_DENIED"
+      },
+      "create": {
+        "status": 403,
+        "errorStatus": "PERMISSION_DENIED"
+      }
+    }
+  },
+  "revisions": {
+    "candidate": {
+      "revision": "dice-accounts-11dd1ef-09140137-on",
+      "ready": true,
+      "mode": "firestore",
+      "sourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+      "exactReviewedImage": true,
+      "explicitDedicatedRuntime": true,
+      "developerWritesDisabled": true,
+      "revisionMaximum": 1,
+      "trafficPercent": 0,
+      "exactProductionDatabaseNamespaceOriginVerified": true
+    },
+    "paused": {
+      "revision": "dice-accounts-11dd1ef-09140137-pause",
+      "ready": true,
+      "mode": "paused",
+      "sourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+      "exactReviewedImage": true,
+      "explicitDedicatedRuntime": true,
+      "developerWritesDisabled": true,
+      "revisionMaximum": 1,
+      "trafficPercent": 0,
+      "accountStorageConfigurationAbsent": true
+    }
+  },
+  "trafficReadback": {
+    "servingRevision": "dice-00059-r9r",
+    "percent": 100,
+    "serviceMaximum": 20,
+    "publicActivationPerformed": false,
+    "canonicalOriginAndServiceIamUnchanged": true
+  },
+  "preparationProcessExitCode": 0,
+  "applicationDataWrittenByPreparation": false,
+  "runtimeProbesWriteOnlyTheirExactDisposableMarker": true,
+  "trafficActivationAndMaintenanceRoutingRemainSeparate": true
+}

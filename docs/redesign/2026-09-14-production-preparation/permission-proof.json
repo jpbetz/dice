@@ -1,0 +1,153 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "artifactNote": "Sanitized actual job evidence. Exact project, image registry/digest, runtime addresses, execution identifiers, credentials and UUID fixture paths remain in private operator records. The two final-image runtime reports retain their original check labels and HTTP classifications.",
+  "sourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+  "runtimeCheckCount": 14,
+  "runtimeChecksPassed": 14,
+  "proofs": [
+    {
+      "sourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+      "operation": "production-runtime-transaction",
+      "commandExitCode": 0,
+      "taskSucceeded": true,
+      "effectiveExecution": {
+        "finalReviewedImage": true,
+        "expectedAttachedIdentity": true,
+        "verifiedNodePath": true,
+        "argvByteExact": true,
+        "productionDatabaseSelected": true,
+        "freshUuidSelected": true,
+        "expectedModeSelected": true,
+        "maxRetries0": true,
+        "taskTimeout60": true,
+        "oneTask": true,
+        "parallelism1": true,
+        "cpu1": true,
+        "memory512Mi": true
+      },
+      "reports": [
+        {
+          "mode": "positive",
+          "checks": [
+            {
+              "label": "attached-identity",
+              "ok": true
+            },
+            {
+              "label": "workload-oauth",
+              "ok": true
+            },
+            {
+              "label": "fresh-record-absent",
+              "ok": true,
+              "status": 404,
+              "errorStatus": "NOT_FOUND"
+            },
+            {
+              "label": "begin-transaction",
+              "ok": true,
+              "status": 200
+            },
+            {
+              "label": "transaction-read-absent",
+              "ok": true,
+              "status": 404,
+              "errorStatus": "NOT_FOUND"
+            },
+            {
+              "label": "commit-marker",
+              "ok": true,
+              "status": 200
+            },
+            {
+              "label": "exact-marker-readback",
+              "ok": true,
+              "status": 200
+            },
+            {
+              "label": "delete-exact-marker",
+              "ok": true
+            },
+            {
+              "label": "cleanup-confirmed-absent",
+              "ok": true,
+              "status": 404,
+              "errorStatus": "NOT_FOUND"
+            }
+          ],
+          "passed": true
+        }
+      ],
+      "noIamGrantAdded": true,
+      "jobAndFixtureIdentityRetained": true,
+      "productionTrafficNotChangedByProbe": true,
+      "completedAt": "2026-09-14T02:06:12.576010Z"
+    },
+    {
+      "sourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+      "operation": "original-staging-runtime-cross-production-denial",
+      "commandExitCode": 0,
+      "taskSucceeded": true,
+      "effectiveExecution": {
+        "finalReviewedImage": true,
+        "expectedAttachedIdentity": true,
+        "verifiedNodePath": true,
+        "argvByteExact": true,
+        "productionDatabaseSelected": true,
+        "freshUuidSelected": true,
+        "expectedModeSelected": true,
+        "maxRetries0": true,
+        "taskTimeout60": true,
+        "oneTask": true,
+        "parallelism1": true,
+        "cpu1": true,
+        "memory512Mi": true
+      },
+      "reports": [
+        {
+          "mode": "denial",
+          "checks": [
+            {
+              "label": "attached-identity",
+              "ok": true
+            },
+            {
+              "label": "workload-oauth",
+              "ok": true
+            },
+            {
+              "label": "read-denied",
+              "ok": true,
+              "status": 403,
+              "errorStatus": "PERMISSION_DENIED"
+            },
+            {
+              "label": "transaction-denied",
+              "ok": true,
+              "status": 403,
+              "errorStatus": "PERMISSION_DENIED"
+            },
+            {
+              "label": "write-denied",
+              "ok": true,
+              "status": 403,
+              "errorStatus": "PERMISSION_DENIED"
+            }
+          ],
+          "passed": true
+        }
+      ],
+      "noIamGrantAdded": true,
+      "jobAndFixtureIdentityRetained": true,
+      "productionTrafficNotChangedByProbe": true,
+      "completedAt": "2026-09-14T02:09:48.540287Z"
+    }
+  ],
+  "independentExactMarkerReadback": {
+    "status": 404,
+    "errorStatus": "NOT_FOUND"
+  },
+  "probeNamespace": "A fresh UUID namespace separate from production-v1; exact harmless marker deleted conditionally.",
+  "iamBindingsAddedByProbe": 0,
+  "temporaryJobAndZeroRoleIdentityRetainedAtProofTime": true
+}
