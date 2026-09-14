@@ -1,0 +1,109 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "scope": "Selected staging PITR clone, exact prepared-point comparison and explicit restored-fixture continuation. Separate from the later source HTTPS pass and production release.",
+  "appSourceSha": "3ed9db1247dc67f622d8903e48ca1523eb1f78db",
+  "pitr": {
+    "snapshotTime": "2026-09-14T00:56:00Z",
+    "preparedFinished": "2026-09-14T00:55:28.039635+00:00",
+    "preparedJournalReadOnly": true,
+    "sourceClosedClientCounts": {
+      "rooms": 0,
+      "players": 0,
+      "streams": 0
+    },
+    "operationState": "SUCCESSFUL",
+    "done": true,
+    "started": "2026-09-14T00:58:07.243338Z",
+    "finished": "2026-09-14T01:09:36.306409Z",
+    "databaseMode": "FIRESTORE_NATIVE",
+    "databaseEdition": "STANDARD",
+    "location": "us-central1",
+    "deleteProtection": "DELETE_PROTECTION_ENABLED",
+    "clonePitr": "POINT_IN_TIME_RECOVERY_DISABLED"
+  },
+  "restoredRuntime": {
+    "revisionSuffix": "00002-lsh",
+    "ready": true,
+    "accountMode": "firestore",
+    "serviceMaximum": 1,
+    "revisionMaximum": 1,
+    "separateDatabase": true,
+    "dedicatedRuntimeMatches": true,
+    "separateRuntime": true,
+    "exactDatabaseRole": true,
+    "exactOriginDatabaseNamespace": true,
+    "samePreparedImage": true,
+    "rulesReleaseMatches": true,
+    "rulesSourceExact": true,
+    "directClientRules": "deny-all; compiled, released and read back",
+    "runtimeRole": "roles/datastore.user; exact database-resource equality"
+  },
+  "pointComparison": {
+    "checkedAt": "2026-09-14T01:16:59.080Z",
+    "restoredHeadEqualsPreparedPoint": true,
+    "laterSourceLibraryRevisionExcluded": true,
+    "bothHomesReadable": true,
+    "pendingInvitationRetained": true,
+    "method": "Generated identities recovered; exact library/home/invitation reads; session cleanup only."
+  },
+  "attempts": [
+    {
+      "kind": "initial-restored-verification",
+      "started": "2026-09-14T01:27:08.118098+00:00",
+      "finished": "2026-09-14T01:27:30.784434+00:00",
+      "durationSeconds": 22.666,
+      "exitCode": 1,
+      "completedCheckpoints": [
+        "https_cookie_and_explicit_identity",
+        "clean_browser_retains_versions_and_explicitly_adopts_library"
+      ],
+      "passedBeforeCaptureFailure": [
+        "both_cold_home_joins",
+        "no_prior_roll_history",
+        "saved_copper_close_setup",
+        "private_library_excluded_from_public_join"
+      ],
+      "failureStage": "cold_home_return",
+      "failureClass": "noninteractive_home_container_screenshot_framing",
+      "journalPreserved": true
+    },
+    {
+      "kind": "explicit-restored-tail-continuation",
+      "started": "2026-09-14T01:43:34.599396+00:00",
+      "finished": "2026-09-14T01:45:44.942974+00:00",
+      "durationSeconds": 130.344,
+      "exitCode": 0,
+      "phase": "continuation-complete",
+      "checkpoints": [
+        "warm_home_setup_rechecked_and_both_cards_captured",
+        "recipient_accept_preserves_turn_and_separate_join_shares_film",
+        "presence_consent_revocation_expiry_and_library_head_preserved"
+      ],
+      "hasFailure": false,
+      "joins": "warm rechecks; no new cold-return claim",
+      "libraryAdoptionReplayed": false,
+      "libraryHeadPreserved": true,
+      "homeHeadsAndDocumentsPreserved": true,
+      "originalFailedJournalBytesPreserved": true,
+      "realPresenceExpiry": true
+    }
+  ],
+  "captureViewport": {
+    "width": 390,
+    "height": 844,
+    "deviceScaleFactor": 1,
+    "mobileEmulation": true
+  },
+  "inspectedImages": [
+    "both-homes.png",
+    "invitation-accepted-before-join.png",
+    "shared-recovered-result.png"
+  ],
+  "excluded": "Canonical origins, database/project/runtime identifiers, account and home IDs, recovery/contact keys, cookies, private driver/config/journals and raw cloud logs. Captures contain only generated display labels and shared fixture results.",
+  "limits": [
+    "Separate initial failure and successful continuation; not a fresh uninterrupted all-checkpoints pass.",
+    "Warm continuation does not replace the prior cold-home assertions.",
+    "No physical-device or uncoached-human validation.",
+    "No production traffic, canonical production account flow or public restore-security certification."
+  ]
+}
