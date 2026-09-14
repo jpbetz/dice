@@ -119,7 +119,7 @@ export async function runSuccessWalk({capture=async()=>{},checkpoint=()=>{}}={})
     assert.equal(home.roomKey,one.room);await click(a,'#home-detail-back');await shot(a,'05-desktop-saved-home');
     mark('optional account keeps local library privately and explicitly saves public home');
     const rileyKey=await createAccount(b,'Riley');
-    await people(a);await click(a,'#people-code-new');await peopleIdle(a);
+    await people(a);await click(a,'#people-tab-friends');await click(a,'#people-add');await click(a,'#people-code-new');await peopleIdle(a);
     const contact=await a.eval('document.getElementById("people-own-code").value');
     await people(b);await click(b,'#people-add');await type(b,'#people-contact-code',contact);await click(b,'#people-request-send');await peopleIdle(b);
     await click(a,'#people-refresh');await peopleIdle(a);await click(a,'#people-tab-invitations');

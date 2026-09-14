@@ -11,8 +11,8 @@ fixture accounts only.
 
 The inherited assumption to replace is that sending another room URL is the
 whole return experience. An accepted connection gets a durable, private inbox;
-accepting a named table invitation adds membership, and **Join now** is a
-separate action. Nothing in this slice sends email, notifications to an external
+accepting a named table invitation adds membership. **Accept and join** then
+explicitly enters the table; **Accept for later** leaves **Join now** available. Nothing in this slice sends email, notifications to an external
 application, or invitations to real people during development.
 
 First connections use an intentionally shared contact code, not a global name
@@ -234,8 +234,12 @@ and identity epoch. Recovering an account does not enable library sync or
 presence. The live roster and guest-link invitation remain available without an
 account; People adds Friends, Invitations and Presence tasks for a recovered
 person. Pending received invitations appear first and label the Invitations tab.
-Accept refreshes authoritative friendship/home membership before any Join
-control appears. Only the separate Join action navigates.
+**Accept for later** refreshes authoritative friendship/home membership without
+navigating. **Accept and join** combines confirmed acceptance with an explicit
+join, checking fresh membership and the originating workspace visit before
+navigating. Closing and reopening People cancels that pending navigation. The
+separate **Join now** remains available after acceptance. This supersedes the
+initial UI rule requiring two separate actions for every accepted invitation.
 
 Every social write first commits its exact operation ID and payload to the
 strict IndexedDB journal in `js/social-journal.js`. The per-person limit is

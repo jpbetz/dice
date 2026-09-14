@@ -20,13 +20,25 @@ export function createHomesWorkspace(actions){
   newForm.addEventListener('submit',event=>{event.preventDefault();run(async()=>{const r=session.newHome(newName.value);if(r.ok)newForm.hidden=true;return r;});});
   const cards=el('div','home-cards');cards.id='homes-cards';
   const detail=el('section','home-detail');detail.id='home-detail';detail.hidden=true;
-  const back=button('← All saved homes','home-detail-back',()=>{session.closeView();});
+  const back=button('← All saved homes','home-detail-back',()=>{const flow=inviteFlow;inviteFlow=null;session.closeView();flow?.cancel();});
   const detailTitle=el('h3');detailTitle.id='home-detail-title';
   const detailNote=el('p','hint','Saving changes the setup for future returns. People already playing keep the live table they have.');
+  const nameForm=el('form','home-new-form');nameForm.id='home-name-form';nameForm.hidden=true;
+  const nameLabel=el('label','','Table name'),nameInput=el('input');nameInput.id='home-table-name';nameInput.maxLength=28;nameInput.required=true;nameLabel.append(nameInput);
+  const nameSubmit=el('button','btn','Name table and preview');nameSubmit.type='submit';nameSubmit.id='home-name-submit';
+  nameForm.append(nameLabel,nameSubmit);
+  nameForm.addEventListener('submit',event=>{event.preventDefault();run(async()=>{
+    const name=nameInput.value.trim(),owner=session.info.owner,view=session.info.view,seat=actions.seat();
+    if(!name||!seat)return {ok:false,message:'Enter a table name.'};
+    const renamed=await actions.nameTable(name,seat);
+    if(owner!==session.info.owner||view!==session.info.view||!mounted)return {ok:false};
+    if(!renamed)return {ok:false,message:'The name could not be confirmed. Try again.'};
+    return captureCurrent();
+  });});
   const columns=el('div','home-comparison');
   const current=el('article','home-version'),candidate=el('article','home-version');current.id='home-current';candidate.id='home-candidate';columns.append(current,candidate);
   const detailActions=el('div','home-actions');
-  const save=button('Save home','home-save',()=>run(async()=>{const r=await session.save();if(r.ok&&!r.viewChanged){message='Home saved.';if(r.home)await session.manage(r.home.id);}return r;}));
+  const save=button('Save home','home-save',()=>run(async()=>{const flow=inviteFlow,r=await session.save();if(r.ok&&!r.viewChanged){message='Home saved.';if(flow&&flow===inviteFlow&&r.home){inviteFlow=null;flow.saved(r.home);}else if(r.home)await session.manage(r.home.id);}return r;}));
   const recapture=button('Capture current setup','home-recapture',()=>run(()=>session.capture(session.info.selected?.home.id||null)));
   const exportPreview=button('Download this preview','home-export-preview',()=>download(session.exportPreview(),'table-home-preview.json'));
   const join=button('Join now','home-join',()=>{const h=session.info.selected?.home;if(h)actions.join(h.roomKey);});detailActions.append(save,recapture,exportPreview,join);
@@ -34,13 +46,15 @@ export function createHomesWorkspace(actions){
   versions.addEventListener('change',()=>{if(versions.value)run(()=>session.version(versions.value));});
   const leaveBox=el('div','home-leave');const leaveLabel=el('label','home-check'),leaveAck=el('input');leaveAck.type='checkbox';leaveAck.id='home-leave-ack';leaveLabel.append(leaveAck,document.createTextNode('Remove this home from my account. Keep my current live seat.'));
   const leave=button('Leave home','home-leave',()=>run(async()=>{if(!leaveAck.checked)return {ok:false,message:'Confirm which home you want to leave.'};const r=await session.leave();if(r.ok)message='Membership removed.';return r;}));leave.disabled=true;leaveAck.addEventListener('change',()=>{leave.disabled=busy||!leaveAck.checked;});leaveBox.append(leaveLabel,leave);
-  detail.append(back,detailTitle,detailNote,columns,detailActions,versionLabel,leaveBox);
+  detail.append(back,detailTitle,detailNote,nameForm,columns,detailActions,versionLabel,leaveBox);
   const kept=el('section','home-kept');kept.id='home-kept';
   root.append(head,status,account,choices,newForm,cards,detail,kept);
+  let inviteFlow=null,queuedInvite=null,mountVisit=0;
   let busy=false,mounted=false,reloadQueued=false,message='',cardsSignature='',detailSignature='',keptSignature='',identity=null;
   const session=createHomeSession({...actions,changed:paint});
   function download(value,name){if(value)actions.download(JSON.stringify(value,null,2),name);}
-  async function run(fn){if(busy)return;const opened=session.info.owner;busy=true;paint();try{const r=await fn();if(r&&!r.ok&&opened===session.info.owner)message=r.message||'The request could not finish. Kept previews and retries remain on this device.';return r;}catch{if(opened===session.info.owner)message='The request could not finish. Keep or download the current preview.';return {ok:false};}finally{busy=false;paint();if(reloadQueued&&mounted){reloadQueued=false;void run(()=>session.load());}}}
+  async function run(fn){if(busy)return;const opened=session.info.owner;busy=true;paint();try{const r=await fn();if(r&&!r.ok&&opened===session.info.owner)message=r.message||'The request could not finish. Kept previews and retries remain on this device.';return r;}catch{if(opened===session.info.owner)message='The request could not finish. Keep or download the current preview.';return {ok:false};}finally{busy=false;paint();if(reloadQueued&&mounted){reloadQueued=false;const invite=queuedInvite;queuedInvite=null;void loadMounted(invite,mountVisit);}}}
+  function loadMounted(invite,visit){return run(async()=>{const r=await session.load();if(r.ok&&mounted&&visit===mountVisit&&invite?.owner===session.info.owner){inviteFlow=invite;return captureCurrent();}return r;});}
   async function captureCurrent(){const here=actions.seat();const existing=session.info.cards.find(h=>h.roomKey===here?.room);return session.capture(existing?.id||null);}
   function cover(host,cover,name){const appearance=actions.appearance(cover);const box=el('div','home-cover');box.dataset.cover=cover?.venue||'table';box.style.setProperty('--home-color',appearance.color||'#343330');
     box.append(el('span','home-cover-mark',(name||'T').trim().slice(0,1).toUpperCase()),el('span','home-cover-label',appearance.label));host.append(box);
@@ -53,13 +67,14 @@ export function createHomesWorkspace(actions){
     if(profiles.length){const list=el('ul');for(const p of profiles){const row=el('li','',`${p.name} · ${p.pools.length} ${p.pools.length===1?'roll':'rolls'}`);if(p.pools.length)row.append(el('p','hint',p.pools.slice(0,3).map(p=>p.name||p.notation).join(' · ')));list.append(row);}host.append(list);}
   }
   function paint(info=session.info){
-    if(identity!==info.owner){identity=info.owner;message='';newForm.hidden=true;newName.value='';leaveAck.checked=false;cardsSignature=detailSignature=keptSignature='';}
+    if(identity!==info.owner){identity=info.owner;inviteFlow=null;message='';nameInput.value='';newForm.hidden=true;newName.value='';leaveAck.checked=false;cardsSignature=detailSignature=keptSignature='';}
     const signed=!!info.owner;account.hidden=signed;choices.hidden=!signed;refresh.hidden=!signed;
-    const showing=!!(info.selected||info.preview);detail.hidden=!showing;cards.hidden=showing;choices.hidden=choices.hidden||showing;head.hidden=showing;actions.layout?.(showing);
+    const showing=!!(info.selected||info.preview);detail.classList.toggle('home-invite-flow',!!inviteFlow);root.classList.toggle('homes-inviting',!!inviteFlow);
+    const needsName=!!info.preview?.document&&!info.preview.document.settings.tableName;nameForm.hidden=!needsName;columns.hidden=needsName;detail.hidden=!showing;cards.hidden=showing;choices.hidden=choices.hidden||showing;head.hidden=showing;actions.layout?.(showing);
     status.textContent=info.error?.message||message||(info.loading?'Loading saved tables…':'');
     status.hidden=!status.textContent;
     capture.textContent=info.cards.some(h=>h.roomKey===actions.seat()?.room)?'Capture changes to this home':'Save this table as a home';
-    for(const b of [refresh,capture,fresh,newSubmit,save,recapture,exportPreview,join,versions])b.disabled=busy||info.loading;
+    for(const b of [refresh,capture,fresh,newSubmit,nameSubmit,nameInput,save,recapture,exportPreview,join,versions])b.disabled=busy||info.loading;
     capture.disabled=capture.disabled||!actions.seat();recapture.disabled=recapture.disabled||!actions.seat()||!!(info.selected&&info.selected.home.roomKey!==actions.seat()?.room);recapture.title=recapture.disabled?'Join this home to capture its live setup':'';leave.disabled=busy||info.loading||!leaveAck.checked;
     const cs=JSON.stringify(info.cards);if(cs!==cardsSignature){const focused=document.activeElement?.dataset.homeFocus;cardsSignature=cs;cards.replaceChildren();
       if(!info.cards.length&&signed)cards.append(el('p','hint','No saved homes.'));
@@ -67,12 +82,12 @@ export function createHomesWorkspace(actions){
         const controls=el('div','home-actions'),manage=button('Manage',null,()=>run(()=>session.manage(h.id))),go=button('Join now',null,()=>actions.join(h.roomKey));manage.dataset.homeFocus='manage:'+h.id;go.dataset.homeFocus='join:'+h.id;controls.append(manage,go);card.append(controls);cards.append(card);}
       if(focused)cards.querySelector(`[data-home-focus="${CSS.escape(focused)}"]`)?.focus({preventScroll:true});
     }
-    const ds=JSON.stringify([info.selected,info.preview]);if(ds!==detailSignature){detailSignature=ds;leaveAck.checked=false;
-      const selected=info.selected,p=info.preview;detailTitle.textContent=p?.kind==='new'?p.input.name:selected?.home.name||'Save the current table';
+    const ds=JSON.stringify([info.selected,info.preview,inviteFlow?.name]);if(ds!==detailSignature){detailSignature=ds;leaveAck.checked=false;
+      const selected=info.selected,p=info.preview;detailTitle.textContent=inviteFlow?'Save table to invite '+inviteFlow.name:p?.kind==='new'?p.input.name:selected?.home.name||'Save the current table';back.textContent=inviteFlow?'‹':'← All saved homes';back.setAttribute('aria-label',inviteFlow?'Back to invitation':'All saved homes');
       current.hidden=!selected;candidate.hidden=!p;if(selected)summary(current,'Saved for future returns',selected.document);else current.replaceChildren();
       if(p)summary(candidate,p.kind==='reconcile'?'Chosen retained version':'Preview to save',p.document);else candidate.replaceChildren();
-      save.hidden=!p;save.textContent=p?.kind==='reconcile'?'Use this saved version':p?.kind==='new'?'Create saved home':'Save captured setup';
-      exportPreview.hidden=!p;join.hidden=!selected;versionLabel.hidden=!selected;leaveBox.hidden=!selected;recapture.hidden=(!selected&&!p)||p?.kind==='new';
+      save.hidden=!p||needsName;save.textContent=inviteFlow?'Save and continue':p?.kind==='reconcile'?'Use this saved version':p?.kind==='new'?'Create saved home':'Save captured setup';
+      exportPreview.hidden=!p||needsName;join.hidden=!selected;versionLabel.hidden=!selected;leaveBox.hidden=!selected;recapture.hidden=needsName||(!selected&&!p)||p?.kind==='new';
       versions.replaceChildren();const placeholder=el('option','','Choose a version to compare');placeholder.value='';versions.append(placeholder);
       for(const v of selected?.versions||[]){const o=el('option','',`${v.id===selected.home.headRevision?'Current saved version':v.kind==='conflict'?'Kept conflict':'Earlier saved version'} · ${new Date(v.createdAt).toLocaleString()}`);o.value=v.id;versions.append(o);}if(p?.kind==='reconcile')versions.value=p.input.sourceVersionId;
     }
@@ -89,7 +104,7 @@ export function createHomesWorkspace(actions){
       }
     }
   }
-  return {session,mount(host){mounted=true;host.append(root);session.identity();paint();if(busy){reloadQueued=true;return;}return run(()=>session.load());},
+  return {session,mount(host,invite=null){mounted=true;const visit=++mountVisit;host.append(root);session.identity();paint();if(busy){reloadQueued=true;queuedInvite=invite;return;}return loadMounted(invite,visit);},
     identityChanged(){const before=session.info.owner;session.identity();paint();if(mounted&&before!==session.info.owner&&session.info.owner){if(busy)reloadQueued=true;else void run(()=>session.load());}},
-    close(){mounted=false;reloadQueued=false;session.closeView();actions.layout?.(false);},get info(){return session.info;}};
+    close(){mounted=false;mountVisit++;inviteFlow=queuedInvite=null;reloadQueued=false;session.closeView();actions.layout?.(false);},get info(){return session.info;}};
 }

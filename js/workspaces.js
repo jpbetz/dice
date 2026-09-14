@@ -63,7 +63,7 @@ export function createWorkspaces(actions) {
   const tableOverview=node('div'),tableRecents=node('div'),homeSlot=node('div');tableOverview.id='workspace-table-overview';tableRecents.id='workspace-table-recents';homeSlot.id='workspace-homes-slot';
   tables.append(tableOverview,homeSlot,tableRecents);
   const people = node('section', 'workspace-section'); people.id = 'workspace-people';
-  const peopleOverview=node('div'),peopleSlot=node('div');peopleOverview.id='workspace-people-current';peopleSlot.id='workspace-people-slot';people.append(peopleOverview,peopleSlot);
+  const peopleOverview=node('div'),peopleSlot=node('div');peopleOverview.id='workspace-people-current';peopleSlot.id='workspace-people-slot';people.append(peopleSlot,peopleOverview);
   const dice = node('section', 'workspace-section'); dice.id = 'workspace-dice';
   const account=node('section','workspace-section');account.id='workspace-account';
   const tools = node('div', 'workspace-tools');
@@ -156,7 +156,7 @@ export function createWorkspaces(actions) {
     if(signature===peopleSignature)return; peopleSignature=signature;
     const focused=focusKey(people); peopleOverview.replaceChildren();
     const h = node('div', 'workspace-list-head'); h.append(node('h3', '', `At ${s.table.name}`));
-    if (s.table.invitable) h.append(keyed(button('Invite to table', e => actions.invite(e.currentTarget)),'invite'));
+    if (s.table.invitable) h.append(keyed(button('Invite by link', e => actions.invite(e.currentTarget)),'invite'));
     peopleOverview.append(h);
     peopleOverview.append(keyed(button('You · account & private library',()=>open('account'),'btn ghost'),'account'));
     for (const p of s.people) {
@@ -187,6 +187,7 @@ export function createWorkspaces(actions) {
     if(current==='tables'&&key!=='tables')actions.homesClosed?.();
     if(current==='people'&&key!=='people')actions.peopleClosed?.();
     viewEpoch++; current = key; root.dataset.workspace = key; title.textContent = names[key];
+    content.scrollTop=0;
     if (key === 'dice' && !browsing) actions.home();
     for (const [k, section] of Object.entries({ tables, dice, people, account })) section.hidden = k !== key;
     for (const b of [...nav.children, ...tabs.children]) b.setAttribute('aria-pressed', String(b.dataset.workspace === key));
@@ -254,5 +255,15 @@ export function createWorkspaces(actions) {
     actions.layoutChanged();
   });
   return { open, close, get current() { return current; }, get viewEpoch() { return viewEpoch; }, library, positionDiceControl,
+    peopleView(key,signed){peopleOverview.hidden=signed&&key!=='table';},
+    invitations(count){
+      for(const host of [nav,tabs]){
+        const b=host.querySelector('[data-workspace="people"]');
+        let badge=b.querySelector('.workspace-badge');
+        if(!badge){badge=node('span','workspace-badge');badge.setAttribute('aria-hidden','true');b.append(badge);}
+        badge.hidden=!count;badge.textContent=count>9?'9+':String(count);
+        b.setAttribute('aria-label',count?`People, ${count} pending ${count===1?'invitation':'invitations'}`:'People');
+      }
+    },
     notice(message){if(current){status.textContent=message||'';status.hidden=!message;}} };
 }

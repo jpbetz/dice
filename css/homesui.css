@@ -40,3 +40,12 @@ body.home-managing #workspace-table-overview,body.home-managing #workspace-table
 .home-kept summary { cursor:pointer; padding:9px 0; font-size:13px; }
 .home-abandon { flex:1 0 100%; padding:10px; border:1px solid var(--hair); border-radius:8px; }
 .home-abandon>.btn { margin-top:10px; }
+
+.homes-workspace.homes-inviting { margin:0; padding:0; border:0; }
+#workspace .home-invite-flow #home-detail-back { display:grid; place-items:center; width:44px; height:44px; min-height:44px; padding:0; margin-bottom:8px; border:0; background:none; color:var(--muted); font:28px/1 var(--font-ui); }
+#workspace .home-invite-flow #home-save { flex-basis:100%; min-height:44px; background:#c9b079; color:#17191b; border-color:#c9b079; }
+.home-invite-flow #home-recapture,.home-invite-flow #home-export-preview { min-height:44px; font-size:12px; }
+.home-invite-flow .home-new-form { margin-top:16px; }
+#home-name-submit { min-height:44px; }
+
+.home-invite-flow #home-detail-title { overflow-wrap:anywhere; }
