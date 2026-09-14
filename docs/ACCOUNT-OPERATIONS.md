@@ -6,7 +6,8 @@
 presence. Its initial read-only review preceded provisioning. The subsequent
 [staging checkpoint](redesign/2026-09-13-staging.md) records executed cloud actions;
 commands below remain reusable procedures, not proof that every step has run.
-The tested `11dd1ef` image is now [released to production](redesign/2026-09-14-production-release/README.md).
+The tested `90b8bb9` image is now [released to production](redesign/2026-09-14-dice-loading-release/README.md),
+preserving the original account configuration and both `11dd1ef` rollback revisions.
 
 ## Historical observation — September 13, before provisioning
 
@@ -36,7 +37,7 @@ pre-provisioning checkpoint; they are not the current staging state.
 
 ## Current cloud checkpoint and remaining observation
 
-The actual source HTTPS return on `11dd1ef` passes all four preparation and
+The original account release's source HTTPS return on `11dd1ef` passes all four preparation and
 five verification checkpoints across a same-image revision replacement.
 Runtime authorization passes 19/19 checks. The selected PITR clone restores the
 exact prepared library head, both homes and pending invitation while excluding
@@ -53,21 +54,24 @@ Production database `dice-accounts`, namespace `production-v1`, the dedicated
 runtime and exact database role, deny-all client rules, PITR, deletion protection
 and daily seven-day backup are prepared and read back. Actual production runtime
 and cross-database checks pass [14/14](redesign/2026-09-14-production-preparation/README.md); anonymous production GET/create both refuse with 403.
-The tested `11dd1ef` enabled revision now receives 100% of traffic, with service
-and revision maxima of 1. The exact compatible paused revision remains Ready
-at 0%. Origin, ingress and public-service IAM are unchanged. The
-[release readback](redesign/2026-09-14-production-release/README.md) records the
-cap-before-route sequence and both prior zero-player/stream samples. The later
-repository portrait optimization is not in this immutable image.
+The subsequent [dice-loading release](redesign/2026-09-14-dice-loading-release/README.md)
+now serves `90b8bb9` at 100%, retaining service and revision maxima of 1. Its
+environment and runtime come from the active enabled revision, changing only
+`GIT_SHA`. Origin, ingress, public-service IAM and database/namespace settings
+are unchanged. Both the original `11dd1ef` enabled and compatible paused
+revisions remain Ready off traffic. The original [account release readback](redesign/2026-09-14-production-release/README.md)
+retains its earlier cap-before-route sequence and idle observations.
 
 Existing project/all-service and billing-wide alerts already cover these
 services with default billing-admin routing. No budget or recipient update was
 needed. Alerts are not hard caps, and alert delivery has not been tested.
 
-Canonical production account/guest browser verification passes all nine
-checkpoints on the released revision; all 36 HTTPS delivery requests pass.
-These are fresh-browser proofs, with no production process replacement or
-cold-home claim. Physical-device and uncoached human observations remain open.
+Canonical production account/guest verification on the original `11dd1ef`
+passes all nine checkpoints and all 36 HTTPS delivery requests. On `90b8bb9`,
+the bounded staging and production frontend checks each pass 5/5 with zero
+account writes; server/account sources are unchanged, so identity, IAM and PITR
+proofs were not repeated. These are fresh-browser proofs, with no production
+process replacement or cold-home claim. Physical-device and uncoached human observations remain open.
 The isolated staging restore is not a public restore-security certification.
 The local release result remains [364/368 plus its separately verified wording
 fix and 20/20 tail cases](redesign/2026-09-13-release/README.md).

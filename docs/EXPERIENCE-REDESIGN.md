@@ -15,11 +15,12 @@ authorized autonomous implementation through all three priorities, with agents
 and reviewed increments. Local implementation and scripted verification are
 complete. Staging has verified runtime permissions, PITR content and a complete
 source HTTPS return. The isolated restored-app continuation also passes.
-Production runtime checks pass 14/14 and the tested `11dd1ef` image is
-[released at 100%](redesign/2026-09-14-production-release/README.md), with
-service maximum 1. All nine canonical browser checkpoints and all 36 HTTPS
-delivery requests pass. Physical-device and uncoached player observation remain
-open. See the [cloud checkpoint](redesign/2026-09-13-staging.md).
+The original `11dd1ef` release passes 14/14 production runtime checks, nine
+canonical browser checkpoints and 36 HTTPS delivery requests. The subsequent
+[dice-loading release](redesign/2026-09-14-dice-loading-release/README.md) now
+serves `90b8bb9` at 100%, maxima 1, with 5/5 staging and production frontend
+checks and unchanged account sources/configuration. Physical-device and
+uncoached player observation remain open. See the [cloud checkpoint](redesign/2026-09-13-staging.md).
 [REDESIGN-PROGRESS.md](REDESIGN-PROGRESS.md) records execution. The detailed R1 design is in
 [PEOPLE-DICE-TABLES.md](PEOPLE-DICE-TABLES.md).
 
@@ -90,8 +91,9 @@ Cold builder opening stays at 99 ms. The subsequent
 reduces the first 4d20 activity's longest task from 209 to 79 ms median in a
 separate three-run emulated-phone comparison, preserving all painted pixels
 and portraits. Ordinary first 2d6 timing stays effectively unchanged;
-physical-phone costs remain open. Both follow-ups are in the repository and
-are outside the currently released `11dd1ef` image.
+physical-phone costs remain open. Both follow-ups are included in the
+[released `90b8bb9` image](redesign/2026-09-14-dice-loading-release/README.md),
+with actual HTTPS guest/art/two-viewer checks on staging and production.
 The [parallel texture study](redesign/2026-09-13-dice-textures/README.md),
 measured separately on `31cb4fe`, records first d20 tap-to-visible falling from
 657 to 431 ms and a first mixed-set activity stall from 1,225 to 694 ms.
@@ -138,14 +140,15 @@ The [composed success walk](redesign/2026-09-13-r1-success-walk.md) and
 current Help are complete locally. The joined walk passes again on the
 composed code, including guest captures during delayed account startup.
 Local release verification is recorded with its exact failures and targeted
-correction. Current staging source `11dd1ef` is Ready on `00006-p2z`; 19/19
-actual runtime permission checks, isolated PITR content comparison and the
-complete source HTTPS return pass. The [isolated restored continuation](redesign/2026-09-14-cloud-return/restore/README.md)
-also passes, retaining its earlier capture failure. Production runtime checks
-pass 14/14; the tested `11dd1ef` image is released at 100% with service maximum
-1 and a Ready compatible paused revision off traffic. All nine canonical
-production browser checkpoints and all 36 HTTPS delivery requests pass. Actual
-player/device observation remains open in the [cloud checkpoint](redesign/2026-09-13-staging.md).
+correction. On the original staging account release `11dd1ef`, all 19/19
+runtime permission checks, isolated PITR content comparison and the complete
+source HTTPS return pass. The [isolated restored continuation](redesign/2026-09-14-cloud-return/restore/README.md)
+also passes, retaining its earlier capture failure. Original production runtime
+checks on `11dd1ef` pass 14/14; its nine canonical production browser checkpoints and 36 HTTPS
+delivery requests pass. The current `90b8bb9` frontend follow-up preserves
+those account sources and configuration, passes 5/5 guest/art checks in each
+environment and retains both `11dd1ef` rollback revisions. Actual player/device
+observation remains open; see the [current release](redesign/2026-09-14-dice-loading-release/README.md).
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable

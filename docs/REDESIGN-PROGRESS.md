@@ -6,12 +6,15 @@
 [plan of record](EXPERIENCE-REDESIGN.md), using agents, reviewing each result,
 and queueing the next ready task. This is an execution ledger, not a new
 priority order. R1–R3's local implementation and scripted verification are
-complete. Staging is enabled on `11dd1ef`, with 19/19 runtime permission
-checks, selected PITR content and the complete source HTTPS return verified.
-The isolated restored-app continuation also passes. Production runtime checks
-pass 14/14 and the tested `11dd1ef` image is released at 100%, service maximum
-1. All nine canonical browser checkpoints and all 36 HTTPS delivery requests
-pass. Actual player/device observation remains open. The three characterized legacy visual gates remain recorded failures.
+complete. The original `11dd1ef` account release has 19/19 staging runtime
+checks, selected PITR content, complete source HTTPS return and an isolated
+restored continuation verified. Its production proof passes 14/14 runtime
+checks, nine canonical browser checkpoints and 36 HTTPS delivery requests.
+The subsequent [dice-loading release](redesign/2026-09-14-dice-loading-release/README.md)
+now serves `90b8bb9` at 100%, maxima 1, with 5/5 guest/art/two-viewer checks
+on staging and production; account sources and configuration are unchanged.
+Actual player/device observation remains open. The three characterized legacy
+visual gates remain recorded failures.
 
 ## Current work
 
@@ -23,7 +26,7 @@ pass. Actual player/device observation remains open. The three characterized leg
 | Shared surface and phone | Three reproducibly baked tables, full-width phone tray, persistent visible results and compact queued arrivals are implemented. Model size follows the shared table. The round physical envelope and full support/golden proofs are integrated as `e67da2c`/`04aafbf`; all six composed geometry proofs pass, with cost and collision profiling retained. The camera correction is integrated: 60 seeded painted-hull cases have no re-exits or settled crops, and all 36 baseline complete films agree. Long history reserves current results, with an inspected usable short-window layout. |
 | Shared film ordering | Ordinary rolls and kept-die rethrows use the worker with complete ordered events. `f4e20c0` orders size changes between films, including held reveals and clear. Warm tower changes now use the ordered FIFO (`cf0e48a`); six composed ordering/readiness cases pass. Required-model failure now offers explicit authored results without fabricated physics. The tainted physical world resumes only after the core is ready and a deliberate authoritative table clear; ordered warm/cold/reveal/keep checks pass. |
 | Lightweight play | Compressed delivery, face-material consolidation, idle sleep, Battery saver and independent Instant results are implemented. Optional scenery and the model parser now load on demand (`70d623b`, `530982b`); all eight composed loading/cancel/failure cases pass. Towers and silent reconstruction retain the inline solver. |
-| Operations and release | Current staging revision `dice-accounts-stage-00006-p2z` is Ready on `11dd1ef`, with maximum 1 and mapping read back. The same-image source return passes 4/4 preparation and 5/5 verification checkpoints; [five actual captures](redesign/2026-09-14-cloud-return/README.md) are inspected. Actual IAM checks pass 19/19; the isolated PITR clone and selected content reads pass. Restore revision `00002-lsh` on `3ed9db1` passed identity/library and cold-home assertions before a capture-helper failure; its [separate continuation](redesign/2026-09-14-cloud-return/restore/README.md) passes all three remaining checkpoints with the original journal preserved. Production runtime checks pass [14/14](redesign/2026-09-14-production-preparation/README.md). The tested `11dd1ef` image is [released at 100%](redesign/2026-09-14-production-release/README.md), service maximum 1; its exact compatible paused revision remains Ready off traffic. All nine canonical production browser checkpoints and all 36 HTTPS delivery requests pass; fresh-browser recovery is proved on one released revision, without a production restart/cold-home claim. [Checkpoint and limits](redesign/2026-09-13-staging.md). HTTPS delivery checks pass; existing alerts cover staging. Production origin, ingress and public-service IAM are unchanged. Local frozen verification remains 364/368 plus 20/20 tail, with the wording correction separately verified and three pre-existing visual gates open. |
+| Operations and release | The original account release's staging revision `dice-accounts-stage-00006-p2z` was Ready on `11dd1ef`, with maximum 1 and mapping read back. The same-image source return passes 4/4 preparation and 5/5 verification checkpoints; [five actual captures](redesign/2026-09-14-cloud-return/README.md) are inspected. Actual IAM checks pass 19/19; the isolated PITR clone and selected content reads pass. Restore revision `00002-lsh` on `3ed9db1` passed identity/library and cold-home assertions before a capture-helper failure; its [separate continuation](redesign/2026-09-14-cloud-return/restore/README.md) passes all three remaining checkpoints with the original journal preserved. Production runtime checks pass [14/14](redesign/2026-09-14-production-preparation/README.md). The original `11dd1ef` image was [released at 100%](redesign/2026-09-14-production-release/README.md), service maximum 1. Its nine canonical production browser checkpoints and 36 HTTPS delivery requests pass, without a production restart/cold-home claim. Current `90b8bb9` passes 5/5 frontend checks in each environment and serves 100% with maxima 1, retaining both original `11dd1ef` enabled/paused rollback revisions and the unchanged account configuration. [Checkpoint and limits](redesign/2026-09-13-staging.md). HTTPS delivery checks pass; existing alerts cover staging. Production origin, ingress and public-service IAM are unchanged. Local frozen verification remains 364/368 plus 20/20 tail, with the wording correction separately verified and three pre-existing visual gates open. |
 
 The root's integration checkout is `/tmp/dice-redesign-integration` on
 `codex/redesign-integration`. Agents use isolated worktrees so reviews and
@@ -34,9 +37,10 @@ The later `39b9ec7` dice-portrait optimization and the reviewed
 are integrated in the repository. The latter reduces the emulated first 4d20
 activity's longest task from 209 to 79 ms median with exact pixel/portrait
 parity; ordinary first 2d6 timing stays effectively unchanged.
-Staging and released production still use the immutable `11dd1ef`
-image; the cloud proofs do not include that later optimization. Temporary
-restore infrastructure has been [removed after proof](redesign/2026-09-14-cloud-return/restore/cleanup.json),
+Both follow-ups are included in the immutable `90b8bb9` image now serving
+staging and production. Their [current frontend proof](redesign/2026-09-14-dice-loading-release/README.md)
+is separate from the original `11dd1ef` account, permission and delivery proofs.
+Temporary restore infrastructure has been [removed after proof](redesign/2026-09-14-cloud-return/restore/cleanup.json),
 with source resources and private evidence preserved.
 
 ## Remaining campaign work
@@ -60,14 +64,15 @@ an actual unused feature boundary; further file splitting alone saves no bytes.
 
 Staging permission, delivery and PITR content checks are recorded separately
 from local tests. The source HTTPS walkthrough and isolated restored continuation
-are complete. Production runtime checks pass 14/14 and the tested `11dd1ef`
-image is released at 100%, service maximum 1. All nine canonical browser
-checkpoints and all 36 HTTPS delivery requests pass. Physical phone/midrange-device
-and newcomer observations remain open. The
-[release record](redesign/2026-09-14-production-release/README.md) keeps actual
-traffic/browser/delivery proofs separate from those remaining observations.
-A disabled optional service or fake-store
-test alone does not complete persistent table homes.
+are complete. The original `11dd1ef` production proof passes 14/14 runtime
+checks, nine canonical browser checkpoints and 36 HTTPS delivery requests.
+Current `90b8bb9` retains those account sources/configuration at 100%, maxima 1;
+its staging and production guest/art checks each pass 5/5. Physical phone/
+midrange-device and newcomer observations remain open. The
+[current release record](redesign/2026-09-14-dice-loading-release/README.md) keeps
+actual frontend proofs, original durable-service evidence and local performance
+measurements separate from those remaining observations.
+A disabled optional service or fake-store test alone does not complete persistent table homes.
 
 ## Validation baseline
 
@@ -331,12 +336,13 @@ separate successful continuation. Temporary restore and permission fixtures
 are removed with evidence preserved. Existing alerts already covered this
 work; no budget or recipient update was required.
 
-The tested immutable `11dd1ef` image is now [released to production](redesign/2026-09-14-production-release/README.md)
-at 100%, service maximum 1, after 14/14 production runtime checks. Canonical
-HTTPS delivery passes, as do all nine canonical production browser checkpoints
-on fresh independent browsers. This does not claim a production restart or
-cold-home proof.
-Later repository work, including `39b9ec7` portraits, is outside that image.
+The original `11dd1ef` account launch passes 14/14 production runtime checks,
+nine canonical browser checkpoints and 36 HTTPS delivery requests. The
+subsequent [dice-loading release](redesign/2026-09-14-dice-loading-release/README.md)
+now serves `90b8bb9` at 100%, maxima 1, including the portraits and atlas
+correction. Staging and production frontend checks each pass 5/5; the original
+account sources/configuration and both `11dd1ef` rollback revisions are retained.
+Neither guest walkthrough claims a production restart or cold-home proof.
 Physical-device and uncoached player rows remain blank; a public data restore
 still needs security reconciliation beyond the isolated fixture proof. The
 owner’s handoff backup and live port 8123 remain untouched. See the

@@ -84,10 +84,11 @@ Browser tests need Chrome or Chromium and use their own temporary ports. Read
 The [redesign plan](docs/EXPERIENCE-REDESIGN.md) and
 [release checkpoint](docs/redesign/2026-09-13-staging.md) distinguish implemented
 features, local tests, actual HTTPS staging/restore evidence and remaining
-release work. The reviewed `11dd1ef` image is now released to production; its
-[release record](docs/redesign/2026-09-14-production-release/README.md) separates
-traffic readback, all nine canonical browser checkpoints and HTTPS delivery.
-Physical-device and uncoached player validation remain separate. Deployment and
+release work. The reviewed `90b8bb9` image is now released to production with
+the [dice-loading improvements](docs/redesign/2026-09-14-dice-loading-release/README.md).
+The original account/restore proofs and the new staging/production guest/art
+checks remain separate. Physical-device and uncoached player validation remain
+open. Deployment and
 maintenance procedures are in [ACCOUNT-OPERATIONS.md](docs/ACCOUNT-OPERATIONS.md)
 and [DEPLOY.md](docs/DEPLOY.md).
 

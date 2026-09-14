@@ -70,8 +70,9 @@ phone, page-load, idle-rendering and battery measurements remain R3 work.
 
 ## Optional recoverable accounts (2026-09-13)
 
-The account service is enabled in the [verified production release](redesign/2026-09-14-production-release/README.md)
-on `11dd1ef`, with one serving instance maximum. [ACCOUNT-OPERATIONS.md](ACCOUNT-OPERATIONS.md)
+The account service remains enabled in the [current production release](redesign/2026-09-14-dice-loading-release/README.md)
+on `90b8bb9`, with service and revision maxima of one. This frontend follow-up
+preserves the original `11dd1ef` account configuration and both rollback revisions. [ACCOUNT-OPERATIONS.md](ACCOUNT-OPERATIONS.md)
 records exact configuration preflight, Firestore/IAM/backup setup, staging and
 production proofs, and safe pause/rollback. It is the operating contract for
 recoverable identity, synchronized libraries, saved homes and social data. The
