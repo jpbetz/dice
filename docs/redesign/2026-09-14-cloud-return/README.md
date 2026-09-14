@@ -61,6 +61,8 @@ cloud log is included. The two home cards were captured while their monogram
 covers were visible; the inbox capture shows the Copper artwork.
 
 The [PITR content and continuation](restore/README.md) are separate evidence.
-Production candidates are now prepared off traffic; their runtime probes,
-traffic decision, and physical-device and uncoached human observations remain open. The
+The tested `11dd1ef` image is now [released to production](../2026-09-14-production-release/README.md)
+after 14/14 production runtime checks. All nine canonical production browser
+checkpoints and all 36 HTTPS delivery requests pass. Physical-device and
+uncoached human observations remain open. The
 [local full-suite record](../2026-09-13-release/README.md) is unchanged.

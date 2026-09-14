@@ -14,9 +14,12 @@ following his instruction to conserve the rolling area's space. Joe then
 authorized autonomous implementation through all three priorities, with agents
 and reviewed increments. Local implementation and scripted verification are
 complete. Staging has verified runtime permissions, PITR content and a complete
-source HTTPS return. The isolated restored-app continuation also passes;
-production candidates are prepared off traffic. Production runtime probes, the
-release decision and physical-device/player observation remain open. See the [staging checkpoint](redesign/2026-09-13-staging.md).
+source HTTPS return. The isolated restored-app continuation also passes.
+Production runtime checks pass 14/14 and the tested `11dd1ef` image is
+[released at 100%](redesign/2026-09-14-production-release/README.md), with
+service maximum 1. All nine canonical browser checkpoints and all 36 HTTPS
+delivery requests pass. Physical-device and uncoached player observation remain
+open. See the [cloud checkpoint](redesign/2026-09-13-staging.md).
 [REDESIGN-PROGRESS.md](REDESIGN-PROGRESS.md) records execution. The detailed R1 design is in
 [PEOPLE-DICE-TABLES.md](PEOPLE-DICE-TABLES.md).
 
@@ -128,9 +131,11 @@ Local release verification is recorded with its exact failures and targeted
 correction. Current staging source `11dd1ef` is Ready on `00006-p2z`; 19/19
 actual runtime permission checks, isolated PITR content comparison and the
 complete source HTTPS return pass. The [isolated restored continuation](redesign/2026-09-14-cloud-return/restore/README.md)
-also passes, retaining its earlier capture failure. Enabled and compatible
-paused production candidates are prepared off traffic; runtime production
-probes, release and actual player/device observation remain open in the [staging checkpoint](redesign/2026-09-13-staging.md).
+also passes, retaining its earlier capture failure. Production runtime checks
+pass 14/14; the tested `11dd1ef` image is released at 100% with service maximum
+1 and a Ready compatible paused revision off traffic. All nine canonical
+production browser checkpoints and all 36 HTTPS delivery requests pass. Actual
+player/device observation remains open in the [cloud checkpoint](redesign/2026-09-13-staging.md).
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable

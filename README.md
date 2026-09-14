@@ -84,8 +84,10 @@ Browser tests need Chrome or Chromium and use their own temporary ports. Read
 The [redesign plan](docs/EXPERIENCE-REDESIGN.md) and
 [release checkpoint](docs/redesign/2026-09-13-staging.md) distinguish implemented
 features, local tests, actual HTTPS staging/restore evidence and remaining
-release work. Production candidates are prepared off traffic; this README does
-not announce a production launch or physical-device validation. Deployment and
+release work. The reviewed `11dd1ef` image is now released to production; its
+[release record](docs/redesign/2026-09-14-production-release/README.md) separates
+traffic readback, all nine canonical browser checkpoints and HTTPS delivery.
+Physical-device and uncoached player validation remain separate. Deployment and
 maintenance procedures are in [ACCOUNT-OPERATIONS.md](docs/ACCOUNT-OPERATIONS.md)
 and [DEPLOY.md](docs/DEPLOY.md).
 

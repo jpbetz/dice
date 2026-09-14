@@ -8,9 +8,10 @@ and queueing the next ready task. This is an execution ledger, not a new
 priority order. R1–R3's local implementation and scripted verification are
 complete. Staging is enabled on `11dd1ef`, with 19/19 runtime permission
 checks, selected PITR content and the complete source HTTPS return verified.
-The isolated restored-app continuation also passes. Production candidates are
-prepared off traffic; production runtime probes, release and actual player/device
-observation remain open. The three characterized legacy visual gates remain recorded failures.
+The isolated restored-app continuation also passes. Production runtime checks
+pass 14/14 and the tested `11dd1ef` image is released at 100%, service maximum
+1. All nine canonical browser checkpoints and all 36 HTTPS delivery requests
+pass. Actual player/device observation remains open. The three characterized legacy visual gates remain recorded failures.
 
 ## Current work
 
@@ -22,14 +23,14 @@ observation remain open. The three characterized legacy visual gates remain reco
 | Shared surface and phone | Three reproducibly baked tables, full-width phone tray, persistent visible results and compact queued arrivals are implemented. Model size follows the shared table. The round physical envelope and full support/golden proofs are integrated as `e67da2c`/`04aafbf`; all six composed geometry proofs pass, with cost and collision profiling retained. The camera correction is integrated: 60 seeded painted-hull cases have no re-exits or settled crops, and all 36 baseline complete films agree. Long history reserves current results, with an inspected usable short-window layout. |
 | Shared film ordering | Ordinary rolls and kept-die rethrows use the worker with complete ordered events. `f4e20c0` orders size changes between films, including held reveals and clear. Warm tower changes now use the ordered FIFO (`cf0e48a`); six composed ordering/readiness cases pass. Required-model failure now offers explicit authored results without fabricated physics. The tainted physical world resumes only after the core is ready and a deliberate authoritative table clear; ordered warm/cold/reveal/keep checks pass. |
 | Lightweight play | Compressed delivery, face-material consolidation, idle sleep, Battery saver and independent Instant results are implemented. Optional scenery and the model parser now load on demand (`70d623b`, `530982b`); all eight composed loading/cancel/failure cases pass. Towers and silent reconstruction retain the inline solver. |
-| Operations and release | Current staging revision `dice-accounts-stage-00006-p2z` is Ready on `11dd1ef`, with maximum 1 and mapping read back. The same-image source return passes 4/4 preparation and 5/5 verification checkpoints; [five actual captures](redesign/2026-09-14-cloud-return/README.md) are inspected. Actual IAM checks pass 19/19; the isolated PITR clone and selected content reads pass. Restore revision `00002-lsh` on `3ed9db1` passed identity/library and cold-home assertions before a capture-helper failure; its [separate continuation](redesign/2026-09-14-cloud-return/restore/README.md) passes all three remaining checkpoints with the original journal preserved. Enabled and compatible paused production candidates using the tested image are prepared at 0%; production runtime probes remain pending. [Checkpoint and limits](redesign/2026-09-13-staging.md). HTTPS delivery checks pass; existing alerts cover staging. Production traffic is unchanged. Local frozen verification remains 364/368 plus 20/20 tail, with the wording correction separately verified and three pre-existing visual gates open. |
+| Operations and release | Current staging revision `dice-accounts-stage-00006-p2z` is Ready on `11dd1ef`, with maximum 1 and mapping read back. The same-image source return passes 4/4 preparation and 5/5 verification checkpoints; [five actual captures](redesign/2026-09-14-cloud-return/README.md) are inspected. Actual IAM checks pass 19/19; the isolated PITR clone and selected content reads pass. Restore revision `00002-lsh` on `3ed9db1` passed identity/library and cold-home assertions before a capture-helper failure; its [separate continuation](redesign/2026-09-14-cloud-return/restore/README.md) passes all three remaining checkpoints with the original journal preserved. Production runtime checks pass [14/14](redesign/2026-09-14-production-preparation/README.md). The tested `11dd1ef` image is [released at 100%](redesign/2026-09-14-production-release/README.md), service maximum 1; its exact compatible paused revision remains Ready off traffic. All nine canonical production browser checkpoints and all 36 HTTPS delivery requests pass; fresh-browser recovery is proved on one released revision, without a production restart/cold-home claim. [Checkpoint and limits](redesign/2026-09-13-staging.md). HTTPS delivery checks pass; existing alerts cover staging. Production origin, ingress and public-service IAM are unchanged. Local frozen verification remains 364/368 plus 20/20 tail, with the wording correction separately verified and three pre-existing visual gates open. |
 
 The root's integration checkout is `/tmp/dice-redesign-integration` on
 `codex/redesign-integration`. Agents use isolated worktrees so reviews and
 cherry-picks are explicit and another ongoing session's edits survive.
 
 The later `39b9ec7` dice-portrait optimization is integrated in the repository.
-Staging and prepared production candidates still use the immutable `11dd1ef`
+Staging and released production still use the immutable `11dd1ef`
 image; the cloud proofs do not include that later optimization. Temporary
 restore infrastructure has been [removed after proof](redesign/2026-09-14-cloud-return/restore/cleanup.json),
 with source resources and private evidence preserved.
@@ -55,10 +56,13 @@ an actual unused feature boundary; further file splitting alone saves no bytes.
 
 Staging permission, delivery and PITR content checks are recorded separately
 from local tests. The source HTTPS walkthrough and isolated restored continuation
-are complete. Production candidates are prepared off traffic; runtime production
-probes, physical phone/midrange-device observations, newcomer observation and
-the production traffic decision remain open. Review the concrete release
-artifacts before changing traffic. A disabled optional service or fake-store
+are complete. Production runtime checks pass 14/14 and the tested `11dd1ef`
+image is released at 100%, service maximum 1. All nine canonical browser
+checkpoints and all 36 HTTPS delivery requests pass. Physical phone/midrange-device
+and newcomer observations remain open. The
+[release record](redesign/2026-09-14-production-release/README.md) keeps actual
+traffic/browser/delivery proofs separate from those remaining observations.
+A disabled optional service or fake-store
 test alone does not complete persistent table homes.
 
 ## Validation baseline
@@ -136,8 +140,8 @@ All eight composed preference/Instant cases pass. The phone fixture measures
 actual viewport fit as preferences grow; the owner's subsequent hidden-library
 selector fix and Dice launcher placement are composed as `639effb`.
 `9b975e8` adds a validated `paused` maintenance mode and concrete operating plan;
-all three composed configuration/pause/restore checks pass. Cloud resources and
-production traffic remain unchanged.
+all three composed configuration/pause/restore checks pass. At that checkpoint,
+cloud resources and production traffic were unchanged.
 
 `1a20aa0` makes each baked table follow shared size. Six design/zoom checks pass
 and all 27 sampled films equal the unchanged baseline. Actual support rays
@@ -254,8 +258,8 @@ scenarios. All **20/20** account/UI/return tail cases pass independently, with
 exit 0 and no signals; the full command exits 1 for its four recorded failures.
 The additional terminology failure is corrected as `094c318`, with paired
 2/2 predecessor/current checks and inspected current Help. The three baseline
-visual failures retain their gates. Cloud traffic and the owner's live preview
-remain untouched.
+visual failures retain their gates. At that local verification checkpoint, cloud
+traffic and the owner's live preview were untouched.
 
 
 ## Joined return and reviewed release corrections
@@ -290,7 +294,8 @@ The durable-service handoff is concrete in
 local recovery drill passes seven checks and explicitly proves that restoring
 older data can revive later-revoked sessions and discard later blocks. Public
 restore therefore still needs a reviewed security-reconciliation procedure.
-No cloud resource, production traffic or live-preview process changed.
+That local drill changed no cloud resource, production traffic or live-preview
+process. Subsequent cloud actions are recorded separately below.
 
 
 ## External observation handoff
@@ -304,29 +309,31 @@ automatic presentation selection and a legacy beta-scenery rebuild remain
 explicitly outside the current implementation scope.
 
 
-## Local closeout and next external action
+## Historical local closeout and current external result
 
-All reviewed application changes are committed on main. The final source is the
-frozen `8a577e5` plus the one-sentence Help correction; the correction's application,
-test and tool files match its independently tested branch. The
+At the local closeout checkpoint, all then-reviewed application changes were
+committed on main. Its frozen source was `8a577e5` plus the one-sentence Help
+correction; that correction's application, test and tool files matched its
+independently tested branch. The
 [release record](redesign/2026-09-13-release/README.md) preserves all command exits,
 the full output, account/return logs, follow-up proof and inspected moments. The
 last R1 run completes all recovery/invitation checkpoints and the held account-load
 case, with matching complete films for recovered members and the unchanged guest.
 
-That local-only boundary is followed by the [staging checkpoint](redesign/2026-09-13-staging.md):
-Firestore and Rules APIs, the named staging database, dedicated conditional-IAM
-runtime, backup/PITR and a paused clean-source revision are now provisioned.
-Account mode is enabled on `dice-accounts-stage-00002-5bn`, with the expected
-source/status and exact origin/database/namespace read back. Remote delivery
-checks pass for all six sampled assets. Existing project and billing-wide alerts
-already cover this work; the earlier missing-budget/recipient blocker was
-self-imposed and is corrected. No budget update or production traffic change
-was needed.
+The subsequent [cloud checkpoint](redesign/2026-09-13-staging.md) records
+staging on `11dd1ef`, all 4/4 source preparation and 5/5 return checkpoints,
+19/19 staging authorization checks, and the selected PITR restore with its
+separate successful continuation. Temporary restore and permission fixtures
+are removed with evidence preserved. Existing alerts already covered this
+work; no budget or recipient update was required.
 
-Next are actual HTTPS fixture/revision return, runtime/zero-role IAM probes and
-an isolated PITR clone/restore. Production candidate/traffic and the restore
-security-reconciliation procedure remain open; physical-device and uncoached
-player rows remain blank. The owner’s untracked handoff backup and live port
-8123 remain untouched. See the [enablement checklist](ACCOUNT-ENABLEMENT-CHECKLIST.md)
-for the remaining proof.
+The tested immutable `11dd1ef` image is now [released to production](redesign/2026-09-14-production-release/README.md)
+at 100%, service maximum 1, after 14/14 production runtime checks. Canonical
+HTTPS delivery passes, as do all nine canonical production browser checkpoints
+on fresh independent browsers. This does not claim a production restart or
+cold-home proof.
+Later repository work, including `39b9ec7` portraits, is outside that image.
+Physical-device and uncoached player rows remain blank; a public data restore
+still needs security reconciliation beyond the isolated fixture proof. The
+owner’s handoff backup and live port 8123 remain untouched. See the
+[enablement checklist](ACCOUNT-ENABLEMENT-CHECKLIST.md) for operating boundaries.

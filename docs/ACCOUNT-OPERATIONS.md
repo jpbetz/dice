@@ -6,7 +6,7 @@
 presence. Its initial read-only review preceded provisioning. The subsequent
 [staging checkpoint](redesign/2026-09-13-staging.md) records executed cloud actions;
 commands below remain reusable procedures, not proof that every step has run.
-Production traffic has not changed.
+The tested `11dd1ef` image is now [released to production](redesign/2026-09-14-production-release/README.md).
 
 ## Historical observation — September 13, before provisioning
 
@@ -34,7 +34,7 @@ UI flows are now implemented and have local browser proofs; the composed release
 sweep was then a separate pending gate. The observations above describe that
 pre-provisioning checkpoint; they are not the current staging state.
 
-## Current staging checkpoint and remaining external work
+## Current cloud checkpoint and remaining observation
 
 The actual source HTTPS return on `11dd1ef` passes all four preparation and
 five verification checkpoints across a same-image revision replacement.
@@ -51,21 +51,24 @@ confirms source resources and retained proof were preserved.
 
 Production database `dice-accounts`, namespace `production-v1`, the dedicated
 runtime and exact database role, deny-all client rules, PITR, deletion protection
-and daily seven-day backup are now prepared and read back. The enabled candidate
-and compatible paused revision use the same tested `11dd1ef` image and remain
-at 0% traffic. Existing `dice-00059-r9r` retains 100%, with service maximum 20;
-the prepared revisions have maximum 1. Anonymous production GET/create both
-refuse with 403. Production runtime and cross-database probes remain pending.
-The [checkpoint](redesign/2026-09-13-staging.md) records the exact revisions.
+and daily seven-day backup are prepared and read back. Actual production runtime
+and cross-database checks pass [14/14](redesign/2026-09-14-production-preparation/README.md); anonymous production GET/create both refuse with 403.
+The tested `11dd1ef` enabled revision now receives 100% of traffic, with service
+and revision maxima of 1. The exact compatible paused revision remains Ready
+at 0%. Origin, ingress and public-service IAM are unchanged. The
+[release readback](redesign/2026-09-14-production-release/README.md) records the
+cap-before-route sequence and both prior zero-player/stream samples. The later
+repository portrait optimization is not in this immutable image.
 
 Existing project/all-service and billing-wide alerts already cover these
 services with default billing-admin routing. No budget or recipient update was
 needed. Alerts are not hard caps, and delivery has not been tested.
 
-Still open: production runtime probes, release review and traffic decision,
-then canonical production HTTPS account and guest verification after any
-switch. Physical-device and uncoached human observation are separate. The
-isolated staging restore is not a public restore-security certification.
+Canonical production account/guest browser verification passes all nine
+checkpoints on the released revision; all 36 HTTPS delivery requests pass.
+These are fresh-browser proofs, with no production process replacement or
+cold-home claim. Physical-device and uncoached human observations remain open.
+The isolated staging restore is not a public restore-security certification.
 The local release result remains [364/368 plus its separately verified wording
 fix and 20/20 tail cases](redesign/2026-09-13-release/README.md).
 
