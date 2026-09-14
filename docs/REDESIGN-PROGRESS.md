@@ -6,9 +6,10 @@
 [plan of record](EXPERIENCE-REDESIGN.md), using agents, reviewing each result,
 and queueing the next ready task. This is an execution ledger, not a new
 priority order. R1–R3's local implementation and scripted verification are
-complete. Staging provisioning has advanced; cloud fixture/restore proofs and
-actual player/device observation remain open. The three characterized legacy
-visual gates remain recorded failures.
+complete. Staging is enabled on `11dd1ef`, with 19/19 runtime permission
+checks and selected PITR content verified. Complete source/restore HTTPS
+walkthroughs, production release and actual player/device observation remain
+open. The three characterized legacy visual gates remain recorded failures.
 
 ## Current work
 
@@ -20,7 +21,7 @@ visual gates remain recorded failures.
 | Shared surface and phone | Three reproducibly baked tables, full-width phone tray, persistent visible results and compact queued arrivals are implemented. Model size follows the shared table. The round physical envelope and full support/golden proofs are integrated as `e67da2c`/`04aafbf`; all six composed geometry proofs pass, with cost and collision profiling retained. The camera correction is integrated: 60 seeded painted-hull cases have no re-exits or settled crops, and all 36 baseline complete films agree. Long history reserves current results, with an inspected usable short-window layout. |
 | Shared film ordering | Ordinary rolls and kept-die rethrows use the worker with complete ordered events. `f4e20c0` orders size changes between films, including held reveals and clear. Warm tower changes now use the ordered FIFO (`cf0e48a`); six composed ordering/readiness cases pass. Required-model failure now offers explicit authored results without fabricated physics. The tainted physical world resumes only after the core is ready and a deliberate authoritative table clear; ordered warm/cold/reveal/keep checks pass. |
 | Lightweight play | Compressed delivery, face-material consolidation, idle sleep, Battery saver and independent Instant results are implemented. Optional scenery and the model parser now load on demand (`70d623b`, `530982b`); all eight composed loading/cancel/failure cases pass. Towers and silent reconstruction retain the inline solver. |
-| Operations and release | Staging database/IAM/rules/backup provisioning and enabled clean-source revision `dice-accounts-stage-00002-5bn` are recorded in the [staging checkpoint](redesign/2026-09-13-staging.md). Remote compressed-delivery checks pass. Existing alerts cover staging without a budget/recipient update. HTTPS fixture, runtime IAM and restore proofs remain open; production traffic is unchanged. Local verification remains unit/fuzz pass, frozen full 364/368 plus 20/20 tail cases, with the wording failure corrected separately; three pre-existing visual gates remain open. |
+| Operations and release | Current staging revision `dice-accounts-stage-00005-tbg` is Ready on `11dd1ef`, with maximum 1 and mapping read back. Actual IAM checks pass 19/19; the isolated PITR clone succeeds and its prepared library head, both homes and pending invitation are verified by reads. Restore revision `00002-lsh` remains on `3ed9db1`. Complete source/restore HTTPS walkthroughs remain pending; the earlier source run failed after identity/library checkpoints with its cause unrecorded. [Checkpoint and limits](redesign/2026-09-13-staging.md). Current HTTPS delivery checks pass; existing alerts cover staging. Production traffic is unchanged. Local frozen verification remains 364/368 plus 20/20 tail, with the wording correction separately verified and three pre-existing visual gates open. |
 
 The root's integration checkout is `/tmp/dice-redesign-integration` on
 `codex/redesign-integration`. Agents use isolated worktrees so reviews and
@@ -45,10 +46,10 @@ Full is the presentation default. Automatic device selection is deferred until
 a measured criterion can support it. Remaining main-module extraction requires
 an actual unused feature boundary; further file splitting alone saves no bytes.
 
-Staging provisioning is now recorded separately from local tests. Cloud
-fixture/restore checks, physical phone/midrange-device observations, newcomer
-observation and production deployment remain open. Prepare and verify their
-concrete artifacts before the production traffic decision. Never treat a
+Staging permission, delivery and PITR content checks are recorded separately
+from local tests. Complete source/restore browser walkthroughs, physical phone/
+midrange-device observations, newcomer observation and production deployment
+remain open. Prepare and verify their concrete artifacts before the production traffic decision. Never treat a
 disabled optional service or fake-store test
 as completion of persistent table homes.
 

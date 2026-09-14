@@ -30,9 +30,12 @@ protocol](PRIVATE-LIBRARY-PROTOCOL.md), [home workflow](SAVED-HOME-PROTOCOL.md),
 [workspace map](WORKSPACES.md).
 
 [Local release verification](redesign/2026-09-13-release/README.md) is recorded,
-including all 20 account/return cases. Remaining: external deployment/restore
-work, actual newcomer and physical-device observations, and the separately
-characterized legacy visual-gate debt. Local fixture accounts,
+including all 20 account/return cases. [Staging](redesign/2026-09-13-staging.md)
+is enabled on `11dd1ef`; 19/19 runtime permission checks pass and isolated PITR
+reads confirm the prepared library head, both homes and pending invitation.
+Complete source/restore HTTPS walkthroughs, production release, actual newcomer
+and physical-device observations, and the separately characterized legacy
+visual-gate debt remain open. Local fixture accounts,
 process restart and phone emulation do not establish those observations or
 production durability. [Operating plan](ACCOUNT-OPERATIONS.md).
 
@@ -320,9 +323,10 @@ one another. No durable friend or home roster goes into public room payloads.
 
 The original sequence below keeps the approved slice identifiers. R1-A through
 R1-E have implementations and focused proofs; R1-F's scripted success walk
-and current Help are complete. Local release verification is recorded; external
-enablement and actual observation are tracked in the execution ledger. External deployment
-is separate from local implementation and service-restart tests.
+and current Help are complete. Local release verification and the advancing
+[staging checkpoint](redesign/2026-09-13-staging.md) are recorded. Complete cloud
+browser walkthroughs, production release and actual observation remain
+separate from local implementation and service-restart tests.
 
 | Slice | Deliverable | Completion evidence |
 | --- | --- | --- |
@@ -408,9 +412,10 @@ roll; do not infer discoverability from click count or scripted completion.
 
 ## 11. What is still a design task
 
-**Next:** execute the external staging/restore/enablement handoff and record
-actual-device and newcomer observations. The
-composed success walk and current Help have passed their local proofs. The destination, practice, setup,
+**Next:** complete the source and restored-app HTTPS walkthroughs, prepare the
+production release artifacts, and record actual-device and newcomer observations.
+The composed success walk and current Help have passed their local proofs.
+The destination, practice, setup,
 saved-home and People workflows have implementations and inspected browser
 captures, including 390px phone emulation.
 The recovery/store decisions and conflict-preservation policy are in the
