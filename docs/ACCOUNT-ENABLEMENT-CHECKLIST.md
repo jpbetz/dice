@@ -2,14 +2,13 @@
 
 # Durable service: external enablement handoff
 
-2026-09-13, reviewed from `b6b890a` with the completed account/home/social
-runtime. These are proposed external actions, not executed changes. The release owner owns
-the final code SHA, release gate and approval. Local rehearsal:
-`node tools/account-local-drill.mjs` passed all seven checks; the three existing
-configuration/maintenance tests passed. No cloud resources or real people were
-changed.
+Initially reviewed on 2026-09-13 from `b6b890a`. Staging provisioning has since
+advanced from clean source `be43dda`; see the [staging checkpoint](redesign/2026-09-13-staging.md)
+for executed actions and remaining proof. The release owner retains the final
+code SHA, release gate and production traffic decision. Local rehearsal passed
+all seven recovery checks and three configuration/maintenance tests.
 
-## Observed state
+## Historical observation — September 13, before provisioning
 
 The existing public origin is `https://dice-5wi5rwk2oa-uc.a.run.app`, revision
 `dice-00059-r9r`, health SHA `407ad4b4c4c9`, Node `24.19.0`. Read-only checks
@@ -28,16 +27,24 @@ deploy preserves existing environment and only sets `GIT_SHA`; it does not
 bootstrap durable storage or a dedicated runtime identity. `make status` is
 not an account-service readiness check.
 
-## Decisions and actions still needed
+## Current status and remaining verification
 
-| Item | Concrete proposed value/action | Evidence required before enabling |
+The staging database, dedicated runtime identity, conditional data role,
+deny-all client rules and paused service have been created and read back.
+Account mode is enabled on `dice-accounts-stage-00002-5bn`; HTTPS status reports
+available library/home/People/presence capabilities. Existing billing alerts
+already cover staging; no budget or recipient update is needed. Cloud fixture recovery,
+runtime authorization probes and restore proof remain open; production traffic
+has not changed. Details and limits are in the [checkpoint](redesign/2026-09-13-staging.md).
+
+| Item | Observed status or proposed action | Remaining verification |
 | --- | --- | --- |
-| Project and cost owner | Reuse the existing private deployment project only after its billing owner approves Firestore, backups/PITR and alerts. No new project is required by the code. | Record approved project and budget/notification owner privately. |
-| Staging | New service `dice-accounts-stage`; Standard Native database `dice-accounts-stage`; namespace `stage-v1`; runtime account `dice-accounts-stage-runtime`. | Confirm each name is unused or belongs to this deployment; record the canonical HTTPS origin returned at creation. |
+| Cost coverage | Existing three identical $5 monthly project/all-service alerts and the $33 billing-wide alert cover staging, with default billing-admin email routing. No alert update is required. | Alert delivery is untested; alerts are notifications, not hard caps. |
+| Staging | Service `dice-accounts-stage`, Standard Native database `dice-accounts-stage` in `us-central1`, and runtime account `dice-accounts-stage-runtime` now exist. Reviewed namespace is `stage-v1`. | Enabled revision and exact origin/database/namespace read back; actual HTTPS fixtures/revision return remain open. |
 | Production | Existing service `dice`; Standard Native database `dice-accounts`; namespace `production-v1`; runtime account `dice-accounts-runtime`; use the existing `run.app` origin unless an intentional domain migration is reviewed. | Record the exact immutable project/database/namespace/origin/runtime mapping. |
-| Data permissions | Enable Firestore; create the two databases in `us-central1` with deletion protection and PITR; attach distinct runtime identities with database-conditional `roles/datastore.user`. | Runtime app transaction succeeds only on its database; unrelated identity/direct browser access refuses; inherited broader roles are absent. |
-| Backup | Daily backups retained seven days, plus PITR; no developer file import. | Isolated staging restore preserves library revisions, memberships and invitation state; record restore point and missing later writes. |
-| Live room placement | Set both service and revision maxima to 1; no traffic split; deploy between games. | Read back both maxima and a single serving revision. Existing SSE requests can still overlap a rollout. |
+| Data permissions | Staging has its sole database-equality `roles/datastore.user` binding, no broader inherited grant found, and released deny-all client rules. Anonymous GET/create both refused with 403. Production provisioning remains proposed. | Runtime transaction on the intended database and zero-role/unrelated-database refusal probes remain open. |
+| Backup | Staging daily seven-day backup schedule, PITR and deletion protection are enabled; no developer file import. | Isolated staging restore preserves library revisions, memberships and invitation state; record restore point and missing later writes. |
+| Live room placement | Staging service and paused revision maxima both read back as 1. Production still needs its reviewed candidate configuration. | Recheck the enabled revision and serving traffic. Existing SSE requests can still overlap a rollout. |
 | Candidate and rollback | Same reviewed release code in staging and production; record one compatible maintenance-capable rollback revision. | Full release gate, clean checkout, correct source manifest, health SHA and recorded compatible schema/config mapping. |
 | Recovery security | Keep restored copies isolated until later revocations, key rotations, blocks/removals, cancellations and memberships are reconciled. | The app has no global restore-time invalidation/reconciliation command. A public restore must not proceed without this additional reviewed procedure. |
 
@@ -63,7 +70,8 @@ database IDs above meet the provider's naming rules; preflight checks a safe
 address shape, not provider existence or every project/database naming policy.
 [Database ID rules](https://docs.cloud.google.com/firestore/native/docs/manage-databases#database_id).
 
-Bootstrap the **new staging service only**, after provisioning its runtime:
+Bootstrap procedure for a new staging service. The recorded service already
+exists; do not rerun resource creation blindly.
 
 ```sh
 gcloud run deploy "$DICE_DEPLOY_SERVICE" --source . \
@@ -87,7 +95,8 @@ export DICE_DEV_WRITE=0
 node tools/account-preflight.mjs --production
 ```
 
-After exit 0 and external IAM/data checks, enable the staging revision:
+After configuration preflight and review of the provisioned policy/rules, enable
+staging for the runtime fixture checks:
 
 ```sh
 gcloud run services update "$DICE_DEPLOY_SERVICE" \

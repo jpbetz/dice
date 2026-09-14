@@ -2,15 +2,15 @@
 
 # Optional account service: enablement, pause and rollback
 
-2026-09-13. Reviewable operating plan for the implemented recovery, library,
-saved-home, invitation and presence service. **No cloud resources were created,
-permissions changed, deployments performed or real invitations sent while
-preparing this document.** Commands under provisioning/deployment are proposed
-operator actions after review, not a record that they ran.
+2026-09-13. Operating plan for recovery, libraries, saved homes, invitations and
+presence. Its initial read-only review preceded provisioning. The subsequent
+[staging checkpoint](redesign/2026-09-13-staging.md) records executed cloud actions;
+commands below remain reusable procedures, not proof that every step has run.
+Production traffic has not changed.
 
-## Current evidence and remaining external work
+## Historical observation — September 13, before provisioning
 
-Read-only Cloud Run/API checks on 2026-09-13 found:
+The initial read-only Cloud Run/API checks found:
 
 | Observation | Result |
 | --- | --- |
@@ -31,14 +31,33 @@ same-address home restoration, recipient isolation, invitation acceptance during
 an open turn, and permitted presence. They do not prove deployed IAM, cloud
 writes, cloud backup recovery or production cookies. Final Account/Tables/People
 UI flows are now implemented and have local browser proofs; the composed release
-sweep remains a separate gate. The observations above were refreshed read-only
-against the completed runtime review on 2026-09-13.
+sweep was then a separate pending gate. The observations above describe that
+pre-provisioning checkpoint; they are not the current staging state.
 
-The external work is: reviewed database/location and cost choice; Firestore API
-enablement; distinct staging/production storage; a dedicated runtime identity;
-database-scoped IAM; restrictive client access; backup/PITR setup and a restore
-drill; staging recovery; and a reviewed deployment/rollback pair. Existing guest
-play can ship with the optional API disabled before those steps.
+## Current staging checkpoint and remaining external work
+
+Staging now has a Standard Native database in `us-central1`, PITR/deletion
+protection, a daily seven-day backup schedule, a dedicated runtime identity
+with its sole database-equality data role, and released deny-all client rules.
+The initial paused revision served clean source `be43dda`; service and revision
+maxima both read back as 1. Anonymous data GET/create returned 403. Configuration preflight
+passes. Enabled revision `dice-accounts-stage-00002-5bn` serves the expected
+source SHA and reports available library/home/People/presence capabilities; the
+exact canonical origin/database/namespace were read back. Remote compressed
+delivery checks pass; actual HTTPS account journeys remain open.
+
+Existing project/all-service and billing-wide alerts already cover staging with
+default billing-admin routing. The earlier instruction to extend an alert or
+supply a new budget/recipient before provisioning was an unnecessary blocker.
+No such update is required. Alerts are not hard caps, and delivery has not been
+tested. The [staging record](redesign/2026-09-13-staging.md) gives the observed
+thresholds, IAM scope and exact revision.
+
+Still open: actual HTTPS fixture/revision-return flows, runtime and zero-role
+IAM probes, a PITR clone/restore drill, and the production candidate/rollback
+and traffic decision. Physical-device and human observation are separate.
+The local release result remains [364/368 plus its separately verified wording
+fix and 20/20 tail cases](redesign/2026-09-13-release/README.md).
 
 [ACCOUNT-ENABLEMENT-CHECKLIST.md](ACCOUNT-ENABLEMENT-CHECKLIST.md) is the concise
 operator handoff: exact remaining external choices, commands and required proof.
@@ -149,8 +168,9 @@ runtime identity must still pass its authenticated get/transaction checks.
 
 PITR begins retaining history when enabled; it cannot immediately supply a full
 week of older history. Backups/PITR and restored databases have separate costs.
-Review the current regional pricing and extend the existing billing alert before
-enabling them; no zero-dollar account-service bill is promised. The 30-second
+Existing billing alerts cover this staging setup; no alert extension is needed.
+Review coverage if the scope changes; no zero-dollar account-service bill is
+promised, and alerts do not cap spending. The 30-second
 presence cadence and bounded inbox/friend projections still incur writes/reads
 while in use. [PITR behavior](https://docs.cloud.google.com/firestore/native/docs/use-pitr),
 [backup operations](https://docs.cloud.google.com/firestore/native/docs/backups),
@@ -200,8 +220,8 @@ are not instant, and existing requests can continue on their previous revision.
 Splitting traffic would split this app's in-memory live rooms, even though
 Firestore transactions remain correct. Use the existing one-instance live-room
 discipline and explicitly set the service-level maximum to one alongside the
-revision maximum (the current service-level value is 20). This still does not
-turn rolling updates into an atomic room migration.
+revision maximum (the historical public-service value was 20; staging now reads
+back 1 at both levels). This still does not turn rolling updates into an atomic room migration.
 [Revision traffic/rollback](https://cloud.google.com/run/docs/rollouts-rollbacks-traffic-migration),
 [maximum-instance semantics](https://docs.cloud.google.com/run/docs/configuring/max-instances).
 

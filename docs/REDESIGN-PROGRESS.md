@@ -6,8 +6,9 @@
 [plan of record](EXPERIENCE-REDESIGN.md), using agents, reviewing each result,
 and queueing the next ready task. This is an execution ledger, not a new
 priority order. R1–R3's local implementation and scripted verification are
-complete; external staging/restore and actual player/device observation remain
-open. The three characterized legacy visual gates remain recorded failures.
+complete. Staging provisioning has advanced; cloud fixture/restore proofs and
+actual player/device observation remain open. The three characterized legacy
+visual gates remain recorded failures.
 
 ## Current work
 
@@ -19,7 +20,7 @@ open. The three characterized legacy visual gates remain recorded failures.
 | Shared surface and phone | Three reproducibly baked tables, full-width phone tray, persistent visible results and compact queued arrivals are implemented. Model size follows the shared table. The round physical envelope and full support/golden proofs are integrated as `e67da2c`/`04aafbf`; all six composed geometry proofs pass, with cost and collision profiling retained. The camera correction is integrated: 60 seeded painted-hull cases have no re-exits or settled crops, and all 36 baseline complete films agree. Long history reserves current results, with an inspected usable short-window layout. |
 | Shared film ordering | Ordinary rolls and kept-die rethrows use the worker with complete ordered events. `f4e20c0` orders size changes between films, including held reveals and clear. Warm tower changes now use the ordered FIFO (`cf0e48a`); six composed ordering/readiness cases pass. Required-model failure now offers explicit authored results without fabricated physics. The tainted physical world resumes only after the core is ready and a deliberate authoritative table clear; ordered warm/cold/reveal/keep checks pass. |
 | Lightweight play | Compressed delivery, face-material consolidation, idle sleep, Battery saver and independent Instant results are implemented. Optional scenery and the model parser now load on demand (`70d623b`, `530982b`); all eight composed loading/cancel/failure cases pass. Towers and silent reconstruction retain the inline solver. |
-| Operations and release | File/Firestore adapters, configuration preflight, safe maintenance pause and a concrete account operating plan are implemented. No cloud resources or production traffic changed. Final verification is recorded: unit/fuzz pass; frozen full 364/368 plus 20/20 account/return cases, with the additional wording failure corrected separately. Execute the external staging/restore/deployment work in ACCOUNT-OPERATIONS.md; three pre-existing visual gates remain open. |
+| Operations and release | Staging database/IAM/rules/backup provisioning and enabled clean-source revision `dice-accounts-stage-00002-5bn` are recorded in the [staging checkpoint](redesign/2026-09-13-staging.md). Remote compressed-delivery checks pass. Existing alerts cover staging without a budget/recipient update. HTTPS fixture, runtime IAM and restore proofs remain open; production traffic is unchanged. Local verification remains unit/fuzz pass, frozen full 364/368 plus 20/20 tail cases, with the wording failure corrected separately; three pre-existing visual gates remain open. |
 
 The root's integration checkout is `/tmp/dice-redesign-integration` on
 `codex/redesign-integration`. Agents use isolated worktrees so reviews and
@@ -44,10 +45,11 @@ Full is the presentation default. Automatic device selection is deferred until
 a measured criterion can support it. Remaining main-module extraction requires
 an actual unused feature boundary; further file splitting alone saves no bytes.
 
-Cloud provisioning, physical phone/midrange-device observations, newcomer
-observation and production deployment are not established by local tests.
-Prepare and verify their concrete artifacts before any final external
-approval step. Never treat a disabled optional service or fake-store test
+Staging provisioning is now recorded separately from local tests. Cloud
+fixture/restore checks, physical phone/midrange-device observations, newcomer
+observation and production deployment remain open. Prepare and verify their
+concrete artifacts before the production traffic decision. Never treat a
+disabled optional service or fake-store test
 as completion of persistent table homes.
 
 ## Validation baseline
@@ -303,10 +305,19 @@ the full output, account/return logs, follow-up proof and inspected moments. The
 last R1 run completes all recovery/invitation checkpoints and the held account-load
 case, with matching complete films for recovered members and the unchanged guest.
 
-The next concrete external action is the proposed staging service/database/runtime
-identity and backup/PITR setup in [ACCOUNT-ENABLEMENT-CHECKLIST.md](ACCOUNT-ENABLEMENT-CHECKLIST.md).
-Billing ownership and budget still need to be recorded before provisioning;
-no cloud resources, permissions or traffic changed during this repository work. Public restore still requires its
-reviewed security-reconciliation procedure; physical-device and uncoached player
-rows remain blank in the observation sheet. The owner’s untracked handoff backup
-and live port 8123 were preserved throughout this local work.
+That local-only boundary is followed by the [staging checkpoint](redesign/2026-09-13-staging.md):
+Firestore and Rules APIs, the named staging database, dedicated conditional-IAM
+runtime, backup/PITR and a paused clean-source revision are now provisioned.
+Account mode is enabled on `dice-accounts-stage-00002-5bn`, with the expected
+source/status and exact origin/database/namespace read back. Remote delivery
+checks pass for all six sampled assets. Existing project and billing-wide alerts
+already cover this work; the earlier missing-budget/recipient blocker was
+self-imposed and is corrected. No budget update or production traffic change
+was needed.
+
+Next are actual HTTPS fixture/revision return, runtime/zero-role IAM probes and
+an isolated PITR clone/restore. Production candidate/traffic and the restore
+security-reconciliation procedure remain open; physical-device and uncoached
+player rows remain blank. The owner’s untracked handoff backup and live port
+8123 remain untouched. See the [enablement checklist](ACCOUNT-ENABLEMENT-CHECKLIST.md)
+for the remaining proof.
