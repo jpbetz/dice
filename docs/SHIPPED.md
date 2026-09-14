@@ -8,6 +8,30 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## Mat previews leave the startup path — 2026-09-13
+
+Settings used to prepare twelve full-size mat textures and encode their PNGs
+at startup, even with the dialog closed. Previews now use the same seeded
+painters at thumbnail size and run only when visible, one per task after a
+frame. The swatches and appearance sample share cached images; only mats
+actually used by the table retain full-size textures. Image loading and
+catalogue edits invalidate the corresponding preview.
+
+Three-run medians in CPU-throttled 390 × 844 phone emulation improve from
+3.86 to 1.48 seconds for a usable Table and from 3.98 to 1.59 seconds for
+Copper Lantern. Encoded preview strings fall from 8.20 MB to 0.62 MB.
+The UI layout, live mat textures and shared rolls retain their existing
+behavior. Playback speed and physical-phone performance are not established
+by this software-rendered comparison.
+
+The [performance record](redesign/2026-09-13-play-performance/README.md)
+preserves samples, reproduction commands, inspected phone captures, the
+progressive Appearance tradeoff and the next measured startup hotspot.
+Focused checks pass for hidden work, cache reuse/invalidation, phone settings,
+shared mats, seeded grain, custom catalogues and image load/failure.
+The complete `npm test` command passes, including all 76 browser smoke
+scenarios and the account/library/home/People integrations.
+
 ## Inviting friends from People — 2026-09-13
 
 The initial People UI put Friends and Invitations beneath the live roster and
