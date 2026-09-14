@@ -5,6 +5,25 @@ import {Table} from '../tests/e2e/harness.mjs';
 import {click,type,key,hover} from '../tests/fixtures/visible-input.mjs';
 
 export {click,type,key,hover};
+export async function frameScreenshot(t,selector,{content=[]}={}){
+  await t.page.browser.send('Page.bringToFront',{},t.page.sessionId);
+  if(!selector)return;
+  // A capture may frame a tall, noninteractive container whose midpoint is
+  // clipped. Measure its painted viewport instead of inventing pointer input.
+  assert.equal(await t.eval(`(()=>{const node=document.querySelector(${JSON.stringify(selector)});if(!node||!node.checkVisibility()||node.closest('[inert]'))return false;node.scrollIntoView({block:'start',inline:'nearest',behavior:'instant'});return true;})()`),true,'screenshot target is rendered');
+  await t.eval('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+  const visible=await t.eval(`(()=>{return ${JSON.stringify(content.length?content:[selector])}.every(selector=>{const node=document.querySelector(selector);if(!node||!node.checkVisibility()||node.closest('[inert]'))return false;
+    const r=node.getBoundingClientRect();let left=Math.max(0,r.left),top=Math.max(0,r.top),right=Math.min(innerWidth,r.right),bottom=Math.min(innerHeight,r.bottom);
+    for(let p=node.parentElement;p;p=p.parentElement){const s=getComputedStyle(p),b=p.getBoundingClientRect();if(s.overflowX!=='visible'){left=Math.max(left,b.left);right=Math.min(right,b.right);}if(s.overflowY!=='visible'){top=Math.max(top,b.top);bottom=Math.min(bottom,b.bottom);}}
+    if(right<=left||bottom<=top)return false;
+    return [.1,.5,.9].some(x=>[.1,.5,.9].some(y=>{const hit=document.elementFromPoint(left+(right-left)*x,top+(bottom-top)*y);return hit&&(node===hit||node.contains(hit));}));});})()`);
+  assert.equal(visible,true,'screenshot content has unoccluded viewport area');
+}
+export async function homeCardsReady(t,homes){
+  await homesIdle(t);
+  assert.equal(!!(await t.dbg('homes.state.error')),false,'home list did not report a service error');
+  await t.waitFor(`(()=>{const s=window.__diceDebug.homes.state;if(s.loading||s.error||s.preview||s.selected)return false;return ${JSON.stringify(homes.map(h=>({id:h.id,name:h.name})))}.every(home=>{const card=Array.from(document.querySelectorAll('#homes-cards [data-home-id]')).find(c=>c.dataset.homeId===home.id);return card?.checkVisibility()&&card.querySelector('h4')?.textContent===home.name&&!!card.querySelector('[data-home-focus="join:'+home.id+'"]');});})()`,{timeout:30000});
+}
 export const accountState=t=>t.dbg('privateLibrary.state');
 export const accountIdle=t=>t.waitFor('window.__diceDebug.privateLibrary.state?.ready&&!document.getElementById("account-refresh")?.disabled',{timeout:30000});
 export const homesIdle=t=>t.waitFor('!!window.__diceDebug.homes.state&&!window.__diceDebug.homes.state.loading&&!document.getElementById("homes-refresh").disabled',{timeout:30000});

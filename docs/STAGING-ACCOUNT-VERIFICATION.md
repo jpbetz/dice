@@ -163,6 +163,13 @@ join and similarly worded application exceptions still fail. This fixes a
 reproduced harness weakness; an earlier cloud run whose cause was suppressed
 cannot retrospectively be attributed to it with certainty.
 
+Screenshot framing foregrounds and scrolls the relevant content, then checks
+its clipped visible area after layout. It does not invent pointer input on a
+noninteractive container. The Tables capture requires both expected home names
+in the rendered, ready list and visible on screen; hidden, missing, error and
+fully covered content cannot satisfy it. Actual controls retain their original
+pointer hit tests. The focused regression includes the real app at 390 × 844.
+
 The local and deployed proofs complement the
 [operating runbook](ACCOUNT-OPERATIONS.md). They do not replace database IAM,
 restrictive direct-client rules, backup/PITR records, revision/traffic evidence,

@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {document} from '../tests/fixtures/library-harness.mjs';
 import {browserTable,accountApi,publicApi,register,recover,cookieAttributes,accountState,accountIdle,openAccount,
-  workspace,closeWorkspace,homesIdle,peopleIdle,compose,joinHome,followJoin,click,type,key,hover} from './staging-account-browser.mjs';
+  workspace,closeWorkspace,homesIdle,peopleIdle,compose,joinHome,followJoin,click,type,key,frameScreenshot,homeCardsReady} from './staging-account-browser.mjs';
 
 const op=()=>crypto.randomUUID();
 const root=fileURLToPath(new URL('../',import.meta.url));
@@ -75,8 +75,8 @@ export async function verifyStaging({phase,origin,sha,journal,revision,restoredF
     for(const who of ['a','b','c']){assert.match(state.identities[who].key,/^dt1_[A-Za-z0-9_-]{43}$/);assert.match(state.identities[who].id,/^p_[A-Za-z0-9_-]{43}$/);}}
   const sessions=[];let stage='health';
   const save=()=>persist(journal,state);
-  const shot=async(t,name,selector)=>{
-    if(selector)await hover(t,selector);else await t.page.browser.send('Page.bringToFront',{},t.page.sessionId);
+  const shot=async(t,name,selector,content=[])=>{
+    await frameScreenshot(t,selector,{content});
     assert.equal(await t.eval('Array.from(document.querySelectorAll("#account-key, #people-own-code, #people-contact-code")).some(el=>el.value&&el.checkVisibility())'),false,'only non-secret fixture moments may be captured');
     const dir=path.join(path.dirname(journal),path.basename(journal)+'.images');await fs.mkdir(dir,{mode:0o700,recursive:true});
     const info=await fs.lstat(dir);assert.ok(info.isDirectory()&&!info.isSymbolicLink()&&(info.mode&0o077)===0);
@@ -144,7 +144,8 @@ export async function verifyStaging({phase,origin,sha,journal,revision,restoredF
       await openAccount(ta);await click(ta,'#account-compare');await ta.waitFor('!document.getElementById("account-comparison").hidden');await accountIdle(ta);await shot(ta,'library-comparison','#account-remote-preview');await click(ta,'#account-choice-remote');await click(ta,'#account-enable-sync');await accountIdle(ta);await click(ta,'#account-sync-retry');await accountIdle(ta);
       assert.deepEqual(await snapshot(ta),state.kept);assert.deepEqual(await ta.dbg('profiles.shared'),[]);await shot(ta,'library-adopted','#account-notice');await mark('clean_browser_retains_versions_and_explicitly_adopts_library');
       stage='cold_home_return';for(const home of [state.reserved,state.converted]){await joinHome(ta,home.id,home.roomKey,home.name);assert.equal(await ta.logCount(),0,'cold home restores setup without per-roll history');}
-      assert.equal(await ta.dbg('settings.venue'),'copper');assert.equal(await ta.dbg('zoom'),'close');await publicPrivateCheck(ta,state.nonce+' kept');await tables(ta);await shot(ta,'both-homes','#homes-cards');await mark('both_cold_home_addresses_restore_public_setup');
+      assert.equal(await ta.dbg('settings.venue'),'copper');assert.equal(await ta.dbg('zoom'),'close');await publicPrivateCheck(ta,state.nonce+' kept');await tables(ta);await homeCardsReady(ta,[state.reserved,state.converted]);
+      await shot(ta,'both-homes','#homes-cards',[state.reserved,state.converted].map(h=>`#homes-cards [data-home-id="${h.id}"] h4`));await mark('both_cold_home_addresses_restore_public_setup');
       stage='recipient_accept_and_join';await negative(tc,aid,state.converted.id,state.invitation.id);
       const turn=await compose(tb,'3d6 t3 secret'),before=await tb.dbg(`turnState(${JSON.stringify(turn)})`),seat=await tb.playerId(),url=await tb.eval('location.href');
       await people(tb);await click(tb,'#people-tab-invitations');await click(tb,`[data-invitation-id="${state.invitation.id}"] [data-social-focus="respond-invitation:${state.invitation.id}:accept"]`);await peopleIdle(tb);
