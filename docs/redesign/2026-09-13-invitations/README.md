@@ -29,3 +29,8 @@ HTTP-response cases verify that delayed acceptance cannot navigate after
 closing/reopening People or browsing Friends. A refused connection retains the
 invitation and retries its original operation. Monitor unit tests cover older
 inbox pages, expiry, hidden tabs, account changes and pre-acceptance responses.
+
+Validation: `npm test` completed successfully, including all 75 browser smoke
+scenarios and all 11 People cases, plus the unit/fuzz and account/library/home
+suites. `git diff --check` passes. No production service or physical-device
+observations are implied by these local browser checks.

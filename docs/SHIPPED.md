@@ -30,8 +30,10 @@ Retries keep their existing exact operation and account boundary.
 The [actual phone and desktop journey](redesign/2026-09-13-invitations/README.md)
 was run and inspected, including four players, an unopened recipient inbox,
 an unnamed table, a different saved home, direct joining, returning and a
-shared roll. The focused failure/retry checks and monitor unit tests pass.
-This supersedes the original UI rule requiring separate Accept and Join clicks;
+shared roll. The complete `npm test` command passes: unit and fuzz checks, all 75 browser
+smoke scenarios, the account/library/home integrations and all 11 People
+scenarios. Monitor unit tests cover pagination, expiry, visibility and stale
+responses. This supersedes the original UI rule requiring separate Accept and Join clicks;
 both choices are explicit and accepting for later still preserves live play.
 
 ## History keeps the current results readable — 2026-09-13
