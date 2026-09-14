@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {document} from '../tests/fixtures/library-harness.mjs';
 import {browserTable,accountApi,publicApi,register,recover,cookieAttributes,accountState,accountIdle,openAccount,
-  workspace,closeWorkspace,homesIdle,peopleIdle,compose,joinHome,afterJoin,click,type,key,hover} from './staging-account-browser.mjs';
+  workspace,closeWorkspace,homesIdle,peopleIdle,compose,joinHome,followJoin,click,type,key,hover} from './staging-account-browser.mjs';
 
 const op=()=>crypto.randomUUID();
 const root=fileURLToPath(new URL('../',import.meta.url));
@@ -150,7 +150,7 @@ export async function verifyStaging({phase,origin,sha,journal,revision,restoredF
       await people(tb);await click(tb,'#people-tab-invitations');await click(tb,`[data-invitation-id="${state.invitation.id}"] [data-social-focus="respond-invitation:${state.invitation.id}:accept"]`);await peopleIdle(tb);
       assert.equal(await tb.eval('location.href'),url);assert.equal(await tb.playerId(),seat);assert.deepEqual(await tb.dbg(`turnState(${JSON.stringify(turn)})`),before);assert.deepEqual(await tb.dbg('profiles.shared'),[]);
       await shot(tb,'invitation-accepted-before-join',`[data-social-focus="join:${state.invitation.id}"]`);
-      await click(tb,`[data-social-focus="join:${state.invitation.id}"]`);await afterJoin(tb,state.converted.roomKey);assert.equal(await ta.logCount(),0);
+      await followJoin(tb,`[data-social-focus="join:${state.invitation.id}"]`,state.converted.roomKey);assert.equal(await ta.logCount(),0);
       const roll=await compose(ta,'2d6+3');await tb.waitFor(`window.__diceDebug.currentRoll?.rollId===${JSON.stringify(roll)}`);await tb.settle();
       const film=await ta.eval('window.__diceDebug.currentRoll.keyframes');assert.ok(Array.isArray(film)&&film.length>0,'completed shared film contains actual frames');
       assert.deepEqual((await ta.entryState(roll)).values,(await tb.entryState(roll)).values);assert.deepEqual(film,await tb.eval('window.__diceDebug.currentRoll.keyframes'));await shot(ta,'shared-recovered-result');await mark('accept_preserves_private_turn_and_separate_join_shares_film');
@@ -171,7 +171,12 @@ export async function verifyStaging({phase,origin,sha,journal,revision,restoredF
     }
     for(const s of sessions)assert.deepEqual(s.table.page.errors,[]);
     return {ok:true,phase,checks:state.checks.filter(c=>c.phase===phase).map(c=>c.name),restored:!!restoredFrom,revisionEvidence:'operator-supplied; verify against Cloud Run records'};
-  }catch(error){state.lastFailure={phase,stage};await save();throw Object.assign(new Error('Staging fixture verification failed',{cause:error}),{stage});}
+  }catch(error){
+    // This journal already holds fixture recovery keys and stays 0600. Keep
+    // bounded diagnostic detail here, never in stdout or a public artifact.
+    state.lastFailure={phase,stage,cause:{name:String(error?.name||'Error').slice(0,100),message:String(error?.message||error).slice(0,4000),stack:String(error?.stack||'').slice(0,8000)}};
+    await save();throw Object.assign(new Error('Staging fixture verification failed',{cause:error}),{stage});
+  }
   finally{for(const s of sessions)await s.close();}
 }
 

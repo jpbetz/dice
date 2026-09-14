@@ -130,7 +130,10 @@ delete accounts or cloud data; no supported account-deletion API is invented for
 cleanup. Retain or remove the dedicated staging database only through a separate
 reviewed operator action. It never messages or invites a real person.
 
-A failed phase records only its stage name and retains its private journal.
+A failed phase records its stage and bounded underlying error/stack in the
+private journal. Those diagnostics may contain fixture data: never publish the
+journal or copy its diagnostic text into a public log. CLI output remains
+aggregate check names only.
 Partial phases refuse automatic replay. Inspect the stage and known fixture
 state before deciding on a new fixture or deliberate recovery; do not reset the
 phase and blindly repeat mutations. A process crash may similarly leave
@@ -139,6 +142,7 @@ phase and blindly repeat mutations. A process crash may similarly leave
 ## Local rehearsal
 
 ```sh
+node tests/staging-navigation.test.mjs
 node tests/staging-verifier.test.mjs
 ```
 
@@ -150,6 +154,14 @@ restart and checks target guards, source-binding refusal and private file modes.
 It manages no cloud resource and does not establish cloud durability. Optional
 `DICE_STAGING_PROOF_DIR=/tmp/NEW_PRIVATE_DIRECTORY` retains only the five fixture
 PNGs for inspection; all recovery data and browser profiles are removed.
+
+The navigation regression holds a real old-document CDP request across a
+pointer-triggered navigation. The old wait aborts; the current wait tolerates
+only recognized CDP teardown errors and requires the new document, exact
+origin/room, completed live join and available home. Wrong targets, a stalled
+join and similarly worded application exceptions still fail. This fixes a
+reproduced harness weakness; an earlier cloud run whose cause was suppressed
+cannot retrospectively be attributed to it with certainty.
 
 The local and deployed proofs complement the
 [operating runbook](ACCOUNT-OPERATIONS.md). They do not replace database IAM,

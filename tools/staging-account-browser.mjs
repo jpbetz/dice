@@ -39,12 +39,30 @@ export async function compose(t,notation){
   assert.equal(await t.dbg('workspaces.current'),null);return t.rollId();
 }
 export async function joinHome(t,id,room,name){
-  await workspace(t,'tables');await homesIdle(t);await click(t,`[data-home-focus="join:${id}"]`);
-  await afterJoin(t,room);assert.equal(await t.dbg('settings.tableName'),name);assert.equal(await t.dbg('net.savedHome'),true);
+  await workspace(t,'tables');await homesIdle(t);await followJoin(t,`[data-home-focus="join:${id}"]`,room);
+  assert.equal(await t.dbg('settings.tableName'),name);assert.equal(await t.dbg('net.savedHome'),true);
 }
-export async function afterJoin(t,room){
-  await t.waitFor(`new URL(location.href).searchParams.get('room')===${JSON.stringify(room)}&&!!window.__diceDebug?.netReady`,{timeout:30000});
-  await t.waitOnline();await t.settle();
+export async function followJoin(t,selector,room){
+  const previous=await t.eval('performance.timeOrigin');await click(t,selector);
+  await afterJoin(t,room,{previous});
+}
+export async function afterJoin(t,room,{previous=null,timeout=30000}={}){
+  const origin=new URL(t.url).origin,deadline=Date.now()+timeout;
+  while(Date.now()<deadline){
+    let result,timer;
+    try{
+      result=await Promise.race([t.eval(`(async()=>{ /* staging navigation readiness */
+        if(location.origin!==${JSON.stringify(origin)}||new URL(location.href).searchParams.get('room')!==${JSON.stringify(room)}||performance.timeOrigin===${JSON.stringify(previous)}||!window.__diceDebug?.netReady)return null;
+        const ready=await window.__diceDebug.netReady,net=window.__diceDebug.net;return {online:ready?.online===true,currentOnline:net?.online===true,unavailableHome:net?.unavailableHome===true};})()`),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Timed out waiting for live destination readiness')),Math.max(1,deadline-Date.now()));})]);
+    }catch(error){
+      // A real pointer starts a full document navigation. Only this transient
+      // CDP failure is retried; app exceptions and incorrect state still fail.
+      if(!/^CDP (?:Execution context was destroyed(?:, most likely because of a navigation)?\.?|Inspected target navigated or closed\.?|Cannot find context with specified id\.?|Cannot find default execution context\.?)(?: —[^\n]*)?$/.test(String(error.message)))throw error;
+    }finally{clearTimeout(timer);}
+    if(result){assert.equal(result.online,true,'destination must join the live server');assert.equal(result.unavailableHome,false,'destination home must be available');if(result.currentOnline){await t.settle();return;}}
+    await new Promise(resolve=>setTimeout(resolve,100));
+  }
+  throw new Error('Timed out waiting for the destination document and live join');
 }
 export async function browserTable(origin,name,{phone=false}={}){
   const browser=await new Browser().launch();

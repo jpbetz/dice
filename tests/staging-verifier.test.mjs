@@ -13,6 +13,18 @@ import {freePort,startServer} from './e2e/harness.mjs';
 import {findChrome} from './e2e/cdp.mjs';
 import {verifyStaging} from '../tools/staging-account-verify.mjs';
 
+test('staging failure keeps bounded diagnostic detail only in the private journal',async t=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'dice-staging-private-error-')),journal=path.join(dir,'fixture.json');
+  t.after(()=>fs.rm(dir,{recursive:true,force:true}));const originalFetch=globalThis.fetch;
+  const diagnostic='fixture-only diagnostic '+ 'x'.repeat(5000);
+  globalThis.fetch=async()=>{throw new Error(diagnostic);};
+  try{await assert.rejects(verifyStaging({phase:'prepare',origin:'https://127.0.0.1:44333',sha:'b'.repeat(40),journal,revision:'fixture-before',allowLoopback:true}),error=>error.message==='Staging fixture verification failed'&&error.stage==='health');}
+  finally{globalThis.fetch=originalFetch;}
+  const state=JSON.parse(await fs.readFile(journal,'utf8'));
+  assert.equal(state.lastFailure.stage,'health');assert.equal(state.lastFailure.cause.name,'Error');assert.equal(state.lastFailure.cause.message,diagnostic.slice(0,4000));assert.ok(state.lastFailure.cause.stack.length<=8000);assert.match(state.lastFailure.cause.stack,/fixture-only diagnostic/);
+  assert.equal((await fs.stat(journal)).mode&0o077,0);assert.equal(state.phase,'preparing');
+});
+
 test('staging verifier refuses unsafe targets and implicit source retargeting before any network request',async t=>{
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'dice-staging-verifier-guards-'));
   t.after(()=>fs.rm(dir,{recursive:true,force:true}));
