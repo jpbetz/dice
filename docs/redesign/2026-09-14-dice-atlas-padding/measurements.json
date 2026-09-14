@@ -1479,6 +1479,64 @@
     "temporaryScratchBytes": 270400,
     "realMaterialRowsEqual": 16,
     "atlasedMaterialRows": 14,
-    "shaderFallbackRows": 2
+    "shaderFallbackRows": 2,
+    "completeStandardSuite": {
+      "command": "npm test",
+      "sourceSha": "096d9e8dccc16c73d54a2a0e59a72b4d2b412926",
+      "exitCode": 0,
+      "unitProgramsPassed": 55,
+      "fuzz": {
+        "seed": "0x5eed1ce",
+        "specs": 5000,
+        "junk": 5000,
+        "parses": 1317295,
+        "threw": 0,
+        "knownAbsorbedD3Cases": 59
+      },
+      "defaultSmoke": {
+        "passed": 77,
+        "failed": 0
+      },
+      "browserPrograms": [
+        {
+          "file": "tests/account-library-browser.test.mjs",
+          "passed": 2,
+          "failed": 0
+        },
+        {
+          "file": "tests/account-homes-browser.test.mjs",
+          "passed": 2,
+          "failed": 0
+        },
+        {
+          "file": "tests/account-ui.test.mjs",
+          "passed": 5,
+          "failed": 0
+        },
+        {
+          "file": "tests/home-connection-ui.test.mjs",
+          "passed": 1,
+          "failed": 0
+        },
+        {
+          "file": "tests/account-social-browser.test.mjs",
+          "passed": 1,
+          "failed": 0
+        },
+        {
+          "file": "tests/home-ui.test.mjs",
+          "passed": 4,
+          "failed": 0
+        },
+        {
+          "file": "tests/people-ui.test.mjs",
+          "passed": 13,
+          "failed": 0
+        }
+      ],
+      "localLogSha256": "79b6f84b255ed3f443d86da1594f8e1ae3c79ee8a3116220faf0d7db799c5a90",
+      "fullSweepRerun": false,
+      "legacyFullSweepVisualFailuresRemainOpen": 3
+    }
   }
 }

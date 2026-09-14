@@ -85,7 +85,16 @@ node tools/drive.mjs tools/steps/dice-portrait-parity.mjs padding-before
 node tools/drive.mjs tools/steps/dice-portrait-parity.mjs padding-after --compare=tools/out/dice-portrait-parity-padding-before/report.json
 node tests/e2e/run.mjs --only dice-atlas-padding,dice-face-atlas,symbol-faces,pool-set-override,themed-chrome,dice-art-loading,held-roll,one-seed-one-film
 npm run -s test:unit
+npm test
 ```
 
-All units and all nine selected browser scenarios pass. No production/cloud
-action, dependency installation, vendor edit or live-preview access occurred.
+All nine selected browser scenarios pass. The complete `npm test` command on
+`096d9e8` exited **0**: all 55 unit programs, seeded fuzz, **77/77** smoke,
+account library/home browser checks **2/2 + 2/2**, and the full account/home/People
+tail (**5/5 + 1/1 + 1/1 + 4/4 + 13/13**) pass. The existing fuzz generator
+records 59 absorbed D3 cases; no gate changes were made. This is the standard
+suite, not a repeat of the [historical full sweep](../2026-09-13-release/README.md);
+its three characterized legacy visual failures remain open.
+
+No production/cloud action, dependency installation, vendor edit or live-preview
+access occurred.
