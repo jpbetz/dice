@@ -1,0 +1,13 @@
+// Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0
+
+// Accounts use the server's database-scoped IAM identity. Browsers use the
+// account HTTP service; neither anonymous nor Firebase-authenticated clients
+// receive direct database access. Release this source to each named database.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
