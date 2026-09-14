@@ -1275,17 +1275,23 @@ function atlasFaceMaterials(geometry, materials, count) {
     const canvas = document.createElement('canvas');
     canvas.width = width; canvas.height = height;
     const ctx = canvas.getContext('2d');
+    // Build each padded face on a small reusable tile. Self-copying the
+    // growing atlas for every gutter forced full-canvas snapshots; a tile
+    // keeps that work bounded and preserves the original filtering exactly.
+    const tile = document.createElement('canvas');
+    tile.width = tile.height = cellSize;
+    const tc = tile.getContext('2d');
     faces.forEach((m, index) => {
       const source = m[key].image;
-      const x = index % columns * cellSize + padding;
-      const y = Math.floor(index / columns) * cellSize + padding;
-      ctx.drawImage(source, x, y);
+      tc.clearRect(0, 0, cellSize, cellSize);
+      tc.drawImage(source, padding, padding);
       // Replicate the border into a gutter for filtering. The painted face
       // already has a wide unused margin; no neighbor's digit reaches it.
-      ctx.drawImage(source, 0, 0, TEX_SIZE, 1, x, y-padding, TEX_SIZE, padding);
-      ctx.drawImage(source, 0, TEX_SIZE-1, TEX_SIZE, 1, x, y+TEX_SIZE, TEX_SIZE, padding);
-      ctx.drawImage(canvas, x, y-padding, 1, cellSize, x-padding, y-padding, padding, cellSize);
-      ctx.drawImage(canvas, x+TEX_SIZE-1, y-padding, 1, cellSize, x+TEX_SIZE, y-padding, padding, cellSize);
+      tc.drawImage(source, 0, 0, TEX_SIZE, 1, padding, 0, TEX_SIZE, padding);
+      tc.drawImage(source, 0, TEX_SIZE-1, TEX_SIZE, 1, padding, padding+TEX_SIZE, TEX_SIZE, padding);
+      tc.drawImage(tile, padding, 0, 1, cellSize, 0, 0, padding, cellSize);
+      tc.drawImage(tile, padding+TEX_SIZE-1, 0, 1, cellSize, padding+TEX_SIZE, 0, padding, cellSize);
+      ctx.drawImage(tile, index % columns * cellSize, Math.floor(index / columns) * cellSize);
     });
     const texture = new THREE.CanvasTexture(canvas);
     texture.channel = 1;
