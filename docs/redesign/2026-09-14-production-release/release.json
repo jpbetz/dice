@@ -1,0 +1,80 @@
+{
+  "copyright": "Copyright 2026 The Dice Table Authors",
+  "license": "Apache-2.0",
+  "kind": "actual-production-release-readback",
+  "started": "2026-09-14T02:17:12.283884+00:00",
+  "finished": "2026-09-14T02:18:03.414160+00:00",
+  "sourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+  "preparedEvidence": "../2026-09-14-production-preparation/README.md",
+  "productionNamespace": "production-v1",
+  "previousRouting": [
+    {
+      "revision": "dice-00059-r9r",
+      "percent": 100
+    }
+  ],
+  "previousServiceMaximum": 20,
+  "releasedRevision": "dice-accounts-11dd1ef-09140137-on",
+  "trafficPercent": 100,
+  "serviceMaximum": 1,
+  "revisionMaximum": 1,
+  "compatiblePausedRevision": "dice-accounts-11dd1ef-09140137-pause",
+  "pausedTrafficPercent": 0,
+  "operations": [
+    {
+      "operation": "set-service-maximum-one",
+      "started": "2026-09-14T02:17:17.807048+00:00",
+      "finished": "2026-09-14T02:17:20.470164+00:00",
+      "exitCode": 0
+    },
+    {
+      "operation": "route-exact-candidate",
+      "started": "2026-09-14T02:17:21.415069+00:00",
+      "finished": "2026-09-14T02:18:01.484197+00:00",
+      "exitCode": 0
+    }
+  ],
+  "healthSamples": [
+    {
+      "sample": "before-health",
+      "sourceSha": "407ad4b4c4c9",
+      "rooms": 0,
+      "players": 0,
+      "streams": 0
+    },
+    {
+      "sample": "before-routing-health",
+      "sourceSha": "407ad4b4c4c9",
+      "rooms": 0,
+      "players": 0,
+      "streams": 0
+    },
+    {
+      "sample": "released-health",
+      "sourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+      "rooms": 0,
+      "players": 0,
+      "streams": 0
+    }
+  ],
+  "readbacks": {
+    "enabledAndPausedReady": true,
+    "exactImmutableImageAndSource": true,
+    "exactDedicatedRuntime": true,
+    "exactEnabledOriginDatabaseNamespace": true,
+    "exactPausedEnvironment": true,
+    "canonicalOriginUnchanged": true,
+    "publicServiceIamUnchanged": true,
+    "ingressUnchanged": true,
+    "noFloatingLatestTraffic": true
+  },
+  "scope": {
+    "accountDataWrittenByRelease": false,
+    "newFixtureBrowserProof": "recorded separately after cutover",
+    "physicalDeviceValidation": false,
+    "uncoachedHumanObservation": false,
+    "laterPortraitCommitIncluded": false,
+    "historicalLocalVisualGatesUnchanged": 3,
+    "idleReadbackIsAdmissionLock": false
+  }
+}
