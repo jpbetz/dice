@@ -1,0 +1,112 @@
+{
+  "copyright": "Copyright 2026 The Dice Table Authors",
+  "license": "Apache-2.0",
+  "schema": 1,
+  "kind": "local-https-frontend-smoke",
+  "ok": true,
+  "sourceSha": "90b8bb9e3865d0278adaa489fb73017994c75dc4",
+  "toolSha256": "412ff7b07932e962a73aa54d536c2677477a9d5c98d18e70c62789b0b79aebd1",
+  "transport": "Local HTTPS proxy with a fixture certificate trusted only by the owned Node/Chrome processes",
+  "viewport": {
+    "width": 390,
+    "height": 844,
+    "deviceScaleFactor": 1,
+    "mobileEmulation": true
+  },
+  "startedAt": "2026-09-14T03:09:59.179Z",
+  "completedAt": "2026-09-14T03:10:07.658Z",
+  "durationMs": 8479,
+  "checks": [
+    "exact_source_and_enabled_status",
+    "quick_2d6_natural_playback_without_portrait_warmup",
+    "visible_built_in_webp_portraits_and_stable_controls",
+    "two_viewers_share_complete_4d20_film_and_readable_result",
+    "accounts_untouched_and_expected_source_retained"
+  ],
+  "unitAndBrowserTests": {
+    "passed": 3,
+    "total": 3,
+    "browserTestDurationMs": 8726.464249
+  },
+  "accountStatus": {
+    "enabled": true,
+    "available": true,
+    "capabilities": [
+      "library",
+      "homes",
+      "people",
+      "presence"
+    ]
+  },
+  "accountMutationRequests": 0,
+  "accountStoreJsonFiles": 0,
+  "portraitAssets": {
+    "beforeOpeningBuilder": 0,
+    "standard": 7,
+    "afterThemedBuilder": 14,
+    "httpStatus": 200,
+    "mime": "image/webp",
+    "nativeWidth": 192,
+    "liveContexts": 0,
+    "liveRenders": 0,
+    "stableControlWidthAndHeight": true
+  },
+  "shared": {
+    "viewers": 2,
+    "notation": "4d20",
+    "values": [
+      18,
+      14,
+      20,
+      4
+    ],
+    "total": 56,
+    "completeKeyframesEqual": true,
+    "displayedFacesEqual": true,
+    "settledDicePerView": 4,
+    "actualProjectedVerticesInsideScene": true,
+    "diceCentersUncoveredByControls": true
+  },
+  "cleanup": {
+    "ownedBrowsersClosed": true,
+    "completedAt": "2026-09-14T03:10:07.713Z"
+  },
+  "images": [
+    {
+      "file": "quick-2d6-moving.png",
+      "sha256": "30f04ecf8fff732e9bd16d21398ee7a110098df81a35c6793bd3062d8ca19543",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "builder-portraits-pending.png",
+      "sha256": "a2bec2e24853102b09c6179302f28d8f7854bd543d1e0b748910c6f6f84d396b",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "builder-seaglass.png",
+      "sha256": "751857920e07406ef93ee31bbe517aedb1ac882ccdb3acd77ba1a89d4fe350da",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "shared-4d20-alice.png",
+      "sha256": "9ffdad302ef9bb8f663133792b9d985d1e85f434d38fdb63f1bd4dc62b64c57b",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "shared-4d20-bob.png",
+      "sha256": "4830336c8d7ef833166ed87055272abca1cde1434403622823508f541b7f8b2e",
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "limits": [
+    "One local HTTPS application process; no cloud request or release action",
+    "Fresh owned guest profiles; no account creation, recovery, or synchronized-library mutation",
+    "Natural app playback, no simulation clock advancement or performance measurement",
+    "Phone viewport emulation; no physical-device or uncoached human observation"
+  ]
+}
