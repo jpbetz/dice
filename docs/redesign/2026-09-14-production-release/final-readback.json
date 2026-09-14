@@ -1,0 +1,58 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "artifactNote": "One bounded read-only production handoff check after the successful browser smoke. Exact project/origin/image/identity mappings and raw provider responses remain in private operator records. Aggregate players/streams are observed counts, not a zero-client release condition.",
+  "checkedAt": "2026-09-14T02:27:42.238393+00:00",
+  "sourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+  "revision": "dice-accounts-11dd1ef-09140137-on",
+  "revisionReady": true,
+  "trafficPercent": 100,
+  "solePositiveTrafficRevision": true,
+  "serviceMaximum": 1,
+  "revisionMaximum": 1,
+  "exactReviewedImmutableImage": true,
+  "exactDedicatedRuntime": true,
+  "runtimeEnvironment": {
+    "matchesReviewedCandidateExactly": true,
+    "accountStore": "firestore",
+    "database": "dice-accounts",
+    "namespace": "production-v1",
+    "developerWritesDisabled": true,
+    "canonicalOriginUnchanged": true,
+    "projectMappingMatches": true
+  },
+  "canonicalHealth": {
+    "httpStatus": 200,
+    "ok": true,
+    "sha": "11dd1efd142f59a157c055ab4da512c745989dca",
+    "node": "24.19.0",
+    "players": 0,
+    "streams": 0
+  },
+  "canonicalAccountStatus": {
+    "httpStatus": 200,
+    "enabled": true,
+    "available": true,
+    "schema": 1,
+    "recoveryMethods": [
+      "key"
+    ],
+    "capabilities": [
+      "library",
+      "homes",
+      "people",
+      "presence"
+    ]
+  },
+  "readOnly": true,
+  "zeroClientsRequired": false,
+  "cloudMutations": 0,
+  "applicationMutations": 0,
+  "checksNotRepeated": [
+    "IAM",
+    "Rules",
+    "backups",
+    "permission probes",
+    "delivery measurements",
+    "browser smoke"
+  ]
+}
