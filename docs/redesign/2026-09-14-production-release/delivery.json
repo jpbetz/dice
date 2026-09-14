@@ -1,0 +1,171 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "artifactNote": "Actual canonical production HTTPS measurement after activation. Only the private canonical origin is omitted from the original helper payload; measurement rows and totals are unchanged. The node field identifies the measurement process, not the deployed runtime. Exact private origin/revision/source binding and health responses remain in the operator record.",
+  "sourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+  "revision": "dice-accounts-11dd1ef-09140137-on",
+  "validation": {
+    "helperCommandExitCode": 0,
+    "cleanImmutableCheckout": true,
+    "exactSourceHealthBeforeAndAfter": true,
+    "assetCount": 6,
+    "requestCount": 36,
+    "firstAndRepeatedStatus200": true,
+    "firstAndRepeatedDecodedBytesEqualIdentity": true,
+    "negotiatedEncodingMatchesOffer": true
+  },
+  "supersedesStagingOnlyMeasurement": "../2026-09-13-staging-delivery.json",
+  "measuredAt": "2026-09-14T02:19:52.733Z",
+  "node": "v24.14.1",
+  "scope": "Six entry assets only; wire body bytes and individual sequential request time, not whole-page loading or device performance.",
+  "totals": {
+    "identity": 3985212,
+    "br": 1113498,
+    "gzip": 1151817
+  },
+  "rows": [
+    {
+      "path": "/",
+      "offered": "identity",
+      "encoding": "identity",
+      "bytes": 97975,
+      "firstMs": 197.12,
+      "warmMs": 93.2
+    },
+    {
+      "path": "/",
+      "offered": "br",
+      "encoding": "br",
+      "bytes": 32442,
+      "firstMs": 90.17,
+      "warmMs": 79.06
+    },
+    {
+      "path": "/",
+      "offered": "gzip",
+      "encoding": "gzip",
+      "bytes": 32035,
+      "firstMs": 69.19,
+      "warmMs": 79.58
+    },
+    {
+      "path": "/js/main.js",
+      "offered": "identity",
+      "encoding": "identity",
+      "bytes": 1898492,
+      "firstMs": 435.33,
+      "warmMs": 428.42
+    },
+    {
+      "path": "/js/main.js",
+      "offered": "br",
+      "encoding": "br",
+      "bytes": 629925,
+      "firstMs": 250.84,
+      "warmMs": 194.92
+    },
+    {
+      "path": "/js/main.js",
+      "offered": "gzip",
+      "encoding": "gzip",
+      "bytes": 667353,
+      "firstMs": 374.78,
+      "warmMs": 283.39
+    },
+    {
+      "path": "/css/style.css",
+      "offered": "identity",
+      "encoding": "identity",
+      "bytes": 327765,
+      "firstMs": 187.37,
+      "warmMs": 177.87
+    },
+    {
+      "path": "/css/style.css",
+      "offered": "br",
+      "encoding": "br",
+      "bytes": 105228,
+      "firstMs": 142.13,
+      "warmMs": 74.01
+    },
+    {
+      "path": "/css/style.css",
+      "offered": "gzip",
+      "encoding": "gzip",
+      "bytes": 105884,
+      "firstMs": 136.83,
+      "warmMs": 120
+    },
+    {
+      "path": "/js/tunables.js",
+      "offered": "identity",
+      "encoding": "identity",
+      "bytes": 41752,
+      "firstMs": 63.13,
+      "warmMs": 63.93
+    },
+    {
+      "path": "/js/tunables.js",
+      "offered": "br",
+      "encoding": "br",
+      "bytes": 13938,
+      "firstMs": 66.41,
+      "warmMs": 66.2
+    },
+    {
+      "path": "/js/tunables.js",
+      "offered": "gzip",
+      "encoding": "gzip",
+      "bytes": 13567,
+      "firstMs": 75.93,
+      "warmMs": 68.02
+    },
+    {
+      "path": "/vendor/three.module.js",
+      "offered": "identity",
+      "encoding": "identity",
+      "bytes": 1272972,
+      "firstMs": 291.28,
+      "warmMs": 214.01
+    },
+    {
+      "path": "/vendor/three.module.js",
+      "offered": "br",
+      "encoding": "br",
+      "bytes": 255043,
+      "firstMs": 142.69,
+      "warmMs": 141.13
+    },
+    {
+      "path": "/vendor/three.module.js",
+      "offered": "gzip",
+      "encoding": "gzip",
+      "bytes": 257859,
+      "firstMs": 193.52,
+      "warmMs": 141.23
+    },
+    {
+      "path": "/vendor/cannon-es.js",
+      "offered": "identity",
+      "encoding": "identity",
+      "bytes": 346256,
+      "firstMs": 107.48,
+      "warmMs": 104.27
+    },
+    {
+      "path": "/vendor/cannon-es.js",
+      "offered": "br",
+      "encoding": "br",
+      "bytes": 76922,
+      "firstMs": 82.85,
+      "warmMs": 64.78
+    },
+    {
+      "path": "/vendor/cannon-es.js",
+      "offered": "gzip",
+      "encoding": "gzip",
+      "bytes": 75119,
+      "firstMs": 83.87,
+      "warmMs": 73.69
+    }
+  ]
+}
