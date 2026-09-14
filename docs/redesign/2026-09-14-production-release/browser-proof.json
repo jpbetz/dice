@@ -1,0 +1,161 @@
+{
+  "copyright": "Copyright 2026 The Dice Table Authors",
+  "license": "Apache-2.0",
+  "schema": 1,
+  "kind": "actual-canonical-production-browser-proof",
+  "sourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+  "revision": "dice-accounts-11dd1ef-09140137-on",
+  "browserHelpersCommit": "bfa98bd2ea9df0a63dc67d0de182ef425aa2661b",
+  "privateReviewedDriverSha256": "310ef07dd1097c6e99700cf609a85365c4d00f50ba3abd708e5f85f92fa07ea3",
+  "firstAttempt": {
+    "exitCode": 1,
+    "startedAt": "2026-09-14T02:18:13.995Z",
+    "cleanupCompletedAt": "2026-09-14T02:18:16.011Z",
+    "durationThroughCleanupSeconds": 2.016,
+    "stoppedAt": "release_readback",
+    "cause": "Fixture expected capabilities as object flags; actual API returns an array.",
+    "completedCheckpoints": 0,
+    "fixtureBrowsersOpened": 0,
+    "identitiesCreated": 0,
+    "accountDataActions": 0,
+    "readOnlyCloudActions": 2,
+    "originalDriverBindingAndFailedJournalByteExact": true
+  },
+  "secondAttempt": {
+    "exitCode": 0,
+    "phase": "complete",
+    "startedAt": "2026-09-14T02:21:56.352Z",
+    "completedAt": "2026-09-14T02:24:39.455Z",
+    "checkpointDurationSeconds": 163.103,
+    "cleanupCompletedAt": "2026-09-14T02:24:39.525Z",
+    "ownedBrowsersClosed": true,
+    "freshJournalAndGeneratedFixtures": true,
+    "priorJournalReplayed": false,
+    "checkpoints": [
+      {
+        "name": "exact_released_revision_and_canonical_https_status",
+        "completedAt": "2026-09-14T02:21:58.362Z"
+      },
+      {
+        "name": "guest_roll_and_generated_https_identity_cookies",
+        "completedAt": "2026-09-14T02:22:09.819Z"
+      },
+      {
+        "name": "immutable_conflict_exact_retry_and_original_retained",
+        "completedAt": "2026-09-14T02:22:16.055Z"
+      },
+      {
+        "name": "explicit_converted_and_reserved_home_capture",
+        "completedAt": "2026-09-14T02:22:20.657Z"
+      },
+      {
+        "name": "offline_recipient_invitation_and_unrelated_fixture_refusal",
+        "completedAt": "2026-09-14T02:22:30.463Z"
+      },
+      {
+        "name": "fresh_browser_recovery_preserves_library_until_explicit_adoption",
+        "completedAt": "2026-09-14T02:22:38.938Z"
+      },
+      {
+        "name": "both_saved_home_addresses_return_without_private_library_publication",
+        "completedAt": "2026-09-14T02:22:44.810Z"
+      },
+      {
+        "name": "accept_for_later_preserves_private_turn_then_join_shares_film",
+        "completedAt": "2026-09-14T02:22:54.371Z"
+      },
+      {
+        "name": "separate_presence_consent_revocation_and_real_expiry",
+        "completedAt": "2026-09-14T02:24:39.454Z"
+      }
+    ]
+  },
+  "status": {
+    "httpStatus": 200,
+    "enabled": true,
+    "available": true,
+    "capabilities": [
+      "library",
+      "homes",
+      "people",
+      "presence"
+    ]
+  },
+  "environment": {
+    "canonicalHttps": true,
+    "freshIndependentChromeProfiles": true,
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "deviceScaleFactor": 1,
+      "mobileEmulation": true
+    },
+    "sharedCaptureVisibleFixtureSeats": 4,
+    "sharedFilmComparedBrowserViewers": 2
+  },
+  "scriptedAssertions": [
+    "Fresh Cloud Run readbacks select the exact released revision at 100%, service/revision maxima 1 and expected immutable image, runtime and account mapping.",
+    "Guest rolling is online; generated identity registration/recovery uses Secure HttpOnly SameSite=Lax host cookies at the canonical HTTPS origin.",
+    "Concurrent library conflict requests retain both versions and an original; exact retry agrees; recovery alone leaves the device library unchanged until explicit comparison/adoption.",
+    "Current-table capture and reserved-home creation are explicit; both addresses return in fresh browsers with expected saved setup.",
+    "An offline generated recipient receives the in-app invitation; unrelated fixture access is refused.",
+    "Accept for later preserves the current seat, URL and unfinished secret turn; separate Join produces equal result values and complete keyframes for two viewers.",
+    "The private library is absent from another seat public state and the secret turn is omitted from an unrelated seat snapshot.",
+    "Presence starts unknown, online and home location are separate choices, revocation withdraws presence, and the real 90-second lease expires."
+  ],
+  "inputBoundary": "Account actions, roll composition, home capture, adoption, invitation acceptance and separate Join use the committed strict pointer/keyboard helpers. Conflict setup, privacy readbacks and presence checks also use fixture APIs.",
+  "captures": [
+    {
+      "file": "library-comparison.png",
+      "sha256": "d2f60ea1dbffc28663e35840c743c791c37e2a6fd44dbcd36bb3bfbfcc58b55e",
+      "width": 390,
+      "height": 844,
+      "inspected": true,
+      "observed": "Account library preview, device/account/merge choices and default-dice choice are visible and legible.",
+      "visibleRecoveryOrContactKey": false
+    },
+    {
+      "file": "library-adopted.png",
+      "sha256": "3e39f69ad93e4c9d83afff5386c6b1f9acbf6b402d6d6842c81ce13e4b888ff8",
+      "width": 390,
+      "height": 844,
+      "inspected": true,
+      "observed": "Private sync shows up to date; the visible confirmation says table sharing stays off until chosen.",
+      "visibleRecoveryOrContactKey": false
+    },
+    {
+      "file": "both-homes.png",
+      "sha256": "7fe2e51e85e4eaa5610c4f839ee210b11183f71d8e7cf6f7e64ed2a8300cc049",
+      "width": 390,
+      "height": 844,
+      "inspected": true,
+      "observed": "Converted Copper and reserved Obsidian homes both show their names, Manage and Join now controls. Covers use the monogram fallback.",
+      "visibleRecoveryOrContactKey": false
+    },
+    {
+      "file": "invitation-accepted-before-join.png",
+      "sha256": "0569daae18df4842d5132f8570dbf7502276794ab56b3dbefd64d2e65591a5d9",
+      "width": 390,
+      "height": 844,
+      "inspected": true,
+      "observed": "The accepted invitation remains in People with a separate Join now action and the Copper preview.",
+      "visibleRecoveryOrContactKey": false
+    },
+    {
+      "file": "shared-recovered-result.png",
+      "sha256": "efd025d44a02f35dcd7d034c67cd3ee41e6af681ff3e96810ddfb18f642f5a86",
+      "width": 390,
+      "height": 844,
+      "inspected": true,
+      "observed": "Current result 8 = 4 + 1 + 3 is visible alongside the retained earlier result 10 = 6 + 2 + 2. Both foreground dice and the earlier dice fit on the Copper surface; the header shows four fixture seats.",
+      "visibleRecoveryOrContactKey": false
+    }
+  ],
+  "limits": [
+    "Same released process may retain live room history; this fresh-browser return does not claim process replacement or cold-home reconstruction.",
+    "The shared capture includes an earlier retained result and four fixture seats; the two-viewer shared-film assertion concerns the new roll.",
+    "Emulated 390\u00d7844 browser, not a physical-device or uncoached-human observation.",
+    "The later repository portrait optimization is outside the immutable 11dd image.",
+    "Private origins, opaque account identifiers, recovery/contact keys, provider records and raw journals are excluded."
+  ]
+}
