@@ -1,0 +1,153 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "artifactNote": "Sanitized real Cloud Run job evidence. Exact project, image registry/digest, runtime addresses, execution identifiers, tokens and fixture paths are not published. Original image/identity/operation evidence remains in the private operator record. Check labels and observed HTTP statuses are unchanged.",
+  "sourceSha": "be43dda9af734f5d574c48b6d791d240cae33496",
+  "serverAndServiceFilesMatchSourceSha": "3ed9db1247dc67f622d8903e48ca1523eb1f78db",
+  "proofs": [
+    {
+      "mode": "denial",
+      "checks": [
+        {
+          "label": "attached-identity",
+          "ok": true
+        },
+        {
+          "label": "workload-oauth",
+          "ok": true
+        },
+        {
+          "label": "read-denied",
+          "ok": true,
+          "status": 403,
+          "errorStatus": "PERMISSION_DENIED"
+        },
+        {
+          "label": "transaction-denied",
+          "ok": true,
+          "status": 403,
+          "errorStatus": "PERMISSION_DENIED"
+        },
+        {
+          "label": "write-denied",
+          "ok": true,
+          "status": 403,
+          "errorStatus": "PERMISSION_DENIED"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "mode": "positive",
+      "checks": [
+        {
+          "label": "attached-identity",
+          "ok": true
+        },
+        {
+          "label": "workload-oauth",
+          "ok": true
+        },
+        {
+          "label": "fresh-record-absent",
+          "ok": true,
+          "status": 404,
+          "errorStatus": "NOT_FOUND"
+        },
+        {
+          "label": "begin-transaction",
+          "ok": true,
+          "status": 200
+        },
+        {
+          "label": "transaction-read-absent",
+          "ok": true,
+          "status": 404,
+          "errorStatus": "NOT_FOUND"
+        },
+        {
+          "label": "commit-marker",
+          "ok": true,
+          "status": 200
+        },
+        {
+          "label": "exact-marker-readback",
+          "ok": true,
+          "status": 200
+        },
+        {
+          "label": "delete-exact-marker",
+          "ok": true
+        },
+        {
+          "label": "cleanup-confirmed-absent",
+          "ok": true,
+          "status": 404,
+          "errorStatus": "NOT_FOUND"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "checks": {
+    "denialImageMatchesReviewedDigest": true,
+    "denialIdentityMatches": true,
+    "denialArgvByteExact": true,
+    "denialNodePathMatches": true,
+    "denialMaxRetries0": true,
+    "denialTaskTimeout60": true,
+    "finalProbeRecordAbsent": true
+  },
+  "proofCheckCount": 14,
+  "jobRetained": true,
+  "zeroRoleIdentityRetained": true,
+  "iamBindingsAddedByProbe": 0,
+  "finalCleanupReadStatus": 404,
+  "operatorCommands": [
+    {
+      "operation": "create-zero-role-identity",
+      "exitCode": 0,
+      "timeout": false
+    },
+    {
+      "operation": "create-positive-job",
+      "exitCode": 0,
+      "timeout": false
+    },
+    {
+      "operation": "execute-positive",
+      "exitCode": 1,
+      "timeout": false
+    },
+    {
+      "operation": "use-image-launcher",
+      "exitCode": 0,
+      "timeout": false
+    },
+    {
+      "operation": "execute-positive-launcher",
+      "exitCode": null,
+      "timeout": true
+    },
+    {
+      "operation": "use-verified-node-path",
+      "exitCode": 0,
+      "timeout": false
+    },
+    {
+      "operation": "execute-positive-direct-node",
+      "exitCode": 0,
+      "timeout": false
+    },
+    {
+      "operation": "attach-zero-role-identity",
+      "exitCode": 0,
+      "timeout": false
+    },
+    {
+      "operation": "execute-zero-role-denial",
+      "exitCode": 0,
+      "timeout": false
+    }
+  ],
+  "serverAndServiceFilesAlsoMatchFinalSourceSha": "11dd1efd142f59a157c055ab4da512c745989dca"
+}

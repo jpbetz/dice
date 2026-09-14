@@ -1,0 +1,55 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "artifactNote": "Sanitized real Cloud Run job evidence. Exact project, image registry/digest, runtime addresses, execution identifiers, tokens and fixture paths are not published. Original image/identity/operation evidence remains in the private operator record. Check labels and observed HTTP statuses are unchanged.",
+  "sourceSha": "be43dda9af734f5d574c48b6d791d240cae33496",
+  "serverAndServiceFilesMatchSourceSha": "3ed9db1247dc67f622d8903e48ca1523eb1f78db",
+  "operation": "original-runtime-cross-database-denial",
+  "commandExitCode": 0,
+  "taskSucceeded": true,
+  "effectiveExecution": {
+    "sameReviewedImage": true,
+    "originalStagingIdentity": true,
+    "verifiedNodePath": true,
+    "argvByteExact": true,
+    "restoreDatabaseSelected": true,
+    "freshUuidSelected": true
+  },
+  "reports": [
+    {
+      "mode": "denial",
+      "checks": [
+        {
+          "label": "attached-identity",
+          "ok": true
+        },
+        {
+          "label": "workload-oauth",
+          "ok": true
+        },
+        {
+          "label": "read-denied",
+          "ok": true,
+          "status": 403,
+          "errorStatus": "PERMISSION_DENIED"
+        },
+        {
+          "label": "transaction-denied",
+          "ok": true,
+          "status": 403,
+          "errorStatus": "PERMISSION_DENIED"
+        },
+        {
+          "label": "write-denied",
+          "ok": true,
+          "status": 403,
+          "errorStatus": "PERMISSION_DENIED"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "noIamGrantAdded": true,
+  "cloneCompletionNotEstablishedByThisProof": true,
+  "jobAndFixtureIdentityRetained": true,
+  "serverAndServiceFilesAlsoMatchFinalSourceSha": "11dd1efd142f59a157c055ab4da512c745989dca"
+}
