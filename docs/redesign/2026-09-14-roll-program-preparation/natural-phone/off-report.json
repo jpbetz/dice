@@ -1,0 +1,1699 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0",
+  "naturalPlayback": true,
+  "metricsBeforeNavigation": true,
+  "compileMode": "off",
+  "capturePaths": true,
+  "moments": [
+    {
+      "name": "ready",
+      "canvas": {
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow": "clip",
+        "transform": "none",
+        "inert": false,
+        "hidden": false,
+        "rect": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 563,
+          "top": 56,
+          "right": 390,
+          "bottom": 619,
+          "left": 0
+        },
+        "width": 390,
+        "height": 563,
+        "drawingBufferWidth": 390,
+        "drawingBufferHeight": 563,
+        "contextLost": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+      },
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "dpr": 1,
+        "scrollX": 0,
+        "scrollY": 0,
+        "clientWidth": 390,
+        "clientHeight": 844,
+        "visual": {
+          "width": 390,
+          "height": 844,
+          "offsetLeft": 0,
+          "offsetTop": 0,
+          "scale": 1
+        }
+      },
+      "body": {
+        "classes": "mini seated",
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow": "hidden",
+        "transform": "none",
+        "inert": false,
+        "hidden": false,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0
+        }
+      },
+      "elements": [
+        {
+          "selector": "#workspace-nav",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 792,
+            "width": 390,
+            "height": 52,
+            "top": 792,
+            "right": 390,
+            "bottom": 844,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "NAV#workspace-nav",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-roll-tray",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 619,
+            "width": 390,
+            "height": 173,
+            "top": 619,
+            "right": 390,
+            "bottom": 792,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#",
+          "hitInside": true
+        },
+        {
+          "selector": "#scene-container",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 56,
+            "width": 390,
+            "height": 563,
+            "top": 56,
+            "right": 390,
+            "bottom": 619,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "CANVAS#",
+          "hitInside": true
+        },
+        {
+          "selector": "#left-panel",
+          "display": "contents",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "DIV#rail",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-build-roll",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 300.203125,
+            "y": 620,
+            "width": 79.796875,
+            "height": 40,
+            "top": 620,
+            "right": 380,
+            "bottom": 660,
+            "left": 300.203125
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-build-roll",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-more",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 291.5,
+            "y": 797,
+            "width": 90.5,
+            "height": 43,
+            "top": 797,
+            "right": 382,
+            "bottom": 840,
+            "left": 291.5
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-more",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(1)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 660,
+            "width": 370,
+            "height": 44,
+            "top": 660,
+            "right": 380,
+            "bottom": 704,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(2)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 704,
+            "width": 370,
+            "height": 44,
+            "top": 704,
+            "right": 380,
+            "bottom": 748,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        }
+      ],
+      "roll": {
+        "shrouded": 0
+      },
+      "preparation": {
+        "enabled": false,
+        "kicks": 0,
+        "last": null
+      },
+      "frame": {
+        "view": {
+          "left": 0,
+          "top": 56,
+          "width": 390,
+          "height": 563
+        },
+        "busy": false,
+        "dice": []
+      },
+      "detail": null,
+      "layoutBefore": {
+        "layoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "visualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "contentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        },
+        "cssLayoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "cssVisualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "cssContentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        }
+      },
+      "surfaceCapture": {
+        "width": 390,
+        "height": 844
+      },
+      "viewCapture": {
+        "width": 390,
+        "height": 844
+      },
+      "layoutAfter": {
+        "layoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "visualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "contentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        },
+        "cssLayoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "cssVisualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "cssContentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        }
+      }
+    },
+    {
+      "name": "held",
+      "canvas": {
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow": "clip",
+        "transform": "none",
+        "inert": false,
+        "hidden": false,
+        "rect": {
+          "x": 0,
+          "y": 148,
+          "width": 390,
+          "height": 471,
+          "top": 148,
+          "right": 390,
+          "bottom": 619,
+          "left": 0
+        },
+        "width": 390,
+        "height": 471,
+        "drawingBufferWidth": 390,
+        "drawingBufferHeight": 471,
+        "contextLost": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+      },
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "dpr": 1,
+        "scrollX": 0,
+        "scrollY": 0,
+        "clientWidth": 390,
+        "clientHeight": 844,
+        "visual": {
+          "width": 390,
+          "height": 844,
+          "offsetLeft": 0,
+          "offsetTop": 0,
+          "scale": 1
+        }
+      },
+      "body": {
+        "classes": "mini seated has-table-result",
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow": "hidden",
+        "transform": "none",
+        "inert": false,
+        "hidden": false,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0
+        }
+      },
+      "elements": [
+        {
+          "selector": "#workspace-nav",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 792,
+            "width": 390,
+            "height": 52,
+            "top": 792,
+            "right": 390,
+            "bottom": 844,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "NAV#workspace-nav",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-roll-tray",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 619,
+            "width": 390,
+            "height": 173,
+            "top": 619,
+            "right": 390,
+            "bottom": 792,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#",
+          "hitInside": true
+        },
+        {
+          "selector": "#scene-container",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 148,
+            "width": 390,
+            "height": 471,
+            "top": 148,
+            "right": 390,
+            "bottom": 619,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "CANVAS#",
+          "hitInside": true
+        },
+        {
+          "selector": "#left-panel",
+          "display": "contents",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "DIV#rail",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-build-roll",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 300.203125,
+            "y": 620,
+            "width": 79.796875,
+            "height": 40,
+            "top": 620,
+            "right": 380,
+            "bottom": 660,
+            "left": 300.203125
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-build-roll",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-more",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 291.5,
+            "y": 797,
+            "width": 90.5,
+            "height": 43,
+            "top": 797,
+            "right": 382,
+            "bottom": 840,
+            "left": 291.5
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-more",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(1)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 660,
+            "width": 370,
+            "height": 44,
+            "top": 660,
+            "right": 380,
+            "bottom": 704,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(2)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 704,
+            "width": 370,
+            "height": 44,
+            "top": 704,
+            "right": 380,
+            "bottom": 748,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        }
+      ],
+      "roll": {
+        "id": "b4351d54-dab9-411a-bdc3-c80d92547f5c",
+        "done": true,
+        "values": null,
+        "shrouded": 4
+      },
+      "preparation": {
+        "enabled": false,
+        "kicks": 0,
+        "last": null
+      },
+      "frame": {
+        "view": {
+          "left": 0,
+          "top": 148,
+          "width": 390,
+          "height": 471
+        },
+        "busy": false,
+        "dice": [
+          {
+            "rollId": "b4351d54-dab9-411a-bdc3-c80d92547f5c",
+            "index": 0,
+            "left": 60.097412740366835,
+            "top": 467.8370618947253,
+            "right": 108.91484738620834,
+            "bottom": 513.544610363859,
+            "nearDepth": 28.40290439684705,
+            "farDepth": 30.630202311721664
+          },
+          {
+            "rollId": "b4351d54-dab9-411a-bdc3-c80d92547f5c",
+            "index": 1,
+            "left": 122.8483955857936,
+            "top": 372.96055275035974,
+            "right": 165.8924312037552,
+            "bottom": 421.84647321517616,
+            "nearDepth": 29.59614034993952,
+            "farDepth": 31.90855226080374
+          },
+          {
+            "rollId": "b4351d54-dab9-411a-bdc3-c80d92547f5c",
+            "index": 2,
+            "left": 148.5950310511469,
+            "top": 406.98883745443874,
+            "right": 197.30169171441096,
+            "bottom": 450.14030069743984,
+            "nearDepth": 29.22372298236391,
+            "farDepth": 31.447598521714777
+          },
+          {
+            "rollId": "b4351d54-dab9-411a-bdc3-c80d92547f5c",
+            "index": 3,
+            "left": 269.90917719148285,
+            "top": 205.68391594634173,
+            "right": 309.28894166838086,
+            "bottom": 249.81665045908898,
+            "nearDepth": 32.188081788176234,
+            "farDepth": 34.491973609663695
+          }
+        ]
+      },
+      "detail": null,
+      "layoutBefore": {
+        "layoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "visualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "contentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        },
+        "cssLayoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "cssVisualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "cssContentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        }
+      },
+      "surfaceCapture": {
+        "width": 390,
+        "height": 844
+      },
+      "viewCapture": {
+        "width": 390,
+        "height": 844
+      },
+      "layoutAfter": {
+        "layoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "visualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "contentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        },
+        "cssLayoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "cssVisualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "cssContentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        }
+      }
+    },
+    {
+      "name": "revealed",
+      "canvas": {
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow": "clip",
+        "transform": "none",
+        "inert": false,
+        "hidden": false,
+        "rect": {
+          "x": 0,
+          "y": 148,
+          "width": 390,
+          "height": 471,
+          "top": 148,
+          "right": 390,
+          "bottom": 619,
+          "left": 0
+        },
+        "width": 390,
+        "height": 471,
+        "drawingBufferWidth": 390,
+        "drawingBufferHeight": 471,
+        "contextLost": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+      },
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "dpr": 1,
+        "scrollX": 0,
+        "scrollY": 0,
+        "clientWidth": 390,
+        "clientHeight": 844,
+        "visual": {
+          "width": 390,
+          "height": 844,
+          "offsetLeft": 0,
+          "offsetTop": 0,
+          "scale": 1
+        }
+      },
+      "body": {
+        "classes": "mini seated has-table-result",
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow": "hidden",
+        "transform": "none",
+        "inert": false,
+        "hidden": false,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0
+        }
+      },
+      "elements": [
+        {
+          "selector": "#workspace-nav",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 792,
+            "width": 390,
+            "height": 52,
+            "top": 792,
+            "right": 390,
+            "bottom": 844,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "NAV#workspace-nav",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-roll-tray",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 619,
+            "width": 390,
+            "height": 173,
+            "top": 619,
+            "right": 390,
+            "bottom": 792,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#",
+          "hitInside": true
+        },
+        {
+          "selector": "#scene-container",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 148,
+            "width": 390,
+            "height": 471,
+            "top": 148,
+            "right": 390,
+            "bottom": 619,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "CANVAS#",
+          "hitInside": true
+        },
+        {
+          "selector": "#left-panel",
+          "display": "contents",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "DIV#rail",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-build-roll",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 300.203125,
+            "y": 620,
+            "width": 79.796875,
+            "height": 40,
+            "top": 620,
+            "right": 380,
+            "bottom": 660,
+            "left": 300.203125
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-build-roll",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-more",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 291.5,
+            "y": 797,
+            "width": 90.5,
+            "height": 43,
+            "top": 797,
+            "right": 382,
+            "bottom": 840,
+            "left": 291.5
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-more",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(1)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 660,
+            "width": 370,
+            "height": 44,
+            "top": 660,
+            "right": 380,
+            "bottom": 704,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(2)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 704,
+            "width": 370,
+            "height": 44,
+            "top": 704,
+            "right": 380,
+            "bottom": 748,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        }
+      ],
+      "roll": {
+        "id": "b4351d54-dab9-411a-bdc3-c80d92547f5c",
+        "done": true,
+        "values": [
+          1,
+          18,
+          4,
+          19
+        ],
+        "shrouded": 0
+      },
+      "preparation": {
+        "enabled": false,
+        "kicks": 0,
+        "last": null
+      },
+      "frame": {
+        "view": {
+          "left": 0,
+          "top": 148,
+          "width": 390,
+          "height": 471
+        },
+        "busy": false,
+        "dice": [
+          {
+            "rollId": "b4351d54-dab9-411a-bdc3-c80d92547f5c",
+            "index": 0,
+            "left": 58.694920990689106,
+            "top": 466.8390088420464,
+            "right": 109.71935668170045,
+            "bottom": 513.7917151377912,
+            "nearDepth": 28.400877094026825,
+            "farDepth": 30.6285529274874
+          },
+          {
+            "rollId": "b4351d54-dab9-411a-bdc3-c80d92547f5c",
+            "index": 1,
+            "left": 122.95189193449124,
+            "top": 375.73190480895926,
+            "right": 166.21814964980337,
+            "bottom": 419.71039276184484,
+            "nearDepth": 29.698202830224673,
+            "farDepth": 31.803717767025372
+          },
+          {
+            "rollId": "b4351d54-dab9-411a-bdc3-c80d92547f5c",
+            "index": 2,
+            "left": 149.61688142396696,
+            "top": 405.21951395338175,
+            "right": 196.97513367162273,
+            "bottom": 451.1764204864673,
+            "nearDepth": 29.2175712306035,
+            "farDepth": 31.453664707963018
+          },
+          {
+            "rollId": "b4351d54-dab9-411a-bdc3-c80d92547f5c",
+            "index": 3,
+            "left": 267.9003596498765,
+            "top": 206.14112404921602,
+            "right": 311.3435702692616,
+            "bottom": 249.0283345891327,
+            "nearDepth": 32.214262675020755,
+            "farDepth": 34.46670460743809
+          }
+        ]
+      },
+      "detail": null,
+      "layoutBefore": {
+        "layoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "visualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "contentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        },
+        "cssLayoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "cssVisualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "cssContentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        }
+      },
+      "surfaceCapture": {
+        "width": 390,
+        "height": 844
+      },
+      "viewCapture": {
+        "width": 390,
+        "height": 844
+      },
+      "layoutAfter": {
+        "layoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "visualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "contentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        },
+        "cssLayoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "cssVisualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "cssContentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        }
+      }
+    },
+    {
+      "name": "next-roll",
+      "canvas": {
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow": "clip",
+        "transform": "none",
+        "inert": false,
+        "hidden": false,
+        "rect": {
+          "x": 0,
+          "y": 148,
+          "width": 390,
+          "height": 471,
+          "top": 148,
+          "right": 390,
+          "bottom": 619,
+          "left": 0
+        },
+        "width": 390,
+        "height": 471,
+        "drawingBufferWidth": 390,
+        "drawingBufferHeight": 471,
+        "contextLost": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+      },
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "dpr": 1,
+        "scrollX": 0,
+        "scrollY": 0,
+        "clientWidth": 390,
+        "clientHeight": 844,
+        "visual": {
+          "width": 390,
+          "height": 844,
+          "offsetLeft": 0,
+          "offsetTop": 0,
+          "scale": 1
+        }
+      },
+      "body": {
+        "classes": "mini seated has-table-result",
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow": "hidden",
+        "transform": "none",
+        "inert": false,
+        "hidden": false,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0
+        }
+      },
+      "elements": [
+        {
+          "selector": "#workspace-nav",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 792,
+            "width": 390,
+            "height": 52,
+            "top": 792,
+            "right": 390,
+            "bottom": 844,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "NAV#workspace-nav",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-roll-tray",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 619,
+            "width": 390,
+            "height": 173,
+            "top": 619,
+            "right": 390,
+            "bottom": 792,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#",
+          "hitInside": true
+        },
+        {
+          "selector": "#scene-container",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 148,
+            "width": 390,
+            "height": 471,
+            "top": 148,
+            "right": 390,
+            "bottom": 619,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "CANVAS#",
+          "hitInside": true
+        },
+        {
+          "selector": "#left-panel",
+          "display": "contents",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "DIV#rail",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-build-roll",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 300.203125,
+            "y": 620,
+            "width": 79.796875,
+            "height": 40,
+            "top": 620,
+            "right": 380,
+            "bottom": 660,
+            "left": 300.203125
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-build-roll",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-more",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 291.5,
+            "y": 797,
+            "width": 90.5,
+            "height": 43,
+            "top": 797,
+            "right": 382,
+            "bottom": 840,
+            "left": 291.5
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-more",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(1)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 660,
+            "width": 370,
+            "height": 44,
+            "top": 660,
+            "right": 380,
+            "bottom": 704,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(2)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 704,
+            "width": 370,
+            "height": 44,
+            "top": 704,
+            "right": 380,
+            "bottom": 748,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        }
+      ],
+      "roll": {
+        "id": "4e440a87-d26c-4227-a5d5-ef81280cc20c",
+        "done": true,
+        "values": [
+          16,
+          5,
+          10,
+          2
+        ],
+        "shrouded": 0
+      },
+      "preparation": {
+        "enabled": false,
+        "kicks": 0,
+        "last": null
+      },
+      "frame": {
+        "view": {
+          "left": 0,
+          "top": 148,
+          "width": 390,
+          "height": 471
+        },
+        "busy": false,
+        "dice": [
+          {
+            "rollId": "4e440a87-d26c-4227-a5d5-ef81280cc20c",
+            "index": 0,
+            "left": 123.46917044307841,
+            "top": 392.4142035515407,
+            "right": 177.2628457176095,
+            "bottom": 440.539952287436,
+            "nearDepth": 25.838615670486032,
+            "farDepth": 28.035833385756668
+          },
+          {
+            "rollId": "4e440a87-d26c-4227-a5d5-ef81280cc20c",
+            "index": 1,
+            "left": 43.15665536621548,
+            "top": 335.5244185490096,
+            "right": 94.01079778743535,
+            "bottom": 384.96042025905155,
+            "nearDepth": 26.44544115820873,
+            "farDepth": 28.65882263800309
+          },
+          {
+            "rollId": "4e440a87-d26c-4227-a5d5-ef81280cc20c",
+            "index": 2,
+            "left": 250.66911884247284,
+            "top": 359.266065959088,
+            "right": 300.731377884443,
+            "bottom": 413.33719656121735,
+            "nearDepth": 26.177766845750533,
+            "farDepth": 28.411640004797523
+          },
+          {
+            "rollId": "4e440a87-d26c-4227-a5d5-ef81280cc20c",
+            "index": 3,
+            "left": 289.57149826529985,
+            "top": 390.82515746024046,
+            "right": 342.0270102709032,
+            "bottom": 438.6552475884581,
+            "nearDepth": 25.869851702081665,
+            "farDepth": 28.04945192713207
+          }
+        ]
+      },
+      "detail": null,
+      "layoutBefore": {
+        "layoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "visualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "contentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        },
+        "cssLayoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "cssVisualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "cssContentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        }
+      },
+      "surfaceCapture": {
+        "width": 390,
+        "height": 844
+      },
+      "viewCapture": {
+        "width": 390,
+        "height": 844
+      },
+      "layoutAfter": {
+        "layoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "visualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "contentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        },
+        "cssLayoutViewport": {
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "cssVisualViewport": {
+          "offsetX": 0,
+          "offsetY": 0,
+          "pageX": 0,
+          "pageY": 0,
+          "clientWidth": 390,
+          "clientHeight": 844,
+          "scale": 1,
+          "zoom": 1
+        },
+        "cssContentSize": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        }
+      }
+    }
+  ]
+}

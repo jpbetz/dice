@@ -137,15 +137,47 @@ The [first moving roll](phone-first-roll.png),
 Dice remain inside the visible surface; held dice have no numerals; the
 revealed glass dice retain their numbers and emission, with the complete
 27 = 7 + 10 + 7 + 3 result visible. The actual-input captures show readable
-result cards and roll controls. The debug-driven revealed/repeat captures
-do not show the bottom controls, so they prove the dice/read moment rather
-than a complete phone interaction or layout. This is phone emulation, not
-physical-device observation.
+result cards and roll controls. An initial multi-image preview appeared to omit the bottom controls. The
+[follow-up classification](natural-phone/classification.json) corrects that
+inference: individual image inspection shows the controls, and the original
+three quick-tray/navigation regions are byte-identical. The original PNGs
+were not changed. This is phone emulation, not physical-device observation.
 
 The separate [look diagnostic](look.json) confirms the second post roll
 copies four dice, has no canvas-to-post transition and adds zero new programs.
 Its single unthrottled 0.3 ms kick is a lifecycle/counter observation, not a
 cold-trial performance estimate.
+
+## Natural phone continuation and capture classification
+
+One fresh natural-input continuation set mobile metrics **before navigation**
+and used real saved-roll, result, Reveal and subsequent-roll clicks with
+natural playback; no held clock or simulation stepping. The
+[ON report](natural-phone/on-report.json) records capture-time body classes,
+viewport, CSS display/visibility/opacity, DOM rectangles, inert state and hit
+tests. The [held](natural-phone/on-held.png),
+[revealed](natural-phone/on-revealed.png) and
+[next-roll](natural-phone/on-next-roll.png) captures preserve the actual
+44 = 7 + 5 + 13 + 19 reveal and later 35 = 1 + 14 + 13 + 7 result.
+
+The same apparent preview omission prompted exactly one fresh **OFF** flow,
+adding both ordinary surface and `fromSurface:false` screenshots plus layout
+metrics, canvas bounds and drawing-buffer/context state. Its
+[report](natural-phone/off-report.json) confirms zero kicks throughout,
+390 × 844 screenshots on both capture paths, a 390 × 471 canvas/drawing buffer
+at the held state, an intact context, and actual SwiftShader. Navigation is
+fixed at y=792–844 and the saved tray at y=619–792, visible and reachable at
+all four recorded moments. Both commands exit zero with clean browser errors.
+
+Direct decoding of the **original PNG bytes** resolves the discrepancy: all
+12 inspected navigation regions are byte-identical, including text pixels.
+Corresponding natural ON/OFF saved-tray regions also match exactly across both
+capture paths. Single-image inspection shows complete controls. This does
+not establish an application or screenshot-capture failure; the earlier
+inference came from the tool's multi-image presentation. The
+[decoder and region hashes](natural-phone/classification.json) retain the
+method, original file hashes, initial interpretation and subsequent proof.
+No runtime change or repeated performance/full-test run was warranted.
 
 ## Current hardware limitation
 

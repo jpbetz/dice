@@ -51,6 +51,10 @@ Canned steps:
   are browser comparisons, not physical-device performance.
 - `dice-art-bake.mjs` — generate the built-in WebP portraits and recipe
   manifest from the actual meshes; see `models/dice-art/README.md`.
+- `roll-program-phone.mjs [--compile=off] [--capture-paths] [--label=name]` —
+  phone metrics before navigation, real held/Reveal/next-roll input and natural
+  playback, with capture-time layout/hit tests. Optional paired surface/view
+  screenshots retain both actual PNGs; this is not a timing comparison.
 - `roll-program-look.mjs` — one owned phone-emulated table: first and warm
   Sea-glass program submission counters, then held and authorized-reveal
   captures. It asserts hidden values remain absent and a warm post roll copies

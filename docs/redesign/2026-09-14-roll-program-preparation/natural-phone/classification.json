@@ -1,0 +1,429 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "method": "Existing tools/steps/rooted.mjs PNG decoder; SHA-256 over decoded row-major RGB bytes in exact unmodified source PNG regions.",
+  "rows": [
+    {
+      "path": "../phone-held.png",
+      "pngSha256": "799a4b47fe6e18daff7bf1676c095737b864798e2249d4e2b6136b496b98d86c",
+      "width": 390,
+      "height": 844,
+      "bpp": 3,
+      "regions": {
+        "nav": {
+          "x": 0,
+          "y": 792,
+          "w": 390,
+          "h": 52,
+          "sha256": "5568f6d49a9e1c1b2be65cef12e04a8ceb399ee53fb17f106eb7992453121de5",
+          "bytes": 60840
+        },
+        "quickTrayAndNav": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 184,
+          "sha256": "106860c79f9c3cd7bdf9adf19a9939bace4421bc5b20af08c6093bcd6bb0a8b0",
+          "bytes": 215280
+        },
+        "savedTrayAndNav": {
+          "x": 0,
+          "y": 619,
+          "w": 390,
+          "h": 225,
+          "sha256": "3631ff60cd3a8a6f582438ceee5d2e4f8d3e82185fc4576846130ee08ff324a1",
+          "bytes": 263250
+        }
+      }
+    },
+    {
+      "path": "../phone-revealed.png",
+      "pngSha256": "e2648e53c77f868c08460568da10e299399005d3816b0dbe7fa4bc052c73236d",
+      "width": 390,
+      "height": 844,
+      "bpp": 3,
+      "regions": {
+        "nav": {
+          "x": 0,
+          "y": 792,
+          "w": 390,
+          "h": 52,
+          "sha256": "5568f6d49a9e1c1b2be65cef12e04a8ceb399ee53fb17f106eb7992453121de5",
+          "bytes": 60840
+        },
+        "quickTrayAndNav": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 184,
+          "sha256": "106860c79f9c3cd7bdf9adf19a9939bace4421bc5b20af08c6093bcd6bb0a8b0",
+          "bytes": 215280
+        },
+        "savedTrayAndNav": {
+          "x": 0,
+          "y": 619,
+          "w": 390,
+          "h": 225,
+          "sha256": "71b09986709e3f046dcce7712ada52456e4e157f5b1c0b2e93506e0722987e65",
+          "bytes": 263250
+        }
+      }
+    },
+    {
+      "path": "../phone-repeat-post.png",
+      "pngSha256": "31354a87d3607a39e43974b3f129021fbd8e20a6bb5ae3d95f85e4f562cc4d2c",
+      "width": 390,
+      "height": 844,
+      "bpp": 3,
+      "regions": {
+        "nav": {
+          "x": 0,
+          "y": 792,
+          "w": 390,
+          "h": 52,
+          "sha256": "5568f6d49a9e1c1b2be65cef12e04a8ceb399ee53fb17f106eb7992453121de5",
+          "bytes": 60840
+        },
+        "quickTrayAndNav": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 184,
+          "sha256": "106860c79f9c3cd7bdf9adf19a9939bace4421bc5b20af08c6093bcd6bb0a8b0",
+          "bytes": 215280
+        },
+        "savedTrayAndNav": {
+          "x": 0,
+          "y": 619,
+          "w": 390,
+          "h": 225,
+          "sha256": "391757199df776a8c8390e50d31dbd6989feab74019c27464a997938cb63032a",
+          "bytes": 263250
+        }
+      }
+    },
+    {
+      "path": "on-held.png",
+      "pngSha256": "c0c257b319c8d3fff45c4024980269b12c61b530450d89d6ac8826473f7ea23a",
+      "width": 390,
+      "height": 844,
+      "bpp": 3,
+      "regions": {
+        "nav": {
+          "x": 0,
+          "y": 792,
+          "w": 390,
+          "h": 52,
+          "sha256": "5568f6d49a9e1c1b2be65cef12e04a8ceb399ee53fb17f106eb7992453121de5",
+          "bytes": 60840
+        },
+        "quickTrayAndNav": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 184,
+          "sha256": "8d4d5c12a8545c8e9e8fa29748b516446cdb61408747fd7af9e505a6dfc0a2b4",
+          "bytes": 215280
+        },
+        "savedTrayAndNav": {
+          "x": 0,
+          "y": 619,
+          "w": 390,
+          "h": 225,
+          "sha256": "a12a299f7660612714b351ac71a880bc10222f9f3395dd85a177c95b924993fe",
+          "bytes": 263250
+        }
+      }
+    },
+    {
+      "path": "on-revealed.png",
+      "pngSha256": "271c4dd7b0ef4740315996749025d4a85ba6c49fc4a31f6f2d16a24c8731fabd",
+      "width": 390,
+      "height": 844,
+      "bpp": 3,
+      "regions": {
+        "nav": {
+          "x": 0,
+          "y": 792,
+          "w": 390,
+          "h": 52,
+          "sha256": "5568f6d49a9e1c1b2be65cef12e04a8ceb399ee53fb17f106eb7992453121de5",
+          "bytes": 60840
+        },
+        "quickTrayAndNav": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 184,
+          "sha256": "f39db08795d72d5ff91f84da898f4e069df1fa7097e3dbb1e53b386d7273edde",
+          "bytes": 215280
+        },
+        "savedTrayAndNav": {
+          "x": 0,
+          "y": 619,
+          "w": 390,
+          "h": 225,
+          "sha256": "e605934317377da97d53ab56690082f217015a48ebac7a98676bcaae22434a95",
+          "bytes": 263250
+        }
+      }
+    },
+    {
+      "path": "on-next-roll.png",
+      "pngSha256": "10c330515d4b1e96720ab590d0f2c473dc101e4a907c685cecd188fbabde28a5",
+      "width": 390,
+      "height": 844,
+      "bpp": 3,
+      "regions": {
+        "nav": {
+          "x": 0,
+          "y": 792,
+          "w": 390,
+          "h": 52,
+          "sha256": "5568f6d49a9e1c1b2be65cef12e04a8ceb399ee53fb17f106eb7992453121de5",
+          "bytes": 60840
+        },
+        "quickTrayAndNav": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 184,
+          "sha256": "484dcc80de6f5fb2c9707d0e8270f1625e8844aa598b021d4502ab855ec5224a",
+          "bytes": 215280
+        },
+        "savedTrayAndNav": {
+          "x": 0,
+          "y": 619,
+          "w": 390,
+          "h": 225,
+          "sha256": "27d259c3f932184cefb84c69610c3225ea5a4ae8c4508c4dfb7d78885fb244b4",
+          "bytes": 263250
+        }
+      }
+    },
+    {
+      "path": "off-held.png",
+      "pngSha256": "9e7eae094e44f128f91c72b0d1b5bf7819c8890afcc4d204caa3cac3658d9bf9",
+      "width": 390,
+      "height": 844,
+      "bpp": 3,
+      "regions": {
+        "nav": {
+          "x": 0,
+          "y": 792,
+          "w": 390,
+          "h": 52,
+          "sha256": "5568f6d49a9e1c1b2be65cef12e04a8ceb399ee53fb17f106eb7992453121de5",
+          "bytes": 60840
+        },
+        "quickTrayAndNav": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 184,
+          "sha256": "8d4d5c12a8545c8e9e8fa29748b516446cdb61408747fd7af9e505a6dfc0a2b4",
+          "bytes": 215280
+        },
+        "savedTrayAndNav": {
+          "x": 0,
+          "y": 619,
+          "w": 390,
+          "h": 225,
+          "sha256": "a12a299f7660612714b351ac71a880bc10222f9f3395dd85a177c95b924993fe",
+          "bytes": 263250
+        }
+      }
+    },
+    {
+      "path": "off-held-from-view.png",
+      "pngSha256": "9e7eae094e44f128f91c72b0d1b5bf7819c8890afcc4d204caa3cac3658d9bf9",
+      "width": 390,
+      "height": 844,
+      "bpp": 3,
+      "regions": {
+        "nav": {
+          "x": 0,
+          "y": 792,
+          "w": 390,
+          "h": 52,
+          "sha256": "5568f6d49a9e1c1b2be65cef12e04a8ceb399ee53fb17f106eb7992453121de5",
+          "bytes": 60840
+        },
+        "quickTrayAndNav": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 184,
+          "sha256": "8d4d5c12a8545c8e9e8fa29748b516446cdb61408747fd7af9e505a6dfc0a2b4",
+          "bytes": 215280
+        },
+        "savedTrayAndNav": {
+          "x": 0,
+          "y": 619,
+          "w": 390,
+          "h": 225,
+          "sha256": "a12a299f7660612714b351ac71a880bc10222f9f3395dd85a177c95b924993fe",
+          "bytes": 263250
+        }
+      }
+    },
+    {
+      "path": "off-revealed.png",
+      "pngSha256": "656af559c15a501c2f769a94de6612e523b92c32fddd493ae206ea3d13c84326",
+      "width": 390,
+      "height": 844,
+      "bpp": 3,
+      "regions": {
+        "nav": {
+          "x": 0,
+          "y": 792,
+          "w": 390,
+          "h": 52,
+          "sha256": "5568f6d49a9e1c1b2be65cef12e04a8ceb399ee53fb17f106eb7992453121de5",
+          "bytes": 60840
+        },
+        "quickTrayAndNav": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 184,
+          "sha256": "f39db08795d72d5ff91f84da898f4e069df1fa7097e3dbb1e53b386d7273edde",
+          "bytes": 215280
+        },
+        "savedTrayAndNav": {
+          "x": 0,
+          "y": 619,
+          "w": 390,
+          "h": 225,
+          "sha256": "e605934317377da97d53ab56690082f217015a48ebac7a98676bcaae22434a95",
+          "bytes": 263250
+        }
+      }
+    },
+    {
+      "path": "off-revealed-from-view.png",
+      "pngSha256": "4fa48d2591d4f46ac97a930d5ee837f04d058acd222b049565c369a95c33741a",
+      "width": 390,
+      "height": 844,
+      "bpp": 3,
+      "regions": {
+        "nav": {
+          "x": 0,
+          "y": 792,
+          "w": 390,
+          "h": 52,
+          "sha256": "5568f6d49a9e1c1b2be65cef12e04a8ceb399ee53fb17f106eb7992453121de5",
+          "bytes": 60840
+        },
+        "quickTrayAndNav": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 184,
+          "sha256": "f39db08795d72d5ff91f84da898f4e069df1fa7097e3dbb1e53b386d7273edde",
+          "bytes": 215280
+        },
+        "savedTrayAndNav": {
+          "x": 0,
+          "y": 619,
+          "w": 390,
+          "h": 225,
+          "sha256": "e605934317377da97d53ab56690082f217015a48ebac7a98676bcaae22434a95",
+          "bytes": 263250
+        }
+      }
+    },
+    {
+      "path": "off-next-roll.png",
+      "pngSha256": "9d05b81abf1c6aa94516d0a8adaf0e5b09c11cb0670895df5220723cb2f5cc95",
+      "width": 390,
+      "height": 844,
+      "bpp": 3,
+      "regions": {
+        "nav": {
+          "x": 0,
+          "y": 792,
+          "w": 390,
+          "h": 52,
+          "sha256": "5568f6d49a9e1c1b2be65cef12e04a8ceb399ee53fb17f106eb7992453121de5",
+          "bytes": 60840
+        },
+        "quickTrayAndNav": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 184,
+          "sha256": "484dcc80de6f5fb2c9707d0e8270f1625e8844aa598b021d4502ab855ec5224a",
+          "bytes": 215280
+        },
+        "savedTrayAndNav": {
+          "x": 0,
+          "y": 619,
+          "w": 390,
+          "h": 225,
+          "sha256": "27d259c3f932184cefb84c69610c3225ea5a4ae8c4508c4dfb7d78885fb244b4",
+          "bytes": 263250
+        }
+      }
+    },
+    {
+      "path": "off-next-roll-from-view.png",
+      "pngSha256": "85691b1627fabc21ce6af5c35eede9e14d321c5e15403d80a2d41773ba152de2",
+      "width": 390,
+      "height": 844,
+      "bpp": 3,
+      "regions": {
+        "nav": {
+          "x": 0,
+          "y": 792,
+          "w": 390,
+          "h": 52,
+          "sha256": "5568f6d49a9e1c1b2be65cef12e04a8ceb399ee53fb17f106eb7992453121de5",
+          "bytes": 60840
+        },
+        "quickTrayAndNav": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 184,
+          "sha256": "484dcc80de6f5fb2c9707d0e8270f1625e8844aa598b021d4502ab855ec5224a",
+          "bytes": 215280
+        },
+        "savedTrayAndNav": {
+          "x": 0,
+          "y": 619,
+          "w": 390,
+          "h": 225,
+          "sha256": "27d259c3f932184cefb84c69610c3225ea5a4ae8c4508c4dfb7d78885fb244b4",
+          "bytes": 263250
+        }
+      }
+    }
+  ],
+  "initialObservation": "Multi-image tool previews appeared to omit bottom controls; original artifacts were preserved and the inference was investigated.",
+  "classification": "No absent navigation/tray pixels in the saved PNGs. Single-image inspection shows full controls; decoded nav regions match across all12 retained comparisons, and actual controls worked.",
+  "comparisons": {
+    "all12NavRegionsIdentical": true,
+    "originalThreeQuickTrayAndNavIdentical": true,
+    "naturalOnOffAndCapturePathsSameSavedTrayByMoment": true
+  },
+  "runtimeChanged": false,
+  "runtimeCommit": "2de6764a068d284b7995c0c60f3d34e86656171d",
+  "runs": [
+    {
+      "mode": "on",
+      "command": "CHROME_BIN=/usr/bin/google-chrome DICE_E2E_CORES=16 node tools/drive.mjs tools/steps/roll-program-phone.mjs",
+      "terminalSession": 27037,
+      "terminalExitCode": 0,
+      "logSha256": "a43b733745d5d5ca15e5e3ba5dd01ef8c01f28ee385ff428771d0dd7cfc49a8e",
+      "log": "{\"moments\":[{\"name\":\"ready\",\"viewport\":{\"width\":390,\"height\":844,\"dpr\":1,\"scrollX\":0,\"scrollY\":0,\"clientWidth\":390,\"clientHeight\":844,\"visual\":{\"width\":390,\"height\":844,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1}},\"bodyClasses\":\"mini seated\",\"nav\":{\"selector\":\"#workspace-nav\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":792,\"width\":390,\"height\":52,\"top\":792,\"right\":390,\"bottom\":844,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"NAV#workspace-nav\",\"hitInside\":true},\"tray\":{\"selector\":\"#phone-roll-tray\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":619,\"width\":390,\"height\":173,\"top\":619,\"right\":390,\"bottom\":792,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"BUTTON#\",\"hitInside\":true},\"roll\":{\"shrouded\":0}},{\"name\":\"held\",\"viewport\":{\"width\":390,\"height\":844,\"dpr\":1,\"scrollX\":0,\"scrollY\":0,\"clientWidth\":390,\"clientHeight\":844,\"visual\":{\"width\":390,\"height\":844,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1}},\"bodyClasses\":\"mini seated has-table-result\",\"nav\":{\"selector\":\"#workspace-nav\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":792,\"width\":390,\"height\":52,\"top\":792,\"right\":390,\"bottom\":844,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"NAV#workspace-nav\",\"hitInside\":true},\"tray\":{\"selector\":\"#phone-roll-tray\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":619,\"width\":390,\"height\":173,\"top\":619,\"right\":390,\"bottom\":792,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"BUTTON#\",\"hitInside\":true},\"roll\":{\"id\":\"698531c1-8d13-489a-8c8a-18ed048cd624\",\"done\":true,\"values\":null,\"shrouded\":4}},{\"name\":\"revealed\",\"viewport\":{\"width\":390,\"height\":844,\"dpr\":1,\"scrollX\":0,\"scrollY\":0,\"clientWidth\":390,\"clientHeight\":844,\"visual\":{\"width\":390,\"height\":844,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1}},\"bodyClasses\":\"mini seated has-table-result\",\"nav\":{\"selector\":\"#workspace-nav\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":792,\"width\":390,\"height\":52,\"top\":792,\"right\":390,\"bottom\":844,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"NAV#workspace-nav\",\"hitInside\":true},\"tray\":{\"selector\":\"#phone-roll-tray\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":619,\"width\":390,\"height\":173,\"top\":619,\"right\":390,\"bottom\":792,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"BUTTON#\",\"hitInside\":true},\"roll\":{\"id\":\"698531c1-8d13-489a-8c8a-18ed048cd624\",\"done\":true,\"values\":[7,5,13,19],\"shrouded\":0}},{\"name\":\"next-roll\",\"viewport\":{\"width\":390,\"height\":844,\"dpr\":1,\"scrollX\":0,\"scrollY\":0,\"clientWidth\":390,\"clientHeight\":844,\"visual\":{\"width\":390,\"height\":844,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1}},\"bodyClasses\":\"mini seated has-table-result\",\"nav\":{\"selector\":\"#workspace-nav\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":792,\"width\":390,\"height\":52,\"top\":792,\"right\":390,\"bottom\":844,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"NAV#workspace-nav\",\"hitInside\":true},\"tray\":{\"selector\":\"#phone-roll-tray\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":619,\"width\":390,\"height\":173,\"top\":619,\"right\":390,\"bottom\":792,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"BUTTON#\",\"hitInside\":true},\"roll\":{\"id\":\"cec4972f-69c9-454a-8623-2525917f1348\",\"done\":true,\"values\":[1,14,13,7],\"shrouded\":0}}],\"pageErrors\":[],\"consoleErrors\":[]}\n"
+    },
+    {
+      "mode": "off",
+      "command": "CHROME_BIN=/usr/bin/google-chrome DICE_E2E_CORES=16 node tools/drive.mjs tools/steps/roll-program-phone.mjs --compile=off --capture-paths --label=off-capture-diagnostic",
+      "terminalSession": 99947,
+      "terminalExitCode": 0,
+      "logSha256": "23aa22e9d237da159e72ef5f4952c75a1eae7d3cc16a46d840d7bc545b86f8ad",
+      "log": "{\"moments\":[{\"name\":\"ready\",\"viewport\":{\"width\":390,\"height\":844,\"dpr\":1,\"scrollX\":0,\"scrollY\":0,\"clientWidth\":390,\"clientHeight\":844,\"visual\":{\"width\":390,\"height\":844,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1}},\"bodyClasses\":\"mini seated\",\"nav\":{\"selector\":\"#workspace-nav\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":792,\"width\":390,\"height\":52,\"top\":792,\"right\":390,\"bottom\":844,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"NAV#workspace-nav\",\"hitInside\":true},\"tray\":{\"selector\":\"#phone-roll-tray\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":619,\"width\":390,\"height\":173,\"top\":619,\"right\":390,\"bottom\":792,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"BUTTON#\",\"hitInside\":true},\"roll\":{\"shrouded\":0}},{\"name\":\"held\",\"viewport\":{\"width\":390,\"height\":844,\"dpr\":1,\"scrollX\":0,\"scrollY\":0,\"clientWidth\":390,\"clientHeight\":844,\"visual\":{\"width\":390,\"height\":844,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1}},\"bodyClasses\":\"mini seated has-table-result\",\"nav\":{\"selector\":\"#workspace-nav\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":792,\"width\":390,\"height\":52,\"top\":792,\"right\":390,\"bottom\":844,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"NAV#workspace-nav\",\"hitInside\":true},\"tray\":{\"selector\":\"#phone-roll-tray\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":619,\"width\":390,\"height\":173,\"top\":619,\"right\":390,\"bottom\":792,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"BUTTON#\",\"hitInside\":true},\"roll\":{\"id\":\"b4351d54-dab9-411a-bdc3-c80d92547f5c\",\"done\":true,\"values\":null,\"shrouded\":4}},{\"name\":\"revealed\",\"viewport\":{\"width\":390,\"height\":844,\"dpr\":1,\"scrollX\":0,\"scrollY\":0,\"clientWidth\":390,\"clientHeight\":844,\"visual\":{\"width\":390,\"height\":844,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1}},\"bodyClasses\":\"mini seated has-table-result\",\"nav\":{\"selector\":\"#workspace-nav\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":792,\"width\":390,\"height\":52,\"top\":792,\"right\":390,\"bottom\":844,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"NAV#workspace-nav\",\"hitInside\":true},\"tray\":{\"selector\":\"#phone-roll-tray\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":619,\"width\":390,\"height\":173,\"top\":619,\"right\":390,\"bottom\":792,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"BUTTON#\",\"hitInside\":true},\"roll\":{\"id\":\"b4351d54-dab9-411a-bdc3-c80d92547f5c\",\"done\":true,\"values\":[1,18,4,19],\"shrouded\":0}},{\"name\":\"next-roll\",\"viewport\":{\"width\":390,\"height\":844,\"dpr\":1,\"scrollX\":0,\"scrollY\":0,\"clientWidth\":390,\"clientHeight\":844,\"visual\":{\"width\":390,\"height\":844,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1}},\"bodyClasses\":\"mini seated has-table-result\",\"nav\":{\"selector\":\"#workspace-nav\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":792,\"width\":390,\"height\":52,\"top\":792,\"right\":390,\"bottom\":844,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"NAV#workspace-nav\",\"hitInside\":true},\"tray\":{\"selector\":\"#phone-roll-tray\",\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"position\":\"fixed\",\"overflow\":\"visible\",\"transform\":\"none\",\"inert\":false,\"hidden\":false,\"rect\":{\"x\":0,\"y\":619,\"width\":390,\"height\":173,\"top\":619,\"right\":390,\"bottom\":792,\"left\":0},\"disabled\":false,\"inertAncestor\":false,\"hit\":\"BUTTON#\",\"hitInside\":true},\"roll\":{\"id\":\"4e440a87-d26c-4227-a5d5-ef81280cc20c\",\"done\":true,\"values\":[16,5,10,2],\"shrouded\":0}}],\"pageErrors\":[],\"consoleErrors\":[]}\n"
+    }
+  ]
+}

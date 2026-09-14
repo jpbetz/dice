@@ -1,0 +1,1220 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0",
+  "naturalPlayback": true,
+  "metricsBeforeNavigation": true,
+  "moments": [
+    {
+      "name": "ready",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "dpr": 1,
+        "scrollX": 0,
+        "scrollY": 0,
+        "clientWidth": 390,
+        "clientHeight": 844,
+        "visual": {
+          "width": 390,
+          "height": 844,
+          "offsetLeft": 0,
+          "offsetTop": 0,
+          "scale": 1
+        }
+      },
+      "body": {
+        "classes": "mini seated",
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow": "hidden",
+        "transform": "none",
+        "inert": false,
+        "hidden": false,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0
+        }
+      },
+      "elements": [
+        {
+          "selector": "#workspace-nav",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 792,
+            "width": 390,
+            "height": 52,
+            "top": 792,
+            "right": 390,
+            "bottom": 844,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "NAV#workspace-nav",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-roll-tray",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 619,
+            "width": 390,
+            "height": 173,
+            "top": 619,
+            "right": 390,
+            "bottom": 792,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#",
+          "hitInside": true
+        },
+        {
+          "selector": "#scene-container",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 56,
+            "width": 390,
+            "height": 563,
+            "top": 56,
+            "right": 390,
+            "bottom": 619,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "CANVAS#",
+          "hitInside": true
+        },
+        {
+          "selector": "#left-panel",
+          "display": "contents",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "DIV#rail",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-build-roll",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 300.203125,
+            "y": 620,
+            "width": 79.796875,
+            "height": 40,
+            "top": 620,
+            "right": 380,
+            "bottom": 660,
+            "left": 300.203125
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-build-roll",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-more",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 291.5,
+            "y": 797,
+            "width": 90.5,
+            "height": 43,
+            "top": 797,
+            "right": 382,
+            "bottom": 840,
+            "left": 291.5
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-more",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(1)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 660,
+            "width": 370,
+            "height": 44,
+            "top": 660,
+            "right": 380,
+            "bottom": 704,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(2)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 704,
+            "width": 370,
+            "height": 44,
+            "top": 704,
+            "right": 380,
+            "bottom": 748,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        }
+      ],
+      "roll": {
+        "shrouded": 0
+      },
+      "preparation": {
+        "enabled": true,
+        "kicks": 0,
+        "last": null
+      },
+      "frame": {
+        "view": {
+          "left": 0,
+          "top": 56,
+          "width": 390,
+          "height": 563
+        },
+        "busy": false,
+        "dice": []
+      },
+      "detail": null
+    },
+    {
+      "name": "held",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "dpr": 1,
+        "scrollX": 0,
+        "scrollY": 0,
+        "clientWidth": 390,
+        "clientHeight": 844,
+        "visual": {
+          "width": 390,
+          "height": 844,
+          "offsetLeft": 0,
+          "offsetTop": 0,
+          "scale": 1
+        }
+      },
+      "body": {
+        "classes": "mini seated has-table-result",
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow": "hidden",
+        "transform": "none",
+        "inert": false,
+        "hidden": false,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0
+        }
+      },
+      "elements": [
+        {
+          "selector": "#workspace-nav",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 792,
+            "width": 390,
+            "height": 52,
+            "top": 792,
+            "right": 390,
+            "bottom": 844,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "NAV#workspace-nav",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-roll-tray",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 619,
+            "width": 390,
+            "height": 173,
+            "top": 619,
+            "right": 390,
+            "bottom": 792,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#",
+          "hitInside": true
+        },
+        {
+          "selector": "#scene-container",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 148,
+            "width": 390,
+            "height": 471,
+            "top": 148,
+            "right": 390,
+            "bottom": 619,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "CANVAS#",
+          "hitInside": true
+        },
+        {
+          "selector": "#left-panel",
+          "display": "contents",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "DIV#rail",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-build-roll",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 300.203125,
+            "y": 620,
+            "width": 79.796875,
+            "height": 40,
+            "top": 620,
+            "right": 380,
+            "bottom": 660,
+            "left": 300.203125
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-build-roll",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-more",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 291.5,
+            "y": 797,
+            "width": 90.5,
+            "height": 43,
+            "top": 797,
+            "right": 382,
+            "bottom": 840,
+            "left": 291.5
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-more",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(1)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 660,
+            "width": 370,
+            "height": 44,
+            "top": 660,
+            "right": 380,
+            "bottom": 704,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(2)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 704,
+            "width": 370,
+            "height": 44,
+            "top": 704,
+            "right": 380,
+            "bottom": 748,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        }
+      ],
+      "roll": {
+        "id": "698531c1-8d13-489a-8c8a-18ed048cd624",
+        "done": true,
+        "values": null,
+        "shrouded": 4
+      },
+      "preparation": {
+        "enabled": true,
+        "kicks": 1,
+        "last": {
+          "at": 721.1000000238419,
+          "ms": 1.899999976158142,
+          "post": false,
+          "transition": false,
+          "objects": 4,
+          "failed": false,
+          "programsAdded": 2,
+          "targetRestored": true
+        }
+      },
+      "frame": {
+        "view": {
+          "left": 0,
+          "top": 148,
+          "width": 390,
+          "height": 471
+        },
+        "busy": false,
+        "dice": [
+          {
+            "rollId": "698531c1-8d13-489a-8c8a-18ed048cd624",
+            "index": 0,
+            "left": 32.45558609252182,
+            "top": 316.9549265690761,
+            "right": 76.83134811377683,
+            "bottom": 358.4707777075787,
+            "nearDepth": 33.45379922008984,
+            "farDepth": 35.67110771692744
+          },
+          {
+            "rollId": "698531c1-8d13-489a-8c8a-18ed048cd624",
+            "index": 1,
+            "left": 159.39826453416129,
+            "top": 372.9226302462031,
+            "right": 200.1055094376845,
+            "bottom": 417.12007595262554,
+            "nearDepth": 32.70299664715469,
+            "farDepth": 34.95637434580026
+          },
+          {
+            "rollId": "698531c1-8d13-489a-8c8a-18ed048cd624",
+            "index": 2,
+            "left": 280.420244091808,
+            "top": 374.80541848524376,
+            "right": 321.1792580036324,
+            "bottom": 416.08334820824655,
+            "nearDepth": 32.76769946643718,
+            "farDepth": 34.88759897803965
+          },
+          {
+            "rollId": "698531c1-8d13-489a-8c8a-18ed048cd624",
+            "index": 3,
+            "left": 316.0024828303869,
+            "top": 464.1874192193854,
+            "right": 359.10292983570207,
+            "bottom": 510.4715611133749,
+            "nearDepth": 31.492366570497083,
+            "farDepth": 33.78521689343292
+          }
+        ]
+      },
+      "detail": null
+    },
+    {
+      "name": "revealed",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "dpr": 1,
+        "scrollX": 0,
+        "scrollY": 0,
+        "clientWidth": 390,
+        "clientHeight": 844,
+        "visual": {
+          "width": 390,
+          "height": 844,
+          "offsetLeft": 0,
+          "offsetTop": 0,
+          "scale": 1
+        }
+      },
+      "body": {
+        "classes": "mini seated has-table-result",
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow": "hidden",
+        "transform": "none",
+        "inert": false,
+        "hidden": false,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0
+        }
+      },
+      "elements": [
+        {
+          "selector": "#workspace-nav",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 792,
+            "width": 390,
+            "height": 52,
+            "top": 792,
+            "right": 390,
+            "bottom": 844,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "NAV#workspace-nav",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-roll-tray",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 619,
+            "width": 390,
+            "height": 173,
+            "top": 619,
+            "right": 390,
+            "bottom": 792,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#",
+          "hitInside": true
+        },
+        {
+          "selector": "#scene-container",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 148,
+            "width": 390,
+            "height": 471,
+            "top": 148,
+            "right": 390,
+            "bottom": 619,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "CANVAS#",
+          "hitInside": true
+        },
+        {
+          "selector": "#left-panel",
+          "display": "contents",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "DIV#rail",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-build-roll",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 300.203125,
+            "y": 620,
+            "width": 79.796875,
+            "height": 40,
+            "top": 620,
+            "right": 380,
+            "bottom": 660,
+            "left": 300.203125
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-build-roll",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-more",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 291.5,
+            "y": 797,
+            "width": 90.5,
+            "height": 43,
+            "top": 797,
+            "right": 382,
+            "bottom": 840,
+            "left": 291.5
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-more",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(1)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 660,
+            "width": 370,
+            "height": 44,
+            "top": 660,
+            "right": 380,
+            "bottom": 704,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(2)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 704,
+            "width": 370,
+            "height": 44,
+            "top": 704,
+            "right": 380,
+            "bottom": 748,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        }
+      ],
+      "roll": {
+        "id": "698531c1-8d13-489a-8c8a-18ed048cd624",
+        "done": true,
+        "values": [
+          7,
+          5,
+          13,
+          19
+        ],
+        "shrouded": 0
+      },
+      "preparation": {
+        "enabled": true,
+        "kicks": 1,
+        "last": {
+          "at": 721.1000000238419,
+          "ms": 1.899999976158142,
+          "post": false,
+          "transition": false,
+          "objects": 4,
+          "failed": false,
+          "programsAdded": 2,
+          "targetRestored": true
+        }
+      },
+      "frame": {
+        "view": {
+          "left": 0,
+          "top": 148,
+          "width": 390,
+          "height": 471
+        },
+        "busy": false,
+        "dice": [
+          {
+            "rollId": "698531c1-8d13-489a-8c8a-18ed048cd624",
+            "index": 0,
+            "left": 34.556772001799985,
+            "top": 319.72804001003885,
+            "right": 75.0464649053911,
+            "bottom": 356.1904182438213,
+            "nearDepth": 33.485124869767276,
+            "farDepth": 35.64132503839321
+          },
+          {
+            "rollId": "698531c1-8d13-489a-8c8a-18ed048cd624",
+            "index": 1,
+            "left": 159.2010886740409,
+            "top": 375.10656912594413,
+            "right": 199.8782066309415,
+            "bottom": 415.4140942921078,
+            "nearDepth": 32.77389552604542,
+            "farDepth": 34.89410668862618
+          },
+          {
+            "rollId": "698531c1-8d13-489a-8c8a-18ed048cd624",
+            "index": 2,
+            "left": 281.7424343664539,
+            "top": 373.63863605221627,
+            "right": 320.13913058151496,
+            "bottom": 417.05161119632396,
+            "nearDepth": 32.713214181852585,
+            "farDepth": 34.94449494155481
+          },
+          {
+            "rollId": "698531c1-8d13-489a-8c8a-18ed048cd624",
+            "index": 3,
+            "left": 316.368533034309,
+            "top": 465.6436546970708,
+            "right": 358.6973403242154,
+            "bottom": 508.5990907328102,
+            "nearDepth": 31.53899961789036,
+            "farDepth": 33.74336231501837
+          }
+        ]
+      },
+      "detail": null
+    },
+    {
+      "name": "next-roll",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "dpr": 1,
+        "scrollX": 0,
+        "scrollY": 0,
+        "clientWidth": 390,
+        "clientHeight": 844,
+        "visual": {
+          "width": 390,
+          "height": 844,
+          "offsetLeft": 0,
+          "offsetTop": 0,
+          "scale": 1
+        }
+      },
+      "body": {
+        "classes": "mini seated has-table-result",
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1",
+        "position": "static",
+        "overflow": "hidden",
+        "transform": "none",
+        "inert": false,
+        "hidden": false,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0
+        }
+      },
+      "elements": [
+        {
+          "selector": "#workspace-nav",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 792,
+            "width": 390,
+            "height": 52,
+            "top": 792,
+            "right": 390,
+            "bottom": 844,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "NAV#workspace-nav",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-roll-tray",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 619,
+            "width": 390,
+            "height": 173,
+            "top": 619,
+            "right": 390,
+            "bottom": 792,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#",
+          "hitInside": true
+        },
+        {
+          "selector": "#scene-container",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 148,
+            "width": 390,
+            "height": 471,
+            "top": 148,
+            "right": 390,
+            "bottom": 619,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "CANVAS#",
+          "hitInside": true
+        },
+        {
+          "selector": "#left-panel",
+          "display": "contents",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "fixed",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "DIV#rail",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-build-roll",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 300.203125,
+            "y": 620,
+            "width": 79.796875,
+            "height": 40,
+            "top": 620,
+            "right": 380,
+            "bottom": 660,
+            "left": 300.203125
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-build-roll",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-more",
+          "display": "block",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 291.5,
+            "y": 797,
+            "width": 90.5,
+            "height": 43,
+            "top": 797,
+            "right": 382,
+            "bottom": 840,
+            "left": 291.5
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "BUTTON#phone-more",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(1)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 660,
+            "width": 370,
+            "height": 44,
+            "top": 660,
+            "right": 380,
+            "bottom": 704,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        },
+        {
+          "selector": "#phone-saved-rolls .phone-pool:nth-child(2)",
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "position": "static",
+          "overflow": "visible",
+          "transform": "none",
+          "inert": false,
+          "hidden": false,
+          "rect": {
+            "x": 10,
+            "y": 704,
+            "width": 370,
+            "height": 44,
+            "top": 704,
+            "right": 380,
+            "bottom": 748,
+            "left": 10
+          },
+          "disabled": false,
+          "inertAncestor": false,
+          "hit": "SPAN#",
+          "hitInside": true
+        }
+      ],
+      "roll": {
+        "id": "cec4972f-69c9-454a-8623-2525917f1348",
+        "done": true,
+        "values": [
+          1,
+          14,
+          13,
+          7
+        ],
+        "shrouded": 0
+      },
+      "preparation": {
+        "enabled": true,
+        "kicks": 2,
+        "last": {
+          "at": 4187.600000023842,
+          "ms": 0.6000000238418579,
+          "post": true,
+          "transition": false,
+          "objects": 4,
+          "failed": false,
+          "programsAdded": 0,
+          "targetRestored": true
+        }
+      },
+      "frame": {
+        "view": {
+          "left": 0,
+          "top": 148,
+          "width": 390,
+          "height": 471
+        },
+        "busy": false,
+        "dice": [
+          {
+            "rollId": "cec4972f-69c9-454a-8623-2525917f1348",
+            "index": 0,
+            "left": 131.42809593298088,
+            "top": 458.05887215252176,
+            "right": 187.74490830028276,
+            "bottom": 509.37010513388856,
+            "nearDepth": 25.14600221820269,
+            "farDepth": 27.34371443659421
+          },
+          {
+            "rollId": "cec4972f-69c9-454a-8623-2525917f1348",
+            "index": 1,
+            "left": 70.78731639747365,
+            "top": 340.7861634364795,
+            "right": 124.7903454920429,
+            "bottom": 392.0750849627634,
+            "nearDepth": 26.388508824235593,
+            "farDepth": 28.60158054630879
+          },
+          {
+            "rollId": "cec4972f-69c9-454a-8623-2525917f1348",
+            "index": 2,
+            "left": 113.88098689906978,
+            "top": 362.2071146573636,
+            "right": 164.51092581264808,
+            "bottom": 416.2090620560563,
+            "nearDepth": 26.108127241873255,
+            "farDepth": 28.340227290578998
+          },
+          {
+            "rollId": "cec4972f-69c9-454a-8623-2525917f1348",
+            "index": 3,
+            "left": 301.5665149823351,
+            "top": 425.3331775357737,
+            "right": 354.6038276167093,
+            "bottom": 473.8586396069505,
+            "nearDepth": 25.500391662610998,
+            "farDepth": 27.68008307081463
+          }
+        ]
+      },
+      "detail": null
+    }
+  ]
+}
