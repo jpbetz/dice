@@ -1,0 +1,26 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "completedAt": "2026-09-14T02:16:34.363492+00:00",
+  "predeleteChecks": {
+    "executionCount": 8,
+    "activeExecutionCount": 0,
+    "fixtureProjectRoleBindings": 0,
+    "fixtureIdentityPolicyBindings": 0,
+    "fixtureUserManagedKeys": 0,
+    "fixtureCloudRunServiceReferences": 0,
+    "fixtureCloudRunJobReferences": 0
+  },
+  "ownedJobDeleted": true,
+  "jobDescribeNotFound": true,
+  "jobAbsentFromSuccessfulList": true,
+  "zeroRoleFixtureIdentityDeleted": true,
+  "identityDescribeStatus": "PERMISSION_DENIED; may not exist, not an independent absence proof",
+  "identityAbsentFromSuccessfulList": true,
+  "deleteCommandsAttempted": 2,
+  "deleteCommandsSucceeded": 2,
+  "automaticMutationRetries": 0,
+  "privateExecutionReportsPreserved": true,
+  "productionAndStagingServicesDatabasesRuntimesNotTargeted": true,
+  "publicTrafficNotChangedByCleanup": true,
+  "artifactNote": "Sanitized cleanup after the permission proof was retained. Only the owned temporary job and zero-role fixture identity were deleted. The identity describe error is preserved as ambiguous; its successful project identity inventory independently confirms absence."
+}

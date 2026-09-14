@@ -57,8 +57,24 @@ contain check labels and classifications, without credentials or fixture paths.
 
 The retained job has one task, parallelism one, no retries, a 60-second task
 timeout, one CPU and 512 MiB. Job startup elapsed time is not an application
-performance measurement. The job and zero-role fixture identity remain retained
-at this proof's completion for the release owner's separately recorded cleanup.
+performance measurement. The job and zero-role fixture identity were retained
+when this proof completed. Their subsequent cleanup is recorded below.
+
+## Temporary resource cleanup
+
+[cleanup.json](cleanup.json) records the later cleanup at `02:16:34Z`. All
+**eight executions were terminal** before deletion. The temporary denial
+identity had no project role bindings, explicit identity-policy users,
+user-managed keys, or references from the listed Cloud Run services and jobs.
+The owned job and that identity were each deleted once, with both commands
+exiting 0 and no mutation retries.
+
+Successful independent inventories confirm both resources absent. The job's
+describe also returns not found. The deleted identity's describe returns
+PERMISSION_DENIED with an ambiguous absence message; that response is retained
+as a limitation, and its successful inventory supplies the absence proof.
+Private execution/report records remain preserved. Production and staging
+services, databases and real runtime identities were not targeted.
 
 ## Scope of this record
 
