@@ -1,0 +1,41 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0",
+  "first": {
+    "at": 464.5,
+    "ms": 4.200000047683716,
+    "post": true,
+    "transition": true,
+    "objects": 6,
+    "failed": false,
+    "programsAdded": 8,
+    "targetRestored": true
+  },
+  "repeat": {
+    "at": 1137.3000000715256,
+    "ms": 0.2999999523162842,
+    "post": true,
+    "transition": false,
+    "objects": 4,
+    "failed": false,
+    "programsAdded": 0,
+    "targetRestored": true
+  },
+  "held": {
+    "at": 1402.3999999761581,
+    "ms": 1.8000000715255737,
+    "post": false,
+    "transition": false,
+    "objects": 4,
+    "failed": false,
+    "programsAdded": 2,
+    "targetRestored": true
+  },
+  "values": [
+    7,
+    10,
+    7,
+    3
+  ],
+  "errors": [],
+  "consoleErrors": []
+}

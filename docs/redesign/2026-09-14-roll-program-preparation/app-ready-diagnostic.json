@@ -1,0 +1,26 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "kind": "one owned ephemeral hardware-requested capability diagnostic",
+  "sourceSha": "096d9e8dccc16c73d54a2a0e59a72b4d2b412926",
+  "applicationBytesMatchReleased90b8bb9": true,
+  "command": "DICE_E2E_GPU=1 DICE_E2E_CORES=8 node tools/drive.mjs /tmp/dice-parallel-backend-diagnostic.mjs",
+  "stepSha256": "50b200a688261e61b248640e1b346fb92677e8c9c0b9446751b0988405a3b0fd",
+  "exitCode": 1,
+  "state": "app-ready timeout before capability read",
+  "explicitExecutions": 1,
+  "harnessAutomaticBootRetries": 1,
+  "observedGraphicsBackend": null,
+  "parallelShaderCompile": null,
+  "browserErrorsCaptured": false,
+  "failure": "timeout waiting for: app ready (localhost, Backend diagnostic) (last value: false)",
+  "hostInventory": {
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "driver": "610.57.04",
+    "installedChrome": "Google Chrome 151.0.7922.108",
+    "isBrowserBackendProof": false
+  },
+  "cleanup": "drive awaited stage.close after step failure; owned browser close and server SIGTERM paths ran; driver process absent on readback",
+  "stressRolls": 0,
+  "physicalDevice": false,
+  "additionalDiagnosticExecuted": false
+}

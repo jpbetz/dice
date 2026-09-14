@@ -51,6 +51,15 @@ Canned steps:
   are browser comparisons, not physical-device performance.
 - `dice-art-bake.mjs` — generate the built-in WebP portraits and recipe
   manifest from the actual meshes; see `models/dice-art/README.md`.
+- `roll-program-look.mjs` — one owned phone-emulated table: first and warm
+  Sea-glass program submission counters, then held and authorized-reveal
+  captures. It asserts hidden values remain absent and a warm post roll copies
+  only its four dice. Run with `node tools/drive.mjs tools/steps/roll-program-look.mjs`.
+- `play-performance.mjs --compile=off|on` — a nonpersisted debug control for
+  source-identical accepted-roll program-preparation comparisons. Use a new
+  drive process with `--runs=1` for every cold trial. `--input-probe` separately
+  dispatches real More input after the worker request; its modal changes scene
+  visibility, so its roll visibility timing is not a bare-table comparison.
 - `dice-texture-cost.mjs <label> [--cpu=4] [--runs=3] [--compare=<report>]` —
   isolate cold mesh/texture preparation, time self/other canvas copies, and
   compare complete texture pixels, geometry and physics data with a baseline.
@@ -384,13 +393,3 @@ tree by the same core the tool above runs. `DICE_DEV_ROOT=DIR` writes into
 another checkout instead (the tests point it at a scratch tree). Without the
 variable the routes are not mounted at all — which is every deploy
 ([docs/DEPLOY.md](../docs/DEPLOY.md)).
-
-- `roll-program-look.mjs` — one owned phone-emulated table: first and warm
-  Sea-glass program submission counters, then held and authorized-reveal
-  captures. It asserts hidden values remain absent and a warm post roll copies
-  only its four dice. Run with `node tools/drive.mjs tools/steps/roll-program-look.mjs`.
-- `play-performance.mjs --compile=off|on` — a nonpersisted debug control for
-  source-identical accepted-roll program-preparation comparisons. Use a new
-  drive process with `--runs=1` for every cold trial. `--input-probe` separately
-  dispatches real More input after the worker request; its modal changes scene
-  visibility, so its roll visibility timing is not a bare-table comparison.
