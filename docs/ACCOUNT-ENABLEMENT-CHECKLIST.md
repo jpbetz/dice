@@ -35,22 +35,22 @@ return checkpoints; 19/19 runtime authorization checks pass. The selected PITR p
 are verified, preserving the initial screenshot failure and earlier cold-return
 assertions. The original production proof passes 14/14 runtime checks, nine
 canonical browser checkpoints and 36 HTTPS delivery requests. The subsequent
-[dice-loading release](redesign/2026-09-14-dice-loading-release/README.md) serves
-`90b8bb9` at 100%, service/revision maxima 1, with 5/5 frontend checks on staging
-and production. Account sources/configuration are unchanged; both `11dd1ef`
-enabled and paused rollback revisions remain Ready off traffic. Existing
+[program-preparation release](redesign/2026-09-14-roll-preparation-release/README.md) serves
+`d0d0f52` at 100%, service/revision maxima 1, with 5/5 frontend checks on staging
+and production. Account sources/configuration are unchanged; previous `90b8bb9`
+and both `11dd1ef` enabled/paused rollback revisions remain Ready off traffic. Existing
 billing alerts cover the services; no budget/recipient update was
 needed. Details and limits are in the [checkpoint](redesign/2026-09-13-staging.md).
 
 | Item | Observed status | Remaining verification |
 | --- | --- | --- |
 | Cost coverage | Existing project/all-service and billing-wide alerts cover these services, with default billing-admin routing. | Alert delivery is untested; alerts are notifications, not hard caps. |
-| Staging | Source `90b8bb9` is Ready at 100%, maxima 1, with 5/5 frontend checks. Original retained-data/account proofs remain on their recorded images. | Physical-device and uncoached human observation remain separate. |
-| Production | Source `90b8bb9` serves the unchanged canonical origin with the existing `dice-accounts` database, `production-v1` namespace and dedicated runtime; frontend checks pass 5/5. | Original account/permission/restore evidence is separate; no new production restart/cold-home claim. Physical-device and uncoached observation remain open. |
+| Staging | Source `d0d0f52` is Ready at 100%, maxima 1, with 5/5 frontend checks. Original retained-data/account proofs remain on their recorded images. | Physical-device and uncoached human observation remain separate. |
+| Production | Source `d0d0f52` serves the unchanged canonical origin with the existing `dice-accounts` database, `production-v1` namespace and dedicated runtime; frontend checks pass 5/5. | Original account/permission/restore evidence is separate; no new production restart/cold-home claim. Physical-device and uncoached observation remain open. |
 | Data permissions | Staging has 19/19 actual runtime checks; production has [14/14](redesign/2026-09-14-production-preparation/README.md). Production exact database role and deny-all rules are read back; anonymous GET/create return 403. | Retain exact database scope when changing runtime identities or storage. |
 | Backup | Source staging and production have PITR, deletion protection and daily seven-day backups. Selected staging PITR clone/content/continuation are verified; no developer file import. | Public recovery must reconcile later security decisions; an isolated fixture restore does not certify that procedure. |
 | Live room placement | Staging and production service/revision maxima remain 1. Each frontend release route followed its own zero-player/stream sample; final activity is an observation, not an idle requirement. | A health sample is not an admission lock; SSE overlap still requires care during future changes. |
-| Release and rollback | Current `90b8bb9` receives 100%; both original `11dd1ef` enabled and paused revisions remain Ready at 0%. The active account environment changes only `GIT_SHA`; mapping and origin/IAM remain unchanged. | Actual maintenance routing is a separate action; readiness alone does not prove a pause was exercised. |
+| Release and rollback | Current `d0d0f52` receives 100%; previous `90b8bb9` and both original `11dd1ef` enabled/paused revisions remain Ready at 0%. The active account environment changes only `GIT_SHA`; mapping and origin/IAM remain unchanged. | Actual maintenance routing is a separate action; readiness alone does not prove a pause was exercised. |
 | Recovery security | Keep restored copies isolated until later revocations, key rotations, blocks/removals, cancellations and memberships are reconciled. | The app has no global restore-time invalidation/reconciliation command. A public restore must not proceed without this additional reviewed procedure. |
 
 First-release identity is the explicitly saved recovery key and HttpOnly

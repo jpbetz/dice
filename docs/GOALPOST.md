@@ -22,7 +22,7 @@ control, ever” and “server holds no durable state” mechanisms explicitly;
 equal participation in live play, private rolls, and safe capture remain
 promises. The direction is approved; durable services and account/library
 workflows, saved-home management, Friends/Invitations and opt-in Presence
-are implemented and released. The [current production release](redesign/2026-09-14-dice-loading-release/README.md)
+are implemented and released. The [current production release](redesign/2026-09-14-roll-preparation-release/README.md)
 links its actual HTTPS checks and the original account, permission and restore
 proofs. Local release verification retains three unchanged legacy visual
 failures. Physical-device and newcomer observations remain unperformed.*

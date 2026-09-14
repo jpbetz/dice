@@ -84,11 +84,12 @@ Browser tests need Chrome or Chromium and use their own temporary ports. Read
 The [redesign plan](docs/EXPERIENCE-REDESIGN.md) and
 [release checkpoint](docs/redesign/2026-09-13-staging.md) distinguish implemented
 features, local tests, actual HTTPS staging/restore evidence and remaining
-release work. The reviewed `90b8bb9` image is now released to production with
-the [dice-loading improvements](docs/redesign/2026-09-14-dice-loading-release/README.md).
-The original account/restore proofs and the new staging/production guest/art
-checks remain separate. Physical-device and uncoached player validation remain
-open. Deployment and
+observations. The bounded R1–R3 implementation and reviewed release are complete.
+The [current `d0d0f52` release](docs/redesign/2026-09-14-roll-preparation-release/README.md)
+adds accepted-roll program preparation, with unchanged account services and
+separate staging/production guest checks. Original account/restore and earlier
+dice-loading proofs retain their source versions. Physical-device and uncoached
+player validation remain open. Deployment and
 maintenance procedures are in [ACCOUNT-OPERATIONS.md](docs/ACCOUNT-OPERATIONS.md)
 and [DEPLOY.md](docs/DEPLOY.md).
 

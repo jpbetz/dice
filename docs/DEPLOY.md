@@ -70,9 +70,10 @@ phone, page-load, idle-rendering and battery measurements remain R3 work.
 
 ## Optional recoverable accounts (2026-09-13)
 
-The account service remains enabled in the [current production release](redesign/2026-09-14-dice-loading-release/README.md)
-on `90b8bb9`, with service and revision maxima of one. This frontend follow-up
-preserves the original `11dd1ef` account configuration and both rollback revisions. [ACCOUNT-OPERATIONS.md](ACCOUNT-OPERATIONS.md)
+The account service remains enabled in the [current production release](redesign/2026-09-14-roll-preparation-release/README.md)
+on `d0d0f52`, with service and revision maxima of one. This frontend follow-up
+preserves the original account configuration, previous `90b8bb9` image and both
+`11dd1ef` rollback revisions. [ACCOUNT-OPERATIONS.md](ACCOUNT-OPERATIONS.md)
 records exact configuration preflight, Firestore/IAM/backup setup, staging and
 production proofs, and safe pause/rollback. It is the operating contract for
 recoverable identity, synchronized libraries, saved homes and social data. The
@@ -84,7 +85,7 @@ guest addresses need the saved-home guard even while storage is unavailable.
 The local file adapter is for private restart proofs and refuses Cloud Run;
 production requires the Firestore REST adapter and reviewed external setup.
 
-The concrete remaining operator decisions and candidate commands are in
+The reusable candidate commands and operating boundaries are in
 [ACCOUNT-ENABLEMENT-CHECKLIST.md](ACCOUNT-ENABLEMENT-CHECKLIST.md). A safe local
 backup/restore and maintenance rehearsal is `node tools/account-local-drill.mjs`.
 `make deploy` preserves account environment but only sets the commit stamp;

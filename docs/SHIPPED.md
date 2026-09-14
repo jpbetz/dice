@@ -8,6 +8,35 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## Accepted-roll program preparation — 2026-09-14
+
+Only an accepted cast's programs are submitted while its worker prepares the
+film. The canvas-to-post transition also prepares the existing scene's required
+post programs. There is no startup/catalogue warmup or extra playback gate.
+Hidden pages, Instant and synchronous fallback skip the optional work; a
+preparation failure restores shared rendering state and disables later attempts
+without stopping the film.
+
+The [local measurement and correctness record](redesign/2026-09-14-roll-program-preparation/README.md)
+retains 24 completed trials: 18 bare-table and six separate actual-input trials.
+In phone emulation with SwiftShader, the mixed-set activity's longest task falls
+from 688 to 607 ms median and accepted-worker-start to visible dice from 605.5 to
+514 ms. The remaining stall is substantial; the slower later-standard sample is
+retained. These are not physical-device, battery or production-speed claims.
+
+The 11 existing focused scenarios, two new mode/failure cases and `npm test`
+passed on `2de6764`, including 78/78 smoke and its account/UI tail. Frozen
+`d0d0f52` carries those exact application bytes. Natural phone-input captures
+confirm the held/revealed/next-roll controls; the apparent multi-image preview
+omission was resolved by inspecting the original pixels, with no runtime fix.
+
+The [actual release](redesign/2026-09-14-roll-preparation-release/README.md)
+serves `d0d0f52` at 100%, maxima 1, after separate 5/5 staging and production
+frontend checks. The same immutable image, unchanged account configuration,
+previous `90b8bb9` image and both `11dd1ef` rollback revisions are confirmed.
+Bounded R1–R3 implementation and release work are complete; physical-device and
+uncoached player observations remain open, alongside the recorded legacy gates.
+
 ## First-roll atlas preparation — 2026-09-13
 
 Dice-face filtering gutters were sampled from the growing atlas, forcing

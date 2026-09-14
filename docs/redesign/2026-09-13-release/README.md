@@ -97,7 +97,7 @@ uncoached player results remain unobserved; use the
 Cloud provisioning and HTTPS/IAM/restore checks had not yet been performed at
 this frozen checkpoint. The [staging evidence](../2026-09-13-staging.md)
 records their subsequent completion; the [original account release](../2026-09-14-production-release/README.md)
-and [current frontend release](../2026-09-14-dice-loading-release/README.md)
+and [current frontend release](../2026-09-14-roll-preparation-release/README.md)
 record the completed production cutovers. The
 [enablement handoff](../../ACCOUNT-ENABLEMENT-CHECKLIST.md) gives the operating steps.
 

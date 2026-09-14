@@ -16,9 +16,11 @@ and reviewed increments. Local implementation and scripted verification are
 complete. Staging has verified runtime permissions, PITR content and a complete
 source HTTPS return. The isolated restored-app continuation also passes.
 The original `11dd1ef` release passes 14/14 production runtime checks, nine
-canonical browser checkpoints and 36 HTTPS delivery requests. The subsequent
-[dice-loading release](redesign/2026-09-14-dice-loading-release/README.md) now
-serves `90b8bb9` at 100%, maxima 1, with 5/5 staging and production frontend
+canonical browser checkpoints and 36 HTTPS delivery requests. The earlier
+[dice-loading release](redesign/2026-09-14-dice-loading-release/README.md) records
+its `90b8bb9` proofs. The final bounded
+[program-preparation release](redesign/2026-09-14-roll-preparation-release/README.md)
+now serves `d0d0f52` at 100%, maxima 1, with 5/5 staging and production frontend
 checks and unchanged account sources/configuration. Physical-device and
 uncoached player observation remain open. See the [cloud checkpoint](redesign/2026-09-13-staging.md).
 [REDESIGN-PROGRESS.md](REDESIGN-PROGRESS.md) records execution. The detailed R1 design is in
@@ -44,9 +46,12 @@ for its content and keep the return to the same live table clear.
 
 | Priority | Investment | First useful release | What follows |
 | --- | --- | --- | --- |
-| **1 — implemented locally** | **People, personal dice, and persistent tables.** Three clear destinations: Tables, My dice & rolls, People. Direct identity editing, a visual dice collection, visible table setup, familiar first rolls, and an optional recoverable identity. | Direct name editing, a usable dice gallery with favorites and practice, named table controls, and Quick dice with explicitly chosen starter kits. | Durable table homes, identity recovery, synchronized libraries, friends, presence, and an invitation inbox. |
-| **2 — three compositions implemented** | **The whole shared playing surface.** Compose recognizable tables and places for people; keep names and each player's latest visible result readable together. | One excellent multiplayer composition and a phone layout with a full-width table, bottom roll tray, and sheets for dice, people, and history. | Explore three complete designs: a worn tavern table with brass inlays, an illustrated navigation table, and a carved stone circle. Explore concurrent or grouped roll presentation. |
-| **3 — measured engineering track** | **Lightweight play.** Reduce delivery, simulation, and rendering costs while retaining character and readable dice. | Verify production compression and establish a reproducible baseline; implement missing compressed delivery and reduce dice-face material draws. | Load optional features on demand, move heavy simulation into a worker, stop unnecessary rendering at rest, and develop an attractive Battery saver presentation with an optional instant result. |
+| **1 — released** | **People, personal dice, and persistent tables.** Three clear destinations: Tables, My dice & rolls, People. Direct identity editing, a visual dice collection, visible table setup, familiar first rolls, and an optional recoverable identity. | Direct name editing, a usable dice gallery with favorites and practice, named table controls, and Quick dice with explicitly chosen starter kits. | Durable table homes, identity recovery, synchronized libraries, friends, presence, and an invitation inbox. |
+| **2 — three compositions released** | **The whole shared playing surface.** Compose recognizable tables and places for people; keep names and each player's latest visible result readable together. | One excellent multiplayer composition and a phone layout with a full-width table, bottom roll tray, and sheets for dice, people, and history. | Explore three complete designs: a worn tavern table with brass inlays, an illustrated navigation table, and a carved stone circle. Explore concurrent or grouped roll presentation. |
+| **3 — implemented and released** | **Lightweight play.** Reduce delivery, simulation, and rendering costs while retaining character and readable dice. | Verify production compression and establish a reproducible baseline; implement missing compressed delivery and reduce dice-face material draws. | Load optional features on demand, move heavy simulation into a worker, stop unnecessary rendering at rest, and develop an attractive Battery saver presentation with an optional instant result. |
+
+The release columns retain the adopted sequence; the summaries below record
+what subsequently shipped. Actual-device and uncoached observations remain open.
 
 These are investment priorities, not a waterfall. Item (1)'s mobile shell
 must agree with (2)'s bottom tray before implementation; its gallery must
@@ -91,15 +96,26 @@ Cold builder opening stays at 99 ms. The subsequent
 reduces the first 4d20 activity's longest task from 209 to 79 ms median in a
 separate three-run emulated-phone comparison, preserving all painted pixels
 and portraits. Ordinary first 2d6 timing stays effectively unchanged;
-physical-phone costs remain open. Both follow-ups are included in the
-[released `90b8bb9` image](redesign/2026-09-14-dice-loading-release/README.md),
+physical-phone costs remain open. Both follow-ups first shipped in the
+[`90b8bb9` release](redesign/2026-09-14-dice-loading-release/README.md),
 with actual HTTPS guest/art/two-viewer checks on staging and production.
 The [parallel texture study](redesign/2026-09-13-dice-textures/README.md),
 measured separately on `31cb4fe`, records first d20 tap-to-visible falling from
 657 to 431 ms and a first mixed-set activity stall from 1,225 to 694 ms.
 Those batches use one scratch tile per channel; the integrated implementation
-reuses one across channels. Shader, upload and complex painter costs remain
-R3 work; these are separate local measurements, not production benchmarks.
+reuses one across channels. The subsequent
+[accepted-roll program preparation](redesign/2026-09-14-roll-program-preparation/README.md)
+submits only the accepted cast's programs during worker simulation. Across 24
+declared local trials, the mixed-set activity's longest task falls from 688 to
+607 ms median; accepted-worker-start to visible dice falls from 605.5 to 514 ms.
+The final bounded slice was tested on `2de6764`; frozen `d0d0f52` carries the
+same application bytes. Its
+[release record](redesign/2026-09-14-roll-preparation-release/README.md) confirms
+100% production traffic, maxima 1 and separate 5/5 frontend checks in each environment.
+It adds no startup or catalogue warmup. Remaining software-renderer stalls are
+recorded limits; further optimization needs a new measured player problem.
+Later standard-roll timing did not improve consistently; the slower sample is retained.
+These are separate local measurements, not production or physical-device benchmarks.
 The [Battery saver](redesign/2026-09-13-battery-presentation.md) and
 [Instant results](redesign/2026-09-13-instant-results.md) preferences are now
 implemented independently. Battery keeps baked artwork and responsive 3D dice,
@@ -145,10 +161,11 @@ runtime permission checks, isolated PITR content comparison and the complete
 source HTTPS return pass. The [isolated restored continuation](redesign/2026-09-14-cloud-return/restore/README.md)
 also passes, retaining its earlier capture failure. Original production runtime
 checks on `11dd1ef` pass 14/14; its nine canonical production browser checkpoints and 36 HTTPS
-delivery requests pass. The current `90b8bb9` frontend follow-up preserves
+delivery requests pass. The current `d0d0f52` frontend follow-up preserves
 those account sources and configuration, passes 5/5 guest/art checks in each
-environment and retains both `11dd1ef` rollback revisions. Actual player/device
-observation remains open; see the [current release](redesign/2026-09-14-dice-loading-release/README.md).
+environment and retains `90b8bb9` plus both `11dd1ef` rollback revisions.
+Bounded implementation and release work are complete; actual player/device
+observation remains open. See the [current release](redesign/2026-09-14-roll-preparation-release/README.md).
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable

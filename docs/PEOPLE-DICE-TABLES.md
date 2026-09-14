@@ -38,8 +38,8 @@ The [complete source HTTPS return](redesign/2026-09-14-cloud-return/README.md)
 passes on `00006-p2z`; the [isolated restored continuation](redesign/2026-09-14-cloud-return/restore/README.md)
 also passes. The original `11dd1ef` production proof passes 14/14 runtime
 checks, nine canonical browser checkpoints and 36 HTTPS delivery requests. The
-subsequent [frontend release](redesign/2026-09-14-dice-loading-release/README.md)
-now serves `90b8bb9` at 100%, maxima 1; its guest/art checks pass 5/5 in each
+current [frontend release](redesign/2026-09-14-roll-preparation-release/README.md)
+now serves `d0d0f52` at 100%, maxima 1; its guest/art checks pass 5/5 in each
 environment, with unchanged account sources and configuration. Actual newcomer and physical-device observations
 and the separately characterized legacy visual-gate debt remain open. Local fixture accounts,
 process restart and phone emulation do not establish those observations or
@@ -333,7 +333,7 @@ and current Help are complete. Local release verification and the advancing
 [staging checkpoint](redesign/2026-09-13-staging.md) are recorded. The complete
 source HTTPS return and isolated restored continuation pass. Production runtime
 checks on the original `11dd1ef` pass 14/14, with nine canonical production
-browser checkpoints. Current `90b8bb9` retains that account code/configuration
+browser checkpoints. Current `d0d0f52` retains that account code/configuration
 at 100%, maxima 1; the frontend follow-up passes 5/5 guest/art checks in each
 environment. Actual observation remains separate from those scripted proofs and local restart tests.
 
@@ -421,8 +421,10 @@ roll; do not infer discoverability from click count or scripted completion.
 
 ## 11. What is still a design task
 
-**Next:** record actual-device and newcomer observations. Current `90b8bb9` is
-released with 5/5 staging and production frontend checks. The original `11dd1ef`
+**Next:** record actual-device and newcomer observations. Current
+[`d0d0f52`](redesign/2026-09-14-roll-preparation-release/README.md) is released
+with 5/5 staging and production frontend checks. No R1 implementation slice
+remains unimplemented. The original `11dd1ef`
 account, permission and delivery proofs remain separate. The production service
 and released revision both have maximum 1.
 The composed success walk and current Help have passed their local proofs.

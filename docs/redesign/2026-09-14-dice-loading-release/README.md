@@ -2,6 +2,11 @@
 
 # Dice-loading frontend release
 
+This records the `90b8bb9` dice-loading release. The subsequent
+[program-preparation release](../2026-09-14-roll-preparation-release/README.md)
+now serves `d0d0f52`. All source versions, counts and observations below retain
+their original scope.
+
 **Released 2026-09-14 UTC:** clean source `90b8bb9` serves 100% of production
 traffic, with service and revision maxima of 1. The same immutable image passed
 staging before promotion. Both staging and production frontend checks pass

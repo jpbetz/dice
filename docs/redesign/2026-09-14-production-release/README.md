@@ -2,9 +2,10 @@
 
 # Production release of the reviewed redesign
 
-This records the original account release through `11dd1ef`. The subsequent
-[dice-loading frontend release](../2026-09-14-dice-loading-release/README.md) now serves `90b8bb9`.
-All source versions, counts and observations below retain their original scope.
+This records the original account release through `11dd1ef`. The later
+[dice-loading release](../2026-09-14-dice-loading-release/README.md) records `90b8bb9`;
+the [current program-preparation release](../2026-09-14-roll-preparation-release/README.md)
+serves `d0d0f52`. All source versions, counts and observations below retain their original scope.
 
 2026-09-14 UTC. The tested immutable `11dd1ef` image now serves **100%** of
 production traffic. The service and released revision both have maximum **1**.

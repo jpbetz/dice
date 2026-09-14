@@ -10,8 +10,10 @@ complete. The original `11dd1ef` account release has 19/19 staging runtime
 checks, selected PITR content, complete source HTTPS return and an isolated
 restored continuation verified. Its production proof passes 14/14 runtime
 checks, nine canonical browser checkpoints and 36 HTTPS delivery requests.
-The subsequent [dice-loading release](redesign/2026-09-14-dice-loading-release/README.md)
-now serves `90b8bb9` at 100%, maxima 1, with 5/5 guest/art/two-viewer checks
+The earlier [dice-loading release](redesign/2026-09-14-dice-loading-release/README.md)
+retains its `90b8bb9` evidence. The final bounded
+[program-preparation release](redesign/2026-09-14-roll-preparation-release/README.md)
+now serves `d0d0f52` at 100%, maxima 1, with 5/5 guest/art/two-viewer checks
 on staging and production; account sources and configuration are unchanged.
 Actual player/device observation remains open. The three characterized legacy
 visual gates remain recorded failures.
@@ -26,7 +28,7 @@ visual gates remain recorded failures.
 | Shared surface and phone | Three reproducibly baked tables, full-width phone tray, persistent visible results and compact queued arrivals are implemented. Model size follows the shared table. The round physical envelope and full support/golden proofs are integrated as `e67da2c`/`04aafbf`; all six composed geometry proofs pass, with cost and collision profiling retained. The camera correction is integrated: 60 seeded painted-hull cases have no re-exits or settled crops, and all 36 baseline complete films agree. Long history reserves current results, with an inspected usable short-window layout. |
 | Shared film ordering | Ordinary rolls and kept-die rethrows use the worker with complete ordered events. `f4e20c0` orders size changes between films, including held reveals and clear. Warm tower changes now use the ordered FIFO (`cf0e48a`); six composed ordering/readiness cases pass. Required-model failure now offers explicit authored results without fabricated physics. The tainted physical world resumes only after the core is ready and a deliberate authoritative table clear; ordered warm/cold/reveal/keep checks pass. |
 | Lightweight play | Compressed delivery, face-material consolidation, idle sleep, Battery saver and independent Instant results are implemented. Optional scenery and the model parser now load on demand (`70d623b`, `530982b`); all eight composed loading/cancel/failure cases pass. Towers and silent reconstruction retain the inline solver. |
-| Operations and release | The original account release's staging revision `dice-accounts-stage-00006-p2z` was Ready on `11dd1ef`, with maximum 1 and mapping read back. The same-image source return passes 4/4 preparation and 5/5 verification checkpoints; [five actual captures](redesign/2026-09-14-cloud-return/README.md) are inspected. Actual IAM checks pass 19/19; the isolated PITR clone and selected content reads pass. Restore revision `00002-lsh` on `3ed9db1` passed identity/library and cold-home assertions before a capture-helper failure; its [separate continuation](redesign/2026-09-14-cloud-return/restore/README.md) passes all three remaining checkpoints with the original journal preserved. Production runtime checks pass [14/14](redesign/2026-09-14-production-preparation/README.md). The original `11dd1ef` image was [released at 100%](redesign/2026-09-14-production-release/README.md), service maximum 1. Its nine canonical production browser checkpoints and 36 HTTPS delivery requests pass, without a production restart/cold-home claim. Current `90b8bb9` passes 5/5 frontend checks in each environment and serves 100% with maxima 1, retaining both original `11dd1ef` enabled/paused rollback revisions and the unchanged account configuration. [Checkpoint and limits](redesign/2026-09-13-staging.md). HTTPS delivery checks pass; existing alerts cover staging. Production origin, ingress and public-service IAM are unchanged. Local frozen verification remains 364/368 plus 20/20 tail, with the wording correction separately verified and three pre-existing visual gates open. |
+| Operations and release | The original account release's staging revision `dice-accounts-stage-00006-p2z` was Ready on `11dd1ef`, with maximum 1 and mapping read back. The same-image source return passes 4/4 preparation and 5/5 verification checkpoints; [five actual captures](redesign/2026-09-14-cloud-return/README.md) are inspected. Actual IAM checks pass 19/19; the isolated PITR clone and selected content reads pass. Restore revision `00002-lsh` on `3ed9db1` passed identity/library and cold-home assertions before a capture-helper failure; its [separate continuation](redesign/2026-09-14-cloud-return/restore/README.md) passes all three remaining checkpoints with the original journal preserved. Production runtime checks pass [14/14](redesign/2026-09-14-production-preparation/README.md). The original `11dd1ef` image was [released at 100%](redesign/2026-09-14-production-release/README.md), service maximum 1. Its nine canonical production browser checkpoints and 36 HTTPS delivery requests pass, without a production restart/cold-home claim. Current `d0d0f52` passes 5/5 frontend checks in each environment and serves 100% with maxima 1, retaining `90b8bb9` and both original `11dd1ef` enabled/paused rollback revisions with the unchanged account configuration. [Checkpoint and limits](redesign/2026-09-13-staging.md). HTTPS delivery checks pass; existing alerts cover staging. Production origin, ingress and public-service IAM are unchanged. Local frozen verification remains 364/368 plus 20/20 tail, with the wording correction separately verified and three pre-existing visual gates open. |
 
 The root's integration checkout is `/tmp/dice-redesign-integration` on
 `codex/redesign-integration`. Agents use isolated worktrees so reviews and
@@ -37,11 +39,23 @@ The later `39b9ec7` dice-portrait optimization and the reviewed
 are integrated in the repository. The latter reduces the emulated first 4d20
 activity's longest task from 209 to 79 ms median with exact pixel/portrait
 parity; ordinary first 2d6 timing stays effectively unchanged.
-Both follow-ups are included in the immutable `90b8bb9` image now serving
-staging and production. Their [current frontend proof](redesign/2026-09-14-dice-loading-release/README.md)
+Both follow-ups first shipped in the immutable `90b8bb9` image. Their
+[earlier frontend proof](redesign/2026-09-14-dice-loading-release/README.md)
 is separate from the original `11dd1ef` account, permission and delivery proofs.
 Temporary restore infrastructure has been [removed after proof](redesign/2026-09-14-cloud-return/restore/cleanup.json),
 with source resources and private evidence preserved.
+
+The final bounded [accepted-roll program preparation](redesign/2026-09-14-roll-program-preparation/README.md)
+was tested on `2de6764`; frozen `d0d0f52` carries the same application bytes.
+All 24 local timing trials completed successfully. The 11 existing focused
+scenarios, two new failure/mode scenarios and `npm test` on `2de6764` pass,
+including 78/78 smoke and the full account/UI tail. The slower later-standard
+sample is retained; these results do not establish a blanket speedup.
+Natural phone-emulation input and the original screenshot
+pixels confirm visible controls through held, revealed and subsequent rolls.
+The [release record](redesign/2026-09-14-roll-preparation-release/README.md) confirms
+100% production traffic, maxima 1 and 5/5 frontend checks in each environment.
+The local timing result makes no deployed-speed or physical-device claim.
 
 ## Remaining campaign work
 
@@ -61,15 +75,20 @@ collider history while each player’s last visible result remains available.
 Full is the presentation default. Automatic device selection is deferred until
 a measured criterion can support it. Remaining main-module extraction requires
 an actual unused feature boundary; further file splitting alone saves no bytes.
+The measured first-use program investigation and its reviewed release are
+complete. No additional implementation slice is required by the approved R1–R3
+plan. The retained mixed-set software-renderer stall is still substantial;
+another optimization requires a concrete measured player problem, rather than
+an assumption that every long task must be eliminated before closeout.
 
 Staging permission, delivery and PITR content checks are recorded separately
 from local tests. The source HTTPS walkthrough and isolated restored continuation
 are complete. The original `11dd1ef` production proof passes 14/14 runtime
 checks, nine canonical browser checkpoints and 36 HTTPS delivery requests.
-Current `90b8bb9` retains those account sources/configuration at 100%, maxima 1;
+Current `d0d0f52` retains those account sources/configuration at 100%, maxima 1;
 its staging and production guest/art checks each pass 5/5. Physical phone/
 midrange-device and newcomer observations remain open. The
-[current release record](redesign/2026-09-14-dice-loading-release/README.md) keeps
+[current release record](redesign/2026-09-14-roll-preparation-release/README.md) keeps
 actual frontend proofs, original durable-service evidence and local performance
 measurements separate from those remaining observations.
 A disabled optional service or fake-store test alone does not complete persistent table homes.
@@ -338,10 +357,12 @@ work; no budget or recipient update was required.
 
 The original `11dd1ef` account launch passes 14/14 production runtime checks,
 nine canonical browser checkpoints and 36 HTTPS delivery requests. The
-subsequent [dice-loading release](redesign/2026-09-14-dice-loading-release/README.md)
-now serves `90b8bb9` at 100%, maxima 1, including the portraits and atlas
-correction. Staging and production frontend checks each pass 5/5; the original
-account sources/configuration and both `11dd1ef` rollback revisions are retained.
+earlier [dice-loading release](redesign/2026-09-14-dice-loading-release/README.md)
+records `90b8bb9` with the portraits and atlas correction. The final bounded
+[program-preparation release](redesign/2026-09-14-roll-preparation-release/README.md)
+now serves `d0d0f52` at 100%, maxima 1. Staging and production frontend checks
+each pass 5/5; the original account sources/configuration, previous `90b8bb9`
+image and both `11dd1ef` rollback revisions are retained.
 Neither guest walkthrough claims a production restart or cold-home proof.
 Physical-device and uncoached player rows remain blank; a public data restore
 still needs security reconciliation beyond the isolated fixture proof. The
