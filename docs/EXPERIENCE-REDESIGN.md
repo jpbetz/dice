@@ -76,8 +76,15 @@ No physical-device battery or active-frame-rate claim is made.
 The [first-roll startup pass](redesign/2026-09-13-play-performance/README.md)
 now paints mat previews on sight at thumbnail size. Three-run medians in
 CPU-throttled phone emulation fall from 3.86 to 1.48 seconds for a usable Table
-and from 3.98 to 1.59 seconds for Copper. The largest remaining startup task
-is dice-button artwork; active playback and physical-phone costs remain open.
+and from 3.98 to 1.59 seconds for Copper. The subsequent
+[dice portrait pass](redesign/2026-09-13-dice-art/README.md) replaces eager
+whole-set rendering with visible-only baked images for built-in sets and a
+per-type live fallback for edits. Usable quick-roll controls improve from
+1.50 to 0.67 seconds; navigation to visible quick dice improves from 2.04 to
+1.21 seconds, and the builder-first journey from 2.44 to 1.68 seconds.
+Cold builder opening stays at 99 ms. First-use live mesh/atlas work becomes
+more visible during play and remains the next implementation target;
+physical-phone costs remain open.
 The [Battery saver](redesign/2026-09-13-battery-presentation.md) and
 [Instant results](redesign/2026-09-13-instant-results.md) preferences are now
 implemented independently. Battery keeps baked artwork and responsive 3D dice,

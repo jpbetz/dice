@@ -1,0 +1,80 @@
+{
+  "startup": {
+    "keys": [],
+    "renders": 0,
+    "contexts": 0,
+    "rendererActive": false,
+    "assets": 0,
+    "assetRequests": 0,
+    "watched": 8,
+    "queued": 0,
+    "scheduled": false
+  },
+  "standard": {
+    "keys": [],
+    "renders": 0,
+    "contexts": 0,
+    "rendererActive": false,
+    "assets": 7,
+    "assetRequests": 7,
+    "watched": 1,
+    "queued": 0,
+    "scheduled": false
+  },
+  "resources": [
+    {
+      "path": "/models/dice-art/std.d4.webp",
+      "encoded": 4702,
+      "bytes": 5002
+    },
+    {
+      "path": "/models/dice-art/std.d6.webp",
+      "encoded": 4932,
+      "bytes": 5232
+    },
+    {
+      "path": "/models/dice-art/std.d8.webp",
+      "encoded": 4754,
+      "bytes": 5054
+    },
+    {
+      "path": "/models/dice-art/std.d10.webp",
+      "encoded": 6632,
+      "bytes": 6932
+    },
+    {
+      "path": "/models/dice-art/std.d10x.webp",
+      "encoded": 6652,
+      "bytes": 6952
+    },
+    {
+      "path": "/models/dice-art/std.d12.webp",
+      "encoded": 6146,
+      "bytes": 6446
+    },
+    {
+      "path": "/models/dice-art/std.d20.webp",
+      "encoded": 7896,
+      "bytes": 8196
+    }
+  ],
+  "final": {
+    "keys": [
+      "classics.ivory/d6",
+      "classics.ivory/d4",
+      "classics.ivory/d8",
+      "classics.ivory/d10",
+      "classics.ivory/d10x",
+      "classics.ivory/d12",
+      "classics.ivory/d20"
+    ],
+    "renders": 7,
+    "contexts": 1,
+    "rendererActive": false,
+    "assets": 14,
+    "assetRequests": 14,
+    "watched": 1,
+    "queued": 0,
+    "scheduled": false
+  }
+}
