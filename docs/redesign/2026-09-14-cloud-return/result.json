@@ -1,0 +1,67 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "scope": "Actual canonical staging HTTPS fixture return across revision replacement; source verification, not PITR restore completion or production release.",
+  "appSourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+  "sameImmutableImageAcrossRevisions": true,
+  "revisionEvidence": "Image and serving revisions read back separately by release owner; verifier revision arguments alone are not evidence.",
+  "verificationToolCommit": "bfa98bd2ea9df0a63dc67d0de182ef425aa2661b",
+  "verificationToolBase": "3ed9db1247dc67f622d8903e48ca1523eb1f78db",
+  "toolScope": "Fixture-only changes; deployed app remains 11dd1ef.",
+  "captureViewport": {
+    "width": 390,
+    "height": 844,
+    "deviceScaleFactor": 1,
+    "mobileEmulation": true
+  },
+  "sharedMoment": {
+    "browserViewers": 2,
+    "httpFixtureObservers": 1,
+    "displayedTableCount": 3
+  },
+  "phases": [
+    {
+      "phase": "prepare",
+      "revision": "dice-accounts-stage-00005-tbg",
+      "started": "2026-09-14T01:23:14.424176+00:00",
+      "finished": "2026-09-14T01:24:11.958265+00:00",
+      "durationSeconds": 57.534,
+      "exitCode": 0,
+      "ok": true,
+      "checkpoints": [
+        "https_cookie_and_explicit_identity",
+        "immutable_conflicts_exact_retry_and_retained_original",
+        "visible_same_address_conversion_and_reserved_home",
+        "offline_fixture_invitation_and_negative_access"
+      ]
+    },
+    {
+      "phase": "verify",
+      "revision": "dice-accounts-stage-00006-p2z",
+      "started": "2026-09-14T01:36:56.124197+00:00",
+      "finished": "2026-09-14T01:39:16.982244+00:00",
+      "durationSeconds": 140.858,
+      "exitCode": 0,
+      "ok": true,
+      "checkpoints": [
+        "https_cookie_and_explicit_identity",
+        "clean_browser_retains_versions_and_explicitly_adopts_library",
+        "both_cold_home_addresses_restore_public_setup",
+        "accept_preserves_private_turn_and_separate_join_shares_film",
+        "separate_presence_consent_expiry_and_session_revocation"
+      ]
+    }
+  ],
+  "finalJournalState": {
+    "phase": "verified",
+    "hasFailure": false,
+    "evidence": "release-owner aggregate readback; no credential journal copied"
+  },
+  "inspectedImages": [
+    "library-comparison.png",
+    "library-adopted.png",
+    "both-homes.png",
+    "invitation-accepted-before-join.png",
+    "shared-recovered-result.png"
+  ],
+  "excluded": "Canonical origins, private project/account/resource mappings, recovery/contact keys, cookies, raw journals and cloud logs."
+}

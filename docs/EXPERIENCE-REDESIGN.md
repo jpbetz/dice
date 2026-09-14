@@ -13,9 +13,9 @@ fits that entry into the name row and reuses the table label for shared setup,
 following his instruction to conserve the rolling area's space. Joe then
 authorized autonomous implementation through all three priorities, with agents
 and reviewed increments. Local implementation and scripted verification are
-complete. Staging is enabled with verified runtime permissions and PITR content;
-complete cloud browser walkthroughs, production release and physical-device/
-player observation remain open. See the [staging checkpoint](redesign/2026-09-13-staging.md).
+complete. Staging has verified runtime permissions, PITR content and a complete
+source HTTPS return. The restored-app continuation, production release and
+physical-device/player observation remain open. See the [staging checkpoint](redesign/2026-09-13-staging.md).
 [REDESIGN-PROGRESS.md](REDESIGN-PROGRESS.md) records execution. The detailed R1 design is in
 [PEOPLE-DICE-TABLES.md](PEOPLE-DICE-TABLES.md).
 
@@ -117,10 +117,10 @@ The [composed success walk](redesign/2026-09-13-r1-success-walk.md) and
 current Help are complete locally. The joined walk passes again on the
 composed code, including guest captures during delayed account startup.
 Local release verification is recorded with its exact failures and targeted
-correction. Current staging source `11dd1ef` is Ready; 19/19 actual runtime
-permission checks and isolated PITR content comparison pass. Complete source/
-restore browser walkthroughs, production release and actual player/device
-observation remain open in the [staging checkpoint](redesign/2026-09-13-staging.md).
+correction. Current staging source `11dd1ef` is Ready on `00006-p2z`; 19/19
+actual runtime permission checks, isolated PITR content comparison and the
+complete source HTTPS return pass. The restored-app continuation, production
+release and actual player/device observation remain open in the [staging checkpoint](redesign/2026-09-13-staging.md).
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable
