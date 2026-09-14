@@ -28,6 +28,12 @@ The root's integration checkout is `/tmp/dice-redesign-integration` on
 `codex/redesign-integration`. Agents use isolated worktrees so reviews and
 cherry-picks are explicit and another ongoing session's edits survive.
 
+The later `39b9ec7` dice-portrait optimization is integrated in the repository.
+Staging and prepared production candidates still use the immutable `11dd1ef`
+image; the cloud proofs do not include that later optimization. Temporary
+restore infrastructure has been [removed after proof](redesign/2026-09-14-cloud-return/restore/cleanup.json),
+with source resources and private evidence preserved.
+
 ## Remaining campaign work
 
 The tower failure and camera slices are reviewed and integrated. The complete

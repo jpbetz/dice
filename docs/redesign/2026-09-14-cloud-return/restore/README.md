@@ -25,9 +25,15 @@ exact database-equality data role, canonical origin/namespace and maximum 1
 were read back. Deny-all client rules were compiled, released and read back
 against that database. The original staging runtime's separate cross-database
 denial proof is retained with the [19/19 authorization checks](../../2026-09-14-staging-permissions/README.md).
-The temporary restore service was removed after proof. The
-[checkpoint](../../2026-09-13-staging.md) tracks the remaining resource cleanup;
-the Ready configuration above describes verification time.
+After proof, the temporary restore service, clone database, runtime identity
+and exact IAM binding were removed. The [cleanup record](cleanup.json) confirms
+absence at **02:03:36.333274 UTC**, all five mutation commands exiting 0, source
+configuration/data protections/runtime unchanged, and 18 private evidence files
+preserved byte-exact. Clone deletion protection was disabled only for that
+cleanup; the Ready/protection configuration above describes verification time.
+An initially stale runtime list later converged, without a repeated delete.
+Deny-all rules were not targeted, and their post-delete attachment was not
+rechecked.
 
 At **01:16:59.080 UTC**, the operator recovered only generated fixture accounts
 and compared their data. The restored library head exactly matched the

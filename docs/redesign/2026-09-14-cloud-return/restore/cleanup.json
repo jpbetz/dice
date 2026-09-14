@@ -1,0 +1,67 @@
+{
+  "copyright": "Copyright 2026 The Dice Table Authors",
+  "license": "Apache-2.0",
+  "schema": 1,
+  "status": "complete",
+  "scope": "Only the temporary isolated restore fixture infrastructure; no shared staging or production deletion.",
+  "verifiedAt": "2026-09-14T02:03:36.333274+00:00",
+  "targets": {
+    "service": "dice-accounts-stage-restore",
+    "database": "dice-accounts-stage-restore",
+    "runtime": "dice-stage-restore-runtime",
+    "clonePoint": "2026-09-14T00:56:00Z"
+  },
+  "beforeDeletion": {
+    "rooms": 0,
+    "players": 0,
+    "streams": 0,
+    "fixtureClientsClosed": true,
+    "runtimeSoleRole": "roles/datastore.user with exact clone database equality condition"
+  },
+  "operations": [
+    {
+      "action": "Delete isolated restore service",
+      "finishedAt": "2026-09-14T01:58:07.492160+00:00",
+      "exitCode": 0
+    },
+    {
+      "action": "Remove exact runtime clone-database binding",
+      "finishedAt": "2026-09-14T01:58:15.492844+00:00",
+      "exitCode": 0
+    },
+    {
+      "action": "Delete isolated restore runtime identity",
+      "finishedAt": "2026-09-14T01:58:35.537311+00:00",
+      "exitCode": 0
+    },
+    {
+      "action": "Disable clone database delete protection",
+      "finishedAt": "2026-09-14T01:59:52.663237+00:00",
+      "exitCode": 0
+    },
+    {
+      "action": "Delete isolated clone database using its read-back etag",
+      "finishedAt": "2026-09-14T02:00:23.726638+00:00",
+      "exitCode": 0
+    }
+  ],
+  "absence": {
+    "serviceAbsent": true,
+    "cloneDatabaseAbsent": true,
+    "cloneDatabaseDirectRead": "NOT_FOUND",
+    "runtimeAbsentFromSuccessfulList": true,
+    "exactRuntimeBindingAbsent": true
+  },
+  "preservation": {
+    "sourceServiceConfigAndTrafficUnchanged": true,
+    "sourceDatabaseIdentityAndProtectionUnchanged": true,
+    "sourceRuntimeAndRoleUnchanged": true,
+    "otherListedRuntimeIdentitiesUnchanged": true,
+    "probeJobsUnchanged": true,
+    "sourceHealthOk": true,
+    "privateFixtureEvidenceFilesByteExact": 18,
+    "sourceApplicationSha": "11dd1efd142f59a157c055ab4da512c745989dca"
+  },
+  "iamReadback": "Runtime delete succeeded. An immediate list was stale; a fresh successful list confirmed absence. Direct describe returned PERMISSION_DENIED and is not used alone as absence proof. Delete was not repeated.",
+  "rules": "Deny-all named release and rulesets not targeted; post-delete attachment state not checked"
+}

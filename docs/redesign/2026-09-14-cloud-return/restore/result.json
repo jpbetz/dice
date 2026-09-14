@@ -102,11 +102,16 @@
     "invitation-accepted-before-join.png",
     "shared-recovered-result.png"
   ],
-  "excluded": "Canonical origins, database/project/runtime identifiers, account and home IDs, recovery/contact keys, cookies, private driver/config/journals and raw cloud logs. Captures contain only generated display labels and shared fixture results.",
+  "excluded": "Canonical origins, project IDs, runtime account addresses, full private resource mappings, account and home IDs, recovery/contact keys, cookies, private driver/config/journals and raw cloud logs. Captures contain only generated display labels and shared fixture results.",
   "limits": [
     "Separate initial failure and successful continuation; not a fresh uninterrupted all-checkpoints pass.",
     "Warm continuation does not replace the prior cold-home assertions.",
     "No physical-device or uncoached-human validation.",
     "No production traffic, canonical production account flow or public restore-security certification."
-  ]
+  ],
+  "cleanup": {
+    "status": "complete",
+    "record": "cleanup.json",
+    "verificationTimeConfigurationRetained": true
+  }
 }

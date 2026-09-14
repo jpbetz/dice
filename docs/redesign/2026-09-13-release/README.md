@@ -83,17 +83,22 @@ The earlier unexplained 143 did not recur. The joined walk's two cases took
 loading-time guest captures and exact shared films after separate Accept/Join.
 All timings here describe this local test run.
 
-Local implementation and its scripted verification are complete. This is not an
+At this frozen checkpoint, local implementation and its scripted verification
+were complete. This is not an
 all-green release certification: the three characterized legacy visual gates
-remain open. Application/test/tool files after the one-sentence Help correction
-are identical to the tested `2283a24` follow-up; later commits only update docs.
-No whole-sweep pass is inferred from that targeted correction.
+remain open. The immediate `2283a24` follow-up contained the one-sentence Help
+correction and its targeted fixture change. Subsequent application work is
+outside this frozen record; see the [current source and cloud checkpoint](../2026-09-13-staging.md).
+No whole-sweep pass is inferred from the targeted correction.
 
 Physical-phone, midrange-device and
 uncoached player results remain unobserved; use the
 [validation sheet](../../REDESIGN-VALIDATION-SHEET.md) for those sessions.
-Cloud provisioning, HTTPS/IAM/restore checks and production traffic are separate
-unperformed actions in the [enablement handoff](../../ACCOUNT-ENABLEMENT-CHECKLIST.md).
+Cloud provisioning and HTTPS/IAM/restore checks had not yet been performed at
+this frozen checkpoint. The [current staging/production evidence](../2026-09-13-staging.md)
+records their subsequent progress and the still-separate production traffic
+decision; the [enablement handoff](../../ACCOUNT-ENABLEMENT-CHECKLIST.md) gives
+the operating steps.
 
 
 ## Correction found by the final frozen run
@@ -108,6 +113,7 @@ The paired `draft-bench,terminology` run passes **2/2** after this correction
 (`2283a24`, composed after the frozen candidate). All five existing actual-input
 Help captures pass; the selected-topic driver waits for the visible consequence
 of its pointer action before measuring. The [current 390px Help
-view](help-phone-current.png) was inspected. This is the only application change
-after the frozen candidate: one Help sentence. The targeted follow-up is
+view](help-phone-current.png) was inspected. This was the only application change
+in that immediate follow-up: one Help sentence. Later application changes are
+tracked outside this historical run. The targeted follow-up is
 recorded separately; the frozen full count remains 364/368.

@@ -45,8 +45,9 @@ passes after a separately preserved screenshot-helper failure. The continuation
 uses warm home rechecks and does not replace the earlier cold-return assertions.
 The source database retains PITR, deletion protection and daily seven-day
 backups. At verification time, the isolated clone had deletion protection
-enabled and PITR disabled. Its subsequent cleanup is tracked with the
-[restore evidence](redesign/2026-09-14-cloud-return/restore/README.md).
+enabled and PITR disabled. Its temporary service, database and runtime were
+subsequently removed; the [cleanup record](redesign/2026-09-14-cloud-return/restore/cleanup.json)
+confirms source resources and retained proof were preserved.
 
 Production database `dice-accounts`, namespace `production-v1`, the dedicated
 runtime and exact database role, deny-all client rules, PITR, deletion protection
