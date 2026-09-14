@@ -3,7 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fixture,account,people,state,idle,seedFriendship,seedHome} from './fixtures/people-app.mjs';
 import {click,type,key} from './fixtures/visible-input.mjs';
-import {invitationJourney} from './fixtures/invitation-journey.mjs';
+import {invitationJourney,invitationSaveCancellation} from './fixtures/invitation-journey.mjs';
+
+for(const nextTask of ['close invitation','browse At table'])test('phone save-table loading is cancelled by '+nextTask,async t=>{
+  await invitationSaveCancellation(await fixture(t),{nextTask});
+});
 
 test('phone invitation saves the current table, reaches an unopened inbox, joins directly and returns with the private kit',async t=>{
   await invitationJourney(await fixture(t));

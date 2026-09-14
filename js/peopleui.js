@@ -112,13 +112,14 @@ export function createPeopleWorkspace(actions){
   inviteSubmit.type='submit';
   inviteSubmit.id='people-invite-send';
   const saveHome=button('Save this table…','people-save-home',()=>{
-    const target=inviteTarget;
+    const target=inviteTarget,opened=visit;
     if(!target||target.owner!==session.info.owner)return;
+    const isCurrent=()=>mounted&&visit===opened&&inviteTarget===target&&target.owner===session.info.owner;
     void run(()=>actions.saveTable?.(target.name,home=>{
       if(target.owner!==session.info.owner)return;
       target.homeId=home.id;inviteTarget=target;inviteForm.hidden=false;
       tab='friends';homeSignature='';paint();
-    }));
+    },isCurrent));
   });
   const inviteNote=el('p','hint');inviteNote.id='people-invite-note';
   const inviteHead=row(),inviteClose=button('×','people-invite-close',()=>{

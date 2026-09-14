@@ -83,3 +83,33 @@ export async function invitationJourney(f,{shot=async()=>{}}={}){
   await assertResultLayout(b,true);await shot(b,'joined-roll-phone');
   assert.deepEqual(a.page.errors,[]);assert.deepEqual(b.page.errors,[]);
 }
+
+// Closing the invitation or selecting another People task must also cancel
+// navigation while the optional Homes module is still loading.
+export async function invitationSaveCancellation(f,{nextTask='close invitation',shot=async()=>{}}={}){
+  const one=await f.context('g_invite_save_cancel'),two=await f.context('invite_save_friend');
+  const a=await one.newTable({origin:'127.0.0.1',name:'Sam'}),b=await two.newTable({origin:'127.0.0.1',name:'Riley'});
+  await account(a);await account(b,{name:'Riley'});const ids=await seedFriendship(a,b);
+  await a.page.browser.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true},a.page.sessionId);
+  await a.emulateCoarsePointer(true);
+  await a.roll('3d6 t3 secret');const roll=await a.rollId(),turn=await a.dbg(`turnState(${JSON.stringify(roll)})`),seat=await a.playerId();
+  await people(a);await click(a,`[data-social-focus="invite:${ids.second}"]`);
+  const browser=a.page.browser;let held=null;
+  browser.on('Fetch.requestPaused',p=>{held=p.requestId;},a.page.sessionId);
+  await browser.send('Fetch.enable',{patterns:[{urlPattern:'*/js/homesui.js',requestStage:'Response'}]},a.page.sessionId);
+  await click(a,'#people-save-home');
+  for(let n=0;n<100&&!held;n++)await new Promise(r=>setTimeout(r,10));
+  assert.ok(held,'Homes module is held before the task can open');
+  await click(a,nextTask==='close invitation'?'#people-invite-close':'#people-tab-table');
+  await shot(a,'pending');
+  await browser.send('Fetch.continueRequest',{requestId:held},a.page.sessionId);
+  await browser.send('Fetch.disable',{},a.page.sessionId);await idle(a);
+  assert.equal(await a.dbg('workspaces.current'),'people','cancelled invitation cannot open Tables after loading');
+  if(nextTask==='close invitation')assert.equal(await a.eval('document.getElementById("people-invite-form").hidden'),true);
+  else assert.equal(await a.eval('document.getElementById("workspace-people-current").hidden'),false);
+  assert.ok(!(await a.dbg('homes.state'))?.preview,'cancelled action creates no capture preview');
+  assert.equal(await a.playerId(),seat);
+  assert.deepEqual(await a.dbg(`turnState(${JSON.stringify(roll)})`),turn,'the private unfinished turn is untouched');
+  await shot(a,'settled');
+  assert.deepEqual(a.page.errors,[]);assert.deepEqual(b.page.errors,[]);
+}

@@ -30,7 +30,17 @@ closing/reopening People or browsing Friends. A refused connection retains the
 invitation and retries its original operation. Monitor unit tests cover older
 inbox pages, expiry, hidden tabs, account changes and pre-acceptance responses.
 
-Validation: `npm test` completed successfully, including all 75 browser smoke
+Validation at `828e8a0`: `npm test` completed successfully, including all 75 browser smoke
 scenarios and all 11 People cases, plus the unit/fuzz and account/library/home
 suites. `git diff --check` passes. No production service or physical-device
 observations are implied by these local browser checks.
+
+Review follow-up: holding the first Homes-module response exposed a cancelled
+invitation reopening Tables. The save request now checks the same invitation,
+People visit and account after that load. Two actual-input 390 × 844 cases
+prove that closing the invitation or browsing At table keeps the selected
+People task and private unfinished turn intact. The original save/send/badge/
+direct-join/return journey passes alongside them (**3/3** targeted checks).
+[Closed invitation](cancel-save-phone.png) · [At table after cancellation](cancel-save-task-phone.png).
+Reproduce the focused views with
+`node tools/drive.mjs tools/steps/invitation-save-cancel-look.mjs`.

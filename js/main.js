@@ -36919,9 +36919,9 @@ async function ensurePeopleWorkspace(){
       tableName:()=>document.getElementById('table-name').textContent,tableSaved:()=>!!net?.savedHome,
       layout:(key,signed)=>destinationShell.peopleView(key,signed),
       inboxChanged:info=>invitationMonitor?.update(info),
-      saveTable:async(name,saved)=>{
+      saveTable:async(name,saved,isCurrent)=>{
         const access=librarySession?.socialAccess(),visit=destinationShell.viewEpoch;
-        if(!access||!await ensureHomesWorkspace()||destinationShell.current!=='people'||destinationShell.viewEpoch!==visit||librarySession?.socialAccess()!==access)return;
+        if(!access||!await ensureHomesWorkspace()||!isCurrent()||destinationShell.current!=='people'||destinationShell.viewEpoch!==visit||librarySession?.socialAccess()!==access)return;
         homeInviteFlow={owner:`${access.personId}:${access.epoch}`,name,
           saved:home=>{if(librarySession?.socialAccess()!==access)return;saved(home);destinationShell.open('people');},
           cancel:()=>destinationShell.open('people')};
