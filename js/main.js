@@ -24,7 +24,8 @@ import { captureFilm, rngFromState, mergeFilmState, unpackFilm } from './film-wi
 import { FilmClient } from './film-client.js';
 import { ROUND_NORMALS, roundApothem, roundSpawnLine, roundSpawnPoint, roundClearance } from './round-table.js';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, bustDie, SHADER_TIME, FACE_SHAPES } from './dice.js';
-import { dieArtURL, bustArt } from './diceart.js';
+import { bustArt } from './diceart.js';
+import { dieArtImage, bindDieArt, diceArtworkInfo, dicePortraitURL } from './diceart-ui.js';
 import { connect, createGuestTable, forgetSeat, peekTable, prejoinSeat, LS_WHO } from './net.js';
 import { recentTables, rememberTable, renameRecentTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
@@ -16737,17 +16738,18 @@ window.__diceDebug = {
     if (!currentRoll) return false;
     return retireCeremonyFlow(currentRoll);
   },
-  // die art (stage A): the palette tiles' rendered die stills — one dataURL
-  // (or null when WebGL was unavailable) per type.
+  // Palette portraits: one asset URL (or a live-rendered fallback for edited
+  // recipes) per type.
   get dieArt() {
     const out = {};
-    for (const t of DIE_TYPES) out[t] = dieArtURL(t);
+    for (const t of DIE_TYPES) out[t] = dicePortraitURL(t);
     return out;
   },
   // §9 chrome: the bakery's (type, variant) surface — what a chip for
   // this die in this skin looks like (themed-chrome asserts DOM img
   // srcs against it, so chips are checked by contract, not by pixels).
-  dieArtFor(type, variant) { return dieArtURL(type, variant); },
+  dieArtFor(type, variant) { return dicePortraitURL(type, variant); },
+  dieArtInfo() { return diceArtworkInfo(); },
   // quick palette (tests): open it / observe its open state
   openPalette() { openPalette(); },
   get paletteOpen() { return isPaletteOpen(); },
@@ -19189,39 +19191,26 @@ const offerDraftBtn = document.getElementById('offer-draft');
 // P1 — the dice are the buttons: each palette tile shows its die's real
 // rendered art (the beveled mesh, hero-posed) above the type label. The tile
 // stays a source-object with button chrome; the art is decorative to a
-// screen reader (alt="") because the label text already names the die. When
-// dieArtURL is null (no WebGL for the offscreen pass), .has-art never lands
-// and the CSS ::before diamond keeps the tile legible — art never gates
-// function.
+// screen reader (alt="") because the label text already names the die.
+// The reserved image box keeps its size while visible artwork arrives.
+// Labels and controls are usable before the portrait is ready.
 function decorateDieBtn(btn, label, artType) {
   // Prospective surfaces show the player's default for new rolls.
-  const url = dieArtURL(artType, diceSet);
-  if (url) {
-    btn.classList.add('has-art');
-    const img = document.createElement('img');
-    img.className = 'die-art';
-    img.dataset.artType = artType; // refreshDieArt re-dresses it on set change
-    img.src = url;
-    img.alt = '';          // decorative: the label carries the name (a11y)
-    img.draggable = false; // die art is clickable chrome, not a draggable image
-    btn.appendChild(img);
-  }
+  btn.classList.add('has-art');
+  btn.appendChild(dieArtImage(artType, diceSet));
   btn.appendChild(document.createTextNode(label));
 }
 
 // A set change re-dresses every PROSPECTIVE die chip in place — palette
 // tiles, tray/pool/offer strips — without re-running their renderers:
 // every chip decorateDieBtn/buildDieStrip builds carries its die type in
-// data-art-type. Log chips deliberately lack the attribute: the log is a
-// record, and each entry keeps the set it was rolled with.
+// data-art-type. Log chips pin their recorded set just as explicit pools do.
 function refreshDieArt() {
   for (const img of document.querySelectorAll('img.die-art[data-art-type]')) {
     // data-art-set pins a chip to a POOL's own set (§9 override) — it
     // re-dresses only when its pool re-renders, never with your set.
     // A venue suggestion never replaces either explicit appearance.
-    const u = dieArtURL(img.dataset.artType,
-      img.dataset.artSet || diceSet);
-    if (u) img.src = u;
+    bindDieArt(img, img.dataset.artType, img.dataset.artSet || diceSet);
   }
 }
 
@@ -20983,22 +20972,10 @@ function buildDieStrip(types, cap, { grouped = false, set = null } = {}) {
     : types.map((t) => [t, 1]);
   const shown = units.slice(0, cap);
   for (const [type, n] of shown) {
-    const url = dieArtURL(type, variant || diceSet);
-    if (url) {
-      const img = document.createElement('img');
-      img.className = 'die-art strip-die';
-      img.dataset.artType = type; // refreshDieArt re-dresses it on set change
-      if (variant) img.dataset.artSet = variant;
-      img.src = url;
-      img.alt = '';
-      img.draggable = false;
-      frag.appendChild(img);
-    } else {
-      const dot = document.createElement('span');
-      dot.className = 'strip-dot';
-      dot.style.background = (DIE_DEFS[type] && DIE_DEFS[type].color) || '#888';
-      frag.appendChild(dot);
-    }
+    const img = dieArtImage(type, variant || diceSet);
+    img.classList.add('strip-die');
+    if (variant) img.dataset.artSet = variant;
+    frag.appendChild(img);
     if (n > 1) {
       const count = document.createElement('span');
       count.className = 'strip-count';
@@ -24497,8 +24474,9 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
     // The log leads with the DICE (GOALS 1: prefer showing real dice) — the
     // only roll surface that was still pure text. Tiny grouped tokens, xN
     // per P5; die TYPES are public even on hidden rolls (goal 11), so a
-    // shrouded entry keeps its tokens. No-GL environments keep text only.
-    let tokensHtml = '';
+    // shrouded entry keeps its tokens. Labels remain usable if artwork fails.
+    const tokens = document.createElement('span');
+    tokens.className = 'log-dice';
     {
       // Chips wear each DIE's own set (§9 mixed pools) — the log is a
       // record of whose dice landed, not what I'd throw next — grouped by
@@ -24511,15 +24489,17 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
         const k = `${v}|${p.type}`;
         counts.set(k, (counts.get(k) || 0) + 1);
       });
-      const bits = [];
       for (const [k, cnt] of counts) {
         const [chipVariant, t] = k.split('|');
-        const u = dieArtURL(t, chipVariant);
-        if (!u) { bits.length = 0; break; }
-        bits.push(`<img class="die-art log-die" src="${u}" alt="" draggable="false">`
-          + (cnt > 1 ? `<span class="log-die-count">×${cnt}</span>` : ''));
+        const img = dieArtImage(t, chipVariant);
+        img.classList.add('log-die'); img.dataset.artSet = chipVariant;
+        tokens.append(img);
+        if (cnt > 1) {
+          const count = document.createElement('span');
+          count.className = 'log-die-count'; count.textContent = `×${cnt}`;
+          tokens.append(count);
+        }
       }
-      if (bits.length) tokensHtml = `<span class="log-dice">${bits.join('')}</span>`;
     }
     // U17 step 3: the flat modifier is ARITHMETIC and renders where the sum
     // does. This was ungated — the exact inversion of the intent card, which
@@ -24613,8 +24593,9 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
         <span class="log-actions"></span>
         <span class="log-total">${!activeSystem().usesTotal ? '' : hidden ? '?' : entry.total}</span>
       </div>
-      <div class="log-detail">${tokensHtml}${detail}${verdictHtml ? '  ·  ' + verdictHtml : ''}${meaningHtml ? '  ·  ' + meaningHtml : ''}</div>
+      <div class="log-detail">${detail}${verdictHtml ? '  ·  ' + verdictHtml : ''}${meaningHtml ? '  ·  ' + meaningHtml : ''}</div>
       <div class="log-time">${fmtTime(entry.t)}</div>`;
+    if (tokens.childElementCount) el.querySelector('.log-detail').prepend(tokens);
     if (meaningHtml) renderTally(el.querySelector('.log-meaning'), entry);
     // Names and labels are user-supplied: textContent only, never innerHTML.
     const groupEl = el.querySelector('.log-group');

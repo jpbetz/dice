@@ -621,6 +621,12 @@ html, body {
   -webkit-touch-callout: none;  /* no long-press image sheet on iOS — it's a button */
   user-select: none;
 }
+/* Reserve the portrait's full box while keeping the existing small colour
+   cue. Loading artwork must not move dice labels, counts or touch targets. */
+.die-art:not([src]) {
+  background: radial-gradient(circle, var(--art-color, #888) 0 5px, transparent 5.5px) center / 12px 12px no-repeat;
+  clip-path: circle(6px); /* Hide the browser's empty-image outline. */
+}
 /* Only the palette tiles center their art; strip contexts (pool rows, the
    draft cluster) pack LEFT — auto margins in a flex row read as dice
    scattered across the width when there are only one or two. */

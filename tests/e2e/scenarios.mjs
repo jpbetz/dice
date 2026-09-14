@@ -32,6 +32,7 @@ import { readLayoutScenarios } from './read-layouts.mjs';
 import { tableDesignScenarios } from './table-designs.mjs';
 import { personalKitScenarios } from './personal-kit.mjs';
 import { tableControlScenarios } from './table-controls.mjs';
+import { diceArtScenarios } from './dice-art.mjs';
 import { joinFirstPlayScenarios } from './join-first-play.mjs';
 import { firstPlayScenarios } from './first-play.mjs';
 import { workspaceScenarios } from './workspaces.mjs';
@@ -795,6 +796,7 @@ export const scenarios = [
   ...personalKitScenarios,
   ...tableDesignScenarios,
   ...tableControlScenarios,
+  ...diceArtScenarios,
   ...firstPlayScenarios,
   ...joinFirstPlayScenarios,
   ...workspaceScenarios,
@@ -5568,20 +5570,21 @@ export const scenarios = [
     name: 'die-art',
     tags: ['chrome', 'cuj12'],
     // P1 — the dice are the buttons: every die type has real rendered art
-    // (a dataURL still of its beveled mesh), the types are visually distinct,
+    // (a pre-rendered still of its beveled mesh), the types are visually distinct,
     // and the compose palette tiles carry it as .die-art imgs (alt="",
-    // draggable=false; the ::before diamond survives only as null-art
-    // fallback, which this WebGL-capable environment must not need).
+    // draggable=false). Hidden palettes request nothing; art arrives on use.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const art = await a.dbg('dieArt');
       const types = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20'];
       for (const t of types) {
         assert.equal(typeof art[t], 'string', `${t} art rendered (got ${art[t]})`);
-        assert.ok(art[t].startsWith('data:image/'), `${t} art is a data URL`);
-        assert.ok(art[t].length > 100, `${t} art is non-trivial (${art[t].length} chars)`);
+        assert.ok(art[t].endsWith(`/models/dice-art/std.${t}.webp`), `${t} uses its baked portrait`);
       }
       assert.ok(new Set(types.map((t) => art[t])).size >= 2, 'at least two types render distinct art');
+
+      await tapControl(a, '#quick-dice .dice-mode-link');
+      await a.waitFor(`[...document.querySelectorAll('#die-buttons .die-art')].every(img=>img.getAttribute('src')&&img.complete&&img.naturalWidth)`);
 
       // The palette: 8 tiles (7 types + d100), every one carrying die art —
       // the d100 shortcut reuses the d10x still.
@@ -5605,7 +5608,7 @@ export const scenarios = [
       assert.equal(tiles[7].src, tiles[4].src, 'd100 reuses the d10x art');
       // Art replaces the diamond, but the tile is still the button: a click
       // still adds its die to the pool draft (the cluster shows its art).
-      await a.eval(`document.querySelector('#die-buttons .die-btn').click()`);
+      await tapControl(a, '#die-buttons .die-btn');
       assert.deepEqual((await a.dbg('trayState')).dice, ['d4'],
         'clicking an art tile still adds its die to the pool');
     },
@@ -9537,6 +9540,9 @@ export const scenarios = [
 
       // palette tiles follow MY set, in place, on the switch
       await a.eval(`window.__diceDebug.setDiceSet('emberforge.blackanvil')`);
+      await a.page.browser.send('Page.bringToFront',{},a.page.sessionId);
+      if(!await a.eval("document.getElementById('quick-dice').hidden"))await tapControl(a, '#quick-dice .dice-mode-link');
+      await a.waitFor(`document.querySelector('.die-btn img[data-art-type="d6"]').src===window.__diceDebug.dieArtFor('d6','emberforge.blackanvil')`);
       const tile = JSON.parse(await a.eval(`JSON.stringify((() => {
         const img = document.querySelector('.die-btn img.die-art[data-art-type="d6"]');
         return img ? img.src === window.__diceDebug.dieArtFor('d6', 'emberforge.blackanvil') : null;
@@ -9548,6 +9554,8 @@ export const scenarios = [
       await a.settle();
       await b.settle();
       await b.waitFor(`document.getElementById('log-list').childElementCount >= 1`, { desc: 'roll reaches tab B' });
+      await tapControl(b, '#rail-log');
+      await b.waitFor(`document.querySelector('#log-list img.log-die')?.src===window.__diceDebug.dieArtFor('d6','emberforge.blackanvil')`);
       const logChip = JSON.parse(await b.eval(`JSON.stringify((() => {
         const img = document.querySelector('#log-list img.log-die');
         return img ? img.src === window.__diceDebug.dieArtFor('d6', 'emberforge.blackanvil') : null;
@@ -9557,6 +9565,8 @@ export const scenarios = [
       // a hidden entry wears obsidian: die types public, identity not
       await a.roll('d20 held');
       await b.waitFor(`document.getElementById('log-list').childElementCount >= 2`, { desc: 'held entry reaches tab B' });
+      await b.page.browser.send('Page.bringToFront',{},b.page.sessionId);
+      await b.waitFor(`document.querySelector('#log-list img.log-die')?.src===window.__diceDebug.dieArtFor('d20','shroud')`);
       const heldChip = JSON.parse(await b.eval(`JSON.stringify((() => {
         const img = document.querySelector('#log-list img.log-die'); // newest entry first
         return img ? img.src === window.__diceDebug.dieArtFor('d20', 'shroud') : null;
@@ -9565,6 +9575,8 @@ export const scenarios = [
 
       // switching back re-dresses the palette
       await a.eval(`window.__diceDebug.setDiceSet('std')`);
+      await a.page.browser.send('Page.bringToFront',{},a.page.sessionId);
+      await a.waitFor(`document.querySelector('.die-btn img[data-art-type="d6"]').src===window.__diceDebug.dieArtFor('d6','std')`);
       const back = JSON.parse(await a.eval(`JSON.stringify((() => {
         const img = document.querySelector('.die-btn img.die-art[data-art-type="d6"]');
         return img ? img.src === window.__diceDebug.dieArtFor('d6', 'std') : null;
@@ -9631,6 +9643,8 @@ export const scenarios = [
       assert.equal(junk, false, 'an unknown set id is refused');
 
       // the tile strip previews the pool's own skin, pinned against refresh
+      await hoverControl(a, `[data-group-id="${gid}"]`);
+      await a.waitFor(`document.querySelector('[data-group-id="${gid}"] img.die-art')?.src===window.__diceDebug.dieArtFor('d6','emberforge.blackanvil')`);
       const tile = JSON.parse(await a.eval(`JSON.stringify((() => {
         const img = document.querySelector('[data-group-id="${gid}"] img.die-art');
         return img ? {
@@ -9672,6 +9686,8 @@ export const scenarios = [
         `document.querySelectorAll('#groups-list .pool-tile.foreign img.die-art').length >= 1`,
         { desc: "Alice's rack renders" },
       );
+      await hoverControl(b, '#groups-list .pool-tile.foreign:has(img[data-art-set="emberforge.blackanvil"])');
+      await b.waitFor(`document.querySelector('#groups-list .pool-tile.foreign img[data-art-set="emberforge.blackanvil"]')?.src===window.__diceDebug.dieArtFor('d6','emberforge.blackanvil')`);
       const foreign = JSON.parse(await b.eval(`JSON.stringify((() => {
         const imgs = [...document.querySelectorAll('#groups-list .pool-tile.foreign img.die-art')];
         return {
