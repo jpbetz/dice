@@ -1,0 +1,6999 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "baselineCommit": "7b6b370",
+  "viewport": {
+    "width": 390,
+    "height": 844,
+    "dpr": 1,
+    "mobile": true,
+    "touch": true
+  },
+  "cpuThrottle": 4,
+  "network": "local ephemeral server; HTTP cache disabled; no network throttle",
+  "before": [
+    {
+      "venue": "table",
+      "sample": 0,
+      "cpu": 4,
+      "network": false,
+      "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "startupMs": 3915.600000023842,
+      "startupLongestTask": 2918,
+      "firstVisibleMs": 319.7000000476837,
+      "firstLongestTask": 201,
+      "activityLongestTask": 72,
+      "activityFrameP95": 26.700000047683716,
+      "appearanceLongestTask": 91,
+      "previewBytes": 8202236,
+      "appearanceFirstFrameMs": 222.19999992847443,
+      "appearanceCompleteMs": 453.0,
+      "activityInputQueueMs": [
+        20.800000071525574,
+        0.10000002384185791
+      ],
+      "startupHotFunctions": [
+        {
+          "fn": "renderFeltSwatches js/main.js:29524",
+          "ms": 1708.7
+        },
+        {
+          "fn": "(anonymous) js/dice.js:1278",
+          "ms": 417.3
+        },
+        {
+          "fn": "stroke js/main.js:2692",
+          "ms": 319.9
+        },
+        {
+          "fn": "(program) :0",
+          "ms": 247.4
+        },
+        {
+          "fn": "warmVariant js/diceart.js:107",
+          "ms": 193.9
+        },
+        {
+          "fn": "paintOakCloth js/main.js:2862",
+          "ms": 162.5
+        },
+        {
+          "fn": "paintSiltCloth js/main.js:2732",
+          "ms": 105.1
+        },
+        {
+          "fn": "texSubImage2D vendor/three.module.js:23670",
+          "ms": 103.9
+        },
+        {
+          "fn": "onFirstUse vendor/three.module.js:20271",
+          "ms": 57
+        },
+        {
+          "fn": "feltTileCanvas js/main.js:2619",
+          "ms": 49
+        }
+      ],
+      "startupResources": [
+        {
+          "path": "/js/report.js",
+          "at": 41.200000047683716,
+          "ms": 8.200000047683716,
+          "encoded": 3313,
+          "bytes": 3613
+        },
+        {
+          "path": "/css/style.css",
+          "at": 42,
+          "ms": 9.900000095367432,
+          "encoded": 105228,
+          "bytes": 105528
+        },
+        {
+          "path": "/css/firstplay.css",
+          "at": 42.200000047683716,
+          "ms": 5.600000023841858,
+          "encoded": 745,
+          "bytes": 1045
+        },
+        {
+          "path": "/css/workspaces.css",
+          "at": 42.300000071525574,
+          "ms": 7,
+          "encoded": 3140,
+          "bytes": 3440
+        },
+        {
+          "path": "/css/playerresults.css",
+          "at": 42.40000009536743,
+          "ms": 6.199999928474426,
+          "encoded": 2877,
+          "bytes": 3177
+        },
+        {
+          "path": "/js/main.js",
+          "at": 42.40000009536743,
+          "ms": 41.09999990463257,
+          "encoded": 628938,
+          "bytes": 629238
+        },
+        {
+          "path": "/js/film-bake.js",
+          "at": 103.80000007152557,
+          "ms": 9.5,
+          "encoded": 15523,
+          "bytes": 15823
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "at": 103.80000007152557,
+          "ms": 11.299999952316284,
+          "encoded": 76922,
+          "bytes": 77222
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "at": 103.80000007152557,
+          "ms": 30.600000023841858,
+          "encoded": 255043,
+          "bytes": 255343
+        },
+        {
+          "path": "/js/film-client.js",
+          "at": 103.90000009536743,
+          "ms": 7.699999928474426,
+          "encoded": 1310,
+          "bytes": 1610
+        },
+        {
+          "path": "/js/film-wire.js",
+          "at": 103.90000009536743,
+          "ms": 9.199999928474426,
+          "encoded": 4646,
+          "bytes": 4946
+        },
+        {
+          "path": "/js/round-table.js",
+          "at": 104.40000009536743,
+          "ms": 9.799999952316284,
+          "encoded": 1147,
+          "bytes": 1447
+        },
+        {
+          "path": "/js/diceart.js",
+          "at": 104.40000009536743,
+          "ms": 15.399999976158142,
+          "encoded": 3932,
+          "bytes": 4232
+        },
+        {
+          "path": "/js/dice.js",
+          "at": 104.40000009536743,
+          "ms": 15.5,
+          "encoded": 24145,
+          "bytes": 24445
+        },
+        {
+          "path": "/js/net.js",
+          "at": 104.40000009536743,
+          "ms": 15.799999952316284,
+          "encoded": 15274,
+          "bytes": 15574
+        },
+        {
+          "path": "/js/tables.js",
+          "at": 104.5,
+          "ms": 16.300000071525574,
+          "encoded": 5400,
+          "bytes": 5700
+        },
+        {
+          "path": "/js/meanings.js",
+          "at": 104.5,
+          "ms": 16.600000023841858,
+          "encoded": 13063,
+          "bytes": 13363
+        },
+        {
+          "path": "/js/rollspec.js",
+          "at": 104.5,
+          "ms": 21.200000047683716,
+          "encoded": 8695,
+          "bytes": 8995
+        },
+        {
+          "path": "/js/places.js",
+          "at": 104.5,
+          "ms": 21.300000071525574,
+          "encoded": 22870,
+          "bytes": 23170
+        },
+        {
+          "path": "/js/demo.js",
+          "at": 104.60000002384186,
+          "ms": 21.700000047683716,
+          "encoded": 4587,
+          "bytes": 4887
+        },
+        {
+          "path": "/js/placard.js",
+          "at": 104.60000002384186,
+          "ms": 22.300000071525574,
+          "encoded": 36034,
+          "bytes": 36334
+        },
+        {
+          "path": "/js/odds.js",
+          "at": 104.60000002384186,
+          "ms": 22.899999976158142,
+          "encoded": 17331,
+          "bytes": 17631
+        },
+        {
+          "path": "/js/notation.js",
+          "at": 104.60000002384186,
+          "ms": 26.899999976158142,
+          "encoded": 17222,
+          "bytes": 17522
+        },
+        {
+          "path": "/js/seed.js",
+          "at": 104.60000002384186,
+          "ms": 27,
+          "encoded": 5961,
+          "bytes": 6261
+        },
+        {
+          "path": "/js/firstplay.js",
+          "at": 104.70000004768372,
+          "ms": 25.600000023841858,
+          "encoded": 2068,
+          "bytes": 2368
+        },
+        {
+          "path": "/js/table-designs.js",
+          "at": 105.40000009536743,
+          "ms": 26.59999990463257,
+          "encoded": 1497,
+          "bytes": 1797
+        },
+        {
+          "path": "/js/workspaces.js",
+          "at": 105.40000009536743,
+          "ms": 26.699999928474426,
+          "encoded": 5527,
+          "bytes": 5827
+        },
+        {
+          "path": "/js/library-document.js",
+          "at": 105.5,
+          "ms": 28.100000023841858,
+          "encoded": 2419,
+          "bytes": 2719
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "at": 105.5,
+          "ms": 32.10000002384186,
+          "encoded": 584,
+          "bytes": 884
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "at": 105.5,
+          "ms": 32.200000047683716,
+          "encoded": 695,
+          "bytes": 995
+        },
+        {
+          "path": "/js/playerresults.js",
+          "at": 105.5,
+          "ms": 32.40000009536743,
+          "encoded": 3578,
+          "bytes": 3878
+        },
+        {
+          "path": "/js/stability.js",
+          "at": 105.5,
+          "ms": 32.40000009536743,
+          "encoded": 3576,
+          "bytes": 3876
+        },
+        {
+          "path": "/js/schema.js",
+          "at": 105.60000002384186,
+          "ms": 32.60000002384186,
+          "encoded": 4728,
+          "bytes": 5028
+        },
+        {
+          "path": "/js/portable.js",
+          "at": 105.70000004768372,
+          "ms": 35.200000047683716,
+          "encoded": 14544,
+          "bytes": 14844
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "at": 105.70000004768372,
+          "ms": 35.5,
+          "encoded": 1117,
+          "bytes": 1417
+        },
+        {
+          "path": "/js/profiles.js",
+          "at": 105.70000004768372,
+          "ms": 35.799999952316284,
+          "encoded": 10493,
+          "bytes": 10793
+        },
+        {
+          "path": "/js/themes.js",
+          "at": 106.20000004768372,
+          "ms": 35.299999952316284,
+          "encoded": 7801,
+          "bytes": 8101
+        },
+        {
+          "path": "/js/particles.js",
+          "at": 106.20000004768372,
+          "ms": 35.39999997615814,
+          "encoded": 4717,
+          "bytes": 5017
+        },
+        {
+          "path": "/js/decals.js",
+          "at": 106.30000007152557,
+          "ms": 35.5,
+          "encoded": 7646,
+          "bytes": 7946
+        },
+        {
+          "path": "/js/towerids.js",
+          "at": 106.30000007152557,
+          "ms": 37,
+          "encoded": 625,
+          "bytes": 925
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "at": 106.30000007152557,
+          "ms": 38.60000002384186,
+          "encoded": 684,
+          "bytes": 984
+        },
+        {
+          "path": "/js/dielights.js",
+          "at": 106.30000007152557,
+          "ms": 38.699999928474426,
+          "encoded": 2245,
+          "bytes": 2545
+        },
+        {
+          "path": "/js/post.js",
+          "at": 106.30000007152557,
+          "ms": 38.799999952316284,
+          "encoded": 6683,
+          "bytes": 6983
+        },
+        {
+          "path": "/js/towerglb.js",
+          "at": 106.30000007152557,
+          "ms": 38.89999997615814,
+          "encoded": 7674,
+          "bytes": 7974
+        },
+        {
+          "path": "/js/motes.js",
+          "at": 106.40000009536743,
+          "ms": 38.59999990463257,
+          "encoded": 3130,
+          "bytes": 3430
+        },
+        {
+          "path": "/js/tunables.js",
+          "at": 106.80000007152557,
+          "ms": 41.699999928474426,
+          "encoded": 13938,
+          "bytes": 14238
+        },
+        {
+          "path": "/js/voices.js",
+          "at": 106.80000007152557,
+          "ms": 41.699999928474426,
+          "encoded": 20876,
+          "bytes": 21176
+        },
+        {
+          "path": "/js/tune.js",
+          "at": 106.90000009536743,
+          "ms": 41.799999952316284,
+          "encoded": 45850,
+          "bytes": 46150
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "at": 129.20000004768372,
+          "ms": 19.299999952316284,
+          "encoded": 5471,
+          "bytes": 5771
+        },
+        {
+          "path": "/js/placard-design.js",
+          "at": 129.30000007152557,
+          "ms": 18.699999928474426,
+          "encoded": 1701,
+          "bytes": 2001
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "at": 150.80000007152557,
+          "ms": 1,
+          "encoded": 2405,
+          "bytes": 2705
+        },
+        {
+          "path": "/js/yaml.js",
+          "at": 151.10000002384186,
+          "ms": 1.3000000715255737,
+          "encoded": 9990,
+          "bytes": 10290
+        },
+        {
+          "path": "/api/join",
+          "at": 3049,
+          "ms": 3.5,
+          "encoded": 326,
+          "bytes": 626
+        },
+        {
+          "path": "/models/mats/linen.png",
+          "at": 3067.8000000715256,
+          "ms": 2.1999999284744263,
+          "encoded": 22974,
+          "bytes": 23274
+        },
+        {
+          "path": "/favicon.ico",
+          "at": 3888.7000000476837,
+          "ms": 1.7000000476837158,
+          "encoded": 40,
+          "bytes": 340
+        },
+        {
+          "path": "/api/pools",
+          "at": 3910.3000000715256,
+          "ms": 1.100000023841858,
+          "encoded": 11,
+          "bytes": 311
+        },
+        {
+          "path": "/api/pools",
+          "at": 3936.600000023842,
+          "ms": 1.2000000476837158,
+          "encoded": 11,
+          "bytes": 311
+        }
+      ],
+      "startupLongTasks": [
+        {
+          "at": 154.80000007152557,
+          "ms": 2918
+        },
+        {
+          "at": 3076.7000000476837,
+          "ms": 172
+        },
+        {
+          "at": 3254.100000023842,
+          "ms": 585
+        }
+      ],
+      "firstRollLongTasks": [
+        {
+          "at": 4189.700000047684,
+          "ms": 201
+        }
+      ],
+      "appearanceLongTasks": [
+        {
+          "at": 9426.800000071526,
+          "ms": 91
+        }
+      ]
+    },
+    {
+      "venue": "table",
+      "sample": 1,
+      "cpu": 4,
+      "network": false,
+      "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "startupMs": 3804,
+      "startupLongestTask": 2859,
+      "firstVisibleMs": 305.09999990463257,
+      "firstLongestTask": 195,
+      "activityLongestTask": 69,
+      "activityFrameP95": 31.100000023841858,
+      "appearanceLongestTask": 94,
+      "previewBytes": 8202236,
+      "appearanceFirstFrameMs": 225.0,
+      "appearanceCompleteMs": 478.60000002384186,
+      "activityInputQueueMs": [
+        25.399999976158142,
+        0.30000007152557373
+      ],
+      "startupHotFunctions": [
+        {
+          "fn": "renderFeltSwatches js/main.js:29524",
+          "ms": 1714.1
+        },
+        {
+          "fn": "(anonymous) js/dice.js:1278",
+          "ms": 405.3
+        },
+        {
+          "fn": "stroke js/main.js:2692",
+          "ms": 310.2
+        },
+        {
+          "fn": "(program) :0",
+          "ms": 223.8
+        },
+        {
+          "fn": "warmVariant js/diceart.js:107",
+          "ms": 180.1
+        },
+        {
+          "fn": "paintOakCloth js/main.js:2862",
+          "ms": 173.9
+        },
+        {
+          "fn": "paintSiltCloth js/main.js:2732",
+          "ms": 106.8
+        },
+        {
+          "fn": "texSubImage2D vendor/three.module.js:23670",
+          "ms": 101.4
+        },
+        {
+          "fn": "onFirstUse vendor/three.module.js:20271",
+          "ms": 67.5
+        },
+        {
+          "fn": "(garbage collector) :0",
+          "ms": 41.9
+        }
+      ],
+      "startupResources": [
+        {
+          "path": "/js/report.js",
+          "at": 15.700000047683716,
+          "ms": 1.7999999523162842,
+          "encoded": 3313,
+          "bytes": 3613
+        },
+        {
+          "path": "/css/style.css",
+          "at": 15.800000071525574,
+          "ms": 6.199999928474426,
+          "encoded": 105228,
+          "bytes": 105528
+        },
+        {
+          "path": "/css/playerresults.css",
+          "at": 16.40000009536743,
+          "ms": 4,
+          "encoded": 2877,
+          "bytes": 3177
+        },
+        {
+          "path": "/css/firstplay.css",
+          "at": 16.40000009536743,
+          "ms": 3.799999952316284,
+          "encoded": 745,
+          "bytes": 1045
+        },
+        {
+          "path": "/css/workspaces.css",
+          "at": 16.40000009536743,
+          "ms": 3.899999976158142,
+          "encoded": 3140,
+          "bytes": 3440
+        },
+        {
+          "path": "/js/main.js",
+          "at": 16.40000009536743,
+          "ms": 9.5,
+          "encoded": 628938,
+          "bytes": 629238
+        },
+        {
+          "path": "/js/film-wire.js",
+          "at": 64.40000009536743,
+          "ms": 5.699999928474426,
+          "encoded": 4646,
+          "bytes": 4946
+        },
+        {
+          "path": "/js/film-bake.js",
+          "at": 64.40000009536743,
+          "ms": 5.699999928474426,
+          "encoded": 15523,
+          "bytes": 15823
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "at": 64.40000009536743,
+          "ms": 9,
+          "encoded": 76922,
+          "bytes": 77222
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "at": 64.40000009536743,
+          "ms": 17.299999952316284,
+          "encoded": 255043,
+          "bytes": 255343
+        },
+        {
+          "path": "/js/film-client.js",
+          "at": 64.5,
+          "ms": 5.400000095367432,
+          "encoded": 1310,
+          "bytes": 1610
+        },
+        {
+          "path": "/js/round-table.js",
+          "at": 64.5,
+          "ms": 5.400000095367432,
+          "encoded": 1147,
+          "bytes": 1447
+        },
+        {
+          "path": "/js/dice.js",
+          "at": 64.5,
+          "ms": 8.200000047683716,
+          "encoded": 24145,
+          "bytes": 24445
+        },
+        {
+          "path": "/js/diceart.js",
+          "at": 64.5,
+          "ms": 8.300000071525574,
+          "encoded": 3932,
+          "bytes": 4232
+        },
+        {
+          "path": "/js/net.js",
+          "at": 65.30000007152557,
+          "ms": 7.799999952316284,
+          "encoded": 15274,
+          "bytes": 15574
+        },
+        {
+          "path": "/js/tables.js",
+          "at": 65.30000007152557,
+          "ms": 7.799999952316284,
+          "encoded": 5400,
+          "bytes": 5700
+        },
+        {
+          "path": "/js/meanings.js",
+          "at": 65.5,
+          "ms": 9.900000095367432,
+          "encoded": 13063,
+          "bytes": 13363
+        },
+        {
+          "path": "/js/rollspec.js",
+          "at": 65.5,
+          "ms": 10.400000095367432,
+          "encoded": 8695,
+          "bytes": 8995
+        },
+        {
+          "path": "/js/places.js",
+          "at": 65.5,
+          "ms": 10.5,
+          "encoded": 22870,
+          "bytes": 23170
+        },
+        {
+          "path": "/js/demo.js",
+          "at": 65.5,
+          "ms": 11.200000047683716,
+          "encoded": 4587,
+          "bytes": 4887
+        },
+        {
+          "path": "/js/placard.js",
+          "at": 65.5,
+          "ms": 12.5,
+          "encoded": 36034,
+          "bytes": 36334
+        },
+        {
+          "path": "/js/odds.js",
+          "at": 65.60000002384186,
+          "ms": 12.200000047683716,
+          "encoded": 17331,
+          "bytes": 17631
+        },
+        {
+          "path": "/js/notation.js",
+          "at": 65.60000002384186,
+          "ms": 13,
+          "encoded": 17222,
+          "bytes": 17522
+        },
+        {
+          "path": "/js/firstplay.js",
+          "at": 66,
+          "ms": 12.800000071525574,
+          "encoded": 2068,
+          "bytes": 2368
+        },
+        {
+          "path": "/js/seed.js",
+          "at": 66,
+          "ms": 12.800000071525574,
+          "encoded": 5961,
+          "bytes": 6261
+        },
+        {
+          "path": "/js/table-designs.js",
+          "at": 66,
+          "ms": 15.100000023841858,
+          "encoded": 1497,
+          "bytes": 1797
+        },
+        {
+          "path": "/js/library-document.js",
+          "at": 66,
+          "ms": 15.100000023841858,
+          "encoded": 2419,
+          "bytes": 2719
+        },
+        {
+          "path": "/js/workspaces.js",
+          "at": 66,
+          "ms": 15.200000047683716,
+          "encoded": 5527,
+          "bytes": 5827
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "at": 66,
+          "ms": 15.100000023841858,
+          "encoded": 584,
+          "bytes": 884
+        },
+        {
+          "path": "/js/playerresults.js",
+          "at": 66.10000002384186,
+          "ms": 15.200000047683716,
+          "encoded": 3578,
+          "bytes": 3878
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "at": 66.5,
+          "ms": 16.90000009536743,
+          "encoded": 695,
+          "bytes": 995
+        },
+        {
+          "path": "/js/stability.js",
+          "at": 66.5,
+          "ms": 17,
+          "encoded": 3576,
+          "bytes": 3876
+        },
+        {
+          "path": "/js/schema.js",
+          "at": 66.5,
+          "ms": 18.100000023841858,
+          "encoded": 4728,
+          "bytes": 5028
+        },
+        {
+          "path": "/js/profiles.js",
+          "at": 66.60000002384186,
+          "ms": 18.300000071525574,
+          "encoded": 10493,
+          "bytes": 10793
+        },
+        {
+          "path": "/js/portable.js",
+          "at": 66.60000002384186,
+          "ms": 18.200000047683716,
+          "encoded": 14544,
+          "bytes": 14844
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "at": 66.90000009536743,
+          "ms": 17.699999928474426,
+          "encoded": 1117,
+          "bytes": 1417
+        },
+        {
+          "path": "/js/themes.js",
+          "at": 66.90000009536743,
+          "ms": 18.09999990463257,
+          "encoded": 7801,
+          "bytes": 8101
+        },
+        {
+          "path": "/js/particles.js",
+          "at": 66.90000009536743,
+          "ms": 18.199999928474426,
+          "encoded": 4717,
+          "bytes": 5017
+        },
+        {
+          "path": "/js/dielights.js",
+          "at": 66.90000009536743,
+          "ms": 19.899999976158142,
+          "encoded": 2245,
+          "bytes": 2545
+        },
+        {
+          "path": "/js/decals.js",
+          "at": 66.90000009536743,
+          "ms": 20.09999990463257,
+          "encoded": 7646,
+          "bytes": 7946
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "at": 67.10000002384186,
+          "ms": 19.800000071525574,
+          "encoded": 684,
+          "bytes": 984
+        },
+        {
+          "path": "/js/towerids.js",
+          "at": 67.10000002384186,
+          "ms": 19.899999976158142,
+          "encoded": 625,
+          "bytes": 925
+        },
+        {
+          "path": "/js/towerglb.js",
+          "at": 67.10000002384186,
+          "ms": 20.5,
+          "encoded": 7674,
+          "bytes": 7974
+        },
+        {
+          "path": "/js/post.js",
+          "at": 67.10000002384186,
+          "ms": 20.399999976158142,
+          "encoded": 6683,
+          "bytes": 6983
+        },
+        {
+          "path": "/js/motes.js",
+          "at": 67.10000002384186,
+          "ms": 22.600000023841858,
+          "encoded": 3130,
+          "bytes": 3430
+        },
+        {
+          "path": "/js/voices.js",
+          "at": 67.10000002384186,
+          "ms": 22.800000071525574,
+          "encoded": 20876,
+          "bytes": 21176
+        },
+        {
+          "path": "/js/tunables.js",
+          "at": 67.90000009536743,
+          "ms": 22.09999990463257,
+          "encoded": 13938,
+          "bytes": 14238
+        },
+        {
+          "path": "/js/tune.js",
+          "at": 67.90000009536743,
+          "ms": 22.59999990463257,
+          "encoded": 45850,
+          "bytes": 46150
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "at": 80.40000009536743,
+          "ms": 10,
+          "encoded": 5471,
+          "bytes": 5771
+        },
+        {
+          "path": "/js/placard-design.js",
+          "at": 80.5,
+          "ms": 9.400000095367432,
+          "encoded": 1701,
+          "bytes": 2001
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "at": 96.90000009536743,
+          "ms": 1.7999999523162842,
+          "encoded": 2405,
+          "bytes": 2705
+        },
+        {
+          "path": "/js/yaml.js",
+          "at": 96.90000009536743,
+          "ms": 1.899999976158142,
+          "encoded": 9990,
+          "bytes": 10290
+        },
+        {
+          "path": "/api/join",
+          "at": 2938.4000000953674,
+          "ms": 1.899999976158142,
+          "encoded": 326,
+          "bytes": 626
+        },
+        {
+          "path": "/models/mats/linen.png",
+          "at": 2956.5,
+          "ms": 1.3000000715255737,
+          "encoded": 22974,
+          "bytes": 23274
+        },
+        {
+          "path": "/favicon.ico",
+          "at": 3782.9000000953674,
+          "ms": 2.0999999046325684,
+          "encoded": 40,
+          "bytes": 340
+        },
+        {
+          "path": "/api/pools",
+          "at": 3798.9000000953674,
+          "ms": 1,
+          "encoded": 11,
+          "bytes": 311
+        },
+        {
+          "path": "/api/pools",
+          "at": 3824.5,
+          "ms": 1.4000000953674316,
+          "encoded": 11,
+          "bytes": 311
+        }
+      ],
+      "startupLongTasks": [
+        {
+          "at": 101.70000004768372,
+          "ms": 2859
+        },
+        {
+          "at": 2965.600000023842,
+          "ms": 202
+        },
+        {
+          "at": 3172.4000000953674,
+          "ms": 582
+        }
+      ],
+      "firstRollLongTasks": [
+        {
+          "at": 4059,
+          "ms": 195
+        }
+      ],
+      "appearanceLongTasks": [
+        {
+          "at": 8922.100000023842,
+          "ms": 94
+        }
+      ]
+    },
+    {
+      "venue": "table",
+      "sample": 2,
+      "cpu": 4,
+      "network": false,
+      "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "startupMs": 3860.7999999523163,
+      "startupLongestTask": 2918,
+      "firstVisibleMs": 338.60000002384186,
+      "firstLongestTask": 222,
+      "activityLongestTask": 71,
+      "activityFrameP95": 26.5,
+      "appearanceLongestTask": 94,
+      "previewBytes": 8202236,
+      "appearanceFirstFrameMs": 228.80000007152557,
+      "appearanceCompleteMs": 501.2000000476837,
+      "activityInputQueueMs": [
+        19.5,
+        21.5
+      ],
+      "startupHotFunctions": [
+        {
+          "fn": "renderFeltSwatches js/main.js:29524",
+          "ms": 1708.8
+        },
+        {
+          "fn": "(anonymous) js/dice.js:1278",
+          "ms": 434.3
+        },
+        {
+          "fn": "stroke js/main.js:2692",
+          "ms": 316.3
+        },
+        {
+          "fn": "(program) :0",
+          "ms": 215.9
+        },
+        {
+          "fn": "warmVariant js/diceart.js:107",
+          "ms": 180.5
+        },
+        {
+          "fn": "paintOakCloth js/main.js:2862",
+          "ms": 168.3
+        },
+        {
+          "fn": "texSubImage2D vendor/three.module.js:23670",
+          "ms": 105.4
+        },
+        {
+          "fn": "paintSiltCloth js/main.js:2732",
+          "ms": 94.2
+        },
+        {
+          "fn": "onFirstUse vendor/three.module.js:20271",
+          "ms": 68.3
+        },
+        {
+          "fn": "rng js/film-wire.js:40",
+          "ms": 45.4
+        }
+      ],
+      "startupResources": [
+        {
+          "path": "/js/report.js",
+          "at": 15.699999928474426,
+          "ms": 3.600000023841858,
+          "encoded": 3313,
+          "bytes": 3613
+        },
+        {
+          "path": "/css/style.css",
+          "at": 15.799999952316284,
+          "ms": 4.600000023841858,
+          "encoded": 105228,
+          "bytes": 105528
+        },
+        {
+          "path": "/css/firstplay.css",
+          "at": 15.899999976158142,
+          "ms": 3.200000047683716,
+          "encoded": 745,
+          "bytes": 1045
+        },
+        {
+          "path": "/css/workspaces.css",
+          "at": 15.899999976158142,
+          "ms": 3.200000047683716,
+          "encoded": 3140,
+          "bytes": 3440
+        },
+        {
+          "path": "/css/playerresults.css",
+          "at": 15.899999976158142,
+          "ms": 3.299999952316284,
+          "encoded": 2877,
+          "bytes": 3177
+        },
+        {
+          "path": "/js/main.js",
+          "at": 15.899999976158142,
+          "ms": 8.100000023841858,
+          "encoded": 628938,
+          "bytes": 629238
+        },
+        {
+          "path": "/js/film-wire.js",
+          "at": 62.10000002384186,
+          "ms": 8.899999976158142,
+          "encoded": 4646,
+          "bytes": 4946
+        },
+        {
+          "path": "/js/film-bake.js",
+          "at": 62.10000002384186,
+          "ms": 8.799999952316284,
+          "encoded": 15523,
+          "bytes": 15823
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "at": 62.10000002384186,
+          "ms": 11.799999952316284,
+          "encoded": 76922,
+          "bytes": 77222
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "at": 62.10000002384186,
+          "ms": 20.699999928474426,
+          "encoded": 255043,
+          "bytes": 255343
+        },
+        {
+          "path": "/js/film-client.js",
+          "at": 62.199999928474426,
+          "ms": 7.900000095367432,
+          "encoded": 1310,
+          "bytes": 1610
+        },
+        {
+          "path": "/js/round-table.js",
+          "at": 62.199999928474426,
+          "ms": 8,
+          "encoded": 1147,
+          "bytes": 1447
+        },
+        {
+          "path": "/js/dice.js",
+          "at": 62.199999928474426,
+          "ms": 11.300000071525574,
+          "encoded": 24145,
+          "bytes": 24445
+        },
+        {
+          "path": "/js/diceart.js",
+          "at": 62.299999952316284,
+          "ms": 11.399999976158142,
+          "encoded": 3932,
+          "bytes": 4232
+        },
+        {
+          "path": "/js/net.js",
+          "at": 62.299999952316284,
+          "ms": 12.300000071525574,
+          "encoded": 15274,
+          "bytes": 15574
+        },
+        {
+          "path": "/js/tables.js",
+          "at": 63,
+          "ms": 11.799999952316284,
+          "encoded": 5400,
+          "bytes": 5700
+        },
+        {
+          "path": "/js/meanings.js",
+          "at": 63.10000002384186,
+          "ms": 13.399999976158142,
+          "encoded": 13063,
+          "bytes": 13363
+        },
+        {
+          "path": "/js/rollspec.js",
+          "at": 63.10000002384186,
+          "ms": 14.099999904632568,
+          "encoded": 8695,
+          "bytes": 8995
+        },
+        {
+          "path": "/js/places.js",
+          "at": 63.10000002384186,
+          "ms": 14.199999928474426,
+          "encoded": 22870,
+          "bytes": 23170
+        },
+        {
+          "path": "/js/demo.js",
+          "at": 63.10000002384186,
+          "ms": 15.099999904632568,
+          "encoded": 4587,
+          "bytes": 4887
+        },
+        {
+          "path": "/js/placard.js",
+          "at": 63.10000002384186,
+          "ms": 15.199999928474426,
+          "encoded": 36034,
+          "bytes": 36334
+        },
+        {
+          "path": "/js/odds.js",
+          "at": 63.10000002384186,
+          "ms": 16.199999928474426,
+          "encoded": 17331,
+          "bytes": 17631
+        },
+        {
+          "path": "/js/firstplay.js",
+          "at": 63.10000002384186,
+          "ms": 17.299999952316284,
+          "encoded": 2068,
+          "bytes": 2368
+        },
+        {
+          "path": "/js/notation.js",
+          "at": 63.10000002384186,
+          "ms": 17.5,
+          "encoded": 17222,
+          "bytes": 17522
+        },
+        {
+          "path": "/js/seed.js",
+          "at": 63.10000002384186,
+          "ms": 18.09999990463257,
+          "encoded": 5961,
+          "bytes": 6261
+        },
+        {
+          "path": "/js/table-designs.js",
+          "at": 63.199999928474426,
+          "ms": 18,
+          "encoded": 1497,
+          "bytes": 1797
+        },
+        {
+          "path": "/js/workspaces.js",
+          "at": 63.199999928474426,
+          "ms": 18.300000071525574,
+          "encoded": 5527,
+          "bytes": 5827
+        },
+        {
+          "path": "/js/library-document.js",
+          "at": 63.299999952316284,
+          "ms": 19.899999976158142,
+          "encoded": 2419,
+          "bytes": 2719
+        },
+        {
+          "path": "/js/playerresults.js",
+          "at": 63.299999952316284,
+          "ms": 20,
+          "encoded": 3578,
+          "bytes": 3878
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "at": 63.299999952316284,
+          "ms": 20,
+          "encoded": 584,
+          "bytes": 884
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "at": 64,
+          "ms": 19.299999952316284,
+          "encoded": 695,
+          "bytes": 995
+        },
+        {
+          "path": "/js/stability.js",
+          "at": 64,
+          "ms": 21.399999976158142,
+          "encoded": 3576,
+          "bytes": 3876
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "at": 64.10000002384186,
+          "ms": 21.899999976158142,
+          "encoded": 1117,
+          "bytes": 1417
+        },
+        {
+          "path": "/js/schema.js",
+          "at": 64.10000002384186,
+          "ms": 22.09999990463257,
+          "encoded": 4728,
+          "bytes": 5028
+        },
+        {
+          "path": "/js/portable.js",
+          "at": 64.10000002384186,
+          "ms": 22.09999990463257,
+          "encoded": 14544,
+          "bytes": 14844
+        },
+        {
+          "path": "/js/profiles.js",
+          "at": 64.10000002384186,
+          "ms": 22.299999952316284,
+          "encoded": 10493,
+          "bytes": 10793
+        },
+        {
+          "path": "/js/themes.js",
+          "at": 64.19999992847443,
+          "ms": 22.200000047683716,
+          "encoded": 7801,
+          "bytes": 8101
+        },
+        {
+          "path": "/js/particles.js",
+          "at": 64.19999992847443,
+          "ms": 24.300000071525574,
+          "encoded": 4717,
+          "bytes": 5017
+        },
+        {
+          "path": "/js/decals.js",
+          "at": 64.19999992847443,
+          "ms": 24.5,
+          "encoded": 7646,
+          "bytes": 7946
+        },
+        {
+          "path": "/js/dielights.js",
+          "at": 64.19999992847443,
+          "ms": 24.5,
+          "encoded": 2245,
+          "bytes": 2545
+        },
+        {
+          "path": "/js/post.js",
+          "at": 64.19999992847443,
+          "ms": 24.600000023841858,
+          "encoded": 6683,
+          "bytes": 6983
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "at": 64.29999995231628,
+          "ms": 24.5,
+          "encoded": 684,
+          "bytes": 984
+        },
+        {
+          "path": "/js/towerids.js",
+          "at": 64.79999995231628,
+          "ms": 24,
+          "encoded": 625,
+          "bytes": 925
+        },
+        {
+          "path": "/js/motes.js",
+          "at": 64.79999995231628,
+          "ms": 26.399999976158142,
+          "encoded": 3130,
+          "bytes": 3430
+        },
+        {
+          "path": "/js/towerglb.js",
+          "at": 64.79999995231628,
+          "ms": 26.5,
+          "encoded": 7674,
+          "bytes": 7974
+        },
+        {
+          "path": "/js/voices.js",
+          "at": 64.89999997615814,
+          "ms": 26.600000023841858,
+          "encoded": 20876,
+          "bytes": 21176
+        },
+        {
+          "path": "/js/tunables.js",
+          "at": 64.89999997615814,
+          "ms": 26.700000047683716,
+          "encoded": 13938,
+          "bytes": 14238
+        },
+        {
+          "path": "/js/tune.js",
+          "at": 64.89999997615814,
+          "ms": 27.5,
+          "encoded": 45850,
+          "bytes": 46150
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "at": 80.89999997615814,
+          "ms": 11.5,
+          "encoded": 5471,
+          "bytes": 5771
+        },
+        {
+          "path": "/js/placard-design.js",
+          "at": 81,
+          "ms": 11.199999928474426,
+          "encoded": 1701,
+          "bytes": 2001
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "at": 98.29999995231628,
+          "ms": 1.7000000476837158,
+          "encoded": 2405,
+          "bytes": 2705
+        },
+        {
+          "path": "/js/yaml.js",
+          "at": 98.5,
+          "ms": 1.5,
+          "encoded": 9990,
+          "bytes": 10290
+        },
+        {
+          "path": "/api/join",
+          "at": 2996.600000023842,
+          "ms": 1.5999999046325684,
+          "encoded": 326,
+          "bytes": 626
+        },
+        {
+          "path": "/models/mats/linen.png",
+          "at": 3016.2999999523163,
+          "ms": 1.3000000715255737,
+          "encoded": 22974,
+          "bytes": 23274
+        },
+        {
+          "path": "/favicon.ico",
+          "at": 3816.899999976158,
+          "ms": 1.100000023841858,
+          "encoded": 40,
+          "bytes": 340
+        },
+        {
+          "path": "/api/pools",
+          "at": 3855.600000023842,
+          "ms": 1.2999999523162842,
+          "encoded": 11,
+          "bytes": 311
+        }
+      ],
+      "startupLongTasks": [
+        {
+          "at": 102.39999997615814,
+          "ms": 2918
+        },
+        {
+          "at": 3024.6999999284744,
+          "ms": 170
+        },
+        {
+          "at": 3199.399999976158,
+          "ms": 595
+        }
+      ],
+      "firstRollLongTasks": [
+        {
+          "at": 4094.600000023842,
+          "ms": 222
+        }
+      ],
+      "appearanceLongTasks": [
+        {
+          "at": 8854.399999976158,
+          "ms": 94
+        }
+      ]
+    },
+    {
+      "venue": "copper",
+      "sample": 0,
+      "cpu": 4,
+      "network": false,
+      "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "startupMs": 4010.3000000715256,
+      "startupLongestTask": 2939,
+      "firstVisibleMs": 634.8000000715256,
+      "firstLongestTask": 304,
+      "activityLongestTask": 107,
+      "activityFrameP95": 83.80000007152557,
+      "appearanceLongestTask": 101,
+      "previewBytes": 8202236,
+      "appearanceFirstFrameMs": 486.2999999523163,
+      "appearanceCompleteMs": 663.6999999284744,
+      "activityInputQueueMs": [
+        70.40000009536743,
+        0.6000000238418579
+      ],
+      "startupHotFunctions": [
+        {
+          "fn": "renderFeltSwatches js/main.js:29524",
+          "ms": 1723
+        },
+        {
+          "fn": "(anonymous) js/dice.js:1278",
+          "ms": 415.1
+        },
+        {
+          "fn": "(program) :0",
+          "ms": 364.3
+        },
+        {
+          "fn": "stroke js/main.js:2692",
+          "ms": 317.3
+        },
+        {
+          "fn": "warmVariant js/diceart.js:107",
+          "ms": 206.4
+        },
+        {
+          "fn": "paintOakCloth js/main.js:2862",
+          "ms": 175
+        },
+        {
+          "fn": "texSubImage2D vendor/three.module.js:23670",
+          "ms": 132.7
+        },
+        {
+          "fn": "paintSiltCloth js/main.js:2732",
+          "ms": 97.3
+        },
+        {
+          "fn": "onFirstUse vendor/three.module.js:20271",
+          "ms": 65.8
+        },
+        {
+          "fn": "(idle) :0",
+          "ms": 50.1
+        }
+      ],
+      "startupResources": [
+        {
+          "path": "/js/report.js",
+          "at": 30.200000047683716,
+          "ms": 3.399999976158142,
+          "encoded": 3313,
+          "bytes": 3613
+        },
+        {
+          "path": "/css/workspaces.css",
+          "at": 30.899999976158142,
+          "ms": 5.300000071525574,
+          "encoded": 3140,
+          "bytes": 3440
+        },
+        {
+          "path": "/css/firstplay.css",
+          "at": 30.899999976158142,
+          "ms": 6.200000047683716,
+          "encoded": 745,
+          "bytes": 1045
+        },
+        {
+          "path": "/css/playerresults.css",
+          "at": 30.899999976158142,
+          "ms": 6.200000047683716,
+          "encoded": 2877,
+          "bytes": 3177
+        },
+        {
+          "path": "/css/style.css",
+          "at": 30.899999976158142,
+          "ms": 10.600000023841858,
+          "encoded": 105228,
+          "bytes": 105528
+        },
+        {
+          "path": "/js/main.js",
+          "at": 30.899999976158142,
+          "ms": 35.300000071525574,
+          "encoded": 628938,
+          "bytes": 629238
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "at": 84.30000007152557,
+          "ms": 35.299999952316284,
+          "encoded": 255043,
+          "bytes": 255343
+        },
+        {
+          "path": "/js/film-client.js",
+          "at": 85.10000002384186,
+          "ms": 5.399999976158142,
+          "encoded": 1310,
+          "bytes": 1610
+        },
+        {
+          "path": "/js/round-table.js",
+          "at": 85.10000002384186,
+          "ms": 5.5,
+          "encoded": 1147,
+          "bytes": 1447
+        },
+        {
+          "path": "/js/film-wire.js",
+          "at": 85.10000002384186,
+          "ms": 5.600000023841858,
+          "encoded": 4646,
+          "bytes": 4946
+        },
+        {
+          "path": "/js/film-bake.js",
+          "at": 85.10000002384186,
+          "ms": 5.700000047683716,
+          "encoded": 15523,
+          "bytes": 15823
+        },
+        {
+          "path": "/js/dice.js",
+          "at": 85.10000002384186,
+          "ms": 10.899999976158142,
+          "encoded": 24145,
+          "bytes": 24445
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "at": 85.10000002384186,
+          "ms": 11.799999952316284,
+          "encoded": 76922,
+          "bytes": 77222
+        },
+        {
+          "path": "/js/diceart.js",
+          "at": 85.5,
+          "ms": 10.399999976158142,
+          "encoded": 3932,
+          "bytes": 4232
+        },
+        {
+          "path": "/js/net.js",
+          "at": 85.5,
+          "ms": 10.700000047683716,
+          "encoded": 15274,
+          "bytes": 15574
+        },
+        {
+          "path": "/js/tables.js",
+          "at": 85.5,
+          "ms": 11.200000047683716,
+          "encoded": 5400,
+          "bytes": 5700
+        },
+        {
+          "path": "/js/meanings.js",
+          "at": 85.60000002384186,
+          "ms": 13.299999952316284,
+          "encoded": 13063,
+          "bytes": 13363
+        },
+        {
+          "path": "/js/rollspec.js",
+          "at": 85.60000002384186,
+          "ms": 13.700000047683716,
+          "encoded": 8695,
+          "bytes": 8995
+        },
+        {
+          "path": "/js/demo.js",
+          "at": 85.60000002384186,
+          "ms": 14.299999952316284,
+          "encoded": 4587,
+          "bytes": 4887
+        },
+        {
+          "path": "/js/places.js",
+          "at": 85.60000002384186,
+          "ms": 14.200000047683716,
+          "encoded": 22870,
+          "bytes": 23170
+        },
+        {
+          "path": "/js/placard.js",
+          "at": 86,
+          "ms": 13.899999976158142,
+          "encoded": 36034,
+          "bytes": 36334
+        },
+        {
+          "path": "/js/firstplay.js",
+          "at": 86.10000002384186,
+          "ms": 18.399999976158142,
+          "encoded": 2068,
+          "bytes": 2368
+        },
+        {
+          "path": "/js/seed.js",
+          "at": 86.10000002384186,
+          "ms": 19,
+          "encoded": 5961,
+          "bytes": 6261
+        },
+        {
+          "path": "/js/notation.js",
+          "at": 86.10000002384186,
+          "ms": 18.899999976158142,
+          "encoded": 17222,
+          "bytes": 17522
+        },
+        {
+          "path": "/js/odds.js",
+          "at": 86.10000002384186,
+          "ms": 19.100000023841858,
+          "encoded": 17331,
+          "bytes": 17631
+        },
+        {
+          "path": "/js/workspaces.js",
+          "at": 86.10000002384186,
+          "ms": 21.200000047683716,
+          "encoded": 5527,
+          "bytes": 5827
+        },
+        {
+          "path": "/js/library-document.js",
+          "at": 86.10000002384186,
+          "ms": 23.799999952316284,
+          "encoded": 2419,
+          "bytes": 2719
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "at": 86.10000002384186,
+          "ms": 23.899999976158142,
+          "encoded": 584,
+          "bytes": 884
+        },
+        {
+          "path": "/js/playerresults.js",
+          "at": 86.10000002384186,
+          "ms": 24,
+          "encoded": 3578,
+          "bytes": 3878
+        },
+        {
+          "path": "/js/table-designs.js",
+          "at": 86.10000002384186,
+          "ms": 21.399999976158142,
+          "encoded": 1497,
+          "bytes": 1797
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "at": 86.70000004768372,
+          "ms": 25.299999952316284,
+          "encoded": 695,
+          "bytes": 995
+        },
+        {
+          "path": "/js/stability.js",
+          "at": 86.70000004768372,
+          "ms": 25.399999976158142,
+          "encoded": 3576,
+          "bytes": 3876
+        },
+        {
+          "path": "/js/schema.js",
+          "at": 86.70000004768372,
+          "ms": 29.699999928474426,
+          "encoded": 4728,
+          "bytes": 5028
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "at": 86.80000007152557,
+          "ms": 29.5,
+          "encoded": 1117,
+          "bytes": 1417
+        },
+        {
+          "path": "/js/portable.js",
+          "at": 86.80000007152557,
+          "ms": 29.699999928474426,
+          "encoded": 14544,
+          "bytes": 14844
+        },
+        {
+          "path": "/js/profiles.js",
+          "at": 86.80000007152557,
+          "ms": 29.699999928474426,
+          "encoded": 10493,
+          "bytes": 10793
+        },
+        {
+          "path": "/js/themes.js",
+          "at": 86.89999997615814,
+          "ms": 30.100000023841858,
+          "encoded": 7801,
+          "bytes": 8101
+        },
+        {
+          "path": "/js/dielights.js",
+          "at": 86.89999997615814,
+          "ms": 32.5,
+          "encoded": 2245,
+          "bytes": 2545
+        },
+        {
+          "path": "/js/particles.js",
+          "at": 86.89999997615814,
+          "ms": 32.90000009536743,
+          "encoded": 4717,
+          "bytes": 5017
+        },
+        {
+          "path": "/js/post.js",
+          "at": 86.89999997615814,
+          "ms": 33.10000002384186,
+          "encoded": 6683,
+          "bytes": 6983
+        },
+        {
+          "path": "/js/decals.js",
+          "at": 86.89999997615814,
+          "ms": 33,
+          "encoded": 7646,
+          "bytes": 7946
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "at": 87.60000002384186,
+          "ms": 31.899999976158142,
+          "encoded": 684,
+          "bytes": 984
+        },
+        {
+          "path": "/js/towerids.js",
+          "at": 87.60000002384186,
+          "ms": 33.89999997615814,
+          "encoded": 625,
+          "bytes": 925
+        },
+        {
+          "path": "/js/motes.js",
+          "at": 87.60000002384186,
+          "ms": 36.799999952316284,
+          "encoded": 3130,
+          "bytes": 3430
+        },
+        {
+          "path": "/js/towerglb.js",
+          "at": 87.60000002384186,
+          "ms": 37,
+          "encoded": 7674,
+          "bytes": 7974
+        },
+        {
+          "path": "/js/voices.js",
+          "at": 87.60000002384186,
+          "ms": 37.10000002384186,
+          "encoded": 20876,
+          "bytes": 21176
+        },
+        {
+          "path": "/js/tunables.js",
+          "at": 87.70000004768372,
+          "ms": 37.10000002384186,
+          "encoded": 13938,
+          "bytes": 14238
+        },
+        {
+          "path": "/js/tune.js",
+          "at": 88.10000002384186,
+          "ms": 37.5,
+          "encoded": 45850,
+          "bytes": 46150
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "at": 103.80000007152557,
+          "ms": 21.299999952316284,
+          "encoded": 5471,
+          "bytes": 5771
+        },
+        {
+          "path": "/js/placard-design.js",
+          "at": 103.89999997615814,
+          "ms": 21.700000047683716,
+          "encoded": 1701,
+          "bytes": 2001
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "at": 130.80000007152557,
+          "ms": 1,
+          "encoded": 2405,
+          "bytes": 2705
+        },
+        {
+          "path": "/js/yaml.js",
+          "at": 131.5,
+          "ms": 1.5,
+          "encoded": 9990,
+          "bytes": 10290
+        },
+        {
+          "path": "/api/join",
+          "at": 3049.3000000715256,
+          "ms": 1.5999999046325684,
+          "encoded": 641,
+          "bytes": 941
+        },
+        {
+          "path": "/models/mats/linen.png",
+          "at": 3070.100000023842,
+          "ms": 1.2999999523162842,
+          "encoded": 22974,
+          "bytes": 23274
+        },
+        {
+          "path": "/favicon.ico",
+          "at": 3886.3000000715256,
+          "ms": 2.1999999284744263,
+          "encoded": 40,
+          "bytes": 340
+        },
+        {
+          "path": "/vendor/GLTFLoader.js",
+          "at": 3974.899999976158,
+          "ms": 3.200000047683716,
+          "encoded": 24361,
+          "bytes": 24661
+        },
+        {
+          "path": "/api/pools",
+          "at": 3980.8000000715256,
+          "ms": 0.8999999761581421,
+          "encoded": 11,
+          "bytes": 311
+        },
+        {
+          "path": "/vendor/BufferGeometryUtils.js",
+          "at": 4201.5,
+          "ms": 2.100000023841858,
+          "encoded": 7390,
+          "bytes": 7690
+        },
+        {
+          "path": "/api/pools",
+          "at": 4202.800000071526,
+          "ms": 1.6999999284744263,
+          "encoded": 11,
+          "bytes": 311
+        }
+      ],
+      "startupLongTasks": [
+        {
+          "at": 135.60000002384186,
+          "ms": 2939
+        },
+        {
+          "at": 3078.8000000715256,
+          "ms": 164
+        },
+        {
+          "at": 3248.3000000715256,
+          "ms": 586
+        },
+        {
+          "at": 3891.600000023842,
+          "ms": 101
+        },
+        {
+          "at": 4008.8000000715256,
+          "ms": 189
+        }
+      ],
+      "firstRollLongTasks": [
+        {
+          "at": 4458.700000047684,
+          "ms": 304
+        },
+        {
+          "at": 4781.100000023842,
+          "ms": 218
+        },
+        {
+          "at": 5007.5,
+          "ms": 68
+        },
+        {
+          "at": 5076.399999976158,
+          "ms": 64
+        },
+        {
+          "at": 5142,
+          "ms": 61
+        },
+        {
+          "at": 5203.600000023842,
+          "ms": 64
+        },
+        {
+          "at": 5267.899999976158,
+          "ms": 64
+        },
+        {
+          "at": 5332.700000047684,
+          "ms": 61
+        },
+        {
+          "at": 5395.399999976158,
+          "ms": 61
+        },
+        {
+          "at": 5458.300000071526,
+          "ms": 61
+        },
+        {
+          "at": 5520,
+          "ms": 59
+        },
+        {
+          "at": 5580,
+          "ms": 61
+        },
+        {
+          "at": 5642,
+          "ms": 65
+        },
+        {
+          "at": 5708,
+          "ms": 60
+        },
+        {
+          "at": 5769.200000047684,
+          "ms": 61
+        },
+        {
+          "at": 5831.5,
+          "ms": 61
+        },
+        {
+          "at": 5893.100000023842,
+          "ms": 66
+        },
+        {
+          "at": 5960,
+          "ms": 82
+        },
+        {
+          "at": 6042.600000023842,
+          "ms": 63
+        },
+        {
+          "at": 6107,
+          "ms": 60
+        }
+      ],
+      "appearanceLongTasks": [
+        {
+          "at": 10601.600000023842,
+          "ms": 60
+        },
+        {
+          "at": 10673.800000071526,
+          "ms": 58
+        },
+        {
+          "at": 10733.800000071526,
+          "ms": 60
+        },
+        {
+          "at": 10810.700000047684,
+          "ms": 60
+        },
+        {
+          "at": 10880.200000047684,
+          "ms": 58
+        },
+        {
+          "at": 10942.100000023842,
+          "ms": 62
+        },
+        {
+          "at": 11016.300000071526,
+          "ms": 59
+        },
+        {
+          "at": 11079.600000023842,
+          "ms": 64
+        },
+        {
+          "at": 11147.200000047684,
+          "ms": 60
+        },
+        {
+          "at": 11208.100000023842,
+          "ms": 101
+        },
+        {
+          "at": 11399.300000071526,
+          "ms": 61
+        }
+      ]
+    },
+    {
+      "venue": "copper",
+      "sample": 1,
+      "cpu": 4,
+      "network": false,
+      "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "startupMs": 3977.100000023842,
+      "startupLongestTask": 2902,
+      "firstVisibleMs": 624.0999999046326,
+      "firstLongestTask": 296,
+      "activityLongestTask": 121,
+      "activityFrameP95": 95.10000002384186,
+      "appearanceLongestTask": 104,
+      "previewBytes": 8202236,
+      "appearanceFirstFrameMs": 473.09999990463257,
+      "appearanceCompleteMs": 672.5,
+      "activityInputQueueMs": [
+        65.89999997615814,
+        66.70000004768372
+      ],
+      "startupHotFunctions": [
+        {
+          "fn": "renderFeltSwatches js/main.js:29524",
+          "ms": 1722.8
+        },
+        {
+          "fn": "(anonymous) js/dice.js:1278",
+          "ms": 416.9
+        },
+        {
+          "fn": "(program) :0",
+          "ms": 390.6
+        },
+        {
+          "fn": "stroke js/main.js:2692",
+          "ms": 317.5
+        },
+        {
+          "fn": "warmVariant js/diceart.js:107",
+          "ms": 184.7
+        },
+        {
+          "fn": "paintOakCloth js/main.js:2862",
+          "ms": 167.7
+        },
+        {
+          "fn": "texSubImage2D vendor/three.module.js:23670",
+          "ms": 133.6
+        },
+        {
+          "fn": "paintSiltCloth js/main.js:2732",
+          "ms": 95.1
+        },
+        {
+          "fn": "(garbage collector) :0",
+          "ms": 74.3
+        },
+        {
+          "fn": "onFirstUse vendor/three.module.js:20271",
+          "ms": 69.4
+        }
+      ],
+      "startupResources": [
+        {
+          "path": "/js/report.js",
+          "at": 16.600000023841858,
+          "ms": 1.7000000476837158,
+          "encoded": 3313,
+          "bytes": 3613
+        },
+        {
+          "path": "/css/firstplay.css",
+          "at": 17.200000047683716,
+          "ms": 2.799999952316284,
+          "encoded": 745,
+          "bytes": 1045
+        },
+        {
+          "path": "/css/workspaces.css",
+          "at": 17.200000047683716,
+          "ms": 4.700000047683716,
+          "encoded": 3140,
+          "bytes": 3440
+        },
+        {
+          "path": "/css/playerresults.css",
+          "at": 17.200000047683716,
+          "ms": 4.799999952316284,
+          "encoded": 2877,
+          "bytes": 3177
+        },
+        {
+          "path": "/css/style.css",
+          "at": 17.200000047683716,
+          "ms": 6.100000023841858,
+          "encoded": 105228,
+          "bytes": 105528
+        },
+        {
+          "path": "/js/main.js",
+          "at": 17.200000047683716,
+          "ms": 11.899999976158142,
+          "encoded": 628938,
+          "bytes": 629238
+        },
+        {
+          "path": "/js/film-bake.js",
+          "at": 48.40000009536743,
+          "ms": 4.399999976158142,
+          "encoded": 15523,
+          "bytes": 15823
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "at": 48.40000009536743,
+          "ms": 9.099999904632568,
+          "encoded": 76922,
+          "bytes": 77222
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "at": 48.40000009536743,
+          "ms": 19.399999976158142,
+          "encoded": 255043,
+          "bytes": 255343
+        },
+        {
+          "path": "/js/film-client.js",
+          "at": 48.90000009536743,
+          "ms": 5.5,
+          "encoded": 1310,
+          "bytes": 1610
+        },
+        {
+          "path": "/js/round-table.js",
+          "at": 48.90000009536743,
+          "ms": 5.599999904632568,
+          "encoded": 1147,
+          "bytes": 1447
+        },
+        {
+          "path": "/js/film-wire.js",
+          "at": 48.90000009536743,
+          "ms": 6.199999928474426,
+          "encoded": 4646,
+          "bytes": 4946
+        },
+        {
+          "path": "/js/dice.js",
+          "at": 48.90000009536743,
+          "ms": 8.5,
+          "encoded": 24145,
+          "bytes": 24445
+        },
+        {
+          "path": "/js/diceart.js",
+          "at": 48.90000009536743,
+          "ms": 8.5,
+          "encoded": 3932,
+          "bytes": 4232
+        },
+        {
+          "path": "/js/net.js",
+          "at": 49,
+          "ms": 8.5,
+          "encoded": 15274,
+          "bytes": 15574
+        },
+        {
+          "path": "/js/tables.js",
+          "at": 49,
+          "ms": 8.700000047683716,
+          "encoded": 5400,
+          "bytes": 5700
+        },
+        {
+          "path": "/js/meanings.js",
+          "at": 49,
+          "ms": 11.100000023841858,
+          "encoded": 13063,
+          "bytes": 13363
+        },
+        {
+          "path": "/js/rollspec.js",
+          "at": 49,
+          "ms": 11.200000047683716,
+          "encoded": 8695,
+          "bytes": 8995
+        },
+        {
+          "path": "/js/places.js",
+          "at": 49.40000009536743,
+          "ms": 11.199999928474426,
+          "encoded": 22870,
+          "bytes": 23170
+        },
+        {
+          "path": "/js/demo.js",
+          "at": 49.5,
+          "ms": 11.200000047683716,
+          "encoded": 4587,
+          "bytes": 4887
+        },
+        {
+          "path": "/js/placard.js",
+          "at": 49.60000002384186,
+          "ms": 12.399999976158142,
+          "encoded": 36034,
+          "bytes": 36334
+        },
+        {
+          "path": "/js/odds.js",
+          "at": 49.60000002384186,
+          "ms": 13.600000023841858,
+          "encoded": 17331,
+          "bytes": 17631
+        },
+        {
+          "path": "/js/firstplay.js",
+          "at": 49.60000002384186,
+          "ms": 13.700000047683716,
+          "encoded": 2068,
+          "bytes": 2368
+        },
+        {
+          "path": "/js/notation.js",
+          "at": 49.60000002384186,
+          "ms": 13.800000071525574,
+          "encoded": 17222,
+          "bytes": 17522
+        },
+        {
+          "path": "/js/seed.js",
+          "at": 49.60000002384186,
+          "ms": 13.899999976158142,
+          "encoded": 5961,
+          "bytes": 6261
+        },
+        {
+          "path": "/js/workspaces.js",
+          "at": 49.60000002384186,
+          "ms": 16.600000023841858,
+          "encoded": 5527,
+          "bytes": 5827
+        },
+        {
+          "path": "/js/table-designs.js",
+          "at": 49.700000047683716,
+          "ms": 15.899999976158142,
+          "encoded": 1497,
+          "bytes": 1797
+        },
+        {
+          "path": "/js/library-document.js",
+          "at": 49.700000047683716,
+          "ms": 15.899999976158142,
+          "encoded": 2419,
+          "bytes": 2719
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "at": 49.800000071525574,
+          "ms": 16.199999928474426,
+          "encoded": 584,
+          "bytes": 884
+        },
+        {
+          "path": "/js/playerresults.js",
+          "at": 50.300000071525574,
+          "ms": 15.799999952316284,
+          "encoded": 3578,
+          "bytes": 3878
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "at": 50.300000071525574,
+          "ms": 17.299999952316284,
+          "encoded": 695,
+          "bytes": 995
+        },
+        {
+          "path": "/js/stability.js",
+          "at": 50.300000071525574,
+          "ms": 17.399999976158142,
+          "encoded": 3576,
+          "bytes": 3876
+        },
+        {
+          "path": "/js/schema.js",
+          "at": 50.300000071525574,
+          "ms": 18.299999952316284,
+          "encoded": 4728,
+          "bytes": 5028
+        },
+        {
+          "path": "/js/portable.js",
+          "at": 50.5,
+          "ms": 18.300000071525574,
+          "encoded": 14544,
+          "bytes": 14844
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "at": 50.5,
+          "ms": 19.700000047683716,
+          "encoded": 1117,
+          "bytes": 1417
+        },
+        {
+          "path": "/js/themes.js",
+          "at": 50.5,
+          "ms": 20,
+          "encoded": 7801,
+          "bytes": 8101
+        },
+        {
+          "path": "/js/profiles.js",
+          "at": 50.5,
+          "ms": 19.800000071525574,
+          "encoded": 10493,
+          "bytes": 10793
+        },
+        {
+          "path": "/js/particles.js",
+          "at": 50.800000071525574,
+          "ms": 20.100000023841858,
+          "encoded": 4717,
+          "bytes": 5017
+        },
+        {
+          "path": "/js/dielights.js",
+          "at": 50.800000071525574,
+          "ms": 20.899999976158142,
+          "encoded": 2245,
+          "bytes": 2545
+        },
+        {
+          "path": "/js/decals.js",
+          "at": 50.800000071525574,
+          "ms": 21,
+          "encoded": 7646,
+          "bytes": 7946
+        },
+        {
+          "path": "/js/post.js",
+          "at": 50.800000071525574,
+          "ms": 21.199999928474426,
+          "encoded": 6683,
+          "bytes": 6983
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "at": 50.90000009536743,
+          "ms": 20.899999976158142,
+          "encoded": 684,
+          "bytes": 984
+        },
+        {
+          "path": "/js/motes.js",
+          "at": 50.90000009536743,
+          "ms": 23.399999976158142,
+          "encoded": 3130,
+          "bytes": 3430
+        },
+        {
+          "path": "/js/towerids.js",
+          "at": 50.90000009536743,
+          "ms": 23.5,
+          "encoded": 625,
+          "bytes": 925
+        },
+        {
+          "path": "/js/towerglb.js",
+          "at": 50.90000009536743,
+          "ms": 23.5,
+          "encoded": 7674,
+          "bytes": 7974
+        },
+        {
+          "path": "/js/voices.js",
+          "at": 50.90000009536743,
+          "ms": 23.699999928474426,
+          "encoded": 20876,
+          "bytes": 21176
+        },
+        {
+          "path": "/js/tunables.js",
+          "at": 50.90000009536743,
+          "ms": 23.799999952316284,
+          "encoded": 13938,
+          "bytes": 14238
+        },
+        {
+          "path": "/js/tune.js",
+          "at": 50.90000009536743,
+          "ms": 24.09999990463257,
+          "encoded": 45850,
+          "bytes": 46150
+        },
+        {
+          "path": "/js/placard-design.js",
+          "at": 85.70000004768372,
+          "ms": 1.399999976158142,
+          "encoded": 1701,
+          "bytes": 2001
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "at": 85.70000004768372,
+          "ms": 1.5,
+          "encoded": 5471,
+          "bytes": 5771
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "at": 89.90000009536743,
+          "ms": 1,
+          "encoded": 2405,
+          "bytes": 2705
+        },
+        {
+          "path": "/js/yaml.js",
+          "at": 89.90000009536743,
+          "ms": 1.0999999046325684,
+          "encoded": 9990,
+          "bytes": 10290
+        },
+        {
+          "path": "/api/join",
+          "at": 2971.3000000715256,
+          "ms": 1.7999999523162842,
+          "encoded": 641,
+          "bytes": 941
+        },
+        {
+          "path": "/models/mats/linen.png",
+          "at": 2991.8000000715256,
+          "ms": 1.100000023841858,
+          "encoded": 22974,
+          "bytes": 23274
+        },
+        {
+          "path": "/favicon.ico",
+          "at": 3857.9000000953674,
+          "ms": 1.5,
+          "encoded": 40,
+          "bytes": 340
+        },
+        {
+          "path": "/vendor/GLTFLoader.js",
+          "at": 3943.100000023842,
+          "ms": 1.5,
+          "encoded": 24361,
+          "bytes": 24661
+        },
+        {
+          "path": "/api/pools",
+          "at": 3948.7000000476837,
+          "ms": 0.7999999523162842,
+          "encoded": 11,
+          "bytes": 311
+        },
+        {
+          "path": "/vendor/BufferGeometryUtils.js",
+          "at": 4205.400000095367,
+          "ms": 1.2999999523162842,
+          "encoded": 7390,
+          "bytes": 7690
+        }
+      ],
+      "startupLongTasks": [
+        {
+          "at": 93.90000009536743,
+          "ms": 2902
+        },
+        {
+          "at": 3000.5,
+          "ms": 234
+        },
+        {
+          "at": 3240.3000000715256,
+          "ms": 587
+        },
+        {
+          "at": 3859.2000000476837,
+          "ms": 100
+        },
+        {
+          "at": 3959.7000000476837,
+          "ms": 242
+        }
+      ],
+      "firstRollLongTasks": [
+        {
+          "at": 4438.5,
+          "ms": 296
+        },
+        {
+          "at": 4751.200000047684,
+          "ms": 219
+        },
+        {
+          "at": 4984,
+          "ms": 71
+        },
+        {
+          "at": 5055.200000047684,
+          "ms": 63
+        },
+        {
+          "at": 5118.900000095367,
+          "ms": 65
+        },
+        {
+          "at": 5183.900000095367,
+          "ms": 62
+        },
+        {
+          "at": 5246.300000071526,
+          "ms": 65
+        },
+        {
+          "at": 5312.300000071526,
+          "ms": 65
+        },
+        {
+          "at": 5378.400000095367,
+          "ms": 64
+        },
+        {
+          "at": 5444.400000095367,
+          "ms": 61
+        },
+        {
+          "at": 5505.900000095367,
+          "ms": 61
+        },
+        {
+          "at": 5568.400000095367,
+          "ms": 61
+        },
+        {
+          "at": 5630.200000047684,
+          "ms": 61
+        },
+        {
+          "at": 5692.900000095367,
+          "ms": 62
+        },
+        {
+          "at": 5755.5,
+          "ms": 64
+        },
+        {
+          "at": 5819.800000071526,
+          "ms": 61
+        },
+        {
+          "at": 5881.5,
+          "ms": 61
+        },
+        {
+          "at": 5943.600000023842,
+          "ms": 63
+        },
+        {
+          "at": 6007.300000071526,
+          "ms": 76
+        },
+        {
+          "at": 6084.900000095367,
+          "ms": 64
+        },
+        {
+          "at": 6160.100000023842,
+          "ms": 60
+        }
+      ],
+      "appearanceLongTasks": [
+        {
+          "at": 10368.900000095367,
+          "ms": 57
+        },
+        {
+          "at": 10428.200000047684,
+          "ms": 58
+        },
+        {
+          "at": 10500.700000047684,
+          "ms": 58
+        },
+        {
+          "at": 10559.700000047684,
+          "ms": 62
+        },
+        {
+          "at": 10637.200000047684,
+          "ms": 62
+        },
+        {
+          "at": 10717.5,
+          "ms": 63
+        },
+        {
+          "at": 10782.600000023842,
+          "ms": 61
+        },
+        {
+          "at": 10853.200000047684,
+          "ms": 59
+        },
+        {
+          "at": 10915.5,
+          "ms": 62
+        },
+        {
+          "at": 10981,
+          "ms": 59
+        },
+        {
+          "at": 11040.100000023842,
+          "ms": 104
+        },
+        {
+          "at": 11238.300000071526,
+          "ms": 62
+        }
+      ]
+    },
+    {
+      "venue": "copper",
+      "sample": 2,
+      "cpu": 4,
+      "network": false,
+      "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "startupMs": 3940.2999999523163,
+      "startupLongestTask": 2880,
+      "firstVisibleMs": 629.3999999761581,
+      "firstLongestTask": 266,
+      "activityLongestTask": 107,
+      "activityFrameP95": 86.60000002384186,
+      "appearanceLongestTask": 109,
+      "previewBytes": 8202236,
+      "appearanceFirstFrameMs": 491.8000000715256,
+      "appearanceCompleteMs": 648.8999999761581,
+      "activityInputQueueMs": [
+        62.60000002384186,
+        1.399999976158142
+      ],
+      "startupHotFunctions": [
+        {
+          "fn": "renderFeltSwatches js/main.js:29524",
+          "ms": 1707.9
+        },
+        {
+          "fn": "(anonymous) js/dice.js:1278",
+          "ms": 423.1
+        },
+        {
+          "fn": "(program) :0",
+          "ms": 395.2
+        },
+        {
+          "fn": "stroke js/main.js:2692",
+          "ms": 310.2
+        },
+        {
+          "fn": "warmVariant js/diceart.js:107",
+          "ms": 192.9
+        },
+        {
+          "fn": "paintOakCloth js/main.js:2862",
+          "ms": 155.6
+        },
+        {
+          "fn": "texSubImage2D vendor/three.module.js:23670",
+          "ms": 139
+        },
+        {
+          "fn": "paintSiltCloth js/main.js:2732",
+          "ms": 94.5
+        },
+        {
+          "fn": "onFirstUse vendor/three.module.js:20271",
+          "ms": 68.1
+        },
+        {
+          "fn": "(garbage collector) :0",
+          "ms": 45.9
+        }
+      ],
+      "startupResources": [
+        {
+          "path": "/js/report.js",
+          "at": 16.299999952316284,
+          "ms": 6.399999976158142,
+          "encoded": 3313,
+          "bytes": 3613
+        },
+        {
+          "path": "/css/firstplay.css",
+          "at": 17,
+          "ms": 2.899999976158142,
+          "encoded": 745,
+          "bytes": 1045
+        },
+        {
+          "path": "/css/playerresults.css",
+          "at": 17,
+          "ms": 3.6999999284744263,
+          "encoded": 2877,
+          "bytes": 3177
+        },
+        {
+          "path": "/css/workspaces.css",
+          "at": 17,
+          "ms": 3.600000023841858,
+          "encoded": 3140,
+          "bytes": 3440
+        },
+        {
+          "path": "/css/style.css",
+          "at": 17,
+          "ms": 6.5,
+          "encoded": 105228,
+          "bytes": 105528
+        },
+        {
+          "path": "/js/main.js",
+          "at": 17.100000023841858,
+          "ms": 11.899999976158142,
+          "encoded": 628938,
+          "bytes": 629238
+        },
+        {
+          "path": "/js/film-client.js",
+          "at": 63.5,
+          "ms": 5.199999928474426,
+          "encoded": 1310,
+          "bytes": 1610
+        },
+        {
+          "path": "/js/film-wire.js",
+          "at": 63.5,
+          "ms": 5.399999976158142,
+          "encoded": 4646,
+          "bytes": 4946
+        },
+        {
+          "path": "/js/round-table.js",
+          "at": 63.5,
+          "ms": 5.299999952316284,
+          "encoded": 1147,
+          "bytes": 1447
+        },
+        {
+          "path": "/js/film-bake.js",
+          "at": 63.5,
+          "ms": 5.399999976158142,
+          "encoded": 15523,
+          "bytes": 15823
+        },
+        {
+          "path": "/js/dice.js",
+          "at": 63.5,
+          "ms": 8.100000023841858,
+          "encoded": 24145,
+          "bytes": 24445
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "at": 63.5,
+          "ms": 8.799999952316284,
+          "encoded": 76922,
+          "bytes": 77222
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "at": 63.5,
+          "ms": 18.699999928474426,
+          "encoded": 255043,
+          "bytes": 255343
+        },
+        {
+          "path": "/js/diceart.js",
+          "at": 63.60000002384186,
+          "ms": 8.199999928474426,
+          "encoded": 3932,
+          "bytes": 4232
+        },
+        {
+          "path": "/js/net.js",
+          "at": 63.60000002384186,
+          "ms": 8.399999976158142,
+          "encoded": 15274,
+          "bytes": 15574
+        },
+        {
+          "path": "/js/tables.js",
+          "at": 63.60000002384186,
+          "ms": 8.599999904632568,
+          "encoded": 5400,
+          "bytes": 5700
+        },
+        {
+          "path": "/js/meanings.js",
+          "at": 64.39999997615814,
+          "ms": 9.899999976158142,
+          "encoded": 13063,
+          "bytes": 13363
+        },
+        {
+          "path": "/js/rollspec.js",
+          "at": 64.5,
+          "ms": 9.799999952316284,
+          "encoded": 8695,
+          "bytes": 8995
+        },
+        {
+          "path": "/js/demo.js",
+          "at": 64.5,
+          "ms": 10.5,
+          "encoded": 4587,
+          "bytes": 4887
+        },
+        {
+          "path": "/js/places.js",
+          "at": 64.5,
+          "ms": 10.399999976158142,
+          "encoded": 22870,
+          "bytes": 23170
+        },
+        {
+          "path": "/js/placard.js",
+          "at": 64.5,
+          "ms": 11.199999928474426,
+          "encoded": 36034,
+          "bytes": 36334
+        },
+        {
+          "path": "/js/seed.js",
+          "at": 64.5,
+          "ms": 14.399999976158142,
+          "encoded": 5961,
+          "bytes": 6261
+        },
+        {
+          "path": "/js/odds.js",
+          "at": 64.5,
+          "ms": 14.199999928474426,
+          "encoded": 17331,
+          "bytes": 17631
+        },
+        {
+          "path": "/js/notation.js",
+          "at": 64.5,
+          "ms": 14.299999952316284,
+          "encoded": 17222,
+          "bytes": 17522
+        },
+        {
+          "path": "/js/firstplay.js",
+          "at": 64.60000002384186,
+          "ms": 13.899999976158142,
+          "encoded": 2068,
+          "bytes": 2368
+        },
+        {
+          "path": "/js/workspaces.js",
+          "at": 64.60000002384186,
+          "ms": 15.099999904632568,
+          "encoded": 5527,
+          "bytes": 5827
+        },
+        {
+          "path": "/js/table-designs.js",
+          "at": 64.60000002384186,
+          "ms": 15.299999952316284,
+          "encoded": 1497,
+          "bytes": 1797
+        },
+        {
+          "path": "/js/library-document.js",
+          "at": 65.19999992847443,
+          "ms": 15.800000071525574,
+          "encoded": 2419,
+          "bytes": 2719
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "at": 65.19999992847443,
+          "ms": 15.800000071525574,
+          "encoded": 584,
+          "bytes": 884
+        },
+        {
+          "path": "/js/playerresults.js",
+          "at": 65.19999992847443,
+          "ms": 15.900000095367432,
+          "encoded": 3578,
+          "bytes": 3878
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "at": 65.19999992847443,
+          "ms": 16.5,
+          "encoded": 695,
+          "bytes": 995
+        },
+        {
+          "path": "/js/stability.js",
+          "at": 65.19999992847443,
+          "ms": 18.200000047683716,
+          "encoded": 3576,
+          "bytes": 3876
+        },
+        {
+          "path": "/js/schema.js",
+          "at": 65.29999995231628,
+          "ms": 18.200000047683716,
+          "encoded": 4728,
+          "bytes": 5028
+        },
+        {
+          "path": "/js/portable.js",
+          "at": 65.29999995231628,
+          "ms": 18.300000071525574,
+          "encoded": 14544,
+          "bytes": 14844
+        },
+        {
+          "path": "/js/profiles.js",
+          "at": 65.29999995231628,
+          "ms": 19.700000047683716,
+          "encoded": 10493,
+          "bytes": 10793
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "at": 65.39999997615814,
+          "ms": 19.399999976158142,
+          "encoded": 1117,
+          "bytes": 1417
+        },
+        {
+          "path": "/js/themes.js",
+          "at": 65.39999997615814,
+          "ms": 19.700000047683716,
+          "encoded": 7801,
+          "bytes": 8101
+        },
+        {
+          "path": "/js/particles.js",
+          "at": 65.39999997615814,
+          "ms": 19.799999952316284,
+          "encoded": 4717,
+          "bytes": 5017
+        },
+        {
+          "path": "/js/decals.js",
+          "at": 65.39999997615814,
+          "ms": 21.5,
+          "encoded": 7646,
+          "bytes": 7946
+        },
+        {
+          "path": "/js/dielights.js",
+          "at": 66.10000002384186,
+          "ms": 20.699999928474426,
+          "encoded": 2245,
+          "bytes": 2545
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "at": 66.19999992847443,
+          "ms": 20.600000023841858,
+          "encoded": 684,
+          "bytes": 984
+        },
+        {
+          "path": "/js/post.js",
+          "at": 66.19999992847443,
+          "ms": 20.90000009536743,
+          "encoded": 6683,
+          "bytes": 6983
+        },
+        {
+          "path": "/js/towerids.js",
+          "at": 66.29999995231628,
+          "ms": 22.600000023841858,
+          "encoded": 625,
+          "bytes": 925
+        },
+        {
+          "path": "/js/motes.js",
+          "at": 66.29999995231628,
+          "ms": 22.700000047683716,
+          "encoded": 3130,
+          "bytes": 3430
+        },
+        {
+          "path": "/js/towerglb.js",
+          "at": 66.29999995231628,
+          "ms": 22.800000071525574,
+          "encoded": 7674,
+          "bytes": 7974
+        },
+        {
+          "path": "/js/voices.js",
+          "at": 66.29999995231628,
+          "ms": 24.300000071525574,
+          "encoded": 20876,
+          "bytes": 21176
+        },
+        {
+          "path": "/js/tunables.js",
+          "at": 66.29999995231628,
+          "ms": 24.5,
+          "encoded": 13938,
+          "bytes": 14238
+        },
+        {
+          "path": "/js/tune.js",
+          "at": 66.79999995231628,
+          "ms": 24.100000023841858,
+          "encoded": 45850,
+          "bytes": 46150
+        },
+        {
+          "path": "/js/placard-design.js",
+          "at": 77.60000002384186,
+          "ms": 12.899999976158142,
+          "encoded": 1701,
+          "bytes": 2001
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "at": 77.60000002384186,
+          "ms": 13.399999976158142,
+          "encoded": 5471,
+          "bytes": 5771
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "at": 96.69999992847443,
+          "ms": 1.9000000953674316,
+          "encoded": 2405,
+          "bytes": 2705
+        },
+        {
+          "path": "/js/yaml.js",
+          "at": 97.10000002384186,
+          "ms": 1.5999999046325684,
+          "encoded": 9990,
+          "bytes": 10290
+        },
+        {
+          "path": "/api/join",
+          "at": 2958.1999999284744,
+          "ms": 1.4000000953674316,
+          "encoded": 641,
+          "bytes": 941
+        },
+        {
+          "path": "/models/mats/linen.png",
+          "at": 2976.600000023842,
+          "ms": 1.0999999046325684,
+          "encoded": 22974,
+          "bytes": 23274
+        },
+        {
+          "path": "/favicon.ico",
+          "at": 3824.899999976158,
+          "ms": 1.2000000476837158,
+          "encoded": 40,
+          "bytes": 340
+        },
+        {
+          "path": "/vendor/GLTFLoader.js",
+          "at": 3906.7999999523163,
+          "ms": 1.600000023841858,
+          "encoded": 24361,
+          "bytes": 24661
+        },
+        {
+          "path": "/api/pools",
+          "at": 3912.2999999523163,
+          "ms": 0.8999999761581421,
+          "encoded": 11,
+          "bytes": 311
+        },
+        {
+          "path": "/vendor/BufferGeometryUtils.js",
+          "at": 4159.799999952316,
+          "ms": 1.7000000476837158,
+          "encoded": 7390,
+          "bytes": 7690
+        },
+        {
+          "path": "/api/pools",
+          "at": 4160.899999976158,
+          "ms": 1.2999999523162842,
+          "encoded": 11,
+          "bytes": 311
+        }
+      ],
+      "startupLongTasks": [
+        {
+          "at": 101.60000002384186,
+          "ms": 2880
+        },
+        {
+          "at": 2985.5,
+          "ms": 211
+        },
+        {
+          "at": 3200.7999999523163,
+          "ms": 594
+        },
+        {
+          "at": 3826,
+          "ms": 97
+        },
+        {
+          "at": 3923.5,
+          "ms": 232
+        }
+      ],
+      "firstRollLongTasks": [
+        {
+          "at": 4435.600000023842,
+          "ms": 266
+        },
+        {
+          "at": 4710,
+          "ms": 239
+        },
+        {
+          "at": 4952.799999952316,
+          "ms": 61
+        },
+        {
+          "at": 5013.899999976158,
+          "ms": 62
+        },
+        {
+          "at": 5077.600000023842,
+          "ms": 61
+        },
+        {
+          "at": 5139.699999928474,
+          "ms": 65
+        },
+        {
+          "at": 5205.199999928474,
+          "ms": 63
+        },
+        {
+          "at": 5268.399999976158,
+          "ms": 67
+        },
+        {
+          "at": 5336.799999952316,
+          "ms": 63
+        },
+        {
+          "at": 5402.399999976158,
+          "ms": 66
+        },
+        {
+          "at": 5469.199999928474,
+          "ms": 64
+        },
+        {
+          "at": 5534.699999928474,
+          "ms": 66
+        },
+        {
+          "at": 5602.100000023842,
+          "ms": 65
+        },
+        {
+          "at": 5667.799999952316,
+          "ms": 60
+        },
+        {
+          "at": 5728.299999952316,
+          "ms": 61
+        },
+        {
+          "at": 5789.5,
+          "ms": 84
+        },
+        {
+          "at": 5874.299999952316,
+          "ms": 63
+        },
+        {
+          "at": 5939.100000023842,
+          "ms": 62
+        }
+      ],
+      "appearanceLongTasks": [
+        {
+          "at": 10937.199999928474,
+          "ms": 62
+        },
+        {
+          "at": 11002.399999976158,
+          "ms": 57
+        },
+        {
+          "at": 11061.699999928474,
+          "ms": 61
+        },
+        {
+          "at": 11145.199999928474,
+          "ms": 63
+        },
+        {
+          "at": 11218.5,
+          "ms": 60
+        },
+        {
+          "at": 11281.100000023842,
+          "ms": 61
+        },
+        {
+          "at": 11352.100000023842,
+          "ms": 63
+        },
+        {
+          "at": 11418.899999976158,
+          "ms": 61
+        },
+        {
+          "at": 11484,
+          "ms": 65
+        },
+        {
+          "at": 11549.299999952316,
+          "ms": 109
+        },
+        {
+          "at": 11748.600000023842,
+          "ms": 62
+        }
+      ]
+    }
+  ],
+  "after": [
+    {
+      "venue": "table",
+      "sample": 0,
+      "cpu": 4,
+      "network": false,
+      "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "startupMs": 1530.7999999523163,
+      "startupLongestTask": 1114,
+      "firstVisibleMs": 367.10000002384186,
+      "firstLongestTask": 224,
+      "activityLongestTask": 67,
+      "activityFrameP95": 34.09999990463257,
+      "appearanceLongestTask": 141,
+      "previewBytes": 616220,
+      "appearanceFirstFrameMs": 53.40000009536743,
+      "appearanceCompleteMs": 1127.1000000238419,
+      "activityInputQueueMs": [
+        19.199999928474426,
+        23.700000047683716
+      ],
+      "startupHotFunctions": [
+        {
+          "fn": "(anonymous) js/dice.js:1278",
+          "ms": 439.7
+        },
+        {
+          "fn": "(program) :0",
+          "ms": 225.4
+        },
+        {
+          "fn": "warmVariant js/diceart.js:107",
+          "ms": 192.7
+        },
+        {
+          "fn": "(idle) :0",
+          "ms": 111
+        },
+        {
+          "fn": "texSubImage2D vendor/three.module.js:23670",
+          "ms": 105
+        },
+        {
+          "fn": "onFirstUse vendor/three.module.js:20271",
+          "ms": 58.1
+        },
+        {
+          "fn": "stroke js/main.js:2703",
+          "ms": 33.2
+        },
+        {
+          "fn": "makeFaceTexture js/dice.js:216",
+          "ms": 22
+        },
+        {
+          "fn": "getContext vendor/three.module.js:28617",
+          "ms": 17.3
+        },
+        {
+          "fn": "(anonymous) js/main.js:1",
+          "ms": 16.3
+        }
+      ],
+      "startupResources": [
+        {
+          "path": "/js/report.js",
+          "at": 21.200000047683716,
+          "ms": 7.899999976158142,
+          "encoded": 3313,
+          "bytes": 3613
+        },
+        {
+          "path": "/css/firstplay.css",
+          "at": 21.299999952316284,
+          "ms": 6.400000095367432,
+          "encoded": 745,
+          "bytes": 1045
+        },
+        {
+          "path": "/css/style.css",
+          "at": 21.299999952316284,
+          "ms": 9.700000047683716,
+          "encoded": 105228,
+          "bytes": 105528
+        },
+        {
+          "path": "/css/playerresults.css",
+          "at": 21.799999952316284,
+          "ms": 7.200000047683716,
+          "encoded": 2877,
+          "bytes": 3177
+        },
+        {
+          "path": "/css/workspaces.css",
+          "at": 21.799999952316284,
+          "ms": 7.200000047683716,
+          "encoded": 3140,
+          "bytes": 3440
+        },
+        {
+          "path": "/js/main.js",
+          "at": 21.799999952316284,
+          "ms": 35.60000002384186,
+          "encoded": 630143,
+          "bytes": 630443
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "at": 79.20000004768372,
+          "ms": 26.799999952316284,
+          "encoded": 255043,
+          "bytes": 255343
+        },
+        {
+          "path": "/js/film-bake.js",
+          "at": 79.29999995231628,
+          "ms": 7.400000095367432,
+          "encoded": 15523,
+          "bytes": 15823
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "at": 79.29999995231628,
+          "ms": 11.5,
+          "encoded": 76922,
+          "bytes": 77222
+        },
+        {
+          "path": "/js/film-client.js",
+          "at": 80,
+          "ms": 6.399999976158142,
+          "encoded": 1310,
+          "bytes": 1610
+        },
+        {
+          "path": "/js/film-wire.js",
+          "at": 80,
+          "ms": 6.700000047683716,
+          "encoded": 4646,
+          "bytes": 4946
+        },
+        {
+          "path": "/js/round-table.js",
+          "at": 80.20000004768372,
+          "ms": 6.199999928474426,
+          "encoded": 1147,
+          "bytes": 1447
+        },
+        {
+          "path": "/js/diceart.js",
+          "at": 80.20000004768372,
+          "ms": 9.799999952316284,
+          "encoded": 3932,
+          "bytes": 4232
+        },
+        {
+          "path": "/js/dice.js",
+          "at": 80.20000004768372,
+          "ms": 9.899999976158142,
+          "encoded": 24145,
+          "bytes": 24445
+        },
+        {
+          "path": "/js/net.js",
+          "at": 80.29999995231628,
+          "ms": 9.900000095367432,
+          "encoded": 15274,
+          "bytes": 15574
+        },
+        {
+          "path": "/js/tables.js",
+          "at": 80.70000004768372,
+          "ms": 9.899999976158142,
+          "encoded": 5400,
+          "bytes": 5700
+        },
+        {
+          "path": "/js/meanings.js",
+          "at": 80.70000004768372,
+          "ms": 14.199999928474426,
+          "encoded": 13063,
+          "bytes": 13363
+        },
+        {
+          "path": "/js/rollspec.js",
+          "at": 80.70000004768372,
+          "ms": 14.399999976158142,
+          "encoded": 8695,
+          "bytes": 8995
+        },
+        {
+          "path": "/js/demo.js",
+          "at": 80.70000004768372,
+          "ms": 14.899999976158142,
+          "encoded": 4587,
+          "bytes": 4887
+        },
+        {
+          "path": "/js/places.js",
+          "at": 80.70000004768372,
+          "ms": 14.599999904632568,
+          "encoded": 22870,
+          "bytes": 23170
+        },
+        {
+          "path": "/js/placard.js",
+          "at": 80.70000004768372,
+          "ms": 15.399999976158142,
+          "encoded": 36034,
+          "bytes": 36334
+        },
+        {
+          "path": "/js/notation.js",
+          "at": 80.79999995231628,
+          "ms": 18.300000071525574,
+          "encoded": 17222,
+          "bytes": 17522
+        },
+        {
+          "path": "/js/odds.js",
+          "at": 80.79999995231628,
+          "ms": 18.300000071525574,
+          "encoded": 17331,
+          "bytes": 17631
+        },
+        {
+          "path": "/js/firstplay.js",
+          "at": 81.39999997615814,
+          "ms": 17.100000023841858,
+          "encoded": 2068,
+          "bytes": 2368
+        },
+        {
+          "path": "/js/seed.js",
+          "at": 81.39999997615814,
+          "ms": 18.200000047683716,
+          "encoded": 5961,
+          "bytes": 6261
+        },
+        {
+          "path": "/js/workspaces.js",
+          "at": 81.5,
+          "ms": 19.899999976158142,
+          "encoded": 5527,
+          "bytes": 5827
+        },
+        {
+          "path": "/js/playerresults.js",
+          "at": 81.5,
+          "ms": 21.200000047683716,
+          "encoded": 3578,
+          "bytes": 3878
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "at": 81.5,
+          "ms": 20.200000047683716,
+          "encoded": 584,
+          "bytes": 884
+        },
+        {
+          "path": "/js/table-designs.js",
+          "at": 81.5,
+          "ms": 20,
+          "encoded": 1497,
+          "bytes": 1797
+        },
+        {
+          "path": "/js/library-document.js",
+          "at": 81.5,
+          "ms": 20.100000023841858,
+          "encoded": 2419,
+          "bytes": 2719
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "at": 81.5,
+          "ms": 23.700000047683716,
+          "encoded": 695,
+          "bytes": 995
+        },
+        {
+          "path": "/js/stability.js",
+          "at": 81.60000002384186,
+          "ms": 23.699999928474426,
+          "encoded": 3576,
+          "bytes": 3876
+        },
+        {
+          "path": "/js/schema.js",
+          "at": 81.60000002384186,
+          "ms": 23.899999976158142,
+          "encoded": 4728,
+          "bytes": 5028
+        },
+        {
+          "path": "/js/portable.js",
+          "at": 82.10000002384186,
+          "ms": 23.699999928474426,
+          "encoded": 14544,
+          "bytes": 14844
+        },
+        {
+          "path": "/js/profiles.js",
+          "at": 82.10000002384186,
+          "ms": 24.100000023841858,
+          "encoded": 10493,
+          "bytes": 10793
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "at": 82.20000004768372,
+          "ms": 26.5,
+          "encoded": 1117,
+          "bytes": 1417
+        },
+        {
+          "path": "/js/themes.js",
+          "at": 82.20000004768372,
+          "ms": 26.799999952316284,
+          "encoded": 7801,
+          "bytes": 8101
+        },
+        {
+          "path": "/js/particles.js",
+          "at": 82.20000004768372,
+          "ms": 26.799999952316284,
+          "encoded": 4717,
+          "bytes": 5017
+        },
+        {
+          "path": "/js/dielights.js",
+          "at": 82.29999995231628,
+          "ms": 26.5,
+          "encoded": 2245,
+          "bytes": 2545
+        },
+        {
+          "path": "/js/decals.js",
+          "at": 82.29999995231628,
+          "ms": 26.90000009536743,
+          "encoded": 7646,
+          "bytes": 7946
+        },
+        {
+          "path": "/js/post.js",
+          "at": 82.29999995231628,
+          "ms": 27,
+          "encoded": 6683,
+          "bytes": 6983
+        },
+        {
+          "path": "/js/towerids.js",
+          "at": 82.29999995231628,
+          "ms": 28.100000023841858,
+          "encoded": 625,
+          "bytes": 925
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "at": 82.29999995231628,
+          "ms": 29.800000071525574,
+          "encoded": 684,
+          "bytes": 984
+        },
+        {
+          "path": "/js/motes.js",
+          "at": 82.29999995231628,
+          "ms": 30.300000071525574,
+          "encoded": 3130,
+          "bytes": 3430
+        },
+        {
+          "path": "/js/towerglb.js",
+          "at": 82.29999995231628,
+          "ms": 30.90000009536743,
+          "encoded": 7674,
+          "bytes": 7974
+        },
+        {
+          "path": "/js/voices.js",
+          "at": 83.10000002384186,
+          "ms": 30.199999928474426,
+          "encoded": 20876,
+          "bytes": 21176
+        },
+        {
+          "path": "/js/tunables.js",
+          "at": 83.10000002384186,
+          "ms": 30.399999976158142,
+          "encoded": 13938,
+          "bytes": 14238
+        },
+        {
+          "path": "/js/tune.js",
+          "at": 83.10000002384186,
+          "ms": 31.5,
+          "encoded": 45850,
+          "bytes": 46150
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "at": 98,
+          "ms": 16.700000047683716,
+          "encoded": 5471,
+          "bytes": 5771
+        },
+        {
+          "path": "/js/placard-design.js",
+          "at": 98.39999997615814,
+          "ms": 16.100000023841858,
+          "encoded": 1701,
+          "bytes": 2001
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "at": 120.20000004768372,
+          "ms": 1.5,
+          "encoded": 2405,
+          "bytes": 2705
+        },
+        {
+          "path": "/js/yaml.js",
+          "at": 120.89999997615814,
+          "ms": 2.3000000715255737,
+          "encoded": 9990,
+          "bytes": 10290
+        },
+        {
+          "path": "/api/join",
+          "at": 1215.6000000238419,
+          "ms": 2.1999999284744263,
+          "encoded": 326,
+          "bytes": 626
+        },
+        {
+          "path": "/favicon.ico",
+          "at": 1509.1000000238419,
+          "ms": 1.5,
+          "encoded": 40,
+          "bytes": 340
+        },
+        {
+          "path": "/api/pools",
+          "at": 1526,
+          "ms": 1.100000023841858,
+          "encoded": 11,
+          "bytes": 311
+        },
+        {
+          "path": "/api/pools",
+          "at": 1551.8999999761581,
+          "ms": 1.8000000715255737,
+          "encoded": 11,
+          "bytes": 311
+        }
+      ],
+      "startupLongTasks": [
+        {
+          "at": 125.89999997615814,
+          "ms": 1114
+        },
+        {
+          "at": 1240.5,
+          "ms": 240
+        }
+      ],
+      "firstRollLongTasks": [
+        {
+          "at": 1838.8999999761581,
+          "ms": 224
+        }
+      ],
+      "appearanceLongTasks": [
+        {
+          "at": 5899.399999976158,
+          "ms": 72
+        },
+        {
+          "at": 5993.200000047684,
+          "ms": 71
+        },
+        {
+          "at": 6085.299999952316,
+          "ms": 68
+        },
+        {
+          "at": 6174,
+          "ms": 64
+        },
+        {
+          "at": 6259.200000047684,
+          "ms": 64
+        },
+        {
+          "at": 6341.299999952316,
+          "ms": 69
+        },
+        {
+          "at": 6415.100000023842,
+          "ms": 66
+        },
+        {
+          "at": 6485.200000047684,
+          "ms": 71
+        },
+        {
+          "at": 6563.700000047684,
+          "ms": 120
+        },
+        {
+          "at": 6693.200000047684,
+          "ms": 141
+        }
+      ]
+    },
+    {
+      "venue": "table",
+      "sample": 1,
+      "cpu": 4,
+      "network": false,
+      "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "startupMs": 1478.6999999284744,
+      "startupLongestTask": 1082,
+      "firstVisibleMs": 355.60000002384186,
+      "firstLongestTask": 217,
+      "activityLongestTask": 75,
+      "activityFrameP95": 30.399999976158142,
+      "appearanceLongestTask": 144,
+      "previewBytes": 616220,
+      "appearanceFirstFrameMs": 46.39999997615814,
+      "appearanceCompleteMs": 1136.2999999523163,
+      "activityInputQueueMs": [
+        19.90000009536743,
+        22.600000023841858
+      ],
+      "startupHotFunctions": [
+        {
+          "fn": "(anonymous) js/dice.js:1278",
+          "ms": 412.7
+        },
+        {
+          "fn": "(program) :0",
+          "ms": 219.1
+        },
+        {
+          "fn": "warmVariant js/diceart.js:107",
+          "ms": 188.1
+        },
+        {
+          "fn": "texSubImage2D vendor/three.module.js:23670",
+          "ms": 102.3
+        },
+        {
+          "fn": "(idle) :0",
+          "ms": 79.1
+        },
+        {
+          "fn": "onFirstUse vendor/three.module.js:20271",
+          "ms": 67.7
+        },
+        {
+          "fn": "stroke js/main.js:2703",
+          "ms": 34.2
+        },
+        {
+          "fn": "makeFaceTexture js/dice.js:216",
+          "ms": 30.6
+        },
+        {
+          "fn": "(garbage collector) :0",
+          "ms": 20.7
+        },
+        {
+          "fn": "getContext vendor/three.module.js:28617",
+          "ms": 16
+        }
+      ],
+      "startupResources": [
+        {
+          "path": "/css/firstplay.css",
+          "at": 16.600000023841858,
+          "ms": 3.1999999284744263,
+          "encoded": 745,
+          "bytes": 1045
+        },
+        {
+          "path": "/css/style.css",
+          "at": 16.600000023841858,
+          "ms": 6.599999904632568,
+          "encoded": 105228,
+          "bytes": 105528
+        },
+        {
+          "path": "/js/report.js",
+          "at": 16.600000023841858,
+          "ms": 6.099999904632568,
+          "encoded": 3313,
+          "bytes": 3613
+        },
+        {
+          "path": "/css/workspaces.css",
+          "at": 16.699999928474426,
+          "ms": 3.8000000715255737,
+          "encoded": 3140,
+          "bytes": 3440
+        },
+        {
+          "path": "/css/playerresults.css",
+          "at": 16.699999928474426,
+          "ms": 3.8000000715255737,
+          "encoded": 2877,
+          "bytes": 3177
+        },
+        {
+          "path": "/js/main.js",
+          "at": 16.699999928474426,
+          "ms": 11,
+          "encoded": 630143,
+          "bytes": 630443
+        },
+        {
+          "path": "/js/film-bake.js",
+          "at": 59.39999997615814,
+          "ms": 4.299999952316284,
+          "encoded": 15523,
+          "bytes": 15823
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "at": 59.39999997615814,
+          "ms": 8.899999976158142,
+          "encoded": 76922,
+          "bytes": 77222
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "at": 59.39999997615814,
+          "ms": 17.100000023841858,
+          "encoded": 255043,
+          "bytes": 255343
+        },
+        {
+          "path": "/js/film-client.js",
+          "at": 60.10000002384186,
+          "ms": 5.199999928474426,
+          "encoded": 1310,
+          "bytes": 1610
+        },
+        {
+          "path": "/js/film-wire.js",
+          "at": 60.10000002384186,
+          "ms": 5.899999976158142,
+          "encoded": 4646,
+          "bytes": 4946
+        },
+        {
+          "path": "/js/round-table.js",
+          "at": 60.10000002384186,
+          "ms": 6,
+          "encoded": 1147,
+          "bytes": 1447
+        },
+        {
+          "path": "/js/dice.js",
+          "at": 60.10000002384186,
+          "ms": 7.199999928474426,
+          "encoded": 24145,
+          "bytes": 24445
+        },
+        {
+          "path": "/js/diceart.js",
+          "at": 60.10000002384186,
+          "ms": 8.099999904632568,
+          "encoded": 3932,
+          "bytes": 4232
+        },
+        {
+          "path": "/js/net.js",
+          "at": 60.10000002384186,
+          "ms": 8.399999976158142,
+          "encoded": 15274,
+          "bytes": 15574
+        },
+        {
+          "path": "/js/tables.js",
+          "at": 60.199999928474426,
+          "ms": 9.100000023841858,
+          "encoded": 5400,
+          "bytes": 5700
+        },
+        {
+          "path": "/js/meanings.js",
+          "at": 60.199999928474426,
+          "ms": 10.400000095367432,
+          "encoded": 13063,
+          "bytes": 13363
+        },
+        {
+          "path": "/js/rollspec.js",
+          "at": 60.60000002384186,
+          "ms": 10.199999928474426,
+          "encoded": 8695,
+          "bytes": 8995
+        },
+        {
+          "path": "/js/places.js",
+          "at": 60.60000002384186,
+          "ms": 10.399999976158142,
+          "encoded": 22870,
+          "bytes": 23170
+        },
+        {
+          "path": "/js/demo.js",
+          "at": 60.60000002384186,
+          "ms": 11.299999952316284,
+          "encoded": 4587,
+          "bytes": 4887
+        },
+        {
+          "path": "/js/placard.js",
+          "at": 60.799999952316284,
+          "ms": 13.200000047683716,
+          "encoded": 36034,
+          "bytes": 36334
+        },
+        {
+          "path": "/js/odds.js",
+          "at": 60.799999952316284,
+          "ms": 13.100000023841858,
+          "encoded": 17331,
+          "bytes": 17631
+        },
+        {
+          "path": "/js/firstplay.js",
+          "at": 60.89999997615814,
+          "ms": 13.100000023841858,
+          "encoded": 2068,
+          "bytes": 2368
+        },
+        {
+          "path": "/js/seed.js",
+          "at": 60.89999997615814,
+          "ms": 13.5,
+          "encoded": 5961,
+          "bytes": 6261
+        },
+        {
+          "path": "/js/notation.js",
+          "at": 60.89999997615814,
+          "ms": 13.299999952316284,
+          "encoded": 17222,
+          "bytes": 17522
+        },
+        {
+          "path": "/js/table-designs.js",
+          "at": 61.199999928474426,
+          "ms": 14.5,
+          "encoded": 1497,
+          "bytes": 1797
+        },
+        {
+          "path": "/js/library-document.js",
+          "at": 61.199999928474426,
+          "ms": 14.5,
+          "encoded": 2419,
+          "bytes": 2719
+        },
+        {
+          "path": "/js/workspaces.js",
+          "at": 61.199999928474426,
+          "ms": 15.400000095367432,
+          "encoded": 5527,
+          "bytes": 5827
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "at": 61.199999928474426,
+          "ms": 15.400000095367432,
+          "encoded": 584,
+          "bytes": 884
+        },
+        {
+          "path": "/js/playerresults.js",
+          "at": 61.199999928474426,
+          "ms": 15.600000023841858,
+          "encoded": 3578,
+          "bytes": 3878
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "at": 61.299999952316284,
+          "ms": 17.600000023841858,
+          "encoded": 695,
+          "bytes": 995
+        },
+        {
+          "path": "/js/stability.js",
+          "at": 61.299999952316284,
+          "ms": 17.600000023841858,
+          "encoded": 3576,
+          "bytes": 3876
+        },
+        {
+          "path": "/js/schema.js",
+          "at": 61.299999952316284,
+          "ms": 17.700000047683716,
+          "encoded": 4728,
+          "bytes": 5028
+        },
+        {
+          "path": "/js/portable.js",
+          "at": 61.299999952316284,
+          "ms": 17.899999976158142,
+          "encoded": 14544,
+          "bytes": 14844
+        },
+        {
+          "path": "/js/profiles.js",
+          "at": 61.299999952316284,
+          "ms": 18.100000023841858,
+          "encoded": 10493,
+          "bytes": 10793
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "at": 61.39999997615814,
+          "ms": 17.600000023841858,
+          "encoded": 1117,
+          "bytes": 1417
+        },
+        {
+          "path": "/js/themes.js",
+          "at": 61.39999997615814,
+          "ms": 20,
+          "encoded": 7801,
+          "bytes": 8101
+        },
+        {
+          "path": "/js/dielights.js",
+          "at": 62.199999928474426,
+          "ms": 19.200000047683716,
+          "encoded": 2245,
+          "bytes": 2545
+        },
+        {
+          "path": "/js/particles.js",
+          "at": 62.199999928474426,
+          "ms": 19.300000071525574,
+          "encoded": 4717,
+          "bytes": 5017
+        },
+        {
+          "path": "/js/decals.js",
+          "at": 62.199999928474426,
+          "ms": 19.600000023841858,
+          "encoded": 7646,
+          "bytes": 7946
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "at": 62.299999952316284,
+          "ms": 19.600000023841858,
+          "encoded": 684,
+          "bytes": 984
+        },
+        {
+          "path": "/js/towerids.js",
+          "at": 62.299999952316284,
+          "ms": 20.399999976158142,
+          "encoded": 625,
+          "bytes": 925
+        },
+        {
+          "path": "/js/post.js",
+          "at": 62.299999952316284,
+          "ms": 21.100000023841858,
+          "encoded": 6683,
+          "bytes": 6983
+        },
+        {
+          "path": "/js/motes.js",
+          "at": 62.299999952316284,
+          "ms": 21.700000047683716,
+          "encoded": 3130,
+          "bytes": 3430
+        },
+        {
+          "path": "/js/towerglb.js",
+          "at": 62.299999952316284,
+          "ms": 21.800000071525574,
+          "encoded": 7674,
+          "bytes": 7974
+        },
+        {
+          "path": "/js/voices.js",
+          "at": 62.299999952316284,
+          "ms": 22.600000023841858,
+          "encoded": 20876,
+          "bytes": 21176
+        },
+        {
+          "path": "/js/tunables.js",
+          "at": 62.39999997615814,
+          "ms": 22.700000047683716,
+          "encoded": 13938,
+          "bytes": 14238
+        },
+        {
+          "path": "/js/tune.js",
+          "at": 62.39999997615814,
+          "ms": 23.200000047683716,
+          "encoded": 45850,
+          "bytes": 46150
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "at": 83.5,
+          "ms": 2.1999999284744263,
+          "encoded": 5471,
+          "bytes": 5771
+        },
+        {
+          "path": "/js/placard-design.js",
+          "at": 83.5,
+          "ms": 2.600000023841858,
+          "encoded": 1701,
+          "bytes": 2001
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "at": 100.79999995231628,
+          "ms": 1.7000000476837158,
+          "encoded": 2405,
+          "bytes": 2705
+        },
+        {
+          "path": "/js/yaml.js",
+          "at": 100.89999997615814,
+          "ms": 1.899999976158142,
+          "encoded": 9990,
+          "bytes": 10290
+        },
+        {
+          "path": "/api/join",
+          "at": 1164.7999999523163,
+          "ms": 1.399999976158142,
+          "encoded": 326,
+          "bytes": 626
+        },
+        {
+          "path": "/favicon.ico",
+          "at": 1454.1999999284744,
+          "ms": 1.8000000715255737,
+          "encoded": 40,
+          "bytes": 340
+        },
+        {
+          "path": "/api/pools",
+          "at": 1472.5,
+          "ms": 1.100000023841858,
+          "encoded": 11,
+          "bytes": 311
+        },
+        {
+          "path": "/api/pools",
+          "at": 1498.6999999284744,
+          "ms": 1,
+          "encoded": 11,
+          "bytes": 311
+        }
+      ],
+      "startupLongTasks": [
+        {
+          "at": 105.89999997615814,
+          "ms": 1082
+        },
+        {
+          "at": 1188.3999999761581,
+          "ms": 237
+        }
+      ],
+      "firstRollLongTasks": [
+        {
+          "at": 1720.5,
+          "ms": 217
+        }
+      ],
+      "appearanceLongTasks": [
+        {
+          "at": 6576.199999928474,
+          "ms": 80
+        },
+        {
+          "at": 6677.199999928474,
+          "ms": 75
+        },
+        {
+          "at": 6772.899999976158,
+          "ms": 73
+        },
+        {
+          "at": 6867.5,
+          "ms": 70
+        },
+        {
+          "at": 6941.699999928474,
+          "ms": 64
+        },
+        {
+          "at": 7022.100000023842,
+          "ms": 69
+        },
+        {
+          "at": 7096.299999952316,
+          "ms": 64
+        },
+        {
+          "at": 7163.5,
+          "ms": 61
+        },
+        {
+          "at": 7228.600000023842,
+          "ms": 144
+        },
+        {
+          "at": 7382.399999976158,
+          "ms": 138
+        }
+      ]
+    },
+    {
+      "venue": "table",
+      "sample": 2,
+      "cpu": 4,
+      "network": false,
+      "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "startupMs": 1444,
+      "startupLongestTask": 1055,
+      "firstVisibleMs": 350.3000000715256,
+      "firstLongestTask": 214,
+      "activityLongestTask": 71,
+      "activityFrameP95": 29.100000023841858,
+      "appearanceLongestTask": 144,
+      "previewBytes": 616220,
+      "appearanceFirstFrameMs": 46.60000002384186,
+      "appearanceCompleteMs": 1092.1999999284744,
+      "activityInputQueueMs": [
+        27,
+        23.200000047683716
+      ],
+      "startupHotFunctions": [
+        {
+          "fn": "(anonymous) js/dice.js:1278",
+          "ms": 410.3
+        },
+        {
+          "fn": "(program) :0",
+          "ms": 209.2
+        },
+        {
+          "fn": "warmVariant js/diceart.js:107",
+          "ms": 176.5
+        },
+        {
+          "fn": "texSubImage2D vendor/three.module.js:23670",
+          "ms": 102.5
+        },
+        {
+          "fn": "(idle) :0",
+          "ms": 85.9
+        },
+        {
+          "fn": "onFirstUse vendor/three.module.js:20271",
+          "ms": 64.6
+        },
+        {
+          "fn": "stroke js/main.js:2703",
+          "ms": 35.7
+        },
+        {
+          "fn": "makeFaceTexture js/dice.js:216",
+          "ms": 24.1
+        },
+        {
+          "fn": "(garbage collector) :0",
+          "ms": 18.3
+        },
+        {
+          "fn": "getContext vendor/three.module.js:28617",
+          "ms": 17.9
+        }
+      ],
+      "startupResources": [
+        {
+          "path": "/js/report.js",
+          "at": 16,
+          "ms": 5.899999976158142,
+          "encoded": 3313,
+          "bytes": 3613
+        },
+        {
+          "path": "/css/playerresults.css",
+          "at": 16.5,
+          "ms": 3.700000047683716,
+          "encoded": 2877,
+          "bytes": 3177
+        },
+        {
+          "path": "/css/firstplay.css",
+          "at": 16.5,
+          "ms": 3.5,
+          "encoded": 745,
+          "bytes": 1045
+        },
+        {
+          "path": "/css/workspaces.css",
+          "at": 16.5,
+          "ms": 3.600000023841858,
+          "encoded": 3140,
+          "bytes": 3440
+        },
+        {
+          "path": "/css/style.css",
+          "at": 16.5,
+          "ms": 5.899999976158142,
+          "encoded": 105228,
+          "bytes": 105528
+        },
+        {
+          "path": "/js/main.js",
+          "at": 16.5,
+          "ms": 12.300000071525574,
+          "encoded": 630143,
+          "bytes": 630443
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "at": 61,
+          "ms": 20.200000047683716,
+          "encoded": 255043,
+          "bytes": 255343
+        },
+        {
+          "path": "/js/film-client.js",
+          "at": 61.10000002384186,
+          "ms": 5.299999952316284,
+          "encoded": 1310,
+          "bytes": 1610
+        },
+        {
+          "path": "/js/film-bake.js",
+          "at": 61.10000002384186,
+          "ms": 5.399999976158142,
+          "encoded": 15523,
+          "bytes": 15823
+        },
+        {
+          "path": "/js/film-wire.js",
+          "at": 61.10000002384186,
+          "ms": 5.600000023841858,
+          "encoded": 4646,
+          "bytes": 4946
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "at": 61.10000002384186,
+          "ms": 9,
+          "encoded": 76922,
+          "bytes": 77222
+        },
+        {
+          "path": "/js/round-table.js",
+          "at": 61.200000047683716,
+          "ms": 5.199999928474426,
+          "encoded": 1147,
+          "bytes": 1447
+        },
+        {
+          "path": "/js/diceart.js",
+          "at": 61.200000047683716,
+          "ms": 8.399999976158142,
+          "encoded": 3932,
+          "bytes": 4232
+        },
+        {
+          "path": "/js/dice.js",
+          "at": 61.200000047683716,
+          "ms": 8.299999952316284,
+          "encoded": 24145,
+          "bytes": 24445
+        },
+        {
+          "path": "/js/net.js",
+          "at": 61.60000002384186,
+          "ms": 7.899999976158142,
+          "encoded": 15274,
+          "bytes": 15574
+        },
+        {
+          "path": "/js/tables.js",
+          "at": 61.60000002384186,
+          "ms": 8.299999952316284,
+          "encoded": 5400,
+          "bytes": 5700
+        },
+        {
+          "path": "/js/meanings.js",
+          "at": 61.700000047683716,
+          "ms": 10.5,
+          "encoded": 13063,
+          "bytes": 13363
+        },
+        {
+          "path": "/js/rollspec.js",
+          "at": 61.700000047683716,
+          "ms": 10.5,
+          "encoded": 8695,
+          "bytes": 8995
+        },
+        {
+          "path": "/js/places.js",
+          "at": 61.700000047683716,
+          "ms": 11.100000023841858,
+          "encoded": 22870,
+          "bytes": 23170
+        },
+        {
+          "path": "/js/demo.js",
+          "at": 62.10000002384186,
+          "ms": 11,
+          "encoded": 4587,
+          "bytes": 4887
+        },
+        {
+          "path": "/js/placard.js",
+          "at": 62.10000002384186,
+          "ms": 11.399999976158142,
+          "encoded": 36034,
+          "bytes": 36334
+        },
+        {
+          "path": "/js/firstplay.js",
+          "at": 62.10000002384186,
+          "ms": 13.200000047683716,
+          "encoded": 2068,
+          "bytes": 2368
+        },
+        {
+          "path": "/js/odds.js",
+          "at": 62.10000002384186,
+          "ms": 13.299999952316284,
+          "encoded": 17331,
+          "bytes": 17631
+        },
+        {
+          "path": "/js/seed.js",
+          "at": 62.10000002384186,
+          "ms": 14.399999976158142,
+          "encoded": 5961,
+          "bytes": 6261
+        },
+        {
+          "path": "/js/notation.js",
+          "at": 62.10000002384186,
+          "ms": 14.200000047683716,
+          "encoded": 17222,
+          "bytes": 17522
+        },
+        {
+          "path": "/js/table-designs.js",
+          "at": 62.200000047683716,
+          "ms": 15.100000023841858,
+          "encoded": 1497,
+          "bytes": 1797
+        },
+        {
+          "path": "/js/library-document.js",
+          "at": 62.200000047683716,
+          "ms": 15.100000023841858,
+          "encoded": 2419,
+          "bytes": 2719
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "at": 62.200000047683716,
+          "ms": 16.100000023841858,
+          "encoded": 584,
+          "bytes": 884
+        },
+        {
+          "path": "/js/playerresults.js",
+          "at": 62.200000047683716,
+          "ms": 16.699999928474426,
+          "encoded": 3578,
+          "bytes": 3878
+        },
+        {
+          "path": "/js/workspaces.js",
+          "at": 62.200000047683716,
+          "ms": 15.299999952316284,
+          "encoded": 5527,
+          "bytes": 5827
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "at": 62.300000071525574,
+          "ms": 18,
+          "encoded": 695,
+          "bytes": 995
+        },
+        {
+          "path": "/js/stability.js",
+          "at": 62.300000071525574,
+          "ms": 18,
+          "encoded": 3576,
+          "bytes": 3876
+        },
+        {
+          "path": "/js/schema.js",
+          "at": 63,
+          "ms": 18.300000071525574,
+          "encoded": 4728,
+          "bytes": 5028
+        },
+        {
+          "path": "/js/portable.js",
+          "at": 63.10000002384186,
+          "ms": 18.299999952316284,
+          "encoded": 14544,
+          "bytes": 14844
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "at": 63.200000047683716,
+          "ms": 19.100000023841858,
+          "encoded": 1117,
+          "bytes": 1417
+        },
+        {
+          "path": "/js/profiles.js",
+          "at": 63.200000047683716,
+          "ms": 19.100000023841858,
+          "encoded": 10493,
+          "bytes": 10793
+        },
+        {
+          "path": "/js/themes.js",
+          "at": 63.200000047683716,
+          "ms": 19.299999952316284,
+          "encoded": 7801,
+          "bytes": 8101
+        },
+        {
+          "path": "/js/particles.js",
+          "at": 63.200000047683716,
+          "ms": 21.299999952316284,
+          "encoded": 4717,
+          "bytes": 5017
+        },
+        {
+          "path": "/js/decals.js",
+          "at": 63.200000047683716,
+          "ms": 21.299999952316284,
+          "encoded": 7646,
+          "bytes": 7946
+        },
+        {
+          "path": "/js/dielights.js",
+          "at": 63.300000071525574,
+          "ms": 21.09999990463257,
+          "encoded": 2245,
+          "bytes": 2545
+        },
+        {
+          "path": "/js/post.js",
+          "at": 63.300000071525574,
+          "ms": 21.799999952316284,
+          "encoded": 6683,
+          "bytes": 6983
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "at": 63.700000047683716,
+          "ms": 20.799999952316284,
+          "encoded": 684,
+          "bytes": 984
+        },
+        {
+          "path": "/js/towerids.js",
+          "at": 63.800000071525574,
+          "ms": 21.199999928474426,
+          "encoded": 625,
+          "bytes": 925
+        },
+        {
+          "path": "/js/towerglb.js",
+          "at": 63.800000071525574,
+          "ms": 23,
+          "encoded": 7674,
+          "bytes": 7974
+        },
+        {
+          "path": "/js/motes.js",
+          "at": 64,
+          "ms": 22.5,
+          "encoded": 3130,
+          "bytes": 3430
+        },
+        {
+          "path": "/js/voices.js",
+          "at": 64,
+          "ms": 23.700000047683716,
+          "encoded": 20876,
+          "bytes": 21176
+        },
+        {
+          "path": "/js/tunables.js",
+          "at": 64,
+          "ms": 24.100000023841858,
+          "encoded": 13938,
+          "bytes": 14238
+        },
+        {
+          "path": "/js/tune.js",
+          "at": 64,
+          "ms": 24.5,
+          "encoded": 45850,
+          "bytes": 46150
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "at": 75.89999997615814,
+          "ms": 12.600000023841858,
+          "encoded": 5471,
+          "bytes": 5771
+        },
+        {
+          "path": "/js/placard-design.js",
+          "at": 76.10000002384186,
+          "ms": 12.100000023841858,
+          "encoded": 1701,
+          "bytes": 2001
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "at": 94.30000007152557,
+          "ms": 1.2999999523162842,
+          "encoded": 2405,
+          "bytes": 2705
+        },
+        {
+          "path": "/js/yaml.js",
+          "at": 94.80000007152557,
+          "ms": 1.5999999046325684,
+          "encoded": 9990,
+          "bytes": 10290
+        },
+        {
+          "path": "/api/join",
+          "at": 1129.6000000238419,
+          "ms": 1.2000000476837158,
+          "encoded": 326,
+          "bytes": 626
+        },
+        {
+          "path": "/favicon.ico",
+          "at": 1420.1000000238419,
+          "ms": 2,
+          "encoded": 40,
+          "bytes": 340
+        },
+        {
+          "path": "/api/pools",
+          "at": 1438.5,
+          "ms": 1.100000023841858,
+          "encoded": 11,
+          "bytes": 311
+        },
+        {
+          "path": "/api/pools",
+          "at": 1463.6000000238419,
+          "ms": 1.899999976158142,
+          "encoded": 11,
+          "bytes": 311
+        }
+      ],
+      "startupLongTasks": [
+        {
+          "at": 98.89999997615814,
+          "ms": 1055
+        },
+        {
+          "at": 1154.3999999761581,
+          "ms": 237
+        }
+      ],
+      "firstRollLongTasks": [
+        {
+          "at": 1717.8999999761581,
+          "ms": 214
+        }
+      ],
+      "appearanceLongTasks": [
+        {
+          "at": 6429.899999976158,
+          "ms": 73
+        },
+        {
+          "at": 6524.800000071526,
+          "ms": 67
+        },
+        {
+          "at": 6611.5,
+          "ms": 65
+        },
+        {
+          "at": 6695.399999976158,
+          "ms": 61
+        },
+        {
+          "at": 6760,
+          "ms": 63
+        },
+        {
+          "at": 6833.899999976158,
+          "ms": 71
+        },
+        {
+          "at": 6908.300000071526,
+          "ms": 66
+        },
+        {
+          "at": 6976.800000071526,
+          "ms": 60
+        },
+        {
+          "at": 7042,
+          "ms": 144
+        },
+        {
+          "at": 7194.5,
+          "ms": 135
+        }
+      ]
+    },
+    {
+      "venue": "copper",
+      "sample": 0,
+      "cpu": 4,
+      "network": false,
+      "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "startupMs": 1592.6000000238419,
+      "startupLongestTask": 1080,
+      "firstVisibleMs": 639.8000000715256,
+      "firstLongestTask": 261,
+      "activityLongestTask": 116,
+      "activityFrameP95": 96.09999990463257,
+      "appearanceLongestTask": 153,
+      "previewBytes": 616220,
+      "appearanceFirstFrameMs": 274.39999997615814,
+      "appearanceCompleteMs": 1281.2999999523163,
+      "activityInputQueueMs": [
+        74.60000002384186,
+        65.40000009536743
+      ],
+      "startupHotFunctions": [
+        {
+          "fn": "(anonymous) js/dice.js:1278",
+          "ms": 424.2
+        },
+        {
+          "fn": "(program) :0",
+          "ms": 357.8
+        },
+        {
+          "fn": "warmVariant js/diceart.js:107",
+          "ms": 180.4
+        },
+        {
+          "fn": "texSubImage2D vendor/three.module.js:23670",
+          "ms": 135.7
+        },
+        {
+          "fn": "(idle) :0",
+          "ms": 107
+        },
+        {
+          "fn": "onFirstUse vendor/three.module.js:20271",
+          "ms": 75
+        },
+        {
+          "fn": "stroke js/main.js:2703",
+          "ms": 37.5
+        },
+        {
+          "fn": "makeFaceTexture js/dice.js:216",
+          "ms": 31.5
+        },
+        {
+          "fn": "(garbage collector) :0",
+          "ms": 19.5
+        },
+        {
+          "fn": "getContext vendor/three.module.js:28617",
+          "ms": 15.3
+        }
+      ],
+      "startupResources": [
+        {
+          "path": "/js/report.js",
+          "at": 19.399999976158142,
+          "ms": 1.7999999523162842,
+          "encoded": 3313,
+          "bytes": 3613
+        },
+        {
+          "path": "/css/workspaces.css",
+          "at": 20.100000023841858,
+          "ms": 3.299999952316284,
+          "encoded": 3140,
+          "bytes": 3440
+        },
+        {
+          "path": "/css/firstplay.css",
+          "at": 20.100000023841858,
+          "ms": 3.299999952316284,
+          "encoded": 745,
+          "bytes": 1045
+        },
+        {
+          "path": "/css/style.css",
+          "at": 20.100000023841858,
+          "ms": 5.899999976158142,
+          "encoded": 105228,
+          "bytes": 105528
+        },
+        {
+          "path": "/css/playerresults.css",
+          "at": 20.199999928474426,
+          "ms": 4.600000023841858,
+          "encoded": 2877,
+          "bytes": 3177
+        },
+        {
+          "path": "/js/main.js",
+          "at": 20.199999928474426,
+          "ms": 11.600000023841858,
+          "encoded": 630143,
+          "bytes": 630443
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "at": 65.19999992847443,
+          "ms": 19.40000009536743,
+          "encoded": 255043,
+          "bytes": 255343
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "at": 65.60000002384186,
+          "ms": 11,
+          "encoded": 76922,
+          "bytes": 77222
+        },
+        {
+          "path": "/js/film-bake.js",
+          "at": 65.69999992847443,
+          "ms": 6.400000095367432,
+          "encoded": 15523,
+          "bytes": 15823
+        },
+        {
+          "path": "/js/film-wire.js",
+          "at": 65.69999992847443,
+          "ms": 8.200000047683716,
+          "encoded": 4646,
+          "bytes": 4946
+        },
+        {
+          "path": "/js/film-client.js",
+          "at": 65.69999992847443,
+          "ms": 8.200000047683716,
+          "encoded": 1310,
+          "bytes": 1610
+        },
+        {
+          "path": "/js/round-table.js",
+          "at": 65.69999992847443,
+          "ms": 8.700000047683716,
+          "encoded": 1147,
+          "bytes": 1447
+        },
+        {
+          "path": "/js/dice.js",
+          "at": 65.79999995231628,
+          "ms": 9.700000047683716,
+          "encoded": 24145,
+          "bytes": 24445
+        },
+        {
+          "path": "/js/diceart.js",
+          "at": 66.10000002384186,
+          "ms": 10.399999976158142,
+          "encoded": 3932,
+          "bytes": 4232
+        },
+        {
+          "path": "/js/net.js",
+          "at": 66.19999992847443,
+          "ms": 10.400000095367432,
+          "encoded": 15274,
+          "bytes": 15574
+        },
+        {
+          "path": "/js/tables.js",
+          "at": 66.19999992847443,
+          "ms": 11.100000023841858,
+          "encoded": 5400,
+          "bytes": 5700
+        },
+        {
+          "path": "/js/rollspec.js",
+          "at": 66.19999992847443,
+          "ms": 13.300000071525574,
+          "encoded": 8695,
+          "bytes": 8995
+        },
+        {
+          "path": "/js/meanings.js",
+          "at": 66.19999992847443,
+          "ms": 13.200000047683716,
+          "encoded": 13063,
+          "bytes": 13363
+        },
+        {
+          "path": "/js/places.js",
+          "at": 66.19999992847443,
+          "ms": 13.700000047683716,
+          "encoded": 22870,
+          "bytes": 23170
+        },
+        {
+          "path": "/js/demo.js",
+          "at": 66.29999995231628,
+          "ms": 13.700000047683716,
+          "encoded": 4587,
+          "bytes": 4887
+        },
+        {
+          "path": "/js/placard.js",
+          "at": 66.60000002384186,
+          "ms": 15.699999928474426,
+          "encoded": 36034,
+          "bytes": 36334
+        },
+        {
+          "path": "/js/odds.js",
+          "at": 66.69999992847443,
+          "ms": 15.800000071525574,
+          "encoded": 17331,
+          "bytes": 17631
+        },
+        {
+          "path": "/js/notation.js",
+          "at": 66.69999992847443,
+          "ms": 16,
+          "encoded": 17222,
+          "bytes": 17522
+        },
+        {
+          "path": "/js/seed.js",
+          "at": 66.69999992847443,
+          "ms": 16.700000047683716,
+          "encoded": 5961,
+          "bytes": 6261
+        },
+        {
+          "path": "/js/firstplay.js",
+          "at": 66.79999995231628,
+          "ms": 15.600000023841858,
+          "encoded": 2068,
+          "bytes": 2368
+        },
+        {
+          "path": "/js/table-designs.js",
+          "at": 66.79999995231628,
+          "ms": 17.800000071525574,
+          "encoded": 1497,
+          "bytes": 1797
+        },
+        {
+          "path": "/js/workspaces.js",
+          "at": 66.79999995231628,
+          "ms": 18.100000023841858,
+          "encoded": 5527,
+          "bytes": 5827
+        },
+        {
+          "path": "/js/library-document.js",
+          "at": 67.19999992847443,
+          "ms": 17.600000023841858,
+          "encoded": 2419,
+          "bytes": 2719
+        },
+        {
+          "path": "/js/playerresults.js",
+          "at": 67.19999992847443,
+          "ms": 18.300000071525574,
+          "encoded": 3578,
+          "bytes": 3878
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "at": 67.19999992847443,
+          "ms": 20.200000047683716,
+          "encoded": 695,
+          "bytes": 995
+        },
+        {
+          "path": "/js/stability.js",
+          "at": 67.19999992847443,
+          "ms": 20.200000047683716,
+          "encoded": 3576,
+          "bytes": 3876
+        },
+        {
+          "path": "/js/schema.js",
+          "at": 67.19999992847443,
+          "ms": 20.5,
+          "encoded": 4728,
+          "bytes": 5028
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "at": 67.19999992847443,
+          "ms": 17.700000047683716,
+          "encoded": 584,
+          "bytes": 884
+        },
+        {
+          "path": "/js/portable.js",
+          "at": 67.29999995231628,
+          "ms": 20.5,
+          "encoded": 14544,
+          "bytes": 14844
+        },
+        {
+          "path": "/js/profiles.js",
+          "at": 67.69999992847443,
+          "ms": 20.40000009536743,
+          "encoded": 10493,
+          "bytes": 10793
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "at": 67.69999992847443,
+          "ms": 20.600000023841858,
+          "encoded": 1117,
+          "bytes": 1417
+        },
+        {
+          "path": "/js/particles.js",
+          "at": 67.69999992847443,
+          "ms": 21.90000009536743,
+          "encoded": 4717,
+          "bytes": 5017
+        },
+        {
+          "path": "/js/themes.js",
+          "at": 67.69999992847443,
+          "ms": 22.200000047683716,
+          "encoded": 7801,
+          "bytes": 8101
+        },
+        {
+          "path": "/js/dielights.js",
+          "at": 67.79999995231628,
+          "ms": 23,
+          "encoded": 2245,
+          "bytes": 2545
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "at": 67.79999995231628,
+          "ms": 23,
+          "encoded": 684,
+          "bytes": 984
+        },
+        {
+          "path": "/js/post.js",
+          "at": 67.79999995231628,
+          "ms": 23.200000047683716,
+          "encoded": 6683,
+          "bytes": 6983
+        },
+        {
+          "path": "/js/decals.js",
+          "at": 67.79999995231628,
+          "ms": 23.100000023841858,
+          "encoded": 7646,
+          "bytes": 7946
+        },
+        {
+          "path": "/js/towerids.js",
+          "at": 67.79999995231628,
+          "ms": 25.5,
+          "encoded": 625,
+          "bytes": 925
+        },
+        {
+          "path": "/js/motes.js",
+          "at": 68.29999995231628,
+          "ms": 24.600000023841858,
+          "encoded": 3130,
+          "bytes": 3430
+        },
+        {
+          "path": "/js/towerglb.js",
+          "at": 68.29999995231628,
+          "ms": 25.100000023841858,
+          "encoded": 7674,
+          "bytes": 7974
+        },
+        {
+          "path": "/js/voices.js",
+          "at": 68.29999995231628,
+          "ms": 25.200000047683716,
+          "encoded": 20876,
+          "bytes": 21176
+        },
+        {
+          "path": "/js/tunables.js",
+          "at": 68.29999995231628,
+          "ms": 25.399999976158142,
+          "encoded": 13938,
+          "bytes": 14238
+        },
+        {
+          "path": "/js/tune.js",
+          "at": 68.60000002384186,
+          "ms": 26.299999952316284,
+          "encoded": 45850,
+          "bytes": 46150
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "at": 84.29999995231628,
+          "ms": 10.399999976158142,
+          "encoded": 5471,
+          "bytes": 5771
+        },
+        {
+          "path": "/js/placard-design.js",
+          "at": 85,
+          "ms": 9.899999976158142,
+          "encoded": 1701,
+          "bytes": 2001
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "at": 100.29999995231628,
+          "ms": 1.399999976158142,
+          "encoded": 2405,
+          "bytes": 2705
+        },
+        {
+          "path": "/js/yaml.js",
+          "at": 100.39999997615814,
+          "ms": 1.5,
+          "encoded": 9990,
+          "bytes": 10290
+        },
+        {
+          "path": "/api/join",
+          "at": 1160.8999999761581,
+          "ms": 1.399999976158142,
+          "encoded": 641,
+          "bytes": 941
+        },
+        {
+          "path": "/favicon.ico",
+          "at": 1458.6000000238419,
+          "ms": 1.0999999046325684,
+          "encoded": 40,
+          "bytes": 340
+        },
+        {
+          "path": "/vendor/GLTFLoader.js",
+          "at": 1559.1999999284744,
+          "ms": 3.100000023841858,
+          "encoded": 24361,
+          "bytes": 24661
+        },
+        {
+          "path": "/api/pools",
+          "at": 1565.1999999284744,
+          "ms": 0.9000000953674316,
+          "encoded": 11,
+          "bytes": 311
+        },
+        {
+          "path": "/vendor/BufferGeometryUtils.js",
+          "at": 1801.7999999523163,
+          "ms": 2,
+          "encoded": 7390,
+          "bytes": 7690
+        },
+        {
+          "path": "/api/pools",
+          "at": 1804,
+          "ms": 0.6999999284744263,
+          "encoded": 11,
+          "bytes": 311
+        }
+      ],
+      "startupLongTasks": [
+        {
+          "at": 104.79999995231628,
+          "ms": 1080
+        },
+        {
+          "at": 1184.7999999523163,
+          "ms": 245
+        },
+        {
+          "at": 1459.3999999761581,
+          "ms": 116
+        },
+        {
+          "at": 1575.7999999523163,
+          "ms": 218
+        }
+      ],
+      "firstRollLongTasks": [
+        {
+          "at": 2080.7999999523163,
+          "ms": 261
+        },
+        {
+          "at": 2350.600000023842,
+          "ms": 257
+        },
+        {
+          "at": 2614.399999976158,
+          "ms": 66
+        },
+        {
+          "at": 2680.600000023842,
+          "ms": 67
+        },
+        {
+          "at": 2749.2999999523163,
+          "ms": 62
+        },
+        {
+          "at": 2811.6999999284744,
+          "ms": 60
+        },
+        {
+          "at": 2873.399999976158,
+          "ms": 62
+        },
+        {
+          "at": 2936.100000023842,
+          "ms": 63
+        },
+        {
+          "at": 3000.600000023842,
+          "ms": 62
+        },
+        {
+          "at": 3064.2999999523163,
+          "ms": 62
+        },
+        {
+          "at": 3126.7999999523163,
+          "ms": 60
+        },
+        {
+          "at": 3188,
+          "ms": 63
+        },
+        {
+          "at": 3251,
+          "ms": 64
+        },
+        {
+          "at": 3315.600000023842,
+          "ms": 64
+        },
+        {
+          "at": 3380,
+          "ms": 65
+        },
+        {
+          "at": 3445.2999999523163,
+          "ms": 69
+        },
+        {
+          "at": 3515.899999976158,
+          "ms": 84
+        },
+        {
+          "at": 3601.399999976158,
+          "ms": 63
+        }
+      ],
+      "appearanceLongTasks": [
+        {
+          "at": 7822.299999952316,
+          "ms": 59
+        },
+        {
+          "at": 7882.799999952316,
+          "ms": 61
+        },
+        {
+          "at": 7946.899999976158,
+          "ms": 59
+        },
+        {
+          "at": 8008.100000023842,
+          "ms": 57
+        },
+        {
+          "at": 8081.799999952316,
+          "ms": 61
+        },
+        {
+          "at": 8149.699999928474,
+          "ms": 59
+        },
+        {
+          "at": 8211.799999952316,
+          "ms": 60
+        },
+        {
+          "at": 8281.100000023842,
+          "ms": 63
+        },
+        {
+          "at": 8347.799999952316,
+          "ms": 62
+        },
+        {
+          "at": 8413.100000023842,
+          "ms": 60
+        },
+        {
+          "at": 8481.199999928474,
+          "ms": 59
+        },
+        {
+          "at": 8548.299999952316,
+          "ms": 74
+        },
+        {
+          "at": 8627.699999928474,
+          "ms": 71
+        },
+        {
+          "at": 8702.5,
+          "ms": 63
+        },
+        {
+          "at": 8769,
+          "ms": 65
+        },
+        {
+          "at": 8838.100000023842,
+          "ms": 62
+        },
+        {
+          "at": 8915.299999952316,
+          "ms": 69
+        },
+        {
+          "at": 8988.600000023842,
+          "ms": 61
+        },
+        {
+          "at": 9054.899999976158,
+          "ms": 75
+        },
+        {
+          "at": 9138.399999976158,
+          "ms": 125
+        },
+        {
+          "at": 9275.699999928474,
+          "ms": 153
+        },
+        {
+          "at": 9464.100000023842,
+          "ms": 58
+        }
+      ]
+    },
+    {
+      "venue": "copper",
+      "sample": 1,
+      "cpu": 4,
+      "network": false,
+      "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "startupMs": 1602.8999999761581,
+      "startupLongestTask": 1088,
+      "firstVisibleMs": 561.2000000476837,
+      "firstLongestTask": 248,
+      "activityLongestTask": 110,
+      "activityFrameP95": 90.10000002384186,
+      "appearanceLongestTask": 147,
+      "previewBytes": 616220,
+      "appearanceFirstFrameMs": 311.09999990463257,
+      "appearanceCompleteMs": 1471.2999999523163,
+      "activityInputQueueMs": [
+        0.6000000238418579,
+        64.29999995231628
+      ],
+      "startupHotFunctions": [
+        {
+          "fn": "(anonymous) js/dice.js:1278",
+          "ms": 428.8
+        },
+        {
+          "fn": "(program) :0",
+          "ms": 377.6
+        },
+        {
+          "fn": "warmVariant js/diceart.js:107",
+          "ms": 188.7
+        },
+        {
+          "fn": "texSubImage2D vendor/three.module.js:23670",
+          "ms": 139.1
+        },
+        {
+          "fn": "(idle) :0",
+          "ms": 109
+        },
+        {
+          "fn": "onFirstUse vendor/three.module.js:20271",
+          "ms": 76.2
+        },
+        {
+          "fn": "stroke js/main.js:2703",
+          "ms": 35.9
+        },
+        {
+          "fn": "makeFaceTexture js/dice.js:216",
+          "ms": 26.4
+        },
+        {
+          "fn": "(garbage collector) :0",
+          "ms": 25.2
+        },
+        {
+          "fn": "(anonymous) js/main.js:1",
+          "ms": 17.8
+        }
+      ],
+      "startupResources": [
+        {
+          "path": "/js/report.js",
+          "at": 15.100000023841858,
+          "ms": 6.299999952316284,
+          "encoded": 3313,
+          "bytes": 3613
+        },
+        {
+          "path": "/css/workspaces.css",
+          "at": 15.399999976158142,
+          "ms": 3.9000000953674316,
+          "encoded": 3140,
+          "bytes": 3440
+        },
+        {
+          "path": "/css/firstplay.css",
+          "at": 15.399999976158142,
+          "ms": 3.8000000715255737,
+          "encoded": 745,
+          "bytes": 1045
+        },
+        {
+          "path": "/css/style.css",
+          "at": 15.399999976158142,
+          "ms": 6.900000095367432,
+          "encoded": 105228,
+          "bytes": 105528
+        },
+        {
+          "path": "/css/playerresults.css",
+          "at": 15.5,
+          "ms": 3.8000000715255737,
+          "encoded": 2877,
+          "bytes": 3177
+        },
+        {
+          "path": "/js/main.js",
+          "at": 15.5,
+          "ms": 10.800000071525574,
+          "encoded": 630143,
+          "bytes": 630443
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "at": 60.800000071525574,
+          "ms": 26.799999952316284,
+          "encoded": 255043,
+          "bytes": 255343
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "at": 60.89999997615814,
+          "ms": 13.900000095367432,
+          "encoded": 76922,
+          "bytes": 77222
+        },
+        {
+          "path": "/js/film-wire.js",
+          "at": 61,
+          "ms": 8.300000071525574,
+          "encoded": 4646,
+          "bytes": 4946
+        },
+        {
+          "path": "/js/film-bake.js",
+          "at": 61,
+          "ms": 8.200000047683716,
+          "encoded": 15523,
+          "bytes": 15823
+        },
+        {
+          "path": "/js/film-client.js",
+          "at": 61.60000002384186,
+          "ms": 7.399999976158142,
+          "encoded": 1310,
+          "bytes": 1610
+        },
+        {
+          "path": "/js/round-table.js",
+          "at": 61.700000047683716,
+          "ms": 11.799999952316284,
+          "encoded": 1147,
+          "bytes": 1447
+        },
+        {
+          "path": "/js/dice.js",
+          "at": 61.700000047683716,
+          "ms": 11.899999976158142,
+          "encoded": 24145,
+          "bytes": 24445
+        },
+        {
+          "path": "/js/diceart.js",
+          "at": 61.700000047683716,
+          "ms": 12,
+          "encoded": 3932,
+          "bytes": 4232
+        },
+        {
+          "path": "/js/net.js",
+          "at": 61.700000047683716,
+          "ms": 12.699999928474426,
+          "encoded": 15274,
+          "bytes": 15574
+        },
+        {
+          "path": "/js/tables.js",
+          "at": 62.10000002384186,
+          "ms": 15.799999952316284,
+          "encoded": 5400,
+          "bytes": 5700
+        },
+        {
+          "path": "/js/meanings.js",
+          "at": 62.10000002384186,
+          "ms": 16.600000023841858,
+          "encoded": 13063,
+          "bytes": 13363
+        },
+        {
+          "path": "/js/rollspec.js",
+          "at": 62.10000002384186,
+          "ms": 16.899999976158142,
+          "encoded": 8695,
+          "bytes": 8995
+        },
+        {
+          "path": "/js/places.js",
+          "at": 62.10000002384186,
+          "ms": 18.100000023841858,
+          "encoded": 22870,
+          "bytes": 23170
+        },
+        {
+          "path": "/js/demo.js",
+          "at": 62.200000047683716,
+          "ms": 18.299999952316284,
+          "encoded": 4587,
+          "bytes": 4887
+        },
+        {
+          "path": "/js/odds.js",
+          "at": 62.200000047683716,
+          "ms": 20.899999976158142,
+          "encoded": 17331,
+          "bytes": 17631
+        },
+        {
+          "path": "/js/placard.js",
+          "at": 62.200000047683716,
+          "ms": 20.799999952316284,
+          "encoded": 36034,
+          "bytes": 36334
+        },
+        {
+          "path": "/js/firstplay.js",
+          "at": 62.200000047683716,
+          "ms": 21.5,
+          "encoded": 2068,
+          "bytes": 2368
+        },
+        {
+          "path": "/js/notation.js",
+          "at": 62.200000047683716,
+          "ms": 21.600000023841858,
+          "encoded": 17222,
+          "bytes": 17522
+        },
+        {
+          "path": "/js/seed.js",
+          "at": 62.200000047683716,
+          "ms": 22.699999928474426,
+          "encoded": 5961,
+          "bytes": 6261
+        },
+        {
+          "path": "/js/table-designs.js",
+          "at": 62.300000071525574,
+          "ms": 23.09999990463257,
+          "encoded": 1497,
+          "bytes": 1797
+        },
+        {
+          "path": "/js/workspaces.js",
+          "at": 62.300000071525574,
+          "ms": 23.799999952316284,
+          "encoded": 5527,
+          "bytes": 5827
+        },
+        {
+          "path": "/js/library-document.js",
+          "at": 63,
+          "ms": 23,
+          "encoded": 2419,
+          "bytes": 2719
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "at": 63,
+          "ms": 23.100000023841858,
+          "encoded": 584,
+          "bytes": 884
+        },
+        {
+          "path": "/js/playerresults.js",
+          "at": 63.200000047683716,
+          "ms": 23.600000023841858,
+          "encoded": 3578,
+          "bytes": 3878
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "at": 63.200000047683716,
+          "ms": 25.199999928474426,
+          "encoded": 695,
+          "bytes": 995
+        },
+        {
+          "path": "/js/stability.js",
+          "at": 63.200000047683716,
+          "ms": 25.299999952316284,
+          "encoded": 3576,
+          "bytes": 3876
+        },
+        {
+          "path": "/js/schema.js",
+          "at": 63.200000047683716,
+          "ms": 25.5,
+          "encoded": 4728,
+          "bytes": 5028
+        },
+        {
+          "path": "/js/portable.js",
+          "at": 63.300000071525574,
+          "ms": 26.199999928474426,
+          "encoded": 14544,
+          "bytes": 14844
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "at": 63.300000071525574,
+          "ms": 27,
+          "encoded": 1117,
+          "bytes": 1417
+        },
+        {
+          "path": "/js/profiles.js",
+          "at": 63.300000071525574,
+          "ms": 27.199999928474426,
+          "encoded": 10493,
+          "bytes": 10793
+        },
+        {
+          "path": "/js/themes.js",
+          "at": 63.300000071525574,
+          "ms": 27.59999990463257,
+          "encoded": 7801,
+          "bytes": 8101
+        },
+        {
+          "path": "/js/dielights.js",
+          "at": 63.800000071525574,
+          "ms": 28,
+          "encoded": 2245,
+          "bytes": 2545
+        },
+        {
+          "path": "/js/particles.js",
+          "at": 63.800000071525574,
+          "ms": 28.299999952316284,
+          "encoded": 4717,
+          "bytes": 5017
+        },
+        {
+          "path": "/js/decals.js",
+          "at": 63.800000071525574,
+          "ms": 28.5,
+          "encoded": 7646,
+          "bytes": 7946
+        },
+        {
+          "path": "/js/post.js",
+          "at": 63.89999997615814,
+          "ms": 28.5,
+          "encoded": 6683,
+          "bytes": 6983
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "at": 64,
+          "ms": 28.300000071525574,
+          "encoded": 684,
+          "bytes": 984
+        },
+        {
+          "path": "/js/towerids.js",
+          "at": 64.10000002384186,
+          "ms": 28.700000047683716,
+          "encoded": 625,
+          "bytes": 925
+        },
+        {
+          "path": "/js/towerglb.js",
+          "at": 64.10000002384186,
+          "ms": 30.799999952316284,
+          "encoded": 7674,
+          "bytes": 7974
+        },
+        {
+          "path": "/js/motes.js",
+          "at": 64.30000007152557,
+          "ms": 30.59999990463257,
+          "encoded": 3130,
+          "bytes": 3430
+        },
+        {
+          "path": "/js/voices.js",
+          "at": 64.30000007152557,
+          "ms": 31.09999990463257,
+          "encoded": 20876,
+          "bytes": 21176
+        },
+        {
+          "path": "/js/tunables.js",
+          "at": 64.39999997615814,
+          "ms": 31.200000047683716,
+          "encoded": 13938,
+          "bytes": 14238
+        },
+        {
+          "path": "/js/tune.js",
+          "at": 64.39999997615814,
+          "ms": 32.10000002384186,
+          "encoded": 45850,
+          "bytes": 46150
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "at": 85.60000002384186,
+          "ms": 10.100000023841858,
+          "encoded": 5471,
+          "bytes": 5771
+        },
+        {
+          "path": "/js/placard-design.js",
+          "at": 85.60000002384186,
+          "ms": 10.700000047683716,
+          "encoded": 1701,
+          "bytes": 2001
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "at": 102,
+          "ms": 1.2000000476837158,
+          "encoded": 2405,
+          "bytes": 2705
+        },
+        {
+          "path": "/js/yaml.js",
+          "at": 102.80000007152557,
+          "ms": 1.2999999523162842,
+          "encoded": 9990,
+          "bytes": 10290
+        },
+        {
+          "path": "/api/join",
+          "at": 1168.1000000238419,
+          "ms": 1.2999999523162842,
+          "encoded": 641,
+          "bytes": 941
+        },
+        {
+          "path": "/favicon.ico",
+          "at": 1471.3999999761581,
+          "ms": 1.100000023841858,
+          "encoded": 40,
+          "bytes": 340
+        },
+        {
+          "path": "/vendor/GLTFLoader.js",
+          "at": 1569.8999999761581,
+          "ms": 1.3000000715255737,
+          "encoded": 24361,
+          "bytes": 24661
+        },
+        {
+          "path": "/api/pools",
+          "at": 1575.8000000715256,
+          "ms": 0.5999999046325684,
+          "encoded": 11,
+          "bytes": 311
+        },
+        {
+          "path": "/vendor/BufferGeometryUtils.js",
+          "at": 1826.8999999761581,
+          "ms": 1.600000023841858,
+          "encoded": 7390,
+          "bytes": 7690
+        },
+        {
+          "path": "/api/pools",
+          "at": 1829.3999999761581,
+          "ms": 0.8000000715255737,
+          "encoded": 11,
+          "bytes": 311
+        }
+      ],
+      "startupLongTasks": [
+        {
+          "at": 106.5,
+          "ms": 1088
+        },
+        {
+          "at": 1194.5,
+          "ms": 250
+        },
+        {
+          "at": 1472.3000000715256,
+          "ms": 113
+        },
+        {
+          "at": 1585.7000000476837,
+          "ms": 234
+        }
+      ],
+      "firstRollLongTasks": [
+        {
+          "at": 2074.2000000476837,
+          "ms": 248
+        },
+        {
+          "at": 2341,
+          "ms": 207
+        },
+        {
+          "at": 2550,
+          "ms": 71
+        },
+        {
+          "at": 2621.399999976158,
+          "ms": 61
+        },
+        {
+          "at": 2683,
+          "ms": 63
+        },
+        {
+          "at": 2746.7000000476837,
+          "ms": 62
+        },
+        {
+          "at": 2809.100000023842,
+          "ms": 68
+        },
+        {
+          "at": 2877.8000000715256,
+          "ms": 62
+        },
+        {
+          "at": 2942,
+          "ms": 62
+        },
+        {
+          "at": 3005.600000023842,
+          "ms": 62
+        },
+        {
+          "at": 3068.2000000476837,
+          "ms": 59
+        },
+        {
+          "at": 3128,
+          "ms": 60
+        },
+        {
+          "at": 3188.899999976158,
+          "ms": 64
+        },
+        {
+          "at": 3253.7000000476837,
+          "ms": 62
+        },
+        {
+          "at": 3316.100000023842,
+          "ms": 64
+        },
+        {
+          "at": 3381.600000023842,
+          "ms": 62
+        },
+        {
+          "at": 3444.7000000476837,
+          "ms": 65
+        },
+        {
+          "at": 3510.600000023842,
+          "ms": 63
+        },
+        {
+          "at": 3573.600000023842,
+          "ms": 63
+        },
+        {
+          "at": 3637.2000000476837,
+          "ms": 63
+        },
+        {
+          "at": 3700.7000000476837,
+          "ms": 60
+        },
+        {
+          "at": 3762.2000000476837,
+          "ms": 82
+        },
+        {
+          "at": 3844.3000000715256,
+          "ms": 64
+        },
+        {
+          "at": 3909.3000000715256,
+          "ms": 61
+        },
+        {
+          "at": 3981.8000000715256,
+          "ms": 60
+        }
+      ],
+      "appearanceLongTasks": [
+        {
+          "at": 7998.700000047684,
+          "ms": 60
+        },
+        {
+          "at": 8074,
+          "ms": 60
+        },
+        {
+          "at": 8135.600000023842,
+          "ms": 60
+        },
+        {
+          "at": 8212.100000023842,
+          "ms": 60
+        },
+        {
+          "at": 8278.300000071526,
+          "ms": 59
+        },
+        {
+          "at": 8339.200000047684,
+          "ms": 68
+        },
+        {
+          "at": 8432.600000023842,
+          "ms": 73
+        },
+        {
+          "at": 8507.800000071526,
+          "ms": 58
+        },
+        {
+          "at": 8573.300000071526,
+          "ms": 62
+        },
+        {
+          "at": 8658,
+          "ms": 72
+        },
+        {
+          "at": 8735.399999976158,
+          "ms": 70
+        },
+        {
+          "at": 8809.800000071526,
+          "ms": 65
+        },
+        {
+          "at": 8878.899999976158,
+          "ms": 64
+        },
+        {
+          "at": 8945.700000047684,
+          "ms": 75
+        },
+        {
+          "at": 9045.200000047684,
+          "ms": 60
+        },
+        {
+          "at": 9105.600000023842,
+          "ms": 62
+        },
+        {
+          "at": 9172.100000023842,
+          "ms": 61
+        },
+        {
+          "at": 9235.899999976158,
+          "ms": 60
+        },
+        {
+          "at": 9301.600000023842,
+          "ms": 126
+        },
+        {
+          "at": 9435.200000047684,
+          "ms": 147
+        },
+        {
+          "at": 9617.200000047684,
+          "ms": 60
+        }
+      ]
+    },
+    {
+      "venue": "copper",
+      "sample": 2,
+      "cpu": 4,
+      "network": false,
+      "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "startupMs": 1582,
+      "startupLongestTask": 1073,
+      "firstVisibleMs": 617.6000000238419,
+      "firstLongestTask": 249,
+      "activityLongestTask": 108,
+      "activityFrameP95": 84.39999997615814,
+      "appearanceLongestTask": 144,
+      "previewBytes": 616220,
+      "appearanceFirstFrameMs": 247.19999992847443,
+      "appearanceCompleteMs": 1340.8999999761581,
+      "activityInputQueueMs": [
+        66.29999995231628,
+        63.700000047683716
+      ],
+      "startupHotFunctions": [
+        {
+          "fn": "(anonymous) js/dice.js:1278",
+          "ms": 417.7
+        },
+        {
+          "fn": "(program) :0",
+          "ms": 375.4
+        },
+        {
+          "fn": "warmVariant js/diceart.js:107",
+          "ms": 174.8
+        },
+        {
+          "fn": "texSubImage2D vendor/three.module.js:23670",
+          "ms": 136.2
+        },
+        {
+          "fn": "(idle) :0",
+          "ms": 97.5
+        },
+        {
+          "fn": "onFirstUse vendor/three.module.js:20271",
+          "ms": 71.9
+        },
+        {
+          "fn": "stroke js/main.js:2703",
+          "ms": 37.7
+        },
+        {
+          "fn": "makeFaceTexture js/dice.js:216",
+          "ms": 29.1
+        },
+        {
+          "fn": "(garbage collector) :0",
+          "ms": 27.9
+        },
+        {
+          "fn": "drawLabel js/dice.js:197",
+          "ms": 15.8
+        }
+      ],
+      "startupResources": [
+        {
+          "path": "/js/report.js",
+          "at": 14.799999952316284,
+          "ms": 5.300000071525574,
+          "encoded": 3313,
+          "bytes": 3613
+        },
+        {
+          "path": "/css/workspaces.css",
+          "at": 15.5,
+          "ms": 2.6999999284744263,
+          "encoded": 3140,
+          "bytes": 3440
+        },
+        {
+          "path": "/css/firstplay.css",
+          "at": 15.5,
+          "ms": 2.6999999284744263,
+          "encoded": 745,
+          "bytes": 1045
+        },
+        {
+          "path": "/css/playerresults.css",
+          "at": 15.5,
+          "ms": 3.600000023841858,
+          "encoded": 2877,
+          "bytes": 3177
+        },
+        {
+          "path": "/css/style.css",
+          "at": 15.5,
+          "ms": 4.600000023841858,
+          "encoded": 105228,
+          "bytes": 105528
+        },
+        {
+          "path": "/js/main.js",
+          "at": 15.600000023841858,
+          "ms": 8.799999952316284,
+          "encoded": 630143,
+          "bytes": 630443
+        },
+        {
+          "path": "/vendor/three.module.js",
+          "at": 61.299999952316284,
+          "ms": 18.100000023841858,
+          "encoded": 255043,
+          "bytes": 255343
+        },
+        {
+          "path": "/js/film-wire.js",
+          "at": 61.39999997615814,
+          "ms": 6,
+          "encoded": 4646,
+          "bytes": 4946
+        },
+        {
+          "path": "/js/film-client.js",
+          "at": 61.39999997615814,
+          "ms": 6.200000047683716,
+          "encoded": 1310,
+          "bytes": 1610
+        },
+        {
+          "path": "/js/round-table.js",
+          "at": 61.39999997615814,
+          "ms": 6.299999952316284,
+          "encoded": 1147,
+          "bytes": 1447
+        },
+        {
+          "path": "/js/film-bake.js",
+          "at": 61.39999997615814,
+          "ms": 6.299999952316284,
+          "encoded": 15523,
+          "bytes": 15823
+        },
+        {
+          "path": "/vendor/cannon-es.js",
+          "at": 61.39999997615814,
+          "ms": 9.399999976158142,
+          "encoded": 76922,
+          "bytes": 77222
+        },
+        {
+          "path": "/js/dice.js",
+          "at": 61.799999952316284,
+          "ms": 8.600000023841858,
+          "encoded": 24145,
+          "bytes": 24445
+        },
+        {
+          "path": "/js/diceart.js",
+          "at": 61.799999952316284,
+          "ms": 8.700000047683716,
+          "encoded": 3932,
+          "bytes": 4232
+        },
+        {
+          "path": "/js/net.js",
+          "at": 61.89999997615814,
+          "ms": 8.899999976158142,
+          "encoded": 15274,
+          "bytes": 15574
+        },
+        {
+          "path": "/js/tables.js",
+          "at": 61.89999997615814,
+          "ms": 10,
+          "encoded": 5400,
+          "bytes": 5700
+        },
+        {
+          "path": "/js/meanings.js",
+          "at": 61.89999997615814,
+          "ms": 10.899999976158142,
+          "encoded": 13063,
+          "bytes": 13363
+        },
+        {
+          "path": "/js/places.js",
+          "at": 61.89999997615814,
+          "ms": 11.799999952316284,
+          "encoded": 22870,
+          "bytes": 23170
+        },
+        {
+          "path": "/js/rollspec.js",
+          "at": 61.89999997615814,
+          "ms": 12,
+          "encoded": 8695,
+          "bytes": 8995
+        },
+        {
+          "path": "/js/demo.js",
+          "at": 62.299999952316284,
+          "ms": 12.100000023841858,
+          "encoded": 4587,
+          "bytes": 4887
+        },
+        {
+          "path": "/js/placard.js",
+          "at": 62.39999997615814,
+          "ms": 13.399999976158142,
+          "encoded": 36034,
+          "bytes": 36334
+        },
+        {
+          "path": "/js/odds.js",
+          "at": 62.39999997615814,
+          "ms": 13.899999976158142,
+          "encoded": 17331,
+          "bytes": 17631
+        },
+        {
+          "path": "/js/notation.js",
+          "at": 62.39999997615814,
+          "ms": 14.200000047683716,
+          "encoded": 17222,
+          "bytes": 17522
+        },
+        {
+          "path": "/js/firstplay.js",
+          "at": 62.699999928474426,
+          "ms": 14.100000023841858,
+          "encoded": 2068,
+          "bytes": 2368
+        },
+        {
+          "path": "/js/seed.js",
+          "at": 62.699999928474426,
+          "ms": 14.100000023841858,
+          "encoded": 5961,
+          "bytes": 6261
+        },
+        {
+          "path": "/js/workspaces.js",
+          "at": 62.699999928474426,
+          "ms": 16.40000009536743,
+          "encoded": 5527,
+          "bytes": 5827
+        },
+        {
+          "path": "/js/table-designs.js",
+          "at": 62.799999952316284,
+          "ms": 15,
+          "encoded": 1497,
+          "bytes": 1797
+        },
+        {
+          "path": "/js/library-document.js",
+          "at": 62.799999952316284,
+          "ms": 16.399999976158142,
+          "encoded": 2419,
+          "bytes": 2719
+        },
+        {
+          "path": "/js/frame-loop.js",
+          "at": 62.799999952316284,
+          "ms": 16.5,
+          "encoded": 584,
+          "bytes": 884
+        },
+        {
+          "path": "/js/rollhistory.js",
+          "at": 62.89999997615814,
+          "ms": 17.100000023841858,
+          "encoded": 695,
+          "bytes": 995
+        },
+        {
+          "path": "/js/stability.js",
+          "at": 62.89999997615814,
+          "ms": 18.600000023841858,
+          "encoded": 3576,
+          "bytes": 3876
+        },
+        {
+          "path": "/js/schema.js",
+          "at": 62.89999997615814,
+          "ms": 19.100000023841858,
+          "encoded": 4728,
+          "bytes": 5028
+        },
+        {
+          "path": "/js/playerresults.js",
+          "at": 62.89999997615814,
+          "ms": 16.5,
+          "encoded": 3578,
+          "bytes": 3878
+        },
+        {
+          "path": "/js/portable.js",
+          "at": 62.89999997615814,
+          "ms": 19.700000047683716,
+          "encoded": 14544,
+          "bytes": 14844
+        },
+        {
+          "path": "/js/profiles.js",
+          "at": 62.89999997615814,
+          "ms": 19.799999952316284,
+          "encoded": 10493,
+          "bytes": 10793
+        },
+        {
+          "path": "/js/profile-sharing.js",
+          "at": 63.699999928474426,
+          "ms": 18.40000009536743,
+          "encoded": 1117,
+          "bytes": 1417
+        },
+        {
+          "path": "/js/themes.js",
+          "at": 63.799999952316284,
+          "ms": 19.399999976158142,
+          "encoded": 7801,
+          "bytes": 8101
+        },
+        {
+          "path": "/js/particles.js",
+          "at": 63.799999952316284,
+          "ms": 21,
+          "encoded": 4717,
+          "bytes": 5017
+        },
+        {
+          "path": "/js/dielights.js",
+          "at": 63.89999997615814,
+          "ms": 20.5,
+          "encoded": 2245,
+          "bytes": 2545
+        },
+        {
+          "path": "/js/decals.js",
+          "at": 63.89999997615814,
+          "ms": 21,
+          "encoded": 7646,
+          "bytes": 7946
+        },
+        {
+          "path": "/js/surfacenormal.js",
+          "at": 63.89999997615814,
+          "ms": 21,
+          "encoded": 684,
+          "bytes": 984
+        },
+        {
+          "path": "/js/post.js",
+          "at": 63.89999997615814,
+          "ms": 21.200000047683716,
+          "encoded": 6683,
+          "bytes": 6983
+        },
+        {
+          "path": "/js/towerids.js",
+          "at": 63.89999997615814,
+          "ms": 21.899999976158142,
+          "encoded": 625,
+          "bytes": 925
+        },
+        {
+          "path": "/js/towerglb.js",
+          "at": 64,
+          "ms": 23.5,
+          "encoded": 7674,
+          "bytes": 7974
+        },
+        {
+          "path": "/js/motes.js",
+          "at": 64.39999997615814,
+          "ms": 22.700000047683716,
+          "encoded": 3130,
+          "bytes": 3430
+        },
+        {
+          "path": "/js/tunables.js",
+          "at": 64.39999997615814,
+          "ms": 23.899999976158142,
+          "encoded": 13938,
+          "bytes": 14238
+        },
+        {
+          "path": "/js/voices.js",
+          "at": 64.39999997615814,
+          "ms": 23.799999952316284,
+          "encoded": 20876,
+          "bytes": 21176
+        },
+        {
+          "path": "/js/tune.js",
+          "at": 64.69999992847443,
+          "ms": 24.300000071525574,
+          "encoded": 45850,
+          "bytes": 46150
+        },
+        {
+          "path": "/js/placard-tooling.js",
+          "at": 76.79999995231628,
+          "ms": 11.800000071525574,
+          "encoded": 5471,
+          "bytes": 5771
+        },
+        {
+          "path": "/js/placard-design.js",
+          "at": 76.79999995231628,
+          "ms": 12.300000071525574,
+          "encoded": 1701,
+          "bytes": 2001
+        },
+        {
+          "path": "/js/placard-knots.js",
+          "at": 94.29999995231628,
+          "ms": 0.8999999761581421,
+          "encoded": 2405,
+          "bytes": 2705
+        },
+        {
+          "path": "/js/yaml.js",
+          "at": 94.69999992847443,
+          "ms": 1.100000023841858,
+          "encoded": 9990,
+          "bytes": 10290
+        },
+        {
+          "path": "/api/join",
+          "at": 1147.5,
+          "ms": 1.399999976158142,
+          "encoded": 641,
+          "bytes": 941
+        },
+        {
+          "path": "/favicon.ico",
+          "at": 1443.5,
+          "ms": 1.600000023841858,
+          "encoded": 40,
+          "bytes": 340
+        },
+        {
+          "path": "/vendor/GLTFLoader.js",
+          "at": 1548.8999999761581,
+          "ms": 1.899999976158142,
+          "encoded": 24361,
+          "bytes": 24661
+        },
+        {
+          "path": "/api/pools",
+          "at": 1554.3999999761581,
+          "ms": 1.2000000476837158,
+          "encoded": 11,
+          "bytes": 311
+        },
+        {
+          "path": "/vendor/BufferGeometryUtils.js",
+          "at": 1802.7999999523163,
+          "ms": 1.600000023841858,
+          "encoded": 7390,
+          "bytes": 7690
+        },
+        {
+          "path": "/api/pools",
+          "at": 1804.6000000238419,
+          "ms": 0.8999999761581421,
+          "encoded": 11,
+          "bytes": 311
+        }
+      ],
+      "startupLongTasks": [
+        {
+          "at": 98.39999997615814,
+          "ms": 1073
+        },
+        {
+          "at": 1171.6999999284744,
+          "ms": 243
+        },
+        {
+          "at": 1445,
+          "ms": 119
+        },
+        {
+          "at": 1564.8999999761581,
+          "ms": 231
+        }
+      ],
+      "firstRollLongTasks": [
+        {
+          "at": 2079,
+          "ms": 249
+        },
+        {
+          "at": 2337,
+          "ms": 248
+        },
+        {
+          "at": 2586.100000023842,
+          "ms": 64
+        },
+        {
+          "at": 2651.100000023842,
+          "ms": 64
+        },
+        {
+          "at": 2716.1999999284744,
+          "ms": 61
+        },
+        {
+          "at": 2778.100000023842,
+          "ms": 62
+        },
+        {
+          "at": 2841,
+          "ms": 64
+        },
+        {
+          "at": 2905.6999999284744,
+          "ms": 64
+        },
+        {
+          "at": 2970.6999999284744,
+          "ms": 64
+        },
+        {
+          "at": 3036.100000023842,
+          "ms": 62
+        },
+        {
+          "at": 3101,
+          "ms": 61
+        },
+        {
+          "at": 3162.600000023842,
+          "ms": 62
+        },
+        {
+          "at": 3225.899999976158,
+          "ms": 60
+        },
+        {
+          "at": 3286,
+          "ms": 61
+        },
+        {
+          "at": 3347.399999976158,
+          "ms": 68
+        },
+        {
+          "at": 3416.1999999284744,
+          "ms": 62
+        },
+        {
+          "at": 3479.600000023842,
+          "ms": 63
+        },
+        {
+          "at": 3543.2999999523163,
+          "ms": 61
+        },
+        {
+          "at": 3605.1999999284744,
+          "ms": 62
+        },
+        {
+          "at": 3667.899999976158,
+          "ms": 65
+        },
+        {
+          "at": 3734.399999976158,
+          "ms": 80
+        },
+        {
+          "at": 3815.600000023842,
+          "ms": 62
+        },
+        {
+          "at": 3878.899999976158,
+          "ms": 63
+        },
+        {
+          "at": 3956.100000023842,
+          "ms": 61
+        }
+      ],
+      "appearanceLongTasks": [
+        {
+          "at": 8816,
+          "ms": 60
+        },
+        {
+          "at": 8878.799999952316,
+          "ms": 61
+        },
+        {
+          "at": 8941,
+          "ms": 61
+        },
+        {
+          "at": 9018.199999928474,
+          "ms": 60
+        },
+        {
+          "at": 9095.799999952316,
+          "ms": 58
+        },
+        {
+          "at": 9156.399999976158,
+          "ms": 58
+        },
+        {
+          "at": 9225.399999976158,
+          "ms": 62
+        },
+        {
+          "at": 9313.899999976158,
+          "ms": 77
+        },
+        {
+          "at": 9399,
+          "ms": 61
+        },
+        {
+          "at": 9464.199999928474,
+          "ms": 75
+        },
+        {
+          "at": 9557.199999928474,
+          "ms": 76
+        },
+        {
+          "at": 9648.699999928474,
+          "ms": 67
+        },
+        {
+          "at": 9722.899999976158,
+          "ms": 65
+        },
+        {
+          "at": 9791.5,
+          "ms": 60
+        },
+        {
+          "at": 9865.100000023842,
+          "ms": 65
+        },
+        {
+          "at": 9938.600000023842,
+          "ms": 67
+        },
+        {
+          "at": 10006.199999928474,
+          "ms": 72
+        },
+        {
+          "at": 10082.799999952316,
+          "ms": 62
+        },
+        {
+          "at": 10147.899999976158,
+          "ms": 126
+        },
+        {
+          "at": 10281.299999952316,
+          "ms": 144
+        },
+        {
+          "at": 10463.199999928474,
+          "ms": 61
+        }
+      ]
+    }
+  ],
+  "medians": {
+    "before": {
+      "table": {
+        "startupMs": 3860.7999999523163,
+        "startupLongestTask": 2918,
+        "firstVisibleMs": 319.7000000476837,
+        "firstLongestTask": 201,
+        "activityLongestTask": 71,
+        "activityFrameP95": 26.700000047683716,
+        "appearanceLongestTask": 94,
+        "previewBytes": 8202236
+      },
+      "copper": {
+        "startupMs": 3977.100000023842,
+        "startupLongestTask": 2902,
+        "firstVisibleMs": 629.3999999761581,
+        "firstLongestTask": 296,
+        "activityLongestTask": 107,
+        "activityFrameP95": 86.60000002384186,
+        "appearanceLongestTask": 104,
+        "previewBytes": 8202236
+      }
+    },
+    "after": {
+      "table": {
+        "startupMs": 1478.6999999284744,
+        "startupLongestTask": 1082,
+        "firstVisibleMs": 355.60000002384186,
+        "firstLongestTask": 217,
+        "activityLongestTask": 71,
+        "activityFrameP95": 30.399999976158142,
+        "appearanceLongestTask": 144,
+        "previewBytes": 616220
+      },
+      "copper": {
+        "startupMs": 1592.6000000238419,
+        "startupLongestTask": 1080,
+        "firstVisibleMs": 617.6000000238419,
+        "firstLongestTask": 249,
+        "activityLongestTask": 110,
+        "activityFrameP95": 90.10000002384186,
+        "appearanceLongestTask": 147,
+        "previewBytes": 616220
+      }
+    }
+  },
+  "implementationCommit": "40708b9",
+  "retinaVisualCheck": {
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "dpr": 3
+    },
+    "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "layout": {
+      "width": 390,
+      "height": 844,
+      "scrollY": 0,
+      "visual": {
+        "height": 844,
+        "offsetTop": 0,
+        "scale": 1
+      },
+      "controls": [
+        {
+          "id": "phone-more",
+          "rect": {
+            "x": 291.5,
+            "y": 797,
+            "width": 90.5,
+            "height": 43,
+            "top": 797,
+            "right": 382,
+            "bottom": 840,
+            "left": 291.5
+          }
+        },
+        {
+          "id": "phone-build-roll",
+          "rect": {
+            "x": 300.203125,
+            "y": 620,
+            "width": 79.796875,
+            "height": 40,
+            "top": 620,
+            "right": 380,
+            "bottom": 660,
+            "left": 300.203125
+          }
+        }
+      ]
+    },
+    "note": "Visual follow-up only; excluded from the before/after timing comparison."
+  }
+}

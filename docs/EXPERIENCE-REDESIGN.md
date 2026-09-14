@@ -70,6 +70,11 @@ loop](redesign/2026-09-13-idle-render.md) now draws zero settled frames for
 Table and all three baked designs on desktop/phone emulation (previously
 60 fps), with audio continuing independently and all 24 films unchanged.
 No physical-device battery or active-frame-rate claim is made.
+The [first-roll startup pass](redesign/2026-09-13-play-performance/README.md)
+now paints mat previews on sight at thumbnail size. Three-run medians in
+CPU-throttled phone emulation fall from 3.86 to 1.48 seconds for a usable Table
+and from 3.98 to 1.59 seconds for Copper. The largest remaining startup task
+is dice-button artwork; active playback and physical-phone costs remain open.
 The [Battery saver](redesign/2026-09-13-battery-presentation.md) and
 [Instant results](redesign/2026-09-13-instant-results.md) preferences are now
 implemented independently. Battery keeps baked artwork and responsive 3D dice,

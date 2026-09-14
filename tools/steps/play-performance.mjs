@@ -49,6 +49,7 @@ const quantile=(values,f)=>{const sorted=[...values].sort((a,b)=>a-b);return sor
 export default async function run(stage,args){
   const label=args[0]||'baseline',dir=stage.out(`play-performance-${label}`);mkdirSync(dir,{recursive:true});
   const cpu=Number(args.find(a=>a.startsWith('--cpu='))?.split('=')[1]||4),runs=Number(args.find(a=>a.startsWith('--runs='))?.split('=')[1]||1);
+  const dpr=Number(args.find(a=>a.startsWith('--dpr='))?.split('=')[1]||1);
   const network=args.includes('--network'),cases=args.includes('--plain')?['table']:args.includes('--copper')?['copper']:['table','copper'];
   const rows=[];
   for(const venue of cases)for(let sample=0;sample<runs;sample++){
@@ -57,7 +58,7 @@ export default async function run(stage,args){
     const original=stage.ctx.browser.newPage.bind(stage.ctx.browser);
     stage.ctx.browser.newPage=async(...args)=>{
       page=await original(...args);const cdp=(method,input={})=>page.browser.send(method,input,page.sessionId);
-      await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+      await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:dpr,mobile:true});
       await cdp('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
       await cdp('Emulation.setCPUThrottlingRate',{rate:cpu});
       await cdp('Network.enable');await cdp('Network.setCacheDisabled',{cacheDisabled:true});
@@ -99,7 +100,7 @@ export default async function run(stage,args){
       await a.waitFor('window.__diceDebug.currentRoll?.playerName==="Cora"&&window.__diceDebug.currentRoll.done',{timeout:60000});
       const activityProfile=(await cdp('Profiler.stop')).profile;
       writeFileSync(`${dir}/${venue}-${sample}-activity.cpuprofile`,JSON.stringify(activityProfile));
-      const activity=await a.eval(`({tasks:__playProbe.tasks.filter(t=>t.at>=${activityAt}),frames:__playProbe.frames.filter(f=>f.at>=${activityAt}),clicks:__playProbe.clicks.filter(c=>c.at>=${activityAt})})`);
+      const activity=await a.eval(`({tasks:__playProbe.tasks.filter(t=>t.at>=${activityAt}),frames:__playProbe.frames.filter(f=>f.at>=${activityAt}),clicks:__playProbe.clicks.filter(c=>c.at>=${activityAt}),layout:{width:innerWidth,height:innerHeight,scrollY,visual:{height:visualViewport.height,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale},controls:['phone-more','phone-build-roll'].map(id=>({id,rect:document.getElementById(id).getBoundingClientRect().toJSON()}))}})`);
       const backend=await a.eval(`(()=>{const gl=document.querySelector('#scene-container canvas').getContext('webgl2'),ext=gl.getExtension('WEBGL_debug_renderer_info');return ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'unknown';})()`);
       await a.eval('__playProbe.stop=true');await stage.shot(a,`${dir}/${venue}-${sample}-four-players.png`);
       await cdp('Profiler.start');const appearanceAt=await a.eval('performance.now()');
@@ -113,7 +114,7 @@ export default async function run(stage,args){
       const appearance=await a.eval(`({ready:${appearanceReady},at:${appearanceAt},complete:performance.now(),tasks:__playProbe.tasks.filter(t=>t.at>=${appearanceAt}),clicks:__playProbe.clicks.filter(c=>c.at>=${appearanceAt}),previewBytes:[...document.querySelectorAll('#felt-swatches .swatch-dot')].reduce((sum,d)=>sum+d.style.backgroundImage.length,0)})`);
       await stage.shot(a,`${dir}/${venue}-${sample}-appearance.png`);
       assert.deepEqual(page.errors,[]);
-      const summary={venue,sample,cpu,network,backend,startupMs:boot.ready,startupLongestTask:Math.max(0,...boot.tasks.map(t=>t.ms)),firstVisibleMs:first.roll.visible-first.input.at,firstLongestTask:Math.max(0,...first.tasks.map(t=>t.ms)),activityLongestTask:Math.max(0,...activity.tasks.map(t=>t.ms)),activityFrameP95:quantile(activity.frames.map(f=>f.ms),.95),appearanceLongestTask:Math.max(0,...appearance.tasks.map(t=>t.ms)),previewBytes:appearance.previewBytes};
+      const summary={venue,sample,cpu,dpr,network,backend,startupMs:boot.ready,startupLongestTask:Math.max(0,...boot.tasks.map(t=>t.ms)),firstVisibleMs:first.roll.visible-first.input.at,firstLongestTask:Math.max(0,...first.tasks.map(t=>t.ms)),activityLongestTask:Math.max(0,...activity.tasks.map(t=>t.ms)),activityFrameP95:quantile(activity.frames.map(f=>f.ms),.95),appearanceLongestTask:Math.max(0,...appearance.tasks.map(t=>t.ms)),previewBytes:appearance.previewBytes};
       const result={...summary,boot,first,activity,appearance,hot:{boot:hot(bootProfile),first:hot(rollProfile),activity:hot(activityProfile),appearance:hot(appearanceProfile)}};
       rows.push(result);writeFileSync(`${dir}/report.json`,JSON.stringify(rows,null,2));
       console.log(JSON.stringify({...summary,hotBoot:result.hot.boot.slice(0,8),hotFirst:result.hot.first.slice(0,8),hotActivity:result.hot.activity.slice(0,8)}));
