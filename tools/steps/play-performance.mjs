@@ -7,7 +7,11 @@ import {click} from '../../tests/fixtures/visible-input.mjs';
 // Cold navigation and real pointer input on owned ephemeral tables. CPU
 // throttling applies to the main target, not a model of an entire phone.
 const observe=`(()=>{
-  const p=window.__playProbe={tasks:[],clicks:[],frames:[],rolls:{},ready:null,stop:false};
+  const p=window.__playProbe={tasks:[],clicks:[],frames:[],rolls:{},arrivals:{},workers:{},ready:null,stop:false,inputArmed:false};
+  const NativeEventSource=window.EventSource;
+  window.EventSource=class extends NativeEventSource{constructor(...args){super(...args);this.addEventListener('roll',event=>{const r=JSON.parse(event.data);p.arrivals[r.rollId]={at:performance.now(),playerName:r.playerName,seed:r.seed,dice:r.dice};});}};
+  const post=Worker.prototype.postMessage;
+  Worker.prototype.postMessage=function(message,...args){const at=performance.now(),result=post.call(this,message,...args);if(message?.input){const r=window.__diceDebug?.currentRoll;if(r)p.workers[r.rollId]={at,playerName:r.playerName};}if(message?.input&&p.inputArmed&&window.__diceDebug?.currentRoll?.playerName==='Cora'){p.inputArmed=false;window.__rollWorkerStarted?.(JSON.stringify({...p.inputPoint,at:performance.now()}));}return result;};
   new PerformanceObserver(list=>p.tasks.push(...list.getEntries().map(e=>({at:e.startTime,ms:e.duration})))).observe({type:'longtask'});
   document.addEventListener('click',event=>{const button=event.target.closest('button');if(button)p.clicks.push({id:button.id,quick:button.dataset.quick,pool:button.dataset.pool,workspace:button.dataset.workspace,at:performance.now(),queued:performance.now()-event.timeStamp});},true);
   const raf=window.requestAnimationFrame.bind(window);let lastFrame=0,previous=0;
@@ -18,7 +22,7 @@ const observe=`(()=>{
     const frame=d.renderAudit().frame;if(frame===lastFrame)return;lastFrame=frame;
     const at=performance.now();if(previous)p.frames.push({at,ms:at-previous});previous=at;
     const r=d.currentRoll;if(!r||r.done||r.baking)return;
-    const row=p.rolls[r.rollId]||=( {prepared:at,time:r.time} );
+    const row=p.rolls[r.rollId]||=( {prepared:at,time:r.time,playerName:r.playerName} );
     if(row.visible||!r.time)return;
     const f=d.phoneFrame?.();if(!f)return;const v=f.view;
     const visible=f.dice.filter(d=>d.rollId===r.rollId&&d.right>v.left&&d.left<v.left+v.width&&d.bottom>v.top&&d.top<v.top+v.height);
@@ -54,12 +58,15 @@ export default async function run(stage,args){
   const firstNotation=args.find(a=>a.startsWith('--first='))?.slice(8)||'2d6';
   const firstSet=args.find(a=>a.startsWith('--set='))?.slice(6)||'std';
   const incomingMixed=args.includes('--incoming-mixed');
+  const compileMode=args.find(a=>a.startsWith('--compile='))?.slice(10)||'on';
+  assert.ok(['off','on'].includes(compileMode),'compile mode');
+  const inputProbe=args.includes('--input-probe');
   assert.ok(!builderFirst||firstNotation==='2d6','the builder-first path composes two d6');
   const network=args.includes('--network'),cases=args.includes('--plain')?['table']:args.includes('--copper')?['copper']:['table','copper'];
   const rows=[];
   for(const venue of cases)for(let sample=0;sample<runs;sample++){
     const ctx=new Ctx(stage.ctx.browser,stage.port,`perf-${label}-${venue}-${sample}`,stage.ctx.server);
-    let page;
+    let page,inputTask=null;
     const original=stage.ctx.browser.newPage.bind(stage.ctx.browser);
     stage.ctx.browser.newPage=async(...args)=>{
       page=await original(...args);const cdp=(method,input={})=>page.browser.send(method,input,page.sessionId);
@@ -68,6 +75,22 @@ export default async function run(stage,args){
       await cdp('Emulation.setCPUThrottlingRate',{rate:cpu});
       await cdp('Network.enable');await cdp('Network.setCacheDisabled',{cacheDisabled:true});
       if(network)await cdp('Network.emulateNetworkConditions',{offline:false,latency:80,downloadThroughput:500000,uploadThroughput:125000,connectionType:'cellular4g'});
+      await cdp('Runtime.addBinding',{name:'__rollWorkerStarted'});
+      page.browser.on('Runtime.bindingCalled',({name,payload})=>{
+        if(name!=='__rollWorkerStarted')return;
+        const point=JSON.parse(payload),requested=performance.now(),timestamp=Date.now()/1000;
+        inputTask=(async()=>{
+          await Promise.all([['mouseMoved',0],['mousePressed',1],['mouseReleased',0]].map(([type,buttons])=>
+            cdp('Input.dispatchMouseEvent',{type,x:point.x,y:point.y,button:'left',buttons,clickCount:1,timestamp})));
+          const acknowledged=performance.now();
+          await page.eval(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+          const result=await page.eval(`(()=>{const p=__playProbe,c=p.clicks.filter(c=>c.id==='phone-more').at(-1);return {click:c,painted:performance.now(),open:!document.getElementById('phone-more-panel').classList.contains('hidden'),preparation:window.__diceDebug.rollPreparation};})()`);
+          assert.equal(result.open,true,'real pointer opens More during accepted preparation');
+          await page.screenshot(`${dir}/${venue}-${sample}-input-response.png`);
+          return {...result,workerStarted:point.at,requestToAckMs:acknowledged-requested};
+        })();
+        inputTask.catch(()=>{});
+      },page.sessionId);
       await page.addInitScript(observe);
       await cdp('Profiler.enable');await cdp('Profiler.start');return page;
     };
@@ -83,6 +106,7 @@ export default async function run(stage,args){
       const bootProfile=(await cdp('Profiler.stop')).profile;
       writeFileSync(`${dir}/${venue}-${sample}-startup.cpuprofile`,JSON.stringify(bootProfile));
       const boot=await a.eval(`({ready:__playProbe.ready,tasks:__playProbe.tasks,paint:performance.getEntriesByType('paint').map(e=>({name:e.name,at:e.startTime})),resources:performance.getEntriesByType('resource').map(e=>({path:new URL(e.name).pathname,at:e.startTime,ms:e.duration,encoded:e.encodedBodySize,bytes:e.transferSize}))})`);
+      await a.dbg(`useRollPreparation(${compileMode==='on'})`);
       if(firstSet!=='std')await a.dbg(`setDiceSet(${JSON.stringify(firstSet)})`);
       await cdp('Profiler.start');
       let coldBuilder=null;
@@ -110,7 +134,7 @@ export default async function run(stage,args){
       await a.waitFor('window.__diceDebug.currentRoll?.done',{timeout:60000});
       const rollProfile=(await cdp('Profiler.stop')).profile;
       writeFileSync(`${dir}/${venue}-${sample}-first-roll.cpuprofile`,JSON.stringify(rollProfile));
-      const first=await a.eval(`(()=>{const p=__playProbe,input=p.clicks.find(c=>c.quick===${JSON.stringify(firstNotation)}||c.pool||c.id==='tray-roll'),roll=Object.values(p.rolls)[0];return {input,roll,tasks:p.tasks.filter(t=>t.at>=input.at),frames:p.frames.filter(f=>f.at>=input.at),film:window.__diceDebug.filmWorker.last,resources:performance.getEntriesByType('resource').filter(r=>r.startTime>input.at).map(r=>({path:new URL(r.name).pathname,ms:r.duration,encoded:r.encodedBodySize})),render:window.__diceDebug.renderAudit()};})()`);
+      const first=await a.eval(`(()=>{const p=__playProbe,input=p.clicks.find(c=>c.quick===${JSON.stringify(firstNotation)}||c.pool||c.id==='tray-roll'),roll=Object.values(p.rolls)[0];return {input,roll,tasks:p.tasks.filter(t=>t.at>=input.at),frames:p.frames.filter(f=>f.at>=input.at),film:window.__diceDebug.filmWorker.last,preparation:window.__diceDebug.rollPreparation,resources:performance.getEntriesByType('resource').filter(r=>r.startTime>input.at).map(r=>({path:new URL(r.name).pathname,ms:r.duration,encoded:r.encodedBodySize})),render:window.__diceDebug.renderAudit()};})()`);
       if(!peers.length)for(const name of ['Bram','Cora','Dev'])peers.push(await ctx.rawPlayer(name));
       await a.dbg(`setGroups(Array.from({length:12},(_,i)=>({name:'Check '+(i+1),notation:i%2?'1d20+4':'2d6'})))`);
       await cdp('Profiler.start');const activityAt=await a.eval('performance.now()');
@@ -123,12 +147,16 @@ export default async function run(stage,args){
       const builder=await a.eval(`({painted:${builderPainted},artReady:performance.now(),input:__playProbe.clicks.filter(c=>c.id==='phone-build-roll').at(-1),audit:window.__diceDebug.dieArtInfo?.()})`);
       await stage.shot(a,`${dir}/${venue}-${sample}-builder-art.png`);
       await click(a,'#workspace-back');
+      if(inputProbe)await a.eval(`(()=>{const el=document.getElementById('phone-more'),r=el.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;if(!el.contains(document.elementFromPoint(x,y)))throw Error('More input point is covered');__playProbe.inputPoint={x,y};__playProbe.inputArmed=true;})()`);
       await ctx.api('/api/roll',{playerId:peers[1].playerId,notation:'4d20',
         ...(incomingMixed?{sets:['std','classics.ivory','tidewrack.seaglass','symbols.monster']}:{})});
       await a.waitFor('window.__diceDebug.currentRoll?.playerName==="Cora"&&window.__diceDebug.currentRoll.done',{timeout:60000});
+      let response=null;
+      if(inputProbe){assert.ok(inputTask,'accepted worker emitted the input probe');response=await inputTask;await click(a,'#phone-more-close');}
+
       const activityProfile=(await cdp('Profiler.stop')).profile;
       writeFileSync(`${dir}/${venue}-${sample}-activity.cpuprofile`,JSON.stringify(activityProfile));
-      const activity=await a.eval(`({tasks:__playProbe.tasks.filter(t=>t.at>=${activityAt}),frames:__playProbe.frames.filter(f=>f.at>=${activityAt}),clicks:__playProbe.clicks.filter(c=>c.at>=${activityAt}),layout:{width:innerWidth,height:innerHeight,scrollY,visual:{height:visualViewport.height,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale},controls:['phone-more','phone-build-roll'].map(id=>({id,rect:document.getElementById(id).getBoundingClientRect().toJSON()}))}})`);
+      const activity=await a.eval(`({preparation:window.__diceDebug.rollPreparation,rolls:__playProbe.rolls,arrivals:__playProbe.arrivals,workers:__playProbe.workers,tasks:__playProbe.tasks.filter(t=>t.at>=${activityAt}),frames:__playProbe.frames.filter(f=>f.at>=${activityAt}),clicks:__playProbe.clicks.filter(c=>c.at>=${activityAt}),layout:{width:innerWidth,height:innerHeight,scrollY,visual:{height:visualViewport.height,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale},controls:['phone-more','phone-build-roll'].map(id=>({id,rect:document.getElementById(id).getBoundingClientRect().toJSON()}))}})`);
       const backend=await a.eval(`(()=>{const gl=document.querySelector('#scene-container canvas').getContext('webgl2'),ext=gl.getExtension('WEBGL_debug_renderer_info');return ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'unknown';})()`);
       await a.eval('__playProbe.stop=true');await stage.shot(a,`${dir}/${venue}-${sample}-four-players.png`);
       await cdp('Profiler.start');const appearanceAt=await a.eval('performance.now()');
@@ -142,7 +170,14 @@ export default async function run(stage,args){
       const appearance=await a.eval(`({ready:${appearanceReady},at:${appearanceAt},complete:performance.now(),tasks:__playProbe.tasks.filter(t=>t.at>=${appearanceAt}),clicks:__playProbe.clicks.filter(c=>c.at>=${appearanceAt}),previewBytes:[...document.querySelectorAll('#felt-swatches .swatch-dot')].reduce((sum,d)=>sum+d.style.backgroundImage.length,0)})`);
       await stage.shot(a,`${dir}/${venue}-${sample}-appearance.png`);
       assert.deepEqual(page.errors,[]);
-      const summary={venue,sample,cpu,dpr,builderFirst,firstNotation,firstSet,incomingMixed,network,backend,
+      const arrival=Object.entries(activity.arrivals).find(([,r])=>r.playerName==='Cora');
+      const incoming=arrival?activity.rolls[arrival[0]]:null;
+      const summary={venue,sample,cpu,dpr,builderFirst,firstNotation,firstSet,incomingMixed,compileMode,inputProbe,network,backend,
+        incomingVisibleMs:incoming?.visible?incoming.visible-arrival[1].at:null,
+        acceptedWorkerToVisibleMs:incoming?.visible&&activity.workers[arrival[0]]?incoming.visible-activity.workers[arrival[0]].at:null,
+        inputRequestToAckMs:response?.requestToAckMs??null,
+        inputQueueMs:response?.click?.queued??null,
+        inputEventToObservedResponseMs:response?.click?response.painted-response.click.at:null,
         startupMs:boot.ready,startupLongestTask:Math.max(0,...boot.tasks.map(t=>t.ms)),
         firstVisibleMs:first.roll.visible-first.input.at,launchToDiceMs:first.roll.visible,
         firstLongestTask:Math.max(0,...first.tasks.map(t=>t.ms)),
@@ -151,7 +186,7 @@ export default async function run(stage,args){
         activityLongestTask:Math.max(0,...activity.tasks.map(t=>t.ms)),
         activityFrameP95:quantile(activity.frames.map(f=>f.ms),.95),
         appearanceLongestTask:Math.max(0,...appearance.tasks.map(t=>t.ms)),previewBytes:appearance.previewBytes};
-      const result={...summary,boot,first,builder,coldBuilder,activity,appearance,hot:{boot:hot(bootProfile),first:hot(rollProfile),activity:hot(activityProfile),appearance:hot(appearanceProfile)}};
+      const result={...summary,boot,first,builder,coldBuilder,activity,response,appearance,hot:{boot:hot(bootProfile),first:hot(rollProfile),activity:hot(activityProfile),appearance:hot(appearanceProfile)}};
       rows.push(result);writeFileSync(`${dir}/report.json`,JSON.stringify(rows,null,2));
       console.log(JSON.stringify({...summary,hotBoot:result.hot.boot.slice(0,8),hotFirst:result.hot.first.slice(0,8),hotActivity:result.hot.activity.slice(0,8)}));
     }finally{stage.ctx.browser.newPage=original;await ctx.closeAll();}

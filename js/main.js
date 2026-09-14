@@ -7255,6 +7255,24 @@ function clearTable({shared = !netOnline} = {}) {
 
 }
 
+let rollPrepareEnabled = true;
+let rollPreparation = { kicks: 0, last: null };
+function prepareRollPrograms(dice) {
+  if (!rollPrepareEnabled || document.hidden || instantResults || renderer.getContext().isContextLost()) return;
+  const at = performance.now(), post = tableNeedsPost(), transition = post && !lastRenderedWithPost;
+  const programs = renderer.info.programs.length, target = renderer.getRenderTarget();
+  let objects = 0, failed = false;
+  try { objects = postStack.compileRoll(scene, camera, dice.map(d => d.mesh), post, transition); }
+  catch {
+    // Stop retrying a failed optional renderer path; the film still completes.
+    failed = true; rollPrepareEnabled = false;
+  }
+  rollPreparation = { kicks: rollPreparation.kicks + 1,
+    last: { at, ms: performance.now() - at, post, transition, objects, failed,
+      programsAdded: renderer.info.programs.length - programs,
+      targetRestored: renderer.getRenderTarget() === target } };
+}
+
 // roll = {dice: [types], values: [...], seed, label, dc?, playerName?, color?}
 // A REDACTED roll (goal 11) arrives with NO values at all (redacted: true,
 // visMode 'held'|'whisper'): it plays the identical seeded tumble with
@@ -7533,6 +7551,7 @@ function playRoll(roll, rethrow = null, options = {}) {
         if (currentRoll.ceremony) skipCeremony(); else skipPlainPlayback();
       } else if (reservation.skipPlayback) fastForwardPlayback();
     });
+    if (filmClient.pending) prepareRollPrograms(dice);
     return;
   }
   finishBake(bakeFilm(bakeContext));
@@ -11732,6 +11751,11 @@ function updateVenueChrome() {
 // and every "under budget" assertion would still pass; a frame that reports
 // several passes and a draw count in the dozens cannot be that frame.
 let renderPasses = 0;
+let lastRenderedWithPost = false;
+function tableNeedsPost() {
+  return !batteryPresentation() && (postForced || postStack.busy() || particleField.count() > 0
+    || tableDice.some((d) => d.mesh.userData.bloom));
+}
 
 function tick(dt, render = true, realtime = false) {
   // Themed-set clocks (Tier 6 §9): the Level 2 shader uniform and the
@@ -11800,14 +11824,14 @@ function tick(dt, render = true, realtime = false) {
     // running ring/shimmer, or the test force. (The S3 fix's shelf gate
     // retired with the felt shelf — C25: a collected roll's dice are off
     // the table, so every bloom-flagged die on it is by definition live.)
-    const need = !battery && (postForced || postStack.busy() || particleField.count() > 0
-      || tableDice.some((d) => d.mesh.userData.bloom));
+    const need = tableNeedsPost();
     if (need) {
       postStack.setShimmer(collectShimmerSources(), camera);
       postStack.render(scene, camera, dt);
     } else {
       renderer.render(scene, camera);
     }
+    lastRenderedWithPost = need;
     renderPasses = renderer.info.render.frame - passAt;
   }
   if (peeked) restoreCamPeek();
@@ -13638,6 +13662,8 @@ window.__diceDebug = {
   get filmInput() { return lastFilmInput; },
   useFilmWorker(on) { filmProbeWorker = !!on; },
   get filmWorker() { return { ...filmClient.stats, baking: !!currentRoll?.baking }; },
+  useRollPreparation(on) { rollPrepareEnabled = !!on; },
+  get rollPreparation() { return { enabled: rollPrepareEnabled, ...rollPreparation }; },
   tick,
   // THE DECLARATION (docs/DEVMODE.md; js/tune.js). tuneGet() with no path is
   // the whole live tree, cloned; tuneSet({'light.lamp.y': 40}) is THE writer

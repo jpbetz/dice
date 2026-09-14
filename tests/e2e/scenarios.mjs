@@ -52,6 +52,7 @@ import { optionalSceneryScenarios } from './optional-scenery.mjs';
 import { towerPendingCancelScenarios } from './tower-pending-cancel.mjs';
 import { optionalModelParserScenarios } from './optional-model-parser.mjs';
 import { filmWorkerScenarios } from "./film-worker.mjs";
+import { rollPreparationScenarios } from "./roll-preparation.mjs";
 import { roundTableScenarios, roundFilmHash } from "./round-table.mjs";
 import { tableCameraScenarios } from "./table-camera.mjs";
 import { compositionScenarios } from "./composition.mjs";
@@ -811,6 +812,7 @@ export const scenarios = [
   ...filmTurnScenarios,
   ...idleRenderScenarios,
   ...presentationScenarios,
+  ...rollPreparationScenarios,
   ...optionalSceneryScenarios,
   ...towerPendingCancelScenarios,
   ...optionalModelParserScenarios,

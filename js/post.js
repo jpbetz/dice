@@ -339,6 +339,62 @@ export class PostStack {
     this.renderer.render(this.quadScene, this.quadCam);
   }
 
+  // Submit only programs needed by an accepted cast. These temporary meshes
+  // share the live materials/geometry without moving or exposing live dice.
+  // compile() submits programs without drawing or an explicit readiness wait.
+  // Selecting a cold post target can allocate its framebuffer; die textures
+  // still upload on first draw. The worker remains the only playback gate.
+  compileRoll(scene, camera, cast, usePost, includeScene) {
+    const renderer = this.renderer;
+    const target = renderer.getRenderTarget();
+    const face = renderer.getActiveCubeFace(), level = renderer.getActiveMipmapLevel();
+    const group = new THREE.Group(), objects = new Set(cast);
+    if (includeScene) scene.traverseVisible((object) => {
+      if (object.material && object.layers.test(camera.layers)) objects.add(object);
+    });
+    for (const object of objects) {
+      const copy = object.clone(false);
+      copy.visible = true;
+      group.add(copy);
+    }
+    const sides = new Map();
+    for (const object of group.children) for (const material of
+      Array.isArray(object.material) ? object.material : [object.material]) {
+      sides.set(material, material.side);
+    }
+    for (const material of [this.blackMat, this.matThresh, this.matBlur, this.matComposite]) sides.set(material, material.side);
+    try {
+      renderer.setRenderTarget(usePost ? this.rtBase : null);
+      renderer.compile(group, camera, scene);
+      if (usePost) {
+        // Match the glow mask on copies only. The real scene, mask bookkeeping
+        // and post clocks remain untouched.
+        for (const object of group.children) {
+          if (object.userData.bloom) continue;
+          if (object.isMesh && !object.material?.isShaderMaterial) object.material = this.blackMat;
+          else object.material = null;
+        }
+        renderer.setRenderTarget(this.rtGlow);
+        renderer.compile(group, camera, scene);
+        const quads = new THREE.Group();
+        quads.add(new THREE.Mesh(this.quad.geometry, this.matThresh));
+        quads.add(new THREE.Mesh(this.quad.geometry, this.matBlur));
+        renderer.setRenderTarget(this.rtA);
+        renderer.compile(quads, this.quadCam);
+        quads.clear();
+        quads.add(new THREE.Mesh(this.quad.geometry, this.matComposite));
+        renderer.setRenderTarget(null);
+        renderer.compile(quads, this.quadCam);
+      }
+    } finally {
+      // Three flips transparent DoubleSide materials while compiling; even a
+      // throwing custom onBeforeCompile must not leave a shared side changed.
+      for (const [material, side] of sides) material.side = side;
+      renderer.setRenderTarget(target, face, level);
+    }
+    return objects.size;
+  }
+
   // Render the frame through the stack. dt drives ring/shimmer clocks
   // (a held clock freezes them — deterministic screenshots hold).
   render(scene, camera, dt) {
