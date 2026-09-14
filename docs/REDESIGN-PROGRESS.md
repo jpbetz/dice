@@ -29,7 +29,11 @@ The root's integration checkout is `/tmp/dice-redesign-integration` on
 `codex/redesign-integration`. Agents use isolated worktrees so reviews and
 cherry-picks are explicit and another ongoing session's edits survive.
 
-The later `39b9ec7` dice-portrait optimization is integrated in the repository.
+The later `39b9ec7` dice-portrait optimization and the reviewed
+[first-use atlas correction](redesign/2026-09-14-dice-atlas-padding/README.md)
+are integrated in the repository. The latter reduces the emulated first 4d20
+activity's longest task from 209 to 79 ms median with exact pixel/portrait
+parity; ordinary first 2d6 timing stays effectively unchanged.
 Staging and released production still use the immutable `11dd1ef`
 image; the cloud proofs do not include that later optimization. Temporary
 restore infrastructure has been [removed after proof](redesign/2026-09-14-cloud-return/restore/cleanup.json),

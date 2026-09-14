@@ -70,10 +70,10 @@ phone, page-load, idle-rendering and battery measurements remain R3 work.
 
 ## Optional recoverable accounts (2026-09-13)
 
-The account service is locally implemented and remains absent from the current
-public revision. [ACCOUNT-OPERATIONS.md](ACCOUNT-OPERATIONS.md) records read-only
-cloud evidence, exact configuration preflight, external Firestore/IAM/backup
-work, staging proofs and safe pause/rollback. It is the operating contract for
+The account service is enabled in the [verified production release](redesign/2026-09-14-production-release/README.md)
+on `11dd1ef`, with one serving instance maximum. [ACCOUNT-OPERATIONS.md](ACCOUNT-OPERATIONS.md)
+records exact configuration preflight, Firestore/IAM/backup setup, staging and
+production proofs, and safe pause/rollback. It is the operating contract for
 recoverable identity, synchronized libraries, saved homes and social data. The
 old guest-only cost estimates below do not include these new operations.
 

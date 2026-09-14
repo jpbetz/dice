@@ -85,9 +85,13 @@ whole-set rendering with visible-only baked images for built-in sets and a
 per-type live fallback for edits. Usable quick-roll controls improve from
 1.50 to 0.67 seconds; navigation to visible quick dice improves from 2.04 to
 1.21 seconds, and the builder-first journey from 2.44 to 1.68 seconds.
-Cold builder opening stays at 99 ms. First-use live mesh/atlas work becomes
-more visible during play and remains the next implementation target;
-physical-phone costs remain open.
+Cold builder opening stays at 99 ms. The subsequent
+[atlas padding correction](redesign/2026-09-14-dice-atlas-padding/README.md)
+reduces the first 4d20 activity's longest task from 209 to 79 ms median in a
+separate three-run emulated-phone comparison, preserving all painted pixels
+and portraits. Ordinary first 2d6 timing stays effectively unchanged;
+physical-phone costs remain open. Both follow-ups are in the repository and
+are outside the currently released `11dd1ef` image.
 The [Battery saver](redesign/2026-09-13-battery-presentation.md) and
 [Instant results](redesign/2026-09-13-instant-results.md) preferences are now
 implemented independently. Battery keeps baked artwork and responsive 3D dice,

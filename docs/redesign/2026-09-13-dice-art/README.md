@@ -74,8 +74,9 @@ die still needs its actual mesh: quick 2d6 tap-to-visible moves from 367 to
 includes a first 4d20, where its longest task grows from 73 to 215 ms in the
 quick path (72 to 222 ms in the builder path). The profile attributes most
 of that new task to atlas `drawImage` work. Reducing that first-use cost is
-the next implementation target; precomputing every mesh at startup would
-restore the original waste. A single custom portrait can also still be a
+the next implementation target at this checkpoint; the subsequent
+[atlas padding correction](../2026-09-14-dice-atlas-padding/README.md) addresses
+that measured cost without restoring startup warmup. A single custom portrait can also still be a
 long task even though the queue yields between types.
 
 These are software-rendered local browser comparisons, not physical iPhone,
