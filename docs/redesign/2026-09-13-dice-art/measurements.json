@@ -1,0 +1,6464 @@
+{
+  "baseline": "44a5ad2",
+  "device": {
+    "viewport": [
+      390,
+      844
+    ],
+    "dpr": 1,
+    "mobile": true,
+    "touch": true,
+    "cpuThrottle": 4,
+    "cpuAffinity": "0-15",
+    "network": "local HTTP, cache disabled",
+    "renderer": "SwiftShader"
+  },
+  "runs": {
+    "before-quick": [
+      {
+        "venue": "table",
+        "sample": 0,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": false,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 1527,
+        "startupLongestTask": 1108,
+        "firstVisibleMs": 384.09999990463257,
+        "launchToDiceMs": 2086.399999976158,
+        "firstLongestTask": 234,
+        "builderOpenMs": 118.09999990463257,
+        "builderArtMs": 163.89999997615814,
+        "coldBuilderOpenMs": null,
+        "activityLongestTask": 71,
+        "activityFrameP95": 29.200000047683716,
+        "appearanceLongestTask": 161,
+        "previewBytes": 616220,
+        "builder": {
+          "painted": 3668.899999976158,
+          "artReady": 3714.7000000476837,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 3550.8000000715256,
+            "queued": 23.199999928474426
+          }
+        },
+        "coldBuilder": null,
+        "hot": {
+          "boot": [
+            {
+              "fn": "(anonymous) js/dice.js:1278",
+              "ms": 429.3
+            },
+            {
+              "fn": "(program) :0",
+              "ms": 242.4
+            },
+            {
+              "fn": "warmVariant js/diceart.js:107",
+              "ms": 194.3
+            },
+            {
+              "fn": "texSubImage2D vendor/three.module.js:23670",
+              "ms": 106.6
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 103.4
+            },
+            {
+              "fn": "onFirstUse vendor/three.module.js:20271",
+              "ms": 52.6
+            },
+            {
+              "fn": "stroke js/main.js:2701",
+              "ms": 34.9
+            },
+            {
+              "fn": "makeFaceTexture js/dice.js:216",
+              "ms": 32.3
+            },
+            {
+              "fn": "(anonymous) js/main.js:1",
+              "ms": 19.1
+            },
+            {
+              "fn": "drawLabel js/dice.js:197",
+              "ms": 14.2
+            },
+            {
+              "fn": "getContext vendor/three.module.js:28617",
+              "ms": 14.1
+            },
+            {
+              "fn": "lobeFieldAt js/main.js:3022",
+              "ms": 13.1
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 10.7
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 9.8
+            },
+            {
+              "fn": "refitView js/main.js:18976",
+              "ms": 9.6
+            },
+            {
+              "fn": "getExtension vendor/three.module.js:17299",
+              "ms": 6.2
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 5.8
+            },
+            {
+              "fn": "WebGLRenderer.forceContextLoss vendor/three.module.js:28781",
+              "ms": 4.4
+            },
+            {
+              "fn": "initNet js/main.js:36386",
+              "ms": 4.2
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 4.1
+            },
+            {
+              "fn": "paintGloss js/main.js:3089",
+              "ms": 4
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2683",
+              "ms": 4
+            },
+            {
+              "fn": "uploadTexture vendor/three.module.js:24708",
+              "ms": 3.8
+            },
+            {
+              "fn": "(anonymous) vendor/three.module.js:1",
+              "ms": 3.5
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2619",
+              "ms": 3.5
+            }
+          ],
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1190.5
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 58.2
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 54
+            },
+            {
+              "fn": "ensureAudio js/main.js:4115",
+              "ms": 20.5
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 16.8
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4105",
+              "ms": 6.6
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 5.7
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5319",
+              "ms": 5.7
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 5.3
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 4.7
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 3.7
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4922",
+              "ms": 3.4
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5403",
+              "ms": 3.4
+            },
+            {
+              "fn": "stepPlayback js/main.js:7953",
+              "ms": 3.1
+            },
+            {
+              "fn": "drawArrays :0",
+              "ms": 3
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 2.9
+            },
+            {
+              "fn": "playImpact js/main.js:5111",
+              "ms": 2.8
+            },
+            {
+              "fn": "(anonymous) :0",
+              "ms": 2.7
+            },
+            {
+              "fn": "getNormalMatrix vendor/three.module.js:1322",
+              "ms": 2.5
+            },
+            {
+              "fn": "WebGLShadowMap.render vendor/three.module.js:22322",
+              "ms": 2.5
+            },
+            {
+              "fn": "parseNotation js/notation.js:296",
+              "ms": 2.3
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 2.3
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 2.1
+            },
+            {
+              "fn": "captureFilm js/film-wire.js:129",
+              "ms": 2
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 1.9
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2427.8
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 20.4
+            },
+            {
+              "fn": "modalOpen js/main.js:36684",
+              "ms": 17.1
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 15.9
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5403",
+              "ms": 9.7
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 8.9
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 8.5
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 7.2
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 6.4
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 5.9
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 5.6
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 5.1
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32815",
+              "ms": 4.9
+            },
+            {
+              "fn": "renderObject vendor/three.module.js:22581",
+              "ms": 4.7
+            },
+            {
+              "fn": "stepPlayback js/main.js:7953",
+              "ms": 4.4
+            },
+            {
+              "fn": "drawArrays :0",
+              "ms": 4.2
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 4.1
+            },
+            {
+              "fn": "bindVertexArray :0",
+              "ms": 3.9
+            },
+            {
+              "fn": "sort vendor/three.module.js:21396",
+              "ms": 3.9
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 3.7
+            },
+            {
+              "fn": "(anonymous) js/main.js:36732",
+              "ms": 3.6
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 3.4
+            },
+            {
+              "fn": "focus :0",
+              "ms": 3.2
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:7720",
+              "ms": 3.1
+            },
+            {
+              "fn": "buildLogEntryEl js/main.js:24473",
+              "ms": 3
+            }
+          ],
+          "appearance": [
+            {
+              "fn": "(program) :0",
+              "ms": 442.8
+            },
+            {
+              "fn": "stroke js/main.js:2701",
+              "ms": 247.1
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 156.1
+            },
+            {
+              "fn": "stroke :0",
+              "ms": 80.9
+            },
+            {
+              "fn": "paintSiltCloth js/main.js:2741",
+              "ms": 65
+            },
+            {
+              "fn": "paintOakCloth js/main.js:2869",
+              "ms": 51.1
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 43.5
+            },
+            {
+              "fn": "toDataURL :0",
+              "ms": 42.6
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 33.6
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 33.6
+            },
+            {
+              "fn": "(anonymous) js/main.js:29570",
+              "ms": 29.3
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 25.7
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2683",
+              "ms": 23.5
+            },
+            {
+              "fn": "(anonymous) :1",
+              "ms": 15.7
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2619",
+              "ms": 14
+            },
+            {
+              "fn": "setFeltPreview js/main.js:29544",
+              "ms": 12.5
+            },
+            {
+              "fn": "(anonymous) js/main.js:2875",
+              "ms": 11.2
+            },
+            {
+              "fn": "(anonymous) js/main.js:33135",
+              "ms": 9.9
+            },
+            {
+              "fn": "showSettingsDest js/main.js:30313",
+              "ms": 7.6
+            },
+            {
+              "fn": "(anonymous) js/main.js:2781",
+              "ms": 4.8
+            },
+            {
+              "fn": "(anonymous) js/main.js:2724",
+              "ms": 4.2
+            },
+            {
+              "fn": "feltWrapped js/main.js:2673",
+              "ms": 4
+            },
+            {
+              "fn": "lineTo :0",
+              "ms": 3.9
+            },
+            {
+              "fn": "near js/main.js:2674",
+              "ms": 2.4
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 2.2
+            }
+          ]
+        },
+        "boot": {
+          "ready": 1527,
+          "tasks": [
+            {
+              "at": 125.10000002384186,
+              "ms": 1108
+            },
+            {
+              "at": 1233.8000000715256,
+              "ms": 238
+            }
+          ],
+          "paint": [
+            {
+              "name": "first-paint",
+              "at": 72
+            },
+            {
+              "name": "first-contentful-paint",
+              "at": 72
+            }
+          ]
+        },
+        "first": {
+          "input": {
+            "id": "",
+            "quick": "2d6",
+            "at": 1702.3000000715256,
+            "queued": 32.200000047683716
+          },
+          "roll": {
+            "prepared": 1909.5,
+            "time": 0,
+            "visible": 2086.399999976158,
+            "bounds": [
+              {
+                "rollId": "61e6f3c9-5a78-46b8-bfa4-e9a7a0fe1d4b",
+                "index": 0,
+                "left": 96.83197219892705,
+                "top": 378.2216032681283,
+                "right": 168.72645997472603,
+                "bottom": 439.16706418369984,
+                "nearDepth": 19.945937240439036,
+                "farDepth": 21.896428020715412
+              },
+              {
+                "rollId": "61e6f3c9-5a78-46b8-bfa4-e9a7a0fe1d4b",
+                "index": 1,
+                "left": 201.41171076928487,
+                "top": 390.18422498190034,
+                "right": 266.8606528922786,
+                "bottom": 448.49122197455875,
+                "nearDepth": 21.41627728243238,
+                "farDepth": 23.348208504086116
+              }
+            ],
+            "view": {
+              "left": 0,
+              "top": 148,
+              "width": 390,
+              "height": 511
+            }
+          },
+          "tasks": [
+            {
+              "at": 1835,
+              "ms": 234
+            }
+          ],
+          "film": {
+            "execution": "worker",
+            "bakeMs": 11.100000023841858,
+            "totalMs": 79.79999995231628
+          }
+        },
+        "activity": {
+          "tasks": [
+            {
+              "at": 4919,
+              "ms": 71
+            }
+          ]
+        }
+      },
+      {
+        "venue": "table",
+        "sample": 1,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": false,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 1496.7000000476837,
+        "startupLongestTask": 1086,
+        "firstVisibleMs": 367.39999997615814,
+        "launchToDiceMs": 2039,
+        "firstLongestTask": 229,
+        "builderOpenMs": 118.39999997615814,
+        "builderArtMs": 164.39999997615814,
+        "coldBuilderOpenMs": null,
+        "activityLongestTask": 73,
+        "activityFrameP95": 31.200000047683716,
+        "appearanceLongestTask": 142,
+        "previewBytes": 616220,
+        "builder": {
+          "painted": 3404.100000023842,
+          "artReady": 3450.100000023842,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 3285.7000000476837,
+            "queued": 22.299999952316284
+          }
+        },
+        "coldBuilder": null,
+        "hot": {
+          "boot": [
+            {
+              "fn": "(anonymous) js/dice.js:1278",
+              "ms": 429.9
+            },
+            {
+              "fn": "(program) :0",
+              "ms": 224.9
+            },
+            {
+              "fn": "warmVariant js/diceart.js:107",
+              "ms": 179.2
+            },
+            {
+              "fn": "texSubImage2D vendor/three.module.js:23670",
+              "ms": 107.3
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 83.6
+            },
+            {
+              "fn": "onFirstUse vendor/three.module.js:20271",
+              "ms": 67.7
+            },
+            {
+              "fn": "stroke js/main.js:2701",
+              "ms": 39.2
+            },
+            {
+              "fn": "makeFaceTexture js/dice.js:216",
+              "ms": 21.8
+            },
+            {
+              "fn": "(anonymous) js/main.js:1",
+              "ms": 16.2
+            },
+            {
+              "fn": "getContext vendor/three.module.js:28617",
+              "ms": 14
+            },
+            {
+              "fn": "lobeFieldAt js/main.js:3022",
+              "ms": 14
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 13.2
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 11.3
+            },
+            {
+              "fn": "drawLabel js/dice.js:197",
+              "ms": 11.1
+            },
+            {
+              "fn": "getExtension vendor/three.module.js:17299",
+              "ms": 7.9
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 6.7
+            },
+            {
+              "fn": "refitView js/main.js:18976",
+              "ms": 6
+            },
+            {
+              "fn": "initNet js/main.js:36386",
+              "ms": 5.7
+            },
+            {
+              "fn": "WebGLRenderer.forceContextLoss vendor/three.module.js:28781",
+              "ms": 5.1
+            },
+            {
+              "fn": "getProgram vendor/three.module.js:29985",
+              "ms": 4.8
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 4.3
+            },
+            {
+              "fn": "createBuffer vendor/three.module.js:13517",
+              "ms": 4.1
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2683",
+              "ms": 4
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 3.7
+            },
+            {
+              "fn": "replaceLightNums vendor/three.module.js:19573",
+              "ms": 3.4
+            }
+          ],
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 925.2
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 80.5
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 52.9
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4105",
+              "ms": 6.2
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.8
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 5.2
+            },
+            {
+              "fn": "render vendor/three.module.js:15699",
+              "ms": 5.2
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 4.7
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5319",
+              "ms": 4.5
+            },
+            {
+              "fn": "ensureAudio js/main.js:4115",
+              "ms": 4.4
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 4.2
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4922",
+              "ms": 3.8
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 3.4
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 2.3
+            },
+            {
+              "fn": "drawArrays :0",
+              "ms": 2.2
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 2.1
+            },
+            {
+              "fn": "renderRollResults js/main.js:9140",
+              "ms": 2.1
+            },
+            {
+              "fn": "stepCamera js/main.js:32868",
+              "ms": 2.1
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 2.1
+            },
+            {
+              "fn": "copy vendor/three.module.js:3989",
+              "ms": 2.1
+            },
+            {
+              "fn": "mergeFilmState js/film-wire.js:84",
+              "ms": 1.9
+            },
+            {
+              "fn": "impactVoicingOf js/main.js:4892",
+              "ms": 1.9
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 1.8
+            },
+            {
+              "fn": "(anonymous) js/main.js:35518",
+              "ms": 1.7
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 1.7
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2992.1
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 14.6
+            },
+            {
+              "fn": "modalOpen js/main.js:36684",
+              "ms": 13.6
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5403",
+              "ms": 11.3
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 11.2
+            },
+            {
+              "fn": "projectObject vendor/three.module.js:29679",
+              "ms": 9.6
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 9.3
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 8.8
+            },
+            {
+              "fn": "applyMatrix4 vendor/three.module.js:4130",
+              "ms": 8.7
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 8.5
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 7.4
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 6.9
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 6.3
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 6
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 5.9
+            },
+            {
+              "fn": "elementFromPoint :0",
+              "ms": 5.8
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 5.7
+            },
+            {
+              "fn": "washAt js/placard.js:1709",
+              "ms": 5.5
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19300",
+              "ms": 5.2
+            },
+            {
+              "fn": "stepPlayback js/main.js:7953",
+              "ms": 5.1
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32815",
+              "ms": 5
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5
+            },
+            {
+              "fn": "renderObject vendor/three.module.js:22581",
+              "ms": 3.9
+            },
+            {
+              "fn": "refreshMaterialUniforms vendor/three.module.js:27537",
+              "ms": 3.8
+            },
+            {
+              "fn": "setFromRotationMatrix vendor/three.module.js:6890",
+              "ms": 3.5
+            }
+          ],
+          "appearance": [
+            {
+              "fn": "(program) :0",
+              "ms": 424.5
+            },
+            {
+              "fn": "stroke js/main.js:2701",
+              "ms": 241.2
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 160.1
+            },
+            {
+              "fn": "stroke :0",
+              "ms": 77.8
+            },
+            {
+              "fn": "paintSiltCloth js/main.js:2741",
+              "ms": 71.2
+            },
+            {
+              "fn": "paintOakCloth js/main.js:2869",
+              "ms": 47.7
+            },
+            {
+              "fn": "toDataURL :0",
+              "ms": 43.1
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 40.4
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 35.7
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 34.2
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 25
+            },
+            {
+              "fn": "(anonymous) js/main.js:29570",
+              "ms": 24
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2683",
+              "ms": 20.1
+            },
+            {
+              "fn": "(anonymous) :1",
+              "ms": 18.5
+            },
+            {
+              "fn": "setFeltPreview js/main.js:29544",
+              "ms": 14.1
+            },
+            {
+              "fn": "(anonymous) js/main.js:2875",
+              "ms": 10.8
+            },
+            {
+              "fn": "(anonymous) js/main.js:33135",
+              "ms": 8.7
+            },
+            {
+              "fn": "showSettingsDest js/main.js:30313",
+              "ms": 7
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2619",
+              "ms": 5.4
+            },
+            {
+              "fn": "scale :0",
+              "ms": 5
+            },
+            {
+              "fn": "moveTo :0",
+              "ms": 4.9
+            },
+            {
+              "fn": "near js/main.js:2674",
+              "ms": 4.7
+            },
+            {
+              "fn": "(anonymous) js/main.js:2781",
+              "ms": 4.4
+            },
+            {
+              "fn": "lineTo :0",
+              "ms": 4.3
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 4.2
+            }
+          ]
+        },
+        "boot": {
+          "ready": 1496.7000000476837,
+          "tasks": [
+            {
+              "at": 107.40000009536743,
+              "ms": 1086
+            },
+            {
+              "at": 1193.4000000953674,
+              "ms": 249
+            }
+          ],
+          "paint": [
+            {
+              "name": "first-paint",
+              "at": 56
+            },
+            {
+              "name": "first-contentful-paint",
+              "at": 56
+            }
+          ]
+        },
+        "first": {
+          "input": {
+            "id": "",
+            "quick": "2d6",
+            "at": 1671.6000000238419,
+            "queued": 30.899999976158142
+          },
+          "roll": {
+            "prepared": 1874.6000000238419,
+            "time": 0,
+            "visible": 2039,
+            "bounds": [
+              {
+                "rollId": "283e22f0-2ba9-4f0d-85d3-a9171283d8a3",
+                "index": 0,
+                "left": 122.64966233859202,
+                "top": 380.58756758429604,
+                "right": 171.66878787411045,
+                "bottom": 440.5880583438462,
+                "nearDepth": 20.337672866184136,
+                "farDepth": 22.20902897556912
+              },
+              {
+                "rollId": "283e22f0-2ba9-4f0d-85d3-a9171283d8a3",
+                "index": 1,
+                "left": 196.66767262344726,
+                "top": 380.4545149299779,
+                "right": 255.93722632421017,
+                "bottom": 447.75893187076724,
+                "nearDepth": 20.46025478075318,
+                "farDepth": 22.564250459546297
+              }
+            ],
+            "view": {
+              "left": 0,
+              "top": 148,
+              "width": 390,
+              "height": 511
+            }
+          },
+          "tasks": [
+            {
+              "at": 1803.9000000953674,
+              "ms": 229
+            }
+          ],
+          "film": {
+            "execution": "worker",
+            "bakeMs": 10.299999952316284,
+            "totalMs": 84.80000007152557
+          }
+        },
+        "activity": {
+          "tasks": [
+            {
+              "at": 4765,
+              "ms": 73
+            }
+          ]
+        }
+      },
+      {
+        "venue": "table",
+        "sample": 2,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": false,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 1485.1999999284744,
+        "startupLongestTask": 1090,
+        "firstVisibleMs": 317.7000000476837,
+        "launchToDiceMs": 1972.2999999523163,
+        "firstLongestTask": 184,
+        "builderOpenMs": 123.30000007152557,
+        "builderArtMs": 173.39999997615814,
+        "coldBuilderOpenMs": null,
+        "activityLongestTask": 74,
+        "activityFrameP95": 31.100000023841858,
+        "appearanceLongestTask": 147,
+        "previewBytes": 616220,
+        "builder": {
+          "painted": 3440,
+          "artReady": 3490.0999999046326,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 3316.6999999284744,
+            "queued": 22
+          }
+        },
+        "coldBuilder": null,
+        "hot": {
+          "boot": [
+            {
+              "fn": "(anonymous) js/dice.js:1278",
+              "ms": 441.5
+            },
+            {
+              "fn": "(program) :0",
+              "ms": 217.1
+            },
+            {
+              "fn": "warmVariant js/diceart.js:107",
+              "ms": 174.3
+            },
+            {
+              "fn": "texSubImage2D vendor/three.module.js:23670",
+              "ms": 104.4
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 86.7
+            },
+            {
+              "fn": "onFirstUse vendor/three.module.js:20271",
+              "ms": 63.9
+            },
+            {
+              "fn": "stroke js/main.js:2701",
+              "ms": 39.5
+            },
+            {
+              "fn": "makeFaceTexture js/dice.js:216",
+              "ms": 26.6
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 20.1
+            },
+            {
+              "fn": "(anonymous) js/main.js:1",
+              "ms": 17.3
+            },
+            {
+              "fn": "drawLabel js/dice.js:197",
+              "ms": 13.7
+            },
+            {
+              "fn": "lobeFieldAt js/main.js:3022",
+              "ms": 11.8
+            },
+            {
+              "fn": "getContext vendor/three.module.js:28617",
+              "ms": 10.4
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 9.8
+            },
+            {
+              "fn": "refitView js/main.js:18976",
+              "ms": 9
+            },
+            {
+              "fn": "getExtension vendor/three.module.js:17299",
+              "ms": 8.7
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 6.4
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 6.4
+            },
+            {
+              "fn": "(anonymous) vendor/three.module.js:1",
+              "ms": 5
+            },
+            {
+              "fn": "cloneUniforms vendor/three.module.js:12163",
+              "ms": 4.3
+            },
+            {
+              "fn": "WebGLRenderer.forceContextLoss vendor/three.module.js:28781",
+              "ms": 4.2
+            },
+            {
+              "fn": "initNet js/main.js:36386",
+              "ms": 4
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 4
+            },
+            {
+              "fn": "fetch :0",
+              "ms": 4
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 3.9
+            }
+          ],
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1008.2
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 65.8
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 51.4
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4105",
+              "ms": 7
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 5.8
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4922",
+              "ms": 5.4
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5319",
+              "ms": 5.1
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 4.9
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5403",
+              "ms": 4.6
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 4.4
+            },
+            {
+              "fn": "playRoll js/main.js:7280",
+              "ms": 4.3
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32815",
+              "ms": 4.1
+            },
+            {
+              "fn": "ensureAudio js/main.js:4115",
+              "ms": 3.8
+            },
+            {
+              "fn": "finishBake js/main.js:7539",
+              "ms": 3.5
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 3.3
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 3.2
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 2.4
+            },
+            {
+              "fn": "(anonymous) :0",
+              "ms": 2.4
+            },
+            {
+              "fn": "renderRollResults js/main.js:9140",
+              "ms": 2.3
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 2.1
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:7720",
+              "ms": 2
+            },
+            {
+              "fn": "stepPlayback js/main.js:7953",
+              "ms": 1.9
+            },
+            {
+              "fn": "setValueV1f vendor/three.module.js:18359",
+              "ms": 1.9
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19300",
+              "ms": 1.7
+            },
+            {
+              "fn": "setBlending vendor/three.module.js:23281",
+              "ms": 1.7
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2554.2
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 16.6
+            },
+            {
+              "fn": "modalOpen js/main.js:36684",
+              "ms": 16.6
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 15
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 12.7
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5403",
+              "ms": 11
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 10.1
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 9.6
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 8
+            },
+            {
+              "fn": "elementFromPoint :0",
+              "ms": 8
+            },
+            {
+              "fn": "createBufferSource :0",
+              "ms": 6.1
+            },
+            {
+              "fn": "applyMatrix4 vendor/three.module.js:4130",
+              "ms": 5.9
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 5.5
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 5.5
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:7720",
+              "ms": 4.9
+            },
+            {
+              "fn": "bindFramebuffer :0",
+              "ms": 4.9
+            },
+            {
+              "fn": "drawArrays :0",
+              "ms": 4.9
+            },
+            {
+              "fn": "setValueV3f vendor/three.module.js:18400",
+              "ms": 4.8
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 4.8
+            },
+            {
+              "fn": "connect :0",
+              "ms": 4.5
+            },
+            {
+              "fn": "refreshTransformUniform vendor/three.module.js:27508",
+              "ms": 4.4
+            },
+            {
+              "fn": "setup vendor/three.module.js:21687",
+              "ms": 4.4
+            },
+            {
+              "fn": "copyArray vendor/three.module.js:18319",
+              "ms": 3.8
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 3.6
+            },
+            {
+              "fn": "bufferSubData :0",
+              "ms": 3.5
+            }
+          ],
+          "appearance": [
+            {
+              "fn": "(program) :0",
+              "ms": 428.4
+            },
+            {
+              "fn": "stroke js/main.js:2701",
+              "ms": 239.7
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 160.1
+            },
+            {
+              "fn": "paintSiltCloth js/main.js:2741",
+              "ms": 75.3
+            },
+            {
+              "fn": "paintOakCloth js/main.js:2869",
+              "ms": 64.9
+            },
+            {
+              "fn": "stroke :0",
+              "ms": 58.2
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 51.6
+            },
+            {
+              "fn": "toDataURL :0",
+              "ms": 41.6
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 39.5
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 33.6
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 29.5
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2683",
+              "ms": 26.4
+            },
+            {
+              "fn": "(anonymous) js/main.js:29570",
+              "ms": 26.1
+            },
+            {
+              "fn": "(anonymous) :1",
+              "ms": 16.1
+            },
+            {
+              "fn": "setFeltPreview js/main.js:29544",
+              "ms": 11.4
+            },
+            {
+              "fn": "(anonymous) js/main.js:33135",
+              "ms": 8.7
+            },
+            {
+              "fn": "(anonymous) js/main.js:2875",
+              "ms": 7
+            },
+            {
+              "fn": "showSettingsDest js/main.js:30313",
+              "ms": 6.6
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2619",
+              "ms": 6.2
+            },
+            {
+              "fn": "feltWrapped js/main.js:2673",
+              "ms": 5.1
+            },
+            {
+              "fn": "scale :0",
+              "ms": 4.7
+            },
+            {
+              "fn": "lineTo :0",
+              "ms": 3.7
+            },
+            {
+              "fn": "querySelectorAll :0",
+              "ms": 2.7
+            },
+            {
+              "fn": "moveTo :0",
+              "ms": 2.7
+            },
+            {
+              "fn": "(anonymous) js/main.js:2781",
+              "ms": 2.4
+            }
+          ]
+        },
+        "boot": {
+          "ready": 1485.1999999284744,
+          "tasks": [
+            {
+              "at": 99.59999990463257,
+              "ms": 1090
+            },
+            {
+              "at": 1189.6999999284744,
+              "ms": 242
+            }
+          ],
+          "paint": [
+            {
+              "name": "first-paint",
+              "at": 52
+            },
+            {
+              "name": "first-contentful-paint",
+              "at": 52
+            }
+          ]
+        },
+        "first": {
+          "input": {
+            "id": "",
+            "quick": "2d6",
+            "at": 1654.5999999046326,
+            "queued": 33.59999990463257
+          },
+          "roll": {
+            "prepared": 1844.5,
+            "time": 0,
+            "visible": 1972.2999999523163,
+            "bounds": [
+              {
+                "rollId": "cd4ea8fb-6f5c-4688-a8ad-ef8c23f386f7",
+                "index": 0,
+                "left": 138.2361568073536,
+                "top": 386.32553002973987,
+                "right": 195.43453387602077,
+                "bottom": 445.74008433951127,
+                "nearDepth": 21.256484961120893,
+                "farDepth": 22.849599647329267
+              },
+              {
+                "rollId": "cd4ea8fb-6f5c-4688-a8ad-ef8c23f386f7",
+                "index": 1,
+                "left": 197.8108656001638,
+                "top": 384.0655391821462,
+                "right": 265.27801709064795,
+                "bottom": 451.2368390937974,
+                "nearDepth": 21.16389479425535,
+                "farDepth": 23.04761514262672
+              }
+            ],
+            "view": {
+              "left": 0,
+              "top": 148,
+              "width": 390,
+              "height": 511
+            }
+          },
+          "tasks": [
+            {
+              "at": 1774.1999999284744,
+              "ms": 184
+            }
+          ],
+          "film": {
+            "execution": "worker",
+            "bakeMs": 11.100000023841858,
+            "totalMs": 71.59999990463257
+          }
+        },
+        "activity": {
+          "tasks": [
+            {
+              "at": 4872.799999952316,
+              "ms": 74
+            }
+          ]
+        }
+      }
+    ],
+    "before-builder": [
+      {
+        "venue": "table",
+        "sample": 0,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": true,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 1525.1999999284744,
+        "startupLongestTask": 1108,
+        "firstVisibleMs": 385.39999997615814,
+        "launchToDiceMs": 2516.5999999046326,
+        "firstLongestTask": 232,
+        "builderOpenMs": 97.70000004768372,
+        "builderArtMs": 146.80000007152557,
+        "coldBuilderOpenMs": 116.89999997615814,
+        "activityLongestTask": 71,
+        "activityFrameP95": 30.5,
+        "appearanceLongestTask": 140,
+        "previewBytes": 616220,
+        "builder": {
+          "painted": 4367.799999952316,
+          "artReady": 4416.899999976158,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 4270.099999904633,
+            "queued": 26.299999952316284
+          }
+        },
+        "coldBuilder": {
+          "painted": 1786.0999999046326,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 1669.1999999284744,
+            "queued": 0.2999999523162842
+          }
+        },
+        "hot": {
+          "boot": [
+            {
+              "fn": "(anonymous) js/dice.js:1278",
+              "ms": 435.2
+            },
+            {
+              "fn": "(program) :0",
+              "ms": 243.9
+            },
+            {
+              "fn": "warmVariant js/diceart.js:107",
+              "ms": 190.7
+            },
+            {
+              "fn": "texSubImage2D vendor/three.module.js:23670",
+              "ms": 107.1
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 94.1
+            },
+            {
+              "fn": "onFirstUse vendor/three.module.js:20271",
+              "ms": 48.8
+            },
+            {
+              "fn": "stroke js/main.js:2701",
+              "ms": 36.7
+            },
+            {
+              "fn": "makeFaceTexture js/dice.js:216",
+              "ms": 27.6
+            },
+            {
+              "fn": "lobeFieldAt js/main.js:3022",
+              "ms": 16.8
+            },
+            {
+              "fn": "(anonymous) js/main.js:1",
+              "ms": 16.5
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 13
+            },
+            {
+              "fn": "drawLabel js/dice.js:197",
+              "ms": 12.6
+            },
+            {
+              "fn": "refitView js/main.js:18976",
+              "ms": 11.2
+            },
+            {
+              "fn": "getContext vendor/three.module.js:28617",
+              "ms": 10.1
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 9.4
+            },
+            {
+              "fn": "getExtension vendor/three.module.js:17299",
+              "ms": 7
+            },
+            {
+              "fn": "createBuffer vendor/three.module.js:13517",
+              "ms": 5.4
+            },
+            {
+              "fn": "(anonymous) vendor/three.module.js:1",
+              "ms": 5.1
+            },
+            {
+              "fn": "WebGLRenderer.forceContextLoss vendor/three.module.js:28781",
+              "ms": 4.9
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 4.5
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 4.4
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2619",
+              "ms": 4.3
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 4.1
+            },
+            {
+              "fn": "WebGLShadowMap.render vendor/three.module.js:22322",
+              "ms": 3.7
+            },
+            {
+              "fn": "buildBeveledGeometry js/dice.js:749",
+              "ms": 3.4
+            }
+          ],
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1663.5
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 194.8
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 54.9
+            },
+            {
+              "fn": "ensureAudio js/main.js:4115",
+              "ms": 21.5
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 13.7
+            },
+            {
+              "fn": "renderTray js/main.js:19397",
+              "ms": 11.7
+            },
+            {
+              "fn": "modalOpen js/main.js:36684",
+              "ms": 11.5
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5403",
+              "ms": 9.4
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 8.9
+            },
+            {
+              "fn": "stepPlayback js/main.js:7953",
+              "ms": 6.1
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4105",
+              "ms": 5.7
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4922",
+              "ms": 5
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5319",
+              "ms": 4.8
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 4.3
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 4.2
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 4.1
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 4.1
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 4
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:7720",
+              "ms": 3.8
+            },
+            {
+              "fn": "playRoll js/main.js:7280",
+              "ms": 3.8
+            },
+            {
+              "fn": "focus :0",
+              "ms": 3.6
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 3.6
+            },
+            {
+              "fn": "updateWorldMatrix vendor/three.module.js:12493",
+              "ms": 3.6
+            },
+            {
+              "fn": "stepTowerLab js/main.js:13526",
+              "ms": 3.5
+            },
+            {
+              "fn": "parseNotation js/notation.js:296",
+              "ms": 3.4
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2429.4
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 17.5
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 14.6
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 10.3
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 10.3
+            },
+            {
+              "fn": "modalOpen js/main.js:36684",
+              "ms": 9
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 8.5
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 8.1
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 7.3
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 7.1
+            },
+            {
+              "fn": "createBufferSource :0",
+              "ms": 6.9
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 6.2
+            },
+            {
+              "fn": "drawArrays :0",
+              "ms": 6
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 5.7
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.6
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 5.3
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19300",
+              "ms": 5.1
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5403",
+              "ms": 4.7
+            },
+            {
+              "fn": "stepPlayback js/main.js:7953",
+              "ms": 3.9
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32815",
+              "ms": 3.8
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 3.7
+            },
+            {
+              "fn": "slerp vendor/three.module.js:3729",
+              "ms": 3.4
+            },
+            {
+              "fn": "clear :0",
+              "ms": 3.1
+            },
+            {
+              "fn": "renderObject vendor/three.module.js:22581",
+              "ms": 3.1
+            },
+            {
+              "fn": "(anonymous) :0",
+              "ms": 3.1
+            }
+          ],
+          "appearance": [
+            {
+              "fn": "(program) :0",
+              "ms": 430
+            },
+            {
+              "fn": "stroke js/main.js:2701",
+              "ms": 239.3
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 155.3
+            },
+            {
+              "fn": "paintSiltCloth js/main.js:2741",
+              "ms": 73.1
+            },
+            {
+              "fn": "stroke :0",
+              "ms": 70.3
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 63.4
+            },
+            {
+              "fn": "paintOakCloth js/main.js:2869",
+              "ms": 49.8
+            },
+            {
+              "fn": "toDataURL :0",
+              "ms": 46.3
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 39.4
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 31.2
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 29.5
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2683",
+              "ms": 27.2
+            },
+            {
+              "fn": "(anonymous) js/main.js:29570",
+              "ms": 21.9
+            },
+            {
+              "fn": "(anonymous) :1",
+              "ms": 19.2
+            },
+            {
+              "fn": "setFeltPreview js/main.js:29544",
+              "ms": 13.6
+            },
+            {
+              "fn": "lineTo :0",
+              "ms": 9.3
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2619",
+              "ms": 8.7
+            },
+            {
+              "fn": "(anonymous) js/main.js:33135",
+              "ms": 8.7
+            },
+            {
+              "fn": "showSettingsDest js/main.js:30313",
+              "ms": 7.1
+            },
+            {
+              "fn": "(anonymous) js/main.js:2781",
+              "ms": 6.4
+            },
+            {
+              "fn": "(anonymous) js/main.js:2875",
+              "ms": 5.9
+            },
+            {
+              "fn": "feltWrapped js/main.js:2673",
+              "ms": 4.6
+            },
+            {
+              "fn": "getContext :0",
+              "ms": 2.9
+            },
+            {
+              "fn": "flatten vendor/three.module.js:18270",
+              "ms": 2.4
+            },
+            {
+              "fn": "schedule js/frame-loop.js:8",
+              "ms": 1.8
+            }
+          ]
+        },
+        "boot": {
+          "ready": 1525.1999999284744,
+          "tasks": [
+            {
+              "at": 119.59999990463257,
+              "ms": 1108
+            },
+            {
+              "at": 1227.5999999046326,
+              "ms": 242
+            }
+          ],
+          "paint": [
+            {
+              "name": "first-paint",
+              "at": 68
+            },
+            {
+              "name": "first-contentful-paint",
+              "at": 68
+            }
+          ]
+        },
+        "first": {
+          "input": {
+            "id": "tray-roll",
+            "at": 2131.1999999284744,
+            "queued": 21.299999952316284
+          },
+          "roll": {
+            "prepared": 2361.1999999284744,
+            "time": 0,
+            "visible": 2516.5999999046326,
+            "bounds": [
+              {
+                "rollId": "1d8d42b3-6527-4e3a-b351-3d83ca29c897",
+                "index": 0,
+                "left": 112.60417261294795,
+                "top": 408.18456986941806,
+                "right": 183.08943920380764,
+                "bottom": 474.57462971900577,
+                "nearDepth": 20.972315260379823,
+                "farDepth": 22.663420319276423
+              },
+              {
+                "rollId": "1d8d42b3-6527-4e3a-b351-3d83ca29c897",
+                "index": 1,
+                "left": 206.28724998613552,
+                "top": 408.48233308921,
+                "right": 271.18068356295265,
+                "bottom": 459.5303974239526,
+                "nearDepth": 20.00067995290422,
+                "farDepth": 21.917447138272404
+              }
+            ],
+            "view": {
+              "left": 0,
+              "top": 148,
+              "width": 390,
+              "height": 559
+            }
+          },
+          "tasks": [
+            {
+              "at": 2283.1999999284744,
+              "ms": 232
+            }
+          ],
+          "film": {
+            "execution": "worker",
+            "bakeMs": 20.5,
+            "totalMs": 110.60000002384186
+          }
+        },
+        "activity": {
+          "tasks": [
+            {
+              "at": 5686.599999904633,
+              "ms": 71
+            }
+          ]
+        }
+      },
+      {
+        "venue": "table",
+        "sample": 1,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": true,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 1498.5,
+        "startupLongestTask": 1091,
+        "firstVisibleMs": 375.39999997615814,
+        "launchToDiceMs": 2438.399999976158,
+        "firstLongestTask": 223,
+        "builderOpenMs": 98.59999990463257,
+        "builderArtMs": 146,
+        "coldBuilderOpenMs": 99.20000004768372,
+        "activityLongestTask": 73,
+        "activityFrameP95": 30,
+        "appearanceLongestTask": 143,
+        "previewBytes": 616220,
+        "builder": {
+          "painted": 3817.899999976158,
+          "artReady": 3865.3000000715256,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 3719.3000000715256,
+            "queued": 29.100000023841858
+          }
+        },
+        "coldBuilder": {
+          "painted": 1713.1000000238419,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 1613.8999999761581,
+            "queued": 0.7999999523162842
+          }
+        },
+        "hot": {
+          "boot": [
+            {
+              "fn": "(anonymous) js/dice.js:1278",
+              "ms": 426.5
+            },
+            {
+              "fn": "(program) :0",
+              "ms": 223.9
+            },
+            {
+              "fn": "warmVariant js/diceart.js:107",
+              "ms": 179.4
+            },
+            {
+              "fn": "texSubImage2D vendor/three.module.js:23670",
+              "ms": 107.7
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 83.3
+            },
+            {
+              "fn": "onFirstUse vendor/three.module.js:20271",
+              "ms": 68.8
+            },
+            {
+              "fn": "stroke js/main.js:2701",
+              "ms": 41.2
+            },
+            {
+              "fn": "makeFaceTexture js/dice.js:216",
+              "ms": 22.7
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 20
+            },
+            {
+              "fn": "drawLabel js/dice.js:197",
+              "ms": 15.5
+            },
+            {
+              "fn": "(anonymous) js/main.js:1",
+              "ms": 15.4
+            },
+            {
+              "fn": "lobeFieldAt js/main.js:3022",
+              "ms": 14.6
+            },
+            {
+              "fn": "getContext vendor/three.module.js:28617",
+              "ms": 11.5
+            },
+            {
+              "fn": "refitView js/main.js:18976",
+              "ms": 10.7
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 10
+            },
+            {
+              "fn": "(anonymous) vendor/three.module.js:1",
+              "ms": 7.5
+            },
+            {
+              "fn": "getExtension vendor/three.module.js:17299",
+              "ms": 6.6
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 6.3
+            },
+            {
+              "fn": "WebGLRenderer.forceContextLoss vendor/three.module.js:28781",
+              "ms": 5.3
+            },
+            {
+              "fn": "initNet js/main.js:36386",
+              "ms": 4.9
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2619",
+              "ms": 4.8
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 4.4
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 3.9
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 3.8
+            },
+            {
+              "fn": "initGLContext vendor/three.module.js:28713",
+              "ms": 3.4
+            }
+          ],
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1183.8
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 197.9
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 47.4
+            },
+            {
+              "fn": "renderTray js/main.js:19397",
+              "ms": 12.7
+            },
+            {
+              "fn": "modalOpen js/main.js:36684",
+              "ms": 9.5
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4105",
+              "ms": 6.2
+            },
+            {
+              "fn": "renderObject vendor/three.module.js:22581",
+              "ms": 5.4
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 5.1
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 4.5
+            },
+            {
+              "fn": "stepPlayback js/main.js:7953",
+              "ms": 4.5
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5403",
+              "ms": 4.4
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 4.4
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 4.3
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5319",
+              "ms": 3.6
+            },
+            {
+              "fn": "renderRollResults js/main.js:9140",
+              "ms": 3.5
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:7720",
+              "ms": 3.2
+            },
+            {
+              "fn": "shaderSource :0",
+              "ms": 3.1
+            },
+            {
+              "fn": "ensureAudio js/main.js:4115",
+              "ms": 3.1
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 3
+            },
+            {
+              "fn": "framingFor js/main.js:32480",
+              "ms": 3
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 3
+            },
+            {
+              "fn": "upload vendor/three.module.js:19316",
+              "ms": 2.7
+            },
+            {
+              "fn": "copyArray vendor/three.module.js:18319",
+              "ms": 2.7
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32815",
+              "ms": 2.5
+            },
+            {
+              "fn": "resolveIncludes vendor/three.module.js:19604",
+              "ms": 2.4
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2715
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 17.7
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 14.9
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 11.9
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 9.8
+            },
+            {
+              "fn": "modalOpen js/main.js:36684",
+              "ms": 9
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 8.5
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5403",
+              "ms": 6.8
+            },
+            {
+              "fn": "copyArray vendor/three.module.js:18319",
+              "ms": 6.7
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 5.8
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:7720",
+              "ms": 5.7
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.7
+            },
+            {
+              "fn": "stepPlayback js/main.js:7953",
+              "ms": 5.4
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 5.4
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 5.2
+            },
+            {
+              "fn": "createGain :0",
+              "ms": 5
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32815",
+              "ms": 4.9
+            },
+            {
+              "fn": "upload vendor/three.module.js:19316",
+              "ms": 4.7
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 4.5
+            },
+            {
+              "fn": "setup vendor/three.module.js:21687",
+              "ms": 4.4
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 4.4
+            },
+            {
+              "fn": "(anonymous) :0",
+              "ms": 4.4
+            },
+            {
+              "fn": "washAt js/placard.js:1709",
+              "ms": 4.3
+            },
+            {
+              "fn": "bufferSubData :0",
+              "ms": 4.2
+            },
+            {
+              "fn": "uniformRollRate js/main.js:6066",
+              "ms": 4.1
+            }
+          ],
+          "appearance": [
+            {
+              "fn": "(program) :0",
+              "ms": 443.5
+            },
+            {
+              "fn": "stroke js/main.js:2701",
+              "ms": 254.1
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 161.1
+            },
+            {
+              "fn": "stroke :0",
+              "ms": 69.6
+            },
+            {
+              "fn": "paintSiltCloth js/main.js:2741",
+              "ms": 61.9
+            },
+            {
+              "fn": "paintOakCloth js/main.js:2869",
+              "ms": 56.9
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 55.7
+            },
+            {
+              "fn": "toDataURL :0",
+              "ms": 39.6
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 39.1
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 37.5
+            },
+            {
+              "fn": "(anonymous) js/main.js:29570",
+              "ms": 29.8
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 26.1
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2683",
+              "ms": 17.8
+            },
+            {
+              "fn": "(anonymous) :1",
+              "ms": 14.1
+            },
+            {
+              "fn": "setFeltPreview js/main.js:29544",
+              "ms": 12.7
+            },
+            {
+              "fn": "(anonymous) js/main.js:2875",
+              "ms": 11.5
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2619",
+              "ms": 9.7
+            },
+            {
+              "fn": "(anonymous) js/main.js:33135",
+              "ms": 8.4
+            },
+            {
+              "fn": "showSettingsDest js/main.js:30313",
+              "ms": 6.8
+            },
+            {
+              "fn": "feltWrapped js/main.js:2673",
+              "ms": 6.4
+            },
+            {
+              "fn": "beginPath :0",
+              "ms": 6
+            },
+            {
+              "fn": "scale :0",
+              "ms": 4
+            },
+            {
+              "fn": "(anonymous) js/main.js:2781",
+              "ms": 3.5
+            },
+            {
+              "fn": "querySelectorAll :0",
+              "ms": 3.1
+            },
+            {
+              "fn": "(anonymous) js/main.js:2724",
+              "ms": 2.8
+            }
+          ]
+        },
+        "boot": {
+          "ready": 1498.5,
+          "tasks": [
+            {
+              "at": 98.80000007152557,
+              "ms": 1091
+            },
+            {
+              "at": 1189.8999999761581,
+              "ms": 243
+            }
+          ],
+          "paint": [
+            {
+              "name": "first-paint",
+              "at": 64
+            },
+            {
+              "name": "first-contentful-paint",
+              "at": 64
+            }
+          ]
+        },
+        "first": {
+          "input": {
+            "id": "tray-roll",
+            "at": 2063,
+            "queued": 21.5
+          },
+          "roll": {
+            "prepared": 2280.7000000476837,
+            "time": 0,
+            "visible": 2438.399999976158,
+            "bounds": [
+              {
+                "rollId": "2d0d161f-2aab-4b26-b7c3-34cdfe36384b",
+                "index": 0,
+                "left": 108.28694947420725,
+                "top": 419.77997310137033,
+                "right": 170.57054518588154,
+                "bottom": 476.7937785123678,
+                "nearDepth": 21.764540763209297,
+                "farDepth": 23.514237941400445
+              },
+              {
+                "rollId": "2d0d161f-2aab-4b26-b7c3-34cdfe36384b",
+                "index": 1,
+                "left": 194.8765944635088,
+                "top": 413.474141597284,
+                "right": 252.65678104156063,
+                "bottom": 481.9895539345675,
+                "nearDepth": 21.72166624855636,
+                "farDepth": 23.73710197465168
+              }
+            ],
+            "view": {
+              "left": 0,
+              "top": 148,
+              "width": 390,
+              "height": 559
+            }
+          },
+          "tasks": [
+            {
+              "at": 2213.2000000476837,
+              "ms": 223
+            }
+          ],
+          "film": {
+            "execution": "worker",
+            "bakeMs": 10.199999928474426,
+            "totalMs": 98.39999997615814
+          }
+        },
+        "activity": {
+          "tasks": [
+            {
+              "at": 5305.5,
+              "ms": 73
+            }
+          ]
+        }
+      },
+      {
+        "venue": "table",
+        "sample": 2,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": true,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 1498.3000000715256,
+        "startupLongestTask": 1091,
+        "firstVisibleMs": 369.2000000476837,
+        "launchToDiceMs": 2431.2000000476837,
+        "firstLongestTask": 225,
+        "builderOpenMs": 109.5,
+        "builderArtMs": 158.89999997615814,
+        "coldBuilderOpenMs": 83.60000002384186,
+        "activityLongestTask": 72,
+        "activityFrameP95": 30.600000023841858,
+        "appearanceLongestTask": 148,
+        "previewBytes": 616220,
+        "builder": {
+          "painted": 4295.5,
+          "artReady": 4344.899999976158,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 4186,
+            "queued": 21.799999952316284
+          }
+        },
+        "coldBuilder": {
+          "painted": 1719,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 1635.3999999761581,
+            "queued": 0.5
+          }
+        },
+        "hot": {
+          "boot": [
+            {
+              "fn": "(anonymous) js/dice.js:1278",
+              "ms": 430.3
+            },
+            {
+              "fn": "(program) :0",
+              "ms": 228.1
+            },
+            {
+              "fn": "warmVariant js/diceart.js:107",
+              "ms": 180.1
+            },
+            {
+              "fn": "texSubImage2D vendor/three.module.js:23670",
+              "ms": 105.4
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 83.4
+            },
+            {
+              "fn": "onFirstUse vendor/three.module.js:20271",
+              "ms": 62.6
+            },
+            {
+              "fn": "stroke js/main.js:2701",
+              "ms": 36.9
+            },
+            {
+              "fn": "makeFaceTexture js/dice.js:216",
+              "ms": 30.8
+            },
+            {
+              "fn": "(anonymous) js/main.js:1",
+              "ms": 21.9
+            },
+            {
+              "fn": "lobeFieldAt js/main.js:3022",
+              "ms": 13.8
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 12.7
+            },
+            {
+              "fn": "getContext vendor/three.module.js:28617",
+              "ms": 11.6
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 10.9
+            },
+            {
+              "fn": "drawLabel js/dice.js:197",
+              "ms": 9.2
+            },
+            {
+              "fn": "refitView js/main.js:18976",
+              "ms": 8.4
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 6.8
+            },
+            {
+              "fn": "getExtension vendor/three.module.js:17299",
+              "ms": 6.8
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 5.3
+            },
+            {
+              "fn": "(anonymous) vendor/three.module.js:1",
+              "ms": 4.2
+            },
+            {
+              "fn": "replaceLightNums vendor/three.module.js:19573",
+              "ms": 4.2
+            },
+            {
+              "fn": "initNet js/main.js:36386",
+              "ms": 4.2
+            },
+            {
+              "fn": "WebGLRenderer.forceContextLoss vendor/three.module.js:28781",
+              "ms": 4.2
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 4.1
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 3.8
+            },
+            {
+              "fn": "initGLContext vendor/three.module.js:28713",
+              "ms": 3.7
+            }
+          ],
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1641.6
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 191
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 49.8
+            },
+            {
+              "fn": "renderTray js/main.js:19397",
+              "ms": 13.1
+            },
+            {
+              "fn": "modalOpen js/main.js:36684",
+              "ms": 9.7
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 7.3
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4105",
+              "ms": 6.4
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 5.8
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 5
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 4.8
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4922",
+              "ms": 4.8
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5319",
+              "ms": 4.5
+            },
+            {
+              "fn": "stepPlayback js/main.js:7953",
+              "ms": 4.5
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 4.1
+            },
+            {
+              "fn": "resolveIncludes vendor/three.module.js:19604",
+              "ms": 3.7
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 3.6
+            },
+            {
+              "fn": "ensureAudio js/main.js:4115",
+              "ms": 3.5
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 3.4
+            },
+            {
+              "fn": "getShaderInfoLog :0",
+              "ms": 3.4
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 3.3
+            },
+            {
+              "fn": "focus :0",
+              "ms": 3.3
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5403",
+              "ms": 3
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:7720",
+              "ms": 3
+            },
+            {
+              "fn": "playImpact js/main.js:5111",
+              "ms": 3
+            },
+            {
+              "fn": "playRoll js/main.js:7280",
+              "ms": 2.7
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2646.8
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 21.2
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 13.9
+            },
+            {
+              "fn": "modalOpen js/main.js:36684",
+              "ms": 9.7
+            },
+            {
+              "fn": "tick js/main.js:11735",
+              "ms": 9.1
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 8.1
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 7.4
+            },
+            {
+              "fn": "animate js/main.js:11862",
+              "ms": 7.3
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5403",
+              "ms": 6.6
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 6.5
+            },
+            {
+              "fn": "clearColor :0",
+              "ms": 5.9
+            },
+            {
+              "fn": "elementFromPoint :0",
+              "ms": 5.8
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32815",
+              "ms": 5.6
+            },
+            {
+              "fn": "createGain :0",
+              "ms": 5.3
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 5.2
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.2
+            },
+            {
+              "fn": "applyMatrix4 vendor/three.module.js:4130",
+              "ms": 5
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 4.5
+            },
+            {
+              "fn": "bufferSubData :0",
+              "ms": 4.2
+            },
+            {
+              "fn": "get vendor/three.module.js:21208",
+              "ms": 4
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 4
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4922",
+              "ms": 4
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 3.8
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 3.6
+            },
+            {
+              "fn": "createBufferSource :0",
+              "ms": 3.6
+            }
+          ],
+          "appearance": [
+            {
+              "fn": "(program) :0",
+              "ms": 439.7
+            },
+            {
+              "fn": "stroke js/main.js:2701",
+              "ms": 261
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 156.7
+            },
+            {
+              "fn": "stroke :0",
+              "ms": 82.9
+            },
+            {
+              "fn": "paintSiltCloth js/main.js:2741",
+              "ms": 70.3
+            },
+            {
+              "fn": "paintOakCloth js/main.js:2869",
+              "ms": 57.9
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 56.6
+            },
+            {
+              "fn": "toDataURL :0",
+              "ms": 43.1
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 31.6
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 30.8
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 27.2
+            },
+            {
+              "fn": "(anonymous) js/main.js:29570",
+              "ms": 24.3
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2683",
+              "ms": 23
+            },
+            {
+              "fn": "(anonymous) :1",
+              "ms": 16.8
+            },
+            {
+              "fn": "setFeltPreview js/main.js:29544",
+              "ms": 13.6
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2619",
+              "ms": 10.4
+            },
+            {
+              "fn": "(anonymous) js/main.js:33135",
+              "ms": 7.7
+            },
+            {
+              "fn": "showSettingsDest js/main.js:30313",
+              "ms": 7.6
+            },
+            {
+              "fn": "moveTo :0",
+              "ms": 5.9
+            },
+            {
+              "fn": "feltWrapped js/main.js:2673",
+              "ms": 4.5
+            },
+            {
+              "fn": "(anonymous) js/main.js:2875",
+              "ms": 4.3
+            },
+            {
+              "fn": "(anonymous) js/main.js:2781",
+              "ms": 4.1
+            },
+            {
+              "fn": "lineTo :0",
+              "ms": 3.1
+            },
+            {
+              "fn": "beginPath :0",
+              "ms": 2.8
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 2.8
+            }
+          ]
+        },
+        "boot": {
+          "ready": 1498.3000000715256,
+          "tasks": [
+            {
+              "at": 103.89999997615814,
+              "ms": 1091
+            },
+            {
+              "at": 1195.5,
+              "ms": 248
+            }
+          ],
+          "paint": [
+            {
+              "name": "first-paint",
+              "at": 52
+            },
+            {
+              "name": "first-contentful-paint",
+              "at": 52
+            }
+          ]
+        },
+        "first": {
+          "input": {
+            "id": "tray-roll",
+            "at": 2062,
+            "queued": 0.5
+          },
+          "roll": {
+            "prepared": 2273.8000000715256,
+            "time": 0,
+            "visible": 2431.2000000476837,
+            "bounds": [
+              {
+                "rollId": "99f3d6d0-4ed2-4b25-9718-cd4116ef5afc",
+                "index": 0,
+                "left": 102.14824194152794,
+                "top": 408.14563703382663,
+                "right": 163.6252634001997,
+                "bottom": 479.99535231433157,
+                "nearDepth": 21.280471682831035,
+                "farDepth": 23.34177844673162
+              },
+              {
+                "rollId": "99f3d6d0-4ed2-4b25-9718-cd4116ef5afc",
+                "index": 1,
+                "left": 194.93765930494496,
+                "top": 419.60534046068324,
+                "right": 259.890631674437,
+                "bottom": 476.74354349389887,
+                "nearDepth": 21.850451931666672,
+                "farDepth": 23.723841843093986
+              }
+            ],
+            "view": {
+              "left": 0,
+              "top": 148,
+              "width": 390,
+              "height": 559
+            }
+          },
+          "tasks": [
+            {
+              "at": 2201.899999976158,
+              "ms": 225
+            }
+          ],
+          "film": {
+            "execution": "worker",
+            "bakeMs": 10.100000023841858,
+            "totalMs": 100.79999995231628
+          }
+        },
+        "activity": {
+          "tasks": [
+            {
+              "at": 5843.100000023842,
+              "ms": 72
+            }
+          ]
+        }
+      }
+    ],
+    "after-quick": [
+      {
+        "venue": "table",
+        "sample": 0,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": false,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 710.1000000238419,
+        "startupLongestTask": 292,
+        "firstVisibleMs": 386.5,
+        "launchToDiceMs": 1266.7000000476837,
+        "firstLongestTask": 201,
+        "builderOpenMs": 116.30000007152557,
+        "builderArtMs": 285.5,
+        "coldBuilderOpenMs": null,
+        "activityLongestTask": 215,
+        "activityFrameP95": 32.5,
+        "appearanceLongestTask": 168,
+        "previewBytes": 616220,
+        "builder": {
+          "painted": 2982.7000000476837,
+          "artReady": 3151.899999976158,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 2866.399999976158,
+            "queued": 27.5
+          },
+          "audit": {
+            "keys": [],
+            "renders": 0,
+            "contexts": 0,
+            "rendererActive": false,
+            "assets": 7,
+            "assetRequests": 7,
+            "watched": 0,
+            "queued": 0,
+            "scheduled": false
+          }
+        },
+        "coldBuilder": null,
+        "hot": {
+          "boot": [
+            {
+              "fn": "(program) :0",
+              "ms": 284.4
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 96.2
+            },
+            {
+              "fn": "stroke js/main.js:2702",
+              "ms": 37.7
+            },
+            {
+              "fn": "onFirstUse vendor/three.module.js:20271",
+              "ms": 36.9
+            },
+            {
+              "fn": "(anonymous) js/main.js:1",
+              "ms": 19.5
+            },
+            {
+              "fn": "texSubImage2D vendor/three.module.js:23670",
+              "ms": 18.7
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 11.1
+            },
+            {
+              "fn": "lobeFieldAt js/main.js:3023",
+              "ms": 10.8
+            },
+            {
+              "fn": "refitView js/main.js:18978",
+              "ms": 8.4
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 7.8
+            },
+            {
+              "fn": "initNet js/main.js:36367",
+              "ms": 6.8
+            },
+            {
+              "fn": "getContext vendor/three.module.js:28617",
+              "ms": 5.9
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 4.5
+            },
+            {
+              "fn": "paintGloss js/main.js:3090",
+              "ms": 4.4
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2620",
+              "ms": 4.3
+            },
+            {
+              "fn": "getExtension vendor/three.module.js:17299",
+              "ms": 4.1
+            },
+            {
+              "fn": "initGLContext vendor/three.module.js:28713",
+              "ms": 3.9
+            },
+            {
+              "fn": "(anonymous) js/playerresults.js:142",
+              "ms": 3.4
+            },
+            {
+              "fn": "paintCmd js/main.js:20069",
+              "ms": 3.2
+            },
+            {
+              "fn": "(anonymous) vendor/three.module.js:1",
+              "ms": 3.1
+            },
+            {
+              "fn": "setupRenderTarget vendor/three.module.js:25609",
+              "ms": 3.1
+            },
+            {
+              "fn": "positionDiceControl js/workspaces.js:100",
+              "ms": 3
+            },
+            {
+              "fn": "WebGLRenderer vendor/three.module.js:28461",
+              "ms": 2.8
+            },
+            {
+              "fn": "getElementById :0",
+              "ms": 2.6
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 2.6
+            }
+          ],
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1226.3
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 55.9
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 38.6
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 30.7
+            },
+            {
+              "fn": "ensureAudio js/main.js:4116",
+              "ms": 21.1
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 16
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4923",
+              "ms": 6.4
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 5.6
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.5
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 5.3
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 5.1
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 4.9
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4106",
+              "ms": 4.9
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 4.8
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 4.4
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 4.4
+            },
+            {
+              "fn": "requestAnimationFrame :0",
+              "ms": 3.9
+            },
+            {
+              "fn": "fillText :0",
+              "ms": 3.6
+            },
+            {
+              "fn": "copy vendor/three.module.js:3400",
+              "ms": 3.5
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5320",
+              "ms": 3.4
+            },
+            {
+              "fn": "renderRollResults js/main.js:9141",
+              "ms": 3.2
+            },
+            {
+              "fn": "renderObject vendor/three.module.js:22581",
+              "ms": 3.1
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 3
+            },
+            {
+              "fn": "bindTexture :0",
+              "ms": 2.9
+            },
+            {
+              "fn": "projectObject vendor/three.module.js:29679",
+              "ms": 2.7
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2451.6
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 159.9
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 26.2
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 17.7
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 14.5
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 9.7
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 9.5
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 8.5
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 8.3
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 7.9
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 7.6
+            },
+            {
+              "fn": "frontFace :0",
+              "ms": 6.9
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 6.9
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 6.3
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 6.2
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 6
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 5.4
+            },
+            {
+              "fn": "fillText :0",
+              "ms": 5
+            },
+            {
+              "fn": "render vendor/three.module.js:15699",
+              "ms": 4.7
+            },
+            {
+              "fn": "createBufferSource :0",
+              "ms": 4.5
+            },
+            {
+              "fn": "copyArray vendor/three.module.js:18319",
+              "ms": 4.5
+            },
+            {
+              "fn": "animate js/main.js:11863",
+              "ms": 4.1
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 4
+            },
+            {
+              "fn": "requestAnimationFrame :0",
+              "ms": 3.5
+            },
+            {
+              "fn": "uniformMatrix3fv :0",
+              "ms": 3.4
+            }
+          ],
+          "appearance": [
+            {
+              "fn": "(program) :0",
+              "ms": 429.4
+            },
+            {
+              "fn": "stroke js/main.js:2702",
+              "ms": 245.3
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 154.9
+            },
+            {
+              "fn": "stroke :0",
+              "ms": 70.5
+            },
+            {
+              "fn": "paintSiltCloth js/main.js:2742",
+              "ms": 69.3
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 56
+            },
+            {
+              "fn": "paintOakCloth js/main.js:2870",
+              "ms": 54.2
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 48.3
+            },
+            {
+              "fn": "toDataURL :0",
+              "ms": 44.6
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 35.6
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 32.1
+            },
+            {
+              "fn": "(anonymous) js/main.js:29551",
+              "ms": 24.9
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2684",
+              "ms": 20.3
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2620",
+              "ms": 15
+            },
+            {
+              "fn": "(anonymous) :1",
+              "ms": 12.6
+            },
+            {
+              "fn": "setFeltPreview js/main.js:29525",
+              "ms": 12.4
+            },
+            {
+              "fn": "(anonymous) js/main.js:33116",
+              "ms": 9.8
+            },
+            {
+              "fn": "(anonymous) js/main.js:2876",
+              "ms": 9.4
+            },
+            {
+              "fn": "moveTo :0",
+              "ms": 7.4
+            },
+            {
+              "fn": "feltWrapped js/main.js:2674",
+              "ms": 7.3
+            },
+            {
+              "fn": "showSettingsDest js/main.js:30294",
+              "ms": 7.3
+            },
+            {
+              "fn": "lineTo :0",
+              "ms": 5.8
+            },
+            {
+              "fn": "scale :0",
+              "ms": 4.6
+            },
+            {
+              "fn": "(anonymous) js/main.js:2782",
+              "ms": 4.3
+            },
+            {
+              "fn": "(anonymous) js/main.js:2725",
+              "ms": 3.5
+            }
+          ]
+        },
+        "boot": {
+          "ready": 710.1000000238419,
+          "tasks": [
+            {
+              "at": 119.29999995231628,
+              "ms": 248
+            },
+            {
+              "at": 367.2999999523163,
+              "ms": 292
+            }
+          ],
+          "paint": [
+            {
+              "name": "first-paint",
+              "at": 64
+            },
+            {
+              "name": "first-contentful-paint",
+              "at": 64
+            }
+          ]
+        },
+        "first": {
+          "input": {
+            "id": "",
+            "quick": "2d6",
+            "at": 880.2000000476837,
+            "queued": 33.200000047683716
+          },
+          "roll": {
+            "prepared": 1140.7000000476837,
+            "time": 0,
+            "visible": 1266.7000000476837,
+            "bounds": [
+              {
+                "rollId": "2f43e679-11dd-4bef-b428-f6bcb5d4d31f",
+                "index": 0,
+                "left": 106.01486847036823,
+                "top": 380.44006396032745,
+                "right": 165.26577069717698,
+                "bottom": 444.7625695553844,
+                "nearDepth": 20.111123964608147,
+                "farDepth": 22.349795200437303
+              },
+              {
+                "rollId": "2f43e679-11dd-4bef-b428-f6bcb5d4d31f",
+                "index": 1,
+                "left": 213.4627435547667,
+                "top": 370.1039328230062,
+                "right": 276.1240902882248,
+                "bottom": 432.23451382270304,
+                "nearDepth": 19.313821655079614,
+                "farDepth": 20.90109840054743
+              }
+            ],
+            "view": {
+              "left": 0,
+              "top": 148,
+              "width": 390,
+              "height": 511
+            }
+          },
+          "tasks": [
+            {
+              "at": 914.8999999761581,
+              "ms": 63
+            },
+            {
+              "at": 1062,
+              "ms": 201
+            }
+          ],
+          "film": {
+            "execution": "worker",
+            "bakeMs": 9.899999976158142,
+            "totalMs": 74
+          }
+        },
+        "activity": {
+          "tasks": [
+            {
+              "at": 4063.600000023842,
+              "ms": 215
+            },
+            {
+              "at": 4288.799999952316,
+              "ms": 76
+            }
+          ]
+        }
+      },
+      {
+        "venue": "table",
+        "sample": 1,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": false,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 646.7999999523163,
+        "startupLongestTask": 247,
+        "firstVisibleMs": 370.10000002384186,
+        "launchToDiceMs": 1138.2000000476837,
+        "firstLongestTask": 181,
+        "builderOpenMs": 113.79999995231628,
+        "builderArtMs": 281.39999997615814,
+        "coldBuilderOpenMs": null,
+        "activityLongestTask": 215,
+        "activityFrameP95": 31.600000023841858,
+        "appearanceLongestTask": 175,
+        "previewBytes": 616220,
+        "builder": {
+          "painted": 2670.2999999523163,
+          "artReady": 2837.899999976158,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 2556.5,
+            "queued": 25.799999952316284
+          },
+          "audit": {
+            "keys": [],
+            "renders": 0,
+            "contexts": 0,
+            "rendererActive": false,
+            "assets": 7,
+            "assetRequests": 7,
+            "watched": 0,
+            "queued": 0,
+            "scheduled": false
+          }
+        },
+        "coldBuilder": null,
+        "hot": {
+          "boot": [
+            {
+              "fn": "(program) :0",
+              "ms": 238.4
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 71.4
+            },
+            {
+              "fn": "onFirstUse vendor/three.module.js:20271",
+              "ms": 53.5
+            },
+            {
+              "fn": "stroke js/main.js:2702",
+              "ms": 26.1
+            },
+            {
+              "fn": "texSubImage2D vendor/three.module.js:23670",
+              "ms": 19.5
+            },
+            {
+              "fn": "(anonymous) js/main.js:1",
+              "ms": 17.8
+            },
+            {
+              "fn": "lobeFieldAt js/main.js:3023",
+              "ms": 17.5
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 9.6
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 6.9
+            },
+            {
+              "fn": "refitView js/main.js:18978",
+              "ms": 6.6
+            },
+            {
+              "fn": "getContext vendor/three.module.js:28617",
+              "ms": 6.3
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 4.7
+            },
+            {
+              "fn": "paintGloss js/main.js:3090",
+              "ms": 4.6
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 4.3
+            },
+            {
+              "fn": "getExtension vendor/three.module.js:17299",
+              "ms": 4.2
+            },
+            {
+              "fn": "createTune js/tune.js:1740",
+              "ms": 4.2
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 4.1
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2620",
+              "ms": 3.4
+            },
+            {
+              "fn": "paintCmd js/main.js:20069",
+              "ms": 3.2
+            },
+            {
+              "fn": "feltWrapped js/main.js:2674",
+              "ms": 3.1
+            },
+            {
+              "fn": "fetch :0",
+              "ms": 3
+            },
+            {
+              "fn": "(anonymous) js/playerresults.js:142",
+              "ms": 3
+            },
+            {
+              "fn": "reconcileFields js/tune.js:1656",
+              "ms": 2.9
+            },
+            {
+              "fn": "(anonymous) :1",
+              "ms": 2.6
+            },
+            {
+              "fn": "updateMassProperties vendor/cannon-es.js:3852",
+              "ms": 2.5
+            }
+          ],
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 996.8
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 79.4
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 49
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 22.7
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 13.9
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 6.2
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4106",
+              "ms": 5.3
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 5.1
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.1
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 5.1
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 4.8
+            },
+            {
+              "fn": "ensureAudio js/main.js:4116",
+              "ms": 4.2
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5320",
+              "ms": 4.1
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 3.8
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 3.8
+            },
+            {
+              "fn": "projectObject vendor/three.module.js:29679",
+              "ms": 3.8
+            },
+            {
+              "fn": "fillText :0",
+              "ms": 2.9
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 2.7
+            },
+            {
+              "fn": "setMaterial vendor/three.module.js:23426",
+              "ms": 2.7
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4923",
+              "ms": 2.6
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 2.5
+            },
+            {
+              "fn": "WebGLShadowMap.render vendor/three.module.js:22322",
+              "ms": 2.4
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 2.4
+            },
+            {
+              "fn": "replaceLightNums vendor/three.module.js:19573",
+              "ms": 2.3
+            },
+            {
+              "fn": "playRoll js/main.js:7281",
+              "ms": 2.3
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2701.1
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 161.4
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 15.2
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 14.7
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 14
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 12.6
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 11
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 9.2
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 8.9
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 8.6
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 7.5
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 7.2
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 7
+            },
+            {
+              "fn": "createBufferSource :0",
+              "ms": 6.9
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 6.4
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 5.4
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 5.2
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 4.6
+            },
+            {
+              "fn": "connect :0",
+              "ms": 4.6
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32796",
+              "ms": 4.5
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:7720",
+              "ms": 4.5
+            },
+            {
+              "fn": "animate js/main.js:11863",
+              "ms": 4.4
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 3.6
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 3.4
+            },
+            {
+              "fn": "WebGLShadowMap.render vendor/three.module.js:22322",
+              "ms": 3.3
+            }
+          ],
+          "appearance": [
+            {
+              "fn": "(program) :0",
+              "ms": 434.5
+            },
+            {
+              "fn": "stroke js/main.js:2702",
+              "ms": 238.3
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 160.7
+            },
+            {
+              "fn": "stroke :0",
+              "ms": 84
+            },
+            {
+              "fn": "paintSiltCloth js/main.js:2742",
+              "ms": 81.4
+            },
+            {
+              "fn": "paintOakCloth js/main.js:2870",
+              "ms": 52.4
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 48.3
+            },
+            {
+              "fn": "toDataURL :0",
+              "ms": 44.9
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 43.1
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 42.2
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 28.2
+            },
+            {
+              "fn": "(anonymous) js/main.js:29551",
+              "ms": 25.5
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2684",
+              "ms": 23.2
+            },
+            {
+              "fn": "(anonymous) :1",
+              "ms": 12.9
+            },
+            {
+              "fn": "setFeltPreview js/main.js:29525",
+              "ms": 12.3
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2620",
+              "ms": 10.2
+            },
+            {
+              "fn": "(anonymous) js/main.js:33116",
+              "ms": 9.7
+            },
+            {
+              "fn": "(anonymous) js/main.js:2876",
+              "ms": 8.6
+            },
+            {
+              "fn": "showSettingsDest js/main.js:30294",
+              "ms": 6.2
+            },
+            {
+              "fn": "feltWrapped js/main.js:2674",
+              "ms": 5
+            },
+            {
+              "fn": "(anonymous) js/main.js:2782",
+              "ms": 5
+            },
+            {
+              "fn": "beginPath :0",
+              "ms": 3.6
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 3.4
+            },
+            {
+              "fn": "scale :0",
+              "ms": 2.5
+            },
+            {
+              "fn": "moveTo :0",
+              "ms": 1.9
+            }
+          ]
+        },
+        "boot": {
+          "ready": 646.7999999523163,
+          "tasks": [
+            {
+              "at": 96.29999995231628,
+              "ms": 236
+            },
+            {
+              "at": 332.7000000476837,
+              "ms": 247
+            }
+          ],
+          "paint": [
+            {
+              "name": "first-paint",
+              "at": 68
+            },
+            {
+              "name": "first-contentful-paint",
+              "at": 68
+            }
+          ]
+        },
+        "first": {
+          "input": {
+            "id": "",
+            "quick": "2d6",
+            "at": 768.1000000238419,
+            "queued": 0.20000004768371582
+          },
+          "roll": {
+            "prepared": 1007.5,
+            "time": 0,
+            "visible": 1138.2000000476837,
+            "bounds": [
+              {
+                "rollId": "b6db2688-ec1d-4370-a8b0-b972777b5e2f",
+                "index": 0,
+                "left": 126.31333776193303,
+                "top": 377.917338802961,
+                "right": 181.74287042867948,
+                "bottom": 438.58503820190566,
+                "nearDepth": 19.80678345527592,
+                "farDepth": 21.93301741208412
+              },
+              {
+                "rollId": "b6db2688-ec1d-4370-a8b0-b972777b5e2f",
+                "index": 1,
+                "left": 193.7328532519814,
+                "top": 373.6660698145103,
+                "right": 256.87229754061667,
+                "bottom": 435.32600173002425,
+                "nearDepth": 19.1353412585164,
+                "farDepth": 21.297100898943604
+              }
+            ],
+            "view": {
+              "left": 0,
+              "top": 148,
+              "width": 390,
+              "height": 511
+            }
+          },
+          "tasks": [
+            {
+              "at": 803.1000000238419,
+              "ms": 53
+            },
+            {
+              "at": 939.1000000238419,
+              "ms": 181
+            }
+          ],
+          "film": {
+            "execution": "worker",
+            "bakeMs": 11.400000095367432,
+            "totalMs": 77.10000002384186
+          }
+        },
+        "activity": {
+          "tasks": [
+            {
+              "at": 3714.7999999523163,
+              "ms": 215
+            },
+            {
+              "at": 3959.399999976158,
+              "ms": 72
+            }
+          ]
+        }
+      },
+      {
+        "venue": "table",
+        "sample": 2,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": false,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 666.8999999761581,
+        "startupLongestTask": 269,
+        "firstVisibleMs": 421.6999999284744,
+        "launchToDiceMs": 1207.1999999284744,
+        "firstLongestTask": 234,
+        "builderOpenMs": 121.40000009536743,
+        "builderArtMs": 167.70000004768372,
+        "coldBuilderOpenMs": null,
+        "activityLongestTask": 212,
+        "activityFrameP95": 31.799999952316284,
+        "appearanceLongestTask": 141,
+        "previewBytes": 616220,
+        "builder": {
+          "painted": 2911.600000023842,
+          "artReady": 2957.899999976158,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 2790.1999999284744,
+            "queued": 26.399999976158142
+          },
+          "audit": {
+            "keys": [],
+            "renders": 0,
+            "contexts": 0,
+            "rendererActive": false,
+            "assets": 7,
+            "assetRequests": 7,
+            "watched": 0,
+            "queued": 0,
+            "scheduled": false
+          }
+        },
+        "coldBuilder": null,
+        "hot": {
+          "boot": [
+            {
+              "fn": "(program) :0",
+              "ms": 221.6
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 76.4
+            },
+            {
+              "fn": "onFirstUse vendor/three.module.js:20271",
+              "ms": 55.2
+            },
+            {
+              "fn": "stroke js/main.js:2702",
+              "ms": 31.3
+            },
+            {
+              "fn": "(anonymous) js/voices.js:1",
+              "ms": 23.4
+            },
+            {
+              "fn": "(anonymous) js/main.js:1",
+              "ms": 18.9
+            },
+            {
+              "fn": "texSubImage2D vendor/three.module.js:23670",
+              "ms": 18
+            },
+            {
+              "fn": "lobeFieldAt js/main.js:3023",
+              "ms": 12.9
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 11
+            },
+            {
+              "fn": "getContext vendor/three.module.js:28617",
+              "ms": 8.7
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 8
+            },
+            {
+              "fn": "refitView js/main.js:18978",
+              "ms": 7.9
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 5.7
+            },
+            {
+              "fn": "feltWrapped js/main.js:2674",
+              "ms": 5
+            },
+            {
+              "fn": "(anonymous) vendor/three.module.js:1",
+              "ms": 4.6
+            },
+            {
+              "fn": "getExtension vendor/three.module.js:17299",
+              "ms": 4.4
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 4.3
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 4.3
+            },
+            {
+              "fn": "addEventListener :0",
+              "ms": 3.3
+            },
+            {
+              "fn": "(anonymous) js/playerresults.js:142",
+              "ms": 3.3
+            },
+            {
+              "fn": "paintCmd js/main.js:20069",
+              "ms": 3.2
+            },
+            {
+              "fn": "Object3D vendor/three.module.js:7178",
+              "ms": 3.1
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2620",
+              "ms": 3.1
+            },
+            {
+              "fn": "positionDiceControl js/workspaces.js:100",
+              "ms": 3
+            },
+            {
+              "fn": "replaceLightNums vendor/three.module.js:19573",
+              "ms": 2.9
+            }
+          ],
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1189.2
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 68.9
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 54.4
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 23.1
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 9.2
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 6.9
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 6.2
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4106",
+              "ms": 5.6
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.4
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5320",
+              "ms": 5.1
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 4.3
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 4
+            },
+            {
+              "fn": "ensureAudio js/main.js:4116",
+              "ms": 3.8
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 3.7
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 3.7
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4923",
+              "ms": 3.5
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 3.2
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 3
+            },
+            {
+              "fn": "playRoll js/main.js:7281",
+              "ms": 2.9
+            },
+            {
+              "fn": "shaderSource :0",
+              "ms": 2.8
+            },
+            {
+              "fn": "setFromQuaternion vendor/three.module.js:7023",
+              "ms": 2.8
+            },
+            {
+              "fn": "(anonymous) js/main.js:7525",
+              "ms": 2.6
+            },
+            {
+              "fn": "renderObject vendor/three.module.js:29954",
+              "ms": 2.6
+            },
+            {
+              "fn": "buildBeveledGeometry js/dice.js:749",
+              "ms": 2.4
+            },
+            {
+              "fn": "WebGLShadowMap.render vendor/three.module.js:22322",
+              "ms": 2.3
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2439.2
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 155.8
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 16.2
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 15.2
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 14.3
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 11.6
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 9.6
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 9.2
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 8.2
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 6.7
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 6
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:7720",
+              "ms": 5.8
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19300",
+              "ms": 5.8
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.7
+            },
+            {
+              "fn": "arraysEqual vendor/three.module.js:18305",
+              "ms": 5.3
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 5.2
+            },
+            {
+              "fn": "flatten vendor/three.module.js:18270",
+              "ms": 4.8
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 4.6
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32796",
+              "ms": 4.5
+            },
+            {
+              "fn": "elementFromPoint :0",
+              "ms": 4.3
+            },
+            {
+              "fn": "createBufferSource :0",
+              "ms": 4.3
+            },
+            {
+              "fn": "WebGLShadowMap.render vendor/three.module.js:22322",
+              "ms": 4.1
+            },
+            {
+              "fn": "animate js/main.js:11863",
+              "ms": 4
+            },
+            {
+              "fn": "disable vendor/three.module.js:23102",
+              "ms": 3.8
+            },
+            {
+              "fn": "setValueV3f vendor/three.module.js:18400",
+              "ms": 3.7
+            }
+          ],
+          "appearance": [
+            {
+              "fn": "(program) :0",
+              "ms": 407.5
+            },
+            {
+              "fn": "stroke js/main.js:2702",
+              "ms": 245.8
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 157.1
+            },
+            {
+              "fn": "paintSiltCloth js/main.js:2742",
+              "ms": 67.9
+            },
+            {
+              "fn": "stroke :0",
+              "ms": 67.3
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 58.1
+            },
+            {
+              "fn": "paintOakCloth js/main.js:2870",
+              "ms": 53.8
+            },
+            {
+              "fn": "toDataURL :0",
+              "ms": 42.5
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 35.7
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 33.1
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 30.5
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2684",
+              "ms": 24.2
+            },
+            {
+              "fn": "(anonymous) js/main.js:29551",
+              "ms": 22.9
+            },
+            {
+              "fn": "(anonymous) :1",
+              "ms": 17.6
+            },
+            {
+              "fn": "setFeltPreview js/main.js:29525",
+              "ms": 13.4
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2620",
+              "ms": 10.7
+            },
+            {
+              "fn": "(anonymous) js/main.js:2876",
+              "ms": 8.8
+            },
+            {
+              "fn": "(anonymous) js/main.js:33116",
+              "ms": 8.7
+            },
+            {
+              "fn": "showSettingsDest js/main.js:30294",
+              "ms": 6.9
+            },
+            {
+              "fn": "lineTo :0",
+              "ms": 6.3
+            },
+            {
+              "fn": "moveTo :0",
+              "ms": 5.4
+            },
+            {
+              "fn": "scale :0",
+              "ms": 4.1
+            },
+            {
+              "fn": "(anonymous) js/main.js:2782",
+              "ms": 2.8
+            },
+            {
+              "fn": "bindTexture :0",
+              "ms": 2.5
+            },
+            {
+              "fn": "(anonymous) js/main.js:2725",
+              "ms": 2.4
+            }
+          ]
+        },
+        "boot": {
+          "ready": 666.8999999761581,
+          "tasks": [
+            {
+              "at": 101.19999992847443,
+              "ms": 269
+            },
+            {
+              "at": 370.7999999523163,
+              "ms": 247
+            }
+          ],
+          "paint": [
+            {
+              "name": "first-paint",
+              "at": 52
+            },
+            {
+              "name": "first-contentful-paint",
+              "at": 52
+            }
+          ]
+        },
+        "first": {
+          "input": {
+            "id": "",
+            "quick": "2d6",
+            "at": 785.5,
+            "queued": 0.7000000476837158
+          },
+          "roll": {
+            "prepared": 1037.1000000238419,
+            "time": 0,
+            "visible": 1207.1999999284744,
+            "bounds": [
+              {
+                "rollId": "2829caf9-416a-4f84-8863-153d127ad2cf",
+                "index": 0,
+                "left": 125.72806839072477,
+                "top": 392.7249471716285,
+                "right": 188.7354786956742,
+                "bottom": 447.13137172643144,
+                "nearDepth": 21.25249593763154,
+                "farDepth": 23.44968445339785
+              },
+              {
+                "rollId": "2829caf9-416a-4f84-8863-153d127ad2cf",
+                "index": 1,
+                "left": 225.20465750639724,
+                "top": 377.84658406274,
+                "right": 287.3511366495554,
+                "bottom": 448.01550361251753,
+                "nearDepth": 20.23539081098595,
+                "farDepth": 22.160139910269475
+              }
+            ],
+            "view": {
+              "left": 0,
+              "top": 148,
+              "width": 390,
+              "height": 511
+            }
+          },
+          "tasks": [
+            {
+              "at": 822.5,
+              "ms": 55
+            },
+            {
+              "at": 960.7999999523163,
+              "ms": 234
+            }
+          ],
+          "film": {
+            "execution": "worker",
+            "bakeMs": 11,
+            "totalMs": 78.30000007152557
+          }
+        },
+        "activity": {
+          "tasks": [
+            {
+              "at": 4095.399999976158,
+              "ms": 212
+            },
+            {
+              "at": 4318.100000023842,
+              "ms": 72
+            }
+          ]
+        }
+      }
+    ],
+    "after-builder": [
+      {
+        "venue": "table",
+        "sample": 0,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": true,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 741.8999999761581,
+        "startupLongestTask": 288,
+        "firstVisibleMs": 447.2999999523163,
+        "launchToDiceMs": 1807.2999999523163,
+        "firstLongestTask": 242,
+        "builderOpenMs": 104,
+        "builderArtMs": 154.30000007152557,
+        "coldBuilderOpenMs": 98.5,
+        "activityLongestTask": 226,
+        "activityFrameP95": 33.799999952316284,
+        "appearanceLongestTask": 140,
+        "previewBytes": 616220,
+        "builder": {
+          "painted": 3477.7999999523163,
+          "artReady": 3528.100000023842,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 3373.7999999523163,
+            "queued": 33.699999928474426
+          },
+          "audit": {
+            "keys": [],
+            "renders": 0,
+            "contexts": 0,
+            "rendererActive": false,
+            "assets": 7,
+            "assetRequests": 7,
+            "watched": 0,
+            "queued": 0,
+            "scheduled": false
+          }
+        },
+        "coldBuilder": {
+          "painted": 1012.6000000238419,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 914.1000000238419,
+            "queued": 31.90000009536743
+          }
+        },
+        "hot": {
+          "boot": [
+            {
+              "fn": "(program) :0",
+              "ms": 284.2
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 93.7
+            },
+            {
+              "fn": "onFirstUse vendor/three.module.js:20271",
+              "ms": 38.8
+            },
+            {
+              "fn": "stroke js/main.js:2702",
+              "ms": 35.5
+            },
+            {
+              "fn": "(anonymous) js/voices.js:1",
+              "ms": 20.2
+            },
+            {
+              "fn": "(anonymous) js/main.js:1",
+              "ms": 20
+            },
+            {
+              "fn": "texSubImage2D vendor/three.module.js:23670",
+              "ms": 16.8
+            },
+            {
+              "fn": "lobeFieldAt js/main.js:3023",
+              "ms": 14.7
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 9.8
+            },
+            {
+              "fn": "getContext vendor/three.module.js:28617",
+              "ms": 8.4
+            },
+            {
+              "fn": "refitView js/main.js:18978",
+              "ms": 8.1
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 7.1
+            },
+            {
+              "fn": "initNet js/main.js:36367",
+              "ms": 4.2
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 4.2
+            },
+            {
+              "fn": "initGLContext vendor/three.module.js:28713",
+              "ms": 3.9
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2620",
+              "ms": 3.8
+            },
+            {
+              "fn": "getExtension vendor/three.module.js:17299",
+              "ms": 3.7
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 3.7
+            },
+            {
+              "fn": "(anonymous) js/playerresults.js:142",
+              "ms": 3.5
+            },
+            {
+              "fn": "Object3D vendor/three.module.js:7178",
+              "ms": 3.3
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2684",
+              "ms": 3
+            },
+            {
+              "fn": "reconcileFields js/tune.js:1656",
+              "ms": 2.7
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 2.6
+            },
+            {
+              "fn": "getProgram vendor/three.module.js:29985",
+              "ms": 2.6
+            },
+            {
+              "fn": "(anonymous) vendor/three.module.js:1",
+              "ms": 2.5
+            }
+          ],
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1518.2
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 182.7
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 59.8
+            },
+            {
+              "fn": "ensureAudio js/main.js:4116",
+              "ms": 22.9
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 22.3
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 19
+            },
+            {
+              "fn": "renderTray js/main.js:19386",
+              "ms": 12.6
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 12.2
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 9.1
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 7.6
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4106",
+              "ms": 6.7
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5320",
+              "ms": 5.2
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 5.2
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 4.9
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 4.4
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 4.3
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 4
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 3.9
+            },
+            {
+              "fn": "updateWorldMatrix vendor/three.module.js:12493",
+              "ms": 3.8
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 3.8
+            },
+            {
+              "fn": "makeFaceTexture js/dice.js:216",
+              "ms": 3.6
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 3.3
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:12485",
+              "ms": 3.2
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 3
+            },
+            {
+              "fn": "focus :0",
+              "ms": 3
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2558.6
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 170.8
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 19.6
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 16.1
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 12.3
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 11.6
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 9.2
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 8.1
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 7.6
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 7.1
+            },
+            {
+              "fn": "elementFromPoint :0",
+              "ms": 6.9
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 6.2
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 4.8
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 4.6
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 4.3
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 4.2
+            },
+            {
+              "fn": "applyMatrix4 vendor/three.module.js:4130",
+              "ms": 3.9
+            },
+            {
+              "fn": "createBufferSource :0",
+              "ms": 3.9
+            },
+            {
+              "fn": "sort vendor/three.module.js:21396",
+              "ms": 3.9
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 3.7
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 3.6
+            },
+            {
+              "fn": "setValueV3f vendor/three.module.js:18400",
+              "ms": 3.6
+            },
+            {
+              "fn": "connect :0",
+              "ms": 3.6
+            },
+            {
+              "fn": "fillText :0",
+              "ms": 3.5
+            },
+            {
+              "fn": "WebGLShadowMap.render vendor/three.module.js:22322",
+              "ms": 3.4
+            }
+          ],
+          "appearance": [
+            {
+              "fn": "(program) :0",
+              "ms": 419
+            },
+            {
+              "fn": "stroke js/main.js:2702",
+              "ms": 242.8
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 158.7
+            },
+            {
+              "fn": "stroke :0",
+              "ms": 77.1
+            },
+            {
+              "fn": "paintOakCloth js/main.js:2870",
+              "ms": 61.1
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 51.1
+            },
+            {
+              "fn": "paintSiltCloth js/main.js:2742",
+              "ms": 49.9
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 42.1
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 40.7
+            },
+            {
+              "fn": "toDataURL :0",
+              "ms": 40
+            },
+            {
+              "fn": "(anonymous) js/main.js:29551",
+              "ms": 29.1
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 28.4
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2684",
+              "ms": 24.1
+            },
+            {
+              "fn": "(anonymous) :1",
+              "ms": 16.3
+            },
+            {
+              "fn": "setFeltPreview js/main.js:29525",
+              "ms": 14.9
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2620",
+              "ms": 13.2
+            },
+            {
+              "fn": "(anonymous) js/main.js:33116",
+              "ms": 8.7
+            },
+            {
+              "fn": "showSettingsDest js/main.js:30294",
+              "ms": 6.5
+            },
+            {
+              "fn": "(anonymous) js/main.js:2782",
+              "ms": 5.2
+            },
+            {
+              "fn": "feltWrapped js/main.js:2674",
+              "ms": 5
+            },
+            {
+              "fn": "(anonymous) js/main.js:2876",
+              "ms": 3
+            },
+            {
+              "fn": "lineTo :0",
+              "ms": 2.8
+            },
+            {
+              "fn": "scrollIntoView :0",
+              "ms": 2
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 2
+            },
+            {
+              "fn": "setBlending vendor/three.module.js:23281",
+              "ms": 2
+            }
+          ]
+        },
+        "boot": {
+          "ready": 741.8999999761581,
+          "tasks": [
+            {
+              "at": 136.10000002384186,
+              "ms": 268
+            },
+            {
+              "at": 404.2999999523163,
+              "ms": 288
+            }
+          ],
+          "paint": [
+            {
+              "name": "first-paint",
+              "at": 80
+            },
+            {
+              "name": "first-contentful-paint",
+              "at": 80
+            }
+          ]
+        },
+        "first": {
+          "input": {
+            "id": "tray-roll",
+            "at": 1360,
+            "queued": 20.200000047683716
+          },
+          "roll": {
+            "prepared": 1642.2999999523163,
+            "time": 0,
+            "visible": 1807.2999999523163,
+            "bounds": [
+              {
+                "rollId": "d010c052-1aaa-4781-8f20-54b4cbec6654",
+                "index": 0,
+                "left": 130.04544173241555,
+                "top": 410.4225418039368,
+                "right": 200.07429002269524,
+                "bottom": 481.3280225955858,
+                "nearDepth": 21.790423465124988,
+                "farDepth": 23.715148207957064
+              },
+              {
+                "rollId": "d010c052-1aaa-4781-8f20-54b4cbec6654",
+                "index": 1,
+                "left": 208.78777429192277,
+                "top": 407.04959252231123,
+                "right": 269.5751913643465,
+                "bottom": 464.80217861772564,
+                "nearDepth": 20.24136846300559,
+                "farDepth": 22.18360019073709
+              }
+            ],
+            "view": {
+              "left": 0,
+              "top": 148,
+              "width": 390,
+              "height": 559
+            }
+          },
+          "tasks": [
+            {
+              "at": 1386.1999999284744,
+              "ms": 53
+            },
+            {
+              "at": 1562.6999999284744,
+              "ms": 242
+            }
+          ],
+          "film": {
+            "execution": "worker",
+            "bakeMs": 11,
+            "totalMs": 107.10000002384186
+          }
+        },
+        "activity": {
+          "tasks": [
+            {
+              "at": 4569,
+              "ms": 226
+            },
+            {
+              "at": 4806.399999976158,
+              "ms": 77
+            }
+          ]
+        }
+      },
+      {
+        "venue": "table",
+        "sample": 1,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": true,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 690.6999999284744,
+        "startupLongestTask": 272,
+        "firstVisibleMs": 430.1999999284744,
+        "launchToDiceMs": 1678.5999999046326,
+        "firstLongestTask": 226,
+        "builderOpenMs": 97.79999995231628,
+        "builderArtMs": 143.79999995231628,
+        "coldBuilderOpenMs": 99.39999997615814,
+        "activityLongestTask": 222,
+        "activityFrameP95": 43.300000071525574,
+        "appearanceLongestTask": 137,
+        "previewBytes": 616220,
+        "builder": {
+          "painted": 3246.7999999523163,
+          "artReady": 3292.7999999523163,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 3149,
+            "queued": 24.800000071525574
+          },
+          "audit": {
+            "keys": [],
+            "renders": 0,
+            "contexts": 0,
+            "rendererActive": false,
+            "assets": 7,
+            "assetRequests": 7,
+            "watched": 0,
+            "queued": 0,
+            "scheduled": false
+          }
+        },
+        "coldBuilder": {
+          "painted": 898.7999999523163,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 799.3999999761581,
+            "queued": 0.20000004768371582
+          }
+        },
+        "hot": {
+          "boot": [
+            {
+              "fn": "(program) :0",
+              "ms": 242.4
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 73.4
+            },
+            {
+              "fn": "onFirstUse vendor/three.module.js:20271",
+              "ms": 54.9
+            },
+            {
+              "fn": "stroke js/main.js:2702",
+              "ms": 42.1
+            },
+            {
+              "fn": "(anonymous) js/voices.js:1",
+              "ms": 21
+            },
+            {
+              "fn": "texSubImage2D vendor/three.module.js:23670",
+              "ms": 18.4
+            },
+            {
+              "fn": "(anonymous) js/main.js:1",
+              "ms": 18.3
+            },
+            {
+              "fn": "lobeFieldAt js/main.js:3023",
+              "ms": 12.1
+            },
+            {
+              "fn": "refitView js/main.js:18978",
+              "ms": 11.1
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 10
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 7.6
+            },
+            {
+              "fn": "getContext vendor/three.module.js:28617",
+              "ms": 7.4
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 6.1
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 4.3
+            },
+            {
+              "fn": "getExtension vendor/three.module.js:17299",
+              "ms": 4.1
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 4.1
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2684",
+              "ms": 3.7
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2620",
+              "ms": 3.3
+            },
+            {
+              "fn": "(anonymous) js/playerresults.js:142",
+              "ms": 3.2
+            },
+            {
+              "fn": "(anonymous) vendor/three.module.js:1",
+              "ms": 3
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 2.8
+            },
+            {
+              "fn": "positionDiceControl js/workspaces.js:100",
+              "ms": 2.7
+            },
+            {
+              "fn": "paintCmd js/main.js:20069",
+              "ms": 2.6
+            },
+            {
+              "fn": "streamReady js/net.js:665",
+              "ms": 2.4
+            },
+            {
+              "fn": "paintGloss js/main.js:3090",
+              "ms": 2.3
+            }
+          ],
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1378.3
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 155.7
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 50.4
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 23.1
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 13.9
+            },
+            {
+              "fn": "renderTray js/main.js:19386",
+              "ms": 12.1
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 10.8
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 6.1
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4106",
+              "ms": 5.5
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.4
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 5.2
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 5.1
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5320",
+              "ms": 5.1
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 4.8
+            },
+            {
+              "fn": "projectObject vendor/three.module.js:29679",
+              "ms": 4.1
+            },
+            {
+              "fn": "renderObject vendor/three.module.js:29954",
+              "ms": 4.1
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 4
+            },
+            {
+              "fn": "ensureAudio js/main.js:4116",
+              "ms": 3.8
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 3.7
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:12485",
+              "ms": 3.6
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 3.5
+            },
+            {
+              "fn": "scrollIntoView :0",
+              "ms": 3.5
+            },
+            {
+              "fn": "focus :0",
+              "ms": 3.3
+            },
+            {
+              "fn": "playRoll js/main.js:7281",
+              "ms": 3.2
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 3.1
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 1971.8
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 164.1
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 15.7
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 11.5
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 11.2
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 8.5
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 7.7
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 6.1
+            },
+            {
+              "fn": "createBufferSource :0",
+              "ms": 5.9
+            },
+            {
+              "fn": "setFromRotationMatrix vendor/three.module.js:6890",
+              "ms": 5.5
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 5.4
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.2
+            },
+            {
+              "fn": "animate js/main.js:11863",
+              "ms": 5
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 4.8
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 4.4
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 4.4
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 4.1
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 4.1
+            },
+            {
+              "fn": "setValueM4 vendor/three.module.js:18525",
+              "ms": 4
+            },
+            {
+              "fn": "bindVertexArray :0",
+              "ms": 3.9
+            },
+            {
+              "fn": "bufferSubData :0",
+              "ms": 3.5
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 3.5
+            },
+            {
+              "fn": "(anonymous) js/main.js:33116",
+              "ms": 3.4
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:7720",
+              "ms": 3.4
+            },
+            {
+              "fn": "renderObjects vendor/three.module.js:29931",
+              "ms": 3.4
+            }
+          ],
+          "appearance": [
+            {
+              "fn": "(program) :0",
+              "ms": 423.4
+            },
+            {
+              "fn": "stroke js/main.js:2702",
+              "ms": 239.2
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 158.8
+            },
+            {
+              "fn": "stroke :0",
+              "ms": 77.5
+            },
+            {
+              "fn": "paintSiltCloth js/main.js:2742",
+              "ms": 65
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 56.2
+            },
+            {
+              "fn": "paintOakCloth js/main.js:2870",
+              "ms": 52.5
+            },
+            {
+              "fn": "toDataURL :0",
+              "ms": 41.6
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 36.1
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 30.1
+            },
+            {
+              "fn": "(anonymous) js/main.js:29551",
+              "ms": 25.9
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 25.6
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2684",
+              "ms": 20.2
+            },
+            {
+              "fn": "setFeltPreview js/main.js:29525",
+              "ms": 14.7
+            },
+            {
+              "fn": "(anonymous) :1",
+              "ms": 14.6
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2620",
+              "ms": 14.4
+            },
+            {
+              "fn": "(anonymous) js/main.js:2876",
+              "ms": 10.1
+            },
+            {
+              "fn": "(anonymous) js/main.js:33116",
+              "ms": 7.8
+            },
+            {
+              "fn": "moveTo :0",
+              "ms": 6.9
+            },
+            {
+              "fn": "lineTo :0",
+              "ms": 6.8
+            },
+            {
+              "fn": "showSettingsDest js/main.js:30294",
+              "ms": 6.1
+            },
+            {
+              "fn": "(anonymous) js/main.js:2725",
+              "ms": 3.6
+            },
+            {
+              "fn": "(anonymous) js/main.js:2782",
+              "ms": 3.5
+            },
+            {
+              "fn": "querySelectorAll :0",
+              "ms": 3.5
+            },
+            {
+              "fn": "feltWrapped js/main.js:2674",
+              "ms": 3.3
+            }
+          ]
+        },
+        "boot": {
+          "ready": 690.6999999284744,
+          "tasks": [
+            {
+              "at": 94.19999992847443,
+              "ms": 272
+            },
+            {
+              "at": 429.5,
+              "ms": 182
+            }
+          ],
+          "paint": [
+            {
+              "name": "first-paint",
+              "at": 64
+            },
+            {
+              "name": "first-contentful-paint",
+              "at": 64
+            }
+          ]
+        },
+        "first": {
+          "input": {
+            "id": "tray-roll",
+            "at": 1248.3999999761581,
+            "queued": 21.600000023841858
+          },
+          "roll": {
+            "prepared": 1517.7999999523163,
+            "time": 0,
+            "visible": 1678.5999999046326,
+            "bounds": [
+              {
+                "rollId": "f1a18297-8355-41e1-852e-e354ba051b80",
+                "index": 0,
+                "left": 111.83461798242027,
+                "top": 418.46769442439626,
+                "right": 179.2831480531895,
+                "bottom": 480.1204818730812,
+                "nearDepth": 21.82199417535226,
+                "farDepth": 23.74767227715632
+              },
+              {
+                "rollId": "f1a18297-8355-41e1-852e-e354ba051b80",
+                "index": 1,
+                "left": 208.095430630126,
+                "top": 415.9398933691008,
+                "right": 276.9696850066297,
+                "bottom": 477.4987904395681,
+                "nearDepth": 21.61480525397954,
+                "farDepth": 23.46543937112819
+              }
+            ],
+            "view": {
+              "left": 0,
+              "top": 148,
+              "width": 390,
+              "height": 559
+            }
+          },
+          "tasks": [
+            {
+              "at": 1273.8999999761581,
+              "ms": 56
+            },
+            {
+              "at": 1448.2999999523163,
+              "ms": 226
+            }
+          ],
+          "film": {
+            "execution": "worker",
+            "bakeMs": 10.100000023841858,
+            "totalMs": 105.29999995231628
+          }
+        },
+        "activity": {
+          "tasks": [
+            {
+              "at": 4019.6999999284744,
+              "ms": 222
+            },
+            {
+              "at": 4253.699999928474,
+              "ms": 73
+            }
+          ]
+        }
+      },
+      {
+        "venue": "table",
+        "sample": 2,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": true,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 653.8999999761581,
+        "startupLongestTask": 255,
+        "firstVisibleMs": 427.6999999284744,
+        "launchToDiceMs": 1644.2999999523163,
+        "firstLongestTask": 222,
+        "builderOpenMs": 98.29999995231628,
+        "builderArtMs": 148.20000004768372,
+        "coldBuilderOpenMs": 99.60000002384186,
+        "activityLongestTask": 218,
+        "activityFrameP95": 29.200000047683716,
+        "appearanceLongestTask": 138,
+        "previewBytes": 616220,
+        "builder": {
+          "painted": 3316.6999999284744,
+          "artReady": 3366.600000023842,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 3218.399999976158,
+            "queued": 38.799999952316284
+          },
+          "audit": {
+            "keys": [],
+            "renders": 0,
+            "contexts": 0,
+            "rendererActive": false,
+            "assets": 7,
+            "assetRequests": 7,
+            "watched": 0,
+            "queued": 0,
+            "scheduled": false
+          }
+        },
+        "coldBuilder": {
+          "painted": 869.3999999761581,
+          "input": {
+            "id": "phone-build-roll",
+            "at": 769.7999999523163,
+            "queued": 0.3999999761581421
+          }
+        },
+        "hot": {
+          "boot": [
+            {
+              "fn": "(program) :0",
+              "ms": 224
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 74.5
+            },
+            {
+              "fn": "onFirstUse vendor/three.module.js:20271",
+              "ms": 57.8
+            },
+            {
+              "fn": "stroke js/main.js:2702",
+              "ms": 37.6
+            },
+            {
+              "fn": "lobeFieldAt js/main.js:3023",
+              "ms": 17.6
+            },
+            {
+              "fn": "texSubImage2D vendor/three.module.js:23670",
+              "ms": 17.1
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 11.5
+            },
+            {
+              "fn": "(anonymous) js/main.js:1",
+              "ms": 8.5
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 8.4
+            },
+            {
+              "fn": "refitView js/main.js:18978",
+              "ms": 8.3
+            },
+            {
+              "fn": "getContext vendor/three.module.js:28617",
+              "ms": 7.4
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 5.2
+            },
+            {
+              "fn": "getExtension vendor/three.module.js:17299",
+              "ms": 5.2
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 4.5
+            },
+            {
+              "fn": "(anonymous) js/playerresults.js:142",
+              "ms": 4.2
+            },
+            {
+              "fn": "(anonymous) vendor/three.module.js:1",
+              "ms": 4.2
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 3.9
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2620",
+              "ms": 3.6
+            },
+            {
+              "fn": "WebGLProgram vendor/three.module.js:19803",
+              "ms": 3.6
+            },
+            {
+              "fn": "framingFor js/main.js:32461",
+              "ms": 3.4
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2684",
+              "ms": 3.1
+            },
+            {
+              "fn": "renderObject vendor/three.module.js:29954",
+              "ms": 2.9
+            },
+            {
+              "fn": "connect js/net.js:283",
+              "ms": 2.6
+            },
+            {
+              "fn": "setup vendor/three.module.js:21687",
+              "ms": 2.5
+            },
+            {
+              "fn": "createElement :0",
+              "ms": 2.5
+            }
+          ],
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1442.1
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 188.2
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 46.8
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 23.9
+            },
+            {
+              "fn": "renderTray js/main.js:19386",
+              "ms": 11.6
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 9.6
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 9
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 6
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.7
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5320",
+              "ms": 5.4
+            },
+            {
+              "fn": "ensureAudio js/main.js:4116",
+              "ms": 4.9
+            },
+            {
+              "fn": "animate js/main.js:11863",
+              "ms": 4.6
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 4.3
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 4.3
+            },
+            {
+              "fn": "setValueV3f vendor/three.module.js:18400",
+              "ms": 4.3
+            },
+            {
+              "fn": "contactKinematics js/main.js:5230",
+              "ms": 4.2
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 4.2
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 4
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 3.7
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4106",
+              "ms": 3.6
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 3.6
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 3.6
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 3.5
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 3.3
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 3.1
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 4403.3
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 165.2
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 38.5
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 16.7
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 16.3
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 15.5
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 13.3
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 13.2
+            },
+            {
+              "fn": "drawArrays :0",
+              "ms": 11.5
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 9.4
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 8.8
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 8.3
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 6.9
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 6.3
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32796",
+              "ms": 6.1
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 6.1
+            },
+            {
+              "fn": "requestAnimationFrame :0",
+              "ms": 6.1
+            },
+            {
+              "fn": "compose vendor/three.module.js:6571",
+              "ms": 5.9
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 5.8
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 5.5
+            },
+            {
+              "fn": "animate js/main.js:11863",
+              "ms": 5.4
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5
+            },
+            {
+              "fn": "createGain :0",
+              "ms": 4.8
+            },
+            {
+              "fn": "fillText :0",
+              "ms": 4.7
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 4.6
+            }
+          ],
+          "appearance": [
+            {
+              "fn": "(program) :0",
+              "ms": 441.3
+            },
+            {
+              "fn": "stroke js/main.js:2702",
+              "ms": 240.3
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 158.5
+            },
+            {
+              "fn": "stroke :0",
+              "ms": 82.4
+            },
+            {
+              "fn": "paintSiltCloth js/main.js:2742",
+              "ms": 61.3
+            },
+            {
+              "fn": "paintOakCloth js/main.js:2870",
+              "ms": 57.9
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 53.1
+            },
+            {
+              "fn": "toDataURL :0",
+              "ms": 42.6
+            },
+            {
+              "fn": "rng js/film-wire.js:40",
+              "ms": 40.6
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 26.6
+            },
+            {
+              "fn": "(anonymous) js/main.js:29551",
+              "ms": 25.9
+            },
+            {
+              "fn": "paintFeltCloth js/main.js:2684",
+              "ms": 25.5
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 24
+            },
+            {
+              "fn": "(anonymous) :1",
+              "ms": 15.6
+            },
+            {
+              "fn": "setFeltPreview js/main.js:29525",
+              "ms": 14
+            },
+            {
+              "fn": "feltTileCanvas js/main.js:2620",
+              "ms": 12.7
+            },
+            {
+              "fn": "(anonymous) js/main.js:2876",
+              "ms": 9
+            },
+            {
+              "fn": "(anonymous) js/main.js:33116",
+              "ms": 8.4
+            },
+            {
+              "fn": "showSettingsDest js/main.js:30294",
+              "ms": 6.4
+            },
+            {
+              "fn": "lineTo :0",
+              "ms": 6.1
+            },
+            {
+              "fn": "moveTo :0",
+              "ms": 5.8
+            },
+            {
+              "fn": "feltWrapped js/main.js:2674",
+              "ms": 3.9
+            },
+            {
+              "fn": "fill :0",
+              "ms": 3.5
+            },
+            {
+              "fn": "getClientRects :0",
+              "ms": 2.4
+            },
+            {
+              "fn": "(anonymous) :0",
+              "ms": 2.3
+            }
+          ]
+        },
+        "boot": {
+          "ready": 653.8999999761581,
+          "tasks": [
+            {
+              "at": 99.5,
+              "ms": 250
+            },
+            {
+              "at": 349.7999999523163,
+              "ms": 255
+            }
+          ],
+          "paint": [
+            {
+              "name": "first-paint",
+              "at": 52
+            },
+            {
+              "name": "first-contentful-paint",
+              "at": 52
+            }
+          ]
+        },
+        "first": {
+          "input": {
+            "id": "tray-roll",
+            "at": 1216.6000000238419,
+            "queued": 21.40000009536743
+          },
+          "roll": {
+            "prepared": 1488.3999999761581,
+            "time": 0,
+            "visible": 1644.2999999523163,
+            "bounds": [
+              {
+                "rollId": "15d92215-63e1-4870-afa9-df0662f9ca0d",
+                "index": 0,
+                "left": 133.2542824788963,
+                "top": 402.1361436305757,
+                "right": 196.04123787693408,
+                "bottom": 468.5156086972775,
+                "nearDepth": 20.130492377816438,
+                "farDepth": 22.136745315135823
+              },
+              {
+                "rollId": "15d92215-63e1-4870-afa9-df0662f9ca0d",
+                "index": 1,
+                "left": 192.8659194927659,
+                "top": 410.03765883606707,
+                "right": 253.11747872360166,
+                "bottom": 479.9353303223826,
+                "nearDepth": 21.379563800574317,
+                "farDepth": 23.572207853498487
+              }
+            ],
+            "view": {
+              "left": 0,
+              "top": 148,
+              "width": 390,
+              "height": 559
+            }
+          },
+          "tasks": [
+            {
+              "at": 1243.2999999523163,
+              "ms": 54
+            },
+            {
+              "at": 1419.6000000238419,
+              "ms": 222
+            }
+          ],
+          "film": {
+            "execution": "worker",
+            "bakeMs": 11.100000023841858,
+            "totalMs": 107.40000009536743
+          }
+        },
+        "activity": {
+          "tasks": [
+            {
+              "at": 6253.299999952316,
+              "ms": 218
+            },
+            {
+              "at": 6502.399999976158,
+              "ms": 71
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

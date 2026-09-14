@@ -8,6 +8,30 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## Dice portraits load on sight — 2026-09-13
+
+The hidden phone builder used to render every die in a set at startup.
+Built-in controls now load small portraits of the actual meshes only when
+visible, with shared requests/cache and no portrait WebGL context. Edited
+recipes and missing assets retain a live fallback, one requested type per
+frame. Pending images keep the control's geometry; rolling works before
+they arrive. History, shrouds and pool overrides retain their own sets.
+
+Three-run medians in CPU-throttled phone emulation improve from 1.50 to
+0.67 seconds for usable quick-roll controls, 2.04 to 1.21 seconds from
+navigation to visible quick-roll dice, and 2.44 to 1.68 seconds through
+Build a roll. Cold builder opening stays at about 99 ms. First-use meshes
+still cost main-thread work: the first 4d20 raises the longest activity task
+from 73 to 215 ms, so this is not a playback-speed claim. Physical-device
+measurements remain open.
+
+The [measurement and visual record](redesign/2026-09-13-dice-art/README.md)
+preserves samples, progressive-image timing, remaining costs and inspected
+DPR 3 phone/desktop captures. The standard palette fetches 41.7 KB across
+seven images on use; phone startup fetches none. Six focused browser checks
+and the asset/recipe unit check pass. The complete `npm test` command passes,
+including all 77 browser smoke scenarios and all 13 People scenarios.
+
 ## Mat previews leave the startup path — 2026-09-13
 
 Settings used to prepare twelve full-size mat textures and encode their PNGs
