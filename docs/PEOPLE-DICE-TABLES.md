@@ -2,7 +2,8 @@
 
 # People, personal dice, and persistent tables
 
-**R1 · implemented and verified locally; external release work open, 2026-09-13.** This is
+**R1 · implemented and verified locally, 2026-09-13; released, 2026-09-14.**
+Actual-player and physical-device observations remain open. This is
 the detailed plan for item (1) of the approved
 [experience redesign](EXPERIENCE-REDESIGN.md). The owner authorized autonomous
 execution of all three priorities with agents. The design and slice identifiers

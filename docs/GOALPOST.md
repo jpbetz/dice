@@ -20,11 +20,12 @@ libraries. Items 3–4 below now permit the account-data permissions and
 durable storage those features require. This revises the former “no access
 control, ever” and “server holds no durable state” mechanisms explicitly;
 equal participation in live play, private rolls, and safe capture remain
-promises. The direction is approved; local durable services and account/library
+promises. The direction is approved; durable services and account/library
 workflows, saved-home management, Friends/Invitations and opt-in Presence
-are implemented. Local release verification is recorded, with three unchanged
-legacy visual gates still failing. Production deployment, physical-device and
-newcomer observation are not established by the local browser proofs.*
+are implemented and released. The [current production release](redesign/2026-09-14-dice-loading-release/README.md)
+links its actual HTTPS checks and the original account, permission and restore
+proofs. Local release verification retains three unchanged legacy visual
+failures. Physical-device and newcomer observations remain unperformed.*
 
 ## What this is
 
@@ -130,8 +131,10 @@ What actually went wrong here, and the habit that would have caught it:
 7. **Don't quote a doc from memory, and don't trust a rule because it is
    old.** Read the line; check the date; ask if the thing it protected still
    exists.
-8. **Backward compatibility is an assumption too.** There is no production
-   use; "hard drop it" has been the owner's answer every time.
+8. **Backward compatibility is an assumption too.** At this file's
+   2026-09-02 writing, the recorded premise was "no production use"; "hard drop
+   it" had been the owner's answer. Recheck that premise for the change at hand;
+   it is not a current claim about who uses the deployed app.
 9. **Simplify until it embarrasses you, then stop.** "Why do you need a
    wall?" The answer was: you don't.
 10. **Write down what you are not covering** — the open mechanic families

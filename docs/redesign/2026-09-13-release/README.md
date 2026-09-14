@@ -95,10 +95,11 @@ Physical-phone, midrange-device and
 uncoached player results remain unobserved; use the
 [validation sheet](../../REDESIGN-VALIDATION-SHEET.md) for those sessions.
 Cloud provisioning and HTTPS/IAM/restore checks had not yet been performed at
-this frozen checkpoint. The [current staging/production evidence](../2026-09-13-staging.md)
-records their subsequent progress and the still-separate production traffic
-decision; the [enablement handoff](../../ACCOUNT-ENABLEMENT-CHECKLIST.md) gives
-the operating steps.
+this frozen checkpoint. The [staging evidence](../2026-09-13-staging.md)
+records their subsequent completion; the [original account release](../2026-09-14-production-release/README.md)
+and [current frontend release](../2026-09-14-dice-loading-release/README.md)
+record the completed production cutovers. The
+[enablement handoff](../../ACCOUNT-ENABLEMENT-CHECKLIST.md) gives the operating steps.
 
 
 ## Correction found by the final frozen run

@@ -69,7 +69,10 @@ texture, real UV range, material count, normals and vertex colors.
 The combined four-player desktop and 390×844 phone captures were inspected
 with persistent result seats, full-width phone dice, and the bottom roll tray.
 The table has a distinct edge and landmarks, quiet grain below the dice, and
-all four latest reads remain together. Grouped roll presentation remains open.
+all four latest reads remain together. The later
+[compact arrival presentation](PLAYER-RESULTS.md#rolls-arriving-together)
+shows the active roller and queued players' previous results. Simultaneous
+physical playback was not selected; the films remain sequential.
 
 ## Navigation and Stone (2026-09-13)
 
