@@ -44,7 +44,9 @@ a later source revision; its [explicit browser continuation](redesign/2026-09-14
 passes after a separately preserved screenshot-helper failure. The continuation
 uses warm home rechecks and does not replace the earlier cold-return assertions.
 The source database retains PITR, deletion protection and daily seven-day
-backups; the isolated verified clone has deletion protection and PITR disabled.
+backups. At verification time, the isolated clone had deletion protection
+enabled and PITR disabled. Its subsequent cleanup is tracked with the
+[restore evidence](redesign/2026-09-14-cloud-return/restore/README.md).
 
 Production database `dice-accounts`, namespace `production-v1`, the dedicated
 runtime and exact database role, deny-all client rules, PITR, deletion protection
