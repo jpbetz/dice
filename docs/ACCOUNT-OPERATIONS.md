@@ -36,31 +36,39 @@ pre-provisioning checkpoint; they are not the current staging state.
 
 ## Current staging checkpoint and remaining external work
 
-Staging now has a Standard Native database in `us-central1`, PITR/deletion
-protection, a daily seven-day backup schedule, a dedicated runtime identity
-with its sole database-equality data role, and released deny-all client rules.
-The initial paused revision served clean source `be43dda`; service and revision
-maxima both read back as 1. Anonymous data GET/create returned 403. Configuration preflight
-passes. Enabled revision `dice-accounts-stage-00002-5bn` serves the expected
-source SHA and reports available library/home/People/presence capabilities; the
-exact canonical origin/database/namespace were read back. Remote compressed
-delivery checks pass; actual HTTPS account journeys remain open.
+The actual source HTTPS return on `11dd1ef` passes all four preparation and
+five verification checkpoints across a same-image revision replacement.
+Runtime authorization passes 19/19 checks. The selected PITR clone restores the
+exact prepared library head, both homes and pending invitation while excluding
+a later source revision; its [explicit browser continuation](redesign/2026-09-14-cloud-return/restore/README.md)
+passes after a separately preserved screenshot-helper failure. The continuation
+uses warm home rechecks and does not replace the earlier cold-return assertions.
+The source database retains PITR, deletion protection and daily seven-day
+backups; the isolated verified clone has deletion protection and PITR disabled.
 
-Existing project/all-service and billing-wide alerts already cover staging with
-default billing-admin routing. The earlier instruction to extend an alert or
-supply a new budget/recipient before provisioning was an unnecessary blocker.
-No such update is required. Alerts are not hard caps, and delivery has not been
-tested. The [staging record](redesign/2026-09-13-staging.md) gives the observed
-thresholds, IAM scope and exact revision.
+Production database `dice-accounts`, namespace `production-v1`, the dedicated
+runtime and exact database role, deny-all client rules, PITR, deletion protection
+and daily seven-day backup are now prepared and read back. The enabled candidate
+and compatible paused revision use the same tested `11dd1ef` image and remain
+at 0% traffic. Existing `dice-00059-r9r` retains 100%, with service maximum 20;
+the prepared revisions have maximum 1. Anonymous production GET/create both
+refuse with 403. Production runtime and cross-database probes remain pending.
+The [checkpoint](redesign/2026-09-13-staging.md) records the exact revisions.
 
-Still open: actual HTTPS fixture/revision-return flows, runtime and zero-role
-IAM probes, a PITR clone/restore drill, and the production candidate/rollback
-and traffic decision. Physical-device and human observation are separate.
+Existing project/all-service and billing-wide alerts already cover these
+services with default billing-admin routing. No budget or recipient update was
+needed. Alerts are not hard caps, and delivery has not been tested.
+
+Still open: production runtime probes, release review and traffic decision,
+then canonical production HTTPS account and guest verification after any
+switch. Physical-device and uncoached human observation are separate. The
+isolated staging restore is not a public restore-security certification.
 The local release result remains [364/368 plus its separately verified wording
 fix and 20/20 tail cases](redesign/2026-09-13-release/README.md).
 
 [ACCOUNT-ENABLEMENT-CHECKLIST.md](ACCOUNT-ENABLEMENT-CHECKLIST.md) is the concise
-operator handoff: exact remaining external choices, commands and required proof.
+operator handoff. The procedures below remain reusable recipes; do not rerun
+resource creation against the already prepared databases or runtime identities.
 
 ## Configuration preflight
 

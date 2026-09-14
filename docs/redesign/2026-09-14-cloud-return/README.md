@@ -24,7 +24,8 @@ waits for the new document, exact destination and live join. Capture framing
 checks visible content while real pointer/keyboard actions retain hit testing.
 The earlier source and restore failures remain in the
 [staging checkpoint](../2026-09-13-staging.md); this source pass does not relabel
-them or complete the separate PITR browser continuation.
+them. The separate [PITR browser continuation](restore/README.md) subsequently
+completed; it preserves its own initial failure and warm-recheck boundary.
 
 ## What the script verifies
 
@@ -59,6 +60,7 @@ is shown. No credential journal, private canonical origin, provider ID or raw
 cloud log is included. The two home cards were captured while their monogram
 covers were visible; the inbox capture shows the Copper artwork.
 
-PITR content/continuation, production candidate and traffic, and physical-device
-and uncoached human observations remain separate evidence. The
+The [PITR content and continuation](restore/README.md) are separate evidence.
+Production candidates are now prepared off traffic; their runtime probes,
+traffic decision, and physical-device and uncoached human observations remain open. The
 [local full-suite record](../2026-09-13-release/README.md) is unchanged.

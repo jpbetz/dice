@@ -25,6 +25,9 @@ exact database-equality data role, canonical origin/namespace and maximum 1
 were read back. Deny-all client rules were compiled, released and read back
 against that database. The original staging runtime's separate cross-database
 denial proof is retained with the [19/19 authorization checks](../../2026-09-14-staging-permissions/README.md).
+The temporary restore service was removed after proof. The
+[checkpoint](../../2026-09-13-staging.md) tracks the remaining resource cleanup;
+the Ready configuration above describes verification time.
 
 At **01:16:59.080 UTC**, the operator recovered only generated fixture accounts
 and compared their data. The restored library head exactly matched the

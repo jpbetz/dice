@@ -29,23 +29,24 @@ not an account-service readiness check.
 
 ## Current status and remaining verification
 
-The staging database, dedicated runtime identity, conditional data role,
-deny-all client rules and paused service have been created and read back.
-Account mode is enabled on `dice-accounts-stage-00002-5bn`; HTTPS status reports
-available library/home/People/presence capabilities. Existing billing alerts
-already cover staging; no budget or recipient update is needed. Cloud fixture recovery,
-runtime authorization probes and restore proof remain open; production traffic
-has not changed. Details and limits are in the [checkpoint](redesign/2026-09-13-staging.md).
+Staging source `11dd1ef` passes 4/4 prepare and 5/5 HTTPS return checkpoints;
+19/19 runtime authorization checks pass. The selected PITR point and
+[separate restored continuation](redesign/2026-09-14-cloud-return/restore/README.md)
+are verified, preserving the initial screenshot failure and earlier cold-return
+assertions. Production's enabled and compatible paused candidates are now
+prepared at 0% traffic; runtime production probes and the release decision remain
+open. Existing billing alerts cover the services; no budget/recipient update was
+needed. Details and limits are in the [checkpoint](redesign/2026-09-13-staging.md).
 
-| Item | Observed status or proposed action | Remaining verification |
+| Item | Observed status | Remaining verification |
 | --- | --- | --- |
-| Cost coverage | Existing three identical $5 monthly project/all-service alerts and the $33 billing-wide alert cover staging, with default billing-admin email routing. No alert update is required. | Alert delivery is untested; alerts are notifications, not hard caps. |
-| Staging | Service `dice-accounts-stage`, Standard Native database `dice-accounts-stage` in `us-central1`, and runtime account `dice-accounts-stage-runtime` now exist. Reviewed namespace is `stage-v1`. | Enabled revision and exact origin/database/namespace read back; actual HTTPS fixtures/revision return remain open. |
-| Production | Existing service `dice`; Standard Native database `dice-accounts`; namespace `production-v1`; runtime account `dice-accounts-runtime`; use the existing `run.app` origin unless an intentional domain migration is reviewed. | Record the exact immutable project/database/namespace/origin/runtime mapping. |
-| Data permissions | Staging has its sole database-equality `roles/datastore.user` binding, no broader inherited grant found, and released deny-all client rules. Anonymous GET/create both refused with 403. Production provisioning remains proposed. | Runtime transaction on the intended database and zero-role/unrelated-database refusal probes remain open. |
-| Backup | Staging daily seven-day backup schedule, PITR and deletion protection are enabled; no developer file import. | Isolated staging restore preserves library revisions, memberships and invitation state; record restore point and missing later writes. |
-| Live room placement | Staging service and paused revision maxima both read back as 1. Production still needs its reviewed candidate configuration. | Recheck the enabled revision and serving traffic. Existing SSE requests can still overlap a rollout. |
-| Candidate and rollback | Same reviewed release code in staging and production; record one compatible maintenance-capable rollback revision. | Full release gate, clean checkout, correct source manifest, health SHA and recorded compatible schema/config mapping. |
+| Cost coverage | Existing project/all-service and billing-wide alerts cover these services, with default billing-admin routing. | Alert delivery is untested; alerts are notifications, not hard caps. |
+| Staging | Source `11dd1ef` is Ready on `00006-p2z`; exact mapping, actual HTTPS return, retained data and guest/shared play pass. | Physical-device and uncoached human observation remain separate. |
+| Production | Database `dice-accounts`, namespace `production-v1` and runtime `dice-accounts-runtime` are prepared with the existing canonical origin. | Runtime positive/cross-database probes and release review; canonical account/guest flows after any traffic switch. |
+| Data permissions | Staging has 19/19 actual runtime checks. Production exact database role and deny-all rules are read back; anonymous GET/create return 403. | Actual attached production runtime transaction and unrelated-database refusal probes remain pending. |
+| Backup | Source staging and production have PITR, deletion protection and daily seven-day backups. Selected staging PITR clone/content/continuation are verified; no developer file import. | Public recovery must reconcile later security decisions; an isolated fixture restore does not certify that procedure. |
+| Live room placement | Staging maxima are 1. Production keeps its prior serving revision at 100% and service maximum 20; new candidate revisions have maximum 1 and 0% traffic. | Set the service cap separately at release, then route explicitly; existing SSE requests can still overlap rollout. |
+| Candidate and rollback | Enabled and compatible paused revisions use the tested immutable `11dd1ef` image; mapping is recorded and both remain off traffic. | Finish runtime probes and release review, then make the traffic decision. Off-traffic readiness is not canonical cookie proof. |
 | Recovery security | Keep restored copies isolated until later revocations, key rotations, blocks/removals, cancellations and memberships are reconciled. | The app has no global restore-time invalidation/reconciliation command. A public restore must not proceed without this additional reviewed procedure. |
 
 First-release identity is the explicitly saved recovery key and HttpOnly

@@ -34,9 +34,10 @@ including all 20 account/return cases. [Staging](redesign/2026-09-13-staging.md)
 is enabled on `11dd1ef`; 19/19 runtime permission checks pass and isolated PITR
 reads confirm the prepared library head, both homes and pending invitation.
 The [complete source HTTPS return](redesign/2026-09-14-cloud-return/README.md)
-passes on `00006-p2z`. The restored-app continuation, production release, actual newcomer
-and physical-device observations, and the separately characterized legacy
-visual-gate debt remain open. Local fixture accounts,
+passes on `00006-p2z`; the [isolated restored continuation](redesign/2026-09-14-cloud-return/restore/README.md)
+also passes. Production candidates are prepared off traffic; runtime production
+probes, release, actual newcomer and physical-device observations, and the
+separately characterized legacy visual-gate debt remain open. Local fixture accounts,
 process restart and phone emulation do not establish those observations or
 production durability. [Operating plan](ACCOUNT-OPERATIONS.md).
 
@@ -326,9 +327,9 @@ The original sequence below keeps the approved slice identifiers. R1-A through
 R1-E have implementations and focused proofs; R1-F's scripted success walk
 and current Help are complete. Local release verification and the advancing
 [staging checkpoint](redesign/2026-09-13-staging.md) are recorded. The complete
-source HTTPS return passes; the restored-app continuation, production release
-and actual observation remain
-separate from local implementation and service-restart tests.
+source HTTPS return and isolated restored continuation pass. Production candidates
+are prepared off traffic; production runtime probes, release and actual
+observation remain separate from local implementation and service-restart tests.
 
 | Slice | Deliverable | Completion evidence |
 | --- | --- | --- |
@@ -414,8 +415,9 @@ roll; do not infer discoverability from click count or scripted completion.
 
 ## 11. What is still a design task
 
-**Next:** complete the separately recorded restored-app continuation, prepare the
-production release artifacts, and record actual-device and newcomer observations.
+**Next:** finish production runtime probes and release review for the prepared
+candidates, and record actual-device and newcomer observations. Production
+traffic has not changed.
 The composed success walk and current Help have passed their local proofs.
 The destination, practice, setup,
 saved-home and People workflows have implementations and inspected browser

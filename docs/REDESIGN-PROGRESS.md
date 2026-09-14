@@ -8,7 +8,8 @@ and queueing the next ready task. This is an execution ledger, not a new
 priority order. R1–R3's local implementation and scripted verification are
 complete. Staging is enabled on `11dd1ef`, with 19/19 runtime permission
 checks, selected PITR content and the complete source HTTPS return verified.
-The restored-app continuation, production release and actual player/device
+The isolated restored-app continuation also passes. Production candidates are
+prepared off traffic; production runtime probes, release and actual player/device
 observation remain open. The three characterized legacy visual gates remain recorded failures.
 
 ## Current work
@@ -21,7 +22,7 @@ observation remain open. The three characterized legacy visual gates remain reco
 | Shared surface and phone | Three reproducibly baked tables, full-width phone tray, persistent visible results and compact queued arrivals are implemented. Model size follows the shared table. The round physical envelope and full support/golden proofs are integrated as `e67da2c`/`04aafbf`; all six composed geometry proofs pass, with cost and collision profiling retained. The camera correction is integrated: 60 seeded painted-hull cases have no re-exits or settled crops, and all 36 baseline complete films agree. Long history reserves current results, with an inspected usable short-window layout. |
 | Shared film ordering | Ordinary rolls and kept-die rethrows use the worker with complete ordered events. `f4e20c0` orders size changes between films, including held reveals and clear. Warm tower changes now use the ordered FIFO (`cf0e48a`); six composed ordering/readiness cases pass. Required-model failure now offers explicit authored results without fabricated physics. The tainted physical world resumes only after the core is ready and a deliberate authoritative table clear; ordered warm/cold/reveal/keep checks pass. |
 | Lightweight play | Compressed delivery, face-material consolidation, idle sleep, Battery saver and independent Instant results are implemented. Optional scenery and the model parser now load on demand (`70d623b`, `530982b`); all eight composed loading/cancel/failure cases pass. Towers and silent reconstruction retain the inline solver. |
-| Operations and release | Current staging revision `dice-accounts-stage-00006-p2z` is Ready on `11dd1ef`, with maximum 1 and mapping read back. The same-image source return passes 4/4 preparation and 5/5 verification checkpoints; [five actual captures](redesign/2026-09-14-cloud-return/README.md) are inspected. Actual IAM checks pass 19/19; the isolated PITR clone and selected content reads pass. Restore revision `00002-lsh` remains on `3ed9db1`: identity/library and cold-home assertions passed before a capture-helper failure; separate continuation is pending. [Checkpoint and limits](redesign/2026-09-13-staging.md). HTTPS delivery checks pass; existing alerts cover staging. Production traffic is unchanged. Local frozen verification remains 364/368 plus 20/20 tail, with the wording correction separately verified and three pre-existing visual gates open. |
+| Operations and release | Current staging revision `dice-accounts-stage-00006-p2z` is Ready on `11dd1ef`, with maximum 1 and mapping read back. The same-image source return passes 4/4 preparation and 5/5 verification checkpoints; [five actual captures](redesign/2026-09-14-cloud-return/README.md) are inspected. Actual IAM checks pass 19/19; the isolated PITR clone and selected content reads pass. Restore revision `00002-lsh` on `3ed9db1` passed identity/library and cold-home assertions before a capture-helper failure; its [separate continuation](redesign/2026-09-14-cloud-return/restore/README.md) passes all three remaining checkpoints with the original journal preserved. Enabled and compatible paused production candidates using the tested image are prepared at 0%; production runtime probes remain pending. [Checkpoint and limits](redesign/2026-09-13-staging.md). HTTPS delivery checks pass; existing alerts cover staging. Production traffic is unchanged. Local frozen verification remains 364/368 plus 20/20 tail, with the wording correction separately verified and three pre-existing visual gates open. |
 
 The root's integration checkout is `/tmp/dice-redesign-integration` on
 `codex/redesign-integration`. Agents use isolated worktrees so reviews and
@@ -47,11 +48,12 @@ a measured criterion can support it. Remaining main-module extraction requires
 an actual unused feature boundary; further file splitting alone saves no bytes.
 
 Staging permission, delivery and PITR content checks are recorded separately
-from local tests. The source HTTPS walkthrough is complete. The restored-app
-continuation, physical phone/midrange-device observations, newcomer observation
-and production deployment remain open. Prepare and verify their concrete artifacts before the production traffic decision. Never treat a
-disabled optional service or fake-store test
-as completion of persistent table homes.
+from local tests. The source HTTPS walkthrough and isolated restored continuation
+are complete. Production candidates are prepared off traffic; runtime production
+probes, physical phone/midrange-device observations, newcomer observation and
+the production traffic decision remain open. Review the concrete release
+artifacts before changing traffic. A disabled optional service or fake-store
+test alone does not complete persistent table homes.
 
 ## Validation baseline
 

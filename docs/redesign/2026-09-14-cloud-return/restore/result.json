@@ -36,7 +36,10 @@
     "rulesReleaseMatches": true,
     "rulesSourceExact": true,
     "directClientRules": "deny-all; compiled, released and read back",
-    "runtimeRole": "roles/datastore.user; exact database-resource equality"
+    "runtimeRole": "roles/datastore.user; exact database-resource equality",
+    "configurationScope": "Verification-time readback; resource cleanup is recorded separately.",
+    "rulesAttachmentMatchesClone": true,
+    "rulesReleaseTargetsClone": true
   },
   "pointComparison": {
     "checkedAt": "2026-09-14T01:16:59.080Z",

@@ -14,8 +14,9 @@ following his instruction to conserve the rolling area's space. Joe then
 authorized autonomous implementation through all three priorities, with agents
 and reviewed increments. Local implementation and scripted verification are
 complete. Staging has verified runtime permissions, PITR content and a complete
-source HTTPS return. The restored-app continuation, production release and
-physical-device/player observation remain open. See the [staging checkpoint](redesign/2026-09-13-staging.md).
+source HTTPS return. The isolated restored-app continuation also passes;
+production candidates are prepared off traffic. Production runtime probes, the
+release decision and physical-device/player observation remain open. See the [staging checkpoint](redesign/2026-09-13-staging.md).
 [REDESIGN-PROGRESS.md](REDESIGN-PROGRESS.md) records execution. The detailed R1 design is in
 [PEOPLE-DICE-TABLES.md](PEOPLE-DICE-TABLES.md).
 
@@ -119,8 +120,10 @@ composed code, including guest captures during delayed account startup.
 Local release verification is recorded with its exact failures and targeted
 correction. Current staging source `11dd1ef` is Ready on `00006-p2z`; 19/19
 actual runtime permission checks, isolated PITR content comparison and the
-complete source HTTPS return pass. The restored-app continuation, production
-release and actual player/device observation remain open in the [staging checkpoint](redesign/2026-09-13-staging.md).
+complete source HTTPS return pass. The [isolated restored continuation](redesign/2026-09-14-cloud-return/restore/README.md)
+also passes, retaining its earlier capture failure. Enabled and compatible
+paused production candidates are prepared off traffic; runtime production
+probes, release and actual player/device observation remain open in the [staging checkpoint](redesign/2026-09-13-staging.md).
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable
