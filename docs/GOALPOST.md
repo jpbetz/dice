@@ -22,9 +22,9 @@ control, ever” and “server holds no durable state” mechanisms explicitly;
 equal participation in live play, private rolls, and safe capture remain
 promises. The direction is approved; local durable services and account/library
 workflows, saved-home management, Friends/Invitations and opt-in Presence
-are implemented. Composed release validation remains in progress; production
-deployment, physical-device and newcomer observation are not established by
-the local browser proofs.*
+are implemented. Local release verification is recorded, with three unchanged
+legacy visual gates still failing. Production deployment, physical-device and
+newcomer observation are not established by the local browser proofs.*
 
 ## What this is
 

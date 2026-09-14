@@ -52,15 +52,42 @@ and repeated identity/Brotli/gzip requests, with identical decoded bytes.
 six-entry-asset subset on an owned ephemeral production-mode server, not the
 whole application graph, deployed traffic, page-load time or a battery result.
 
-The frozen `8a577e5` complete scenario run finished **364/368** in 1,840.3s,
-with a recorded child exit **1**, signal **null**. Its exact failures are
+The frozen `8a577e5` full command completed in 1,840.3s with **364/368**
+scenarios passing and a recorded child exit **1**, signal **null**. Its exact failures are
 `felt-gloss`, `terminology`, `venue-life`, and `venue-frame`; the
 [complete output](full-8a577e5.txt) is retained. All eight corrections from the
 preceding preflight passed in full order, including 42.6s for the unchanged
 support matrix and 114.0s for the pointer camera matrix. These are test durations,
 not application performance claims. The additional account/UI/scripted-return
-tail is being run independently because the package script stops on the scenario
-failure. The post-freeze terminology correction is recorded below.
+tail completed independently because the package script stops on the scenario
+failure. All **20/20** tail cases passed, and all six commands exited **0** with
+signal **null**. The preceding library/home protocol suites also passed **4/4**.
+The post-freeze terminology correction is recorded below.
+
+| Final command | Result | Retained output |
+| --- | --- | --- |
+| Unit | Exit 0, 85.9s | [Unit](unit-8a577e5.txt) |
+| Fuzz | Exit 0, 1.6s | [Fuzz](fuzz-8a577e5.txt) |
+| Full | 364/368 scenarios, exit 1 | [Full](full-8a577e5.txt) |
+| Account UI | 5/5, exit 0 | [Account](account-ui-8a577e5.txt) |
+| Home connection | 1/1, exit 0 | [Connection](home-connection-ui-8a577e5.txt) |
+| Social browser | 1/1, exit 0 | [Social](account-social-browser-8a577e5.txt) |
+| Saved-home UI | 4/4, exit 0 | [Homes](home-ui-8a577e5.txt) |
+| People UI | 7/7, exit 0 | [People](people-ui-8a577e5.txt) |
+| Joined R1 | 2/2, exit 0, 240.2s | [Return walk](r1-success-walk-8a577e5.txt) |
+
+The [exact command record](commands-8a577e5.json) contains all nine child exits;
+all signals are null. The overall runner exits 1 because the full gate failed.
+The earlier unexplained 143 did not recur. The joined walk's two cases took
+234.3s and 5.9s; they include real restart, clean-browser recovery, preserved
+loading-time guest captures and exact shared films after separate Accept/Join.
+All timings here describe this local test run.
+
+Local implementation and its scripted verification are complete. This is not an
+all-green release certification: the three characterized legacy visual gates
+remain open. Application/test/tool files after the one-sentence Help correction
+are identical to the tested `2283a24` follow-up; later commits only update docs.
+No whole-sweep pass is inferred from that targeted correction.
 
 Physical-phone, midrange-device and
 uncoached player results remain unobserved; use the
@@ -82,5 +109,5 @@ The paired `draft-bench,terminology` run passes **2/2** after this correction
 Help captures pass; the selected-topic driver waits for the visible consequence
 of its pointer action before measuring. The [current 390px Help
 view](help-phone-current.png) was inspected. This is the only application change
-after the frozen candidate: one Help sentence. Its results will be reported as a
-targeted follow-up, not retroactively counted as a passing frozen full case.
+after the frozen candidate: one Help sentence. The targeted follow-up is
+recorded separately; the frozen full count remains 364/368.

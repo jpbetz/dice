@@ -7546,3 +7546,20 @@ cases pass. The real wheel driver
 [multiple-profile](redesign/2026-09-13-task-focus/rack-multiple.png) and
 [restored single-profile](redesign/2026-09-13-task-focus/rack-restored.png)
 captures were inspected.
+
+
+## Experience redesign: local implementation record (2026-09-13)
+
+The three approved priorities have local implementations: [people, personal dice
+and persistent tables](PEOPLE-DICE-TABLES.md); [three complete table
+compositions](TABLE-COMPOSITIONS.md), upright group results and the phone roll
+surface; and [lightweight play](EXPERIENCE-REDESIGN.md), including compressed
+delivery, face atlases, ordered worker films, optional loading, idle sleep,
+Battery saver and Instant results. The joined recovery/guest/invitation loop and
+current Help are verified through actual input.
+
+[Final local verification](redesign/2026-09-13-release/README.md): unit/fuzz pass,
+364/368 frozen scenarios and 20/20 account/return cases. One wording failure is
+corrected and passes its separate paired check; three pre-existing legacy
+visual gates remain red. This records committed implementation, with cloud
+provisioning/restore/deployment and actual player/device observation still open.

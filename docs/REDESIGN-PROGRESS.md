@@ -5,7 +5,9 @@
 **2026-09-13:** the owner authorized autonomous work through the complete
 [plan of record](EXPERIENCE-REDESIGN.md), using agents, reviewing each result,
 and queueing the next ready task. This is an execution ledger, not a new
-priority order. R1, R2 and R3 remain open until their composed proofs pass.
+priority order. R1–R3's local implementation and scripted verification are
+complete; external staging/restore and actual player/device observation remain
+open. The three characterized legacy visual gates remain recorded failures.
 
 ## Current work
 
@@ -17,7 +19,7 @@ priority order. R1, R2 and R3 remain open until their composed proofs pass.
 | Shared surface and phone | Three reproducibly baked tables, full-width phone tray, persistent visible results and compact queued arrivals are implemented. Model size follows the shared table. The round physical envelope and full support/golden proofs are integrated as `e67da2c`/`04aafbf`; all six composed geometry proofs pass, with cost and collision profiling retained. The camera correction is integrated: 60 seeded painted-hull cases have no re-exits or settled crops, and all 36 baseline complete films agree. Long history reserves current results, with an inspected usable short-window layout. |
 | Shared film ordering | Ordinary rolls and kept-die rethrows use the worker with complete ordered events. `f4e20c0` orders size changes between films, including held reveals and clear. Warm tower changes now use the ordered FIFO (`cf0e48a`); six composed ordering/readiness cases pass. Required-model failure now offers explicit authored results without fabricated physics. The tainted physical world resumes only after the core is ready and a deliberate authoritative table clear; ordered warm/cold/reveal/keep checks pass. |
 | Lightweight play | Compressed delivery, face-material consolidation, idle sleep, Battery saver and independent Instant results are implemented. Optional scenery and the model parser now load on demand (`70d623b`, `530982b`); all eight composed loading/cancel/failure cases pass. Towers and silent reconstruction retain the inline solver. |
-| Operations and release | File/Firestore adapters, configuration preflight, safe maintenance pause and a concrete account operating plan are implemented. No cloud resources or production traffic changed. Complete composed release checks, then verify the external staging/restore/deployment work described in ACCOUNT-OPERATIONS.md. |
+| Operations and release | File/Firestore adapters, configuration preflight, safe maintenance pause and a concrete account operating plan are implemented. No cloud resources or production traffic changed. Final verification is recorded: unit/fuzz pass; frozen full 364/368 plus 20/20 account/return cases, with the additional wording failure corrected separately. Execute the external staging/restore/deployment work in ACCOUNT-OPERATIONS.md; three pre-existing visual gates remain open. |
 
 The root's integration checkout is `/tmp/dice-redesign-integration` on
 `codex/redesign-integration`. Agents use isolated worktrees so reviews and
@@ -28,8 +30,10 @@ cherry-picks are explicit and another ongoing session's edits survive.
 The tower failure and camera slices are reviewed and integrated. The complete
 guest/recovered return loop and current Help pass on the composed app, including
 unfinished private-turn preservation and loading-time guest captures. The final
-full sweep must reconcile superseded fixtures with current behavior;
-a passing old geometry proxy is not a substitute for supported, visible dice.
+full sweep has reconciled superseded fixtures with current behavior. The
+[final evidence](redesign/2026-09-13-release/README.md) retains its exact failures
+and the separately verified wording correction; supported, visible dice are
+proved directly.
 The three baseline legacy venue/material failures retain their gates and
 are characterized separately from redesign regressions.
 
@@ -234,9 +238,13 @@ full unit/fuzz rerun and both leading protocol-browser suites passed. All eleven
 failures are classified in the [retained release
 record](redesign/2026-09-13-release/README.md): eight corrections and three
 unchanged legacy venue/material failures. Their gates remain intact.
-The final frozen candidate is `8a577e5`; unit/fuzz, the entire browser sweep and
-its normally skipped account/UI tail are now running with independent exit-code
-and signal recording. Cloud traffic and the owner's live preview remain untouched.
+The final frozen candidate `8a577e5` passes unit/fuzz and finishes **364/368**
+scenarios. All **20/20** account/UI/return tail cases pass independently, with
+exit 0 and no signals; the full command exits 1 for its four recorded failures.
+The additional terminology failure is corrected as `094c318`, with paired
+2/2 predecessor/current checks and inspected current Help. The three baseline
+visual failures retain their gates. Cloud traffic and the owner's live preview
+remain untouched.
 
 
 ## Joined return and reviewed release corrections
@@ -283,3 +291,22 @@ plan, not completed evidence or a new performance threshold. A final read-only
 scope audit found no missing local R1-A–E feature; simultaneous physical films,
 automatic presentation selection and a legacy beta-scenery rebuild remain
 explicitly outside the current implementation scope.
+
+
+## Local closeout and next external action
+
+All reviewed application changes are committed on main. The final source is the
+frozen `8a577e5` plus the one-sentence Help correction; the correction's application,
+test and tool files match its independently tested branch. The
+[release record](redesign/2026-09-13-release/README.md) preserves all command exits,
+the full output, account/return logs, follow-up proof and inspected moments. The
+last R1 run completes all recovery/invitation checkpoints and the held account-load
+case, with matching complete films for recovered members and the unchanged guest.
+
+The next concrete external action is the proposed staging service/database/runtime
+identity and backup/PITR setup in [ACCOUNT-ENABLEMENT-CHECKLIST.md](ACCOUNT-ENABLEMENT-CHECKLIST.md).
+Billing ownership and budget still need to be recorded before provisioning;
+no cloud resources, permissions or traffic changed during this repository work. Public restore still requires its
+reviewed security-reconciliation procedure; physical-device and uncoached player
+rows remain blank in the observation sheet. The owner’s untracked handoff backup
+and live port 8123 were preserved throughout this local work.

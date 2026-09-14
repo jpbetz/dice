@@ -1,0 +1,11 @@
+Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0
+
+✔ clean independent browsers recover an offline home invitation, keep an open turn through acceptance, and join deliberately (973.222902ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 975.068574

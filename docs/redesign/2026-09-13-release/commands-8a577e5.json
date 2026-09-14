@@ -1,0 +1,115 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "artifactNote": "Exit codes and signals are unchanged. Log paths refer to the retained files beside this report; cwd records the actual frozen execution checkout.",
+  "sha": "8a577e5aecb89ed9b34d13582cb857ca9937f090",
+  "cwd": "/tmp/dice-redesign-final-check",
+  "started": "2026-09-13T23:26:19.494Z",
+  "commands": [
+    {
+      "name": "unit",
+      "command": [
+        "npm",
+        "run",
+        "-s",
+        "test:unit"
+      ],
+      "code": 0,
+      "signal": null,
+      "seconds": 85.868,
+      "log": "unit-8a577e5.txt"
+    },
+    {
+      "name": "fuzz",
+      "command": [
+        "npm",
+        "run",
+        "-s",
+        "test:fuzz"
+      ],
+      "code": 0,
+      "signal": null,
+      "seconds": 1.591,
+      "log": "fuzz-8a577e5.txt"
+    },
+    {
+      "name": "full",
+      "command": [
+        "npm",
+        "run",
+        "-s",
+        "test:e2e:full"
+      ],
+      "code": 1,
+      "signal": null,
+      "seconds": 1840.264,
+      "log": "full-8a577e5.txt"
+    },
+    {
+      "name": "account-ui",
+      "command": [
+        "/home/jpbetz/.nvm/versions/node/v24.14.1/bin/node",
+        "tests/account-ui.test.mjs"
+      ],
+      "code": 0,
+      "signal": null,
+      "seconds": 31.379,
+      "log": "account-ui-8a577e5.txt"
+    },
+    {
+      "name": "home-connection-ui",
+      "command": [
+        "/home/jpbetz/.nvm/versions/node/v24.14.1/bin/node",
+        "tests/home-connection-ui.test.mjs"
+      ],
+      "code": 0,
+      "signal": null,
+      "seconds": 3.787,
+      "log": "home-connection-ui-8a577e5.txt"
+    },
+    {
+      "name": "account-social-browser",
+      "command": [
+        "/home/jpbetz/.nvm/versions/node/v24.14.1/bin/node",
+        "tests/account-social-browser.test.mjs"
+      ],
+      "code": 0,
+      "signal": null,
+      "seconds": 1,
+      "log": "account-social-browser-8a577e5.txt"
+    },
+    {
+      "name": "home-ui",
+      "command": [
+        "/home/jpbetz/.nvm/versions/node/v24.14.1/bin/node",
+        "tests/home-ui.test.mjs"
+      ],
+      "code": 0,
+      "signal": null,
+      "seconds": 35.332,
+      "log": "home-ui-8a577e5.txt"
+    },
+    {
+      "name": "people-ui",
+      "command": [
+        "/home/jpbetz/.nvm/versions/node/v24.14.1/bin/node",
+        "tests/people-ui.test.mjs"
+      ],
+      "code": 0,
+      "signal": null,
+      "seconds": 48.18,
+      "log": "people-ui-8a577e5.txt"
+    },
+    {
+      "name": "r1-success-walk",
+      "command": [
+        "/home/jpbetz/.nvm/versions/node/v24.14.1/bin/node",
+        "tests/r1-success-walk.test.mjs"
+      ],
+      "code": 0,
+      "signal": null,
+      "seconds": 240.194,
+      "log": "r1-success-walk-8a577e5.txt"
+    }
+  ],
+  "finished": "2026-09-14T00:04:27.093Z"
+}

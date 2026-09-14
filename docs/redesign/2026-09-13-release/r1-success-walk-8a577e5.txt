@@ -1,0 +1,23 @@
+Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0
+
+  fresh guest renamed without reseating
+  practice stays local and chosen dice become the future default
+  useful roll saved and named table applied
+  copied guest link joins the same named table with matching values
+  returning Soul Deal guest joins and rolls with all kept profile content intact
+  optional account keeps local library privately and explicitly saves public home
+  all clients closed before real room process restart
+  clean phone recovers the exact private kit and cold home without an old client repush
+  People sends a home invitation while the fixture recipient has no open client
+  Accept preserves the private turn and seat; separate Join reaches the same home
+  recovered players and unchanged Soul Deal guest share matching results after return
+✔ R1 joined success walk uses visible controls from guest dice to recovered table invitation (234280.358043ms)
+✔ R1 optional account startup keeps play and guest captures before restoring the private namespace (5884.485966ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 240167.074708

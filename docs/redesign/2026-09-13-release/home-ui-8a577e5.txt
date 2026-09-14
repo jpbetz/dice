@@ -1,0 +1,14 @@
+Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0
+
+✔ actual app saves a public home without library sync; explicit clean-browser join restores after restart and never repushes old client setup (9939.87357ms)
+✔ actual home UI retains failed captures and exact retries, resolves a competing saved version, and leaves membership without leaving play (9368.021214ms)
+✔ actual home UI refuses HTTP before durable capture and clears held old-account details after a real shared-cookie change (7989.375766ms)
+✔ closing during a real save does not reopen management, and a new-account mount waits for the old busy action (8006.644008ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35306.318821

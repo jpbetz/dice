@@ -1,0 +1,13 @@
+Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0
+
+notation fuzz  seed=0x5eed1ce  specs=5000 junk=5000 p3=404
+  1317295 parses  ok=12101 invalid=3576 incomplete=576 threw=0
+  slowest parse 0.87ms on "2d6+5d8+1d10x ! cinematic held # | WZqq'ul+6d)vyZ\"=w"
+  P4 dialect spot checks: 9
+  P1 skipped 56 generated specs that were not in contract
+
+KNOWN live defects (absorbed; see KNOWN in this file):
+  D3-incomplete-with-no-valid-extension: 59 cases
+    D3 examples: "2d1000", "d10000", "d100100", "2d100100", "/roll 2d61", "1d20V# a \\| x"
+
+all properties hold (known defects absorbed)

@@ -1,0 +1,210 @@
+Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0
+
+✔ strict JSON records and paths preserve values without hidden coercion (1.03702ms)
+✔ transactions persist together, isolate returned objects and serialize competing writers (10.366256ms)
+✔ callback abort, read-after-write and leaked transaction cannot commit partial changes (0.742724ms)
+✔ separate processes recover the committed person and home without a repushing client (40.718302ms)
+✔ live lock refuses another writer; killed process recovers only explicitly (45.308478ms)
+✔ failed rename preserves both records and permits a later confirmed retry (2.874635ms)
+✔ killing a process between temporary-file flush and rename cannot partially replace a transaction (63.132515ms)
+✔ post-rename directory flush failure reports uncertainty and requires reopening (1.863656ms)
+✔ malformed and future state refuse without replacing bytes or restoring an older backup (2.240941ms)
+✔ bounds and private location checks fail before taking or replacing data (1.080147ms)
+✔ local transaction byte budget matches the portable REST encoding budget (27.87764ms)
+✔ close waits for accepted transactions and refuses new work (1.154254ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 200.915913
+✔ Firestore transaction binds every read and atomic write to the same token (16.692928ms)
+✔ a changed read-only authorization dependency aborts and reruns before writing (1.622152ms)
+✔ missing-document creation is a tracked dependency and causes a fresh retry (0.685784ms)
+✔ callback failure and illegal read-after-write roll back without partial mutation (0.877739ms)
+✔ contention retries are bounded and expose no provider body (0.649078ms)
+✔ lost commit response reports uncertainty without replaying the callback (0.458259ms)
+✔ fetch, token acquisition, response body and commit timeouts are bounded (59.767566ms)
+✔ bad remote state and denied requests fail closed without raw error disclosure (0.475781ms)
+✔ metadata supplier caches, refreshes, shares inflight requests and uses the fixed endpoint (15.872793ms)
+✔ invalid paths/configuration and oversized transactions never send a commit (26.689567ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 126.462164
+✔ private library survives a process restart and is recovered by a clean cookie jar (146.613979ms)
+✔ clean browsers recover one person after a real process restart; no library uploads or room authority (150.276344ms)
+✔ origin/CSRF refusal, revocation, logout and key rotation preserve account boundaries (82.636132ms)
+✔ off, malformed configuration and unavailable storage keep explicit new guest tables available (221.264696ms)
+✔ production cookies carry the host-only Secure prefix (70.869719ms)
+✔ expired credentials recover into a new session while deliberate registration and quotas stay enforced (11.487695ms)
+✔ cookie-changing requests serialize real Set-Cookie responses across competing recovery and logout (80.16156ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 765.499335
+✔ recovery key uses Web Crypto and is accepted without a weak fallback (0.942905ms)
+✔ recoverable account transport never persists keys or publishes profiles and awaits namespace reset (9.853503ms)
+✔ offline sign-out freezes the namespace and retries revocation before restoring any account on reload (0.685625ms)
+✔ an old session response cannot restore identity after a newer sign-out (0.306315ms)
+✔ a refused namespace reset retains the previous identity and exposes no adopted person (0.606504ms)
+✔ static-host 404 and a configured outage are distinct and do not register or poll (0.255221ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15.398894
+✔ actual house catalogue favorites and portable profile/pool skins roundtrip without a second slug or notation limit (10.587808ms)
+✔ strict document boundary refuses unknown/private fields and future schemas; merge preserves divergent p1 profiles (0.469994ms)
+✔ separate cookie clients racing one base retain both immutable versions and enforce exact retry payloads (42.931551ms)
+✔ explicit ancestor cleanup frees capacity, protects originals and keeps exact operation receipts (145.167189ms)
+✔ local stale-tab edits, uncertain envelopes and newer in-flight edits survive reconciliation and acknowledgements (1.448475ms)
+✔ history byte capacity refuses before count capacity and leaves the last acknowledged head intact (385.462334ms)
+✔ ordinary offline typing coalesces unsubmitted text while explicit stale alternatives remain at capacity (169.258851ms)
+✔ a definitive refused payload keeps its original and permits a new explicit choice; uncertain saves cannot be abandoned as refused (0.546748ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 758.180485
+✔ same-address conversion captures only shared preparation and concurrent clean guests restore it after process restart (142.975008ms)
+✔ independent account sessions retain stale home saves and reconcile explicitly without changing the live table (77.489357ms)
+✔ a configured store outage refuses cold addresses while fresh guest creation and occupied rooms stay usable (63.325064ms)
+✔ new named homes recover at reserved addresses; leaving preserves an unclaimable closed reservation (127.745762ms)
+✔ distinct authenticated members using the same operation ID retain separate versions and correct venue covers (139.965112ms)
+✔ malformed new-table requests refuse without 500s and reserved missing addresses never become solo replacements (63.76909ms)
+✔ home version capacity refuses without losing a captured version or replacing the current head (184.479004ms)
+✔ corrupt saved setup remains on disk and cold joins never hydrate an empty replacement (110.720313ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 912.853054
+all 682 notation tests pass
+all 27 rollspec tests pass
+all 73 odds tests pass
+all 115 sum-read tests pass
+all 36 redaction tests pass
+meanings: 38 checks ok
+seed.test.mjs: 16 tests ok
+all 56 profiles tests pass
+all 97 portable tests pass
+static-cache.test: 60 passed
+log-level.test: ok
+log-injection.test: ok
+presence: 11/11 passed
+all 16 tables tests pass
+subtables: 15/15 passed
+turns: 26 passed
+stability: 18 assertions run
+all 24 schema tests pass
+identity: 20/20 passed
+voices: 26 assertions run
+all 6 felt-id tests pass (12 felts: emerald, crimson, midnight, slate, walnut, obsidian, ocean, plum, sand, silt, taproom, linen)
+felt-image: 6 tests passed
+all 58 places tests pass
+26/26 places-wire checks passed
+demo: 13 tests passed
+tune: declared felts.house-b.texture: must be a path under `models/` (the one asset directory the server serves), with no `..` and no percent-escape; the default stands
+tune: declared felts.house-c.texture: must be a path under `models/` (the one asset directory the server serves), with no `..` and no percent-escape; the default stands
+tune: 56 tests passed
+catalogue: 9 tests passed
+felts-catalogue: 7 tests passed
+devui: 61 tests passed
+tunables-serve.test: 29 passed
+all 41 yaml tests pass
+dice-apply.test: 22 passed
+dev-write.test: 29 passed
+firstplay: passed
+✔ no consent publishes neither active rack nor alternate profiles (0.616405ms)
+✔ selection is table-specific and new profiles never inherit it (0.265963ms)
+✔ a selected active profile publishes live edits and only allowed fields (0.122242ms)
+✔ malformed or future consent fails closed and bounded tables expire privately (4.335887ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7.860708
+rollhistory: retention, privacy, continued turns, and bounded creation passed
+film-worker: passed
+film-merge: passed
+round-table: 782784 spawn hull/jitter clearances passed
+library-session: durable handoff, refused sharing boundary, namespaces, and stale edits passed
+✔ coalesces invalidations, stops at rest and never accumulates idle wall time (0.812485ms)
+✔ hidden tabs cancel scheduled work, coalesce hidden mutations and resume once (0.111833ms)
+✔ a mutation during drawing schedules the required follow-up frame (0.11395ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4.176665
+✔ contact codes are distinct cryptographic sharing inputs and never recovery credentials (1.114316ms)
+✔ blocked account names survive inbox archive and restart, with private GET and expected-person boundaries (150.299569ms)
+✔ blocked names page at 32 and verify their relationship within the 128-record transaction budget (103.261903ms)
+✔ an offline friend receives a named durable invitation after restart and accepts membership without joining (142.88963ms)
+✔ recipient isolation, expected person, CSRF and closed request schemas protect social actions (72.472495ms)
+✔ separate authenticated devices race response/cancel once; lost receipts never restore removed friends or left memberships (82.761108ms)
+✔ blocking and removal invalidate pending invitations, rotation invalidates old codes, and archive preserves other inboxes (81.497533ms)
+✔ social corruption refuses rather than emptying a directory, while new guest play still works during outage (211.091396ms)
+✔ independent sender cancellation and recipient acceptance have one outcome and never duplicate membership (73.917716ms)
+✔ injected time proves expiry and daily quota without sleeping; expired actions cannot grant friendship (64.312636ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 986.215225
+✔ online status and saved-home location require separate explicit choices, membership and a current seat (95.23322ms)
+✔ revoking devices, logout and key rotation invalidate markers immediately without waiting for expiry (79.452538ms)
+✔ register/recover withdraw the previous marker atomically even when the changed cookie arrives but the body is lost (76.62096ms)
+✔ injected time expires signals, bounds renewal writes, and keeps corrupt markers out of projections (9.283174ms)
+✔ heartbeat is off by default, stops when hidden/closed, and reports failures as unknown (0.201529ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 262.952262
+home-session: exact retries, retained conflicts, private export and fixed-owner/view completions passed
+✔ shared runtime/preflight schema validates modes and exact origins without echoing configuration values (1.056636ms)
+✔ preflight CLI creates no local store and reports only sanitized readiness (39.232598ms)
+✔ paused mode protects both converted and reserved homes without credentials; live guest turns continue and resuming restores data (198.957591ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 241.104468
+social-journal: exact intents, protected uncertain writes, attempt/owner boundaries, explicit cleanup and capacity passed
+social-session: durable exact requests, authoritative membership, opt-in/offline opt-out and fixed-owner completions passed

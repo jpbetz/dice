@@ -2,7 +2,7 @@
 
 # People, personal dice, and persistent tables
 
-**R1 · implemented; composed validation in progress, 2026-09-13.** This is
+**R1 · implemented and verified locally; external release work open, 2026-09-13.** This is
 the detailed plan for item (1) of the approved
 [experience redesign](EXPERIENCE-REDESIGN.md). The owner authorized autonomous
 execution of all three priorities with agents. The design and slice identifiers
@@ -29,8 +29,10 @@ protocol](PRIVATE-LIBRARY-PROTOCOL.md), [home workflow](SAVED-HOME-PROTOCOL.md),
 [social workflow](SOCIAL-SERVICE-PROTOCOL.md), and
 [workspace map](WORKSPACES.md).
 
-Remaining: composed release validation and external deployment/restore work,
-plus actual newcomer and physical-device observations. Local fixture accounts,
+[Local release verification](redesign/2026-09-13-release/README.md) is recorded,
+including all 20 account/return cases. Remaining: external deployment/restore
+work, actual newcomer and physical-device observations, and the separately
+characterized legacy visual-gate debt. Local fixture accounts,
 process restart and phone emulation do not establish those observations or
 production durability. [Operating plan](ACCOUNT-OPERATIONS.md).
 
@@ -318,8 +320,8 @@ one another. No durable friend or home roster goes into public room payloads.
 
 The original sequence below keeps the approved slice identifiers. R1-A through
 R1-E have implementations and focused proofs; R1-F's scripted success walk
-and current Help are complete. Final release verification and actual
-observation are tracked in the execution ledger. External deployment
+and current Help are complete. Local release verification is recorded; external
+enablement and actual observation are tracked in the execution ledger. External deployment
 is separate from local implementation and service-restart tests.
 
 | Slice | Deliverable | Completion evidence |
@@ -406,8 +408,8 @@ roll; do not infer discoverability from click count or scripted completion.
 
 ## 11. What is still a design task
 
-**Next:** finish release reconciliation, then record actual-device and
-newcomer observations and execute the external enablement handoff. The
+**Next:** execute the external staging/restore/enablement handoff and record
+actual-device and newcomer observations. The
 composed success walk and current Help have passed their local proofs. The destination, practice, setup,
 saved-home and People workflows have implementations and inspected browser
 captures, including 390px phone emulation.

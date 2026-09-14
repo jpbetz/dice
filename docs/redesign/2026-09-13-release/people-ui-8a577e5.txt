@@ -1,0 +1,17 @@
+Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0
+
+✔ actual controls deliver an offline invitation across restart; acceptance preserves a private turn and Join is separate (10922.609184ms)
+✔ presence expires without a fetch; a held pre-block reply cannot restore a removed signal (6049.459863ms)
+✔ home location is a separate opt-in, unavailable location reads are Unknown, and invitation expiry removes Accept (6102.674744ms)
+✔ real IDB keeps uncertain exact actions across reload and refuses HTTP before a device commit (8324.866068ms)
+✔ a held inbox response cannot expose previous-account names after a real same-origin cookie replacement (8060.06464ms)
+✔ Decline, Cancel and Archive use the visible invitation controls and retain the other inbox copy (5170.844358ms)
+✔ service-absent guest People remains an optional task beside a working phone table (3518.874814ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 48154.998822

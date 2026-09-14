@@ -10,9 +10,10 @@ On 2026-09-13 he asked to focus on one area and start implementing: the
 now delivers direct name editing and a visual dice collection. The
 [compact table-controls follow-up](SHIPPED.md#compact-table-controls-and-setup-2026-09-13)
 fits that entry into the name row and reuses the table label for shared setup,
-following his instruction to conserve the rolling area's space. The larger
-release remains in progress. Joe then authorized autonomous implementation
-through all three priorities, with agents and reviewed increments;
+following his instruction to conserve the rolling area's space. Joe then
+authorized autonomous implementation through all three priorities, with agents
+and reviewed increments. Local implementation and scripted verification are
+complete; cloud enablement and physical-device/player observation remain open.
 [REDESIGN-PROGRESS.md](REDESIGN-PROGRESS.md) records execution. The detailed R1 design is in
 [PEOPLE-DICE-TABLES.md](PEOPLE-DICE-TABLES.md).
 
@@ -36,7 +37,7 @@ for its content and keep the return to the same live table clear.
 
 | Priority | Investment | First useful release | What follows |
 | --- | --- | --- | --- |
-| **1 — implementation started** | **People, personal dice, and persistent tables.** Three clear destinations: Tables, My dice & rolls, People. Direct identity editing, a visual dice collection, visible table setup, familiar first rolls, and an optional recoverable identity. | Direct name editing, a usable dice gallery with favorites and practice, named table controls, and Quick dice with explicitly chosen starter kits. | Durable table homes, identity recovery, synchronized libraries, friends, presence, and an invitation inbox. |
+| **1 — implemented locally** | **People, personal dice, and persistent tables.** Three clear destinations: Tables, My dice & rolls, People. Direct identity editing, a visual dice collection, visible table setup, familiar first rolls, and an optional recoverable identity. | Direct name editing, a usable dice gallery with favorites and practice, named table controls, and Quick dice with explicitly chosen starter kits. | Durable table homes, identity recovery, synchronized libraries, friends, presence, and an invitation inbox. |
 | **2 — three compositions implemented** | **The whole shared playing surface.** Compose recognizable tables and places for people; keep names and each player's latest visible result readable together. | One excellent multiplayer composition and a phone layout with a full-width table, bottom roll tray, and sheets for dice, people, and history. | Explore three complete designs: a worn tavern table with brass inlays, an illustrated navigation table, and a carved stone circle. Explore concurrent or grouped roll presentation. |
 | **3 — measured engineering track** | **Lightweight play.** Reduce delivery, simulation, and rendering costs while retaining character and readable dice. | Verify production compression and establish a reproducible baseline; implement missing compressed delivery and reduce dice-face material draws. | Load optional features on demand, move heavy simulation into a worker, stop unnecessary rendering at rest, and develop an attractive Battery saver presentation with an optional instant result. |
 
@@ -61,7 +62,8 @@ the real solver off the main thread. Seated 40d20 input return falls from
 The [turn-worker follow-up](redesign/2026-09-13-film-turns.md) now retains
 complete ordered turn/reveal/collection events and moves rethrows off-thread,
 with 24 complete first/rethrow films matching the pre-worker baseline. Towers
-and silent reconstruction retain the shared inline bake. Physical devices and rendering startup remain open. The optional scenery and
+and silent reconstruction retain the shared inline bake. Physical-device startup
+and active rendering costs still need measurement. The optional scenery and
 [model-parser graphs](redesign/2026-09-13-optional-model-parser.md) now load on
 first use, saving 67,256 encoded startup bytes in the recorded local comparison. The [on-demand render
 loop](redesign/2026-09-13-idle-render.md) now draws zero settled frames for
@@ -92,8 +94,9 @@ Sixty seeded visibility cases pass and all 36 baseline complete films agree.
 The inspected close stress view makes an early outward camera movement to keep
 that read; its motion and playback-CPU costs are recorded.
 [History now reserves the result region](redesign/2026-09-13-history-read/README.md),
-including a usable short-window history. Full composed release and physical
-device observations remain open.
+including a usable short-window history. [Local release verification](redesign/2026-09-13-release/README.md)
+is recorded; three pre-existing visual gates and physical-device observation
+remain open.
 
 **R1 durable workflows, 2026-09-13:** optional accounts, explicit private-library
 comparison/sync, saved-home capture/retained-version management and People
@@ -106,7 +109,8 @@ browser proofs; production enablement and human observation remain separate.
 The [composed success walk](redesign/2026-09-13-r1-success-walk.md) and
 current Help are complete locally. The joined walk passes again on the
 composed code, including guest captures during delayed account startup.
-Final release reconciliation, external enablement and observation remain open.
+Local release verification is recorded with its exact failures and targeted
+correction. External enablement and actual player/device observation remain open.
 
 For **R2**, design landmarks, interesting edges, and quiet rolling areas as
 one composition. Explore personal crests, dice pouches or trays, readable

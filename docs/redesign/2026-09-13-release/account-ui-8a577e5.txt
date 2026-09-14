@@ -1,0 +1,15 @@
+Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0
+
+✔ actual app: recovery, explicit merge/dice choice, offline retry, restart, in-flight edits and protected history (9724.433181ms)
+✔ actual app: namespace switch, table publication, shared-cookie refusal and retained competing tab edits (9393.403175ms)
+✔ actual app on service-absent host keeps guest play and export available (2159.145204ms)
+✔ actual app: late edits during held publication and committed IDB handoffs abort adoption and remain exportable (5048.198892ms)
+✔ actual guest tabs can choose a kept device version without an account or discarding originals (5024.325188ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31351.897216
