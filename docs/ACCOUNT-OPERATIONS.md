@@ -62,7 +62,7 @@ repository portrait optimization is not in this immutable image.
 
 Existing project/all-service and billing-wide alerts already cover these
 services with default billing-admin routing. No budget or recipient update was
-needed. Alerts are not hard caps, and delivery has not been tested.
+needed. Alerts are not hard caps, and alert delivery has not been tested.
 
 Canonical production account/guest browser verification passes all nine
 checkpoints on the released revision; all 36 HTTPS delivery requests pass.
