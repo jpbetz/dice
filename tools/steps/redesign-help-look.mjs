@@ -11,12 +11,14 @@ export default async function run(stage) {
       {desc:'the resized navigation has reached its visible position'});
     if(width<640){await click(a,'#phone-more');await click(a,'#phone-tool-help');}
     else await click(a,'#rail-help');
+    await a.waitFor("!document.getElementById('help-panel').getAnimations().some(animation=>animation.playState==='running')",
+      {desc:'Help entrance animation finishes before choosing a topic'});
     await click(a,'#help-nav [data-topic="start"]');
     await a.waitFor("document.getElementById('help-start').classList.contains('lit')",
       {desc:'Getting started is selected after the pointer action'});
     assert.ok(await a.eval("document.querySelector('#help-start h3').getBoundingClientRect().top>=document.getElementById('help-nav').getBoundingClientRect().bottom"),'sticky topic links leave the selected heading readable');
     const start=await a.eval('document.getElementById("help-start").textContent');
-    for(const term of ['Friends','Invitations','Presence','Accept','Join now','More','Rolls'])assert.ok(start.includes(term),`Getting started names ${term}`);
+    for(const term of ['Friends','Invitations','Presence','Accept and join','Accept for later','More','Rolls'])assert.ok(start.includes(term),`Getting started names ${term}`);
     console.log(await stage.shot(a,`redesign-help-${name}-start.png`));
     if(width<640){
       const scroll=await a.eval(`(()=>{const p=[...document.querySelectorAll('#help-start p')].find(p=>p.textContent.trim().startsWith('People')),r=p.getBoundingClientRect(),nav=document.getElementById('help-nav').getBoundingClientRect(),body=document.getElementById('help-body').getBoundingClientRect();return {x:body.x+body.width/2,y:body.y+body.height/2,deltaY:r.top-nav.bottom-16};})()`);

@@ -44,3 +44,10 @@ direct-join/return journey passes alongside them (**3/3** targeted checks).
 [Closed invitation](cancel-save-phone.png) · [At table after cancellation](cancel-save-task-phone.png).
 Reproduce the focused views with
 `node tools/drive.mjs tools/steps/invitation-save-cancel-look.mjs`.
+
+
+The existing Help capture now expects the owner's explicit **Accept and join**
+and **Accept for later** wording. It waits for the dialog's entrance animation
+before selecting a topic, then uses the same hit-tested pointer actions. The
+five desktop/390-pixel views pass and were inspected; the [current phone
+explanation](help-phone.png) is retained separately from the runtime fix.
