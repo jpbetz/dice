@@ -1542,6 +1542,11 @@ export const scenarios = [
       // THE SWATCH SHOWS THE CLOTH. renderFeltSwatches paints the chip from
       // the real tile, so a cloth that never reached the painter would show
       // the wrong surface in the picker while the table showed the right one.
+      // Previews now paint on sight: inspect the picker a player has opened.
+      await a.page.browser.send('Page.bringToFront',{},a.page.sessionId);
+      await a.dbg("openSettings('staging')");
+      await a.eval("document.getElementById('felt-swatches').scrollIntoView({block:'center'})");
+      await a.waitFor(`[...document.querySelectorAll('#felt-swatches .swatch-dot')].every(el=>el.style.backgroundImage)`);
       const chips = JSON.parse(await a.eval(`JSON.stringify((() => {
         const els = [...document.querySelectorAll('.felt-swatch')];
         const one = els.find((e) => e.dataset.felt === 'silt');
@@ -25551,8 +25556,6 @@ export const scenarios = [
       // reader can see which half each number came from — and so this can
       // assert that the two really differ, rather than that a default happened
       // to equal what the row asked for.
-      await t.waitFor(`window.__diceDebug.devFeltSurface('linen').loaded === 'ready'`,
-        { desc: 'the picture arrived from models/' });
       const s = await t.dbg(`devFeltSurface('linen')`);
       assert.equal(s.cloth, 'image');
       assert.equal(s.tile, 1.25, 'four repeats across the 5-unit felt tile — the picture at 1:1');
@@ -25573,6 +25576,9 @@ export const scenarios = [
         `JSON.stringify(window.__diceDebug.feltPixel(${x}, ${z}))`));
       assert.equal((await t.dbg(`devFeltApply('linen')`)).felt, 'linen');
       assert.equal((await t.dbg('felt')).feltBase, '#8d7f66', 'the table says it is wearing the row');
+      // An unused mat no longer fetches its texture just for a hidden picker.
+      await t.waitFor(`window.__diceDebug.devFeltSurface('linen').loaded === 'ready'`,
+        { desc: 'the picture arrived from models/ when used' });
       await t.waitFor(`window.__diceDebug.feltPixel(0.3, 0.3)[0] !== ${BASE[0]}`,
         { desc: 'the cloth is the picture and not the flat tint' });
 
