@@ -8,6 +8,31 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## First-roll atlas preparation — 2026-09-13
+
+Dice-face filtering gutters were sampled from the growing atlas, forcing
+large canvas snapshots twice per face. They now use one small scratch tile
+per channel and copy each completed face into the atlas. Complete texture
+pixels, geometry and physics data match in all 39 cold factory comparisons;
+regenerating the 175 portraits produces identical image files.
+
+Three-run medians in CPU-throttled phone emulation reduce cold standard d20
+preparation from 187 to 38 ms, first d20 tap-to-visible from 657 to 431 ms,
+and the longest ordinary multiplayer task from 217 to 80 ms. The longest
+task when first using four different sets falls from 1,225 to 694 ms; shader compilation,
+uploads and complex face painters still need work. Startup remains quick
+and builder opening stays at about 120 ms in the ordinary activity case.
+
+Implementation `31cb4fe` and the
+[measurement/visual record](redesign/2026-09-13-dice-textures/README.md)
+include first dice, one-action clear, builder return and four-player mixed
+sets on the named phone viewport and desktop. Six focused browser scenarios
+pass, including all 63 face/material rendering cases and shared determinism.
+The complete `npm test` suite passes on rerun; the record includes the
+initial server-fixture fetch failure and its unchanged passing reruns.
+These are software-renderer comparisons, not physical-device or steady
+frame-rate improvements.
+
 ## Dice portraits load on sight — 2026-09-13
 
 The hidden phone builder used to render every die in a set at startup.

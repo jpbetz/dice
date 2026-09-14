@@ -1,0 +1,662 @@
+[
+  {
+    "name": "phone-first-d20",
+    "layout": {
+      "width": 390,
+      "height": 844,
+      "scrollY": 0,
+      "visual": {
+        "height": 844,
+        "offsetTop": 0,
+        "scale": 1
+      },
+      "controls": [
+        {
+          "id": "phone-more",
+          "rect": {
+            "x": 291.5,
+            "y": 797,
+            "width": 90.5,
+            "height": 43,
+            "top": 797,
+            "right": 382,
+            "bottom": 840,
+            "left": 291.5
+          },
+          "hit": true
+        },
+        {
+          "id": "phone-build-roll",
+          "rect": {
+            "x": 300.203125,
+            "y": 660,
+            "width": 79.796875,
+            "height": 40,
+            "top": 660,
+            "right": 380,
+            "bottom": 700,
+            "left": 300.203125
+          },
+          "hit": true
+        }
+      ]
+    },
+    "frame": {
+      "view": {
+        "left": 0,
+        "top": 148,
+        "width": 390,
+        "height": 511
+      },
+      "busy": true,
+      "dice": [
+        {
+          "rollId": "4a277cbb-7f69-4702-8111-29f16f739258",
+          "index": 0,
+          "left": 180.46162598955783,
+          "top": 398.8703483535555,
+          "right": 240.31213535165452,
+          "bottom": 453.3989203937276,
+          "nearDepth": 25.779222154608465,
+          "farDepth": 27.860270308194252
+        }
+      ]
+    },
+    "dice": [
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "4a277cbb-7f69-4702-8111-29f16f739258"
+      }
+    ],
+    "workspace": null
+  },
+  {
+    "name": "phone-d20-result",
+    "layout": {
+      "width": 390,
+      "height": 844,
+      "scrollY": 0,
+      "visual": {
+        "height": 844,
+        "offsetTop": 0,
+        "scale": 1
+      },
+      "controls": [
+        {
+          "id": "phone-more",
+          "rect": {
+            "x": 291.5,
+            "y": 797,
+            "width": 90.5,
+            "height": 43,
+            "top": 797,
+            "right": 382,
+            "bottom": 840,
+            "left": 291.5
+          },
+          "hit": true
+        },
+        {
+          "id": "phone-build-roll",
+          "rect": {
+            "x": 300.203125,
+            "y": 660,
+            "width": 79.796875,
+            "height": 40,
+            "top": 660,
+            "right": 380,
+            "bottom": 700,
+            "left": 300.203125
+          },
+          "hit": true
+        }
+      ]
+    },
+    "frame": {
+      "view": {
+        "left": 0,
+        "top": 148,
+        "width": 390,
+        "height": 511
+      },
+      "busy": false,
+      "dice": [
+        {
+          "rollId": "4a277cbb-7f69-4702-8111-29f16f739258",
+          "index": 0,
+          "left": 208.98544763256015,
+          "top": 377.26996817165565,
+          "right": 268.09921242360014,
+          "bottom": 434.05312237848943,
+          "nearDepth": 26.137012891116825,
+          "farDepth": 28.38467785310711
+        }
+      ]
+    },
+    "dice": [
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "4a277cbb-7f69-4702-8111-29f16f739258"
+      }
+    ],
+    "workspace": null
+  },
+  {
+    "name": "phone-builder-return",
+    "layout": {
+      "width": 390,
+      "height": 844,
+      "scrollY": 0,
+      "visual": {
+        "height": 844,
+        "offsetTop": 0,
+        "scale": 1
+      },
+      "controls": [
+        {
+          "id": "phone-more",
+          "rect": {
+            "x": 291.5,
+            "y": 797,
+            "width": 90.5,
+            "height": 43,
+            "top": 797,
+            "right": 382,
+            "bottom": 840,
+            "left": 291.5
+          },
+          "hit": true
+        },
+        {
+          "id": "phone-build-roll",
+          "rect": {
+            "x": 300.203125,
+            "y": 708,
+            "width": 79.796875,
+            "height": 40,
+            "top": 708,
+            "right": 380,
+            "bottom": 748,
+            "left": 300.203125
+          },
+          "hit": true
+        }
+      ]
+    },
+    "frame": {
+      "view": {
+        "left": 0,
+        "top": 148,
+        "width": 390,
+        "height": 559
+      },
+      "busy": true,
+      "dice": [
+        {
+          "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1",
+          "index": 0,
+          "left": 273.37729709245946,
+          "top": 449.80436111836013,
+          "right": 292.9083699856005,
+          "bottom": 471.76624936212414,
+          "nearDepth": 73.28785918111234,
+          "farDepth": 75.38051320422932
+        },
+        {
+          "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1",
+          "index": 1,
+          "left": 312.71658493637506,
+          "top": 447.63816794782093,
+          "right": 331.6619304914323,
+          "bottom": 468.02212275327435,
+          "nearDepth": 73.54009428282636,
+          "farDepth": 75.5001226979452
+        },
+        {
+          "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1",
+          "index": 2,
+          "left": 320.12608804138995,
+          "top": 394.1498166063711,
+          "right": 342.2429007518433,
+          "bottom": 415.75182318346646,
+          "nearDepth": 76.48150877520523,
+          "farDepth": 78.71571090943549
+        },
+        {
+          "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1",
+          "index": 3,
+          "left": 274.81882459875663,
+          "top": 385.20234589983306,
+          "right": 297.7641197489864,
+          "bottom": 406.085449129476,
+          "nearDepth": 77.06537851807788,
+          "farDepth": 79.40236274233655
+        },
+        {
+          "rollId": "2ac60720-0462-499c-a4e7-f07d0b75f89a",
+          "index": 0,
+          "left": 162.7568919321881,
+          "top": 496.9782551382378,
+          "right": 187.44690950252777,
+          "bottom": 520.2948678037147,
+          "nearDepth": 69.95655541351839,
+          "farDepth": 72.25361017585918
+        }
+      ]
+    },
+    "dice": [
+      {
+        "type": "d6",
+        "variant": "classics.ivory",
+        "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1"
+      },
+      {
+        "type": "d6",
+        "variant": "tidewrack.seaglass",
+        "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1"
+      },
+      {
+        "type": "d20",
+        "variant": "symbols.monster",
+        "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "2ac60720-0462-499c-a4e7-f07d0b75f89a"
+      }
+    ],
+    "workspace": null
+  },
+  {
+    "name": "phone-four-players-mixed",
+    "layout": {
+      "width": 390,
+      "height": 844,
+      "scrollY": 0,
+      "visual": {
+        "height": 844,
+        "offsetTop": 0,
+        "scale": 1
+      },
+      "controls": [
+        {
+          "id": "phone-more",
+          "rect": {
+            "x": 291.5,
+            "y": 797,
+            "width": 90.5,
+            "height": 43,
+            "top": 797,
+            "right": 382,
+            "bottom": 840,
+            "left": 291.5
+          },
+          "hit": true
+        },
+        {
+          "id": "phone-build-roll",
+          "rect": {
+            "x": 300.203125,
+            "y": 708,
+            "width": 79.796875,
+            "height": 40,
+            "top": 708,
+            "right": 380,
+            "bottom": 748,
+            "left": 300.203125
+          },
+          "hit": true
+        }
+      ]
+    },
+    "frame": {
+      "view": {
+        "left": 0,
+        "top": 232,
+        "width": 390,
+        "height": 475
+      },
+      "busy": false,
+      "dice": [
+        {
+          "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1",
+          "index": 0,
+          "left": 272.7087816562087,
+          "top": 491.6467223225238,
+          "right": 292.33902366591536,
+          "bottom": 513.4429961747026,
+          "nearDepth": 62.574912522904725,
+          "farDepth": 64.6675665460217
+        },
+        {
+          "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1",
+          "index": 1,
+          "left": 311.63572667435125,
+          "top": 489.4908371380487,
+          "right": 330.84123818695355,
+          "bottom": 509.7129349550736,
+          "nearDepth": 62.82724606687928,
+          "farDepth": 64.78848031351423
+        },
+        {
+          "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1",
+          "index": 2,
+          "left": 318.34194317626657,
+          "top": 436.59334690828393,
+          "right": 340.17000946667014,
+          "bottom": 457.92824374398094,
+          "nearDepth": 65.76856211699761,
+          "farDepth": 68.00276425122787
+        },
+        {
+          "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1",
+          "index": 3,
+          "left": 273.56282628312357,
+          "top": 427.8168633451288,
+          "right": 296.2063768061744,
+          "bottom": 448.43572865672,
+          "nearDepth": 66.35243185987026,
+          "farDepth": 68.68941608412894
+        },
+        {
+          "rollId": "2ac60720-0462-499c-a4e7-f07d0b75f89a",
+          "index": 0,
+          "left": 154.5020300588143,
+          "top": 542.136757348866,
+          "right": 179.41373085459654,
+          "bottom": 563.4865853202222,
+          "nearDepth": 59.13114880751699,
+          "farDepth": 61.45789793912178
+        },
+        {
+          "rollId": "c91a55d9-52e7-4083-a272-0f4ba786bafe",
+          "index": 0,
+          "left": 205.17929928097436,
+          "top": 394.84722097476697,
+          "right": 226.4557545364827,
+          "bottom": 414.5926028848842,
+          "nearDepth": 68.78810573424636,
+          "farDepth": 71.15329323978712
+        },
+        {
+          "rollId": "c91a55d9-52e7-4083-a272-0f4ba786bafe",
+          "index": 1,
+          "left": 186.93647984661175,
+          "top": 402.67641535636557,
+          "right": 205.8296669407256,
+          "bottom": 423.9984330008147,
+          "nearDepth": 68.29159259931853,
+          "farDepth": 70.36916145486502
+        },
+        {
+          "rollId": "737af036-cb04-4057-bc4f-0f85cf67c4ef",
+          "index": 0,
+          "left": 72.31889234783604,
+          "top": 454.59779907880215,
+          "right": 94.62277340954364,
+          "bottom": 475.5708025826858,
+          "nearDepth": 64.52078211328218,
+          "farDepth": 66.82594966398376
+        },
+        {
+          "rollId": "737af036-cb04-4057-bc4f-0f85cf67c4ef",
+          "index": 1,
+          "left": 78.18448117258554,
+          "top": 503.8503115610976,
+          "right": 101.30817271287836,
+          "bottom": 525.3690249473019,
+          "nearDepth": 61.33099137187143,
+          "farDepth": 63.713349976926374
+        }
+      ]
+    },
+    "dice": [
+      {
+        "type": "d6",
+        "variant": "classics.ivory",
+        "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1"
+      },
+      {
+        "type": "d6",
+        "variant": "tidewrack.seaglass",
+        "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1"
+      },
+      {
+        "type": "d20",
+        "variant": "symbols.monster",
+        "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "2ac60720-0462-499c-a4e7-f07d0b75f89a"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "c91a55d9-52e7-4083-a272-0f4ba786bafe"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "c91a55d9-52e7-4083-a272-0f4ba786bafe"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "737af036-cb04-4057-bc4f-0f85cf67c4ef"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "737af036-cb04-4057-bc4f-0f85cf67c4ef"
+      }
+    ],
+    "workspace": null
+  },
+  {
+    "name": "desktop-four-players-mixed",
+    "layout": {
+      "width": 1440,
+      "height": 1000,
+      "scrollY": 0,
+      "visual": {
+        "height": 1000,
+        "offsetTop": 0,
+        "scale": 1
+      },
+      "controls": [
+        {
+          "id": "phone-more",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "hit": false
+        },
+        {
+          "id": "phone-build-roll",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "hit": false
+        }
+      ]
+    },
+    "frame": {
+      "view": {
+        "left": 112,
+        "top": 102,
+        "width": 1328,
+        "height": 898
+      },
+      "busy": false,
+      "dice": [
+        {
+          "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1",
+          "index": 0,
+          "left": 986.8603262127701,
+          "top": 611.3654404901997,
+          "right": 1042.3466707159782,
+          "bottom": 670.688945147063,
+          "nearDepth": 43.096827689799994,
+          "farDepth": 45.18948171291696
+        },
+        {
+          "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1",
+          "index": 1,
+          "left": 1091.858689548827,
+          "top": 605.4678298030893,
+          "right": 1147.5021145808396,
+          "bottom": 660.3202737693883,
+          "nearDepth": 43.35263073304188,
+          "farDepth": 45.307300612176896
+        },
+        {
+          "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1",
+          "index": 2,
+          "left": 1104.8973655289535,
+          "top": 462.99792949424716,
+          "right": 1163.3142469940078,
+          "bottom": 520.2137770040107,
+          "nearDepth": 46.29047728389288,
+          "farDepth": 48.524679418123135
+        },
+        {
+          "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1",
+          "index": 3,
+          "left": 984.5540355837975,
+          "top": 439.94023781883516,
+          "right": 1045.1721447973466,
+          "bottom": 495.18454722935337,
+          "nearDepth": 46.87434702676553,
+          "farDepth": 49.211331251024205
+        },
+        {
+          "rollId": "2ac60720-0462-499c-a4e7-f07d0b75f89a",
+          "index": 0,
+          "left": 662.7691166164171,
+          "top": 753.8890941136934,
+          "right": 732.5188836613218,
+          "bottom": 814.1710141364578,
+          "nearDepth": 39.653063974412255,
+          "farDepth": 41.97981310601704
+        },
+        {
+          "rollId": "c91a55d9-52e7-4083-a272-0f4ba786bafe",
+          "index": 0,
+          "left": 802.6959070082997,
+          "top": 354.9004182799747,
+          "right": 858.3224737695876,
+          "bottom": 407.52090907296656,
+          "nearDepth": 49.31002090114163,
+          "farDepth": 51.67520840668237
+        },
+        {
+          "rollId": "c91a55d9-52e7-4083-a272-0f4ba786bafe",
+          "index": 1,
+          "left": 754.7836838515026,
+          "top": 374.90186762623665,
+          "right": 804.4943025676498,
+          "bottom": 431.64030906724713,
+          "nearDepth": 48.8135077662138,
+          "farDepth": 50.891076621760284
+        },
+        {
+          "rollId": "737af036-cb04-4057-bc4f-0f85cf67c4ef",
+          "index": 0,
+          "left": 446.4786724689622,
+          "top": 510.83317860597236,
+          "right": 506.0410554525893,
+          "bottom": 567.2703886861808,
+          "nearDepth": 45.04269728017745,
+          "farDepth": 47.347864830879026
+        },
+        {
+          "rollId": "737af036-cb04-4057-bc4f-0f85cf67c4ef",
+          "index": 1,
+          "left": 455.7383102041143,
+          "top": 645.0710927176846,
+          "right": 518.3026333888914,
+          "bottom": 704.8401605994142,
+          "nearDepth": 41.85290653876669,
+          "farDepth": 44.235265143821636
+        }
+      ]
+    },
+    "dice": [
+      {
+        "type": "d6",
+        "variant": "classics.ivory",
+        "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1"
+      },
+      {
+        "type": "d6",
+        "variant": "tidewrack.seaglass",
+        "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1"
+      },
+      {
+        "type": "d20",
+        "variant": "symbols.monster",
+        "rollId": "a0da7119-84c8-48a7-9b4c-831aa5f53bd1"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "2ac60720-0462-499c-a4e7-f07d0b75f89a"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "c91a55d9-52e7-4083-a272-0f4ba786bafe"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "c91a55d9-52e7-4083-a272-0f4ba786bafe"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "737af036-cb04-4057-bc4f-0f85cf67c4ef"
+      },
+      {
+        "type": "d20",
+        "variant": "std",
+        "rollId": "737af036-cb04-4057-bc4f-0f85cf67c4ef"
+      }
+    ],
+    "workspace": null
+  }
+]

@@ -44,12 +44,18 @@ Two things that cost a run each when they were undocumented (2026-08-13):
 Canned steps:
 
 - `play-performance.mjs <label> [--plain|--copper] [--cpu=4] [--runs=3]
-  [--builder-first] [--dpr=3] [--network]` — cold navigation through the first
+  [--builder-first] [--first=1d20] [--set=classics.ivory] [--incoming-mixed]
+  [--dpr=3] [--network]` — cold navigation through the first
   visible roll, builder opening during multiplayer activity, and Appearance.
   Records profiles, long tasks and screenshots; software-renderer timings
   are browser comparisons, not physical-device performance.
 - `dice-art-bake.mjs` — generate the built-in WebP portraits and recipe
   manifest from the actual meshes; see `models/dice-art/README.md`.
+- `dice-texture-cost.mjs <label> [--cpu=4] [--runs=3] [--compare=<report>]` —
+  isolate cold mesh/texture preparation, time self/other canvas copies, and
+  compare complete texture pixels, geometry and physics data with a baseline.
+- `dice-texture-look.mjs` — first d20, one-action clear, builder Roll returning
+  to play, and incoming mixed sets with four players on phone and desktop.
 - `dice-art-look.mjs` — inspect pending/loaded/edited dice portraits on the
   iPhone 12 Pro viewport, rolling while images wait, four players and desktop.
 - `two-tab-roll.mjs ['<notation>']` — A rolls, both tabs settle, full state
