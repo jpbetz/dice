@@ -92,6 +92,12 @@ separate three-run emulated-phone comparison, preserving all painted pixels
 and portraits. Ordinary first 2d6 timing stays effectively unchanged;
 physical-phone costs remain open. Both follow-ups are in the repository and
 are outside the currently released `11dd1ef` image.
+The [parallel texture study](redesign/2026-09-13-dice-textures/README.md),
+measured separately on `31cb4fe`, records first d20 tap-to-visible falling from
+657 to 431 ms and a first mixed-set activity stall from 1,225 to 694 ms.
+Those batches use one scratch tile per channel; the integrated implementation
+reuses one across channels. Shader, upload and complex painter costs remain
+R3 work; these are separate local measurements, not production benchmarks.
 The [Battery saver](redesign/2026-09-13-battery-presentation.md) and
 [Instant results](redesign/2026-09-13-instant-results.md) preferences are now
 implemented independently. Battery keeps baked artwork and responsive 3D dice,

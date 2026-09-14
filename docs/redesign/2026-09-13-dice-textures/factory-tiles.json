@@ -1,0 +1,2828 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0",
+  "label": "tiles",
+  "cpu": 4,
+  "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "rows": [
+    {
+      "sample": 0,
+      "variant": "std",
+      "type": "d4",
+      "buildMs": 23.200000047683716,
+      "copies": {
+        "selfCalls": 8,
+        "selfMs": 1.7999999523162842,
+        "otherCalls": 16,
+        "otherMs": 4.399999976158142
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 12,
+          "materialIndex": 0
+        },
+        {
+          "start": 12,
+          "count": 216,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "4c203386f1c7037155ba1afbd97bdd80e9895ad3c20c8347bd1d353ea7c2abce",
+        "normal": "0ddb052558ff70b1da0308ed186249595aadd2c5decdaa1acd3d0bb2ba7b5153",
+        "uv": "fe656f4f8c970fea82a112ea6708669731cf121c7c7a03311132b5365ba1f272",
+        "uv1": "b805a7087f3acdc0628cdda8ec546dfbe67e05a7df07cdc5c3b4a22d42ad00f0"
+      },
+      "hull": "f6d011724866b9db01b4658682cf2d782be883e2df8159eed7a71fd782fe2e5d",
+      "channels": {
+        "map": [
+          {
+            "width": 520,
+            "height": 520,
+            "hash": "a038e16331a6608f68460bb1b82448c6cf1dc0d9202161786017fb7bbed6d462"
+          }
+        ]
+      },
+      "textureBytes": 1081600
+    },
+    {
+      "sample": 0,
+      "variant": "std",
+      "type": "d6",
+      "buildMs": 18,
+      "copies": {
+        "selfCalls": 12,
+        "selfMs": 2.0999999046325684,
+        "otherCalls": 24,
+        "otherMs": 6.100000023841858
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 36,
+          "materialIndex": 0
+        },
+        {
+          "start": 36,
+          "count": 432,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "4917c1c1d536adffec7156d59b3c5ea201e87680b3127f7af944adcabcfeb66e",
+        "normal": "d43cafffd030606a6aba93a926441e456816f8c8dbf5c20f5bb8a46a39cd1df5",
+        "uv": "951add47b11aa2efacbb85ad3ce006bc51e62f720f9e9ca609a61593b14f5780",
+        "uv1": "486f14532fc006660ff2fd8cdb7c88265274b6a367819bd327a6d731abc26f92"
+      },
+      "hull": "190a36fc5102a5928da1b2dc9da256919560167b12d72bd0ab9e9ea3a7ba253b",
+      "channels": {
+        "map": [
+          {
+            "width": 780,
+            "height": 520,
+            "hash": "a308bb5e9d102f13e6c697b488ee177ccf790fe2fc9a1c49dc33b5bdce58602b"
+          }
+        ]
+      },
+      "textureBytes": 1622400
+    },
+    {
+      "sample": 0,
+      "variant": "std",
+      "type": "d8",
+      "buildMs": 18.200000047683716,
+      "copies": {
+        "selfCalls": 16,
+        "selfMs": 4.600000023841858,
+        "otherCalls": 32,
+        "otherMs": 5.699999809265137
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 24,
+          "materialIndex": 0
+        },
+        {
+          "start": 24,
+          "count": 432,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "15a8f192ce3eaf0ca1f3b398dc1effe13f81b03466b685986715496a2e9cc66f",
+        "normal": "cd1333acbe8e8d66f572b036aac63d09b34bfc1067db89ed9a7b0f9ed3469d34",
+        "uv": "0ecb654000b7b88e013945f5e21ed175b3ddde5cebfd1a54be747f9b75fb445e",
+        "uv1": "7590787fef75ff73e7ff8b0cb5ea07909222008ae9507d7e2a8eade43dc3df21"
+      },
+      "hull": "5cb6874dfbc9355eae72c81172b45a7c2b6f35ec790d0f29be3438de1027d588",
+      "channels": {
+        "map": [
+          {
+            "width": 1040,
+            "height": 520,
+            "hash": "ad3d32ff3080a4bdf3a7f068631620d9f86a5dcff2499c70c283d8774e59cbdf"
+          }
+        ]
+      },
+      "textureBytes": 2163200
+    },
+    {
+      "sample": 0,
+      "variant": "std",
+      "type": "d10",
+      "buildMs": 22.5,
+      "copies": {
+        "selfCalls": 20,
+        "selfMs": 4.499999761581421,
+        "otherCalls": 40,
+        "otherMs": 9.700000286102295
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 720,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "17aac769a0e7cd8481497c436096d49709e69532739a13b0d9c7682e0cc73c3d",
+        "normal": "4dc33c774f88c0a583bac7ce618137cce54961f8ee1fb5eb8ec5680386211209",
+        "uv": "50ba18b00dd5bc68cd7d8bc625f352a2c7b1f8ee90b04ba7b54f9a389e1f7442",
+        "uv1": "0a9a89af08c022ed966e0989f72dbd59283f01499637848a6b0ef7ca2c2be8a7"
+      },
+      "hull": "21b6dfe36f90106be7230603a2b4d05f4b4b052e2273ffae33ac1292e28b1ddf",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 520,
+            "hash": "a4d952b3fca2602ad00fa7c2ec6879d51091d1659046853bb5f2ad1f2fc6aab5"
+          }
+        ]
+      },
+      "textureBytes": 2704000
+    },
+    {
+      "sample": 0,
+      "variant": "std",
+      "type": "d10x",
+      "buildMs": 19.5,
+      "copies": {
+        "selfCalls": 20,
+        "selfMs": 6.200000047683716,
+        "otherCalls": 40,
+        "otherMs": 8.199999928474426
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 720,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "17aac769a0e7cd8481497c436096d49709e69532739a13b0d9c7682e0cc73c3d",
+        "normal": "4dc33c774f88c0a583bac7ce618137cce54961f8ee1fb5eb8ec5680386211209",
+        "uv": "50ba18b00dd5bc68cd7d8bc625f352a2c7b1f8ee90b04ba7b54f9a389e1f7442",
+        "uv1": "0a9a89af08c022ed966e0989f72dbd59283f01499637848a6b0ef7ca2c2be8a7"
+      },
+      "hull": "2b39696f29dc47879f3f16a425b1831ce9dfb8e6d9517a2efe2a328c59918e5c",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 520,
+            "hash": "9d28784e0a481f0254e417550d694ef43604f556592cc7120649d9cb17ef78a0"
+          }
+        ]
+      },
+      "textureBytes": 2704000
+    },
+    {
+      "sample": 0,
+      "variant": "std",
+      "type": "d12",
+      "buildMs": 27.300000071525574,
+      "copies": {
+        "selfCalls": 24,
+        "selfMs": 4.0000001192092896,
+        "otherCalls": 48,
+        "otherMs": 12.699999928474426
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 108,
+          "materialIndex": 0
+        },
+        {
+          "start": 108,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "b85ad1410b33ec39811fae51da68d98a406888ac43f7149507dd34142e45c25d",
+        "normal": "d2b8fa164fb15ab6e74c30dc7767d1652de432318bbc30c467b19c9f7a5d36d1",
+        "uv": "de1051eb66a19cdd9ccbc0f4199ec593fdf899522b7d99da7552a41c9c9f0610",
+        "uv1": "f233560ddcd87945b09f895ccace45edf9aac94296e465f792f102448bae079e"
+      },
+      "hull": "33610b9eb8f2682a3da4406a6d0c59f345a90fc7c0cf226bba790185f0693681",
+      "channels": {
+        "map": [
+          {
+            "width": 1040,
+            "height": 780,
+            "hash": "4962682b300cd480622eb04dc5da9c49681f85d8e34baf5c715acdea2a6365e6"
+          }
+        ]
+      },
+      "textureBytes": 3244800
+    },
+    {
+      "sample": 0,
+      "variant": "std",
+      "type": "d20",
+      "buildMs": 38.10000002384186,
+      "copies": {
+        "selfCalls": 40,
+        "selfMs": 8.4000004529953,
+        "otherCalls": 80,
+        "otherMs": 16.899999618530273
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "219aad66101d3cc28d9f045c0dba1cd6211b6258e33f8fa4e5eccfe69741417d",
+        "normal": "a0b36bbfe01d24b1a0e93cd23f061a16ae2677043df7417b590bae3810999f26",
+        "uv": "7521dc1e7b86979c457fc5ad92efe487b0b6770f8194d1d9b45687f9d7412657",
+        "uv1": "4a3afe730db4af103aea12c55893170d4ff3ce1e120785d6d0ea313a98d3d61e"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "089d31aca8dfa23a7ef3e51d54f083ae4be83b5b83bfeaea4aaa9def80024174"
+          }
+        ]
+      },
+      "textureBytes": 5408000
+    },
+    {
+      "sample": 0,
+      "variant": "shroud",
+      "type": "d20",
+      "buildMs": 41.200000047683716,
+      "copies": {
+        "selfCalls": 40,
+        "selfMs": 7.400000095367432,
+        "otherCalls": 80,
+        "otherMs": 24.199999928474426
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "219aad66101d3cc28d9f045c0dba1cd6211b6258e33f8fa4e5eccfe69741417d",
+        "normal": "a0b36bbfe01d24b1a0e93cd23f061a16ae2677043df7417b590bae3810999f26",
+        "uv": "7521dc1e7b86979c457fc5ad92efe487b0b6770f8194d1d9b45687f9d7412657",
+        "uv1": "4a3afe730db4af103aea12c55893170d4ff3ce1e120785d6d0ea313a98d3d61e"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "23c33235ae770515494f3f7037ab351ddd6e6fe281774569af839aa84b539e75"
+          }
+        ]
+      },
+      "textureBytes": 5408000
+    },
+    {
+      "sample": 0,
+      "variant": "classics.ivory",
+      "type": "d20",
+      "buildMs": 39.40000009536743,
+      "copies": {
+        "selfCalls": 40,
+        "selfMs": 9.299999952316284,
+        "otherCalls": 80,
+        "otherMs": 15.700000047683716
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "219aad66101d3cc28d9f045c0dba1cd6211b6258e33f8fa4e5eccfe69741417d",
+        "normal": "a0b36bbfe01d24b1a0e93cd23f061a16ae2677043df7417b590bae3810999f26",
+        "uv": "7521dc1e7b86979c457fc5ad92efe487b0b6770f8194d1d9b45687f9d7412657",
+        "uv1": "4a3afe730db4af103aea12c55893170d4ff3ce1e120785d6d0ea313a98d3d61e"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "c246c72aa9576c0390e8b3d1e63c0bba3c4475254c2f998c218d6e5439bfe4c6"
+          }
+        ]
+      },
+      "textureBytes": 5408000
+    },
+    {
+      "sample": 0,
+      "variant": "tidewrack.seaglass",
+      "type": "d20",
+      "buildMs": 45.40000009536743,
+      "copies": {
+        "selfCalls": 40,
+        "selfMs": 9.700000166893005,
+        "otherCalls": 80,
+        "otherMs": 15.599999904632568
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "c21a0e71b5a1ad71b79ba5d0f849211e8f0e58b09ff1d81e68625683114f3de5",
+        "normal": "d83804b3bf50bfea5347ce60485eccdda184dfa186e9209563f06ad385fbdab4",
+        "uv": "95e5d18468e2f796611f9d8ffb18312f47ad0671ea8aef0cd57a216c437d111b",
+        "uv1": "217e3bf9aa5fb77f5bb9cdad8a95b6d7233cb0adc0a3f0ec8809f1d9fd3f822b"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "6dfc34be0accdd4ee9285a7db4cf3aa4d8ec59590c5aa0dd87234bbfe81e3871"
+          }
+        ]
+      },
+      "textureBytes": 5408000
+    },
+    {
+      "sample": 0,
+      "variant": "symbols.monster",
+      "type": "d6",
+      "buildMs": 31.300000071525574,
+      "copies": {
+        "selfCalls": 12,
+        "selfMs": 2.399999976158142,
+        "otherCalls": 24,
+        "otherMs": 5.700000047683716
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 36,
+          "materialIndex": 0
+        },
+        {
+          "start": 36,
+          "count": 96,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "4c06981ee0cf84490fae0ca1c2d329c1c5db7da5ce777c93eae610838a7c7bb0",
+        "normal": "da6b1e8805fd550556f90345ee93a741f8048909011b1b949950400edc671359",
+        "uv": "f131904e71ab1c92fe1b5b32f00df6ab63e144f425848016ad2e533b476ca8ed",
+        "uv1": "8493905b955e4420adf1444d990e3ad5a676f671599c97d7db472fd2d0649385"
+      },
+      "hull": "190a36fc5102a5928da1b2dc9da256919560167b12d72bd0ab9e9ea3a7ba253b",
+      "channels": {
+        "map": [
+          {
+            "width": 780,
+            "height": 520,
+            "hash": "0d13f5d69d301dfd7616cc05745819e6217519bea9f8e5ee6b211627f7b92a8c"
+          }
+        ]
+      },
+      "textureBytes": 1622400
+    },
+    {
+      "sample": 0,
+      "variant": "test.texture",
+      "type": "d20",
+      "buildMs": 312.7000000476837,
+      "copies": {
+        "selfCalls": 120,
+        "selfMs": 29.50000023841858,
+        "otherCalls": 260,
+        "otherMs": 66.7999997138977
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 288,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "7c2094a0d14a65bbde0b4baaa77adf9e538e55adc7110276beaf4e8d4bebb888",
+        "normal": "30b2fa3fadc1f0754f388f8c34b81840050c12589ca92e2e4031947c38d7f536",
+        "uv": "1a98470edf84975c7d81e3d108bec4884a82d5d56e471cece32e815fd9239d9b",
+        "uv1": "ce12880aa1940b2760f04675141d7c84f354b831c952afc25a51364050b9513a"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "bc7631c77ed39d2542986e5e307d7e89fb4b737c2c7e8b2c00ec10b4fca8fc4d"
+          }
+        ],
+        "normalMap": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "048b1de450a57c6885a45181ca39a8d16024519e002892f310d26dc5c8410174"
+          }
+        ],
+        "emissiveMap": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "13f91c9a41bdfb610b938fb5a0f68021d8fd11f3c991f82c48be79c237346287"
+          }
+        ]
+      },
+      "textureBytes": 16224000
+    },
+    {
+      "sample": 0,
+      "variant": "emberforge.blackanvil",
+      "type": "d20",
+      "buildMs": 260.2000000476837,
+      "copies": {
+        "selfCalls": 0,
+        "selfMs": 0,
+        "otherCalls": 20,
+        "otherMs": 33.299999833106995
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 3,
+          "materialIndex": 0
+        },
+        {
+          "start": 3,
+          "count": 3,
+          "materialIndex": 1
+        },
+        {
+          "start": 6,
+          "count": 3,
+          "materialIndex": 2
+        },
+        {
+          "start": 9,
+          "count": 3,
+          "materialIndex": 3
+        },
+        {
+          "start": 12,
+          "count": 3,
+          "materialIndex": 4
+        },
+        {
+          "start": 15,
+          "count": 3,
+          "materialIndex": 5
+        },
+        {
+          "start": 18,
+          "count": 3,
+          "materialIndex": 6
+        },
+        {
+          "start": 21,
+          "count": 3,
+          "materialIndex": 7
+        },
+        {
+          "start": 24,
+          "count": 3,
+          "materialIndex": 8
+        },
+        {
+          "start": 27,
+          "count": 3,
+          "materialIndex": 9
+        },
+        {
+          "start": 30,
+          "count": 3,
+          "materialIndex": 10
+        },
+        {
+          "start": 33,
+          "count": 3,
+          "materialIndex": 11
+        },
+        {
+          "start": 36,
+          "count": 3,
+          "materialIndex": 12
+        },
+        {
+          "start": 39,
+          "count": 3,
+          "materialIndex": 13
+        },
+        {
+          "start": 42,
+          "count": 3,
+          "materialIndex": 14
+        },
+        {
+          "start": 45,
+          "count": 3,
+          "materialIndex": 15
+        },
+        {
+          "start": 48,
+          "count": 3,
+          "materialIndex": 16
+        },
+        {
+          "start": 51,
+          "count": 3,
+          "materialIndex": 17
+        },
+        {
+          "start": 54,
+          "count": 3,
+          "materialIndex": 18
+        },
+        {
+          "start": 57,
+          "count": 3,
+          "materialIndex": 19
+        },
+        {
+          "start": 60,
+          "count": 288,
+          "materialIndex": 20
+        }
+      ],
+      "shape": {
+        "position": "858e5cf722e396580776b5416fc5469fd1c083dbfdbf6189074a029203c7ab45",
+        "normal": "c5245328101caa7569fa6661cf9c360e49a305c1456d9e7d78c57766ad1ea840",
+        "uv": "1a98470edf84975c7d81e3d108bec4884a82d5d56e471cece32e815fd9239d9b"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "87404b98e2bb0b6d1ebce6eb636c3b85e1d2c2b9ba5fe36210d16da2661963da"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "69c317cf984cf4dffd493a84a8e0915020b47d7297697cda7ea2318bed3d0dc5"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "f4e572c10671dbe813c9a7a9d780d9122101e3659dd5a6b50aa5ed7b28cc4a72"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "bb83a480ce029f9c3e01b30eab484c2ecb2594e64902da9ca37a694fef9f19b3"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "c99b742eb294cf22343d7ee40a9cdb9c152b233f206161ba0c952c8a48a4ad5b"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9e7f8373609cf80d4eefb84b647b03c80088e873cf0d9d8a65a976e917755bde"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "d5ce49678665945a6061ce2f50d8d2db09c81a18d2a31727af65e9d86d991c57"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9c50a1bf4e5c54503f5d230442d7b6f30f245d11d4fb33ead86755f7685067c3"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "8725a5ae555b8c1838f63484eec1bbbbd2240cc51e19a1b6b25f671d9735a97c"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "b50b39350074afaa538c14bef6306239d04690f8d330866cde2b52be43bfcb09"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "1fbca316b00bba32c4613d3aef6bffc3c0d2b333f9834eb834b4f78d7922c4ba"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "04fb0a4712184e16d17da68b2c2a8b24b7666a8e6502d3053b25100c2545b6e9"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "c8c429f73ba0a2bdd51f71eebb56ba6965c8b6e441c1328ab105176a05a66c06"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "83204913f4e971d06f15724cfbe8eab69ab02ee815357eee7fe18c2a57613571"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "f79c12e6cbb1d5b888aeee6f30715f29cb38f44109b6b235b18687a3374db17e"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "ab44b59106a3360272668af64decb506d5c0b3cdf3633dfde49ced934792c2fd"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "4e5baf9baa450a44471d3622918cc7eeafd5fdfa9499c5fbfd8b107c47134e53"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "533fe3614d886759f0682217fcac6eb011670c3b444d5c24a6933bd8d5e60511"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "a2ca522559d3852bc827951695ef4f1bde55200300bb336efb4d81ac0ba906c4"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "992710d3119262424e2d9f9b663130bd8123a15b58885943dbceeec6d52993bc"
+          }
+        ],
+        "normalMap": [
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "7176847e57988553a305fbca0bfd38e26f9fd2ef827f9373b0433a7bbafd8b68"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "3aa58b6db8f53c1bccc86ecae8f2b29b23ff0bbe396ef8a1c16cc27291fa2597"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "cbc48b2100ff4951c914c6f9b0b5195e734b00a2bf8e3109c3106f43f2914467"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "cab16424fe1bef3f587d83bae48eb928d36c032e9642570b04336859a4e7680b"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "a18014e901ff487e72efb2605d9bebdde0f06c8468804d00367670d785150575"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "7523d3b04427987afcd363120b484485eddfa053352ae6f41da18ef4d9acdcd8"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "959045b53c4bafac29f76deab0ab70c7fcbb1ec2d9619ea7b9b774f1ad57848d"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "ab290d7d42b61518b48024542cba84c4c6630d39b4dac6adcda6c57560fa0310"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "8d87b811e576926210a20b152f3c40d0f3422727bfdd924b8d5a7b0a2900e5d4"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "5190d8e1c8aefc51fce26824779584c0a42d0e56b34220d472091793c76b7db4"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "2161b1212b7a289f9e3d72961c9bc4e46fbeca08ddb171cef3726e674b69ddd4"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "ac701a62e61ca20b389c86b7205c56f7f800604d623fa0200af687ba98c1b8bc"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9a3a2a333e98b657fc8ce1056ee47449f590c538293a9d9a7e43171e113639e3"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "b68ba47f19524f5080cce689a1accfd67095208902706d5667bf9823ee168c72"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9f14fc683d11229a6db59a18785ad258776190331d6e482dbc4342cb4ba8df23"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "74d4d9e1ff265e6765dc0d46a1a487e6f25e30fdcd08519ff9b3d450b09a28a7"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "f097d3921581b2c4654766ea64ec20dc958a0d427715d3043dfdb6287f0f5ec7"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "3575896e178187c434edbcff56c6ce884933f244026aac6e54044f6bbffa8045"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "97c280ca9d6c6c124e287e98df95fb75e96fc74b4818ad9f025826a28887d6ee"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "810df2b8241d66a3af33c30cc4f5ec816708e3d72e5783184c6d8163037ef473"
+          }
+        ],
+        "emissiveMap": [
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "3a9249ba3693779952a1e66660ae31d92b46343705b801292510c3ba8106e2f6"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "362c2d3c5becf8a254d02879a4eda4112426e5325cf49719423bb1ce85667494"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "d59eadbf05d27ec53d2db9a934e9dc5ab4ee4fc9a0dbca75268d94c34b2201dd"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "be9987b2fc0a0add35d1e9428f2c2f32cab40ff7ede652311752333f0d6ff63d"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "86599bd7bfcf220d9b536c63aa7c8aa31299f8115b685de962ec47cad307d699"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "2655e0f592e9710966feafd5c396aa378fb3fc55566906234295d01f7c79dab2"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "e7c555b73e7dd50529e205a77c84cf7ab47ff6ddb690becbfa5610edd0af8d56"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "bc00dede54f021dcd7741a583521aa1e49954b87c27b464624ee106971a4be20"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "3fca507ecb0332223d17e459d56f7a751225a2880ffa7b5c2d79336fc181b612"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "01bb8a5cec54b7da7dadde25832396a6d1b0cf420a0ebad76dac3206cc59e318"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "c03455ea72758f1a130b2fc7a39ea7627f955b76466865232dd5ae8f0905f782"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "1830ff1fbefb1319a7ee1394826227b4215523aab952e606af5179bac1f91677"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "74857f9c0f25a5a793a5ceb6ccdda6c7b3318fa5a589527f547a6eeb8e2ad4bc"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "52a262fb89992f2e147f40b21f157ecca90d003b9b81a111daac157d8338e921"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "cb80e52f9f8e902a3af40765e317da25c6bc89a13455d90a73dea9ad7264fc39"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "8da1c6a44098eb99c99cfd13cce4e2dd1c92aa2abafac62a08ab02971970c17a"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "dc4fb6813521ca1b108232d043b366aa608bf78a9fb5d3ff6c84c2f1ac5a28c9"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "cbbe9930829c0764494e622251bf4c79218876ed2e1c9b11164ff3ef25470169"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9d0b529bdea678e16fafea4a5f37d2c8f65c20b1c0a7f417d5426fa44c2062ac"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "f648526fcf856e801ee0562440bcb711c82f7c214e3a8e0a3391ba96a0dfc844"
+          }
+        ]
+      },
+      "textureBytes": 15728640
+    },
+    {
+      "sample": 1,
+      "variant": "std",
+      "type": "d4",
+      "buildMs": 10.600000023841858,
+      "copies": {
+        "selfCalls": 8,
+        "selfMs": 1.4000000953674316,
+        "otherCalls": 16,
+        "otherMs": 4.199999928474426
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 12,
+          "materialIndex": 0
+        },
+        {
+          "start": 12,
+          "count": 216,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "4c203386f1c7037155ba1afbd97bdd80e9895ad3c20c8347bd1d353ea7c2abce",
+        "normal": "0ddb052558ff70b1da0308ed186249595aadd2c5decdaa1acd3d0bb2ba7b5153",
+        "uv": "fe656f4f8c970fea82a112ea6708669731cf121c7c7a03311132b5365ba1f272",
+        "uv1": "b805a7087f3acdc0628cdda8ec546dfbe67e05a7df07cdc5c3b4a22d42ad00f0"
+      },
+      "hull": "f6d011724866b9db01b4658682cf2d782be883e2df8159eed7a71fd782fe2e5d",
+      "channels": {
+        "map": [
+          {
+            "width": 520,
+            "height": 520,
+            "hash": "a038e16331a6608f68460bb1b82448c6cf1dc0d9202161786017fb7bbed6d462"
+          }
+        ]
+      },
+      "textureBytes": 1081600
+    },
+    {
+      "sample": 1,
+      "variant": "std",
+      "type": "d6",
+      "buildMs": 11.799999952316284,
+      "copies": {
+        "selfCalls": 12,
+        "selfMs": 2.1999999284744263,
+        "otherCalls": 24,
+        "otherMs": 5.800000071525574
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 36,
+          "materialIndex": 0
+        },
+        {
+          "start": 36,
+          "count": 432,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "4917c1c1d536adffec7156d59b3c5ea201e87680b3127f7af944adcabcfeb66e",
+        "normal": "d43cafffd030606a6aba93a926441e456816f8c8dbf5c20f5bb8a46a39cd1df5",
+        "uv": "951add47b11aa2efacbb85ad3ce006bc51e62f720f9e9ca609a61593b14f5780",
+        "uv1": "486f14532fc006660ff2fd8cdb7c88265274b6a367819bd327a6d731abc26f92"
+      },
+      "hull": "190a36fc5102a5928da1b2dc9da256919560167b12d72bd0ab9e9ea3a7ba253b",
+      "channels": {
+        "map": [
+          {
+            "width": 780,
+            "height": 520,
+            "hash": "a308bb5e9d102f13e6c697b488ee177ccf790fe2fc9a1c49dc33b5bdce58602b"
+          }
+        ]
+      },
+      "textureBytes": 1622400
+    },
+    {
+      "sample": 1,
+      "variant": "std",
+      "type": "d8",
+      "buildMs": 16.100000023841858,
+      "copies": {
+        "selfCalls": 16,
+        "selfMs": 2.399999976158142,
+        "otherCalls": 32,
+        "otherMs": 7.899999976158142
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 24,
+          "materialIndex": 0
+        },
+        {
+          "start": 24,
+          "count": 432,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "15a8f192ce3eaf0ca1f3b398dc1effe13f81b03466b685986715496a2e9cc66f",
+        "normal": "cd1333acbe8e8d66f572b036aac63d09b34bfc1067db89ed9a7b0f9ed3469d34",
+        "uv": "0ecb654000b7b88e013945f5e21ed175b3ddde5cebfd1a54be747f9b75fb445e",
+        "uv1": "7590787fef75ff73e7ff8b0cb5ea07909222008ae9507d7e2a8eade43dc3df21"
+      },
+      "hull": "5cb6874dfbc9355eae72c81172b45a7c2b6f35ec790d0f29be3438de1027d588",
+      "channels": {
+        "map": [
+          {
+            "width": 1040,
+            "height": 520,
+            "hash": "ad3d32ff3080a4bdf3a7f068631620d9f86a5dcff2499c70c283d8774e59cbdf"
+          }
+        ]
+      },
+      "textureBytes": 2163200
+    },
+    {
+      "sample": 1,
+      "variant": "std",
+      "type": "d10",
+      "buildMs": 26.299999952316284,
+      "copies": {
+        "selfCalls": 20,
+        "selfMs": 4.700000166893005,
+        "otherCalls": 40,
+        "otherMs": 8.199999809265137
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 720,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "17aac769a0e7cd8481497c436096d49709e69532739a13b0d9c7682e0cc73c3d",
+        "normal": "4dc33c774f88c0a583bac7ce618137cce54961f8ee1fb5eb8ec5680386211209",
+        "uv": "50ba18b00dd5bc68cd7d8bc625f352a2c7b1f8ee90b04ba7b54f9a389e1f7442",
+        "uv1": "0a9a89af08c022ed966e0989f72dbd59283f01499637848a6b0ef7ca2c2be8a7"
+      },
+      "hull": "21b6dfe36f90106be7230603a2b4d05f4b4b052e2273ffae33ac1292e28b1ddf",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 520,
+            "hash": "a4d952b3fca2602ad00fa7c2ec6879d51091d1659046853bb5f2ad1f2fc6aab5"
+          }
+        ]
+      },
+      "textureBytes": 2704000
+    },
+    {
+      "sample": 1,
+      "variant": "std",
+      "type": "d10x",
+      "buildMs": 29.100000023841858,
+      "copies": {
+        "selfCalls": 20,
+        "selfMs": 2.9000000953674316,
+        "otherCalls": 40,
+        "otherMs": 8.099999904632568
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 720,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "17aac769a0e7cd8481497c436096d49709e69532739a13b0d9c7682e0cc73c3d",
+        "normal": "4dc33c774f88c0a583bac7ce618137cce54961f8ee1fb5eb8ec5680386211209",
+        "uv": "50ba18b00dd5bc68cd7d8bc625f352a2c7b1f8ee90b04ba7b54f9a389e1f7442",
+        "uv1": "0a9a89af08c022ed966e0989f72dbd59283f01499637848a6b0ef7ca2c2be8a7"
+      },
+      "hull": "2b39696f29dc47879f3f16a425b1831ce9dfb8e6d9517a2efe2a328c59918e5c",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 520,
+            "hash": "9d28784e0a481f0254e417550d694ef43604f556592cc7120649d9cb17ef78a0"
+          }
+        ]
+      },
+      "textureBytes": 2704000
+    },
+    {
+      "sample": 1,
+      "variant": "std",
+      "type": "d12",
+      "buildMs": 20.299999952316284,
+      "copies": {
+        "selfCalls": 24,
+        "selfMs": 5.900000214576721,
+        "otherCalls": 48,
+        "otherMs": 8.699999809265137
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 108,
+          "materialIndex": 0
+        },
+        {
+          "start": 108,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "b85ad1410b33ec39811fae51da68d98a406888ac43f7149507dd34142e45c25d",
+        "normal": "d2b8fa164fb15ab6e74c30dc7767d1652de432318bbc30c467b19c9f7a5d36d1",
+        "uv": "de1051eb66a19cdd9ccbc0f4199ec593fdf899522b7d99da7552a41c9c9f0610",
+        "uv1": "f233560ddcd87945b09f895ccace45edf9aac94296e465f792f102448bae079e"
+      },
+      "hull": "33610b9eb8f2682a3da4406a6d0c59f345a90fc7c0cf226bba790185f0693681",
+      "channels": {
+        "map": [
+          {
+            "width": 1040,
+            "height": 780,
+            "hash": "4962682b300cd480622eb04dc5da9c49681f85d8e34baf5c715acdea2a6365e6"
+          }
+        ]
+      },
+      "textureBytes": 3244800
+    },
+    {
+      "sample": 1,
+      "variant": "std",
+      "type": "d20",
+      "buildMs": 34.299999952316284,
+      "copies": {
+        "selfCalls": 40,
+        "selfMs": 9.099999904632568,
+        "otherCalls": 80,
+        "otherMs": 15.100000143051147
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "219aad66101d3cc28d9f045c0dba1cd6211b6258e33f8fa4e5eccfe69741417d",
+        "normal": "a0b36bbfe01d24b1a0e93cd23f061a16ae2677043df7417b590bae3810999f26",
+        "uv": "7521dc1e7b86979c457fc5ad92efe487b0b6770f8194d1d9b45687f9d7412657",
+        "uv1": "4a3afe730db4af103aea12c55893170d4ff3ce1e120785d6d0ea313a98d3d61e"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "089d31aca8dfa23a7ef3e51d54f083ae4be83b5b83bfeaea4aaa9def80024174"
+          }
+        ]
+      },
+      "textureBytes": 5408000
+    },
+    {
+      "sample": 1,
+      "variant": "shroud",
+      "type": "d20",
+      "buildMs": 41.5,
+      "copies": {
+        "selfCalls": 40,
+        "selfMs": 5.7999995946884155,
+        "otherCalls": 80,
+        "otherMs": 26.100000381469727
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "219aad66101d3cc28d9f045c0dba1cd6211b6258e33f8fa4e5eccfe69741417d",
+        "normal": "a0b36bbfe01d24b1a0e93cd23f061a16ae2677043df7417b590bae3810999f26",
+        "uv": "7521dc1e7b86979c457fc5ad92efe487b0b6770f8194d1d9b45687f9d7412657",
+        "uv1": "4a3afe730db4af103aea12c55893170d4ff3ce1e120785d6d0ea313a98d3d61e"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "23c33235ae770515494f3f7037ab351ddd6e6fe281774569af839aa84b539e75"
+          }
+        ]
+      },
+      "textureBytes": 5408000
+    },
+    {
+      "sample": 1,
+      "variant": "classics.ivory",
+      "type": "d20",
+      "buildMs": 42.200000047683716,
+      "copies": {
+        "selfCalls": 40,
+        "selfMs": 7.000000357627869,
+        "otherCalls": 80,
+        "otherMs": 19.5999995470047
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "219aad66101d3cc28d9f045c0dba1cd6211b6258e33f8fa4e5eccfe69741417d",
+        "normal": "a0b36bbfe01d24b1a0e93cd23f061a16ae2677043df7417b590bae3810999f26",
+        "uv": "7521dc1e7b86979c457fc5ad92efe487b0b6770f8194d1d9b45687f9d7412657",
+        "uv1": "4a3afe730db4af103aea12c55893170d4ff3ce1e120785d6d0ea313a98d3d61e"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "c246c72aa9576c0390e8b3d1e63c0bba3c4475254c2f998c218d6e5439bfe4c6"
+          }
+        ]
+      },
+      "textureBytes": 5408000
+    },
+    {
+      "sample": 1,
+      "variant": "tidewrack.seaglass",
+      "type": "d20",
+      "buildMs": 39.10000002384186,
+      "copies": {
+        "selfCalls": 40,
+        "selfMs": 10.199999809265137,
+        "otherCalls": 80,
+        "otherMs": 13.200000166893005
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "c21a0e71b5a1ad71b79ba5d0f849211e8f0e58b09ff1d81e68625683114f3de5",
+        "normal": "d83804b3bf50bfea5347ce60485eccdda184dfa186e9209563f06ad385fbdab4",
+        "uv": "95e5d18468e2f796611f9d8ffb18312f47ad0671ea8aef0cd57a216c437d111b",
+        "uv1": "217e3bf9aa5fb77f5bb9cdad8a95b6d7233cb0adc0a3f0ec8809f1d9fd3f822b"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "6dfc34be0accdd4ee9285a7db4cf3aa4d8ec59590c5aa0dd87234bbfe81e3871"
+          }
+        ]
+      },
+      "textureBytes": 5408000
+    },
+    {
+      "sample": 1,
+      "variant": "symbols.monster",
+      "type": "d6",
+      "buildMs": 11.700000047683716,
+      "copies": {
+        "selfCalls": 12,
+        "selfMs": 1.9000000953674316,
+        "otherCalls": 24,
+        "otherMs": 5.699999928474426
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 36,
+          "materialIndex": 0
+        },
+        {
+          "start": 36,
+          "count": 96,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "4c06981ee0cf84490fae0ca1c2d329c1c5db7da5ce777c93eae610838a7c7bb0",
+        "normal": "da6b1e8805fd550556f90345ee93a741f8048909011b1b949950400edc671359",
+        "uv": "f131904e71ab1c92fe1b5b32f00df6ab63e144f425848016ad2e533b476ca8ed",
+        "uv1": "8493905b955e4420adf1444d990e3ad5a676f671599c97d7db472fd2d0649385"
+      },
+      "hull": "190a36fc5102a5928da1b2dc9da256919560167b12d72bd0ab9e9ea3a7ba253b",
+      "channels": {
+        "map": [
+          {
+            "width": 780,
+            "height": 520,
+            "hash": "0d13f5d69d301dfd7616cc05745819e6217519bea9f8e5ee6b211627f7b92a8c"
+          }
+        ]
+      },
+      "textureBytes": 1622400
+    },
+    {
+      "sample": 1,
+      "variant": "test.texture",
+      "type": "d20",
+      "buildMs": 280.2000000476837,
+      "copies": {
+        "selfCalls": 120,
+        "selfMs": 24.59999966621399,
+        "otherCalls": 260,
+        "otherMs": 63.799999952316284
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 288,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "7c2094a0d14a65bbde0b4baaa77adf9e538e55adc7110276beaf4e8d4bebb888",
+        "normal": "30b2fa3fadc1f0754f388f8c34b81840050c12589ca92e2e4031947c38d7f536",
+        "uv": "1a98470edf84975c7d81e3d108bec4884a82d5d56e471cece32e815fd9239d9b",
+        "uv1": "ce12880aa1940b2760f04675141d7c84f354b831c952afc25a51364050b9513a"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "bc7631c77ed39d2542986e5e307d7e89fb4b737c2c7e8b2c00ec10b4fca8fc4d"
+          }
+        ],
+        "normalMap": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "048b1de450a57c6885a45181ca39a8d16024519e002892f310d26dc5c8410174"
+          }
+        ],
+        "emissiveMap": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "13f91c9a41bdfb610b938fb5a0f68021d8fd11f3c991f82c48be79c237346287"
+          }
+        ]
+      },
+      "textureBytes": 16224000
+    },
+    {
+      "sample": 1,
+      "variant": "emberforge.blackanvil",
+      "type": "d20",
+      "buildMs": 238.60000002384186,
+      "copies": {
+        "selfCalls": 0,
+        "selfMs": 0,
+        "otherCalls": 20,
+        "otherMs": 25.99999988079071
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 3,
+          "materialIndex": 0
+        },
+        {
+          "start": 3,
+          "count": 3,
+          "materialIndex": 1
+        },
+        {
+          "start": 6,
+          "count": 3,
+          "materialIndex": 2
+        },
+        {
+          "start": 9,
+          "count": 3,
+          "materialIndex": 3
+        },
+        {
+          "start": 12,
+          "count": 3,
+          "materialIndex": 4
+        },
+        {
+          "start": 15,
+          "count": 3,
+          "materialIndex": 5
+        },
+        {
+          "start": 18,
+          "count": 3,
+          "materialIndex": 6
+        },
+        {
+          "start": 21,
+          "count": 3,
+          "materialIndex": 7
+        },
+        {
+          "start": 24,
+          "count": 3,
+          "materialIndex": 8
+        },
+        {
+          "start": 27,
+          "count": 3,
+          "materialIndex": 9
+        },
+        {
+          "start": 30,
+          "count": 3,
+          "materialIndex": 10
+        },
+        {
+          "start": 33,
+          "count": 3,
+          "materialIndex": 11
+        },
+        {
+          "start": 36,
+          "count": 3,
+          "materialIndex": 12
+        },
+        {
+          "start": 39,
+          "count": 3,
+          "materialIndex": 13
+        },
+        {
+          "start": 42,
+          "count": 3,
+          "materialIndex": 14
+        },
+        {
+          "start": 45,
+          "count": 3,
+          "materialIndex": 15
+        },
+        {
+          "start": 48,
+          "count": 3,
+          "materialIndex": 16
+        },
+        {
+          "start": 51,
+          "count": 3,
+          "materialIndex": 17
+        },
+        {
+          "start": 54,
+          "count": 3,
+          "materialIndex": 18
+        },
+        {
+          "start": 57,
+          "count": 3,
+          "materialIndex": 19
+        },
+        {
+          "start": 60,
+          "count": 288,
+          "materialIndex": 20
+        }
+      ],
+      "shape": {
+        "position": "858e5cf722e396580776b5416fc5469fd1c083dbfdbf6189074a029203c7ab45",
+        "normal": "c5245328101caa7569fa6661cf9c360e49a305c1456d9e7d78c57766ad1ea840",
+        "uv": "1a98470edf84975c7d81e3d108bec4884a82d5d56e471cece32e815fd9239d9b"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "87404b98e2bb0b6d1ebce6eb636c3b85e1d2c2b9ba5fe36210d16da2661963da"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "69c317cf984cf4dffd493a84a8e0915020b47d7297697cda7ea2318bed3d0dc5"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "f4e572c10671dbe813c9a7a9d780d9122101e3659dd5a6b50aa5ed7b28cc4a72"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "bb83a480ce029f9c3e01b30eab484c2ecb2594e64902da9ca37a694fef9f19b3"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "c99b742eb294cf22343d7ee40a9cdb9c152b233f206161ba0c952c8a48a4ad5b"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9e7f8373609cf80d4eefb84b647b03c80088e873cf0d9d8a65a976e917755bde"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "d5ce49678665945a6061ce2f50d8d2db09c81a18d2a31727af65e9d86d991c57"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9c50a1bf4e5c54503f5d230442d7b6f30f245d11d4fb33ead86755f7685067c3"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "8725a5ae555b8c1838f63484eec1bbbbd2240cc51e19a1b6b25f671d9735a97c"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "b50b39350074afaa538c14bef6306239d04690f8d330866cde2b52be43bfcb09"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "1fbca316b00bba32c4613d3aef6bffc3c0d2b333f9834eb834b4f78d7922c4ba"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "04fb0a4712184e16d17da68b2c2a8b24b7666a8e6502d3053b25100c2545b6e9"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "c8c429f73ba0a2bdd51f71eebb56ba6965c8b6e441c1328ab105176a05a66c06"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "83204913f4e971d06f15724cfbe8eab69ab02ee815357eee7fe18c2a57613571"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "f79c12e6cbb1d5b888aeee6f30715f29cb38f44109b6b235b18687a3374db17e"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "ab44b59106a3360272668af64decb506d5c0b3cdf3633dfde49ced934792c2fd"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "4e5baf9baa450a44471d3622918cc7eeafd5fdfa9499c5fbfd8b107c47134e53"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "533fe3614d886759f0682217fcac6eb011670c3b444d5c24a6933bd8d5e60511"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "a2ca522559d3852bc827951695ef4f1bde55200300bb336efb4d81ac0ba906c4"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "992710d3119262424e2d9f9b663130bd8123a15b58885943dbceeec6d52993bc"
+          }
+        ],
+        "normalMap": [
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "7176847e57988553a305fbca0bfd38e26f9fd2ef827f9373b0433a7bbafd8b68"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "3aa58b6db8f53c1bccc86ecae8f2b29b23ff0bbe396ef8a1c16cc27291fa2597"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "cbc48b2100ff4951c914c6f9b0b5195e734b00a2bf8e3109c3106f43f2914467"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "cab16424fe1bef3f587d83bae48eb928d36c032e9642570b04336859a4e7680b"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "a18014e901ff487e72efb2605d9bebdde0f06c8468804d00367670d785150575"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "7523d3b04427987afcd363120b484485eddfa053352ae6f41da18ef4d9acdcd8"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "959045b53c4bafac29f76deab0ab70c7fcbb1ec2d9619ea7b9b774f1ad57848d"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "ab290d7d42b61518b48024542cba84c4c6630d39b4dac6adcda6c57560fa0310"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "8d87b811e576926210a20b152f3c40d0f3422727bfdd924b8d5a7b0a2900e5d4"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "5190d8e1c8aefc51fce26824779584c0a42d0e56b34220d472091793c76b7db4"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "2161b1212b7a289f9e3d72961c9bc4e46fbeca08ddb171cef3726e674b69ddd4"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "ac701a62e61ca20b389c86b7205c56f7f800604d623fa0200af687ba98c1b8bc"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9a3a2a333e98b657fc8ce1056ee47449f590c538293a9d9a7e43171e113639e3"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "b68ba47f19524f5080cce689a1accfd67095208902706d5667bf9823ee168c72"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9f14fc683d11229a6db59a18785ad258776190331d6e482dbc4342cb4ba8df23"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "74d4d9e1ff265e6765dc0d46a1a487e6f25e30fdcd08519ff9b3d450b09a28a7"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "f097d3921581b2c4654766ea64ec20dc958a0d427715d3043dfdb6287f0f5ec7"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "3575896e178187c434edbcff56c6ce884933f244026aac6e54044f6bbffa8045"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "97c280ca9d6c6c124e287e98df95fb75e96fc74b4818ad9f025826a28887d6ee"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "810df2b8241d66a3af33c30cc4f5ec816708e3d72e5783184c6d8163037ef473"
+          }
+        ],
+        "emissiveMap": [
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "3a9249ba3693779952a1e66660ae31d92b46343705b801292510c3ba8106e2f6"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "362c2d3c5becf8a254d02879a4eda4112426e5325cf49719423bb1ce85667494"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "d59eadbf05d27ec53d2db9a934e9dc5ab4ee4fc9a0dbca75268d94c34b2201dd"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "be9987b2fc0a0add35d1e9428f2c2f32cab40ff7ede652311752333f0d6ff63d"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "86599bd7bfcf220d9b536c63aa7c8aa31299f8115b685de962ec47cad307d699"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "2655e0f592e9710966feafd5c396aa378fb3fc55566906234295d01f7c79dab2"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "e7c555b73e7dd50529e205a77c84cf7ab47ff6ddb690becbfa5610edd0af8d56"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "bc00dede54f021dcd7741a583521aa1e49954b87c27b464624ee106971a4be20"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "3fca507ecb0332223d17e459d56f7a751225a2880ffa7b5c2d79336fc181b612"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "01bb8a5cec54b7da7dadde25832396a6d1b0cf420a0ebad76dac3206cc59e318"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "c03455ea72758f1a130b2fc7a39ea7627f955b76466865232dd5ae8f0905f782"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "1830ff1fbefb1319a7ee1394826227b4215523aab952e606af5179bac1f91677"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "74857f9c0f25a5a793a5ceb6ccdda6c7b3318fa5a589527f547a6eeb8e2ad4bc"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "52a262fb89992f2e147f40b21f157ecca90d003b9b81a111daac157d8338e921"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "cb80e52f9f8e902a3af40765e317da25c6bc89a13455d90a73dea9ad7264fc39"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "8da1c6a44098eb99c99cfd13cce4e2dd1c92aa2abafac62a08ab02971970c17a"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "dc4fb6813521ca1b108232d043b366aa608bf78a9fb5d3ff6c84c2f1ac5a28c9"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "cbbe9930829c0764494e622251bf4c79218876ed2e1c9b11164ff3ef25470169"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9d0b529bdea678e16fafea4a5f37d2c8f65c20b1c0a7f417d5426fa44c2062ac"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "f648526fcf856e801ee0562440bcb711c82f7c214e3a8e0a3391ba96a0dfc844"
+          }
+        ]
+      },
+      "textureBytes": 15728640
+    },
+    {
+      "sample": 2,
+      "variant": "std",
+      "type": "d4",
+      "buildMs": 7.399999976158142,
+      "copies": {
+        "selfCalls": 8,
+        "selfMs": 1.5,
+        "otherCalls": 16,
+        "otherMs": 3.299999952316284
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 12,
+          "materialIndex": 0
+        },
+        {
+          "start": 12,
+          "count": 216,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "4c203386f1c7037155ba1afbd97bdd80e9895ad3c20c8347bd1d353ea7c2abce",
+        "normal": "0ddb052558ff70b1da0308ed186249595aadd2c5decdaa1acd3d0bb2ba7b5153",
+        "uv": "fe656f4f8c970fea82a112ea6708669731cf121c7c7a03311132b5365ba1f272",
+        "uv1": "b805a7087f3acdc0628cdda8ec546dfbe67e05a7df07cdc5c3b4a22d42ad00f0"
+      },
+      "hull": "f6d011724866b9db01b4658682cf2d782be883e2df8159eed7a71fd782fe2e5d",
+      "channels": {
+        "map": [
+          {
+            "width": 520,
+            "height": 520,
+            "hash": "a038e16331a6608f68460bb1b82448c6cf1dc0d9202161786017fb7bbed6d462"
+          }
+        ]
+      },
+      "textureBytes": 1081600
+    },
+    {
+      "sample": 2,
+      "variant": "std",
+      "type": "d6",
+      "buildMs": 12.100000023841858,
+      "copies": {
+        "selfCalls": 12,
+        "selfMs": 0.5000001192092896,
+        "otherCalls": 24,
+        "otherMs": 6.3999998569488525
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 36,
+          "materialIndex": 0
+        },
+        {
+          "start": 36,
+          "count": 432,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "4917c1c1d536adffec7156d59b3c5ea201e87680b3127f7af944adcabcfeb66e",
+        "normal": "d43cafffd030606a6aba93a926441e456816f8c8dbf5c20f5bb8a46a39cd1df5",
+        "uv": "951add47b11aa2efacbb85ad3ce006bc51e62f720f9e9ca609a61593b14f5780",
+        "uv1": "486f14532fc006660ff2fd8cdb7c88265274b6a367819bd327a6d731abc26f92"
+      },
+      "hull": "190a36fc5102a5928da1b2dc9da256919560167b12d72bd0ab9e9ea3a7ba253b",
+      "channels": {
+        "map": [
+          {
+            "width": 780,
+            "height": 520,
+            "hash": "a308bb5e9d102f13e6c697b488ee177ccf790fe2fc9a1c49dc33b5bdce58602b"
+          }
+        ]
+      },
+      "textureBytes": 1622400
+    },
+    {
+      "sample": 2,
+      "variant": "std",
+      "type": "d8",
+      "buildMs": 15.399999976158142,
+      "copies": {
+        "selfCalls": 16,
+        "selfMs": 4.699999809265137,
+        "otherCalls": 32,
+        "otherMs": 6.000000238418579
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 24,
+          "materialIndex": 0
+        },
+        {
+          "start": 24,
+          "count": 432,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "15a8f192ce3eaf0ca1f3b398dc1effe13f81b03466b685986715496a2e9cc66f",
+        "normal": "cd1333acbe8e8d66f572b036aac63d09b34bfc1067db89ed9a7b0f9ed3469d34",
+        "uv": "0ecb654000b7b88e013945f5e21ed175b3ddde5cebfd1a54be747f9b75fb445e",
+        "uv1": "7590787fef75ff73e7ff8b0cb5ea07909222008ae9507d7e2a8eade43dc3df21"
+      },
+      "hull": "5cb6874dfbc9355eae72c81172b45a7c2b6f35ec790d0f29be3438de1027d588",
+      "channels": {
+        "map": [
+          {
+            "width": 1040,
+            "height": 520,
+            "hash": "ad3d32ff3080a4bdf3a7f068631620d9f86a5dcff2499c70c283d8774e59cbdf"
+          }
+        ]
+      },
+      "textureBytes": 2163200
+    },
+    {
+      "sample": 2,
+      "variant": "std",
+      "type": "d10",
+      "buildMs": 19.300000071525574,
+      "copies": {
+        "selfCalls": 20,
+        "selfMs": 3.899999976158142,
+        "otherCalls": 40,
+        "otherMs": 8.400000095367432
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 720,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "17aac769a0e7cd8481497c436096d49709e69532739a13b0d9c7682e0cc73c3d",
+        "normal": "4dc33c774f88c0a583bac7ce618137cce54961f8ee1fb5eb8ec5680386211209",
+        "uv": "50ba18b00dd5bc68cd7d8bc625f352a2c7b1f8ee90b04ba7b54f9a389e1f7442",
+        "uv1": "0a9a89af08c022ed966e0989f72dbd59283f01499637848a6b0ef7ca2c2be8a7"
+      },
+      "hull": "21b6dfe36f90106be7230603a2b4d05f4b4b052e2273ffae33ac1292e28b1ddf",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 520,
+            "hash": "a4d952b3fca2602ad00fa7c2ec6879d51091d1659046853bb5f2ad1f2fc6aab5"
+          }
+        ]
+      },
+      "textureBytes": 2704000
+    },
+    {
+      "sample": 2,
+      "variant": "std",
+      "type": "d10x",
+      "buildMs": 18.5,
+      "copies": {
+        "selfCalls": 20,
+        "selfMs": 4.599999785423279,
+        "otherCalls": 40,
+        "otherMs": 8.300000190734863
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 720,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "17aac769a0e7cd8481497c436096d49709e69532739a13b0d9c7682e0cc73c3d",
+        "normal": "4dc33c774f88c0a583bac7ce618137cce54961f8ee1fb5eb8ec5680386211209",
+        "uv": "50ba18b00dd5bc68cd7d8bc625f352a2c7b1f8ee90b04ba7b54f9a389e1f7442",
+        "uv1": "0a9a89af08c022ed966e0989f72dbd59283f01499637848a6b0ef7ca2c2be8a7"
+      },
+      "hull": "2b39696f29dc47879f3f16a425b1831ce9dfb8e6d9517a2efe2a328c59918e5c",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 520,
+            "hash": "9d28784e0a481f0254e417550d694ef43604f556592cc7120649d9cb17ef78a0"
+          }
+        ]
+      },
+      "textureBytes": 2704000
+    },
+    {
+      "sample": 2,
+      "variant": "std",
+      "type": "d12",
+      "buildMs": 22.200000047683716,
+      "copies": {
+        "selfCalls": 24,
+        "selfMs": 5.200000286102295,
+        "otherCalls": 48,
+        "otherMs": 9.999999761581421
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 108,
+          "materialIndex": 0
+        },
+        {
+          "start": 108,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "b85ad1410b33ec39811fae51da68d98a406888ac43f7149507dd34142e45c25d",
+        "normal": "d2b8fa164fb15ab6e74c30dc7767d1652de432318bbc30c467b19c9f7a5d36d1",
+        "uv": "de1051eb66a19cdd9ccbc0f4199ec593fdf899522b7d99da7552a41c9c9f0610",
+        "uv1": "f233560ddcd87945b09f895ccace45edf9aac94296e465f792f102448bae079e"
+      },
+      "hull": "33610b9eb8f2682a3da4406a6d0c59f345a90fc7c0cf226bba790185f0693681",
+      "channels": {
+        "map": [
+          {
+            "width": 1040,
+            "height": 780,
+            "hash": "4962682b300cd480622eb04dc5da9c49681f85d8e34baf5c715acdea2a6365e6"
+          }
+        ]
+      },
+      "textureBytes": 3244800
+    },
+    {
+      "sample": 2,
+      "variant": "std",
+      "type": "d20",
+      "buildMs": 39.89999997615814,
+      "copies": {
+        "selfCalls": 40,
+        "selfMs": 5.800000190734863,
+        "otherCalls": 80,
+        "otherMs": 19.59999978542328
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "219aad66101d3cc28d9f045c0dba1cd6211b6258e33f8fa4e5eccfe69741417d",
+        "normal": "a0b36bbfe01d24b1a0e93cd23f061a16ae2677043df7417b590bae3810999f26",
+        "uv": "7521dc1e7b86979c457fc5ad92efe487b0b6770f8194d1d9b45687f9d7412657",
+        "uv1": "4a3afe730db4af103aea12c55893170d4ff3ce1e120785d6d0ea313a98d3d61e"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "089d31aca8dfa23a7ef3e51d54f083ae4be83b5b83bfeaea4aaa9def80024174"
+          }
+        ]
+      },
+      "textureBytes": 5408000
+    },
+    {
+      "sample": 2,
+      "variant": "shroud",
+      "type": "d20",
+      "buildMs": 41.5,
+      "copies": {
+        "selfCalls": 40,
+        "selfMs": 9.799999713897705,
+        "otherCalls": 80,
+        "otherMs": 24.300000309944153
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "219aad66101d3cc28d9f045c0dba1cd6211b6258e33f8fa4e5eccfe69741417d",
+        "normal": "a0b36bbfe01d24b1a0e93cd23f061a16ae2677043df7417b590bae3810999f26",
+        "uv": "7521dc1e7b86979c457fc5ad92efe487b0b6770f8194d1d9b45687f9d7412657",
+        "uv1": "4a3afe730db4af103aea12c55893170d4ff3ce1e120785d6d0ea313a98d3d61e"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "23c33235ae770515494f3f7037ab351ddd6e6fe281774569af839aa84b539e75"
+          }
+        ]
+      },
+      "textureBytes": 5408000
+    },
+    {
+      "sample": 2,
+      "variant": "classics.ivory",
+      "type": "d20",
+      "buildMs": 33.90000009536743,
+      "copies": {
+        "selfCalls": 40,
+        "selfMs": 9.0999995470047,
+        "otherCalls": 80,
+        "otherMs": 15.500000476837158
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "219aad66101d3cc28d9f045c0dba1cd6211b6258e33f8fa4e5eccfe69741417d",
+        "normal": "a0b36bbfe01d24b1a0e93cd23f061a16ae2677043df7417b590bae3810999f26",
+        "uv": "7521dc1e7b86979c457fc5ad92efe487b0b6770f8194d1d9b45687f9d7412657",
+        "uv1": "4a3afe730db4af103aea12c55893170d4ff3ce1e120785d6d0ea313a98d3d61e"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "c246c72aa9576c0390e8b3d1e63c0bba3c4475254c2f998c218d6e5439bfe4c6"
+          }
+        ]
+      },
+      "textureBytes": 5408000
+    },
+    {
+      "sample": 2,
+      "variant": "tidewrack.seaglass",
+      "type": "d20",
+      "buildMs": 36.60000002384186,
+      "copies": {
+        "selfCalls": 40,
+        "selfMs": 9.5,
+        "otherCalls": 80,
+        "otherMs": 14.899999976158142
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 1080,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "c21a0e71b5a1ad71b79ba5d0f849211e8f0e58b09ff1d81e68625683114f3de5",
+        "normal": "d83804b3bf50bfea5347ce60485eccdda184dfa186e9209563f06ad385fbdab4",
+        "uv": "95e5d18468e2f796611f9d8ffb18312f47ad0671ea8aef0cd57a216c437d111b",
+        "uv1": "217e3bf9aa5fb77f5bb9cdad8a95b6d7233cb0adc0a3f0ec8809f1d9fd3f822b"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "6dfc34be0accdd4ee9285a7db4cf3aa4d8ec59590c5aa0dd87234bbfe81e3871"
+          }
+        ]
+      },
+      "textureBytes": 5408000
+    },
+    {
+      "sample": 2,
+      "variant": "symbols.monster",
+      "type": "d6",
+      "buildMs": 8.899999976158142,
+      "copies": {
+        "selfCalls": 12,
+        "selfMs": 1.100000023841858,
+        "otherCalls": 24,
+        "otherMs": 5.199999928474426
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 36,
+          "materialIndex": 0
+        },
+        {
+          "start": 36,
+          "count": 96,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "4c06981ee0cf84490fae0ca1c2d329c1c5db7da5ce777c93eae610838a7c7bb0",
+        "normal": "da6b1e8805fd550556f90345ee93a741f8048909011b1b949950400edc671359",
+        "uv": "f131904e71ab1c92fe1b5b32f00df6ab63e144f425848016ad2e533b476ca8ed",
+        "uv1": "8493905b955e4420adf1444d990e3ad5a676f671599c97d7db472fd2d0649385"
+      },
+      "hull": "190a36fc5102a5928da1b2dc9da256919560167b12d72bd0ab9e9ea3a7ba253b",
+      "channels": {
+        "map": [
+          {
+            "width": 780,
+            "height": 520,
+            "hash": "0d13f5d69d301dfd7616cc05745819e6217519bea9f8e5ee6b211627f7b92a8c"
+          }
+        ]
+      },
+      "textureBytes": 1622400
+    },
+    {
+      "sample": 2,
+      "variant": "test.texture",
+      "type": "d20",
+      "buildMs": 303.3000000715256,
+      "copies": {
+        "selfCalls": 120,
+        "selfMs": 21.799999952316284,
+        "otherCalls": 260,
+        "otherMs": 65.70000004768372
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 60,
+          "materialIndex": 0
+        },
+        {
+          "start": 60,
+          "count": 288,
+          "materialIndex": 1
+        }
+      ],
+      "shape": {
+        "position": "7c2094a0d14a65bbde0b4baaa77adf9e538e55adc7110276beaf4e8d4bebb888",
+        "normal": "30b2fa3fadc1f0754f388f8c34b81840050c12589ca92e2e4031947c38d7f536",
+        "uv": "1a98470edf84975c7d81e3d108bec4884a82d5d56e471cece32e815fd9239d9b",
+        "uv1": "ce12880aa1940b2760f04675141d7c84f354b831c952afc25a51364050b9513a"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "bc7631c77ed39d2542986e5e307d7e89fb4b737c2c7e8b2c00ec10b4fca8fc4d"
+          }
+        ],
+        "normalMap": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "048b1de450a57c6885a45181ca39a8d16024519e002892f310d26dc5c8410174"
+          }
+        ],
+        "emissiveMap": [
+          {
+            "width": 1300,
+            "height": 1040,
+            "hash": "13f91c9a41bdfb610b938fb5a0f68021d8fd11f3c991f82c48be79c237346287"
+          }
+        ]
+      },
+      "textureBytes": 16224000
+    },
+    {
+      "sample": 2,
+      "variant": "emberforge.blackanvil",
+      "type": "d20",
+      "buildMs": 207.39999997615814,
+      "copies": {
+        "selfCalls": 0,
+        "selfMs": 0,
+        "otherCalls": 20,
+        "otherMs": 27.299999952316284
+      },
+      "groups": [
+        {
+          "start": 0,
+          "count": 3,
+          "materialIndex": 0
+        },
+        {
+          "start": 3,
+          "count": 3,
+          "materialIndex": 1
+        },
+        {
+          "start": 6,
+          "count": 3,
+          "materialIndex": 2
+        },
+        {
+          "start": 9,
+          "count": 3,
+          "materialIndex": 3
+        },
+        {
+          "start": 12,
+          "count": 3,
+          "materialIndex": 4
+        },
+        {
+          "start": 15,
+          "count": 3,
+          "materialIndex": 5
+        },
+        {
+          "start": 18,
+          "count": 3,
+          "materialIndex": 6
+        },
+        {
+          "start": 21,
+          "count": 3,
+          "materialIndex": 7
+        },
+        {
+          "start": 24,
+          "count": 3,
+          "materialIndex": 8
+        },
+        {
+          "start": 27,
+          "count": 3,
+          "materialIndex": 9
+        },
+        {
+          "start": 30,
+          "count": 3,
+          "materialIndex": 10
+        },
+        {
+          "start": 33,
+          "count": 3,
+          "materialIndex": 11
+        },
+        {
+          "start": 36,
+          "count": 3,
+          "materialIndex": 12
+        },
+        {
+          "start": 39,
+          "count": 3,
+          "materialIndex": 13
+        },
+        {
+          "start": 42,
+          "count": 3,
+          "materialIndex": 14
+        },
+        {
+          "start": 45,
+          "count": 3,
+          "materialIndex": 15
+        },
+        {
+          "start": 48,
+          "count": 3,
+          "materialIndex": 16
+        },
+        {
+          "start": 51,
+          "count": 3,
+          "materialIndex": 17
+        },
+        {
+          "start": 54,
+          "count": 3,
+          "materialIndex": 18
+        },
+        {
+          "start": 57,
+          "count": 3,
+          "materialIndex": 19
+        },
+        {
+          "start": 60,
+          "count": 288,
+          "materialIndex": 20
+        }
+      ],
+      "shape": {
+        "position": "858e5cf722e396580776b5416fc5469fd1c083dbfdbf6189074a029203c7ab45",
+        "normal": "c5245328101caa7569fa6661cf9c360e49a305c1456d9e7d78c57766ad1ea840",
+        "uv": "1a98470edf84975c7d81e3d108bec4884a82d5d56e471cece32e815fd9239d9b"
+      },
+      "hull": "03ef571c04d2a43aea35e1566b5ec4f85ff4aa8e6c9f9066012e0e2d91408b68",
+      "channels": {
+        "map": [
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "87404b98e2bb0b6d1ebce6eb636c3b85e1d2c2b9ba5fe36210d16da2661963da"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "69c317cf984cf4dffd493a84a8e0915020b47d7297697cda7ea2318bed3d0dc5"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "f4e572c10671dbe813c9a7a9d780d9122101e3659dd5a6b50aa5ed7b28cc4a72"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "bb83a480ce029f9c3e01b30eab484c2ecb2594e64902da9ca37a694fef9f19b3"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "c99b742eb294cf22343d7ee40a9cdb9c152b233f206161ba0c952c8a48a4ad5b"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9e7f8373609cf80d4eefb84b647b03c80088e873cf0d9d8a65a976e917755bde"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "d5ce49678665945a6061ce2f50d8d2db09c81a18d2a31727af65e9d86d991c57"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9c50a1bf4e5c54503f5d230442d7b6f30f245d11d4fb33ead86755f7685067c3"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "8725a5ae555b8c1838f63484eec1bbbbd2240cc51e19a1b6b25f671d9735a97c"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "b50b39350074afaa538c14bef6306239d04690f8d330866cde2b52be43bfcb09"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "1fbca316b00bba32c4613d3aef6bffc3c0d2b333f9834eb834b4f78d7922c4ba"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "04fb0a4712184e16d17da68b2c2a8b24b7666a8e6502d3053b25100c2545b6e9"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "c8c429f73ba0a2bdd51f71eebb56ba6965c8b6e441c1328ab105176a05a66c06"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "83204913f4e971d06f15724cfbe8eab69ab02ee815357eee7fe18c2a57613571"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "f79c12e6cbb1d5b888aeee6f30715f29cb38f44109b6b235b18687a3374db17e"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "ab44b59106a3360272668af64decb506d5c0b3cdf3633dfde49ced934792c2fd"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "4e5baf9baa450a44471d3622918cc7eeafd5fdfa9499c5fbfd8b107c47134e53"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "533fe3614d886759f0682217fcac6eb011670c3b444d5c24a6933bd8d5e60511"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "a2ca522559d3852bc827951695ef4f1bde55200300bb336efb4d81ac0ba906c4"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "992710d3119262424e2d9f9b663130bd8123a15b58885943dbceeec6d52993bc"
+          }
+        ],
+        "normalMap": [
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "7176847e57988553a305fbca0bfd38e26f9fd2ef827f9373b0433a7bbafd8b68"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "3aa58b6db8f53c1bccc86ecae8f2b29b23ff0bbe396ef8a1c16cc27291fa2597"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "cbc48b2100ff4951c914c6f9b0b5195e734b00a2bf8e3109c3106f43f2914467"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "cab16424fe1bef3f587d83bae48eb928d36c032e9642570b04336859a4e7680b"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "a18014e901ff487e72efb2605d9bebdde0f06c8468804d00367670d785150575"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "7523d3b04427987afcd363120b484485eddfa053352ae6f41da18ef4d9acdcd8"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "959045b53c4bafac29f76deab0ab70c7fcbb1ec2d9619ea7b9b774f1ad57848d"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "ab290d7d42b61518b48024542cba84c4c6630d39b4dac6adcda6c57560fa0310"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "8d87b811e576926210a20b152f3c40d0f3422727bfdd924b8d5a7b0a2900e5d4"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "5190d8e1c8aefc51fce26824779584c0a42d0e56b34220d472091793c76b7db4"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "2161b1212b7a289f9e3d72961c9bc4e46fbeca08ddb171cef3726e674b69ddd4"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "ac701a62e61ca20b389c86b7205c56f7f800604d623fa0200af687ba98c1b8bc"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9a3a2a333e98b657fc8ce1056ee47449f590c538293a9d9a7e43171e113639e3"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "b68ba47f19524f5080cce689a1accfd67095208902706d5667bf9823ee168c72"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9f14fc683d11229a6db59a18785ad258776190331d6e482dbc4342cb4ba8df23"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "74d4d9e1ff265e6765dc0d46a1a487e6f25e30fdcd08519ff9b3d450b09a28a7"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "f097d3921581b2c4654766ea64ec20dc958a0d427715d3043dfdb6287f0f5ec7"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "3575896e178187c434edbcff56c6ce884933f244026aac6e54044f6bbffa8045"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "97c280ca9d6c6c124e287e98df95fb75e96fc74b4818ad9f025826a28887d6ee"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "810df2b8241d66a3af33c30cc4f5ec816708e3d72e5783184c6d8163037ef473"
+          }
+        ],
+        "emissiveMap": [
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "3a9249ba3693779952a1e66660ae31d92b46343705b801292510c3ba8106e2f6"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "362c2d3c5becf8a254d02879a4eda4112426e5325cf49719423bb1ce85667494"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "d59eadbf05d27ec53d2db9a934e9dc5ab4ee4fc9a0dbca75268d94c34b2201dd"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "be9987b2fc0a0add35d1e9428f2c2f32cab40ff7ede652311752333f0d6ff63d"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "86599bd7bfcf220d9b536c63aa7c8aa31299f8115b685de962ec47cad307d699"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "2655e0f592e9710966feafd5c396aa378fb3fc55566906234295d01f7c79dab2"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "e7c555b73e7dd50529e205a77c84cf7ab47ff6ddb690becbfa5610edd0af8d56"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "bc00dede54f021dcd7741a583521aa1e49954b87c27b464624ee106971a4be20"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "3fca507ecb0332223d17e459d56f7a751225a2880ffa7b5c2d79336fc181b612"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "01bb8a5cec54b7da7dadde25832396a6d1b0cf420a0ebad76dac3206cc59e318"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "c03455ea72758f1a130b2fc7a39ea7627f955b76466865232dd5ae8f0905f782"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "1830ff1fbefb1319a7ee1394826227b4215523aab952e606af5179bac1f91677"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "74857f9c0f25a5a793a5ceb6ccdda6c7b3318fa5a589527f547a6eeb8e2ad4bc"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "52a262fb89992f2e147f40b21f157ecca90d003b9b81a111daac157d8338e921"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "cb80e52f9f8e902a3af40765e317da25c6bc89a13455d90a73dea9ad7264fc39"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "8da1c6a44098eb99c99cfd13cce4e2dd1c92aa2abafac62a08ab02971970c17a"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "dc4fb6813521ca1b108232d043b366aa608bf78a9fb5d3ff6c84c2f1ac5a28c9"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "cbbe9930829c0764494e622251bf4c79218876ed2e1c9b11164ff3ef25470169"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "9d0b529bdea678e16fafea4a5f37d2c8f65c20b1c0a7f417d5426fa44c2062ac"
+          },
+          {
+            "width": 256,
+            "height": 256,
+            "hash": "f648526fcf856e801ee0562440bcb711c82f7c214e3a8e0a3391ba96a0dfc844"
+          }
+        ]
+      },
+      "textureBytes": 15728640
+    }
+  ]
+}

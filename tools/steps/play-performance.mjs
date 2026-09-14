@@ -9,7 +9,7 @@ import {click} from '../../tests/fixtures/visible-input.mjs';
 const observe=`(()=>{
   const p=window.__playProbe={tasks:[],clicks:[],frames:[],rolls:{},ready:null,stop:false};
   new PerformanceObserver(list=>p.tasks.push(...list.getEntries().map(e=>({at:e.startTime,ms:e.duration})))).observe({type:'longtask'});
-  document.addEventListener('click',event=>{const button=event.target.closest('button');if(button)p.clicks.push({id:button.id,quick:button.dataset.quick,workspace:button.dataset.workspace,at:performance.now(),queued:performance.now()-event.timeStamp});},true);
+  document.addEventListener('click',event=>{const button=event.target.closest('button');if(button)p.clicks.push({id:button.id,quick:button.dataset.quick,pool:button.dataset.pool,workspace:button.dataset.workspace,at:performance.now(),queued:performance.now()-event.timeStamp});},true);
   const raf=window.requestAnimationFrame.bind(window);let lastFrame=0,previous=0;
   window.requestAnimationFrame=fn=>raf(time=>{
     fn(time);
@@ -51,6 +51,10 @@ export default async function run(stage,args){
   const cpu=Number(args.find(a=>a.startsWith('--cpu='))?.split('=')[1]||4),runs=Number(args.find(a=>a.startsWith('--runs='))?.split('=')[1]||1);
   const dpr=Number(args.find(a=>a.startsWith('--dpr='))?.split('=')[1]||1);
   const builderFirst=args.includes('--builder-first');
+  const firstNotation=args.find(a=>a.startsWith('--first='))?.slice(8)||'2d6';
+  const firstSet=args.find(a=>a.startsWith('--set='))?.slice(6)||'std';
+  const incomingMixed=args.includes('--incoming-mixed');
+  assert.ok(!builderFirst||firstNotation==='2d6','the builder-first path composes two d6');
   const network=args.includes('--network'),cases=args.includes('--plain')?['table']:args.includes('--copper')?['copper']:['table','copper'];
   const rows=[];
   for(const venue of cases)for(let sample=0;sample<runs;sample++){
@@ -79,6 +83,7 @@ export default async function run(stage,args){
       const bootProfile=(await cdp('Profiler.stop')).profile;
       writeFileSync(`${dir}/${venue}-${sample}-startup.cpuprofile`,JSON.stringify(bootProfile));
       const boot=await a.eval(`({ready:__playProbe.ready,tasks:__playProbe.tasks,paint:performance.getEntriesByType('paint').map(e=>({name:e.name,at:e.startTime})),resources:performance.getEntriesByType('resource').map(e=>({path:new URL(e.name).pathname,at:e.startTime,ms:e.duration,encoded:e.encodedBodySize,bytes:e.transferSize}))})`);
+      if(firstSet!=='std')await a.dbg(`setDiceSet(${JSON.stringify(firstSet)})`);
       await cdp('Profiler.start');
       let coldBuilder=null;
       if(builderFirst){
@@ -90,7 +95,14 @@ export default async function run(stage,args){
         await click(a,'#die-buttons .die-btn:nth-child(2)');
         await click(a,'#tray-roll');
         await a.waitFor('window.__diceDebug.workspaces.current===null');
-      }else await click(a,'#phone-quick-dice [data-quick="2d6"]');
+      }else{
+        const quick=`#phone-quick-dice [data-quick=${JSON.stringify(firstNotation)}]`;
+        if(await a.eval(`!!document.querySelector(${JSON.stringify(quick)})`))await click(a,quick);
+        else{
+          await a.dbg(`setGroups([{name:'First roll',notation:${JSON.stringify(firstNotation)}}])`);
+          await click(a,'#phone-saved-rolls .phone-pool');
+        }
+      }
       await a.waitFor('Object.values(__playProbe.rolls).some(r=>r.visible)',{timeout:60000});
       await stage.shot(a,`${dir}/${venue}-${sample}-first-roll.png`);
       // Natural playback; settle() advances the simulation and is unsuitable
@@ -98,7 +110,7 @@ export default async function run(stage,args){
       await a.waitFor('window.__diceDebug.currentRoll?.done',{timeout:60000});
       const rollProfile=(await cdp('Profiler.stop')).profile;
       writeFileSync(`${dir}/${venue}-${sample}-first-roll.cpuprofile`,JSON.stringify(rollProfile));
-      const first=await a.eval(`(()=>{const p=__playProbe,input=p.clicks.find(c=>c.quick==='2d6'||c.id==='tray-roll'),roll=Object.values(p.rolls)[0];return {input,roll,tasks:p.tasks.filter(t=>t.at>=input.at),frames:p.frames.filter(f=>f.at>=input.at),film:window.__diceDebug.filmWorker.last,resources:performance.getEntriesByType('resource').filter(r=>r.startTime>input.at).map(r=>({path:new URL(r.name).pathname,ms:r.duration,encoded:r.encodedBodySize})),render:window.__diceDebug.renderAudit()};})()`);
+      const first=await a.eval(`(()=>{const p=__playProbe,input=p.clicks.find(c=>c.quick===${JSON.stringify(firstNotation)}||c.pool||c.id==='tray-roll'),roll=Object.values(p.rolls)[0];return {input,roll,tasks:p.tasks.filter(t=>t.at>=input.at),frames:p.frames.filter(f=>f.at>=input.at),film:window.__diceDebug.filmWorker.last,resources:performance.getEntriesByType('resource').filter(r=>r.startTime>input.at).map(r=>({path:new URL(r.name).pathname,ms:r.duration,encoded:r.encodedBodySize})),render:window.__diceDebug.renderAudit()};})()`);
       if(!peers.length)for(const name of ['Bram','Cora','Dev'])peers.push(await ctx.rawPlayer(name));
       await a.dbg(`setGroups(Array.from({length:12},(_,i)=>({name:'Check '+(i+1),notation:i%2?'1d20+4':'2d6'})))`);
       await cdp('Profiler.start');const activityAt=await a.eval('performance.now()');
@@ -111,7 +123,8 @@ export default async function run(stage,args){
       const builder=await a.eval(`({painted:${builderPainted},artReady:performance.now(),input:__playProbe.clicks.filter(c=>c.id==='phone-build-roll').at(-1),audit:window.__diceDebug.dieArtInfo?.()})`);
       await stage.shot(a,`${dir}/${venue}-${sample}-builder-art.png`);
       await click(a,'#workspace-back');
-      await ctx.api('/api/roll',{playerId:peers[1].playerId,notation:'4d20'});
+      await ctx.api('/api/roll',{playerId:peers[1].playerId,notation:'4d20',
+        ...(incomingMixed?{sets:['std','classics.ivory','tidewrack.seaglass','symbols.monster']}:{})});
       await a.waitFor('window.__diceDebug.currentRoll?.playerName==="Cora"&&window.__diceDebug.currentRoll.done',{timeout:60000});
       const activityProfile=(await cdp('Profiler.stop')).profile;
       writeFileSync(`${dir}/${venue}-${sample}-activity.cpuprofile`,JSON.stringify(activityProfile));
@@ -129,7 +142,15 @@ export default async function run(stage,args){
       const appearance=await a.eval(`({ready:${appearanceReady},at:${appearanceAt},complete:performance.now(),tasks:__playProbe.tasks.filter(t=>t.at>=${appearanceAt}),clicks:__playProbe.clicks.filter(c=>c.at>=${appearanceAt}),previewBytes:[...document.querySelectorAll('#felt-swatches .swatch-dot')].reduce((sum,d)=>sum+d.style.backgroundImage.length,0)})`);
       await stage.shot(a,`${dir}/${venue}-${sample}-appearance.png`);
       assert.deepEqual(page.errors,[]);
-      const summary={venue,sample,cpu,dpr,builderFirst,network,backend,startupMs:boot.ready,startupLongestTask:Math.max(0,...boot.tasks.map(t=>t.ms)),firstVisibleMs:first.roll.visible-first.input.at,launchToDiceMs:first.roll.visible,firstLongestTask:Math.max(0,...first.tasks.map(t=>t.ms)),builderOpenMs:builder.painted-builder.input.at,builderArtMs:builder.artReady-builder.input.at,coldBuilderOpenMs:coldBuilder?coldBuilder.painted-coldBuilder.input.at:null,activityLongestTask:Math.max(0,...activity.tasks.map(t=>t.ms)),activityFrameP95:quantile(activity.frames.map(f=>f.ms),.95),appearanceLongestTask:Math.max(0,...appearance.tasks.map(t=>t.ms)),previewBytes:appearance.previewBytes};
+      const summary={venue,sample,cpu,dpr,builderFirst,firstNotation,firstSet,incomingMixed,network,backend,
+        startupMs:boot.ready,startupLongestTask:Math.max(0,...boot.tasks.map(t=>t.ms)),
+        firstVisibleMs:first.roll.visible-first.input.at,launchToDiceMs:first.roll.visible,
+        firstLongestTask:Math.max(0,...first.tasks.map(t=>t.ms)),
+        builderOpenMs:builder.painted-builder.input.at,builderArtMs:builder.artReady-builder.input.at,
+        coldBuilderOpenMs:coldBuilder?coldBuilder.painted-coldBuilder.input.at:null,
+        activityLongestTask:Math.max(0,...activity.tasks.map(t=>t.ms)),
+        activityFrameP95:quantile(activity.frames.map(f=>f.ms),.95),
+        appearanceLongestTask:Math.max(0,...appearance.tasks.map(t=>t.ms)),previewBytes:appearance.previewBytes};
       const result={...summary,boot,first,builder,coldBuilder,activity,appearance,hot:{boot:hot(bootProfile),first:hot(rollProfile),activity:hot(activityProfile),appearance:hot(appearanceProfile)}};
       rows.push(result);writeFileSync(`${dir}/report.json`,JSON.stringify(rows,null,2));
       console.log(JSON.stringify({...summary,hotBoot:result.hot.boot.slice(0,8),hotFirst:result.hot.first.slice(0,8),hotActivity:result.hot.activity.slice(0,8)}));
