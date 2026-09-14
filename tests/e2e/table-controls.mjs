@@ -20,6 +20,58 @@ const click = (tab, selector) => tab.eval(`document.querySelector(${JSON.stringi
 
 export const tableControlScenarios = [
   {
+    name:'felt-previews-on-demand', tags:['smoke','table-controls','settings','felt-previews'],
+    async fn(ctx) {
+      const a=await ctx.newTable({origin:'127.0.0.109',name:'Alice'});
+      await a.page.browser.send('Emulation.setDeviceMetricsOverride',
+        {width:390,height:844,deviceScaleFactor:1,mobile:true},a.page.sessionId);
+      await a.emulateCoarsePointer();
+      const info=()=>a.dbg('feltPreviewInfo()');
+      const initial=await info();
+      assert.equal(initial.previews,0,'closed settings generate no preview images');
+      assert.equal(initial.tiles,1,'only the mat in use has a full-size texture');
+      await a.dbg("openSettings('you')");
+      await a.eval('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+      assert.equal((await info()).previews,0,'Preferences does not build Appearance');
+      await a.dbg('closeSettingsModal()');
+      await tapControl(a,'#table-open');await tapControl(a,'#snav-staging');
+      await a.waitFor(`!!document.getElementById('table-preview').style.backgroundImage`);
+      await a.eval("document.getElementById('felt-swatches').scrollIntoView({block:'center'})");
+      await a.waitFor(`[...document.querySelectorAll('#felt-swatches .swatch-dot')].every(el=>el.style.backgroundImage)`);
+      const drawn=await info();
+      assert.ok(drawn.previews>=10,'visible choices still show their real cloth');
+      assert.equal(drawn.tiles,1,'previews do not retain full-size textures for unused mats');
+      assert.ok(drawn.bytes<1000000,'the catalogue keeps thumbnail-sized images');
+      const before=await a.dbg('felt.id');
+      await tapControl(a,'[data-felt="ocean"]');
+      assert.equal(await a.dbg('felt.id'),before,'previewing a choice leaves the shared mat unchanged');
+      await a.eval("document.getElementById('table-preview').scrollIntoView({block:'center'})");
+      await a.waitFor(`document.getElementById('table-preview').style.backgroundImage===document.querySelector('[data-felt="ocean"] .swatch-dot').style.backgroundImage`);
+      await tapControl(a,'#table-edit-apply');
+      await a.waitFor('window.__diceDebug.felt.id==="ocean"');
+      await tapControl(a,'#settings-close');
+      await a.waitFor('window.__diceDebug.feltPreviewInfo().pending===0');
+      assert.equal((await info()).tiles,2,'only applying a mat retains its full-size texture');
+      // Reopening uses cached previews, with no new image work queued.
+      await a.dbg("openSettings('staging')");
+      await a.eval("document.getElementById('felt-swatches').scrollIntoView({block:'center'})");
+      await a.eval('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+      assert.equal((await info()).paints,drawn.paints,'unchanged thumbnails are reused');
+      await a.eval(`window.__oldFeltPreview=document.querySelector('[data-felt="ocean"] .swatch-dot').style.backgroundImage`);
+      await a.dbg('devOpen()');
+      assert.deepEqual((await a.dbg("devFeltSet('ocean',{feltBase:'#315674'})")).refused,[]);
+      await a.dbg('devClose()');
+      await a.dbg("openSettings('staging')");
+      await a.eval("document.getElementById('felt-swatches').scrollIntoView({block:'center'})");
+      await a.waitFor(`(()=>{const image=document.querySelector('[data-felt="ocean"] .swatch-dot').style.backgroundImage;return image&&image!==window.__oldFeltPreview;})()`);
+      assert.equal((await info()).previews,drawn.previews,'editing a mat replaces its cached thumbnail');
+      await a.eval("document.getElementById('table-preview').scrollIntoView({block:'center'})");
+      await a.waitFor(`document.getElementById('table-preview').style.backgroundImage===document.querySelector('[data-felt="ocean"] .swatch-dot').style.backgroundImage`);
+      await tapControl(a,'#settings-close');
+      await a.waitFor('window.__diceDebug.feltPreviewInfo().pending===0');
+    },
+  },
+  {
     name:'table-controls', tags:['smoke','table-controls','settings','cuj2'],
     async fn(ctx) {
       const a=await ctx.newTable({origin:'127.0.0.101',name:'Alice'});

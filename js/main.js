@@ -2383,10 +2383,8 @@ const FELT_REPEAT = 160 / FELT_TILE_U;   // tiles across the plane
 // is the seam every later mat rides — a new surface is a painter and a row,
 // not a change to the floor.
 //
-// The picker gets the new cloth for free: renderFeltSwatches already draws the
-// chip from `feltTileCanvas(...).toDataURL()`, so a swatch has always shown the
-// real tile rather than a paint chip. It only needed the cloth threaded
-// through with the colour.
+// The picker uses the same seeded painter at thumbnail size, on demand.
+// It needs the cloth threaded through with the colour.
 //
 // …AND SINCE PHASE E2 (2026-09-03) ONE OF THE PAINTERS TAKES ITS PICTURE FROM
 // THE FILE. `image` is not a fourth cloth in the sense the other three are: it
@@ -2616,21 +2614,32 @@ function paintImageCloth(ctx, rnd, base, row) {
 // the whole ROW since E2, because an image cloth's canvas is decided by three
 // more of its fields (`feltTileKey`).
 const feltTileCache = new Map();
-function feltTileCanvas(row) {
+// Preview-only tiles are temporary: opening a picker must not retain a full
+// 1024² canvas for every mat the player has never used.
+function feltTileCanvas(row, { retain = true, size = FELT_TILE_PX } = {}) {
   const key = feltTileKey(row);
   let c = feltTileCache.get(key);
   if (c) return c;
   const base = row.feltBase;
   c = document.createElement('canvas');
-  c.width = c.height = FELT_TILE_PX;
+  c.width = c.height = size;
   const ctx = c.getContext('2d');
+  ctx.scale(size / FELT_TILE_PX, size / FELT_TILE_PX);
   const rnd = mulberry32(feltSeed(base));
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, FELT_TILE_PX, FELT_TILE_PX);
   (FELT_CLOTHS[row.cloth] || paintFeltCloth)(ctx, rnd, base, row);
-  feltTileCache.set(key, c);
+  if (retain) feltTileCache.set(key, c);
   return c;
 }
+
+// These initialize before the boot-time settings sync. Functions below hoist,
+// but the preview state must also exist when that first sync reaches them.
+const feltPreviewCache = new Map();
+const feltPreviewPending = new Set();
+let feltPreviewObserver = null;
+let feltPreviewScheduled = false;
+let feltPreviewPaints = 0;
 
 // WHICH FLANK THE LAMP IS ON — the rule both painters below get their relief
 // from, and two shipped features had it backwards until 2026-08-29.
@@ -2735,10 +2744,8 @@ function paintSiltCloth(ctx, rnd) {
   // scale a d6 sets, which is what keeps it sand rather than gravel.
   // fillRect, NOT arc. A grain here is 0.6-1.7 px: at that size a circle and a
   // square are the same handful of pixels, but `beginPath` + `arc` + `fill`
-  // costs several times a `fillRect`, and this runs 26,000 times per tile —
-  // for ELEVEN tiles at boot, because renderFeltSwatches paints every theme's
-  // cloth to build its swatch. The arc version wedged the tab on load, which
-  // is a startup cost paid by every player for a picker most never open.
+  // costs several times a `fillRect`, and this runs 26,000 times per tile.
+  // Only the live mat is painted at boot; picker previews are made on demand.
   //
   // No wrapping either, and that is a size argument rather than laziness: a
   // sub-2 px mark can only be clipped within 2 px of the seam, which is 0.4%
@@ -16084,6 +16091,11 @@ window.__diceDebug = {
   // room settings (roadmap §2): current merged object, live felt state, and
   // the same entry points the settings modal uses.
   get settings() { return { ...roomSettings }; },
+  feltPreviewInfo() {
+    return { tiles: feltTileCache.size, previews: feltPreviewCache.size,
+      pending: feltPreviewPending.size, paints: feltPreviewPaints,
+      bytes: [...feltPreviewCache.values()].reduce((n, url) => n + url.length, 0) };
+  },
   get felt() {
     return {
       id: currentFeltId,
@@ -29470,7 +29482,7 @@ function applyRoomSettings(settings) {
 // otherwise never grow a chip, and an edited row's chip would keep the colour
 // it was drawn with. The signature covers exactly what a chip is drawn from
 // (id, name, base, cloth), so a table with no declared felts rebuilds nothing
-// ever and pays what it always paid: eleven `toDataURL` calls, once.
+// ever. Texture images are made separately, only for visible previews.
 // A FUNCTION DECLARATION, not a const arrow, for exactly the reason the holder
 // is resolved by id below: `setSound()` calls renderFeltSwatches during module
 // evaluation, thousands of lines before this point, so anything here that does
@@ -29521,10 +29533,81 @@ function feltSwatchSig() {
     return [id, t.name, t.feltBase, s.cloth, s.texture, s.tile, s.loaded].join('|');
   }).join('/');
 }
+
+function feltPreviewKey(row) {
+  return `${feltTileKey(row)}|${feltSurfaceOf(row).loaded}`;
+}
+
+// Observe the actual preview, including clipping by the dialog's scroller.
+// Hidden Appearance, offscreen swatches, and mats covered by a modeled table
+// cost no painting. Colours and labels are usable before texture arrives.
+function setFeltPreview(el, id) {
+  const row = FELT_THEMES[id];
+  const key = row ? feltPreviewKey(row) : '';
+  el.dataset.feltPreviewId = row ? id : '';
+  if (key && el.dataset.feltPreview === key) return;
+  feltPreviewObserver?.unobserve(el);
+  feltPreviewPending.delete(el);
+  el.dataset.feltPreview = key;
+  el.style.backgroundColor = row?.feltBase || '';
+  el.style.backgroundImage = feltPreviewCache.get(key) || '';
+  if (!key || el.style.backgroundImage) return;
+  feltPreviewObserver ||= new IntersectionObserver(entries => {
+    for (const {target, isIntersecting, intersectionRatio} of entries) {
+      if (isIntersecting && intersectionRatio > 0) feltPreviewPending.add(target);
+      else feltPreviewPending.delete(target);
+    }
+    scheduleFeltPreview();
+  });
+  feltPreviewObserver.observe(el);
+}
+
+function scheduleFeltPreview() {
+  if (feltPreviewScheduled || !feltPreviewPending.size) return;
+  feltPreviewScheduled = true;
+  // One tile per task, after a frame has painted. Do not move the former
+  // whole-catalogue startup stall into the first press of Appearance.
+  requestAnimationFrame(() => setTimeout(() => {
+    feltPreviewScheduled = false;
+    const el = feltPreviewPending.values().next().value;
+    if (!el) return;
+    feltPreviewPending.delete(el);
+    const row = FELT_THEMES[el.dataset.feltPreviewId];
+    if (row && el.isConnected && el.getClientRects().length) {
+      const key = feltPreviewKey(row);
+      let url = feltPreviewCache.get(key);
+      if (!url) {
+        const thumbnail = document.createElement('canvas');
+        // Shared with the 192px appearance sample, not just the 15px dots.
+        thumbnail.width = thumbnail.height = 256;
+        thumbnail.getContext('2d').drawImage(feltTileCanvas(row, {retain:false, size:256}), 0, 0, 256, 256);
+        url = `url(${thumbnail.toDataURL()})`;
+        feltPreviewCache.set(key, url);
+        feltPreviewPaints++;
+      }
+      // The sample and its matching chip share one thumbnail. An image mat
+      // may finish loading while hidden; its new key refreshes both on sync.
+      for (const target of document.querySelectorAll('[data-felt-preview]')) {
+        if (target.dataset.feltPreview !== key) continue;
+        target.style.backgroundImage = url;
+        feltPreviewObserver.unobserve(target);
+        feltPreviewPending.delete(target);
+      }
+    }
+    scheduleFeltPreview();
+  }, 0));
+}
+
 function renderFeltSwatches() {
   const holder = document.getElementById('felt-swatches');
   const sig = feltSwatchSig();
   if (!holder.childElementCount || holder.dataset.feltSig !== sig) {
+    for (const dot of holder.querySelectorAll('.swatch-dot')) {
+      feltPreviewObserver?.unobserve(dot);
+      feltPreviewPending.delete(dot);
+    }
+    const keys = new Set(feltSwatchIds().map(id => feltPreviewKey(FELT_THEMES[id])));
+    for (const key of feltPreviewCache.keys()) if (!keys.has(key)) feltPreviewCache.delete(key);
     holder.replaceChildren();
     holder.dataset.feltSig = sig;
     for (const [id, theme] of feltSwatchIds().map((k) => [k, FELT_THEMES[k]])) {
@@ -29537,7 +29620,7 @@ function renderFeltSwatches() {
       // The swatch shows the CLOTH, not a paint chip: the same grain tile
       // the table itself wears (the felt exploration deserves to be seen
       // in the picker, not guessed from a flat dot).
-      dot.style.backgroundImage = `url(${feltTileCanvas(theme).toDataURL()})`;
+      setFeltPreview(dot, id);
       dot.style.backgroundSize = '64px 64px';
       const nm = document.createElement('span');
       nm.textContent = theme.name;
@@ -29550,6 +29633,8 @@ function renderFeltSwatches() {
   holder.querySelectorAll('.felt-swatch').forEach((b) => {
     b.setAttribute('aria-pressed', String(b.dataset.felt === tableSettingValue('felt', currentFeltId)));
   });
+  const sample = document.getElementById('table-preview');
+  if (sample.dataset.feltPreviewId) setFeltPreview(sample, sample.dataset.feltPreviewId);
 }
 
 // ---------------------------------------------------------------------------
@@ -30119,10 +30204,10 @@ function renderTableEdit() {
   renderSystemPicker(); renderZoomPicker(); renderFeltSwatches();
   renderTowerPicker(); renderVenuePicker(); updateVenueChrome();
   const sample = document.getElementById('table-preview');
-  const swatch = [...document.querySelectorAll('#felt-swatches [data-felt]')].find(b => b.dataset.felt === e.values.felt);
   const fantasy = VENUES[e.values.venue]?.register === 'fantasy';
   const design = TABLE_DESIGNS[e.values.venue];
-  sample.style.backgroundImage = design ? '' : fantasy ? 'radial-gradient(ellipse at top, #47634e, #132524)' : swatch?.querySelector('.swatch-dot').style.backgroundImage || '';
+  setFeltPreview(sample, design || fantasy ? null : e.values.felt);
+  if (fantasy && !design) sample.style.backgroundImage = 'radial-gradient(ellipse at top, #47634e, #132524)';
   document.getElementById('table-preview-label').textContent = design ? `${design.label} · appearance preview` : fantasy
     ? `Venue selection · ${VENUES[e.values.venue].label}`
     : `Mat preview · ${FELT_THEMES[e.values.felt]?.name || e.values.felt}`;
