@@ -1,0 +1,190 @@
+{
+  "copyright": "Copyright 2026 The Dice Table Authors",
+  "license": "Apache-2.0",
+  "schema": 1,
+  "kind": "production-roll-preparation-frontend-https-smoke",
+  "ok": true,
+  "sourceSha": "d0d0f52d3fe3f2089e9488fcf7db04a860b4c65c",
+  "revision": "dice-r3-d0d0f52-09140434-on",
+  "toolSha256": "412ff7b07932e962a73aa54d536c2677477a9d5c98d18e70c62789b0b79aebd1",
+  "finalPrivateProofSha256": "266e39f63787c5c178bc2aba10cc73ad3d4ea1945c8a99db5ced9184c380667f",
+  "canonicalOriginMatchesReviewedPrivateCommand": true,
+  "startedAt": "2026-09-14T04:40:54.130Z",
+  "completedAt": "2026-09-14T04:41:05.395Z",
+  "durationMs": 11265,
+  "viewport": {
+    "width": 390,
+    "height": 844,
+    "deviceScaleFactor": 1,
+    "mobileEmulation": true
+  },
+  "methods": {
+    "fixtureSetup": "API-created generated guest room and two fresh owned guest browser profiles",
+    "interaction": "Hit-tested real pointer and keyboard input",
+    "playback": "Natural app playback; no simulation advancement or held clock",
+    "accountRequests": "Read-only status and anonymous session GETs; no account creation or recovery"
+  },
+  "checkpoints": [
+    "exact_source_and_enabled_status",
+    "quick_2d6_natural_playback_without_portrait_warmup",
+    "visible_built_in_webp_portraits_and_stable_controls",
+    "two_viewers_share_complete_4d20_film_and_readable_result",
+    "accounts_untouched_and_expected_source_retained"
+  ],
+  "health": {
+    "beforeExpectedSource": true,
+    "afterExpectedSource": true
+  },
+  "accountStatus": {
+    "statusBefore": {
+      "httpStatus": 200,
+      "enabled": true,
+      "available": true,
+      "capabilities": [
+        "library",
+        "homes",
+        "people",
+        "presence"
+      ]
+    },
+    "statusAfter": {
+      "httpStatus": 200,
+      "enabled": true,
+      "available": true,
+      "capabilities": [
+        "library",
+        "homes",
+        "people",
+        "presence"
+      ]
+    }
+  },
+  "accountMutationRequests": 0,
+  "portraitChecks": {
+    "startupRequests": 0,
+    "standardVisibleControls": 8,
+    "standardUniqueAssets": 7,
+    "d100ReusesD10x": true,
+    "afterThemedBuilderRequests": 14,
+    "liveContexts": 0,
+    "liveRenders": 0,
+    "liveRendererActive": false,
+    "nativeWidth": 192,
+    "successfulWebpAssets": 14,
+    "pendingToLoadedControlWidthAndHeightUnchanged": true
+  },
+  "loadedFrontendModules": [
+    {
+      "path": "/js/diceart-ui.js",
+      "httpStatus": 200
+    },
+    {
+      "path": "/js/dice.js",
+      "httpStatus": 200
+    },
+    {
+      "path": "/js/diceart.js",
+      "httpStatus": 200
+    },
+    {
+      "path": "/js/diceart-manifest.js",
+      "httpStatus": 200
+    }
+  ],
+  "shared": {
+    "notation": "4d20",
+    "values": [
+      17,
+      9,
+      12,
+      7
+    ],
+    "total": 45,
+    "completeFilmEqual": true,
+    "completeFilmSha256": "22d23a8d710a1a5ec6fb4e77667df5b3b6cf318fc821058dc4aeb2e54cd3b9fc",
+    "keyframeDice": 4,
+    "views": [
+      {
+        "viewer": "alice",
+        "visibleTotal": 45,
+        "visibleFaces": [
+          "17",
+          "9",
+          "12",
+          "7"
+        ],
+        "settledMeshCount": 4,
+        "actualProjectedVerticesInsideScene": true
+      },
+      {
+        "viewer": "bob",
+        "visibleTotal": 45,
+        "visibleFaces": [
+          "17",
+          "9",
+          "12",
+          "7"
+        ],
+        "settledMeshCount": 4,
+        "actualProjectedVerticesInsideScene": true
+      }
+    ],
+    "diceCentersUncoveredByControlsAsserted": true
+  },
+  "captures": [
+    {
+      "file": "quick-2d6-moving.png",
+      "sha256": "9d39af63004af3abdc8d933ed4c274ed7943ab4d42b1d54021672b82775f85ec",
+      "width": 390,
+      "height": 844,
+      "retained": true
+    },
+    {
+      "file": "builder-portraits-pending.png",
+      "sha256": "a2bec2e24853102b09c6179302f28d8f7854bd543d1e0b748910c6f6f84d396b",
+      "width": 390,
+      "height": 844,
+      "retained": true
+    },
+    {
+      "file": "builder-seaglass.png",
+      "sha256": "af30563da9a57172ec7aadfa8034a38be39584ac0b1fa3f1d76a6285444d4fdb",
+      "width": 390,
+      "height": 844,
+      "retained": true
+    },
+    {
+      "file": "shared-4d20-alice.png",
+      "sha256": "b45e3d9539cc73a45f70a4591c3e81438edbeb8fa6e81c9c5f5a4013043e1c50",
+      "width": 390,
+      "height": 844,
+      "retained": true
+    },
+    {
+      "file": "shared-4d20-bob.png",
+      "sha256": "9227c235dabfcbaf50ace6675308fe428d5799d16438b9a1e5214190e179bb38",
+      "width": 390,
+      "height": 844,
+      "retained": true
+    }
+  ],
+  "visualReview": {
+    "reviewer": "root",
+    "inspectedCaptures": 5,
+    "quickDiceVisibleDuringPlayback": true,
+    "pendingLabelsAndLoadedSeaGlassPaletteReadable": true,
+    "bothSharedResultsReadable": true,
+    "diceUnobscured": true,
+    "noCredentialsOrPrivateOriginsVisible": true
+  },
+  "cleanup": {
+    "ownedBrowsersClosed": true,
+    "completedAt": "2026-09-14T04:41:05.451Z"
+  },
+  "limits": [
+    "Frontend guest proof on one released revision; no process replacement or cold-home return assertion",
+    "Original11dd account, permission and restore proofs remain separate",
+    "No performance, physical-device, or uncoached-human-observation claim"
+  ],
+  "terminalExitCode": 0
+}

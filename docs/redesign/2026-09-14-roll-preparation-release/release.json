@@ -1,0 +1,192 @@
+{
+  "copyright": "Copyright 2026 The Dice Table Authors",
+  "license": "Apache-2.0",
+  "schema": 1,
+  "kind": "completed-roll-preparation-frontend-release",
+  "sourceSha": "d0d0f52d3fe3f2089e9488fcf7db04a860b4c65c",
+  "testedAppCommit": "2de6764",
+  "sameAppRuntimeModelsAndPackageAsTestedCommit": true,
+  "localEvidence": [
+    "../2026-09-14-roll-program-preparation/README.md"
+  ],
+  "localTrialSplit": {
+    "bareTable": 18,
+    "separateRealInput": 6,
+    "totalFreshProcesses": 24
+  },
+  "sourceUpload": {
+    "files": 304,
+    "portraitFiles": 175,
+    "portraitBytes": 1015886,
+    "accountServiceModules": 10,
+    "privateAndDeveloperFilesExcluded": true
+  },
+  "phaseResults": [
+    {
+      "phase": "stage-prepare",
+      "ok": true,
+      "finished": "2026-09-14T04:36:17.011871+00:00",
+      "sourceSha": "d0d0f52d3fe3f2089e9488fcf7db04a860b4c65c",
+      "revision": "dice-accounts-stage-r3-d0d0f52-09140434-stage",
+      "trafficPercent": 0,
+      "started": "2026-09-14T04:35:32.481137+00:00",
+      "mutations": [
+        {
+          "operation": "deploy-candidate",
+          "started": "2026-09-14T04:35:36.243259+00:00",
+          "finished": "2026-09-14T04:36:14.722877+00:00",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "phase": "stage-route",
+      "ok": true,
+      "finished": "2026-09-14T04:36:40.217675+00:00",
+      "sourceSha": "d0d0f52d3fe3f2089e9488fcf7db04a860b4c65c",
+      "revision": "dice-accounts-stage-r3-d0d0f52-09140434-stage",
+      "trafficPercent": 100,
+      "started": "2026-09-14T04:36:27.223620+00:00",
+      "mutations": [
+        {
+          "operation": "route-exact-candidate",
+          "started": "2026-09-14T04:36:29.941116+00:00",
+          "finished": "2026-09-14T04:36:38.352471+00:00",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "phase": "prod-prepare",
+      "ok": true,
+      "finished": "2026-09-14T04:40:01.795895+00:00",
+      "sourceSha": "d0d0f52d3fe3f2089e9488fcf7db04a860b4c65c",
+      "revision": "dice-r3-d0d0f52-09140434-on",
+      "trafficPercent": 0,
+      "started": "2026-09-14T04:39:45.836792+00:00",
+      "mutations": [
+        {
+          "operation": "deploy-candidate",
+          "started": "2026-09-14T04:39:53.158685+00:00",
+          "finished": "2026-09-14T04:39:57.110560+00:00",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "phase": "prod-route",
+      "ok": true,
+      "finished": "2026-09-14T04:40:31.972904+00:00",
+      "sourceSha": "d0d0f52d3fe3f2089e9488fcf7db04a860b4c65c",
+      "revision": "dice-r3-d0d0f52-09140434-on",
+      "trafficPercent": 100,
+      "started": "2026-09-14T04:40:15.660771+00:00",
+      "mutations": [
+        {
+          "operation": "route-exact-candidate",
+          "started": "2026-09-14T04:40:20.311911+00:00",
+          "finished": "2026-09-14T04:40:27.938042+00:00",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "phase": "final-readback",
+      "ok": true,
+      "finished": "2026-09-14T04:42:12.156951+00:00",
+      "sourceSha": "d0d0f52d3fe3f2089e9488fcf7db04a860b4c65c",
+      "revision": "dice-r3-d0d0f52-09140434-on",
+      "trafficPercent": 100,
+      "started": "2026-09-14T04:42:07.462576+00:00",
+      "mutations": []
+    }
+  ],
+  "sameImmutableImageFromStageBuildThroughProduction": true,
+  "imageDigest": "sha256:4fc3e3d850a5f61b25677965b24d0aa88511b758d78814c4fd0a4f1fb3dec7b0",
+  "idleBeforeRouting": [
+    {
+      "target": "stage",
+      "players": 0,
+      "streams": 0,
+      "sourceSha": "90b8bb9e3865d0278adaa489fb73017994c75dc4"
+    },
+    {
+      "target": "production",
+      "players": 0,
+      "streams": 0,
+      "sourceSha": "90b8bb9e3865d0278adaa489fb73017994c75dc4"
+    }
+  ],
+  "preserved": {
+    "accountServerAndTransportSourcesUnchangedFrom11dd": true,
+    "activeRevisionEnvironmentExceptGitSha": true,
+    "activeRuntime": true,
+    "canonicalOrigins": true,
+    "serviceIam": true,
+    "ingress": true,
+    "serviceMaximum": 1,
+    "revisionMaximum": 1,
+    "databaseAndNamespaceConfiguration": true,
+    "databaseIamRulesBackupsNotMutated": true
+  },
+  "rollbackRevisions": [
+    {
+      "role": "previous",
+      "revision": "dice-r3-90b8bb9-09140304-on",
+      "sourceSha": "90b8bb9e3865d0278adaa489fb73017994c75dc4",
+      "accountMode": "firestore",
+      "ready": true,
+      "trafficPercent": 0
+    },
+    {
+      "role": "legacy-enabled",
+      "revision": "dice-accounts-11dd1ef-09140137-on",
+      "sourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+      "accountMode": "firestore",
+      "ready": true,
+      "trafficPercent": 0
+    },
+    {
+      "role": "legacy-paused",
+      "revision": "dice-accounts-11dd1ef-09140137-pause",
+      "sourceSha": "11dd1efd142f59a157c055ab4da512c745989dca",
+      "accountMode": "paused",
+      "ready": true,
+      "trafficPercent": 0
+    }
+  ],
+  "finalPublicReadback": {
+    "sourceSha": "d0d0f52d3fe3f2089e9488fcf7db04a860b4c65c",
+    "node": "24.19.0",
+    "accountEnabled": true,
+    "accountAvailable": true,
+    "capabilities": [
+      "library",
+      "homes",
+      "people",
+      "presence"
+    ],
+    "playersObserved": 2,
+    "streamsObserved": 1,
+    "zeroActivityRequiredForFinalReadback": false
+  },
+  "browserEvidence": [
+    "stage-browser.json",
+    "production-browser.json"
+  ],
+  "browserCheckpoints": {
+    "stage": 5,
+    "production": 5
+  },
+  "browserAccountMutationRequests": 0,
+  "scope": {
+    "newAccountPermissionOrRestoreProof": false,
+    "accountSchemaMigration": false,
+    "physicalDeviceBenchmark": false,
+    "uncoachedHumanObservation": false,
+    "runtimePerformanceBenchmark": false,
+    "idleReadbackIsAdmissionLock": false,
+    "original11ddAndPrevious90EvidenceUnchanged": true,
+    "navigationBugFixed": false
+  }
+}
