@@ -7,6 +7,8 @@ Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0
 // not the requested flag, determines whether this is a hardware measurement.
 // Own ephemeral server; no live preview. The JSON retains exact hull, render
 // shape, face-local UV and per-face channel hashes beside measured draw calls.
+// --whole-atlas adds edge/corner equality to --compare; older pre-atlas
+// records remain valid for the default face-interior comparison.
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
@@ -34,9 +36,13 @@ export default async function run(stage, args) {
       const buildMs = performance.now() - at;
       const g = die.geometry, atlas = g.userData.faceAtlas;
       const textures = [...new Set(die.materials.flatMap(m => [m.map,m.normalMap,m.emissiveMap,m.roughnessMap]).filter(Boolean))];
-      const channels = {};
+      const channels = {}, atlasChannels = {};
       for (const channel of ['map','normalMap','emissiveMap','roughnessMap']) {
         if (!die.materials[0][channel]) continue;
+        if (atlas) {
+          const c = die.materials[0][channel].image;
+          atlasChannels[channel] = await hash(c.getContext('2d').getImageData(0,0,c.width,c.height).data);
+        }
         channels[channel] = [];
         for (let f=0;f<die.faces.length;f++) {
           const c = atlas ? die.materials[0][channel].image : die.materials[f][channel].image;
@@ -51,7 +57,7 @@ export default async function run(stage, args) {
         positions:await hash(g.attributes.position.array),normals:await hash(g.attributes.normal.array),
         faceUv:await hash(g.attributes.uv.array),
         hull:await hash(JSON.stringify({vertices:die.shape.vertices,faces:die.shape.faces,values:die.faces.map(f=>f.value),vertexValues:die.vertexValues})),
-        channels});
+        channels,atlasChannels});
     }
     return rows;
   })()`);
@@ -142,10 +148,14 @@ export default async function run(stage, args) {
   })()`);
   await stage.shot(table, `${dir}/materials.png`);
   const reference = args.find(arg=>arg.startsWith('--compare='));
+  const wholeAtlas = args.includes('--whole-atlas');
+  if (wholeAtlas) assert.ok(reference, '--whole-atlas requires --compare=reference.json');
   if(reference) {
     const before=JSON.parse(readFileSync(reference.slice('--compare='.length),'utf8'));
+    if (wholeAtlas) assert.ok(before.assets.every(row=>row.atlasChannels), 'reference must include whole-atlas channel hashes');
     assert.equal(assets.length,before.assets.length);
-    for(let i=0;i<assets.length;i++)for(const key of ['type','variant','positions','normals','faceUv','hull','channels']) {
+    const keys=['type','variant','positions','normals','faceUv','hull','channels',...(wholeAtlas?['atlasChannels']:[])];
+    for(let i=0;i<assets.length;i++)for(const key of keys) {
       assert.deepEqual(assets[i][key],before.assets[i][key],`${assets[i].variant}/${assets[i].type}: ${key}`);
     }
     assert.equal(workloads.length,before.workloads.length);

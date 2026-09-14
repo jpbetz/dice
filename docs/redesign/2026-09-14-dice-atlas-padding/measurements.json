@@ -1,0 +1,1484 @@
+{
+  "_copyright": "Copyright 2026 The Dice Table Authors \u2014 SPDX-License-Identifier: Apache-2.0",
+  "baselineSha": "ab6a225",
+  "environment": {
+    "cpu": "13th Gen Intel(R) Core(TM) i9-13900K",
+    "mainTargetCpuThrottle": 4,
+    "width": 390,
+    "height": 844,
+    "deviceScaleFactor": 1,
+    "cpuAffinity": "0-15",
+    "cacheDisabled": true,
+    "networkThrottle": false,
+    "browserBatches": "Before and after ran sequentially; three fresh navigations per separate owned browser batch. Profiles and parity runs did not overlap. Other workspace activity was not controlled.",
+    "physicalDevice": false,
+    "workerCpuThrottleEquivalent": false
+  },
+  "medians": {
+    "before": {
+      "startupMs": 645.1999999284744,
+      "firstVisibleMs": 387.89999997615814,
+      "firstLongestTask": 216,
+      "activityLongestTask": 209,
+      "activityFrameP95": 31.59999990463257,
+      "activityDrawImageSelfMs": 155.9
+    },
+    "after": {
+      "startupMs": 665.1999999284744,
+      "firstVisibleMs": 386.60000002384186,
+      "firstLongestTask": 220,
+      "activityLongestTask": 79,
+      "activityFrameP95": 30.399999976158142,
+      "activityDrawImageSelfMs": 25.7
+    }
+  },
+  "samples": {
+    "before": [
+      {
+        "venue": "table",
+        "sample": 0,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": false,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 670.2999999523163,
+        "startupLongestTask": 261,
+        "firstVisibleMs": 370.10000002384186,
+        "launchToDiceMs": 1213.3999999761581,
+        "firstLongestTask": 197,
+        "builderOpenMs": 115,
+        "builderArtMs": 287.7000000476837,
+        "activityLongestTask": 210,
+        "activityFrameP95": 31.59999990463257,
+        "startupPortraitRequests": 0,
+        "portraitAudit": {
+          "keys": [],
+          "renders": 0,
+          "contexts": 0,
+          "rendererActive": false,
+          "assets": 7,
+          "assetRequests": 7,
+          "watched": 0,
+          "queued": 0,
+          "scheduled": false
+        },
+        "hot": {
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1156.9
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 55.5
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 39.4
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 22.1
+            },
+            {
+              "fn": "ensureAudio js/main.js:4116",
+              "ms": 21.5
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 13.8
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 7.6
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4923",
+              "ms": 6.5
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.5
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 5.3
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 5.3
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 5.1
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4106",
+              "ms": 4.7
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 4.7
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5320",
+              "ms": 4.1
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:12485",
+              "ms": 3.5
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 3.3
+            },
+            {
+              "fn": "fillText :0",
+              "ms": 3.1
+            },
+            {
+              "fn": "arraysEqual vendor/three.module.js:18305",
+              "ms": 3
+            },
+            {
+              "fn": "setup vendor/three.module.js:21687",
+              "ms": 2.7
+            },
+            {
+              "fn": "getNormalMatrix vendor/three.module.js:1322",
+              "ms": 2.3
+            },
+            {
+              "fn": "addLogEntry js/main.js:25256",
+              "ms": 2.3
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 2.2
+            },
+            {
+              "fn": "resolveIncludes vendor/three.module.js:19604",
+              "ms": 2.2
+            },
+            {
+              "fn": "WebGLShadowMap.render vendor/three.module.js:22322",
+              "ms": 2.2
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2158
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 156.6
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 20.1
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 20
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 14.6
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 8.9
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 7.9
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 6.5
+            },
+            {
+              "fn": "setValueV1f vendor/three.module.js:18359",
+              "ms": 6.1
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 5.5
+            },
+            {
+              "fn": "setValueM4 vendor/three.module.js:18525",
+              "ms": 5.4
+            },
+            {
+              "fn": "arraysEqual vendor/three.module.js:18305",
+              "ms": 5.2
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 5.2
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32796",
+              "ms": 5.1
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 4.9
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 4.6
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 4.4
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 4.3
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 4.2
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 4
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 3.8
+            },
+            {
+              "fn": "WebGLRenderer.setRenderTarget vendor/three.module.js:30585",
+              "ms": 3.6
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 3.5
+            },
+            {
+              "fn": "fillText :0",
+              "ms": 3.4
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 3.4
+            }
+          ]
+        }
+      },
+      {
+        "venue": "table",
+        "sample": 1,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": false,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 629.5,
+        "startupLongestTask": 244,
+        "firstVisibleMs": 404.39999997615814,
+        "launchToDiceMs": 1141.6999999284744,
+        "firstLongestTask": 219,
+        "builderOpenMs": 117.89999997615814,
+        "builderArtMs": 288,
+        "activityLongestTask": 207,
+        "activityFrameP95": 31.5,
+        "startupPortraitRequests": 0,
+        "portraitAudit": {
+          "keys": [],
+          "renders": 0,
+          "contexts": 0,
+          "rendererActive": false,
+          "assets": 7,
+          "assetRequests": 7,
+          "watched": 0,
+          "queued": 0,
+          "scheduled": false
+        },
+        "hot": {
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 951.6
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 60.9
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 49.3
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 21.2
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 13.4
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 6.2
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 6
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 5.9
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 5.4
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5320",
+              "ms": 5.2
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 5.1
+            },
+            {
+              "fn": "ensureAudio js/main.js:4116",
+              "ms": 4.7
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4106",
+              "ms": 4.3
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 3.8
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4923",
+              "ms": 3.8
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 3.7
+            },
+            {
+              "fn": "renderObject vendor/three.module.js:22581",
+              "ms": 3.5
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 3.3
+            },
+            {
+              "fn": "traverse vendor/three.module.js:7668",
+              "ms": 3.3
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 2.3
+            },
+            {
+              "fn": "refreshTransformUniform vendor/three.module.js:27508",
+              "ms": 2.3
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 2.3
+            },
+            {
+              "fn": "atlasFaceMaterials js/dice.js:1251",
+              "ms": 2.2
+            },
+            {
+              "fn": "invert vendor/three.module.js:6366",
+              "ms": 2.2
+            },
+            {
+              "fn": "(anonymous) js/main.js:7525",
+              "ms": 2.1
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2429.5
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 154.6
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 23.5
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 18.9
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 14.1
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 10.8
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 10.3
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 9.1
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 8.2
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 8.1
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 7.7
+            },
+            {
+              "fn": "copyArray vendor/three.module.js:18319",
+              "ms": 7.7
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 7
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 6.9
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 6.5
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 6.2
+            },
+            {
+              "fn": "animate js/main.js:11863",
+              "ms": 5.9
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 5.7
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5
+            },
+            {
+              "fn": "createGain :0",
+              "ms": 5
+            },
+            {
+              "fn": "createBufferSource :0",
+              "ms": 4.6
+            },
+            {
+              "fn": "drawArrays :0",
+              "ms": 3.9
+            },
+            {
+              "fn": "(anonymous) :0",
+              "ms": 3.9
+            },
+            {
+              "fn": "update vendor/three.module.js:13683",
+              "ms": 3.7
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4923",
+              "ms": 3.7
+            }
+          ]
+        }
+      },
+      {
+        "venue": "table",
+        "sample": 2,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": false,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 645.1999999284744,
+        "startupLongestTask": 247,
+        "firstVisibleMs": 387.89999997615814,
+        "launchToDiceMs": 1140.0999999046326,
+        "firstLongestTask": 216,
+        "builderOpenMs": 111.60000002384186,
+        "builderArtMs": 280.39999997615814,
+        "activityLongestTask": 209,
+        "activityFrameP95": 32.799999952316284,
+        "startupPortraitRequests": 0,
+        "portraitAudit": {
+          "keys": [],
+          "renders": 0,
+          "contexts": 0,
+          "rendererActive": false,
+          "assets": 7,
+          "assetRequests": 7,
+          "watched": 0,
+          "queued": 0,
+          "scheduled": false
+        },
+        "hot": {
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1189.2
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 48.9
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 47.2
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 22.2
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 10.1
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 5.6
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.4
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 5
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5320",
+              "ms": 4.6
+            },
+            {
+              "fn": "ensureAudio js/main.js:4116",
+              "ms": 4.5
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 4.4
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4106",
+              "ms": 3.9
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 3.8
+            },
+            {
+              "fn": "phaseAt js/main.js:5267",
+              "ms": 3.2
+            },
+            {
+              "fn": "requestAnimationFrame :0",
+              "ms": 3.1
+            },
+            {
+              "fn": "WebGLShadowMap.render vendor/three.module.js:22322",
+              "ms": 2.7
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 2.5
+            },
+            {
+              "fn": "renderObject vendor/three.module.js:29954",
+              "ms": 2.5
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 2.4
+            },
+            {
+              "fn": "setFromRotationMatrix vendor/three.module.js:6890",
+              "ms": 2.4
+            },
+            {
+              "fn": "replaceClippingPlaneNums vendor/three.module.js:19592",
+              "ms": 2.4
+            },
+            {
+              "fn": "updateWorldMatrix vendor/three.module.js:12493",
+              "ms": 2.4
+            },
+            {
+              "fn": "fillText :0",
+              "ms": 2.3
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4923",
+              "ms": 2.3
+            },
+            {
+              "fn": "(anonymous) :0",
+              "ms": 2.2
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2380.8
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 155.9
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 29
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 14.2
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 13.3
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 12.8
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 10.2
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 8.6
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 8.4
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 7.9
+            },
+            {
+              "fn": "drawArrays :0",
+              "ms": 7.8
+            },
+            {
+              "fn": "bufferSubData :0",
+              "ms": 7.6
+            },
+            {
+              "fn": "(anonymous) :0",
+              "ms": 5.6
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 5.4
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 4.7
+            },
+            {
+              "fn": "copyArray vendor/three.module.js:18319",
+              "ms": 4.5
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 4.5
+            },
+            {
+              "fn": "setValueM4 vendor/three.module.js:18525",
+              "ms": 4.3
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 4.2
+            },
+            {
+              "fn": "createBufferSource :0",
+              "ms": 4
+            },
+            {
+              "fn": "projectObject vendor/three.module.js:29679",
+              "ms": 4
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 3.8
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32796",
+              "ms": 3.7
+            },
+            {
+              "fn": "clear :0",
+              "ms": 3.7
+            },
+            {
+              "fn": "fillText :0",
+              "ms": 3.6
+            }
+          ]
+        }
+      }
+    ],
+    "after": [
+      {
+        "venue": "table",
+        "sample": 0,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": false,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 677.3999999761581,
+        "startupLongestTask": 257,
+        "firstVisibleMs": 409,
+        "launchToDiceMs": 1249.1000000238419,
+        "firstLongestTask": 240,
+        "builderOpenMs": 125.19999992847443,
+        "builderArtMs": 280.6999999284744,
+        "activityLongestTask": 79,
+        "activityFrameP95": 28.90000009536743,
+        "startupPortraitRequests": 0,
+        "portraitAudit": {
+          "keys": [],
+          "renders": 0,
+          "contexts": 0,
+          "rendererActive": false,
+          "assets": 7,
+          "assetRequests": 7,
+          "watched": 0,
+          "queued": 0,
+          "scheduled": false
+        },
+        "hot": {
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1034.3
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 58.5
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 47
+            },
+            {
+              "fn": "ensureAudio js/main.js:4116",
+              "ms": 26.2
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 10.3
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 8.7
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4106",
+              "ms": 6.3
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 5.3
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 5.2
+            },
+            {
+              "fn": "WebGLRenderer.setSize vendor/three.module.js:28817",
+              "ms": 4.8
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5320",
+              "ms": 4.4
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 4.2
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 4
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 3.9
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 3.9
+            },
+            {
+              "fn": "fillText :0",
+              "ms": 3.3
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 3.2
+            },
+            {
+              "fn": "WebGLShadowMap.render vendor/three.module.js:22322",
+              "ms": 3.1
+            },
+            {
+              "fn": "replaceLightNums vendor/three.module.js:19573",
+              "ms": 2.8
+            },
+            {
+              "fn": "clearColor :0",
+              "ms": 2.7
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 2.5
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:7720",
+              "ms": 2.5
+            },
+            {
+              "fn": "parseNotation js/notation.js:296",
+              "ms": 2.4
+            },
+            {
+              "fn": "updateCardActions js/main.js:9872",
+              "ms": 2.3
+            },
+            {
+              "fn": "postJson js/net.js:67",
+              "ms": 2.2
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 3870
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 26.3
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 21.2
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 19.4
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 16.4
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 14.8
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 11.7
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 10.6
+            },
+            {
+              "fn": "elementFromPoint :0",
+              "ms": 10
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 10
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 9.7
+            },
+            {
+              "fn": "applyMatrix4 vendor/three.module.js:4130",
+              "ms": 9.2
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 8.9
+            },
+            {
+              "fn": "(anonymous) js/main.js:36713",
+              "ms": 8.8
+            },
+            {
+              "fn": "copyArray vendor/three.module.js:18319",
+              "ms": 8
+            },
+            {
+              "fn": "setValueV3f vendor/three.module.js:18400",
+              "ms": 7.4
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 7.3
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 7.3
+            },
+            {
+              "fn": "createBufferSource :0",
+              "ms": 7.3
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 7.3
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 6.7
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19300",
+              "ms": 6.6
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 6.5
+            },
+            {
+              "fn": "upload vendor/three.module.js:19316",
+              "ms": 5.7
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 5.4
+            }
+          ]
+        }
+      },
+      {
+        "venue": "table",
+        "sample": 1,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": false,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 631.9000000953674,
+        "startupLongestTask": 243,
+        "firstVisibleMs": 386.60000002384186,
+        "launchToDiceMs": 1138.7000000476837,
+        "firstLongestTask": 220,
+        "builderOpenMs": 117.60000002384186,
+        "builderArtMs": 279.3000000715256,
+        "activityLongestTask": 79,
+        "activityFrameP95": 33,
+        "startupPortraitRequests": 0,
+        "portraitAudit": {
+          "keys": [],
+          "renders": 0,
+          "contexts": 0,
+          "rendererActive": false,
+          "assets": 7,
+          "assetRequests": 7,
+          "watched": 0,
+          "queued": 0,
+          "scheduled": false
+        },
+        "hot": {
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 983.2
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 72.6
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 50.9
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 15
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 7.1
+            },
+            {
+              "fn": "ensureAudio js/main.js:4116",
+              "ms": 5.3
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.3
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 5.1
+            },
+            {
+              "fn": "clear :0",
+              "ms": 4.3
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 4
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:7720",
+              "ms": 3.9
+            },
+            {
+              "fn": "WebGLRenderer.renderBufferDirect vendor/three.module.js:29173",
+              "ms": 3.9
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 3.7
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19300",
+              "ms": 3.5
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 3.4
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 3.1
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4106",
+              "ms": 3.1
+            },
+            {
+              "fn": "refreshMaterialUniforms vendor/three.module.js:27537",
+              "ms": 3
+            },
+            {
+              "fn": "buildBeveledGeometry js/dice.js:749",
+              "ms": 2.9
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5320",
+              "ms": 2.8
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32796",
+              "ms": 2.7
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 2.3
+            },
+            {
+              "fn": "renderObject vendor/three.module.js:22581",
+              "ms": 2.3
+            },
+            {
+              "fn": "handleNetEvent js/main.js:35036",
+              "ms": 2.1
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 2
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 2629.6
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 24.5
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 22.5
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 15.3
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 15.2
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 9.6
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 9.1
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 8.9
+            },
+            {
+              "fn": "elementFromPoint :0",
+              "ms": 8.5
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 8.4
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 7.7
+            },
+            {
+              "fn": "animate js/main.js:11863",
+              "ms": 7.6
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 7.3
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 7.3
+            },
+            {
+              "fn": "copyArray vendor/three.module.js:18319",
+              "ms": 7
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 7
+            },
+            {
+              "fn": "applyMatrix4 vendor/three.module.js:4130",
+              "ms": 6.9
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 6.8
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 6.6
+            },
+            {
+              "fn": "drawArrays :0",
+              "ms": 6.4
+            },
+            {
+              "fn": "(anonymous) js/main.js:36713",
+              "ms": 6.3
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 6.2
+            },
+            {
+              "fn": "arraysEqual vendor/three.module.js:18305",
+              "ms": 4.8
+            },
+            {
+              "fn": "projectObject vendor/three.module.js:29679",
+              "ms": 4.2
+            },
+            {
+              "fn": "bindVertexArray :0",
+              "ms": 4.2
+            }
+          ]
+        }
+      },
+      {
+        "venue": "table",
+        "sample": 2,
+        "cpu": 4,
+        "dpr": 1,
+        "builderFirst": false,
+        "network": false,
+        "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "startupMs": 665.1999999284744,
+        "startupLongestTask": 271,
+        "firstVisibleMs": 352.8000000715256,
+        "launchToDiceMs": 1175.1000000238419,
+        "firstLongestTask": 188,
+        "builderOpenMs": 112.20000004768372,
+        "builderArtMs": 283.10000002384186,
+        "activityLongestTask": 77,
+        "activityFrameP95": 30.399999976158142,
+        "startupPortraitRequests": 0,
+        "portraitAudit": {
+          "keys": [],
+          "renders": 0,
+          "contexts": 0,
+          "rendererActive": false,
+          "assets": 7,
+          "assetRequests": 7,
+          "watched": 0,
+          "queued": 0,
+          "scheduled": false
+        },
+        "hot": {
+          "first": [
+            {
+              "fn": "(program) :0",
+              "ms": 1042.1
+            },
+            {
+              "fn": "getProgramInfoLog :0",
+              "ms": 51.1
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 41.8
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 8.9
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 8.8
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 6.8
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 5.5
+            },
+            {
+              "fn": "setProgram vendor/three.module.js:30131",
+              "ms": 5.2
+            },
+            {
+              "fn": "makeRollVoice js/main.js:5320",
+              "ms": 4.9
+            },
+            {
+              "fn": "WebGLRenderer.render vendor/three.module.js:29530",
+              "ms": 4.7
+            },
+            {
+              "fn": "makeNoiseBuffer js/main.js:4106",
+              "ms": 4.6
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 4.4
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 3.9
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4923",
+              "ms": 3.5
+            },
+            {
+              "fn": "renderObject vendor/three.module.js:22581",
+              "ms": 3.5
+            },
+            {
+              "fn": "ensureAudio js/main.js:4116",
+              "ms": 3.5
+            },
+            {
+              "fn": "finishBake js/main.js:7540",
+              "ms": 3.3
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 2.7
+            },
+            {
+              "fn": "buildDie js/dice.js:1137",
+              "ms": 2.6
+            },
+            {
+              "fn": "fillText :0",
+              "ms": 2.6
+            },
+            {
+              "fn": "frontFace :0",
+              "ms": 2.5
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "ms": 2.4
+            },
+            {
+              "fn": "shaderSource :0",
+              "ms": 2.4
+            },
+            {
+              "fn": "invert vendor/three.module.js:6366",
+              "ms": 2.3
+            },
+            {
+              "fn": "setValueV3f vendor/three.module.js:18400",
+              "ms": 2.2
+            }
+          ],
+          "activity": [
+            {
+              "fn": "(program) :0",
+              "ms": 3248.8
+            },
+            {
+              "fn": "drawImage :0",
+              "ms": 25.7
+            },
+            {
+              "fn": "(idle) :0",
+              "ms": 18.4
+            },
+            {
+              "fn": "texSubImage2D :0",
+              "ms": 14.8
+            },
+            {
+              "fn": "modalOpen js/main.js:36665",
+              "ms": 14.3
+            },
+            {
+              "fn": "tick js/main.js:11736",
+              "ms": 11.3
+            },
+            {
+              "fn": "(anonymous) :6",
+              "ms": 10
+            },
+            {
+              "fn": "stepRollingAudio js/main.js:5404",
+              "ms": 9.7
+            },
+            {
+              "fn": "uniformMatrix4fv :0",
+              "ms": 8.2
+            },
+            {
+              "fn": "createBiquadFilter :0",
+              "ms": 7.7
+            },
+            {
+              "fn": "setup vendor/three.module.js:15073",
+              "ms": 7.4
+            },
+            {
+              "fn": "fillRect :0",
+              "ms": 7.3
+            },
+            {
+              "fn": "copyArray vendor/three.module.js:18319",
+              "ms": 7.3
+            },
+            {
+              "fn": "setValue vendor/three.module.js:19190",
+              "ms": 7.2
+            },
+            {
+              "fn": "needsUpdate vendor/three.module.js:15223",
+              "ms": 7
+            },
+            {
+              "fn": "noiseOneShot js/main.js:4923",
+              "ms": 6.3
+            },
+            {
+              "fn": "setFromRotationMatrix vendor/three.module.js:6890",
+              "ms": 6.2
+            },
+            {
+              "fn": "stepPlayback js/main.js:7954",
+              "ms": 6.1
+            },
+            {
+              "fn": "keepEnteredDiceInFrame js/main.js:32796",
+              "ms": 6
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "ms": 5.5
+            },
+            {
+              "fn": "WebGLShadowMap.render vendor/three.module.js:22322",
+              "ms": 5.2
+            },
+            {
+              "fn": "update js/workspaces.js:222",
+              "ms": 5.1
+            },
+            {
+              "fn": "requestAnimationFrame :0",
+              "ms": 4.4
+            },
+            {
+              "fn": "createBufferSource :0",
+              "ms": 4.3
+            },
+            {
+              "fn": "updateMatrixWorld vendor/three.module.js:7720",
+              "ms": 4.2
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "seamDiagnostic": {
+    "scope": "One unthrottled canvas-only sample,20 nonuniform256px faces; complete1300x1040 RGBA comparison including edges/corners. Separate from complete-journey timing.",
+    "opaque": {
+      "originalMs": 33.4,
+      "scratchTileMs": 3.5,
+      "scratchDifferentBytes": 0,
+      "rejectedDirectDifferentBytes": 22961
+    },
+    "partialAlpha": {
+      "originalMs": 33.5,
+      "scratchTileMs": 3.5,
+      "scratchDifferentBytes": 0,
+      "rejectedDirectDifferentBytes": 30619
+    }
+  },
+  "validation": {
+    "targetedBrowserScenariosPassed": 9,
+    "fullUnitCommandExitCode": 0,
+    "livePortraitPngHashesEqual": 175,
+    "bakedPortraitAssetsChanged": 0,
+    "syntheticWholeAtlasByteParity": true,
+    "retainedTextureAndGeometrySizesEqual": true,
+    "temporaryScratchBytes": 270400,
+    "realMaterialRowsEqual": 16,
+    "atlasedMaterialRows": 14,
+    "shaderFallbackRows": 2
+  }
+}

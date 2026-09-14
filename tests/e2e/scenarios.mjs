@@ -27999,6 +27999,69 @@ export const scenarios = [
     },
   },
   {
+    name: 'dice-atlas-padding',
+    tags: ['dice', 'themes', 'perf'],
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Atlas padding' });
+      const rows = await a.eval(`(async () => {
+        const D = await import('/js/dice.js');
+        const results = [], size = 256;
+        for (const alpha of [false, true]) {
+          D.bustDie('std');
+          const sources = [], original = CanvasRenderingContext2D.prototype.drawImage;
+          let largeSelfReads = 0, die;
+          CanvasRenderingContext2D.prototype.drawImage = function(source, ...args) {
+            if (source === this.canvas && source.width > size + 4) largeSelfReads++;
+            // Replace only the full face entering the production packer. This
+            // exercises the actual path with nonuniform edges, all alpha values
+            // and different adjacent tiles, including corners and clearing.
+            if (source.width === size && source.height === size && this.canvas.width > size && args.length === 2) {
+              const index = sources.length, context = source.getContext('2d');
+              const pixels = context.createImageData(size,size);
+              for (let y=0;y<size;y++) for (let x=0;x<size;x++) {
+                const i=(y*size+x)*4;
+                pixels.data[i]=(x*13+index*9)%256;
+                pixels.data[i+1]=(y*7+index*11)%256;
+                pixels.data[i+2]=(x+y+index)%256;
+                pixels.data[i+3]=alpha?(x+y*3+index*11)%256:255;
+              }
+              context.putImageData(pixels,0,0);sources.push(source);
+            }
+            return original.call(this,source,...args);
+          };
+          try { die = D.getDie('d20','std'); }
+          finally { CanvasRenderingContext2D.prototype.drawImage = original; }
+          const actual=die.materials[0].map.image, layout=die.geometry.userData.faceAtlas;
+          const expected=document.createElement('canvas');expected.width=actual.width;expected.height=actual.height;
+          const paint=expected.getContext('2d'),p=layout.padding,cell=layout.cellSize;
+          // Preserve the former destination-atlas sequence as an independent
+          // byte oracle, including its interpolated side/corner compositing.
+          sources.forEach((source,index)=>{
+            const x=index%layout.columns*cell+p,y=Math.floor(index/layout.columns)*cell+p;
+            paint.drawImage(source,x,y);
+            paint.drawImage(source,0,0,size,1,x,y-p,size,p);
+            paint.drawImage(source,0,size-1,size,1,x,y+size,size,p);
+            paint.drawImage(expected,x,y-p,1,cell,x-p,y-p,p,cell);
+            paint.drawImage(expected,x+size-1,y-p,1,cell,x+size,y-p,p,cell);
+          });
+          const before=paint.getImageData(0,0,expected.width,expected.height).data;
+          const after=actual.getContext('2d').getImageData(0,0,actual.width,actual.height).data;
+          let differentBytes=0;for(let i=0;i<before.length;i++)if(before[i]!==after[i])differentBytes++;
+          results.push({alpha,faces:sources.length,bytes:before.length,differentBytes,largeSelfReads});
+          D.bustDie('std');
+        }
+        return results;
+      })()`);
+      for (const row of rows) {
+        assert.equal(row.faces,20,'all distinct face images entered the real packer');
+        assert.ok(row.bytes>5000000,'whole atlas includes every face, edge and corner');
+        assert.equal(row.differentBytes,0,`alpha=${row.alpha}: all RGBA bytes match the original compositor`);
+        assert.equal(row.largeSelfReads,0,'the growing destination atlas is never its own source');
+      }
+      assert.deepEqual(a.page.consoleErrors,[]);
+    },
+  },
+  {
     name: 'dice-face-atlas',
     tags: ['dice', 'themes', 'perf'],
     async fn(ctx) {

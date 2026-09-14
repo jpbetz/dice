@@ -1269,6 +1269,13 @@ function atlasFaceMaterials(geometry, materials, count) {
   const width = columns * cellSize, height = rows * cellSize;
   const oldTextures = new Set(faces.flatMap((m) => channels.map((k) => m[k])).filter(Boolean));
   const atlases = {};
+  // A canvas self-copy can snapshot its entire backing surface. Build each
+  // padded face in one small reusable tile, so the two side copies below
+  // never read the growing atlas. Keep the original interpolation, alpha and
+  // corner-overlap order; copying corners directly from the source differs.
+  const tile = document.createElement('canvas');
+  tile.width = tile.height = cellSize;
+  const paint = tile.getContext('2d');
   for (const key of channels) {
     const reference = first[key];
     if (!reference) continue;
@@ -1279,13 +1286,15 @@ function atlasFaceMaterials(geometry, materials, count) {
       const source = m[key].image;
       const x = index % columns * cellSize + padding;
       const y = Math.floor(index / columns) * cellSize + padding;
-      ctx.drawImage(source, x, y);
+      paint.clearRect(0, 0, cellSize, cellSize);
+      paint.drawImage(source, padding, padding);
       // Replicate the border into a gutter for filtering. The painted face
       // already has a wide unused margin; no neighbor's digit reaches it.
-      ctx.drawImage(source, 0, 0, TEX_SIZE, 1, x, y-padding, TEX_SIZE, padding);
-      ctx.drawImage(source, 0, TEX_SIZE-1, TEX_SIZE, 1, x, y+TEX_SIZE, TEX_SIZE, padding);
-      ctx.drawImage(canvas, x, y-padding, 1, cellSize, x-padding, y-padding, padding, cellSize);
-      ctx.drawImage(canvas, x+TEX_SIZE-1, y-padding, 1, cellSize, x+TEX_SIZE, y-padding, padding, cellSize);
+      paint.drawImage(source, 0, 0, TEX_SIZE, 1, padding, 0, TEX_SIZE, padding);
+      paint.drawImage(source, 0, TEX_SIZE-1, TEX_SIZE, 1, padding, padding+TEX_SIZE, TEX_SIZE, padding);
+      paint.drawImage(tile, padding, 0, 1, cellSize, 0, 0, padding, cellSize);
+      paint.drawImage(tile, padding+TEX_SIZE-1, 0, 1, cellSize, padding+TEX_SIZE, 0, padding, cellSize);
+      ctx.drawImage(tile, x-padding, y-padding);
     });
     const texture = new THREE.CanvasTexture(canvas);
     texture.channel = 1;
