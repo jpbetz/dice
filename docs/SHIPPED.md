@@ -8,6 +8,32 @@ here is a to-do. Cross-referenced from UX.md; commits cited inline.
 Section numbers preserved from the pre-cleanup roadmap so incoming links
 still resolve.
 
+## Inviting friends from People — 2026-09-13
+
+The initial People UI put Friends and Invitations beneath the live roster and
+selected the first saved home when inviting someone. The expanded task now
+starts with At table, Friends and Invitations; maintenance actions live under
+its options menu. Invite selects the current table. If it is unsaved, naming
+and an explicit public save preview return to the same friend and destination.
+
+A count on the existing People destination exposes pending invitations during
+play. The optional account module checks a visible signed-in browser's inbox
+every 30 seconds and after visibility changes; guests and hidden tabs do not
+poll. Counts expire, clear on account changes and ignore superseded responses.
+
+Accept and join combines confirmed acceptance with explicit navigation after
+fresh membership checks. Accept for later retains the existing seat and turn;
+Tables offers a later return with the same private dice and pools. Closing the
+originating visit or opening another People task cancels delayed navigation.
+Retries keep their existing exact operation and account boundary.
+
+The [actual phone and desktop journey](redesign/2026-09-13-invitations/README.md)
+was run and inspected, including four players, an unopened recipient inbox,
+an unnamed table, a different saved home, direct joining, returning and a
+shared roll. The focused failure/retry checks and monitor unit tests pass.
+This supersedes the original UI rule requiring separate Accept and Join clicks;
+both choices are explicit and accepting for later still preserves live play.
+
 ## History keeps the current results readable — 2026-09-13
 
 A long history covered every sampled pixel of the current phone result. Its

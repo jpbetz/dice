@@ -19,17 +19,26 @@ comparison expand into a focused task. Browsing never leaves the room.
 creating or saving a home does not. See the [saved-home workflow and
 proof](SAVED-HOME-PROTOCOL.md#tables-workspace-implementation--2026-09-13).
 
-People keeps the live roster, each person's latest result from this viewer's
-redacted history, shared-roll browsing and **Invite to table** for guest links.
-Where the optional service is available, an account also opens **Friends**,
-**Invitations**, and **Presence**. Contact codes allow friend requests; the
-inbox retains invitations sent while a recipient is away. **Accept** updates
-the relationship or home membership without changing the current seat, draft
-or unfinished turn. **Join now** is a separate choice. Presence starts off;
-sharing online status and sharing a saved-home location are separate controls.
-Expired or unavailable signals read **Unknown**. Account recovery does not
-enable presence or private-library sync. [Social contract and
-proof](SOCIAL-SERVICE-PROTOCOL.md).
+People gives signed-in players **At table**, **Friends** and **Invitations**
+near the top of the workspace. At table keeps the live roster, visible results,
+shared-roll browsing and **Invite by link** for guests. Friends uses contact
+codes to establish connections; **Invite** selects the current saved table.
+If it is unsaved, a public preview and **Save and continue** return to the
+same friend and table before sending. Other saved tables remain selectable.
+
+Pending invitations have a count on the existing People destination; opening
+People with pending invitations shows the inbox. **Accept and join** explicitly
+enters the named table after confirmed acceptance and fresh membership.
+**Accept for later** preserves the current seat, draft and unfinished turn;
+**Join now** and Tables remain available for a later return. A delayed response
+cannot navigate after its originating workspace visit closes. Account changes
+clear the count and supersede old reads. The visible signed-in browser checks
+the inbox every 30 seconds; guests and hidden tabs do not poll.
+
+People’s **⋯** menu holds Presence & privacy, blocked accounts and data export.
+Presence starts off; online status and saved-home location are separate choices.
+Expired or unavailable signals read **Unknown**. Recovery does not enable
+presence or library sync. [Social contract](SOCIAL-SERVICE-PROTOCOL.md).
 
 People and Tables use a desktop drawer up to 480px wide, with the scene
 reserving its space. Home comparison expands further. My dice & rolls opens

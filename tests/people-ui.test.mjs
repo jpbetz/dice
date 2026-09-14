@@ -2,18 +2,69 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fixture,account,people,state,idle,seedFriendship,seedHome} from './fixtures/people-app.mjs';
-import {click,type} from './fixtures/visible-input.mjs';
+import {click,type,key} from './fixtures/visible-input.mjs';
+import {invitationJourney} from './fixtures/invitation-journey.mjs';
+
+test('phone invitation saves the current table, reaches an unopened inbox, joins directly and returns with the private kit',async t=>{
+  await invitationJourney(await fixture(t));
+});
+
+for(const nextTask of ['reopen People','browse Friends'])test('a delayed Accept and join cannot navigate after '+nextTask,async t=>{
+  const f=await fixture(t),one=await f.context('invite-delay-sender'),two=await f.context('invite-delay-recipient');
+  const a=await one.newTable({origin:'127.0.0.1',name:'Sam'}),b=await two.newTable({origin:'127.0.0.1',name:'Riley'});
+  await account(a);await account(b,{name:'Riley'});const {second}=await seedFriendship(a,b);
+  await one.api('/api/settings',{playerId:await a.playerId(),settings:{tableName:'The Copper Lantern'}});
+  const {invitation}=await seedHome(a,{toPersonId:second});await people(b);
+  const url=await b.eval('location.href'),seat=await b.playerId(),browser=b.page.browser;
+  let held=null;
+  browser.on('Fetch.requestPaused',p=>{held=p.requestId;},b.page.sessionId);
+  await browser.send('Fetch.enable',{patterns:[{urlPattern:`*/api/account/invitations/${invitation.id}/respond`,requestStage:'Response'}]},b.page.sessionId);
+  await click(b,`[data-social-focus="accept-join:${invitation.id}"]`);
+  for(let n=0;n<100&&!held;n++)await new Promise(r=>setTimeout(r,10));assert.ok(held);
+  if(nextTask==='reopen People'){await click(b,'#workspace-back');await click(b,'#workspace-nav [data-workspace="people"]');}
+  else await click(b,'#people-tab-friends');
+  await browser.send('Fetch.continueRequest',{requestId:held},b.page.sessionId);
+  await browser.send('Fetch.disable',{},b.page.sessionId);await idle(b);
+  assert.equal(await b.eval('location.href'),url);assert.equal(await b.playerId(),seat);
+  assert.equal((await state(b)).incoming.find(i=>i.id===invitation.id).state,'accepted');
+  assert.equal(await b.dbg('workspaces.current'),'people');
+  if(nextTask==='browse Friends'){assert.equal(await b.eval('document.getElementById("people-friends").hidden'),false);await click(b,'#people-tab-invitations');}
+  await click(b,`[data-social-focus="join:${invitation.id}"]`);
+  await b.waitFor(`new URL(location.href).searchParams.get('room')===${JSON.stringify(one.room)}&&window.__diceDebug?.net?.savedHome`);
+  assert.deepEqual(a.page.errors,[]);assert.deepEqual(b.page.errors,[]);
+});
+
+test('Accept and join retains the invitation on a refused connection and retries the same operation',async t=>{
+  const f=await fixture(t),one=await f.context('invite-retry-sender'),two=await f.context('invite-retry-recipient');
+  const a=await one.newTable({origin:'127.0.0.1',name:'Sam'}),b=await two.newTable({origin:'127.0.0.1',name:'Riley'});
+  await account(a);await account(b,{name:'Riley'});const {second}=await seedFriendship(a,b);
+  await one.api('/api/settings',{playerId:await a.playerId(),settings:{tableName:'The Copper Lantern'}});
+  const {invitation}=await seedHome(a,{toPersonId:second});await people(b);
+  const url=await b.eval('location.href'),browser=b.page.browser,path=`*/api/account/invitations/${invitation.id}/respond`;
+  await browser.send('Network.enable',{},b.page.sessionId);
+  await browser.send('Network.setBlockedURLs',{urls:[path]},b.page.sessionId);
+  await click(b,`[data-social-focus="accept-join:${invitation.id}"]`);await idle(b);
+  assert.equal(await b.eval('location.href'),url);
+  assert.equal((await state(b)).incoming.find(i=>i.id===invitation.id).state,'pending');
+  const pending=(await state(b)).records.find(r=>r.status==='pending');assert.ok(pending);
+  let operation=null;
+  browser.on('Network.requestWillBeSent',p=>{if(p.request.method==='POST'&&p.request.url.endsWith('/respond'))operation=JSON.parse(p.request.postData).operationId;},b.page.sessionId);
+  await browser.send('Network.setBlockedURLs',{urls:[]},b.page.sessionId);
+  await click(b,`[data-social-focus="accept-join:${invitation.id}"]`);
+  await b.waitFor(`new URL(location.href).searchParams.get('room')===${JSON.stringify(one.room)}&&window.__diceDebug?.net?.savedHome`);
+  assert.equal(operation,pending.id);assert.deepEqual(a.page.errors,[]);assert.deepEqual(b.page.errors,[]);
+});
 
 test('actual controls deliver an offline invitation across restart; acceptance preserves a private turn and Join is separate',async t=>{
   const f=await fixture(t),one=await f.context('people-ui-one'),two=await f.context('people-ui-two'),a=await one.newTable({origin:'127.0.0.1',name:'Alice'});let b=await two.newTable({origin:'127.0.0.1',name:'Bob'});
-  await account(a,{name:'Sam'});const recoveryKey=await account(b,{name:'Riley'});await people(a);await click(a,'#people-code-new');await idle(a);
+  await account(a,{name:'Sam'});const recoveryKey=await account(b,{name:'Riley'});await people(a);await click(a,'#people-tab-friends');await click(a,'#people-add');await click(a,'#people-code-new');await idle(a);
   const code=await a.eval('document.getElementById("people-own-code").value');assert.ok(code.startsWith('dc1_'));
   await people(b);await click(b,'#people-add');await type(b,'#people-contact-code',code);await click(b,'#people-request-send');await idle(b);
   await click(a,'#people-refresh');await idle(a);await click(a,'#people-tab-invitations');let invitation=(await state(a)).incoming.find(i=>i.state==='pending');assert.ok(invitation);
   await click(a,`[data-invitation-id="${invitation.id}"] [data-social-focus="respond-invitation:${invitation.id}:accept"]`);await idle(a);assert.equal((await state(a)).friends[0].displayName,'Riley');
   await two.closeAll(); // The recipient is offline when the home invitation is sent.
   await click(a,'#workspace .workspace-tabs [data-workspace="tables"]');await a.waitFor('document.getElementById("homes-new")&&!document.getElementById("homes-new").disabled');await click(a,'#homes-new');await type(a,'#homes-new-name','The Copper Lantern');await click(a,'#homes-new-form button');await click(a,'#home-save');await a.waitFor('window.__diceDebug.homes.state.cards.length===1&&!window.__diceDebug.homes.state.loading');
-  await people(a);await click(a,'#people-tab-friends');const friend=(await state(a)).friends[0];await click(a,`[data-social-focus="invite:${friend.id}"]`);await click(a,'#people-invite-send');await idle(a);
+  await people(a);await click(a,'#people-tab-friends');const friend=(await state(a)).friends[0];await click(a,`[data-social-focus="invite:${friend.id}"]`);await click(a,'#people-invite-home');await key(a,'End','End',35);await key(a,'Enter','Enter',13);await click(a,'#people-invite-send');await idle(a);
   assert.deepEqual(a.page.errors,[]);await one.closeAll();await f.restart();
   const returned=await f.context('people-ui-returned');b=await returned.newTable({origin:'127.0.0.1',name:'Bob'});
   await b.page.browser.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true},b.page.sessionId);
@@ -33,11 +84,11 @@ test('presence expires without a fetch; a held pre-block reply cannot restore a 
   const a=await one.newTable({origin:'127.0.0.1',name:'Alice'}),b=await two.newTable({origin:'127.0.0.1',name:'Bob'});
   await account(a,{name:'Sam'});await account(b,{name:'Riley'});
   const {second}=await seedFriendship(a,b);
-  await people(b);await click(b,'#people-tab-presence');
+  await people(b);await click(b,'#people-options');await click(b,'#people-tab-presence');
   assert.equal((await state(b)).sharing.online,false,'reading People does not opt into presence');
   await click(b,'#people-share-online');await idle(b);
   assert.equal((await state(b)).sharing.online,true);assert.equal((await state(b)).sharing.location,false);
-  await people(a);await click(a,'#people-tab-presence');
+  await people(a);await click(a,'#people-options');await click(a,'#people-tab-presence');
   assert.equal(await a.eval('document.getElementById("people-presence-list").textContent'),'Riley · Online');
   // A transport fixture shortens the real authorized projection's lease. The
   // UI must repaint from its timer without another successful service read.
@@ -64,13 +115,13 @@ test('presence expires without a fetch; a held pre-block reply cannot restore a 
   // the relationship change that must invalidate it.
   await a.eval('void window.__diceDebug.people.readPresence()');
   for(let n=0;n<100&&!held;n++)await new Promise(r=>setTimeout(r,10));assert.ok(held);
-  await click(a,'#people-tab-friends');await click(a,`[data-social-focus="block:${second}"]`);
+  await click(a,'#people-tab-friends');await click(a,`[data-person-id="${second}"] .social-friend-options>summary`);await click(a,`[data-social-focus="block:${second}"]`);
   await click(a,'#people-confirm-ack');await click(a,'#people-confirm');
   await a.waitFor('window.__diceDebug.people.state.signals.every(s=>s.state!=="online")');
   await browser.send('Fetch.continueRequest',{requestId:held},a.page.sessionId);await idle(a);
   await browser.send('Fetch.disable',{},a.page.sessionId);
   assert.deepEqual((await state(a)).friends,[]);assert.equal((await state(a)).signals.some(s=>s.state==='online'),false);
-  await click(a,'.social-blocked summary');
+  await click(a,'#people-options');await click(a,'#people-tab-blocked');
   assert.equal(await a.eval('document.getElementById("people-blocked-list").textContent.includes("Riley")'),true);
   await click(a,`[data-social-focus="unblock:${second}"]`);await idle(a);
   assert.deepEqual((await state(a)).blockedPeople,[]);assert.deepEqual((await state(a)).friends,[],'unblock does not restore friendship');
@@ -91,7 +142,7 @@ test('home location is a separate opt-in, unavailable location reads are Unknown
   const saved=await seedHome(a,{toPersonId:second}),home=saved.home;
   await b.eval(`__socialFixture.respondInvitation(__socialFixturePerson,${JSON.stringify(saved.invitation.id)},{operationId:crypto.randomUUID(),choice:'accept'})`);
   const invitation=await a.eval(`(async()=>{const saved=await __socialFixture.createHome(__socialFixturePerson,{operationId:crypto.randomUUID(),name:'The Stone Circle'});return (await __socialFixture.inviteHome(__socialFixturePerson,{operationId:crypto.randomUUID(),homeId:saved.home.id,toPersonId:${JSON.stringify(second)}})).invitation;})()`);
-  await people(a);await click(a,'#people-tab-presence');await click(a,'#people-share-online');await idle(a);
+  await people(a);await click(a,'#people-options');await click(a,'#people-tab-presence');await click(a,'#people-share-online');await idle(a);
   await click(a,'#people-refresh');await idle(a);
   assert.equal((await state(a)).homeSignals.length,0,'online sharing alone does not disclose the home');
   await click(a,'#people-share-home');await idle(a);await click(a,'#people-refresh');await idle(a);
@@ -134,7 +185,7 @@ test('real IDB keeps uncertain exact actions across reload and refuses HTTP befo
   const {second}=await seedFriendship(a,b);await people(a);
   const browser=a.page.browser;await browser.send('Network.enable',{},a.page.sessionId);
   await browser.send('Network.setBlockedURLs',{urls:[`*/api/account/people/${second}/remove`]},a.page.sessionId);
-  await click(a,`[data-social-focus="remove:${second}"]`);await click(a,'#people-confirm-ack');await click(a,'#people-confirm');await idle(a);
+  await click(a,`[data-person-id="${second}"] .social-friend-options>summary`);await click(a,`[data-social-focus="remove:${second}"]`);await click(a,'#people-confirm-ack');await click(a,'#people-confirm');await idle(a);
   const pending=(await state(a)).records.find(r=>r.status==='pending');assert.ok(pending);
   await a.reload();await people(a);assert.equal((await state(a)).records.some(r=>r.id===pending.id),true);
   await browser.send('Network.setBlockedURLs',{urls:[]},a.page.sessionId);
@@ -144,7 +195,7 @@ test('real IDB keeps uncertain exact actions across reload and refuses HTTP befo
   await a.eval(`window.__socialPut=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(...args){
     const request=window.__socialPut.apply(this,args);if(this.transaction.db.name==='dice.social-actions.v1')this.transaction.abort();return request;
   }`);
-  await click(a,'#people-code-new');await idle(a);
+  await click(a,'#people-tab-friends');await click(a,'#people-add');await click(a,'#people-code-new');await idle(a);
   const unkept=(await state(a)).records.find(r=>r.volatile);assert.ok(unkept);assert.equal(posts,0,'no social write before strict IDB confirmation');
   await a.eval(`window.__socialDownloads=[];window.__socialURL=URL.createObjectURL;URL.createObjectURL=blob=>{__socialDownloads.push(blob.text());return __socialURL(blob);}`);
   await click(a,`[data-operation="${unkept.id}"] button:first-of-type`);
@@ -171,7 +222,7 @@ test('a held inbox response cannot expose previous-account names after a real sa
   const f=await fixture(t),one=await f.context('people-cookie-a'),two=await f.context('people-cookie-other');
   const a=await one.newTable({origin:'127.0.0.1',name:'Alice'}),c=await two.newTable({origin:'127.0.0.1',name:'Charlie'});
   const firstKey=await account(a,{name:'Sam'}),secondKey=await account(c,{name:'Other account'});
-  await seedFriendship(a,c);await people(a);await click(a,'#people-code-new');await idle(a);
+  await seedFriendship(a,c);await people(a);await click(a,'#people-tab-friends');await click(a,'#people-add');await click(a,'#people-code-new');await idle(a);
   const oldId=(await state(a)).records[0].id;
   const b=await one.newTable({origin:'127.0.0.1',name:'Second tab'});
   await b.dbg('privateLibrary.open()');await b.waitFor('!!window.__diceDebug.privateLibrary.state?.person&&!document.getElementById("account-refresh").disabled');
@@ -189,7 +240,7 @@ test('a held inbox response cannot expose previous-account names after a real sa
   assert.equal((await state(a)).records.some(r=>r.id===oldId),false);
   await account(a,{recoveryKey:firstKey});await people(a);
   assert.equal((await state(a)).records.some(r=>r.id===oldId),true,'old journal is available only after recovering its owner');
-  await click(a,'#workspace-people-current [data-focus-key="account"]');
+  await click(a,'#people-tab-table');await click(a,'#workspace-people-current [data-focus-key="account"]');
   await a.waitFor('!document.getElementById("account-logout").disabled');await click(a,'#account-logout');
   await a.waitFor('!window.__diceDebug.privateLibrary.state.person&&!document.getElementById("account-refresh").disabled');await people(a);
   assert.equal((await state(a)).owner,null);assert.deepEqual((await state(a)).friends,[]);assert.deepEqual((await state(a)).records,[]);

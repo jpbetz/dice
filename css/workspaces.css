@@ -130,3 +130,6 @@
   #home-connection-notice .btn { min-height:32px; }
   body.home-unavailable #left-panel #status-pill { display:none; }
 }
+
+.workspace-badge { display:inline-grid; place-items:center; min-width:16px; height:16px; margin-left:4px; padding:0 3px; border-radius:8px; background:#d1b575; color:#17191b; font:600 10px/1 var(--font-ui); vertical-align:middle; }
+.workspace-badge[hidden] { display:none; }

@@ -1,11 +1,11 @@
 /* Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 */
-.people-workspace { margin-top:22px; padding-top:18px; border-top:1px solid var(--hair); }
+.people-workspace { min-width:0; }
 .people-workspace [hidden] { display:none!important; }
 .social-actions { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
 .social-actions .btn,.social-kept-row .btn { min-height:38px; padding:7px 10px; }
 .social-actions [aria-pressed=true] { border-color:#ceb369; background:#ceb36922; }
 .social-form,.social-card,.social-code { min-width:0; padding:14px; border:1px solid var(--hair); border-radius:10px; margin:12px 0; }
-.social-card h4,.social-form h4 { font-size:17px; margin:0 0 8px; }
+.social-card h4,.social-form h4 { overflow-wrap:anywhere; font-size:17px; margin:0 0 8px; }
 .social-card .hint { margin:6px 0; }
 .social-form label,.social-code label { display:grid; gap:8px; margin-bottom:10px; }
 .social-form textarea,.social-form select,.social-code textarea { width:100%; box-sizing:border-box; padding:9px; border:1px solid #ffffff38; border-radius:6px; color:var(--ink); background:#141719; font:inherit; }
@@ -19,6 +19,42 @@
 .social-kept-row>span,.social-abandon { flex:1 0 100%; font-size:13px; }
 @media(max-width:640px) { .social-actions .btn,.social-kept-row .btn { min-height:42px; } }
 
-.social-home-cover.has-image { height:145px; }
+.social-home-cover.has-image { height:128px; }
 .social-code summary { cursor:pointer; font-size:13px; }
 .social-code[open] summary { margin-bottom:12px; }
+
+.social-navigation { display:flex; align-items:center; gap:8px; margin-bottom:16px; border-bottom:1px solid var(--hair); }
+.social-navigation>.social-actions { margin:0 0 8px; flex:none; gap:2px; }
+.social-navigation .social-nav { flex:1; gap:2px; }
+.social-nav .btn { flex:1; padding:8px 6px; font-size:12px; white-space:nowrap; }
+#workspace .social-nav .btn { border:0; background:none; }
+#workspace .social-nav .btn[aria-pressed=true] { background:#ffffff0b; color:#e1c78d; }
+#people-refresh,.social-options>summary,.social-friend-options>summary,.social-form-head>.btn { display:grid; place-items:center; width:44px; height:44px; min-height:44px; padding:0; font:22px/1 var(--font-ui); border:0; border-radius:7px; cursor:pointer; }
+#workspace #people-refresh { background:none; color:var(--muted); }
+.social-options,.social-friend-options { position:relative; }
+.social-options>summary,.social-friend-options>summary { list-style:none; color:var(--muted); }
+.social-options>summary::-webkit-details-marker,.social-friend-options>summary::-webkit-details-marker { display:none; }
+.social-options>summary:hover,.social-friend-options>summary:hover { background:#ffffff0b; color:var(--ivory); }
+.social-options-body,.social-friend-options[open]>.social-actions { position:absolute; right:0; top:100%; z-index:2; display:grid; width:220px; margin:4px 0; padding:8px; gap:4px; border:1px solid var(--hair); border-radius:10px; background:#25282b; box-shadow:var(--lift-deep); }
+.social-options-body .btn,.social-friend-options .social-actions .btn { width:100%; text-align:left; min-height:44px; }
+.social-list-head { align-items:center; justify-content:space-between; margin:16px 0; }
+.social-list-head h3 { font-size:22px; }
+.social-friend { display:flex; align-items:center; gap:12px; padding:10px 0; margin:0; border:0; border-bottom:1px solid var(--hair); border-radius:0; }
+.social-friend h4 { flex:1; min-width:0; margin:0; overflow-wrap:anywhere; font-size:16px; }
+.social-friend>.social-actions { flex:none; align-items:center; margin:0; gap:4px; }
+.social-form-head { justify-content:space-between; align-items:center; margin:0 0 12px; }
+.social-form-head h4 { flex:1; min-width:0; margin:0; }
+.social-form .btn { min-height:44px; }
+#people-code-new { display:block; margin-top:16px; }
+#people-invite-note { line-height:1.5; }
+#people-status { margin:12px 0; line-height:1.5; }
+#workspace .social-primary,#workspace #people-invite-send { background:#c9b079; color:#17191b; border-color:#c9b079; }
+#workspace .social-primary:hover,#workspace #people-invite-send:hover { background:#dbc391; }
+.social-card>.social-actions { align-items:center; gap:6px; margin-bottom:0; }
+.social-card>.social-actions .social-primary { flex:1 0 100%; }
+#people-inbox .social-card { margin:12px 0; }
+@media(max-width:640px) {
+  .social-actions .btn,.social-kept-row .btn { min-height:44px; }
+  .social-navigation { gap:2px; }
+  .social-nav .btn { padding:8px 4px; }
+}

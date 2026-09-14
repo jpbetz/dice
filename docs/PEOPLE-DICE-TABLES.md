@@ -23,8 +23,8 @@ first comparison, offline retry, retained competing versions, account/session
 boundaries and independent-browser recovery. Tables implements named homes,
 public-setup capture, retained comparison, exact retries and deliberate return
 after restart. People implements Friends, an offline invitation inbox and
-opt-in online/home-location presence. Accept preserves the active table and
-turn; joining a home remains a separate action. See the [library
+opt-in online/home-location presence. **Accept for later** preserves the active table and turn; **Accept and join**
+explicitly enters the invited table after confirmed acceptance. See the [library
 protocol](PRIVATE-LIBRARY-PROTOCOL.md), [home workflow](SAVED-HOME-PROTOCOL.md),
 [social workflow](SOCIAL-SERVICE-PROTOCOL.md), and
 [workspace map](WORKSPACES.md).

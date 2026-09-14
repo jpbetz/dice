@@ -44,7 +44,7 @@ export default async function run(stage){
     await click(a,'#workspace-back');
     console.log('phone four-player bounds',await assertResultLayout(a,true));
     console.log(await stage.shot(a,'people-return-phone-four.png'));
-    await people(a);await click(a,'#people-tab-presence');
+    await people(a);await click(a,'#people-options');await click(a,'#people-tab-presence');
     console.log(await stage.shot(a,'people-presence-phone.png'));
     assert.deepEqual(a.page.errors,[]);assert.deepEqual(b.page.errors,[]);
   }finally{await f.close();}

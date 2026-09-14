@@ -19,24 +19,33 @@ export function createPeopleWorkspace(actions){
   const row=()=>el('div','social-actions');
   const root=el('section','people-workspace');
   root.id='people-workspace';
-  const top=row(),refresh=button('Refresh','people-refresh',()=>run(()=>reload())),download=button('Download People data','people-export',()=>saveFile(session.export(),'people.json'));
-  top.append(refresh,download);
+  const top=row(),refresh=button('↻','people-refresh',()=>run(()=>reload())),download=button('Download People data','people-export',()=>saveFile(session.export(),'people.json'));
+  refresh.setAttribute('aria-label','Refresh People');refresh.title='Refresh';
+  const options=el('details','social-options'),optionsTitle=el('summary','','⋯');
+  optionsTitle.id='people-options';optionsTitle.setAttribute('aria-label','People options');optionsTitle.title='People options';
+  const optionsBody=el('div','social-options-body');options.append(optionsTitle,optionsBody);
+  top.append(refresh,options);
   const account=button('Sign in or recover an account','people-account',actions.account),status=el('p','hint');
   status.id='people-status';
   status.setAttribute('role','status');
   const nav=row(),sections={},tabs={};
-  for(const [key,label] of [['friends','Friends'],['invitations','Invitations'],['presence','Presence']]){
+  nav.classList.add('social-nav');
+  for(const [key,label] of [['table','At table'],['friends','Friends'],['invitations','Invitations']]){
     tabs[key]=button(label,'people-tab-'+key,()=>open(key));
     nav.append(tabs[key]);
     sections[key]=el('section','social-section');
     sections[key].id='people-'+key;
   }
-  root.append(top,account,status,nav,...Object.values(sections));
+  sections.presence=el('section','social-section');sections.presence.id='people-presence';
+  tabs.presence=button('Presence & privacy','people-tab-presence',()=>{options.open=false;open('presence');});
+  optionsBody.append(tabs.presence,download);
+  const navigation=el('div','social-navigation');navigation.append(nav,top);
+  root.append(account,navigation,status,...Object.values(sections));
   const friendsHead=row(),add=button('Add a friend','people-add',()=>{
-    requestForm.hidden=!requestForm.hidden;
+    requestForm.hidden=false;
     if(!requestForm.hidden)requestCode.focus();
   }),codeNew=button('New contact code','people-code-new',()=>run(()=>session.act('contact-code',{code:generateContactCode()})));
-  friendsHead.append(add,codeNew);
+  friendsHead.classList.add('social-list-head');friendsHead.append(el('h3','','Friends'),add);
   const codePanel=el('details','social-code'),codeSummary=el('summary','','Contact code'),codeLabel=el('label','','Your contact code'),ownCode=el('textarea');
   ownCode.id='people-own-code';
   ownCode.readOnly=true;
@@ -69,7 +78,9 @@ export function createPeopleWorkspace(actions){
   const requestSubmit=el('button','btn','Send friend request');
   requestSubmit.id='people-request-send';
   requestSubmit.type='submit';
-  requestForm.append(requestLabel,requestSubmit);
+  const requestHead=row(),requestTitle=el('h4','','Add a friend'),requestClose=button('×','people-request-close',()=>{requestForm.hidden=true;add.focus();});
+  requestClose.setAttribute('aria-label','Close add friend');requestHead.classList.add('social-form-head');requestHead.append(requestTitle,requestClose);
+  requestForm.append(requestHead,requestLabel,requestSubmit,codeNew,codePanel);
   requestForm.addEventListener('submit',event=>{
     event.preventDefault();
     run(async()=>{
@@ -84,31 +95,49 @@ export function createPeopleWorkspace(actions){
   });
   const friendList=el('div','social-list');
   friendList.id='people-friend-list';
-  const blocked=el('details','social-blocked'),blockedSummary=el('summary','','Blocked accounts'),blockedList=el('div','social-list');
+  const blocked=el('section','social-blocked'),blockedSummary=el('h3','','Blocked accounts'),blockedList=el('div','social-list');
   blockedList.id='people-blocked-list';
   const blockedMore=button('More blocked accounts','people-blocked-more',()=>run(()=>session.page('blocked')));
   blocked.append(blockedSummary,blockedList,blockedMore);
+  sections.blocked=blocked;
+  tabs.blocked=button('Blocked accounts','people-tab-blocked',()=>{options.open=false;open('blocked');});
+  optionsBody.insertBefore(tabs.blocked,download);root.append(blocked);
   const inviteForm=el('form','social-form');
   inviteForm.id='people-invite-form';
   inviteForm.hidden=true;
-  const inviteTitle=el('h4'),homeLabel=el('label','','Saved home'),homeSelect=el('select');
+  const inviteTitle=el('h4'),homeLabel=el('label','','Table'),homeSelect=el('select');
   homeSelect.id='people-invite-home';
   homeLabel.append(homeSelect);
   const inviteSubmit=el('button','btn','Send invitation');
   inviteSubmit.type='submit';
   inviteSubmit.id='people-invite-send';
-  const saveHome=button('Open Tables','people-save-home',actions.tables);
-  inviteForm.append(inviteTitle,homeLabel,inviteSubmit,saveHome);
+  const saveHome=button('Save this table…','people-save-home',()=>{
+    const target=inviteTarget;
+    if(!target||target.owner!==session.info.owner)return;
+    void run(()=>actions.saveTable?.(target.name,home=>{
+      if(target.owner!==session.info.owner)return;
+      target.homeId=home.id;inviteTarget=target;inviteForm.hidden=false;
+      tab='friends';homeSignature='';paint();
+    }));
+  });
+  const inviteNote=el('p','hint');inviteNote.id='people-invite-note';
+  const inviteHead=row(),inviteClose=button('×','people-invite-close',()=>{
+    const target=inviteTarget;inviteForm.hidden=true;inviteTarget=null;paint();
+    if(target)friendList.querySelector(`[data-social-focus="invite:${CSS.escape(target.id)}"]`)?.focus({preventScroll:true});
+  });
+  inviteHead.classList.add('social-form-head');inviteClose.setAttribute('aria-label','Close invitation');inviteHead.append(inviteTitle,inviteClose);
+  inviteForm.append(inviteHead,homeLabel,inviteNote,inviteSubmit,saveHome);
+  homeSelect.addEventListener('change',()=>{if(inviteTarget)inviteTarget.homeId=homeSelect.value;paint();});
   inviteForm.addEventListener('submit',event=>{
     event.preventDefault();
-    if(!inviteTarget||inviteTarget.owner!==session.info.owner)return;
+    if(!inviteTarget||inviteTarget.owner!==session.info.owner||!homeSelect.value)return;
     const selected=inviteTarget;
     run(async()=>{
       const result=await session.act('invite-home',{toPersonId:selected.id,homeId:homeSelect.value});
       if(result.ok&&selected.owner===session.info.owner){
         inviteForm.hidden=true;
         inviteTarget=null;
-        message='Invitation sent.';
+        message='Invitation sent to '+selected.name+'.';
       }
       return result;
     });
@@ -138,11 +167,13 @@ export function createPeopleWorkspace(actions){
     confirmButton.disabled=busy||!confirmAck.checked;
   });
   confirmation.append(confirmationText,confirmAckLabel,confirmButton);
-  sections.friends.append(friendsHead,codePanel,requestForm,inviteForm,confirmation,friendList,blocked);
+  sections.friends.append(friendsHead,requestForm,inviteForm,confirmation,friendList);
   const inboxNav=row(),incomingTab=button('Incoming','people-incoming',()=>{
+    if(direction!=='incoming')visit++;
     direction='incoming';
     paint();
   }),outgoingTab=button('Sent','people-outgoing',()=>{
+    if(direction!=='outgoing')visit++;
     direction='outgoing';
     paint();
   });
@@ -178,7 +209,7 @@ export function createPeopleWorkspace(actions){
   const kept=el('section','social-kept');
   kept.id='people-kept';
   root.append(kept);
-  let tab='friends',direction='incoming',identity=null,busy=false,mounted=false,queued=false,timer=null,expiryTimer=null,message='',inviteTarget=null,confirmIntent=null;
+  let tab='friends',direction='incoming',identity=null,busy=false,mounted=false,queued=false,timer=null,expiryTimer=null,message='',inviteTarget=null,confirmIntent=null,visit=0;
   let friendSignature='',blockedSignature='',inboxSignature='',keptSignature='',homeSignature='';
   const session=createSocialSession({...actions,changed:paint});
   function saveFile(value,name){
@@ -227,6 +258,7 @@ export function createPeopleWorkspace(actions){
     } finally{
       busy=false;
       paint();
+      actions.inboxChanged?.(session.info);
       if(queued&&mounted){
         queued=false;
         void run(reload);
@@ -248,12 +280,14 @@ export function createPeopleWorkspace(actions){
     },30000);
   }
   function open(key){
+    if(tab!==key)visit++;
     tab=key;
     confirmation.hidden=true;
     confirmIntent=null;
     paint();
   }
   function confirm(kind,person,input={}){
+    for(const menu of root.querySelectorAll('.social-friend-options'))menu.open=false;
     open('friends');
     confirmIntent={owner:session.info.owner,kind,id:person.id,input};
     confirmation.hidden=false;
@@ -263,7 +297,8 @@ export function createPeopleWorkspace(actions){
     confirmation.scrollIntoView({block:'nearest'});
   }
   function invite(person){
-    inviteTarget={owner:session.info.owner,id:person.id};
+    const home=session.info.homes.find(h=>h.roomKey===actions.seat()?.room);
+    inviteTarget={owner:session.info.owner,id:person.id,name:person.displayName,homeId:home?.id||''};
     inviteTitle.textContent='Invite '+person.displayName;
     inviteForm.hidden=false;
     paint();
@@ -271,21 +306,23 @@ export function createPeopleWorkspace(actions){
     homeSelect.focus();
   }
   function renderFriends(info,enabled){
-    const fs=JSON.stringify(info.friends);
+    const fs=JSON.stringify([info.friends,info.outgoing,actions.seat()?.room]);
     if(fs!==friendSignature){
       friendSignature=fs;
       replace(friendList,()=>{
         if(!info.friends.length)friendList.append(el('p','hint','No friends.'));
         for(const person of info.friends){
-          const card=el('article','social-card');
+          const card=el('article','social-card social-friend');
           card.dataset.personId=person.id;
           card.append(el('h4','',person.displayName));
           const controls=row();
-          const send=keyed(button('Invite to a home',null,()=>invite(person)),'invite:'+person.id);
+          const send=keyed(button('Invite',null,()=>invite(person)),'invite:'+person.id);
           const remove=keyed(button('Remove friend',null,()=>confirm('remove-friend',person)),'remove:'+person.id);
           const block=keyed(button('Block',null,()=>confirm('block-person',person,{blocked:true})),'block:'+person.id);
           for(const b of [send,remove,block])b.disabled=!enabled;
-          controls.append(send,remove,block);
+          const menu=el('details','social-friend-options'),summary=el('summary','','⋯'),choices=row();
+          summary.setAttribute('aria-label','Options for '+person.displayName);choices.append(remove,block);menu.append(summary,choices);
+          controls.append(send,menu);
           card.append(controls);
           friendList.append(card);
         }
@@ -335,11 +372,28 @@ export function createPeopleWorkspace(actions){
           };
           if(state==='pending'){
             if(direction==='incoming'){
-              action('Accept','respond-invitation',{choice:'accept'});
+              if(item.home){
+                const join=keyed(button('Accept and join',null,()=>{
+                  const owner=session.info.owner,opened=visit;
+                  run(async()=>{
+                    const result=await session.act('respond-invitation',{choice:'accept'},item.id);
+                    // Acceptance is durable; navigation belongs only to the
+                    // visit that requested it, never a later reopened task.
+                    if(result.ok&&owner===session.info.owner&&mounted&&opened===visit){
+                      if(!session.joinHome(item.home.id))message='Invitation accepted. Refresh to join the table.';
+                    }
+                    return result;
+                  });
+                }),'accept-join:'+item.id);
+                join.classList.add('social-primary');controls.append(join);
+              }
+              action(item.home?'Accept for later':'Accept','respond-invitation',{choice:'accept'});
               action('Decline','respond-invitation',{choice:'decline'});
+              const menu=el('details','social-friend-options'),summary=el('summary','','⋯'),choices=row();
+              summary.setAttribute('aria-label','Invitation options');
               const block=button('Block account',null,()=>confirm('block-person',item.otherPerson,{blocked:true}));
               block.disabled=!enabled;
-              controls.append(block);
+              choices.append(block);menu.append(summary,choices);controls.append(menu);
             } else action('Cancel','cancel-invitation');
           }
           else{
@@ -468,8 +522,8 @@ export function createPeopleWorkspace(actions){
     }
     const signed=!!info.owner,enabled=signed&&info.available&&info.fresh&&!busy;
     account.hidden=signed;
-    nav.hidden=!signed;
-    top.hidden=!signed;
+    navigation.hidden=!signed;
+    actions.layout?.(tab,signed);
     status.textContent=info.error?.message||message||(info.loading?'Loading People…':'');
     status.hidden=!status.textContent;
     for(const [key,section] of Object.entries(sections)){
@@ -482,29 +536,41 @@ export function createPeopleWorkspace(actions){
     homeSelect.disabled=busy;
     requestCode.disabled=busy;
     const pending=info.incoming.filter(i=>i.state==='pending'&&i.expiresAt>Date.now()).length;
-    tabs.invitations.textContent='Invitations'+(pending?' · '+pending+(info.next.incoming?'+':''):'');
+    tabs.invitations.textContent='Invitations';
+    if(pending){const badge=el('span','workspace-badge',pending>9?'9+':String(pending));badge.setAttribute('aria-hidden','true');tabs.invitations.append(badge);}
+    tabs.invitations.setAttribute('aria-label',pending?`Invitations, ${pending}${info.next.incoming?' or more':''} pending`:'Invitations');
     codePanel.hidden=!info.contactCode?.enabled&&!info.ownCode;
     codeLabel.hidden=!info.ownCode;
     copyCode.hidden=!info.ownCode;
     if(ownCode.value!==(info.ownCode?.code||''))codePanel.open=!!info.ownCode;
     ownCode.value=info.ownCode?.code||'';
     copyCode.disabled=busy;
-    const hs=JSON.stringify(info.homes);
+    const room=actions.seat()?.room,current=info.homes.find(h=>h.roomKey===room),guestHome=!current&&actions.tableSaved?.();
+    const hs=JSON.stringify([info.homes,room,inviteTarget?.homeId,guestHome]);
     if(hs!==homeSignature){
       homeSignature=hs;
-      const chosen=homeSelect.value;
       homeSelect.replaceChildren();
-      for(const h of info.homes){
-        const option=el('option','',h.name);
+      if(!current){
+        const option=el('option','',room?`${actions.tableName?.()||'Current table'} · ${guestHome?'guest':'not saved'}`:'Choose a saved table');
+        option.value='';homeSelect.append(option);
+      }
+      for(const h of [...info.homes].sort((a,b)=>Number(b.id===current?.id)-Number(a.id===current?.id))){
+        const option=el('option','',h.name+(h.id===current?.id?' · current table':''));
         option.value=h.id;
         homeSelect.append(option);
       }
-      if([...homeSelect.options].some(o=>o.value===chosen))homeSelect.value=chosen;
+      homeSelect.value=inviteTarget?.homeId||current?.id||'';
     }
-    homeLabel.hidden=!info.homes.length;
-    inviteSubmit.hidden=!info.homes.length;
-    saveHome.hidden=!!info.homes.length;
+    homeLabel.hidden=false;
+    inviteSubmit.hidden=!homeSelect.value;
+    saveHome.hidden=!!homeSelect.value||!room||guestHome;
+    saveHome.disabled=!enabled;
+    inviteNote.hidden=!!homeSelect.value;
+    inviteNote.textContent=guestHome?'Only members of this saved table can send invitations. Use Invite by link under At table.'
+      :room?'Save this table before inviting a friend. They can return to it from Tables.':'Choose a saved table to send an invitation.';
     confirmButton.disabled=busy||!info.fresh||!confirmAck.checked;
+    friendsHead.hidden=friendList.hidden=!inviteForm.hidden;
+    if(!inviteForm.hidden)requestForm.hidden=true;
     renderFriends(info,enabled);
     renderInbox(info,enabled);
     renderPresence(info);
@@ -517,6 +583,7 @@ export function createPeopleWorkspace(actions){
     return session.info;
   },mount(host){
     mounted=true;
+    const opened=++visit;
     host.append(root);
     session.identity();
     paint();
@@ -524,7 +591,12 @@ export function createPeopleWorkspace(actions){
       queued=true;
       return;
     }
-    return run(reload);
+    return run(reload).then(()=>{
+      if(!mounted||opened!==visit)return;
+      if(inviteTarget){tab='friends';inviteForm.hidden=false;}
+      else if(session.info.incoming.some(i=>i.state==='pending'&&i.expiresAt>Date.now())){tab='invitations';direction='incoming';}
+      paint();
+    });
   },identityChanged(){
     const previous=session.info.owner;
     session.identity();
@@ -535,6 +607,7 @@ export function createPeopleWorkspace(actions){
     }
   },close(){
     mounted=false;
+    visit++;
     queued=false;
     clearTimeout(timer);
     clearTimeout(expiryTimer);

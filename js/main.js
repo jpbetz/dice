@@ -728,7 +728,7 @@ const LIBRARY_IDENTITY_INTENT='dice.library.account-intent.v1';
 var libraryNamespace='guest',libraryApplying=false,librarySession,accountWorkspace,accountWorkspaceLoading;
 var libraryFavorites=null,libraryDefaultSet=null;
 var homesWorkspace=null,homesWorkspaceLoading=null;
-var peopleWorkspace=null,peopleWorkspaceLoading=null;
+var peopleWorkspace=null,peopleWorkspaceLoading=null,homeInviteFlow=null,invitationMonitor=null;
 var libraryMarkerAtBoot=(()=>{try{return localStorage.getItem(LIBRARY_NAMESPACE_KEY)||'guest';}catch{return 'guest';}})();
 var libraryPublicationBlocked=libraryMarkerAtBoot!=='guest';
 
@@ -36628,7 +36628,7 @@ destinationShell = createWorkspaces({
   result: id => tableResults?.open(id),
   account: async slot => {const workspace=await ensureAccountWorkspace();workspace?.mount(slot);},
   accountClosed:()=>accountWorkspace?.close(),
-  homes:async slot=>{const workspace=await ensureHomesWorkspace();workspace?.mount(slot);},
+  homes:async slot=>{const workspace=await ensureHomesWorkspace();if(destinationShell.current!=='tables')return;const invite=homeInviteFlow;homeInviteFlow=null;workspace?.mount(slot,invite);},
   homesClosed:()=>homesWorkspace?.close(),
   people:async slot=>{const workspace=await ensurePeopleWorkspace();if(destinationShell.current==='people')workspace?.mount(slot);},
   peopleClosed:()=>peopleWorkspace?.close(),
@@ -36841,7 +36841,7 @@ async function ensureAccountWorkspace(){
   if(accountWorkspace)return accountWorkspace;
   if(accountWorkspaceLoading)return accountWorkspaceLoading;
   accountWorkspaceLoading=(async()=>{
-    const [{createAccountWorkspace}]=await Promise.all([import('./accountui.js'),new Promise((resolve,reject)=>{
+    const [{createAccountWorkspace},{createInvitationMonitor}]=await Promise.all([import('./accountui.js'),import('./invitation-monitor.js'),new Promise((resolve,reject)=>{
       const link=document.createElement('link');link.rel='stylesheet';link.href='css/accountui.css';link.onload=resolve;link.onerror=reject;document.head.append(link);
     })]);
     accountWorkspace=createAccountWorkspace({
@@ -36854,6 +36854,7 @@ async function ensureAccountWorkspace(){
         librarySession=accountWorkspace?.session||librarySession;
         homesWorkspace?.identityChanged();
         peopleWorkspace?.identityChanged();
+        invitationMonitor?.identity();
         if(info.namespace!=='guest')setStorageJammed(!!info.error&&!info.error.retained&&['cache_unavailable','cache_full','cache_corrupt','invalid_library'].includes(info.error.code));
         const button=document.getElementById('private-library-status');if(button)button.textContent=accountWorkspace?.statusText(info)||'Private library';
       },
@@ -36863,6 +36864,8 @@ async function ensureAccountWorkspace(){
       diceName:id=>id==='std'?'Standard':SETS[id]?.label||id,
     });
     librarySession=accountWorkspace.session;
+    invitationMonitor=createInvitationMonitor({access:()=>librarySession?.socialAccess(),changed:count=>destinationShell.invitations(count)});
+    document.addEventListener('visibilitychange',()=>invitationMonitor?.visibilityChanged());
     await accountWorkspace.initialize();
     return accountWorkspace;
   })().catch(()=>{accountWorkspaceLoading=null;setPill('Couldn’t open the private library. Your table still works.');return null;});
@@ -36895,6 +36898,7 @@ async function ensureHomesWorkspace(){
       seat:()=>netOnline&&net&&!unavailableHomeInfo?{room:ROOM,playerId:net.playerId}:null,
       account:openAccountWorkspace,join:room=>{if(room===ROOM&&!unavailableHomeInfo)destinationShell.close();else gotoTable(room);},
       appearance:cover=>{const venue=cover?.venue||'table',felt=cover?.felt||DEFAULT_FELT;return {label:venue==='table'?(FELT_THEMES[felt]?.name||felt):(VENUES[venue]?.label||venue),color:FELT_THEMES[felt]?.feltBase||'#343330'};},
+      nameTable:(name,seat)=>netOnline&&net&&ROOM===seat.room&&net.playerId===seat.playerId?net.setSettings({tableName:name}):false,
       systemName:systemLabel,
       download:(text,name)=>portableDownload(text,name,'application/json;charset=utf-8'),
       layout:show=>{document.body.classList.toggle('home-managing',show&&destinationShell.current==='tables');refitView();},
@@ -36911,7 +36915,18 @@ async function ensurePeopleWorkspace(){
   peopleWorkspaceLoading=(async()=>{
     if(!await ensureAccountWorkspace())return null;
     const [{createPeopleWorkspace}]=await Promise.all([import('./peopleui.js'),new Promise((resolve,reject)=>{const css=document.createElement('link');css.rel='stylesheet';css.href='css/peopleui.css';css.onload=resolve;css.onerror=reject;document.head.append(css);})]);
-    peopleWorkspace=createPeopleWorkspace({access:()=>librarySession?.socialAccess(),account:openAccountWorkspace,tables:()=>destinationShell.open('tables'),
+    peopleWorkspace=createPeopleWorkspace({access:()=>librarySession?.socialAccess(),account:openAccountWorkspace,
+      tableName:()=>document.getElementById('table-name').textContent,tableSaved:()=>!!net?.savedHome,
+      layout:(key,signed)=>destinationShell.peopleView(key,signed),
+      inboxChanged:info=>invitationMonitor?.update(info),
+      saveTable:async(name,saved)=>{
+        const access=librarySession?.socialAccess(),visit=destinationShell.viewEpoch;
+        if(!access||!await ensureHomesWorkspace()||destinationShell.current!=='people'||destinationShell.viewEpoch!==visit||librarySession?.socialAccess()!==access)return;
+        homeInviteFlow={owner:`${access.personId}:${access.epoch}`,name,
+          saved:home=>{if(librarySession?.socialAccess()!==access)return;saved(home);destinationShell.open('people');},
+          cancel:()=>destinationShell.open('people')};
+        destinationShell.open('tables');
+      },
       seat:()=>netOnline&&net&&!unavailableHomeInfo?{room:ROOM,playerId:net.playerId}:null,
       join:room=>{if(room===ROOM&&!unavailableHomeInfo)destinationShell.close();else gotoTable(room);},
       download:(text,name)=>portableDownload(text,name,'application/json;charset=utf-8'),
