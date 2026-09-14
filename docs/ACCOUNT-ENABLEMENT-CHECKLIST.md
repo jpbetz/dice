@@ -65,7 +65,10 @@ permissions. [Database creation](https://docs.cloud.google.com/sdk/gcloud/refere
 Set these operator variables privately for the environment being reviewed:
 `DICE_DEPLOY_PROJECT`, `DICE_DEPLOY_SERVICE`, `DICE_DEPLOY_REGION`,
 `DICE_DEPLOY_DATABASE`, `DICE_DEPLOY_NAMESPACE`, `DICE_DEPLOY_RUNTIME`, `DICE_DEPLOY_RUNTIME_EMAIL`,
-`DICE_DEPLOY_ORIGIN`, and the clean reviewed `DICE_DEPLOY_SHA`. The proposed
+`DICE_DEPLOY_ORIGIN`, the clean reviewed `DICE_DEPLOY_SHA`, and
+`DICE_DEPLOY_IMAGE` (the tested image URI including its `@sha256:` digest).
+Record the source SHA and image digest together; the SHA environment stamp alone
+does not establish which artifact was tested. The proposed
 database IDs above meet the provider's naming rules; preflight checks a safe
 address shape, not provider existence or every project/database naming policy.
 [Database ID rules](https://docs.cloud.google.com/firestore/native/docs/manage-databases#database_id).
@@ -105,11 +108,13 @@ gcloud run services update "$DICE_DEPLOY_SERVICE" \
   --update-env-vars "DICE_ACCOUNT_STORE=firestore,DICE_ACCOUNT_ORIGIN=$DICE_DEPLOY_ORIGIN,DICE_FIRESTORE_PROJECT=$DICE_DEPLOY_PROJECT,DICE_FIRESTORE_DATABASE=$DICE_DEPLOY_DATABASE,DICE_ACCOUNT_NAMESPACE=$DICE_DEPLOY_NAMESPACE,DICE_DEV_WRITE=0"
 ```
 
-For the existing production service, prepare the same source candidate with
-the reviewed **production** values and `--no-traffic`:
+For the existing production service, reuse the exact immutable image tested in
+staging with the reviewed **production** values and `--no-traffic`. Set
+`DICE_DEPLOY_SHA` to that image's recorded source SHA; do not rebuild from source
+or substitute a mutable image tag during candidate preparation:
 
 ```sh
-gcloud run deploy "$DICE_DEPLOY_SERVICE" --source . --no-traffic \
+gcloud run deploy "$DICE_DEPLOY_SERVICE" --image "$DICE_DEPLOY_IMAGE" --no-traffic \
   --project "$DICE_DEPLOY_PROJECT" --region "$DICE_DEPLOY_REGION" \
   --service-account "$DICE_DEPLOY_RUNTIME_EMAIL" \
   --cpu 1 --memory 512Mi --concurrency 80 --timeout 3600 \

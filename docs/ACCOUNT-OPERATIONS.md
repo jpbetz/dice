@@ -205,8 +205,9 @@ data and must never be committed or included in a source upload.
    immutable versions, memberships and invitation states there. Record the
    restored point and any writes later than that point. Do not restore over the
    active database or merge private records by hand.
-5. Prepare a production candidate using the same tested code, correct production
-   runtime account and explicit production configuration. Keep it off production
+5. Prepare a production candidate using the same tested immutable image and its
+   recorded source SHA, correct production runtime account and explicit
+   production configuration. Keep it off production
    traffic while reviewing public status/delivery and the deployment artifact.
    A revision tag has a different origin and is not the final browser-auth proof.
 6. Record a compatible rollback revision and its data/config mapping before
@@ -248,14 +249,18 @@ keeps all traffic. Set `DICE_COMPATIBLE_IMAGE` to the recorded immutable image
 digest and `DICE_COMPATIBLE_SHA` to its reviewed source stamp; never substitute
 an unexamined latest image or the old pre-home revision. Set a new lowercase
 `DICE_PAUSE_SUFFIX` so the full revision name below is unique and at most 63
-characters. Use the recorded service/project/region values:
+characters. Use the recorded service/project/region values and set
+`DICE_DEPLOY_RUNTIME_EMAIL` to the dedicated production runtime identity. Specify
+it explicitly even for paused mode; do not inherit an older revision's runtime
+identity:
 
 ```sh
-export DICE_COMPATIBLE_IMAGE DICE_COMPATIBLE_SHA
+export DICE_COMPATIBLE_IMAGE DICE_COMPATIBLE_SHA DICE_DEPLOY_RUNTIME_EMAIL
 export DICE_PAUSE_REVISION="$DICE_DEPLOY_SERVICE-$DICE_PAUSE_SUFFIX"
 gcloud run deploy "$DICE_DEPLOY_SERVICE" --image "$DICE_COMPATIBLE_IMAGE" \
   --no-traffic --revision-suffix "$DICE_PAUSE_SUFFIX" \
   --project "$DICE_DEPLOY_PROJECT" --region "$DICE_DEPLOY_REGION" \
+  --service-account "$DICE_DEPLOY_RUNTIME_EMAIL" \
   --min-instances 0 --max-instances 1 \
   --update-env-vars "GIT_SHA=$DICE_COMPATIBLE_SHA,DICE_ACCOUNT_STORE=paused,DICE_DEV_WRITE=0"
 gcloud run revisions describe "$DICE_PAUSE_REVISION" \
@@ -267,10 +272,12 @@ gcloud run revisions describe "$DICE_PAUSE_REVISION" \
   const ready=r.status.conditions.some(c=>c.type==="Ready"&&c.status==="True");
   if(r.metadata.name!==process.env.DICE_PAUSE_REVISION || !ready ||
      c.image!==process.env.DICE_COMPATIBLE_IMAGE ||
+     !process.env.DICE_DEPLOY_RUNTIME_EMAIL ||
+     r.spec.serviceAccountName!==process.env.DICE_DEPLOY_RUNTIME_EMAIL ||
      env.GIT_SHA!==process.env.DICE_COMPATIBLE_SHA ||
      env.DICE_ACCOUNT_STORE!=="paused" || env.DICE_DEV_WRITE!=="0")
     throw new Error("Paused revision verification failed");
-  console.log("Recorded paused image, source and mode are Ready");
+  console.log("Recorded paused image, source, runtime identity and mode are Ready");
 '
 ```
 
