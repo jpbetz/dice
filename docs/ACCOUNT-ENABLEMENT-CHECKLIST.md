@@ -113,19 +113,48 @@ gcloud run deploy "$DICE_DEPLOY_SERVICE" --source . --no-traffic \
   --project "$DICE_DEPLOY_PROJECT" --region "$DICE_DEPLOY_REGION" \
   --service-account "$DICE_DEPLOY_RUNTIME_EMAIL" \
   --cpu 1 --memory 512Mi --concurrency 80 --timeout 3600 \
-  --min 0 --max 1 --min-instances 0 --max-instances 1 --cpu-boost \
+  --min-instances 0 --max-instances 1 --cpu-boost \
   --update-env-vars "GIT_SHA=$DICE_DEPLOY_SHA,DICE_ACCOUNT_STORE=firestore,DICE_ACCOUNT_ORIGIN=$DICE_DEPLOY_ORIGIN,DICE_FIRESTORE_PROJECT=$DICE_DEPLOY_PROJECT,DICE_FIRESTORE_DATABASE=$DICE_DEPLOY_DATABASE,DICE_ACCOUNT_NAMESPACE=$DICE_DEPLOY_NAMESPACE,DICE_DEV_WRITE=0"
 ```
 
-`--max` is service-wide; `--max-instances` belongs to the revision.
-`--no-traffic` retains traffic on the prior revision. Neither makes a live-room
-rollout atomic. A revision tag is a different browser origin and cannot stand
-in for the final cookie/origin proof. The explicit candidate command is not
-`make deploy`, which sends traffic to the new revision by default.
+The candidate command leaves service-level minimum/maximum settings unchanged.
+`--max` is service-wide and takes effect immediately even with `--no-traffic`;
+`--max-instances` belongs to the new revision. Set the service cap separately at
+release, before switching traffic. [Maximum-instance behavior](https://docs.cloud.google.com/run/docs/configuring/max-instances).
+
+`--no-traffic` retains traffic on the prior revision and replaces any floating
+LATEST assignment with that exact revision. Later deployments or environment
+updates do not automatically resume LATEST routing. Always select the intended
+release or maintenance revision explicitly. A revision tag is a different
+browser origin and cannot stand in for the final cookie/origin proof. Use this
+explicit candidate command rather than `make deploy`, whose routing follows the
+existing service traffic configuration.
 [Cloud Run deploy flags](https://docs.cloud.google.com/sdk/gcloud/reference/run/deploy).
 
-The final external action is the reviewed 100% traffic switch to the exact
-candidate revision, followed by HTTPS fixture recovery, library conflict,
+Before release, record the exact Ready candidate revision, its source/image and
+production configuration, and the Ready compatible paused revision prepared by
+the [maintenance recipe](ACCOUNT-OPERATIONS.md#safe-pause-and-rollback). Both new
+revisions must still have 0% traffic, with the existing revision at 100%.
+
+After that review, set `DICE_RELEASE_REVISION` to the recorded candidate. These
+are **release actions**, not candidate preparation. The service-cap update
+affects the currently serving revision immediately:
+
+```sh
+gcloud run services update "$DICE_DEPLOY_SERVICE" \
+  --project "$DICE_DEPLOY_PROJECT" --region "$DICE_DEPLOY_REGION" --max 1
+gcloud run services update-traffic "$DICE_DEPLOY_SERVICE" \
+  --project "$DICE_DEPLOY_PROJECT" --region "$DICE_DEPLOY_REGION" \
+  --to-revisions "$DICE_RELEASE_REVISION=100"
+gcloud run services describe "$DICE_DEPLOY_SERVICE" \
+  --project "$DICE_DEPLOY_PROJECT" --region "$DICE_DEPLOY_REGION" \
+  --format='table(metadata.annotations."run.googleapis.com/maxScale":label=SERVICE_MAX,status.traffic.revisionName,status.traffic.percent,status.traffic.latestRevision)'
+```
+
+Read back the service maximum as 1 and exactly the recorded release revision at
+100%, with no floating LATEST assignment or split. Routing changes do not drain
+existing SSE requests immediately or preserve their in-memory turns. Follow the
+switch with HTTPS fixture recovery, library conflict,
 converted/reserved home return, invitation acceptance with separate Join,
 presence opt-in/revocation, guest play and compression checks. The release owner should
 present that concrete candidate and compatible rollback revision for approval.

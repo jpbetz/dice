@@ -243,20 +243,79 @@ addresses. It makes no storage calls. Account APIs report unavailable and all
 cold room keys require retry; an already live room bypasses storage, and explicit
 new guest creation/rolling works. The saved data and mapping remain untouched.
 
-After reviewing the service/region/project values, the maintenance action is:
+Prepare a compatible paused revision before release, while the prior revision
+keeps all traffic. Set `DICE_COMPATIBLE_IMAGE` to the recorded immutable image
+digest and `DICE_COMPATIBLE_SHA` to its reviewed source stamp; never substitute
+an unexamined latest image or the old pre-home revision. Set a new lowercase
+`DICE_PAUSE_SUFFIX` so the full revision name below is unique and at most 63
+characters. Use the recorded service/project/region values:
+
+```sh
+export DICE_COMPATIBLE_IMAGE DICE_COMPATIBLE_SHA
+export DICE_PAUSE_REVISION="$DICE_DEPLOY_SERVICE-$DICE_PAUSE_SUFFIX"
+gcloud run deploy "$DICE_DEPLOY_SERVICE" --image "$DICE_COMPATIBLE_IMAGE" \
+  --no-traffic --revision-suffix "$DICE_PAUSE_SUFFIX" \
+  --project "$DICE_DEPLOY_PROJECT" --region "$DICE_DEPLOY_REGION" \
+  --min-instances 0 --max-instances 1 \
+  --update-env-vars "GIT_SHA=$DICE_COMPATIBLE_SHA,DICE_ACCOUNT_STORE=paused,DICE_DEV_WRITE=0"
+gcloud run revisions describe "$DICE_PAUSE_REVISION" \
+  --project "$DICE_DEPLOY_PROJECT" --region "$DICE_DEPLOY_REGION" \
+  --format=json | node --input-type=module -e '
+  let raw=""; for await (const chunk of process.stdin) raw+=chunk;
+  const r=JSON.parse(raw), c=r.spec.containers[0];
+  const env=Object.fromEntries((c.env||[]).map(e=>[e.name,e.value]));
+  const ready=r.status.conditions.some(c=>c.type==="Ready"&&c.status==="True");
+  if(r.metadata.name!==process.env.DICE_PAUSE_REVISION || !ready ||
+     c.image!==process.env.DICE_COMPATIBLE_IMAGE ||
+     env.GIT_SHA!==process.env.DICE_COMPATIBLE_SHA ||
+     env.DICE_ACCOUNT_STORE!=="paused" || env.DICE_DEV_WRITE!=="0")
+    throw new Error("Paused revision verification failed");
+  console.log("Recorded paused image, source and mode are Ready");
+'
+```
+
+The check emits no environment values or provider response. Stop on failure;
+Ready alone does not certify compatibility without the recorded image/source
+review. This preparation changes neither the service-wide instance cap nor the
+current traffic allocation. Read back the existing revision at 100% and the
+paused revision at 0%; keep the paused revision's exact name in the rollback
+record. No database, namespace or credentials are needed by paused mode.
+
+When maintenance is actually needed, apply the service cap and **explicitly
+route** to that recorded revision:
 
 ```sh
 gcloud run services update "$DICE_DEPLOY_SERVICE" \
+  --project "$DICE_DEPLOY_PROJECT" --region "$DICE_DEPLOY_REGION" --max 1
+gcloud run services update-traffic "$DICE_DEPLOY_SERVICE" \
   --project "$DICE_DEPLOY_PROJECT" --region "$DICE_DEPLOY_REGION" \
-  --update-env-vars DICE_ACCOUNT_STORE=paused
+  --to-revisions "$DICE_PAUSE_REVISION=100"
+gcloud run services describe "$DICE_DEPLOY_SERVICE" \
+  --project "$DICE_DEPLOY_PROJECT" --region "$DICE_DEPLOY_REGION" \
+  --format=json | node --input-type=module -e '
+  let raw=""; for await (const chunk of process.stdin) raw+=chunk;
+  const s=JSON.parse(raw), traffic=s.status.traffic.filter(t=>t.percent>0);
+  if(s.metadata.annotations["run.googleapis.com/maxScale"]!=="1" ||
+     traffic.length!==1 || traffic[0].revisionName!==process.env.DICE_PAUSE_REVISION ||
+     traffic[0].percent!==100 || traffic[0].latestRevision===true)
+    throw new Error("Maintenance routing not confirmed");
+  console.log("Service maximum 1; recorded paused revision receives 100 percent");
+'
 ```
 
-That configuration update creates a revision and may interrupt a live process;
-the pause mode itself does not preserve in-memory turns across a deployment.
-Prefer a between-games pause when possible. Existing requests during traffic
-transition may still reach the old revision; an urgent halt of malicious writes
-also requires the reviewed runtime IAM containment action. Do not claim the
-environment update instantly drains every in-flight request.
+A prior `--no-traffic` deployment pins traffic to an exact revision. Merely
+updating `DICE_ACCOUNT_STORE=paused` can therefore create a paused revision
+without routing requests to it; the explicit switch/readback above is required.
+The `--max 1` operation affects the live service immediately. These commands
+were checked against the installed CLI help on 2026-09-13.
+[Deployment routing](https://docs.cloud.google.com/sdk/gcloud/reference/run/deploy),
+[explicit revision traffic](https://docs.cloud.google.com/sdk/gcloud/reference/run/services/update-traffic).
+
+Prefer a between-games pause. Traffic migration is not an instantaneous drain:
+existing requests may still reach the old revision, and pause does not preserve
+in-memory turns across a deployment. An urgent halt of malicious writes also
+requires the reviewed runtime IAM containment action. Re-read routing if it has
+not converged; do not treat an unconfirmed switch as successful maintenance.
 
 Rollback choices:
 
