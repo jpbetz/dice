@@ -1,104 +1,95 @@
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+
 # Dice Table
 
-A 3D physics dice roller for tabletop RPGs. Dice tumble across a felt table
-with real physics, settle on real faces, and show their results on screen —
-solo, or at a shared multiplayer table with no database and no persistent
-state anywhere.
+A shared 3D dice table for tabletop games, with physical tumbles, readable
+results and private rolls. Start as a guest, play solo, or optionally keep a
+recoverable identity, private dice library and named table homes.
 
-![Dice on the table](docs/screenshot.jpg)
+## Find your way around
 
-## Features
+- **Tables** — return to recent tables, preview Table setup, or save a named
+  home for future games. The Copper Lantern, The Navigation Table and The Stone
+  Circle give the shared playing surface distinct artwork.
+- **My dice & rolls** — build a roll, browse and favorite visual dice, try a
+  private practice throw, and manage saved rolls and characters. New play starts
+  with Quick dice and **Numbers only**; preview a game's starter kit before
+  adding it. **Saved rolls & starter kits → Import / export** previews portable
+  YAML before applying it; **Download backup** keeps a library copy.
+- **People** — see who is at the table and invite guests by link. Where accounts
+  are enabled, add friends and receive invitations inside the app. **Accept for
+  later** preserves the current turn; **Accept and join** explicitly enters the
+  invited table. Online and table-location sharing start off.
 
-- **Seven die types** — d4, d6, d8, d10, d10x (percentile 00–90), d12, d20 —
-  as true polyhedra (the d10 is a mathematically planar pentagonal
-  trapezohedron) simulated with [cannon-es](https://github.com/pmndrs/cannon-es)
-  and rendered with [three.js](https://github.com/mrdoob/three).
-- **Dice pools** — build a pool (e.g. 3d4, or 1d6 + 1d10), name it, save it,
-  and reroll it with one click. Saved pools edit in place: ✎ on the Pools
-  panel header enters manage mode; each row's pencil then opens name +
-  notation, and Update writes back to the same pool.
-- **Portable pools** — Settings → *Your data* exports your rack and just-you
-  settings as human-editable YAML, and takes it back: pasting re-parses live
-  into a preview (`✓ 1 new · 1 update · 2 unchanged`) and Apply merges by
-  name, deleting nothing. Zero server or account state.
-- **Shared tables** — run the bundled server and everyone in a room sees the
-  same dice land on the same values, with per-player attribution, a live
-  player list, and a shared roll log.
-- **Roll meanings** — multi-die totals are read against the *Your Soul Deal*
-  outcome chart (Blemish, Mishap, Partial Success, Success & Bonus, Advantage,
-  Critical Success, …). Critical Success and Critical Fail get full-screen
-  effects.
-- **Collapsible chrome** — ONE Pools panel (the draft pool first, saved
-  pools beneath — the dice themselves are the roll buttons), collapsing to
-  a labelled edge tab; the roll log rides the rail as a pinned flyout.
-  Collapse it (`m`/`n`) and only the table is left — sized for a corner
-  window during a video call. Small windows start collapsed. A persistent
-  rail (roster · identity · ❯ · ≣ · 🔊 · ⚙) never hides.
-- Roll log with timestamps, per-die breakdowns, and max/min highlighting;
-  procedural impact sounds; solo mode persists pools and log in localStorage.
+On phones, **Rolls** opens My dice & rolls, with roll controls along the bottom
+and **More** for Preferences, history and Help. The table keeps each player's latest public
+result available. In Preferences, **Battery saver** reduces effects and
+pauses animated surroundings at rest; **Instant results** skips the tumble on
+this device. Hidden rolls still require Reveal.
 
-## Quick start
+## What is kept
 
-Multiplayer (recommended — also serves the app):
+Your library stays in this browser by default. Where the optional account
+service is enabled, save a recovery key and review local and saved versions
+before choosing private sync. Offline edits and competing versions remain
+available for review and export. Profiles are shared only when you select
+**Share at this table**, separately from each roll's visibility.
 
-```bash
-node server.js            # PORT=8123 by default
+Saved homes retain their name and public prepared setup across server restarts.
+Private libraries and private rolls are excluded. Live rooms, unfinished turns
+and shared roll history are temporary, even at a saved home. Guest play needs
+no account; static hosting provides local solo play without the service.
+
+## Run locally
+
+Use Node **22–24**. No npm install or build step is required; browser
+libraries are vendored. From the repository root, choose a free port:
+
+```sh
+PORT=8080 node server.js
 ```
 
-Then open `http://localhost:8123/?room=yourparty`. Everyone who opens the same
-room shares the table. Rooms are created on demand, live in memory, and vanish
-when empty.
+Open `http://localhost:8080/?room=yourparty`. Players using the same server and
+room share the table. Accounts are off by default; the
+[operating guide](docs/ACCOUNT-OPERATIONS.md) covers the optional local file
+store and Firestore deployment. A Cloud Run filesystem is not durable storage.
 
-Solo / static hosting — serve the directory with any static file server:
+For static solo hosting, serve the same directory:
 
-```bash
-python3 -m http.server 8123
+```sh
+python3 -m http.server 8081
 ```
 
-With no API available the app detects it and falls back to fully-local play.
+Open `http://localhost:8081/`. Without the server API, rolls stay local.
 
-## How shared rolls work
+## Development and verification
 
-The server (zero npm dependencies, in-memory only) assigns each roll's values
-with crypto randomness and broadcasts them over Server-Sent Events. Each
-client then fast-forwards its own physics simulation headlessly from a shared
-seed, records keyframes, and applies a per-die corrective rotation so the die
-visually lands on the server's value — then plays the tumble back. Every
-client shows identical results without requiring cross-browser floating-point
-determinism, and no client is trusted for values.
+The app uses plain ES modules, three.js and cannon-es. The server authors shared
+values and broadcasts rolls over Server-Sent Events; clients simulate and play
+seeded films. Personal presentation controls do not change shared values.
 
-## Development
+`server.js` handles live rooms and optional account routes; `service/` contains
+durable storage and account permissions. `js/main.js` wires the scene and UI;
+`js/net.js` handles live connections; `js/portable.js` handles library YAML.
 
-No build step. The app is plain ES modules; dependencies are vendored in
-[`vendor/`](vendor/README.md) (MIT-licensed; see that file for versions).
-
-Layout:
-
-- `server.js` — room server: static files + `/api/join`, `/api/roll`,
-  `/api/clear`, `/api/events` (SSE)
-- `js/main.js` — scene, roll engine (simulate-ahead + keyframe playback),
-  UI, multiplayer wiring
-- `js/dice.js` — die geometry, face textures, physics hulls, value reading
-- `js/net.js` — join/SSE/reconnect client
-- `js/meanings.js` — the *Your Soul Deal* roll-meaning chart
-- `js/portable.js` — pools + settings ⇄ portable YAML (export/import)
-
-For automated testing in hidden tabs (where `requestAnimationFrame` never
-fires), `window.__diceDebug` exposes `sim(frames)`, `playRoll(roll)` with
-forced values, `rollDice`, `clearTable`, and connection state.
-
-## Testing
-
-```bash
-npm test                    # unit + fuzz + e2e smoke (seconds)
-npm run test:e2e:full       # full end-to-end sweep
+```sh
+npm test                   # unit, fuzz and browser smoke/feature checks
+npm run test:e2e:full       # complete browser release sweep
 ```
 
-End-to-end tests drive headless Chrome over raw CDP with zero dependencies
-(`tests/e2e/` — Node ≥ 22 and a Chrome/Chromium binary required). Policy in
-[docs/TESTING.md](docs/TESTING.md).
+Browser tests need Chrome or Chromium and use their own temporary ports. Read
+[AGENTS.md](AGENTS.md), [the goal post](docs/GOALPOST.md) and
+[testing guidance](docs/TESTING.md) before contributing.
+
+The [redesign plan](docs/EXPERIENCE-REDESIGN.md) and
+[release checkpoint](docs/redesign/2026-09-13-staging.md) distinguish implemented
+features, local tests, actual HTTPS staging/restore evidence and remaining
+release work. Production candidates are prepared off traffic; this README does
+not announce a production launch or physical-device validation. Deployment and
+maintenance procedures are in [ACCOUNT-OPERATIONS.md](docs/ACCOUNT-OPERATIONS.md)
+and [DEPLOY.md](docs/DEPLOY.md).
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE). Vendored third-party libraries
-in `vendor/` remain under their own licenses ([details](vendor/README.md)).
+[Apache License 2.0](LICENSE). Vendored libraries retain their
+[own licenses](vendor/README.md).
